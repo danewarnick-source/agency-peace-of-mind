@@ -28,7 +28,7 @@ import {
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
-import { SectionsView } from "@/components/clients/client-specific-training-card";
+import { SectionsView, ClientSpecificTrainingCard } from "@/components/clients/client-specific-training-card";
 import { ArrowLeft, CheckCircle2, Loader2, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
 import { clientFeatureVisible } from "@/lib/client-features";
 import {
@@ -156,6 +156,14 @@ function ClientProfileHub() {
         <TabsContent value="care" className="space-y-4">
           <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
           <SupportStrategiesPanel client={client} clientId={clientId} orgId={orgId} />
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Client-specific training</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ClientSpecificTrainingCard clientId={clientId} />
+            </CardContent>
+          </Card>
           <CaseloadEditor clientId={clientId} />
         </TabsContent>
 

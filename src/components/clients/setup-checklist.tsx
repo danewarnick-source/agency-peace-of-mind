@@ -772,3 +772,258 @@ function HomeEvvRow({
     </ChecklistRow>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Row 7: missing SOW-required profile fields
+// ---------------------------------------------------------------------------
+function SowFieldsRow({
+  clientId, missingKeys, passing, onChanged,
+}: { clientId: string; missingKeys: string[]; passing: boolean; onChanged: () => void }) {
+  return (
+    <ChecklistRow
+      passing={passing}
+      label="Missing required Scope of Work fields"
+      valueChip={
+        passing ? (
+          <span className="text-xs text-muted-foreground">All required filled</span>
+        ) : (
+          <span className="text-xs text-amber-700 dark:text-amber-400">
+            {missingKeys.length} missing
+          </span>
+        )
+      }
+      defaultOpen={!passing}
+    >
+      {missingKeys.length === 0 ? (
+        <p className="text-xs text-muted-foreground">Nothing missing — every SOW-required field has a value.</p>
+      ) : (
+        <div className="space-y-3">
+          {missingKeys.map((key) => {
+            const f = PROFILE_FIELD_BY_KEY[key];
+            if (!f) return null;
+            return <SowFieldInput key={key} clientId={clientId} field={f} onSaved={onChanged} />;
+          })}
+        </div>
+      )}
+    </ChecklistRow>
+  );
+}
+
+function SowFieldInput({
+  clientId, field, onSaved,
+}: { clientId: string; field: ProfileField; onSaved: () => void }) {
+  const [textVal, setTextVal] = useState<string>("");
+  const [boolVal, setBoolVal] = useState<boolean>(false);
+  const saveFn = useServerFn(saveProfileField);
+
+  function buildPayload(): string | boolean | string[] | null {
+    if (field.type === "bool") return boolVal;
+    if (field.type === "array") {
+      return textVal.split(/[,\n;]/).map((s) => s.trim()).filter(Boolean);
+    }
+    return textVal.trim() || null;
+  }
+
+  const m = useMutation({
+    mutationFn: () => saveFn({ data: { clientId, fieldKey: field.key, value: buildPayload() } }),
+    onSuccess: () => { toast.success(`${field.label} saved.`); setTextVal(""); onSaved(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const blocked =
+    field.type === "bool"
+      ? false
+      : field.type === "array"
+        ? buildPayload() instanceof Array && (buildPayload() as string[]).length === 0
+        : !textVal.trim();
+
+  return (
+    <div className="rounded-lg border border-border p-3">
+      <Label className="text-xs">{field.label}</Label>
+      {field.type === "textarea" ? (
+        <Textarea
+          className="mt-1"
+          rows={3}
+          value={textVal}
+          onChange={(e) => setTextVal(e.target.value)}
+        />
+      ) : field.type === "bool" ? (
+        <div className="mt-2 flex items-center gap-3">
+          <Switch checked={boolVal} onCheckedChange={setBoolVal} />
+          <span className="text-sm">{boolVal ? "Yes" : "No"}</span>
+        </div>
+      ) : field.type === "date" ? (
+        <Input className="mt-1" type="date" value={textVal} onChange={(e) => setTextVal(e.target.value)} />
+      ) : field.type === "array" ? (
+        <Input
+          className="mt-1"
+          value={textVal}
+          onChange={(e) => setTextVal(e.target.value)}
+          placeholder="Comma-separated"
+        />
+      ) : (
+        <Input className="mt-1" value={textVal} onChange={(e) => setTextVal(e.target.value)} />
+      )}
+      <div className="mt-2 flex justify-end">
+        <Button size="sm" onClick={() => m.mutate()} disabled={m.isPending || blocked}>
+          {m.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          Save
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Row 8: level of need
+// ---------------------------------------------------------------------------
+function LevelOfNeedRow({
+  clientId, initial, passing, onChanged,
+}: { clientId: string; initial: string; passing: boolean; onChanged: () => void }) {
+  const [val, setVal] = useState(initial);
+  const saveFn = useServerFn(setLevelOfNeed);
+  const m = useMutation({
+    mutationFn: () => saveFn({ data: { clientId, value: val.trim() || null } }),
+    onSuccess: () => { toast.success("Level of need saved."); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <ChecklistRow
+      passing={passing}
+      label="Level of need"
+      valueChip={passing ? <span className="text-xs text-muted-foreground">{initial}</span> : null}
+      defaultOpen={!passing}
+    >
+      <div className="space-y-2">
+        <div className="space-y-1">
+          <Label className="text-xs">Level of need (DSPD-assigned)</Label>
+          <Input value={val} onChange={(e) => setVal(e.target.value)} placeholder="e.g. Level 5" />
+        </div>
+        <div className="flex justify-end">
+          <Button size="sm" onClick={() => m.mutate()} disabled={m.isPending || !val.trim()}>
+            {m.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Save
+          </Button>
+        </div>
+      </div>
+    </ChecklistRow>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Row 9: second emergency contact
+// ---------------------------------------------------------------------------
+function EmergencyContact2Row({
+  clientId, initial, passing, onChanged,
+}: {
+  clientId: string;
+  initial: { name: string; phone: string; instructions: string };
+  passing: boolean;
+  onChanged: () => void;
+}) {
+  const [name, setName] = useState(initial.name);
+  const [phone, setPhone] = useState(initial.phone);
+  const [instr, setInstr] = useState(initial.instructions);
+  const saveFn = useServerFn(setEmergencyContact);
+  const m = useMutation({
+    mutationFn: () => saveFn({ data: { clientId, slot: "secondary", name, phone, instructions: instr } }),
+    onSuccess: () => { toast.success("Secondary emergency contact saved."); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <ChecklistRow
+      passing={passing}
+      label="Second emergency contact"
+      valueChip={
+        passing ? (
+          <span className="text-xs text-muted-foreground">{initial.name}</span>
+        ) : null
+      }
+      defaultOpen={!passing}
+    >
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label className="text-xs">Name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Phone</Label>
+            <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Instructions on how to reach them</Label>
+          <Textarea
+            rows={2}
+            value={instr}
+            onChange={(e) => setInstr(e.target.value)}
+            placeholder="Best times to call, voicemail OK, backup number, etc."
+          />
+        </div>
+        <div className="flex justify-end">
+          <Button size="sm" onClick={() => m.mutate()} disabled={m.isPending || !name.trim()}>
+            {m.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Save
+          </Button>
+        </div>
+      </div>
+    </ChecklistRow>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Row 10: grievance policy acknowledgment
+// ---------------------------------------------------------------------------
+function GrievanceRow({
+  clientId, initial, passing, onChanged,
+}: {
+  clientId: string;
+  initial: { acknowledged: boolean; date: string };
+  passing: boolean;
+  onChanged: () => void;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [acked, setAcked] = useState(initial.acknowledged);
+  const [date, setDate] = useState(initial.date || today);
+  const saveFn = useServerFn(setGrievanceAcknowledgment);
+  const m = useMutation({
+    mutationFn: () => saveFn({ data: { clientId, acknowledged: acked, signedDate: date } }),
+    onSuccess: () => { toast.success("Grievance acknowledgment saved."); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <ChecklistRow
+      passing={passing}
+      label="Grievance policy acknowledged"
+      valueChip={
+        passing ? (
+          <span className="text-xs text-muted-foreground">Signed {initial.date || "today"}</span>
+        ) : null
+      }
+      defaultOpen={!passing}
+    >
+      <div className="space-y-3">
+        <div className="flex items-center justify-between rounded-lg border border-border p-3">
+          <div>
+            <div className="text-sm font-medium">Client / representative acknowledged the grievance policy</div>
+            <p className="text-xs text-muted-foreground">
+              Toggle on once they&apos;ve received and acknowledged it.
+            </p>
+          </div>
+          <Switch checked={acked} onCheckedChange={setAcked} />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Date signed / acknowledged</Label>
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div className="flex justify-end">
+          <Button size="sm" onClick={() => m.mutate()} disabled={m.isPending || !acked}>
+            {m.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Save
+          </Button>
+        </div>
+      </div>
+    </ChecklistRow>
+  );
+}

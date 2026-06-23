@@ -29,7 +29,7 @@ import { ClientDocumentsCard } from "@/components/clients/client-documents-card"
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
 import { SectionsView, ClientSpecificTrainingCard, ReviewQuestionsEditor } from "@/components/clients/client-specific-training-card";
-import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Pencil, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
 import { clientFeatureVisible } from "@/lib/client-features";
 import {
   getClientSpecificTraining,

@@ -316,7 +316,7 @@ function SubjectReview({
 }
 
 // ---------------------------- SubjectHeader ----------------------------
-function SubjectHeader({ subject, onChanged }: { subject: SubjectRow; onChanged: () => void }) {
+function SubjectHeader({ subject, onChanged, canMarkReady = true }: { subject: SubjectRow; onChanged: () => void; canMarkReady?: boolean }) {
   const setReady = useServerFn(setSubjectReady);
   const m = useMutation({
     mutationFn: (ready: boolean) => setReady({ data: { subjectId: subject.id, ready } }),
@@ -324,6 +324,7 @@ function SubjectHeader({ subject, onChanged }: { subject: SubjectRow; onChanged:
     onError: (e: Error) => toast.error(e.message),
   });
   const isReady = subject.review_status === "ready";
+  const blocked = !isReady && !canMarkReady;
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div>
@@ -335,10 +336,114 @@ function SubjectHeader({ subject, onChanged }: { subject: SubjectRow; onChanged:
           <Badge variant="outline" className="capitalize">{subject.review_status.replace("_", " ")}</Badge>
         </div>
       </div>
-      <Button variant={isReady ? "outline" : "default"} onClick={() => m.mutate(!isReady)} disabled={m.isPending}>
+      <Button
+        variant={isReady ? "outline" : "default"}
+        onClick={() => m.mutate(!isReady)}
+        disabled={m.isPending || blocked}
+        title={blocked ? "Resolve NECTAR validation issues below first" : undefined}
+      >
         {m.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         {isReady ? "Reopen" : <><CheckCircle2 className="mr-2 h-4 w-4" /> Mark ready</>}
       </Button>
+    </div>
+  );
+}
+
+// ---------------------------- ValidationPanel ----------------------------
+function ValidationPanel({
+  subjectId, validation, onChanged,
+}: {
+  subjectId: string;
+  validation: { ok: boolean; issues: Array<{ key: string; severity: "error" | "warning"; field?: string; message: string }>; blocking: string[] };
+  onChanged: () => void;
+}) {
+  const overrideFn = useServerFn(overrideValidationIssue);
+  const m = useMutation({
+    mutationFn: (vars: { issueKey: string; overridden: boolean }) =>
+      overrideFn({ data: { subjectId, issueKey: vars.issueKey, overridden: vars.overridden } }),
+    onSuccess: () => { toast.success("Override saved"); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const blockingSet = new Set(validation.blocking);
+  return (
+    <div className="rounded-2xl border border-destructive/40 bg-destructive/5 p-4">
+      <div className="flex items-center gap-2 text-sm font-semibold text-destructive">
+        <AlertTriangle className="h-4 w-4" />
+        NECTAR needs you to confirm these before saving
+      </div>
+      <ul className="mt-2 space-y-2 text-sm">
+        {validation.issues.map((i) => {
+          const isBlocking = blockingSet.has(i.key);
+          return (
+            <li key={i.key} className="flex flex-wrap items-start justify-between gap-2 rounded-md border border-border/70 bg-background/60 px-3 py-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <Badge variant={i.severity === "error" ? "destructive" : "outline"} className="capitalize text-[10px]">
+                    {i.severity}
+                  </Badge>
+                  {i.field && <span className="text-xs text-muted-foreground">{i.field}</span>}
+                </div>
+                <div className="mt-1">{i.message}</div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {isBlocking ? (
+                  <Button size="sm" variant="outline" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: true })}>
+                    Override — I've checked
+                  </Button>
+                ) : i.severity === "error" ? (
+                  <Button size="sm" variant="ghost" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: false })}>
+                    Un-override
+                  </Button>
+                ) : null}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+// ---------------------------- MergeFlagsPanel ----------------------------
+function MergeFlagsPanel({
+  flags, onChanged,
+}: {
+  flags: Array<Record<string, string | number | boolean | null>>;
+  onChanged: () => void;
+}) {
+  const resolveFn = useServerFn(resolveMergeFlag);
+  const m = useMutation({
+    mutationFn: (vars: { flagId: string; action: "keep_both" | "merge_into_existing" | "replace" }) =>
+      resolveFn({ data: vars }),
+    onSuccess: () => { toast.success("Merge resolved"); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <div className="rounded-2xl border border-amber-300/60 bg-amber-50/30 p-4 dark:bg-amber-950/20">
+      <div className="flex items-center gap-2 text-sm font-semibold">
+        <Sparkles className="h-4 w-4 text-primary" />
+        Merge review — {flags.length} unresolved
+      </div>
+      <ul className="mt-2 space-y-2 text-sm">
+        {flags.map((f) => (
+          <li key={String(f.id)} className="rounded-md border border-border/70 bg-background/60 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="outline" className="capitalize">{String(f.kind ?? "").replace("_", " ")}</Badge>
+              <span>{String(f.field ?? "")}</span>
+              {f.source_document_type && <span>· source: {String(f.source_document_type)}</span>}
+            </div>
+            <div className="mt-1 grid grid-cols-1 gap-1 text-sm sm:grid-cols-2">
+              <div><span className="text-muted-foreground">Existing:</span> {String(f.existing_value ?? "—")}</div>
+              <div><span className="text-muted-foreground">Incoming:</span> {String(f.incoming_value ?? "—")}</div>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" disabled={m.isPending} onClick={() => m.mutate({ flagId: String(f.id), action: "keep_both" })}>Keep both</Button>
+              <Button size="sm" variant="outline" disabled={m.isPending} onClick={() => m.mutate({ flagId: String(f.id), action: "merge_into_existing" })}>Keep existing</Button>
+              <Button size="sm" disabled={m.isPending} onClick={() => m.mutate({ flagId: String(f.id), action: "replace" })}>Use incoming</Button>
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

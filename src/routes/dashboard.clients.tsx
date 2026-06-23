@@ -495,15 +495,25 @@ export function ClientsPage() {
                     <TableRow
                       key={c.id}
                       className="cursor-pointer h-12 hover:bg-muted/50 transition-colors"
-                      onClick={() => navigate({ to: "/dashboard/clients/$clientId", params: { clientId: c.id }, search: { tab: "overview" } })}
+                      onClick={(e) => {
+                        if (e.defaultPrevented) return;
+                        const t = e.target as HTMLElement;
+                        if (t.closest('a,button,input,select,textarea,[role="menuitem"],[role="menu"],[data-no-row-nav]')) return;
+                        navigate({ to: "/dashboard/clients/$clientId", params: { clientId: c.id }, search: { tab: "overview" } });
+                      }}
                     >
-                      <TableCell className="font-semibold whitespace-nowrap py-2">
-                        <div className="flex items-center gap-2">
+                      <TableCell className="font-semibold whitespace-nowrap p-0">
+                        <Link
+                          to="/dashboard/clients/$clientId"
+                          params={{ clientId: c.id }}
+                          search={{ tab: "overview" }}
+                          className="flex items-center gap-2 px-4 py-2 w-full h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                        >
                           <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
                             {c.first_name?.[0] ?? ""}{c.last_name?.[0] ?? ""}
                           </span>
                           <span className="truncate">{c.first_name} {c.last_name}</span>
-                        </div>
+                        </Link>
                       </TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap py-2">
                         {c.medicaid_id || "—"}
@@ -535,14 +545,14 @@ export function ClientsPage() {
                           {c.physical_address || "—"}
                         </div>
                       </TableCell>
-                      <TableCell className="py-2 w-[110px]">
+                      <TableCell className="py-2 w-[110px]" data-no-row-nav onClick={(e) => e.stopPropagation()}>
                         <IntakeChip
                           organizationId={org?.organization_id}
                           clientId={c.id}
                           intakeStatus={c.intake_status}
                         />
                       </TableCell>
-                      <TableCell className="text-right py-2 w-[220px]" onClick={(e) => e.stopPropagation()}>
+                      <TableCell className="text-right py-2 w-[220px]" data-no-row-nav onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           <IntakeAction
                             organizationId={org?.organization_id}

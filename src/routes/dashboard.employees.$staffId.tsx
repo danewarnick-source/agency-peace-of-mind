@@ -18,6 +18,7 @@ import {
   Loader2,
   Plus,
   Trash2,
+  CalendarDays,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -155,6 +156,36 @@ function StaffProfilePage() {
     },
   });
 
+  // All active teams in the org (for team picker)
+  const teamsQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["org-teams", orgId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("teams")
+        .select("id, team_name")
+        .eq("organization_id", orgId!)
+        .eq("active", true)
+        .order("team_name");
+      return data ?? [];
+    },
+  });
+
+  // All active clients in the org (for caseload picker)
+  const allClientsQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["org-clients-list", orgId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("clients")
+        .select("id, first_name, last_name")
+        .eq("organization_id", orgId!)
+        .eq("account_status", "active")
+        .order("last_name");
+      return data ?? [];
+    },
+  });
+
   if (!orgId || memberQ.isLoading) {
     return <div className="p-6 text-sm text-muted-foreground">Loading staff profile…</div>;
   }
@@ -228,44 +259,46 @@ function StaffProfilePage() {
               onSaved={invalidateProfile}
             />
 
-            {/* Card 2 — HR Sensitive */}
-            <HrSensitiveCard
+            {/* Card 2 — Team */}
+            <TeamCard
               orgId={orgId}
               staffId={staffId}
-              isSelf={isSelf}
+              teamId={teamId}
+              teamData={teamQ.data ?? null}
+              allTeams={teamsQ.data ?? []}
               orgRole={org?.role}
+              onSaved={() => {
+                qc.invalidateQueries({ queryKey: ["staff-profile", orgId, staffId] });
+                qc.invalidateQueries({ queryKey: ["staff-team", teamId] });
+              }}
             />
 
             {/* Card 3 — Caseload */}
+            <CaseloadCard
+              orgId={orgId}
+              staffId={staffId}
+              caseload={caseloadQ.data ?? []}
+              allClients={allClientsQ.data ?? []}
+              orgRole={org?.role}
+              onChanged={() => qc.invalidateQueries({ queryKey: ["staff-caseload", orgId, staffId] })}
+            />
+
+            {/* Card 4 — Schedule */}
             <Card className="lg:col-span-2">
-              <CardHeader><CardTitle className="text-base">Caseload</CardTitle></CardHeader>
-              <CardContent>
-                {caseloadQ.isLoading ? (
-                  <div className="text-sm text-muted-foreground">Loading…</div>
-                ) : (caseloadQ.data ?? []).length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No clients assigned.</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {(caseloadQ.data ?? []).map((c) => (
-                      <Link
-                        key={c.id}
-                        to="/dashboard/workspace/$clientId"
-                        params={{ clientId: c.id }}
-                        className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/30 px-3 py-1 text-sm hover:bg-muted"
-                      >
-                        {c.name}
-                        {c.codes.slice(0, 2).map((code) => (
-                          <span key={code} className="ml-1 rounded bg-muted px-1 text-[10px] text-muted-foreground">{code}</span>
-                        ))}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-                <p className="mt-3 text-xs text-muted-foreground">Manage assignments in the Employees list.</p>
+              <CardHeader><CardTitle className="text-base">Schedule</CardTitle></CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                <p>View and manage shifts for this staff member in the scheduler.</p>
+                <div className="mt-3">
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to="/dashboard/scheduler">
+                      <CalendarDays className="mr-1 h-3.5 w-3.5" /> Open scheduler →
+                    </Link>
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
-            {/* Card 4 — Staff types */}
+            {/* Card 5 — Staff types */}
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle className="text-base">
@@ -294,7 +327,13 @@ function StaffProfilePage() {
         </TabsContent>
 
         {/* ----- HR DOCS ----- */}
-        <TabsContent value="hrdocs" className="mt-4">
+        <TabsContent value="hrdocs" className="mt-4 space-y-4">
+          <HrSensitiveCard
+            orgId={orgId}
+            staffId={staffId}
+            isSelf={isSelf}
+            orgRole={org?.role}
+          />
           <StaffHrDocsPanel organizationId={orgId} staffId={staffId} />
         </TabsContent>
 
@@ -469,6 +508,317 @@ function ContactCard({
                 Save
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ======================================================================
+ * Team card — shows team assignment; admin/manager can reassign inline.
+ * ====================================================================*/
+function TeamCard({ orgId, staffId, teamId, teamData, allTeams, orgRole, onSaved }: {
+  orgId: string;
+  staffId: string;
+  teamId: string | null;
+  teamData: { team_name: string; manager_name: string | null } | null;
+  allTeams: Array<{ id: string; team_name: string }>;
+  orgRole: string | undefined;
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [selectedTeamId, setSelectedTeamId] = useState(teamId ?? "");
+  const [saving, setSaving] = useState(false);
+  const canEdit = orgRole === "admin" || orgRole === "manager";
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      if (selectedTeamId) {
+        const { data: desig } = await supabase
+          .from("home_designations")
+          .select("id")
+          .eq("organization_id", orgId)
+          .eq("active", true)
+          .order("sort")
+          .limit(1)
+          .maybeSingle();
+        if (!desig?.id) throw new Error("No staff designations configured. Add one in Homes & Teams first.");
+        const { error } = await supabase.from("home_staff_designations").upsert(
+          { organization_id: orgId, team_id: selectedTeamId, staff_id: staffId, designation_id: desig.id },
+          { onConflict: "team_id,staff_id" }
+        );
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("home_staff_designations")
+          .delete()
+          .eq("staff_id", staffId)
+          .eq("organization_id", orgId);
+        if (error) throw error;
+      }
+      toast.success("Team updated");
+      setEditing(false);
+      onSaved();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to update team");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-base">Team</CardTitle>
+        {canEdit && !editing && (
+          <button
+            type="button"
+            onClick={() => { setSelectedTeamId(teamId ?? ""); setEditing(true); }}
+            className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-muted"
+            aria-label="Edit team"
+          >
+            <Pencil className="h-3 w-3" />
+          </button>
+        )}
+      </CardHeader>
+      <CardContent className="text-sm">
+        {editing ? (
+          <div className="space-y-3">
+            <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a team…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">— No team —</SelectItem>
+                {allTeams.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>{t.team_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={save} disabled={saving}>
+                {saving ? "Saving…" : "Save"}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+            </div>
+          </div>
+        ) : teamData ? (
+          <div className="grid gap-1">
+            <Row label="Team" value={teamData.team_name} />
+            <Row label="Reports to" value={teamData.manager_name ?? "—"} />
+          </div>
+        ) : (
+          <p className="text-muted-foreground">Not assigned to a team.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ======================================================================
+ * Caseload card — list of assigned clients with add/remove controls.
+ * ====================================================================*/
+function CaseloadCard({ orgId, staffId, caseload, allClients, orgRole, onChanged }: {
+  orgId: string;
+  staffId: string;
+  caseload: Array<{ id: string; name: string; is_gh: boolean; codes: string[] }>;
+  allClients: Array<{ id: string; first_name: string | null; last_name: string | null }>;
+  orgRole: string | undefined;
+  onChanged: () => void;
+}) {
+  const canEdit = orgRole === "admin" || orgRole === "manager";
+  const [adding, setAdding] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const [availableCodes, setAvailableCodes] = useState<string[]>([]);
+  const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
+  const [loadingCodes, setLoadingCodes] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const assignedIds = new Set(caseload.map((c) => c.id));
+  const unassignedClients = allClients.filter((c) => !assignedIds.has(c.id));
+
+  const onClientChange = async (clientId: string) => {
+    setSelectedClientId(clientId);
+    setSelectedCodes([]);
+    setAvailableCodes([]);
+    if (!clientId) return;
+    setLoadingCodes(true);
+    try {
+      const { data } = await supabase
+        .from("client_billing_codes")
+        .select("service_code")
+        .eq("client_id", clientId)
+        .eq("organization_id", orgId);
+      setAvailableCodes((data ?? []).map((r) => r.service_code));
+    } finally {
+      setLoadingCodes(false);
+    }
+  };
+
+  const toggleCode = (code: string) => {
+    setSelectedCodes((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
+    );
+  };
+
+  const saveAdd = async () => {
+    if (!selectedClientId || selectedCodes.length === 0) return;
+    setSaving(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await supabase.from("staff_assignments" as any).insert({
+        organization_id: orgId,
+        staff_id: staffId,
+        client_id: selectedClientId,
+        service_codes: selectedCodes,
+        is_group_home_assignment: false,
+      } as any);
+      if (error) throw error;
+      toast.success("Client added to caseload");
+      setAdding(false);
+      setSelectedClientId("");
+      setSelectedCodes([]);
+      setAvailableCodes([]);
+      onChanged();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to add client");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeClient = async (clientId: string, clientName: string) => {
+    if (!window.confirm(`Remove ${clientName} from caseload?`)) return;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.from("staff_assignments" as any) as any)
+        .delete()
+        .eq("staff_id", staffId)
+        .eq("client_id", clientId)
+        .eq("organization_id", orgId);
+      if (error) throw error;
+      toast.success("Removed from caseload");
+      onChanged();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to remove client");
+    }
+  };
+
+  return (
+    <Card className="lg:col-span-2">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-base">Caseload</CardTitle>
+        {canEdit && !adding && (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-muted"
+            aria-label="Add client to caseload"
+          >
+            <Plus className="h-3 w-3" />
+          </button>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-1 text-sm">
+        {caseload.length === 0 && !adding && (
+          <p className="text-muted-foreground">No clients assigned.</p>
+        )}
+        {caseload.map((c) => (
+          <div key={c.id} className="flex items-center justify-between gap-2 border-b border-border/30 py-2 last:border-0">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate font-medium">{c.name}</span>
+              {c.codes.length > 0
+                ? c.codes.map((code) => (
+                    <Badge key={code} variant="secondary" className="text-[10px]">{code}</Badge>
+                  ))
+                : <Badge variant="outline" className="text-[10px] text-muted-foreground">No code</Badge>
+              }
+            </div>
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => removeClient(c.id, c.name)}
+                className="shrink-0 text-muted-foreground hover:text-destructive"
+                aria-label={`Remove ${c.name}`}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        ))}
+
+        {adding && (
+          <div className="mt-3 space-y-3 rounded-lg border border-border/60 p-3">
+            <div>
+              <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Client</label>
+              <Select value={selectedClientId} onValueChange={onClientChange}>
+                <SelectTrigger className="mt-1 w-full">
+                  <SelectValue placeholder="Select a client…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {unassignedClients.length === 0
+                    ? <SelectItem value="_none" disabled>All clients already assigned</SelectItem>
+                    : unassignedClients.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {`${c.last_name ?? ""}, ${c.first_name ?? ""}`.trim().replace(/^,\s*/, "")}
+                        </SelectItem>
+                      ))
+                  }
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedClientId && (
+              <div>
+                <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Job code(s)</label>
+                {loadingCodes ? (
+                  <p className="mt-1 text-xs text-muted-foreground">Loading codes…</p>
+                ) : availableCodes.length === 0 ? (
+                  <p className="mt-1 text-xs text-amber-700">No billing codes on file for this client. Add them on the client profile first.</p>
+                ) : (
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {availableCodes.map((code) => (
+                      <button
+                        key={code}
+                        type="button"
+                        onClick={() => toggleCode(code)}
+                        className={`rounded-full border px-3 py-0.5 text-xs font-medium transition-colors ${
+                          selectedCodes.includes(code)
+                            ? "border-[#137182] bg-[#137182] text-white"
+                            : "border-border text-muted-foreground hover:border-[#137182]"
+                        }`}
+                      >
+                        {code}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={saveAdd}
+                disabled={saving || !selectedClientId || selectedCodes.length === 0}
+              >
+                {saving ? "Saving…" : "Add to caseload"}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setAdding(false);
+                  setSelectedClientId("");
+                  setSelectedCodes([]);
+                  setAvailableCodes([]);
+                }}
+              >
+                Cancel
+              </Button>
             </div>
           </div>
         )}

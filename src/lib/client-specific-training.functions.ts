@@ -53,6 +53,32 @@ export type CSTItem =
 export type CSTSection = { id: string; title: string; items: CSTItem[] };
 export type CSTContent = { sections: CSTSection[] };
 
+// In-depth PCSP goal — verbatim from the PCSP, admin-reviewed. Training-local
+// (NOT the platform-wide clients.pcsp_goals).
+export type CSTGoal = {
+  id: string;
+  goal: string;        // the goal/objective statement (verbatim)
+  supports: string;    // what will be done to assist (verbatim from PCSP)
+  details: string;     // objective detail: measures, frequency, target, timeline (verbatim)
+  job_codes: string[]; // service/job code(s) linked to this goal
+};
+
+// Applied-reasoning prompt shown to staff per tab.
+export type CSTReviewQuestion = {
+  id: string;
+  tab: string;     // which tab this question belongs to (e.g. "pcsp", "support_strategies")
+  prompt: string;  // the question text
+};
+
+// A staff member's written answer, frozen onto the completion.
+export type CSTQuestionAnswer = {
+  question: string;
+  answer: string;
+  tab: string;
+};
+
+export type CSTTrainingType = "person_specific" | "support_strategies";
+
 const ItemSchema: z.ZodType<CSTItem> = z.union([
   z.object({ kind: z.literal("text"), label: z.string(), value: z.string() }),
   z.object({ kind: z.literal("list"), label: z.string(), values: z.array(z.string()) }),
@@ -62,6 +88,20 @@ const ItemSchema: z.ZodType<CSTItem> = z.union([
 ]);
 const SectionSchema = z.object({ id: z.string(), title: z.string().min(1).max(200), items: z.array(ItemSchema).max(50) });
 const ContentSchema = z.object({ sections: z.array(SectionSchema).max(30) });
+const GoalSchema = z.object({
+  id: z.string(),
+  goal: z.string(),
+  supports: z.string(),
+  details: z.string(),
+  job_codes: z.array(z.string()),
+});
+const ReviewQuestionSchema = z.object({
+  id: z.string(),
+  tab: z.string(),
+  prompt: z.string(),
+});
+// GoalSchema and ReviewQuestionSchema are defined for use in later pieces.
+void GoalSchema; void ReviewQuestionSchema;
 
 function sid(): string { return `s_${Math.random().toString(36).slice(2, 10)}`; }
 
@@ -269,6 +309,7 @@ export const getClientSpecificTraining = createServerFn({ method: "GET" })
       .from("client_specific_trainings")
       .select("*")
       .eq("client_id", data.clientId)
+      .eq("training_type", "person_specific")
       .maybeSingle();
     if (error) throw new Error(error.message);
     return { training: row };
@@ -295,6 +336,7 @@ export const draftClientSpecificTrainingWithNectar = createServerFn({ method: "P
       .from("client_specific_trainings")
       .select("id, version")
       .eq("client_id", data.clientId)
+      .eq("training_type", "person_specific")
       .maybeSingle();
 
     if (existing) {
@@ -319,6 +361,7 @@ export const draftClientSpecificTrainingWithNectar = createServerFn({ method: "P
       .insert({
         organization_id: m.organization_id,
         client_id: data.clientId,
+        training_type: "person_specific",
         title: "Client-Specific Training",
         content: content as unknown,
         status: "draft",
@@ -508,6 +551,7 @@ export const getStaffClientSpecificTraining = createServerFn({ method: "GET" })
       .from("client_specific_trainings")
       .select("id, organization_id, client_id, title, content, attestation_statement, status, version, updated_at")
       .eq("client_id", data.clientId)
+      .eq("training_type", "person_specific")
       .maybeSingle();
     if (error) throw new Error(error.message);
     // Staff only see PUBLISHED versions. Admin/manager get null too if not published yet — they can use admin path.
@@ -564,6 +608,7 @@ export const completeClientSpecificTraining = createServerFn({ method: "POST" })
       .from("client_specific_trainings")
       .select("id, organization_id, client_id, title, content, attestation_statement, status, version")
       .eq("client_id", data.clientId)
+      .eq("training_type", "person_specific")
       .maybeSingle();
     if (error || !training) throw new Error("Training not found.");
     if (training.organization_id !== m.organization_id) throw new Error("Forbidden.");

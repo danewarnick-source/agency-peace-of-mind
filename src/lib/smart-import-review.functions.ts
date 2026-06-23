@@ -5,6 +5,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import {
+  validateClientDraft,
+  filterBlocking,
+  type ClientDraft,
+  type ValidationIssue,
+} from "@/lib/import-validation";
 
 const JobId = z.object({ jobId: z.string().uuid() });
 const SubjectId = z.object({ subjectId: z.string().uuid() });
@@ -73,6 +79,23 @@ export const getReviewSubject = createServerFn({ method: "POST" })
 
 
 
+    // ── Validation issues + merge flags (prompt 3 triple-check) ──────────
+    const draft = buildDraftFromExtractedFields(fields ?? []);
+    const validation = validateClientDraft(draft);
+    const overrides = ((subject as { validation_overrides?: Record<string, boolean> }).validation_overrides) ?? {};
+    const blockingIssues = filterBlocking(validation.issues, overrides);
+
+    let mergeFlags: Array<Record<string, unknown>> = [];
+    if (subject.matched_record_id) {
+      const { data: flags } = await sb
+        .from("import_merge_flags")
+        .select("*")
+        .eq("client_id", subject.matched_record_id)
+        .is("resolved_at", null)
+        .order("created_at", { ascending: false });
+      mergeFlags = (flags ?? []) as Array<Record<string, unknown>>;
+    }
+
     return {
       subject,
       fields: fields ?? [],
@@ -80,8 +103,68 @@ export const getReviewSubject = createServerFn({ method: "POST" })
       certs: certs ?? [],
       questions: questions ?? [],
       matched,
+      validation: {
+        ok: blockingIssues.length === 0,
+        issues: validation.issues,
+        overrides,
+        blocking: blockingIssues.map((i) => i.key),
+      },
+      mergeFlags,
     };
   });
+
+// Build a minimal ClientDraft from extracted_fields rows so the same
+// validator runs on review + commit. Mirrors buildClientDraftFromFields in
+// smart-import-commit.functions.ts; kept inline to avoid cross-file imports.
+function buildDraftFromExtractedFields(
+  rows: Array<{ target_field: string; value: string | null }>,
+): ClientDraft {
+  const d: ClientDraft = {};
+  const codes: NonNullable<ClientDraft["billing_codes"]> = [];
+  for (const r of rows) {
+    const v = (r.value ?? "").trim();
+    if (!v) continue;
+    switch (r.target_field) {
+      case "first_name": d.first_name = v; break;
+      case "last_name": d.last_name = v; break;
+      case "physical_address":
+      case "address":
+        d.physical_address = v; break;
+      case "medicaid_id": d.medicaid_id = v; break;
+      case "date_of_birth":
+      case "dob":
+        d.date_of_birth = v; break;
+      case "admission_date": d.admission_date = v; break;
+      case "discharge_date": d.discharge_date = v; break;
+      case "form_1056_approved_date": d.form_1056_approved_date = v; break;
+      case "is_own_guardian":
+        try { d.is_own_guardian = !!(JSON.parse(v) as { bool?: boolean }).bool; }
+        catch { d.is_own_guardian = v === "true"; }
+        break;
+      case "guardian_name": d.guardian_name = v; break;
+      case "billing_code_row":
+        try {
+          const j = JSON.parse(v) as Record<string, unknown>;
+          if (j.service_code) {
+            codes.push({
+              service_code: String(j.service_code).toUpperCase(),
+              rate: typeof j.rate === "number" ? j.rate : Number(j.rate) || null,
+              max_units: typeof j.max_units === "number" ? j.max_units : Number(j.max_units) || null,
+              unit_type: j.unit_type ? String(j.unit_type) : null,
+              plan_start: j.plan_start ? String(j.plan_start).slice(0, 10) : null,
+              plan_end: j.plan_end ? String(j.plan_end).slice(0, 10) : null,
+            });
+          }
+        } catch { /* malformed */ }
+        break;
+    }
+  }
+  if (codes.length) d.billing_codes = codes;
+  return d;
+}
+
+// Keep ValidationIssue importable from the route file via this re-export.
+export type { ValidationIssue };
 
 // ---------- Edit a field value / reassign target / mark edited ----------
 const EditField = z.object({

@@ -52,7 +52,7 @@ export function AssignModal({
         <DialogHeader><DialogTitle>Assign form</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <section>
-            <p className="text-sm font-semibold mb-1.5">Staff — by group / job code</p>
+            <p className="text-sm font-semibold mb-1.5">Staff — by group / billing code</p>
             <div className="flex flex-wrap gap-1.5">
               <Pill checked={g.includes("all_staff")} label="All staff" onClick={() => toggleG("all_staff")} />
               {types.map((t: { key: string; label: string }) => (

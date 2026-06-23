@@ -195,7 +195,9 @@ const ExtractApplyInput = z.object({
   documentType: z.enum([
     "pcsp", "1056_budget", "mar", "bsp",
     "immunization", "allergy",
-    "dnr", "polst", "palliative", "hospice", "other",
+    "dnr", "polst", "palliative", "hospice",
+    "grievance_acknowledgment", "hrc_approval",
+    "other",
   ]),
   storagePath: z.string().min(1).max(500),
   fileName: z.string().min(1).max(300),

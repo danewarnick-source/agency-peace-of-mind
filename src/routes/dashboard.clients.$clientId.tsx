@@ -119,11 +119,6 @@ function ClientProfileHub() {
             {disabilityCategory === "ID-RC" && <Badge variant="outline">ID/RC</Badge>}
           </div>
         </div>
-        <Button asChild variant="outline" size="sm">
-          <Link to="/dashboard/clients">
-            <Pencil className="h-4 w-4 mr-1" /> Edit in directory
-          </Link>
-        </Button>
       </div>
 
       <ClientReadinessCard clientId={clientId} />
@@ -131,7 +126,7 @@ function ClientProfileHub() {
 
       <Tabs value={tab ?? "overview"} className="w-full">
         <TabsList className="flex w-full flex-wrap h-auto justify-start">
-          <TabTrigger value="overview" icon={<User className="h-3.5 w-3.5" />} label="Overview" clientId={clientId} />
+          <TabTrigger value="overview" icon={<User className="h-3.5 w-3.5" />} label="Profile" clientId={clientId} />
           <TabTrigger value="plan" icon={<Sparkles className="h-3.5 w-3.5" />} label="Plan & goals" clientId={clientId} />
           <TabTrigger value="codes" icon={<FileText className="h-3.5 w-3.5" />} label="Billing codes" clientId={clientId} />
           <TabTrigger value="caseload" icon={<Users className="h-3.5 w-3.5" />} label="Caseload" clientId={clientId} />
@@ -143,11 +138,14 @@ function ClientProfileHub() {
             <TabTrigger value="hhcert" icon={<HomeIcon className="h-3.5 w-3.5" />} label="Host-home cert" clientId={clientId} />
           ) : null}
           <TabTrigger value="deadlines" icon={<CalendarClock className="h-3.5 w-3.5" />} label="Deadlines" clientId={clientId} />
-          <TabTrigger value="documents" icon={<FolderOpen className="h-3.5 w-3.5" />} label="Documents" clientId={clientId} />
+          <TabTrigger value="files" icon={<FolderOpen className="h-3.5 w-3.5" />} label="Files" clientId={clientId} />
         </TabsList>
 
         <TabsContent value="overview" className="mt-6">
-          <OverviewPanel client={client} clientId={clientId} isHostHome={isHostHome} showBehavior={showBehavior} orgId={orgId} />
+          <ClientProfileTab
+            clientId={clientId}
+            onOpenFiles={() => router.navigate({ to: "/dashboard/clients/$clientId", params: { clientId }, search: { tab: "files" } })}
+          />
         </TabsContent>
         <TabsContent value="plan" className="mt-6">
           <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
@@ -178,7 +176,7 @@ function ClientProfileHub() {
         <TabsContent value="deadlines" className="mt-6">
           <DeadlinesPanel clientId={clientId} />
         </TabsContent>
-        <TabsContent value="documents" className="mt-6">
+        <TabsContent value="files" className="mt-6">
           <ClientDocumentsCard clientId={clientId} clientName={fullName} />
         </TabsContent>
       </Tabs>

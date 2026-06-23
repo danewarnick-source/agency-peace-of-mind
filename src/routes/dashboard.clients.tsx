@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link, Outlet } from "@tanstack/react-router";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -215,13 +215,10 @@ function ClientsError({ error }: { error: Error; reset: () => void }) {
   );
 }
 
+// Layout route — renders child routes (e.g. /dashboard/clients/$clientId).
+// The directory page lives at /dashboard/clients/ in dashboard.clients.index.tsx.
 export const Route = createFileRoute("/dashboard/clients")({
-  head: () => ({ meta: [{ title: "Client Directory — HIVE" }] }),
-  component: () => (
-    <RequirePermission perm="manage_users">
-      <ClientsPage />
-    </RequirePermission>
-  ),
+  component: () => <Outlet />,
   errorComponent: ClientsError,
 });
 

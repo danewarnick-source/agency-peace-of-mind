@@ -2611,13 +2611,26 @@ export type Database = {
         Row: {
           account_status: string
           admin_hours_per_week: number | null
+          admission_date: string | null
+          advanced_directives: boolean | null
           allergies: string[]
           authorized_dspd_codes: string[]
+          bsp_status: string | null
+          chronic_conditions: string[] | null
+          client_photo_url: string | null
+          court_orders: string[] | null
           created_at: string
           date_of_birth: string | null
+          dentist_name: string | null
+          dentist_phone: string | null
+          diagnoses: string[] | null
+          disability_category: string | null
+          discharge_date: string | null
           dysphagia: boolean
+          emergency_contact_instructions: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
+          emergency_medical_treatment_authorization: boolean | null
           feature_config: Json | null
           field_confirmations: Json
           first_name: string
@@ -2630,32 +2643,63 @@ export type Database = {
           hhs_monthly_support_hours: number | null
           home_latitude: number | null
           home_longitude: number | null
+          housing_voucher: string | null
           id: string
+          immunizations: string[] | null
           intake_status: string
           is_own_guardian: boolean
           job_code: string[]
           last_name: string
           medicaid_id: string | null
+          medical_insurance: string | null
+          neurologist_name: string | null
+          neurologist_phone: string | null
           organization_id: string
           pcsp_goals: string[]
+          personal_belongings_inventory: string[] | null
           phone_number: string | null
           physical_address: string | null
+          plan_year: string | null
+          preferred_activities: string[] | null
+          preferred_living: string | null
+          prescriber_name: string | null
+          prescriber_phone: string | null
+          primary_care_name: string | null
+          primary_care_phone: string | null
           profile_photo_url: string | null
+          rights_restrictions: string[] | null
+          roommates: string[] | null
           self_admin_med_support: boolean
           special_directions: string | null
+          support_coordinator_email: string | null
+          support_coordinator_name: string | null
+          support_coordinator_phone: string | null
           swallowing_alerts: string[]
           team_id: string | null
         }
         Insert: {
           account_status?: string
           admin_hours_per_week?: number | null
+          admission_date?: string | null
+          advanced_directives?: boolean | null
           allergies?: string[]
           authorized_dspd_codes?: string[]
+          bsp_status?: string | null
+          chronic_conditions?: string[] | null
+          client_photo_url?: string | null
+          court_orders?: string[] | null
           created_at?: string
           date_of_birth?: string | null
+          dentist_name?: string | null
+          dentist_phone?: string | null
+          diagnoses?: string[] | null
+          disability_category?: string | null
+          discharge_date?: string | null
           dysphagia?: boolean
+          emergency_contact_instructions?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
+          emergency_medical_treatment_authorization?: boolean | null
           feature_config?: Json | null
           field_confirmations?: Json
           first_name: string
@@ -2668,32 +2712,63 @@ export type Database = {
           hhs_monthly_support_hours?: number | null
           home_latitude?: number | null
           home_longitude?: number | null
+          housing_voucher?: string | null
           id?: string
+          immunizations?: string[] | null
           intake_status?: string
           is_own_guardian?: boolean
           job_code?: string[]
           last_name: string
           medicaid_id?: string | null
+          medical_insurance?: string | null
+          neurologist_name?: string | null
+          neurologist_phone?: string | null
           organization_id: string
           pcsp_goals?: string[]
+          personal_belongings_inventory?: string[] | null
           phone_number?: string | null
           physical_address?: string | null
+          plan_year?: string | null
+          preferred_activities?: string[] | null
+          preferred_living?: string | null
+          prescriber_name?: string | null
+          prescriber_phone?: string | null
+          primary_care_name?: string | null
+          primary_care_phone?: string | null
           profile_photo_url?: string | null
+          rights_restrictions?: string[] | null
+          roommates?: string[] | null
           self_admin_med_support?: boolean
           special_directions?: string | null
+          support_coordinator_email?: string | null
+          support_coordinator_name?: string | null
+          support_coordinator_phone?: string | null
           swallowing_alerts?: string[]
           team_id?: string | null
         }
         Update: {
           account_status?: string
           admin_hours_per_week?: number | null
+          admission_date?: string | null
+          advanced_directives?: boolean | null
           allergies?: string[]
           authorized_dspd_codes?: string[]
+          bsp_status?: string | null
+          chronic_conditions?: string[] | null
+          client_photo_url?: string | null
+          court_orders?: string[] | null
           created_at?: string
           date_of_birth?: string | null
+          dentist_name?: string | null
+          dentist_phone?: string | null
+          diagnoses?: string[] | null
+          disability_category?: string | null
+          discharge_date?: string | null
           dysphagia?: boolean
+          emergency_contact_instructions?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
+          emergency_medical_treatment_authorization?: boolean | null
           feature_config?: Json | null
           field_confirmations?: Json
           first_name?: string
@@ -2706,19 +2781,37 @@ export type Database = {
           hhs_monthly_support_hours?: number | null
           home_latitude?: number | null
           home_longitude?: number | null
+          housing_voucher?: string | null
           id?: string
+          immunizations?: string[] | null
           intake_status?: string
           is_own_guardian?: boolean
           job_code?: string[]
           last_name?: string
           medicaid_id?: string | null
+          medical_insurance?: string | null
+          neurologist_name?: string | null
+          neurologist_phone?: string | null
           organization_id?: string
           pcsp_goals?: string[]
+          personal_belongings_inventory?: string[] | null
           phone_number?: string | null
           physical_address?: string | null
+          plan_year?: string | null
+          preferred_activities?: string[] | null
+          preferred_living?: string | null
+          prescriber_name?: string | null
+          prescriber_phone?: string | null
+          primary_care_name?: string | null
+          primary_care_phone?: string | null
           profile_photo_url?: string | null
+          rights_restrictions?: string[] | null
+          roommates?: string[] | null
           self_admin_med_support?: boolean
           special_directions?: string | null
+          support_coordinator_email?: string | null
+          support_coordinator_name?: string | null
+          support_coordinator_phone?: string | null
           swallowing_alerts?: string[]
           team_id?: string | null
         }
@@ -3813,6 +3906,8 @@ export type Database = {
       }
       evv_export_batches: {
         Row: {
+          archived_at: string | null
+          archived_by: string | null
           batch_number: number
           created_at: string
           created_by: string | null
@@ -3823,6 +3918,8 @@ export type Database = {
           row_count: number
         }
         Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
           batch_number: number
           created_at?: string
           created_by?: string | null
@@ -3833,6 +3930,8 @@ export type Database = {
           row_count?: number
         }
         Update: {
+          archived_at?: string | null
+          archived_by?: string | null
           batch_number?: number
           created_at?: string
           created_by?: string | null
@@ -13155,13 +13254,26 @@ export type Database = {
         Returns: {
           account_status: string
           admin_hours_per_week: number | null
+          admission_date: string | null
+          advanced_directives: boolean | null
           allergies: string[]
           authorized_dspd_codes: string[]
+          bsp_status: string | null
+          chronic_conditions: string[] | null
+          client_photo_url: string | null
+          court_orders: string[] | null
           created_at: string
           date_of_birth: string | null
+          dentist_name: string | null
+          dentist_phone: string | null
+          diagnoses: string[] | null
+          disability_category: string | null
+          discharge_date: string | null
           dysphagia: boolean
+          emergency_contact_instructions: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
+          emergency_medical_treatment_authorization: boolean | null
           feature_config: Json | null
           field_confirmations: Json
           first_name: string
@@ -13174,19 +13286,37 @@ export type Database = {
           hhs_monthly_support_hours: number | null
           home_latitude: number | null
           home_longitude: number | null
+          housing_voucher: string | null
           id: string
+          immunizations: string[] | null
           intake_status: string
           is_own_guardian: boolean
           job_code: string[]
           last_name: string
           medicaid_id: string | null
+          medical_insurance: string | null
+          neurologist_name: string | null
+          neurologist_phone: string | null
           organization_id: string
           pcsp_goals: string[]
+          personal_belongings_inventory: string[] | null
           phone_number: string | null
           physical_address: string | null
+          plan_year: string | null
+          preferred_activities: string[] | null
+          preferred_living: string | null
+          prescriber_name: string | null
+          prescriber_phone: string | null
+          primary_care_name: string | null
+          primary_care_phone: string | null
           profile_photo_url: string | null
+          rights_restrictions: string[] | null
+          roommates: string[] | null
           self_admin_med_support: boolean
           special_directions: string | null
+          support_coordinator_email: string | null
+          support_coordinator_name: string | null
+          support_coordinator_phone: string | null
           swallowing_alerts: string[]
           team_id: string | null
         }[]

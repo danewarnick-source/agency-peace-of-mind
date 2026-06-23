@@ -175,7 +175,7 @@ export const runInternalAudit = createServerFn({ method: "POST" })
       support_coordinator_email?: string | null;
       support_coordinator_phone?: string | null;
     };
-    const clients = (clientsRes.data ?? []) as ClientRow[];
+    const clients = (clientsRes.data ?? []) as unknown as ClientRow[];
     const clientById = new Map(clients.map((c) => [c.id, c]));
     const clientName = (id: string | null | undefined) => {
       if (!id) return null;

@@ -659,38 +659,41 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
     const linkItem = content.sections[0].items[0];
     const fileName = linkItem.kind === "link" ? (linkItem.links[0]?.label ?? "document") : "document";
     return (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Support strategies</CardTitle>
-          <SSStatusBadge status={training.status} version={training.version} />
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 p-3 text-sm">
-            <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
-            <div className="min-w-0">
-              <p className="font-medium truncate">{fileName}</p>
-              <p className="text-xs text-muted-foreground">Uploaded provider document</p>
+      <>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base">Support strategies</CardTitle>
+            <SSStatusBadge status={training.status} version={training.version} />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 p-3 text-sm">
+              <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="min-w-0">
+                <p className="font-medium truncate">{fileName}</p>
+                <p className="text-xs text-muted-foreground">Uploaded provider document</p>
+              </div>
             </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {training.status !== "published" && (
-              <Button size="sm" onClick={() => publishMut.mutate(training.id)} disabled={publishMut.isPending}>
-                {publishMut.isPending
+            <div className="flex flex-wrap gap-2">
+              {training.status !== "published" && (
+                <Button size="sm" onClick={() => publishMut.mutate(training.id)} disabled={publishMut.isPending}>
+                  {publishMut.isPending
+                    ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
+                  Approve & Publish
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading || !orgId}>
+                {uploading
                   ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
-                Approve & Publish
+                  : <Upload className="mr-1.5 h-3.5 w-3.5" />}
+                Replace
               </Button>
-            )}
-            <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading || !orgId}>
-              {uploading
-                ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                : <Upload className="mr-1.5 h-3.5 w-3.5" />}
-              Replace
-            </Button>
-            {fileInput}
-          </div>
-        </CardContent>
-      </Card>
+              {fileInput}
+            </div>
+          </CardContent>
+        </Card>
+        {pcspDialog}
+      </>
     );
   }
 

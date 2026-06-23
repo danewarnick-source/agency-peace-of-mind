@@ -41,6 +41,7 @@ export type ParseOutT = z.infer<typeof ParseOut>;
 export const CORE_CLIENT_FIELD_KEYS = new Set<string>([
   // Person
   "first_name", "last_name", "full_name", "dob", "medicaid_id", "phone", "plan_year",
+  "disability_category", "admission_date", "discharge_date",
   // Address
   "physical_address",
   // Emergency contact (split, never one blob)
@@ -93,7 +94,13 @@ Each extracted field has: field_key, field_group, optional value_text / value_nu
 - Structured rows (per-code billing authorizations) in value_json.
 
 Common field_key values to extract when present (use field_group to bucket related fields):
-  Person (group "person"): first_name, last_name, dob (value_date), medicaid_id, phone, plan_year
+  Person (group "person"): first_name, last_name, dob (value_date), medicaid_id, phone, plan_year,
+    disability_category (value_text: exactly "ID-RC" or "ABI" — read from the population/diagnosis
+    section of the PCSP; ID-RC = Intellectual Disability / Related Condition, ABI = Acquired Brain
+    Injury; omit this field entirely if the document does not state the population),
+    admission_date (value_date — SOW §1.10 required; use the service/plan begin date if no explicit
+    admission date is present; omit if not present in any form),
+    discharge_date (value_date — usually absent on intake; omit if not present)
   Address (group "address"): physical_address  -- client's service/home street address
   Emergency contact (group "emergency_contact"): emergency_contact_name, emergency_contact_phone, emergency_contact_instructions
     ALWAYS split name and phone into TWO separate fields. Never combine.
@@ -116,10 +123,14 @@ Common field_key values to extract when present (use field_group to bucket relat
   Billing (group "billing_code"): emit ONE field per authorized service code with
     field_key = "billing_code_row" and
     value_json = { service_code, rate, max_units, unit_type, weekly_cap_units, plan_start, plan_end, financial_eligibility }.
-    rate is the dollar rate per unit (a number, no "$"). max_units is the ANNUAL unit
-    authorization (an integer, e.g. 3120 for DSI, 960 for SEI). unit_type is "15 min"
-    or "day" or "session" or "month" exactly as printed. Read EVERY row of the
-    authorization table; do not collapse multiple codes into one.
+    CRITICAL: For EVERY billing/authorization table row, read ALL columns and populate rate and
+    max_units. rate is the dollar rate per unit (a number, no "$" sign). max_units is the ANNUAL
+    unit authorization (an integer, e.g. 3120 for DSI, 960 for SEI). If the table has a rate
+    column and a units column for this code, you MUST fill both — do NOT emit the row with
+    rate/max_units null when the values appear in the table. Only leave rate/max_units null when
+    the document genuinely omits them for that code.
+    unit_type is "15 min" or "day" or "session" or "month" exactly as printed.
+    Read EVERY row of the authorization table; do not collapse multiple codes into one.
   SOW (group "sow_clause"): clause_number, required_document, obligation, deadline
   Certification (group "cert"): cert_name, issued_at, expires_at, issuing_body
   Support coordinator (group "support_coordinator"): support_coordinator_name,
@@ -130,13 +141,13 @@ Common field_key values to extract when present (use field_group to bucket relat
     diagnoses (value_array), chronic_conditions (value_array),
     immunizations (value_array),
     emergency_medical_treatment_authorization (value_bool),
-    advanced_directives (value_text)
-  Rights & behavior (group "rights"): rights_restrictions (value_text),
+    advanced_directives (value_bool — true if client has advance directives on file)
+  Rights & behavior (group "rights"): rights_restrictions (value_array — one entry per restriction),
     bsp_status (value_text)
   Service plan (group "service_plan"): staff_ratio (value_text e.g. "1:1"),
     preferred_activities (value_array), preferred_living (value_text),
     roommates (value_array), housing_voucher (value_text),
-    court_orders (value_text), personal_belongings_inventory (value_array),
+    court_orders (value_array — one entry per court order), personal_belongings_inventory (value_array),
     team_name (value_text)
 
 For each field include source_locator (e.g. "page 3", "§4.2", "row 12 of budget table") and a confidence 0..1.

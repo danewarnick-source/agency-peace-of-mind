@@ -22,13 +22,18 @@ import { Input } from "@/components/ui/input";
 import { CheckboxMultiSelect } from "@/components/ui/checkbox-multi-select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { EVV_SERVICE_CODES, isEvvLockedCode } from "@/lib/evv-codes";
-import { downloadCsv } from "@/lib/utah-evv-export";
+import { EVV_SERVICE_CODES, isEvvLockedCode, padMemberId } from "@/lib/evv-codes";
+import { buildUtahCsv, downloadCsv, isValidIso, type UtahExportLine } from "@/lib/utah-evv-export";
 import { reviewExceptions, type ReviewException } from "@/lib/records-review-rules";
 import { ResidentialDailyTab } from "@/components/residential/residential-daily-tab";
 import { NectarSearchBar } from "@/components/nectar/nectar-search-bar";
 import { UtahExportDialog } from "@/components/evv/utah-export-dialog";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/use-auth";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const PAGE_SIZE = 100;
 const FETCH_CAP = 2000;
@@ -97,6 +102,7 @@ function defaultTo(): string { return new Date().toISOString().slice(0, 10); }
 
 export function RecordsTab() {
   const { data: org } = useCurrentOrg();
+  const { user } = useAuth();
   const orgId = org?.organization_id;
   const isAdmin = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
 
@@ -109,6 +115,8 @@ export function RecordsTab() {
   const [from, setFrom] = useState<string>(defaultFrom());
   const [to, setTo] = useState<string>(defaultTo());
   const [utahDialogOpen, setUtahDialogOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState<any | null>(null);
 
   // ── Option sources ──────────────────────────────────────────────────────
   const staffOptionsQ = useQuery({
@@ -166,6 +174,33 @@ export function RecordsTab() {
     () => EVV_SERVICE_CODES.map((c) => ({ value: c.code, label: c.code, sublabel: c.label })),
     [],
   );
+
+  const batchesQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["evv-batches", orgId],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from("evv_export_batches")
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .select("id, batch_number, range_start, range_end, row_count, created_by, created_at, archived_at, archived_by" as any)
+          .eq("organization_id", orgId!)
+          .order("batch_number", { ascending: false });
+        if (error) throw error;
+        return (data ?? []) as any[];
+      } catch {
+        // archived_at/archived_by columns may not exist yet
+        const { data } = await supabase
+          .from("evv_export_batches")
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .select("id, batch_number, range_start, range_end, row_count, created_by, created_at" as any)
+          .eq("organization_id", orgId!)
+          .order("batch_number", { ascending: false });
+        return (data ?? []) as any[];
+      }
+    },
+  });
+  const batches = (batchesQ.data ?? []).filter((b) => showArchived ? true : !b.archived_at);
 
   // ── Main query ──────────────────────────────────────────────────────────
   const rowsQ = useQuery({
@@ -289,6 +324,125 @@ export function RecordsTab() {
       ].map((v) => esc(String(v))).join(",")),
     ).join("\r\n");
     downloadCsv(`agency-records_${from}_${to}.csv`, body);
+  };
+
+  const reDownloadBatch = async (batch: any) => {
+    const { data: recs, error: e1 } = await supabase
+      .from("evv_export_records")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .select("id, timesheet_id, record_id, is_correction, orig_record" as any)
+      .eq("batch_id", batch.id)
+      .order("record_id", { ascending: true });
+    if (e1 || !recs || recs.length === 0) { toast.error("No records found for this batch."); return; }
+    const records = recs as unknown as Array<{ id: string; timesheet_id: string; record_id: number; is_correction: boolean; orig_record: string | null }>;
+
+    const tsIds = records.map((r) => r.timesheet_id);
+    const { data: tsRows, error: e2 } = await supabase
+      .from("evv_timesheets")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .select("id, service_type_code, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, corrected_clock_in, corrected_clock_out, review_status, gps_in_coordinates, gps_out_coordinates, staff_id, matched_approved_location_id, clients(first_name, last_name, physical_address, medicaid_id)" as any)
+      .in("id", tsIds);
+    if (e2) { toast.error("Failed to load timesheet data."); return; }
+    const tsMap = new Map<string, any>();
+    for (const t of ((tsRows ?? []) as any[])) tsMap.set(t.id, t);
+
+    const { data: orgData, error: e3 } = await supabase
+      .from("organizations")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .select("dhhs_provider_id, evv_vendor_name" as any)
+      .eq("id", orgId!)
+      .single();
+    if (e3) { toast.error("Failed to load org settings."); return; }
+    const o = orgData as unknown as { dhhs_provider_id: string | null; evv_vendor_name: string };
+
+    const staffIds = Array.from(new Set(((tsRows ?? []) as any[]).map((t) => t.staff_id)));
+    const { data: staffData } = await supabase.from("org_member_directory").select("id, full_name, email").in("id", staffIds as string[]);
+    const sm = new Map<string, string>();
+    for (const s of ((staffData ?? []) as Array<{ id: string; full_name: string | null; email: string | null }>)) {
+      sm.set(s.id, s.full_name ?? s.email ?? "");
+    }
+
+    const locIds2 = Array.from(new Set(((tsRows ?? []) as any[]).map((t) => t.matched_approved_location_id).filter(Boolean) as string[]));
+    const addrMap = new Map<string, string>();
+    if (locIds2.length > 0) {
+      const { data: locs } = await supabase.from("client_approved_locations").select("id, address").in("id", locIds2);
+      for (const l of ((locs ?? []) as Array<{ id: string; address: string | null }>)) {
+        if (l.address) addrMap.set(l.id, l.address);
+      }
+    }
+
+    const origIds = records.map((r) => r.orig_record).filter(Boolean) as string[];
+    const origMap = new Map<string, number>();
+    if (origIds.length > 0) {
+      const { data: origs } = await supabase
+        .from("evv_export_records")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select("id, record_id" as any)
+        .in("id", origIds);
+      for (const r of ((origs ?? []) as unknown as Array<{ id: string; record_id: number }>)) origMap.set(r.id, r.record_id);
+    }
+
+    const providerId = (o.dhhs_provider_id ?? "").trim();
+    const vendor = (o.evv_vendor_name ?? "Hive").trim() || "Hive";
+
+    const lines: UtahExportLine[] = records.map((rec) => {
+      const t = tsMap.get(rec.timesheet_id);
+      if (!t) return null;
+      const beginIso = (t.review_status === "approved" && t.corrected_clock_in) ? t.corrected_clock_in : (t.rounded_clock_in ?? t.clock_in_timestamp);
+      const endIso = (t.review_status === "approved" && t.corrected_clock_out) ? t.corrected_clock_out : (t.rounded_clock_out ?? t.clock_out_timestamp ?? beginIso);
+      if (!isValidIso(beginIso) || !isValidIso(endIso)) return null;
+      const locAddr = t.matched_approved_location_id ? (addrMap.get(t.matched_approved_location_id) ?? "") : "";
+      const address = (locAddr || t.clients?.physical_address || "").trim();
+      return {
+        memberId: padMemberId(t.clients?.medicaid_id ?? ""),
+        firstName: t.clients?.first_name ?? "",
+        lastName: t.clients?.last_name ?? "",
+        serviceCode: t.service_type_code,
+        serviceDescription: "",
+        providerId,
+        employeeName: sm.get(t.staff_id) ?? "",
+        beginIso, endIso,
+        beginAddress: address,
+        beginLat: t.gps_in_coordinates?.latitude ?? null,
+        beginLng: t.gps_in_coordinates?.longitude ?? null,
+        endAddress: address,
+        endLat: t.gps_out_coordinates?.latitude ?? null,
+        endLng: t.gps_out_coordinates?.longitude ?? null,
+        origReceiptId: rec.is_correction && rec.orig_record ? String(origMap.get(rec.orig_record) ?? "") : "",
+        vendor,
+      };
+    }).filter(Boolean) as UtahExportLine[];
+
+    const { csv } = buildUtahCsv(lines, batch.batch_number);
+    downloadCsv(`evv-batch-${batch.batch_number}.csv`, csv);
+    toast.success(`Re-downloaded Batch #${batch.batch_number}.`);
+  };
+
+  const archiveBatch = async (batch: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from("evv_export_batches") as any)
+      .update({ archived_at: new Date().toISOString(), archived_by: user?.id ?? null })
+      .eq("id", batch.id);
+    if (error) { toast.error("Failed to archive batch."); return; }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from("hive_executive_audit_log") as any).insert({
+      actor_user_id: user?.id ?? "",
+      action: "evv_batch_archive",
+      target_org_id: orgId,
+      summary: `Archived EVV export batch #${batch.batch_number} (id: ${batch.id})`,
+    });
+    toast.success(`Batch #${batch.batch_number} archived.`);
+    setConfirmArchive(null);
+    batchesQ.refetch();
+  };
+
+  const unarchiveBatch = async (batch: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from("evv_export_batches") as any)
+      .update({ archived_at: null, archived_by: null })
+      .eq("id", batch.id);
+    toast.success(`Batch #${batch.batch_number} unarchived.`);
+    batchesQ.refetch();
   };
 
   const dateLabel = `${fmtShort(from)} – ${fmtShort(to)}`;
@@ -543,6 +697,48 @@ export function RecordsTab() {
         </>
       )}
 
+      <section className="rounded-xl border border-border bg-card p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold text-[#0B1126]">EVV Export Batches</h3>
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+            Show archived
+          </label>
+        </div>
+        {batches.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No EVV batches exported yet.</p>
+        ) : (
+          <div className="divide-y divide-border">
+            {batches.map((b) => (
+              <div key={b.id} className="flex items-center justify-between py-2 text-sm">
+                <div>
+                  <div className="font-medium">
+                    Batch #{b.batch_number}
+                    {b.archived_at && (
+                      <Badge variant="outline" className="ml-1 text-[10px]">
+                        Archived {format(parseISO(b.archived_at), "MMM d, yyyy")}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {b.range_start} → {b.range_end} · {b.row_count} records · {format(parseISO(b.created_at), "MMM d, yyyy")}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => reDownloadBatch(b)}>Re-download</Button>
+                  {isAdmin && !b.archived_at && (
+                    <Button variant="outline" size="sm" className="text-red-600" onClick={() => setConfirmArchive(b)}>Archive</Button>
+                  )}
+                  {isAdmin && b.archived_at && (
+                    <Button variant="outline" size="sm" onClick={() => unarchiveBatch(b)}>Unarchive</Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
       {utahDialogOpen && canDhhsExport && orgId && (
         <UtahExportDialog
           open={utahDialogOpen}
@@ -551,6 +747,26 @@ export function RecordsTab() {
           staffNameMap={new Map((staffOptionsQ.data ?? []).map((s) => [s.value, s.label]))}
         />
       )}
+
+      <AlertDialog open={!!confirmArchive} onOpenChange={(o) => { if (!o) setConfirmArchive(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive EVV batch?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Government record-keeping rules require retaining EVV records. Archiving hides this batch from the list but does NOT delete the underlying records. This action is logged. Continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmArchive(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => confirmArchive && archiveBatch(confirmArchive)}
+            >
+              Archive batch
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -131,6 +131,22 @@ export const getClientOnboardingState = createServerFn({ method: "POST" })
         !c.annual_unit_authorization || c.annual_unit_authorization === 0,
     );
 
+    // Build a per-code message that names exactly what is missing so the UI
+    // can show "Billing code SLN imported, but no rate found in the PCSP."
+    const missingRateMessages = missingRates.map(
+      (c: { id: string; service_code: string; rate_per_unit: number | null; annual_unit_authorization: number | null }) => {
+        const missingFields: string[] = [];
+        if (!c.rate_per_unit || c.rate_per_unit === 0) missingFields.push("rate");
+        if (!c.annual_unit_authorization || c.annual_unit_authorization === 0) missingFields.push("annual units");
+        const missingList = missingFields.join(" and ");
+        return {
+          codeId: c.id,
+          service_code: c.service_code,
+          message: `Billing code ${c.service_code} imported, but no ${missingList} found in the PCSP — enter ${missingList}.`,
+        };
+      },
+    );
+
     const guardianOk =
       client.is_own_guardian === true ||
       (client.is_own_guardian === false &&
@@ -149,6 +165,7 @@ export const getClientOnboardingState = createServerFn({ method: "POST" })
       sowMissingKeys,
       assignedCount: assignedCount ?? 0,
       missingRates,
+      missingRateMessages,
       billingCodes: codes ?? [],
       skipped: Array.from(skipped),
       doneFlags: {
@@ -445,7 +462,8 @@ export const skipOnboardingItem = createServerFn({ method: "POST" })
 // Add one or more DSPD service codes to a client. Used by the inline "Add
 // billing code" control on the readiness card + onboarding wizard — no
 // navigation: upsert client_billing_codes (default rate 0, default annual
-// auth 0) and merge codes into clients.authorized_dspd_codes + job_code.
+// auth 0) and merge codes into clients.authorized_dspd_codes + job_code
+// (billing codes mirror — job_code kept in sync for scheduler reads).
 // ---------------------------------------------------------------------------
 export const addClientBillingCodes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

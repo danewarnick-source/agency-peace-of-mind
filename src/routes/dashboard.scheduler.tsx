@@ -8,8 +8,8 @@
 // homes), profiles (staff), scheduled_shifts, time_off_requests,
 // day_program_sessions/_staff/_attendance. No sample/mock data.
 import { useMemo, useState, useEffect } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
@@ -26,6 +26,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { getMissingThirtyDayStaffIds } from "@/lib/sow-perimeters.functions";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
   useSchedulerData, startOfWeek, startOfDay, startOfMonth,
@@ -863,6 +864,17 @@ function AddShiftDialog({
   const qc = useQueryClient();
   const save = useServerFn(saveShift);
   const recur = useServerFn(createRecurringShifts);
+  const missingThirtyDayFn = useServerFn(getMissingThirtyDayStaffIds);
+  const { data: missingData } = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["sow-r3", org?.organization_id],
+    queryFn: () => missingThirtyDayFn({ data: { organizationId: org!.organization_id } }),
+    staleTime: 5 * 60_000,
+  });
+  const missingThirtyDay = useMemo(
+    () => new Set(missingData?.missingIds ?? []),
+    [missingData],
+  );
   const [clientId, setClientId] = useState<string>(prefill?.clientId ?? "");
   const [code, setCode] = useState<string>(prefill?.code ?? "");
   const [staffId, setStaffId] = useState<string>("__open__");
@@ -1002,9 +1014,19 @@ function AddShiftDialog({
                   const isOff = off.has(s.id);
                   const notActive = !s.is_active;
                   const reason = isOff ? "Off this day" : notActive ? "Onboarding incomplete" : null;
+                  const needs30Day = missingThirtyDay.has(s.id);
                   return (
                     <SelectItem key={s.id} value={s.id} disabled={!!reason}>
-                      {s.name}{reason ? ` — ${reason}` : ""}
+                      <span className="flex items-center gap-1">
+                        {needs30Day && (
+                          <AlertTriangle
+                            className="inline h-3 w-3 shrink-0 text-red-600"
+                            title="30-day training incomplete"
+                            aria-label="30-day training incomplete"
+                          />
+                        )}
+                        {s.name}{reason ? ` — ${reason}` : ""}
+                      </span>
                     </SelectItem>
                   );
                 })}
@@ -1148,6 +1170,17 @@ function ShiftDetailPanel({
   const save = useServerFn(saveShift);
   const del = useServerFn(deleteShift);
   const add = useServerFn(addToCaseload);
+  const missingThirtyDayFn = useServerFn(getMissingThirtyDayStaffIds);
+  const { data: missingData } = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["sow-r3", org?.organization_id],
+    queryFn: () => missingThirtyDayFn({ data: { organizationId: org!.organization_id } }),
+    staleTime: 5 * 60_000,
+  });
+  const missingThirtyDay = useMemo(
+    () => new Set(missingData?.missingIds ?? []),
+    [missingData],
+  );
   const client = sched.clients.find((c) => c.id === shift.client_id);
   const staffById = new Map(sched.staff.map((s) => [s.id, s]));
   const code = shift.service_code ?? shift.job_code ?? "";
@@ -1276,14 +1309,37 @@ function ShiftDetailPanel({
           >
             <SelectTrigger>
               <SelectValue>
-                {shift.staff_id ? staffById.get(shift.staff_id)?.name ?? "Staff" : "Open"}
+                <span className="flex items-center gap-1">
+                  {shift.staff_id && missingThirtyDay.has(shift.staff_id) && (
+                    <AlertTriangle
+                      className="inline h-3 w-3 shrink-0 text-red-600"
+                      title="30-day training incomplete"
+                      aria-label="30-day training incomplete"
+                    />
+                  )}
+                  {shift.staff_id ? staffById.get(shift.staff_id)?.name ?? "Staff" : "Open"}
+                </span>
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__open__">Open (no one assigned)</SelectItem>
-              {caseloadStaff.map((s) => (
-                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-              ))}
+              {caseloadStaff.map((s) => {
+                const needs30Day = missingThirtyDay.has(s.id);
+                return (
+                  <SelectItem key={s.id} value={s.id}>
+                    <span className="flex items-center gap-1">
+                      {needs30Day && (
+                        <AlertTriangle
+                          className="inline h-3 w-3 shrink-0 text-red-600"
+                          title="30-day training incomplete"
+                          aria-label="30-day training incomplete"
+                        />
+                      )}
+                      {s.name}
+                    </span>
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </Field>
@@ -1298,9 +1354,18 @@ function ShiftDetailPanel({
               <div className="max-h-48 overflow-y-auto border rounded-md divide-y">
                 {matchOthers.map((s) => {
                   const onCaseload = caseloadStaffIds.has(s.id);
+                  const needs30Day = missingThirtyDay.has(s.id);
                   return (
                     <div key={s.id} className="flex items-center gap-2 px-2 py-1.5 text-sm">
-                      <div className="flex-1 truncate">{s.name}</div>
+                      <div className="flex-1 truncate flex items-center gap-1">
+                        {needs30Day && (
+                          <AlertTriangle
+                            className="inline h-3 w-3 shrink-0 text-red-600"
+                            title="30-day training incomplete"
+                          />
+                        )}
+                        {s.name}
+                      </div>
                       {onCaseload ? (
                         <Button size="sm" variant="outline" onClick={() => assign.mutate(s.id)}>Assign</Button>
                       ) : (

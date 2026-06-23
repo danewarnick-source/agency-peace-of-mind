@@ -1,5 +1,6 @@
+import React from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, TrendingDown, TrendingUp, Download, History, Loader2, Settings, Save, Pin, PinOff, Trash2, Calendar, X, Play } from "lucide-react";
@@ -100,9 +101,7 @@ function NectarPage() {
             No clients flagged at current sensitivity. {isLoading ? "Loading usage data…" : "All budgets are on pace."}
           </p>
         ) : (
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {alerts.map((a, i) => <AlertCard key={`${a.client_id}-${a.service_code}-${i}`} alert={a} />)}
-          </div>
+          <ClientGroups alerts={alerts} />
         )}
       </section>
 
@@ -144,6 +143,62 @@ function AlertCard({ alert: a }: { alert: NectarAlert }) {
             <div>Target: <span className="tabular-nums font-medium">{a.hours_per_week_target.toFixed(1)} hr/wk</span></div>
             <div>Renewal: <span className="tabular-nums font-medium">{a.weeks_to_renewal.toFixed(1)} wks</span></div>
           </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function ClientGroups({ alerts }: { alerts: NectarAlert[] }) {
+  const severity = { exhausted: 4, expired: 4, over: 3, under: 2 } as Record<string, number>;
+  const clientGroups = useMemo(() => {
+    const map = new Map<string, {
+      client_id: string;
+      client_name: string;
+      codes: typeof alerts;
+      worstKind: string;
+    }>();
+    for (const a of alerts) {
+      const g = map.get(a.client_id) ?? { client_id: a.client_id, client_name: a.client_name, codes: [], worstKind: a.kind };
+      g.codes.push(a);
+      if ((severity[a.kind] ?? 0) >= (severity[g.worstKind] ?? 0)) g.worstKind = a.kind;
+      map.set(a.client_id, g);
+    }
+    return Array.from(map.values());
+  }, [alerts]);
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      {clientGroups.map((g) => <ClientCard key={g.client_id} group={g} />)}
+    </div>
+  );
+}
+
+function ClientCard({ group }: { group: { client_id: string; client_name: string; codes: NectarAlert[]; worstKind: string } }) {
+  const palette = ({
+    exhausted: { bg: "bg-[#fef2f2]", border: "border-[#fecaca]", text: "text-[#991b1b]", Icon: AlertTriangle },
+    expired:   { bg: "bg-[#fef2f2]", border: "border-[#fecaca]", text: "text-[#991b1b]", Icon: AlertTriangle },
+    over:      { bg: "bg-[#fff7ed]", border: "border-[#fed7aa]", text: "text-[#9a3412]", Icon: TrendingUp },
+    under:     { bg: "bg-[#eff6ff]", border: "border-[#bfdbfe]", text: "text-[#1e40af]", Icon: TrendingDown },
+  } as Record<string, { bg: string; border: string; text: string; Icon: React.ElementType }>)[group.worstKind]
+    ?? { bg: "bg-[#eff6ff]", border: "border-[#bfdbfe]", text: "text-[#1e40af]", Icon: TrendingDown };
+  const Icon = palette.Icon;
+  return (
+    <Link
+      to="/dashboard/billing/$clientId"
+      params={{ clientId: group.client_id }}
+      className={`block rounded-lg border ${palette.border} ${palette.bg} p-3 transition hover:shadow-sm`}
+    >
+      <div className={`flex items-start gap-2 ${palette.text}`}>
+        <Icon className="mt-0.5 h-4 w-4 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-sm font-semibold">{group.client_name}</h3>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {group.codes.map((c) => (
+              <span key={c.service_code} className="rounded bg-white/60 px-1.5 py-0.5 font-mono text-xs">{c.service_code}</span>
+            ))}
+          </div>
+          <p className="mt-1 text-xs">{group.codes.length} code{group.codes.length === 1 ? "" : "s"} flagged · tap to view client billing</p>
         </div>
       </div>
     </Link>

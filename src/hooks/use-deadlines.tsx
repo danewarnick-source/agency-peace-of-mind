@@ -10,13 +10,15 @@ import {
   listOpenSummaries,
   type ProgressSummaryRow,
 } from "@/lib/progress-summaries.functions";
+import { computeSowAlerts } from "@/lib/sow-perimeters.functions";
 
 export type DeadlineSource =
   | "summary"
   | "host_home_cert"
   | "staff_cert"
   | "incident"
-  | "billing_code";
+  | "billing_code"
+  | "sow_perimeter";
 
 export type DeadlineItem = {
   key: string;
@@ -53,6 +55,7 @@ export function useDeadlines() {
   const orgId = org?.organization_id ?? null;
   const ensureFn = useServerFn(ensureCurrentSummaryPeriods);
   const listSummariesFn = useServerFn(listOpenSummaries);
+  const computeSowFn = useServerFn(computeSowAlerts);
 
   // 1. Progress summaries — ensure rows then list.
   const summariesQ = useQuery({
@@ -236,6 +239,13 @@ export function useDeadlines() {
 
 
 
+  // 9. SOW perimeter alerts — R1 through R5 (training gaps, incident timelines, requirements).
+  const sowQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "sow", orgId],
+    queryFn: () => computeSowFn({ data: { organizationId: orgId! } }),
+  });
+
   const items = useMemo<DeadlineItem[]>(() => {
     if (!orgId) return [];
     const now = new Date();
@@ -348,6 +358,23 @@ export function useDeadlines() {
       }
     }
 
+    // SOW perimeter alerts (R1–R5)
+    for (const a of sowQ.data?.alerts ?? []) {
+      out.push({
+        key: a.key,
+        source: "sow_perimeter",
+        title: a.title,
+        subject: a.subject,
+        subjectKind: a.subjectKind,
+        dueAt: new Date(a.dueAt),
+        status: bucketStatus(new Date(a.dueAt), now),
+        href: a.href,
+        staffId: a.staffId,
+        clientId: a.clientId,
+        incidentId: a.incidentId,
+      });
+    }
+
     out.sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
     return out;
   }, [
@@ -360,6 +387,7 @@ export function useDeadlines() {
     profilesQ.data,
     incidentsQ.data,
     bcQ.data,
+    sowQ.data,
   ]);
 
   return {
@@ -369,6 +397,7 @@ export function useDeadlines() {
     upcoming: items.filter((i) => i.status === "upcoming"),
     isLoading:
       summariesQ.isLoading || clientsQ.isLoading || hhsQ.isLoading ||
-      certsQ.isLoading || incidentsQ.isLoading || bcQ.isLoading || hhCertsQ.isLoading,
+      certsQ.isLoading || incidentsQ.isLoading || bcQ.isLoading || hhCertsQ.isLoading ||
+      sowQ.isLoading,
   };
 }

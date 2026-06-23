@@ -251,20 +251,36 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
   const getCST = useServerFn(getClientSpecificTraining);
   const extractFn = useServerFn(extractPcspGoalsForTraining);
   const updateCST = useServerFn(updateClientSpecificTraining);
+  const draftBlankCST = useServerFn(draftClientSpecificTrainingBlank);
   const { data: cstData } = useQuery({
     queryKey: ["client-specific-training", clientId],
     queryFn: () => getCST({ data: { clientId } }),
     staleTime: 30_000,
   });
   const extractedGoals = ((cstData?.training as { goals?: CSTGoal[] } | null)?.goals ?? []) as CSTGoal[];
+  const goalIsIncomplete = (g: CSTGoal) => !g.supports?.trim() || !g.details?.trim();
+  const missingLabel = (g: CSTGoal) => {
+    const ms = !g.supports?.trim();
+    const md = !g.details?.trim();
+    if (ms && md) return "Needs supports & details";
+    if (ms) return "Needs supports";
+    if (md) return "Needs details";
+    return "";
+  };
+  const incompleteCount = extractedGoals.filter(goalIsIncomplete).length;
   const [openGoal, setOpenGoal] = useState<string | number | null>(null);
   const [editingGoals, setEditingGoals] = useState(false);
   const [draftGoals, setDraftGoals] = useState<CSTGoal[] | null>(null);
 
   const saveGoalsMut = useMutation({
     mutationFn: async () => {
-      const tid = (cstData?.training as { id?: string } | null)?.id;
-      if (!tid || !draftGoals) throw new Error("No training to update");
+      if (!draftGoals) throw new Error("No goals to save");
+      let tid = (cstData?.training as { id?: string } | null)?.id;
+      if (!tid) {
+        const res = await draftBlankCST({ data: { clientId } });
+        tid = (res?.training as { id?: string } | null)?.id;
+        if (!tid) throw new Error("Could not create training record");
+      }
       await updateCST({ data: { id: tid, goals: draftGoals } });
       const flat = draftGoals.map((g) => g.goal).filter((g): g is string => !!g && g.trim().length > 0);
       const { error } = await supabase.from("clients").update({ pcsp_goals: flat }).eq("id", clientId);
@@ -280,6 +296,12 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to save goals"),
   });
+
+  function startManualEntry() {
+    setDraftGoals([{ id: crypto.randomUUID(), goal: "", supports: "", details: "", job_codes: [] } as CSTGoal]);
+    setEditingGoals(true);
+  }
+
 
   const codesMut = useMutation({
     mutationFn: async () => {

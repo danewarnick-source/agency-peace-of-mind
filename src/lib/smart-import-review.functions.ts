@@ -85,7 +85,7 @@ export const getReviewSubject = createServerFn({ method: "POST" })
     const overrides = ((subject as { validation_overrides?: Record<string, boolean> }).validation_overrides) ?? {};
     const blockingIssues = filterBlocking(validation.issues, overrides);
 
-    let mergeFlags: Array<Record<string, unknown>> = [];
+    let mergeFlags: Array<Record<string, string | number | boolean | null>> = [];
     if (subject.matched_record_id) {
       const { data: flags } = await sb
         .from("import_merge_flags")
@@ -93,7 +93,14 @@ export const getReviewSubject = createServerFn({ method: "POST" })
         .eq("client_id", subject.matched_record_id)
         .is("resolved_at", null)
         .order("created_at", { ascending: false });
-      mergeFlags = (flags ?? []) as Array<Record<string, unknown>>;
+      mergeFlags = ((flags ?? []) as Array<Record<string, unknown>>).map((row) => {
+        const out: Record<string, string | number | boolean | null> = {};
+        for (const [k, v] of Object.entries(row)) {
+          if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") out[k] = v;
+          else out[k] = String(v);
+        }
+        return out;
+      });
     }
 
     return {

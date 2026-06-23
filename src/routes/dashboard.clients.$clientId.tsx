@@ -70,7 +70,7 @@ function ClientProfileHub() {
       const { data, error } = await supabase
         .from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, first_name, last_name, phone_number, physical_address, date_of_birth, medicaid_id, account_status, authorized_dspd_codes, pcsp_goals, job_code, special_directions, emergency_contact_name, emergency_contact_phone, team_id, admin_hours_per_week, feature_config, support_coordinator_name, support_coordinator_email, support_coordinator_phone, disability_category, bsp_status, diagnoses, advanced_directives, admission_date, discharge_date" as any)
+        .select("id, first_name, last_name, phone_number, physical_address, date_of_birth, medicaid_id, account_status, authorized_dspd_codes, pcsp_goals, job_code, special_directions, emergency_contact_name, emergency_contact_phone, emergency_contact_instructions, emergency_contact_2_name, emergency_contact_2_phone, emergency_contact_2_instructions, level_of_need, form_1056_number, form_1056_approved_date, grievance_acknowledged, grievance_signed_date, rights_restrictions, dnr_status, dnr_location, polst_status, palliative_care_status, hospice_status, team_id, admin_hours_per_week, feature_config, support_coordinator_name, support_coordinator_email, support_coordinator_phone, disability_category, bsp_status, diagnoses, advanced_directives, admission_date, discharge_date" as any)
         .eq("id", clientId)
         .maybeSingle();
       if (error) throw error;
@@ -256,12 +256,77 @@ function OverviewPanel({ client, clientId, isHostHome, showBehavior, orgId }: { 
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Emergency contact</CardTitle></CardHeader>
-        <CardContent className="text-sm space-y-1">
-          <Field label="Name" value={client.emergency_contact_name as string | null} />
-          <Field label="Phone" value={client.emergency_contact_phone as string | null} />
+        <CardHeader><CardTitle className="text-base">Emergency contacts</CardTitle></CardHeader>
+        <CardContent className="text-sm space-y-2">
+          <div className="space-y-1">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Primary</div>
+            <Field label="Name" value={client.emergency_contact_name as string | null} />
+            <Field label="Phone" value={client.emergency_contact_phone as string | null} />
+            <Field label="How to reach" value={(client.emergency_contact_instructions as string | null) ?? null} />
+          </div>
+          {Boolean(client.emergency_contact_2_name || client.emergency_contact_2_phone) && (
+            <div className="space-y-1 border-t border-border pt-2">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Secondary</div>
+              <Field label="Name" value={client.emergency_contact_2_name as string | null} />
+              <Field label="Phone" value={client.emergency_contact_2_phone as string | null} />
+              <Field label="How to reach" value={(client.emergency_contact_2_instructions as string | null) ?? null} />
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">DSPD / SOW</CardTitle></CardHeader>
+        <CardContent className="text-sm space-y-1">
+          <Field label="Level of need" value={(client.level_of_need as string | null) ?? null} />
+          <Field label="1056 number" value={(client.form_1056_number as string | null) ?? null} />
+          <Field label="1056 approved" value={(client.form_1056_approved_date as string | null) ?? null} />
+          <Field
+            label="Grievance acknowledged"
+            value={
+              client.grievance_acknowledged === true
+                ? `Yes${client.grievance_signed_date ? ` · ${client.grievance_signed_date}` : ""}`
+                : client.grievance_acknowledged === false
+                  ? "No"
+                  : null
+            }
+          />
+          <Field
+            label="Rights restrictions"
+            value={
+              Array.isArray(client.rights_restrictions) && (client.rights_restrictions as string[]).length
+                ? (client.rights_restrictions as string[]).join(", ")
+                : null
+            }
+          />
+        </CardContent>
+      </Card>
+
+      {Boolean(client.dnr_status || client.polst_status || client.palliative_care_status || client.hospice_status) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Advanced care / end-of-life</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm space-y-1">
+            {Boolean(client.dnr_status) && client.dnr_status !== "none" && (
+              <>
+                <Field label="DNR" value={client.dnr_status as string} />
+                <Field label="DNR kept at" value={(client.dnr_location as string | null) ?? null} />
+              </>
+            )}
+            {Boolean(client.polst_status) && client.polst_status !== "none" && (
+              <Field label="POLST" value={client.polst_status as string} />
+            )}
+            {Boolean(client.palliative_care_status) && client.palliative_care_status !== "none" && (
+              <Field label="Palliative care" value={client.palliative_care_status as string} />
+            )}
+            {Boolean(client.hospice_status) && client.hospice_status !== "none" && (
+              <Field label="Hospice" value={client.hospice_status as string} />
+            )}
+          </CardContent>
+        </Card>
+      )}
+
 
       <Card>
         <CardHeader>

@@ -37,6 +37,8 @@ export type SourceDocumentType =
   | "polst"
   | "palliative"
   | "hospice"
+  | "grievance_acknowledgment"
+  | "hrc_approval"
   | "other";
 
 export interface ApplyExtractedCtx {
@@ -193,10 +195,13 @@ export async function applyExtractedFieldsToClient(
       "dentist_name, dentist_phone, " +
       "prescriber_name, prescriber_phone, " +
       "bsp_status, medical_insurance, housing_voucher, preferred_living, " +
-      "plan_year, disability_category, staff_ratio, " +
+      "plan_year, disability_category, staff_ratio, level_of_need, " +
       "advanced_directives, emergency_medical_treatment_authorization, " +
       "diagnoses, chronic_conditions, immunizations, court_orders, rights_restrictions, " +
       "preferred_activities, roommates, personal_belongings_inventory, " +
+      "emergency_contact_2_name, emergency_contact_2_phone, emergency_contact_2_instructions, " +
+      "grievance_acknowledged, grievance_signed_date, " +
+      "dnr_status, dnr_location, polst_status, palliative_care_status, hospice_status, " +
       "admission_date, discharge_date, form_1056_number, form_1056_approved_date",
     )
     .eq("id", clientId)
@@ -357,13 +362,28 @@ export async function applyExtractedFieldsToClient(
   setScalarText("housing_voucher", "housing_voucher");
   setScalarText("preferred_living", "preferred_living");
   setScalarText("emergency_contact_instructions", "emergency_contact_instructions");
+  setScalarText("emergency_contact_2_name", "emergency_contact_2_name");
+  setScalarText("emergency_contact_2_phone", "emergency_contact_2_phone");
+  setScalarText("emergency_contact_2_instructions", "emergency_contact_2_instructions");
   setScalarText("plan_year", "plan_year");
   setScalarText("disability_category", "disability_category");
   setScalarText("staff_ratio", "staff_ratio");
+  setScalarText("level_of_need", "level_of_need");
+
+  // End-of-life / advanced care — extractor maps real document wording onto
+  // these columns. Status values stay as-extracted (e.g. "Active", "On file");
+  // the EOL UI normalizes "none" vs anything-else.
+  setScalarText("dnr_status", "dnr_status");
+  setScalarText("dnr_location", "dnr_location");
+  setScalarText("polst_status", "polst_status");
+  setScalarText("palliative_care_status", "palliative_care_status");
+  setScalarText("hospice_status", "hospice_status");
 
   // Booleans
   setScalarBool("advanced_directives", "advanced_directives");
   setScalarBool("emergency_medical_treatment_authorization", "emergency_medical_treatment_authorization");
+  setScalarBool("grievance_acknowledged", "grievance_acknowledged");
+  setScalarDate("grievance_signed_date", "grievance_signed_date");
 
   // Array columns
   const diagnosesF = byKey.get("diagnoses");
@@ -755,6 +775,10 @@ export async function applyExtractedFieldsToClient(
     "admission_date", "discharge_date",
     // 1056 header fields
     "form_1056_number", "form_1056_approved_date",
+    // SOW supplemental
+    "level_of_need",
+    "emergency_contact_2_name", "emergency_contact_2_phone", "emergency_contact_2_instructions",
+    "grievance_acknowledged", "grievance_signed_date",
     // End-of-life / advanced care
     "dnr_status", "dnr_location", "polst_status", "palliative_care_status", "hospice_status",
   ]);

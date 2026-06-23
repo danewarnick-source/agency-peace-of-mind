@@ -285,6 +285,7 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
       toast.success("PCSP goals saved");
       setDraft(cleaned);
       setDirty(false);
+      setEditingGoals(false);
       qc.invalidateQueries({ queryKey: ["client-profile", orgId, clientId] });
       qc.invalidateQueries({ queryKey: ["client", clientId] });
     },

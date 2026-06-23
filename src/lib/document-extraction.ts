@@ -44,8 +44,9 @@ export const CORE_CLIENT_FIELD_KEYS = new Set<string>([
   "disability_category", "admission_date", "discharge_date",
   // Address
   "physical_address",
-  // Emergency contact (split, never one blob)
+  // Emergency contact (split, never one blob) — primary + secondary
   "emergency_contact_name", "emergency_contact_phone", "emergency_contact_instructions",
+  "emergency_contact_2_name", "emergency_contact_2_phone", "emergency_contact_2_instructions",
   // Guardian
   "is_own_guardian", "guardian_name", "guardian_phone",
   "guardian_relationship", "guardian_email", "guardian_address",
@@ -73,6 +74,8 @@ export const CORE_CLIENT_FIELD_KEYS = new Set<string>([
   // Rights / behavior / end-of-life
   "rights_restrictions", "bsp_status",
   "dnr_status", "dnr_location", "polst_status", "palliative_care_status", "hospice_status",
+  // SOW supplemental
+  "level_of_need", "grievance_acknowledged", "grievance_signed_date",
   // Service plan
   "staff_ratio", "preferred_activities", "preferred_living", "roommates",
   "housing_voucher", "court_orders", "personal_belongings_inventory",

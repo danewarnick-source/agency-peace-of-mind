@@ -32,6 +32,15 @@ import {
   setFieldConfirmation,
 } from "@/lib/field-confirmations.functions";
 import { TRACKED_FIELDS } from "@/lib/field-confirmations";
+
+// EOL fields are surfaced by the "Advanced care / end-of-life" group on the
+// profile; exclude them here so they don't appear twice.
+const EOL_CONFIRMATION_KEYS = new Set<string>([
+  "dnr_status",
+  "polst_status",
+  "palliative_care_status",
+  "hospice_status",
+]);
 import {
   PROFILE_FIELD_BY_KEY,
   getProfileFieldValue,
@@ -70,7 +79,11 @@ export function FinishOnboardingCard({ clientId }: { clientId: string }) {
   const items = buildItems(s);
   const open = items.filter((i) => !i.done && !i.skipped);
   const unknowns = fieldStatesQ.data
-    ? TRACKED_FIELDS.filter((f) => fieldStatesQ.data!.states[f.key] === "unknown")
+    ? TRACKED_FIELDS.filter(
+        (f) =>
+          fieldStatesQ.data!.states[f.key] === "unknown" &&
+          !EOL_CONFIRMATION_KEYS.has(f.key),
+      )
     : [];
 
   if (open.length === 0 && unknowns.length === 0) return null;
@@ -133,34 +146,6 @@ type Item = {
 function buildItems(s: State): Item[] {
   const skipSet = new Set(s.skipped);
   return [
-    {
-      key: "staff",
-      label: "Assign staff",
-      icon: <Users className="h-4 w-4" />,
-      done: s.doneFlags.staff,
-      skipped: skipSet.has("staff"),
-    },
-    {
-      key: "home",
-      label: "Confirm home location & geofence",
-      icon: <MapPin className="h-4 w-4" />,
-      done: s.doneFlags.home,
-      skipped: skipSet.has("home"),
-    },
-    {
-      key: "rates",
-      label: `Billing rates (${s.missingRates.length} missing)`,
-      icon: <DollarSign className="h-4 w-4" />,
-      done: s.doneFlags.rates,
-      skipped: skipSet.has("rates"),
-    },
-    {
-      key: "guardian",
-      label: "Guardian",
-      icon: <Shield className="h-4 w-4" />,
-      done: s.doneFlags.guardian,
-      skipped: skipSet.has("guardian"),
-    },
     {
       key: "sow",
       label: "Required SOW fields",

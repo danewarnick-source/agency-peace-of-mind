@@ -192,7 +192,6 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
     return <div className="text-sm text-muted-foreground"><Loader2 className="inline h-3.5 w-3.5 animate-spin mr-1.5" />Loading…</div>;
   }
 
-  if (!training) {
   const pcspDialog = (
     <Dialog open={showPcspPrompt} onOpenChange={setShowPcspPrompt}>
       <DialogContent className="max-w-sm">

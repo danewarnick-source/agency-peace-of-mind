@@ -155,6 +155,7 @@ function ClientProfileHub() {
         </TabsList>
 
         <TabsContent value="profile" className="space-y-4">
+          <UpdateInfoFromDocumentCard clientId={clientId} orgId={orgId} />
           <ClientProfileTab clientId={clientId} onOpenFiles={() => setTab("files")} />
         </TabsContent>
 

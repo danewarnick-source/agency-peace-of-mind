@@ -649,7 +649,7 @@ export function GoalsView({ goals }: { goals: CSTGoal[] }) {
 
 
 // ── Goals editor ─────────────────────────────────────────────────────────────
-function GoalsEditor({ goals, onChange }: { goals: CSTGoal[]; onChange: (next: CSTGoal[]) => void }) {
+export function GoalsEditor({ goals, onChange }: { goals: CSTGoal[]; onChange: (next: CSTGoal[]) => void }) {
   function addGoal() {
     onChange([...goals, {
       id: `s_${Math.random().toString(36).slice(2, 10)}`,

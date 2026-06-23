@@ -23,3 +23,18 @@ HIVE is a multi-tenant compliance platform for Utah DSPD (disability services) p
 - Old hhs_daily_records table is orphaned; read hhs_daily_records_v instead (never delete the old table without instruction).
 - must_change_password must be enforced at router root. /fix-admin route is deleted; never recreate.
 - The human runs SQL in Lovable's editor and must Clear it before each paste; write handoff SQL truncation-proof (string_agg for lists).
+
+# Build & commit rules for this repo
+
+This project uses TanStack Router (via @lovable.dev/vite-tanstack-config). The
+file src/routeTree.gen.ts is auto-generated AND committed to git. If it is stale
+relative to the route files, the Lovable preview fails to build ("Preview has
+not been built yet").
+
+## Required before EVERY commit and push:
+1. Run `npm run build`. This regenerates src/routeTree.gen.ts via the
+   tanstack router plugin.
+2. If src/routeTree.gen.ts changed, stage it together with your other changes.
+3. Never commit changes to files under src/routes/ without the matching
+   regenerated src/routeTree.gen.ts in the same commit.
+4. The build must pass before you push.

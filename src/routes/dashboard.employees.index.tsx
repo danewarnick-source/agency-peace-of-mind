@@ -293,18 +293,6 @@ export function EmployeesPage() {
             {members?.filter((m) => m.active).length ?? 0} active
             {(invites?.length ?? 0) > 0 && ` · ${invites!.length} pending invite${invites!.length === 1 ? "" : "s"}`}
           </p>
-          {(() => {
-            const active = (members ?? []).filter((m) => m.active);
-            const byType = new Map<string, number>();
-            for (const m of active) {
-              const t = (m.profile?.worker_type as string | null)?.trim() || "Unassigned";
-              byType.set(t, (byType.get(t) ?? 0) + 1);
-            }
-            const parts = Array.from(byType.entries()).map(([t, n]) => `${n} ${t}`);
-            return parts.length > 0 ? (
-              <p className="mt-0.5 text-xs text-muted-foreground">{parts.join(" · ")}</p>
-            ) : null;
-          })()}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline" className="border-primary/40 text-primary hover:bg-primary/5">

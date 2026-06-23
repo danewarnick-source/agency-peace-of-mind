@@ -288,9 +288,8 @@ function DonePage() {
                   </div>
                 )}
                 {s.record_id && s.subject_type === "client" && s.committed && (
-                  <div className="mt-3 space-y-3">
-                    <ClientReadinessCard clientId={s.record_id} />
-                    <FinishOnboardingCard clientId={s.record_id} />
+                  <div className="mt-3">
+                    <ImportChecklist clientId={s.record_id} jobId={jobId} />
                   </div>
                 )}
               </div>

@@ -1606,7 +1606,7 @@ function CertsTab({
                         subjectRef={row.requirement_id}
                         hrDocumentId={row.completion.evidence_document_id}
                         statement="I verify that the information on this document is accurate and current, and that this individual has met this requirement."
-                        attested={(attestationsQ.data ?? []).some((a) => a.subject_kind === "checklist_doc" && a.subject_ref === row.requirement_id)}
+                        attested={(attestationsQ.data ?? []).some((a: { subject_kind: string; subject_ref: string }) => a.subject_kind === "checklist_doc" && a.subject_ref === row.requirement_id)}
                         onAttested={() => { attestationsQ.refetch(); invalidate(); }}
                       />
                     )}

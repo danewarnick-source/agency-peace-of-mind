@@ -39,7 +39,9 @@ import {
   attachSupportStrategyDocument,
   updateClientSpecificTraining,
   publishClientSpecificTraining,
+  extractPcspGoalsForTraining,
   type CSTContent,
+  type CSTGoal,
   type CSTReviewQuestion,
 } from "@/lib/client-specific-training.functions";
 

@@ -37,6 +37,8 @@ export type SourceDocumentType =
   | "polst"
   | "palliative"
   | "hospice"
+  | "grievance_acknowledgment"
+  | "hrc_approval"
   | "other";
 
 export interface ApplyExtractedCtx {

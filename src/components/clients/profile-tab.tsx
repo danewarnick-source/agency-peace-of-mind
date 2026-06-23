@@ -105,7 +105,7 @@ export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; 
 
       <ClinicalAlertBanner clientId={clientId} client={client} />
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 items-start lg:grid-cols-[1.65fr_1fr]">
         <IdentityCard clientId={clientId} client={client} />
         <div className="space-y-4">
           <ContactsCard clientId={clientId} orgId={orgId!} contacts={contacts} />
@@ -145,15 +145,29 @@ function initials(name: string): string {
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-2 border-b border-border/60 last:border-0">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <span className="text-sm font-medium text-right">{children ?? <span className="text-muted-foreground font-normal">—</span>}</span>
+    <div className="flex items-center justify-between gap-4 py-2 text-sm border-b border-border/60 last:border-0">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-semibold text-right">{children ?? <span className="text-muted-foreground font-normal">—</span>}</span>
     </div>
   );
 }
 
 function GroupHeader({ children }: { children: React.ReactNode }) {
-  return <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-3 first:mt-0">{children}</div>;
+  return <div className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-muted-foreground/80 mt-4 mb-1.5 first:mt-0">{children}</div>;
+}
+
+function HexMarker() {
+  // Honeycomb marker — small hex with inner dot, themed via primary.
+  const hex = "polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)";
+  return (
+    <span
+      aria-hidden
+      className="grid place-items-center h-[18px] w-[18px] bg-primary/15 flex-none"
+      style={{ clipPath: hex }}
+    >
+      <span className="block h-[7px] w-[7px] bg-primary" style={{ clipPath: hex }} />
+    </span>
+  );
 }
 
 function CardShell({
@@ -170,11 +184,12 @@ function CardShell({
   headerRight?: React.ReactNode;
 }) {
   return (
-    <Card>
-      <CardContent className="p-5 space-y-3">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-semibold">{title}</h3>
+    <Card className="overflow-hidden">
+      <CardContent className="p-0">
+        <div className="flex items-start gap-2.5 px-5 py-4 border-b border-border/60">
+          <HexMarker />
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold leading-tight">{title}</h3>
             {subtitle ? <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p> : null}
           </div>
           <div className="flex items-center gap-2">
@@ -186,13 +201,15 @@ function CardShell({
             ) : null}
           </div>
         </div>
-        <div>{children}</div>
-        {editing ? (
-          <div className="flex justify-end gap-2 pt-2 border-t">
-            <Button variant="outline" size="sm" onClick={onCancel} disabled={saving}>Cancel</Button>
-            <Button size="sm" onClick={onSave} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
-          </div>
-        ) : null}
+        <div className="p-5 space-y-3">
+          <div>{children}</div>
+          {editing ? (
+            <div className="flex justify-end gap-2 pt-3 border-t">
+              <Button variant="outline" size="sm" onClick={onCancel} disabled={saving}>Cancel</Button>
+              <Button size="sm" onClick={onSave} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+            </div>
+          ) : null}
+        </div>
       </CardContent>
     </Card>
   );
@@ -436,9 +453,18 @@ function IdentityCard({ clientId, client }: { clientId: string; client: ClientRo
       saving={mut.isPending}
     >
       <div className="space-y-1">
-        <div className="flex items-center gap-3 pb-3 border-b mb-2">
-          <div className="h-14 w-14 rounded-full bg-muted grid place-items-center text-muted-foreground text-xs">Photo</div>
-          <div className="text-xs text-muted-foreground">Profile photo — upload (coming soon)</div>
+        <div className="flex items-center gap-3 pb-4 mb-2 border-b border-border/60">
+          <div
+            aria-hidden
+            className="h-[52px] w-[52px] grid place-items-center bg-muted text-muted-foreground text-base font-bold flex-none"
+            style={{ clipPath: "polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)" }}
+          >
+            {initials(`${client.first_name ?? ""} ${client.last_name ?? ""}`) || "—"}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            <span className="block text-sm font-semibold text-foreground">Profile photo</span>
+            Required within the last 5 years — upload coming soon.
+          </div>
         </div>
 
         {!editing ? (
@@ -568,15 +594,15 @@ function ContactsCard({
         contacts.length === 0 ? (
           <p className="text-sm text-muted-foreground py-2">No emergency contacts on file.</p>
         ) : (
-          <ul className="space-y-2">
+          <ul>
             {contacts.map((c) => (
-              <li key={c.id} className="flex items-center gap-3 py-1">
-                <div className="h-9 w-9 rounded bg-muted grid place-items-center text-xs font-semibold flex-none">{initials(c.name) || "?"}</div>
+              <li key={c.id} className="flex items-center gap-3 py-2.5 border-b border-border/60 last:border-0">
+                <div className="h-8 w-8 rounded-md bg-muted grid place-items-center text-[11px] font-bold text-muted-foreground flex-none">{initials(c.name) || "?"}</div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{c.name}</div>
-                  {c.relationship ? <div className="text-xs text-muted-foreground truncate">{c.relationship}</div> : null}
+                  <div className="text-sm font-semibold truncate leading-tight">{c.name}</div>
+                  {c.relationship ? <div className="text-[11px] text-muted-foreground truncate mt-0.5">{c.relationship}</div> : null}
                 </div>
-                <div className="text-sm text-right">{c.phone || <span className="text-muted-foreground">—</span>}</div>
+                <div className="text-xs text-muted-foreground tabular-nums text-right">{c.phone || "—"}</div>
               </li>
             ))}
           </ul>
@@ -701,14 +727,20 @@ function RetentionFooter({ clientId, status }: { clientId: string; status: strin
   });
 
   return (
-    <div className="rounded-lg border bg-muted/30 p-4 flex items-start justify-between gap-4">
+    <div className="rounded-lg border border-border bg-card p-4 flex items-center justify-between gap-4">
       <div>
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Record retention</div>
-        <p className="text-sm text-muted-foreground mt-1">
-          Medicaid requires client records be kept for 7 years. A client can be archived (hidden from active lists) but the record is never deleted.
+        <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Record retention</div>
+        <p className="text-xs text-muted-foreground mt-1 max-w-xl">
+          Medicaid requires client records be kept for 7 years. A client can be <b className="text-foreground font-semibold">archived</b> (hidden from active lists) but the record is never deleted.
         </p>
       </div>
-      <Button variant="outline" size="sm" onClick={() => mut.mutate()} disabled={mut.isPending}>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => mut.mutate()}
+        disabled={mut.isPending}
+        className="flex-none border-destructive/30 text-destructive hover:bg-destructive/5 hover:text-destructive"
+      >
         {isArchived ? "Reactivate client" : "Archive client"}
       </Button>
     </div>

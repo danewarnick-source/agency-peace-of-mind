@@ -355,3 +355,147 @@ export const overrideValidationIssue = createServerFn({ method: "POST" })
     });
     return { ok: true, overrides: next };
   });
+
+// ── SOW supplemental: level of need, secondary emergency contact ────────
+export const setLevelOfNeed = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({
+      clientId: z.string().uuid(),
+      value: z.string().max(120).nullable(),
+    }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as Sb;
+    await requireAdminForClient(sb, context.userId as string, data.clientId);
+    const { error } = await sb
+      .from("clients")
+      .update({ level_of_need: data.value?.trim() || null })
+      .eq("id", data.clientId);
+    if (error) throw error;
+    return { ok: true };
+  });
+
+export const setEmergencyContact = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({
+      clientId: z.string().uuid(),
+      slot: z.enum(["primary", "secondary"]),
+      name: z.string().max(120).nullable().optional(),
+      phone: z.string().max(40).nullable().optional(),
+      instructions: z.string().max(2000).nullable().optional(),
+    }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as Sb;
+    await requireAdminForClient(sb, context.userId as string, data.clientId);
+    const cols = data.slot === "primary"
+      ? { name: "emergency_contact_name", phone: "emergency_contact_phone", instr: "emergency_contact_instructions" }
+      : { name: "emergency_contact_2_name", phone: "emergency_contact_2_phone", instr: "emergency_contact_2_instructions" };
+    const patch: Record<string, unknown> = {};
+    if (data.name !== undefined) patch[cols.name] = data.name?.trim() || null;
+    if (data.phone !== undefined) patch[cols.phone] = data.phone?.trim() || null;
+    if (data.instructions !== undefined) patch[cols.instr] = data.instructions?.trim() || null;
+    if (Object.keys(patch).length === 0) return { ok: true };
+    const { error } = await sb.from("clients").update(patch).eq("id", data.clientId);
+    if (error) throw error;
+    return { ok: true };
+  });
+
+// ── Grievance policy acknowledgment (SOW §1.10(11)) ─────────────────────
+export const setGrievanceAcknowledgment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({
+      clientId: z.string().uuid(),
+      acknowledged: z.boolean(),
+      signedDate: z.string().max(40).nullable().optional(),
+    }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as Sb;
+    await requireAdminForClient(sb, context.userId as string, data.clientId);
+    const patch: Record<string, unknown> = {
+      grievance_acknowledged: data.acknowledged,
+      grievance_signed_date: data.acknowledged
+        ? (data.signedDate || new Date().toISOString().slice(0, 10))
+        : null,
+    };
+    const { error } = await sb.from("clients").update(patch).eq("id", data.clientId);
+    if (error) throw error;
+    return { ok: true };
+  });
+
+// ── HRC chain (rights restrictions, SOW §1.20) ──────────────────────────
+// Uses the existing hrc_reviews table — no new columns on clients.
+export const listHrcReviewsForClient = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ clientId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as Sb;
+    await requireAdminForClient(sb, context.userId as string, data.clientId);
+    const { data: rows, error } = await sb
+      .from("hrc_reviews")
+      .select("id, restriction_summary, status, created_at")
+      .eq("client_id", data.clientId)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return { reviews: rows ?? [] };
+  });
+
+export const createHrcReview = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({
+      clientId: z.string().uuid(),
+      restriction_summary: z.string().min(1).max(2000),
+      status: z.string().min(1).max(40).default("pending"),
+    }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as Sb;
+    const orgId = await requireAdminForClient(sb, context.userId as string, data.clientId);
+    const { data: ins, error } = await sb
+      .from("hrc_reviews")
+      .insert({
+        organization_id: orgId,
+        client_id: data.clientId,
+        restriction_summary: data.restriction_summary,
+        status: data.status,
+        created_by: context.userId,
+      })
+      .select("id, status, restriction_summary")
+      .single();
+    if (error) throw error;
+    return { ok: true, review: ins };
+  });
+
+// ── Signed-URL fetch for a client_documents row (profile downloads) ─────
+export const signClientDocument = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({
+      documentId: z.string().uuid(),
+      expiresIn: z.number().int().positive().max(3600).default(300),
+    }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as Sb;
+    const { data: doc } = await sb
+      .from("client_documents")
+      .select("id, client_id, storage_path, file_url, file_name")
+      .eq("id", data.documentId)
+      .maybeSingle();
+    if (!doc) throw new Error("Document not found");
+    await requireAdminForClient(sb, context.userId as string, doc.client_id);
+    const path = (doc.storage_path as string) || (doc.file_url as string);
+    if (!path) throw new Error("Document has no storage path");
+    const { data: signed, error } = await sb.storage
+      .from("client-documents")
+      .createSignedUrl(path, data.expiresIn);
+    if (error) throw error;
+    return { url: signed.signedUrl as string, fileName: doc.file_name as string };
+  });

@@ -21,7 +21,7 @@ import { applyMissingClientFields } from "@/lib/smart-import-review.functions";
 import { generateSmartImportReminders } from "@/lib/smart-import-reminders.functions";
 import { previewUndoImport, undoCommittedImport } from "@/lib/smart-import-history.functions";
 import { ClientLiveBadge } from "@/components/clients/client-readiness-card";
-import { ImportChecklist } from "@/components/clients/import-checklist";
+import { SetupChecklist } from "@/components/clients/setup-checklist";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/done")({
   head: () => ({ meta: [{ title: "Smart Import — Done" }] }),

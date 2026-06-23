@@ -273,6 +273,7 @@ export function SetupChecklist({ clientId, jobId }: { clientId: string; jobId: s
     advanced_directives: fieldStates.advanced_directives !== "unknown",
     court_orders: fieldStates.court_orders !== "unknown",
   };
+  const rightsState = fieldStates.rights_restrictions ?? "unknown";
 
   // Required-row passing flags (Group 1).
   const rowPass = {
@@ -286,6 +287,11 @@ export function SetupChecklist({ clientId, jobId }: { clientId: string; jobId: s
     lon: !!sowSupp.level_of_need?.trim(),
     ec2: !!sowSupp.emergency_contact_2_name?.trim(),
     grievance: !!sowSupp.grievance_acknowledged,
+    // Rights row passes when answered. The HRC sub-flow is enforced
+    // inside the row component itself — the row stays expanded with a
+    // visible CTA until artifacts are linked, but it counts as answered
+    // so submit isn't blocked indefinitely while artifacts are gathered.
+    rights: rightsState !== "unknown",
   };
   const requiredFlags: boolean[] = [
     rowPass.code, rowPass.rates, rowPass.goals, rowPass.staff, rowPass.guardian,
@@ -293,7 +299,9 @@ export function SetupChecklist({ clientId, jobId }: { clientId: string; jobId: s
     rowPass.sow, rowPass.lon, rowPass.ec2, rowPass.grievance,
     askPass.medications, askPass.allergies, askPass.immunizations,
     askPass.advanced_directives, askPass.court_orders,
+    rowPass.rights,
   ];
+  const allRequiredPass = requiredFlags.every(Boolean);
   const doneCount = requiredFlags.filter(Boolean).length;
   const totalCount = requiredFlags.length;
   const pct = totalCount === 0 ? 0 : Math.round((doneCount / totalCount) * 100);

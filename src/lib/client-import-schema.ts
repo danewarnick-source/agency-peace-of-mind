@@ -438,34 +438,82 @@ export async function applyExtractedFieldsToClient(
 
   if (codeRows.length) {
     const codes = Array.from(new Set(codeRows.map((r) => r.service_code)));
-    // PCSP / 1056 is authoritative — REPLACE authorized_dspd_codes and job_code (billing codes)
-    // with exactly the codes the document yielded. A code the client had before
-    // that is NOT in this PCSP no longer remains as an active authorized billing code.
-    const curCodes = ((client as Record<string, unknown>).authorized_dspd_codes as string[] | null) ?? [];
-    const sameSet = curCodes.length === codes.length && curCodes.every((c) => codes.includes(c));
-    if (!sameSet) {
-      update.authorized_dspd_codes = codes;
-      autofilled.push("authorized_dspd_codes");
+    // Only PCSP and 1056 are authoritative for the active code SET. Other
+    // document types (MAR, BSP, immunization, allergy, end-of-life docs) must
+    // NEVER touch authorized_dspd_codes / job_code, even if a stray
+    // billing_code_row leaks through.
+    const isAuthoritative =
+      sourceDocumentType === null || // legacy callers (no type) keep prior behavior
+      sourceDocumentType === "pcsp" ||
+      sourceDocumentType === "1056_budget";
+
+    if (isAuthoritative) {
+      const curCodes = ((client as Record<string, unknown>).authorized_dspd_codes as string[] | null) ?? [];
+      const sameSet = curCodes.length === codes.length && curCodes.every((c) => codes.includes(c));
+      if (!sameSet) {
+        update.authorized_dspd_codes = codes;
+        autofilled.push("authorized_dspd_codes");
+      }
+      update.job_code = codes;
     }
-    update.job_code = codes;
 
     const { isDailyServiceCode } = await import("@/lib/service-billing");
-    const stubs = codeRows.map((r) => ({
-      organization_id: organizationId,
-      client_id: clientId,
-      service_code: r.service_code,
-      unit_type: r.unit_type ?? (isDailyServiceCode(r.service_code) ? "day" : "unit"),
-      annual_unit_authorization: r.max_units ?? 0,
-      rate_per_unit: r.rate ?? 0,
-      weekly_cap_units: r.weekly_cap_units ?? null,
-      service_start_date: r.plan_start ?? null,
-      service_end_date: r.plan_end ?? null,
-    }));
+
+    // Authoritative-source rule for UNITS: the 1056 wins. A PCSP may seed
+    // units only when no prior authorization row exists; the 1056 always
+    // overwrites annual_unit_authorization for the codes it lists.
+    // Pull current rows so we know which (org, client, service_code) exist.
+    const { data: existingForUnits } = await supabase
+      .from("client_billing_codes")
+      .select("service_code, annual_unit_authorization")
+      .eq("organization_id", organizationId)
+      .eq("client_id", clientId);
+    const existingByCode = new Map<string, number | null>(
+      ((existingForUnits ?? []) as Array<{ service_code: string; annual_unit_authorization: number | null }>)
+        .map((r) => [r.service_code, r.annual_unit_authorization]),
+    );
+
+    const stubs = codeRows.map((r) => {
+      const prior = existingByCode.get(r.service_code) ?? null;
+      let annual: number | null = r.max_units ?? null;
+      if (sourceDocumentType === "1056_budget") {
+        // 1056 wins for units — always overwrite when it provides a value.
+        annual = r.max_units ?? prior ?? 0;
+      } else if (sourceDocumentType === "pcsp") {
+        // PCSP only fills units when none are on file (or were zero).
+        annual = (prior && prior > 0) ? prior : (r.max_units ?? 0);
+        if (r.max_units && prior && prior > 0 && r.max_units !== prior) {
+          void writeScalarConflict(
+            `client_billing_codes.${r.service_code}.annual_unit_authorization`,
+            prior,
+            r.max_units,
+          );
+        }
+      } else {
+        annual = r.max_units ?? prior ?? 0;
+      }
+      return {
+        organization_id: organizationId,
+        client_id: clientId,
+        service_code: r.service_code,
+        unit_type: r.unit_type ?? (isDailyServiceCode(r.service_code) ? "day" : "unit"),
+        annual_unit_authorization: annual ?? 0,
+        rate_per_unit: r.rate ?? 0,
+        weekly_cap_units: r.weekly_cap_units ?? null,
+        service_start_date: r.plan_start ?? null,
+        service_end_date: r.plan_end ?? null,
+      };
+    });
     const { error: bcErr } = await supabase
       .from("client_billing_codes")
       .upsert(stubs, { onConflict: "organization_id,client_id,service_code" });
     if (bcErr) throw new Error(`billing-codes upsert failed: ${bcErr.message}`);
     autofilled.push(`client_billing_codes(${stubs.length})`);
+
+    // Close stale rows only on authoritative writes.
+    if (!isAuthoritative) {
+      // Skip the stale-closing sweep below.
+    }
 
     // Close any existing authorization rows for codes NOT in the new PCSP.
     const today = new Date().toISOString().slice(0, 10);

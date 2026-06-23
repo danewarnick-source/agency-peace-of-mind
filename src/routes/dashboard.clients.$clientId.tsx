@@ -29,6 +29,7 @@ import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { FinishOnboardingCard } from "@/components/clients/finish-onboarding-card";
 import { ClientReadinessCard } from "@/components/clients/client-readiness-card";
 import { TrackedFieldsCard } from "@/components/clients/tracked-fields-card";
+import { ClientProfileTab } from "@/components/clients/profile-tab";
 import {
   ArrowLeft, User, FileText, ClipboardList, Clock, AlertTriangle,
   Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Pencil, Users, Trash2,
@@ -41,7 +42,7 @@ const search = z.object({
   tab: z
     .enum([
       "overview", "plan", "codes", "caseload", "shifts", "logs", "incidents",
-      "summaries", "hhcert", "deadlines", "documents",
+      "summaries", "hhcert", "deadlines", "documents", "files",
     ])
     .optional(),
 });

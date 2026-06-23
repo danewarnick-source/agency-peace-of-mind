@@ -108,10 +108,17 @@ Common field_key values to extract when present (use field_group to bucket relat
     admission date is present; omit if not present in any form),
     discharge_date (value_date — usually absent on intake; omit if not present)
   Address (group "address"): physical_address  -- client's service/home street address
-  Emergency contact (group "emergency_contact"): emergency_contact_name, emergency_contact_phone, emergency_contact_instructions
+  Emergency contact (group "emergency_contact"): emergency_contact_name, emergency_contact_phone, emergency_contact_instructions.
     ALWAYS split name and phone into TWO separate fields. Never combine.
+    If a SECOND emergency contact is listed, emit emergency_contact_2_name,
+    emergency_contact_2_phone, emergency_contact_2_instructions for that person.
   Guardian (group "guardian"): is_own_guardian (value_bool), guardian_name, guardian_phone,
     guardian_relationship, guardian_email, guardian_address
+  Level of need (group "person"): level_of_need (value_text) — the DSPD-assigned level/score
+    (e.g. "Level 4", "High", "Acuity 5") when stated in the PCSP, 1056, or assessment.
+  Grievance acknowledgment (group "rights"): grievance_acknowledged (value_bool true) and
+    grievance_signed_date (value_date) when the document is a SIGNED grievance-policy
+    acknowledgment form (SOW §1.10(11)). Omit unless explicitly signed.
   Goals (group "goals"): pcsp_goal -- emit ONE field per distinct goal/objective in value_text.
     PCSP goals often appear in a table (Goal / Objective / Support Code). Emit one pcsp_goal
     per ROW, not one combined entry.

@@ -115,7 +115,22 @@ export async function applyExtractedFieldsToClient(
   const { data: client, error: cErr } = await supabase
     .from("clients")
     .select(
-      "id, first_name, last_name, date_of_birth, medicaid_id, phone_number, physical_address, emergency_contact_name, emergency_contact_phone, is_own_guardian, guardian_name, guardian_phone, guardian_relationship, guardian_email, guardian_address, special_directions, allergies, dysphagia, swallowing_alerts, self_admin_med_support, pcsp_goals, authorized_dspd_codes, job_code, team_id",
+      "id, first_name, last_name, date_of_birth, medicaid_id, phone_number, physical_address, " +
+      "emergency_contact_name, emergency_contact_phone, emergency_contact_instructions, " +
+      "is_own_guardian, guardian_name, guardian_phone, guardian_relationship, guardian_email, guardian_address, " +
+      "special_directions, allergies, dysphagia, swallowing_alerts, self_admin_med_support, " +
+      "pcsp_goals, authorized_dspd_codes, job_code, team_id, " +
+      "support_coordinator_name, support_coordinator_email, support_coordinator_phone, " +
+      "primary_care_name, primary_care_phone, " +
+      "neurologist_name, neurologist_phone, " +
+      "dentist_name, dentist_phone, " +
+      "prescriber_name, prescriber_phone, " +
+      "bsp_status, medical_insurance, housing_voucher, preferred_living, " +
+      "plan_year, disability_category, staff_ratio, " +
+      "advanced_directives, emergency_medical_treatment_authorization, " +
+      "diagnoses, chronic_conditions, immunizations, court_orders, rights_restrictions, " +
+      "preferred_activities, roommates, personal_belongings_inventory, " +
+      "admission_date, discharge_date",
     )
     .eq("id", clientId)
     .eq("organization_id", organizationId)
@@ -222,6 +237,57 @@ export async function applyExtractedFieldsToClient(
     .filter((s): s is string => !!s);
   if (goals.length) mergeArrayColumn("pcsp_goals", goals);
 
+  // Support coordinator
+  setScalarText("support_coordinator_name", "support_coordinator_name");
+  setScalarText("support_coordinator_email", "support_coordinator_email");
+  setScalarText("support_coordinator_phone", "support_coordinator_phone");
+
+  // Medical providers
+  setScalarText("primary_care_name", "primary_care_name");
+  setScalarText("primary_care_phone", "primary_care_phone");
+  setScalarText("neurologist_name", "neurologist_name");
+  setScalarText("neurologist_phone", "neurologist_phone");
+  setScalarText("dentist_name", "dentist_name");
+  setScalarText("dentist_phone", "dentist_phone");
+  setScalarText("prescriber_name", "prescriber_name");
+  setScalarText("prescriber_phone", "prescriber_phone");
+
+  // Medical / compliance
+  setScalarText("bsp_status", "bsp_status");
+  setScalarText("medical_insurance", "medical_insurance");
+  setScalarText("housing_voucher", "housing_voucher");
+  setScalarText("preferred_living", "preferred_living");
+  setScalarText("emergency_contact_instructions", "emergency_contact_instructions");
+  setScalarText("plan_year", "plan_year");
+  setScalarText("disability_category", "disability_category");
+  setScalarText("staff_ratio", "staff_ratio");
+
+  // Booleans
+  setScalarBool("advanced_directives", "advanced_directives");
+  setScalarBool("emergency_medical_treatment_authorization", "emergency_medical_treatment_authorization");
+
+  // Array columns
+  const diagnosesF = byKey.get("diagnoses");
+  if (diagnosesF) mergeArrayColumn("diagnoses", fieldArray(diagnosesF) ?? []);
+  const chronicF = byKey.get("chronic_conditions");
+  if (chronicF) mergeArrayColumn("chronic_conditions", fieldArray(chronicF) ?? []);
+  const immunF = byKey.get("immunizations");
+  if (immunF) mergeArrayColumn("immunizations", fieldArray(immunF) ?? []);
+  const courtF = byKey.get("court_orders");
+  if (courtF) mergeArrayColumn("court_orders", fieldArray(courtF) ?? []);
+  const rightsF = byKey.get("rights_restrictions");
+  if (rightsF) mergeArrayColumn("rights_restrictions", fieldArray(rightsF) ?? []);
+  const activitiesF = byKey.get("preferred_activities");
+  if (activitiesF) mergeArrayColumn("preferred_activities", fieldArray(activitiesF) ?? []);
+  const roommatesF = byKey.get("roommates");
+  if (roommatesF) mergeArrayColumn("roommates", fieldArray(roommatesF) ?? []);
+  const belongingsF = byKey.get("personal_belongings_inventory");
+  if (belongingsF) mergeArrayColumn("personal_belongings_inventory", fieldArray(belongingsF) ?? []);
+
+  // SOW §1.10 required dates
+  setScalarDate("admission_date", "admission_date");
+  setScalarDate("discharge_date", "discharge_date");
+
   // Billing-code rows
   const codeRows: Array<{
     service_code: string;
@@ -269,9 +335,9 @@ export async function applyExtractedFieldsToClient(
 
   if (codeRows.length) {
     const codes = Array.from(new Set(codeRows.map((r) => r.service_code)));
-    // PCSP / 1056 is authoritative — REPLACE authorized_dspd_codes and job_code
+    // PCSP / 1056 is authoritative — REPLACE authorized_dspd_codes and job_code (billing codes)
     // with exactly the codes the document yielded. A code the client had before
-    // that is NOT in this PCSP no longer remains as an active authorized code.
+    // that is NOT in this PCSP no longer remains as an active authorized billing code.
     const curCodes = ((client as Record<string, unknown>).authorized_dspd_codes as string[] | null) ?? [];
     const sameSet = curCodes.length === codes.length && curCodes.every((c) => codes.includes(c));
     if (!sameSet) {
@@ -497,11 +563,11 @@ export async function applyExtractedFieldsToClient(
     }
   }
 
-  // Anything else without a clients column → generic custom field, so
-  // nothing extracted is lost and each agency builds its own field library.
+  // Anything else without a clients column → generic custom field so nothing
+  // extracted is lost. Unknown keys are logged once so we can detect future drops.
   const KNOWN_CORE = new Set<string>([
-    "first_name", "last_name", "dob", "medicaid_id", "phone",
-    "physical_address", "emergency_contact_name", "emergency_contact_phone",
+    "first_name", "last_name", "full_name", "dob", "medicaid_id", "phone",
+    "physical_address", "emergency_contact_name", "emergency_contact_phone", "emergency_contact_instructions",
     "is_own_guardian", "guardian_name", "guardian_phone", "guardian_relationship",
     "guardian_email", "guardian_address",
     "clinical_alert", "special_directions", "dysphagia", "self_admin_med_support",
@@ -510,6 +576,23 @@ export async function applyExtractedFieldsToClient(
     "weekly_cap_units", "plan_start", "plan_end",
     "team_name", "staff_ratio",
     "client_medication", "pcsp_has_medications",
+    // Support coordinator
+    "support_coordinator_name", "support_coordinator_email", "support_coordinator_phone",
+    // Medical providers
+    "primary_care_name", "primary_care_phone",
+    "neurologist_name", "neurologist_phone",
+    "dentist_name", "dentist_phone",
+    "prescriber_name", "prescriber_phone",
+    // Medical / compliance
+    "bsp_status", "medical_insurance", "housing_voucher", "preferred_living",
+    "plan_year", "disability_category",
+    "advanced_directives", "emergency_medical_treatment_authorization",
+    // Array columns
+    "diagnoses", "chronic_conditions", "immunizations",
+    "court_orders", "rights_restrictions",
+    "preferred_activities", "roommates", "personal_belongings_inventory",
+    // SOW §1.10 dates
+    "admission_date", "discharge_date",
   ]);
   const seenCustom = new Set<string>();
   for (const f of ok) {
@@ -517,6 +600,7 @@ export async function applyExtractedFieldsToClient(
     if (registryConsumed.has(f.field_key)) continue;
     if (seenCustom.has(f.field_key)) continue;
     seenCustom.add(f.field_key);
+    console.warn(`[client-import] unmapped field_key "${f.field_key}" — routing to custom field`);
     const val = fieldText(f) ?? (fieldArray(f)?.join(", ") ?? null);
     if (!val) continue;
     try {

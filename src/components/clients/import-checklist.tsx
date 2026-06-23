@@ -341,11 +341,11 @@ function RightsRestrictionRow({
   const hasRestrictions = (restrictions ?? []).length > 0;
   const [yes, setYes] = useState<boolean | null>(hasRestrictions ? true : null);
   useEffect(() => { if (hasRestrictions) setYes(true); }, [hasRestrictions]);
+  const listFn = useServerFn(listHrcReviewsForClient);
   const reviewsQ = useQuery({
     queryKey: ["hrc-reviews-for-client", clientId],
     queryFn: async () => {
-      const list = useServerFnSafe(listHrcReviewsForClient);
-      const r = await list({ data: { clientId } });
+      const r = await listFn({ data: { clientId } });
       return r.reviews as Array<{ id: string; status: string; restriction_summary: string | null }>;
     },
     enabled: yes === true,

@@ -32,6 +32,9 @@ export const Route = createFileRoute("/dashboard/client-training/$clientId")({
 // ── Question answer state ────────────────────────────────────────────────────
 type QAnswer = { question: string; answer: string; tab: string; relevant: boolean | null; hint: string; checking: boolean };
 
+const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
+const MIN_WORDS = 25;
+
 function ClientTrainingViewer() {
   const { clientId } = Route.useParams();
   const { trainingType: rawType } = Route.useSearch();

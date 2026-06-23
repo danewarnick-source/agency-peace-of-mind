@@ -193,26 +193,43 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
   }
 
   if (!training) {
+  const pcspDialog = (
+    <Dialog open={showPcspPrompt} onOpenChange={setShowPcspPrompt}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Upload the PCSP first</DialogTitle>
+          <DialogDescription>
+            This client has no PCSP on file. Support strategies and client-specific training are built from the PCSP, so you'll need to upload it before drafting. Add it under the client's Files tab.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowPcspPrompt(false)}>Got it</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  if (!training) {
     return (
       <div className="space-y-3">
         <div className="rounded-md border border-dashed border-border/60 bg-muted/30 p-4 text-sm text-muted-foreground">
           No client-specific training yet. NECTAR will assemble a draft from this client's own authoritative data (intake, PCSP goals, billing codes, active meds, BSP status & published behaviors, rights summary, documents). NECTAR <strong>presents verbatim</strong> — it does not author care guidance.
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => draftMut.mutate(false)} disabled={draftMut.isPending}>
+          <Button size="sm" onClick={() => pcspReady ? draftMut.mutate(false) : setShowPcspPrompt(true)} disabled={draftMut.isPending}>
             {draftMut.isPending
               ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
               : <Sparkles className="mr-1.5 h-3.5 w-3.5 text-amber-500" />}
             Build from PCSP goals (NECTAR)
           </Button>
-          <Button size="sm" variant="outline" onClick={() => blankMut.mutate()} disabled={blankMut.isPending}>
+          <Button size="sm" variant="outline" onClick={() => pcspReady ? blankMut.mutate() : setShowPcspPrompt(true)} disabled={blankMut.isPending}>
             {blankMut.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
             Write manually
           </Button>
           <Button
             size="sm"
             variant="outline"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => pcspReady ? fileInputRef.current?.click() : setShowPcspPrompt(true)}
             disabled={uploading || !orgId}
           >
             {uploading
@@ -232,6 +249,7 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
             }}
           />
         </div>
+        {pcspDialog}
       </div>
     );
   }

@@ -367,11 +367,24 @@ async function commitClient(
         base.value_text = s;
         return base;
       });
+    // Infer source document type from the extracted fields (good enough for the
+    // authoritative-source rules — see client-import-schema for full semantics).
+    const inferredType: "1056_budget" | "pcsp" | "other" =
+      norm.some((n) => n.field_key === "form_1056_number" || n.field_key === "form_1056_approved_date")
+        ? "1056_budget"
+        : norm.some((n) => n.field_key === "pcsp_goal" || n.field_key === "pcsp_has_medications")
+        ? "pcsp"
+        : "other";
     const apply = await applyExtractedFieldsToClient({
       supabase: sb,
       organizationId: orgId,
       clientId: recordId,
       fields: norm,
+      sourceDocumentType: inferredType,
+      importJobId: jobId,
+      onError: async (action, message) => {
+        await audit(sb, jobId, orgId, subj.id, message, "admin_override", userId, action);
+      },
     });
     gaps.push(...apply.suggested.map((s) => `Review: ${s}`));
   } catch (err) {
@@ -383,6 +396,57 @@ async function commitClient(
 
   return recordId;
 }
+
+// Helper for the pre-commit validation gate. Builds a minimal ClientDraft
+// from extracted_fields rows so the same validator the review screen uses
+// can also run server-side immediately before write.
+function buildClientDraftFromFields(
+  rows: Array<{ target_field: string; value: string | null }>,
+): ClientDraft {
+  const d: ClientDraft = {};
+  const codes: NonNullable<ClientDraft["billing_codes"]> = [];
+  for (const r of rows) {
+    const v = (r.value ?? "").trim();
+    if (!v) continue;
+    switch (r.target_field) {
+      case "first_name": d.first_name = v; break;
+      case "last_name": d.last_name = v; break;
+      case "physical_address":
+      case "address":
+        d.physical_address = v; break;
+      case "medicaid_id": d.medicaid_id = v; break;
+      case "date_of_birth":
+      case "dob":
+        d.date_of_birth = v; break;
+      case "admission_date": d.admission_date = v; break;
+      case "discharge_date": d.discharge_date = v; break;
+      case "form_1056_approved_date": d.form_1056_approved_date = v; break;
+      case "is_own_guardian":
+        try { d.is_own_guardian = !!(JSON.parse(v) as { bool?: boolean }).bool; }
+        catch { d.is_own_guardian = v === "true"; }
+        break;
+      case "guardian_name": d.guardian_name = v; break;
+      case "billing_code_row":
+        try {
+          const j = JSON.parse(v) as Record<string, unknown>;
+          if (j.service_code) {
+            codes.push({
+              service_code: String(j.service_code).toUpperCase(),
+              rate: typeof j.rate === "number" ? j.rate : Number(j.rate) || null,
+              max_units: typeof j.max_units === "number" ? j.max_units : Number(j.max_units) || null,
+              unit_type: j.unit_type ? String(j.unit_type) : null,
+              plan_start: j.plan_start ? String(j.plan_start).slice(0, 10) : null,
+              plan_end: j.plan_end ? String(j.plan_end).slice(0, 10) : null,
+            });
+          }
+        } catch { /* malformed row — validator only checks codes it can read */ }
+        break;
+    }
+  }
+  if (codes.length) d.billing_codes = codes;
+  return d;
+}
+
 
 
 // --------------------------------------------------------------

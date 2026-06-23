@@ -313,7 +313,7 @@ function ClientTrainingViewer() {
               </div>
               <Button
                 onClick={() => completeMut.mutate()}
-                disabled={completeMut.isPending || anyChecking || signature.trim().length < 3 || !allAnswered}
+                disabled={completeMut.isPending || anyChecking || signature.trim().length < 3 || !allAnswered || !contentRead}
                 className="bg-[image:var(--gradient-brand)] text-primary-foreground"
               >
                 {completeMut.isPending || anyChecking

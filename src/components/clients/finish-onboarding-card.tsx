@@ -70,7 +70,11 @@ export function FinishOnboardingCard({ clientId }: { clientId: string }) {
   const items = buildItems(s);
   const open = items.filter((i) => !i.done && !i.skipped);
   const unknowns = fieldStatesQ.data
-    ? TRACKED_FIELDS.filter((f) => fieldStatesQ.data!.states[f.key] === "unknown")
+    ? TRACKED_FIELDS.filter(
+        (f) =>
+          fieldStatesQ.data!.states[f.key] === "unknown" &&
+          !EOL_CONFIRMATION_KEYS.has(f.key),
+      )
     : [];
 
   if (open.length === 0 && unknowns.length === 0) return null;

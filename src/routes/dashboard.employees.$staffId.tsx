@@ -59,6 +59,7 @@ import {
   addStaffHoursEntry,
   deleteStaffHoursEntry,
 } from "@/lib/hr-training-hours.functions";
+import { recordAttestation, listAttestations } from "@/lib/document-attestations.functions";
 
 export const Route = createFileRoute("/dashboard/employees/$staffId")({
   component: () => (
@@ -994,6 +995,9 @@ function CertsTab({
   const fetchAnnualHours = useServerFn(getStaffAnnualHoursDetail);
   const addHoursFn = useServerFn(addStaffHoursEntry);
   const delHoursFn = useServerFn(deleteStaffHoursEntry);
+  const recordAttestationFn = useServerFn(recordAttestation);
+  const listAttestationsFn = useServerFn(listAttestations);
+  const qc = useQueryClient();
 
   const [filter, setFilter] = useState<"all" | "action" | "current" | "na">("all");
   const [auditOpen, setAuditOpen] = useState(false);
@@ -1003,6 +1007,7 @@ function CertsTab({
     hours: "",
     note: "",
   });
+  const [attestedHours, setAttestedHours] = useState(false);
 
   const checklistQ = useQuery({
     queryKey: ["staff-checklist", organizationId, staffId],
@@ -1017,6 +1022,12 @@ function CertsTab({
   const annualHoursQ = useQuery({
     queryKey: ["staff-annual-hours", organizationId, staffId],
     queryFn: () => fetchAnnualHours({ data: { organization_id: organizationId, staff_id: staffId } }),
+  });
+
+  const attestationsQ = useQuery({
+    enabled: !!organizationId && !!staffId,
+    queryKey: ["attestations", organizationId, staffId],
+    queryFn: () => listAttestationsFn({ data: { organization_id: organizationId, staff_id: staffId } }),
   });
 
   const invalidate = () => {
@@ -1038,13 +1049,25 @@ function CertsTab({
           note: hoursDraft.note || null,
         },
       });
+      await recordAttestationFn({
+        data: {
+          organization_id: organizationId,
+          staff_id: staffId,
+          subject_kind: "training_hours",
+          subject_ref: requirementId,
+          hr_document_id: null,
+          attestation_text: "I verify that these training hours were completed as logged.",
+        },
+      });
     },
     onSuccess: () => {
       toast.success("Hours logged");
       setLogHoursOpen(false);
+      setAttestedHours(false);
       setHoursDraft({ entry_date: new Date().toISOString().slice(0, 10), hours: "", note: "" });
       annualHoursQ.refetch();
       checklistQ.refetch();
+      qc.invalidateQueries({ queryKey: ["attestations", organizationId, staffId] });
     },
     onError: (e) => toast.error((e as Error).message),
   });
@@ -1452,17 +1475,28 @@ function CertsTab({
                             placeholder="What was the training?"
                           />
                         </div>
-                        <div className="sm:col-span-4 flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => addHoursMutation.mutate(annualDetail.config.requirement_id)}
-                            disabled={addHoursMutation.isPending}
-                          >
-                            Save
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setLogHoursOpen(false)}>
-                            Cancel
-                          </Button>
+                        <div className="sm:col-span-4 space-y-2">
+                          <label className="flex items-center gap-2 text-xs">
+                            <input
+                              type="checkbox"
+                              checked={attestedHours}
+                              onChange={(e) => setAttestedHours(e.target.checked)}
+                              className="rounded"
+                            />
+                            I verify these hours were completed as logged.
+                          </label>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => addHoursMutation.mutate(annualDetail.config.requirement_id)}
+                              disabled={addHoursMutation.isPending || !attestedHours}
+                            >
+                              Save
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setLogHoursOpen(false)}>
+                              Cancel
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1490,6 +1524,22 @@ function CertsTab({
                     createUpload={createUpload}
                     getDocUrl={getDocUrl}
                   />
+                  {!!row.completion.evidence_document_id && row.completion.nectar_validation_status !== "failed" && (
+                    <AttestationGate
+                      organizationId={organizationId}
+                      staffId={staffId}
+                      subjectKind="baseline_cert"
+                      subjectRef={key}
+                      hrDocumentId={row.completion.evidence_document_id}
+                      statement="I verify that the information on this document is accurate and current, and that this individual has met this requirement."
+                      attested={(attestationsQ.data ?? []).some((a) => a.subject_kind === "baseline_cert" && a.subject_ref === key)}
+                      onAttested={async () => {
+                        attestationsQ.refetch();
+                        try { await signOffBaselineFn({ data: { organization_id: organizationId, staff_id: staffId, training_key: key } }); } catch (_) {}
+                        invalidate();
+                      }}
+                    />
+                  )}
                 </div>
               )}
               {notTriggered && (
@@ -1546,6 +1596,18 @@ function CertsTab({
                         attachBaselineFn={attachBaselineFn}
                         createUpload={createUpload}
                         getDocUrl={getDocUrl}
+                      />
+                    )}
+                    {row.applicable !== false && !!row.completion.evidence_document_id && row.completion.nectar_validation_status !== "failed" && (
+                      <AttestationGate
+                        organizationId={organizationId}
+                        staffId={staffId}
+                        subjectKind="checklist_doc"
+                        subjectRef={row.requirement_id}
+                        hrDocumentId={row.completion.evidence_document_id}
+                        statement="I verify that the information on this document is accurate and current, and that this individual has met this requirement."
+                        attested={(attestationsQ.data ?? []).some((a) => a.subject_kind === "checklist_doc" && a.subject_ref === row.requirement_id)}
+                        onAttested={() => { attestationsQ.refetch(); invalidate(); }}
                       />
                     )}
                     {row.applicable === false && (
@@ -1683,14 +1745,14 @@ function CertBaselineAction({
           ? "border-rose-300 text-rose-700 hover:bg-rose-50"
           : "border-border/60 text-muted-foreground"
       } ${working ? "opacity-50 pointer-events-none" : ""}`}
-      title={validationFailed ? "Nectar rejected this cert — upload a replacement" : "Upload certificate (PDF or photo)"}
+      title={validationFailed ? "Nectar rejected this cert — upload a replacement" : "Upload certificate (PDF, image, or document)"}
     >
       <Upload className="h-3 w-3" />
       <span>{validationFailed ? "Replace cert" : hasCert ? "Replace" : "Upload"}</span>
       <input
         type="file"
         className="hidden"
-        accept=".pdf,image/png,image/jpeg,image/jpg"
+        accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.doc,.docx,.csv,.xls,.xlsx,image/*,application/pdf"
         disabled={working}
         onChange={async (e) => {
           const f = e.target.files?.[0];
@@ -1700,6 +1762,57 @@ function CertBaselineAction({
         }}
       />
     </label>
+  );
+}
+
+/* ======================================================================
+ * AttestationGate — admin attests a document or training hours entry.
+ * ====================================================================*/
+function AttestationGate({
+  organizationId, staffId, subjectKind, subjectRef, hrDocumentId, statement, attested, onAttested,
+}: {
+  organizationId: string;
+  staffId: string;
+  subjectKind: "baseline_cert" | "checklist_doc" | "training_hours";
+  subjectRef: string;
+  hrDocumentId: string | null;
+  statement: string;
+  attested: boolean;
+  onAttested: () => void;
+}) {
+  const recordFn = useServerFn(recordAttestation);
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  if (attested) {
+    return <span className="text-[11px] text-emerald-700">Attested ✓</span>;
+  }
+  const attest = async () => {
+    setSaving(true);
+    try {
+      await recordFn({ data: {
+        organization_id: organizationId, staff_id: staffId,
+        subject_kind: subjectKind, subject_ref: subjectRef,
+        hr_document_id: hrDocumentId, attestation_text: statement,
+      }});
+      toast.success("Attested");
+      setOpen(false);
+      onAttested();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+  return open ? (
+    <div className="flex flex-col items-end gap-1">
+      <span className="max-w-[220px] text-right text-[10px] text-muted-foreground">{statement}</span>
+      <div className="flex gap-1">
+        <Button size="sm" className="h-6 text-[11px]" disabled={saving} onClick={attest}>Confirm</Button>
+        <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => setOpen(false)}>Cancel</Button>
+      </div>
+    </div>
+  ) : (
+    <button type="button" onClick={() => setOpen(true)} className="text-[11px] text-primary underline">Attest</button>
   );
 }
 

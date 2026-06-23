@@ -1,14 +1,17 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   listStaffTypeProposal,
   getStaffTypeAssignment,
   setStaffTypeKeys,
+  upsertStaffType,
 } from "@/lib/staff-types.functions";
 
 /**
@@ -25,7 +28,26 @@ export function StaffTypeEditor({
   const fetchProposal = useServerFn(listStaffTypeProposal);
   const fetchAssignment = useServerFn(getStaffTypeAssignment);
   const save = useServerFn(setStaffTypeKeys);
+  const createType = useServerFn(upsertStaffType);
   const qc = useQueryClient();
+
+  const [newLabel, setNewLabel] = useState("");
+  const [addingType, setAddingType] = useState(false);
+
+  const createMutation = useMutation({
+    mutationFn: async (label: string) => {
+      const key = label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+      if (!key) throw new Error("Enter a valid type name");
+      return createType({ data: { organization_id: organizationId, key, label: label.trim() } });
+    },
+    onSuccess: () => {
+      toast.success("Staff type added");
+      setNewLabel("");
+      setAddingType(false);
+      qc.invalidateQueries({ queryKey: ["staff-types-proposal", organizationId] });
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
 
   const typesQ = useQuery({
     queryKey: ["staff-types-proposal", organizationId],
@@ -97,6 +119,27 @@ export function StaffTypeEditor({
               <Badge variant="outline" className="text-[10px]">
                 Untyped — all requirements treated as applicable
               </Badge>
+            )}
+            {addingType ? (
+              <div className="mt-2 flex items-center gap-2">
+                <Input
+                  value={newLabel}
+                  onChange={(e) => setNewLabel(e.target.value)}
+                  placeholder="New staff type name"
+                  className="h-7 text-xs"
+                  onKeyDown={(e) => { if (e.key === "Enter" && newLabel.trim()) createMutation.mutate(newLabel); }}
+                />
+                <Button size="sm" className="h-7 text-xs" disabled={!newLabel.trim() || createMutation.isPending} onClick={() => createMutation.mutate(newLabel)}>
+                  Add
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setAddingType(false); setNewLabel(""); }}>
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <Button size="sm" variant="outline" className="mt-2 h-7 text-xs" onClick={() => setAddingType(true)}>
+                <Plus className="mr-1 h-3 w-3" /> Add custom type
+              </Button>
             )}
             <p className="text-[11px] text-muted-foreground">
               UNION rule: the staffer is required for any requirement that applies to at least

@@ -66,7 +66,15 @@ function ClientTrainingViewer() {
   if (training?.id && training.id !== lastTrainingId) {
     setLastTrainingId(training.id);
     setAnswers(questions.map((q) => ({ question: q.prompt, answer: "", tab: q.tab, relevant: null, hint: "", checking: false })));
+    setContentRead(false);
   }
+
+  // Short-content safety: if there's nothing to scroll, mark as read.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !training) return;
+    if (el.scrollHeight <= el.clientHeight + 4) setContentRead(true);
+  }, [training, lastTrainingId]);
 
   function patchAnswer(idx: number, p: Partial<QAnswer>) {
     setAnswers((prev) => { const next = [...prev]; next[idx] = { ...next[idx], ...p }; return next; });

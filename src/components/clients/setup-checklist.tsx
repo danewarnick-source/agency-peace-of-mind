@@ -48,7 +48,14 @@ import {
   setLevelOfNeed,
   setEmergencyContact,
   setGrievanceAcknowledgment,
+  appendClientArrayField,
+  upsertClientMedication,
 } from "@/lib/import-checklist.functions";
+import {
+  getClientFieldStates,
+  setFieldConfirmation,
+  type FieldStateMap,
+} from "@/lib/field-confirmations.functions";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
 import { isClockableServiceCode } from "@/lib/service-billing";
 import {
@@ -56,6 +63,7 @@ import {
   type ProfileField,
 } from "@/lib/client-profile-fields";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
+import { NectarAsk } from "@/components/clients/nectar-ask";
 import { Textarea } from "@/components/ui/textarea";
 
 // ---------------------------------------------------------------------------

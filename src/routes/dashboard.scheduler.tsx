@@ -1021,7 +1021,7 @@ function AddShiftDialog({
                         {needs30Day && (
                           <AlertTriangle
                             className="inline h-3 w-3 shrink-0 text-red-600"
-                            title="30-day training incomplete"
+                           
                             aria-label="30-day training incomplete"
                           />
                         )}
@@ -1313,7 +1313,7 @@ function ShiftDetailPanel({
                   {shift.staff_id && missingThirtyDay.has(shift.staff_id) && (
                     <AlertTriangle
                       className="inline h-3 w-3 shrink-0 text-red-600"
-                      title="30-day training incomplete"
+                     
                       aria-label="30-day training incomplete"
                     />
                   )}
@@ -1331,7 +1331,7 @@ function ShiftDetailPanel({
                       {needs30Day && (
                         <AlertTriangle
                           className="inline h-3 w-3 shrink-0 text-red-600"
-                          title="30-day training incomplete"
+                         
                           aria-label="30-day training incomplete"
                         />
                       )}
@@ -1361,7 +1361,7 @@ function ShiftDetailPanel({
                         {needs30Day && (
                           <AlertTriangle
                             className="inline h-3 w-3 shrink-0 text-red-600"
-                            title="30-day training incomplete"
+                           
                           />
                         )}
                         {s.name}

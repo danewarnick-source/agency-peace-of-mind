@@ -289,7 +289,12 @@ function ClientTrainingViewer() {
             )}
             {questions.length > 0 && !allAnswered && (
               <p className="text-[11px] text-amber-800">
-                Please answer all review questions above before signing.
+                Please answer all review questions (at least 25 words each) before signing.
+              </p>
+            )}
+            {!contentRead && (
+              <p className="text-[11px] text-amber-800">
+                Scroll through the full training above before signing.
               </p>
             )}
             <p className="text-[11px] leading-relaxed text-muted-foreground">

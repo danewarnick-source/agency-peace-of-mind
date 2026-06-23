@@ -167,7 +167,7 @@ function ClientTrainingViewer() {
   const alreadyCurrent = completion?.is_current && pinned;
   const goals = (training as { goals?: CSTGoal[] | null }).goals ?? null;
 
-  const allAnswered = questions.length === 0 || answers.every((a) => a.answer.trim().length > 0);
+  const allAnswered = questions.length === 0 || answers.every((a) => wordCount(a.answer) >= MIN_WORDS);
   const anyChecking = answers.some((a) => a.checking);
 
   return (

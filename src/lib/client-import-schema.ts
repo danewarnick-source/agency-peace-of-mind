@@ -387,6 +387,10 @@ export async function applyExtractedFieldsToClient(
   setScalarDate("admission_date", "admission_date");
   setScalarDate("discharge_date", "discharge_date");
 
+  // 1056 (DSPD Service Authorization Form) — header fields.
+  setScalarText("form_1056_number", "form_1056_number");
+  setScalarDate("form_1056_approved_date", "form_1056_approved_date");
+
   // Billing-code rows
   const codeRows: Array<{
     service_code: string;

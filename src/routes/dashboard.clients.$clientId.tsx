@@ -19,17 +19,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
-import {
-  ArrowLeft, User, FileText, ClipboardList, Clock, AlertTriangle,
-  Stethoscope, HomeIcon, CalendarClock, FolderOpen, Sparkles, Users, Trash2,
-} from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { clientFeatureVisible } from "@/lib/client-features";
 
 const search = z.object({
@@ -53,10 +50,10 @@ export const Route = createFileRoute("/dashboard/clients/$clientId")({
 
 function ClientProfileHub() {
   const { clientId } = Route.useParams();
-  const { tab } = Route.useSearch();
   const { data: org } = useCurrentOrg();
   const router = useRouter();
   const orgId = org?.organization_id;
+  const [showFiles, setShowFiles] = useState(false);
 
   const clientQ = useQuery({
     enabled: !!orgId,
@@ -117,81 +114,20 @@ function ClientProfileHub() {
 
 
 
-      <Tabs value={tab ?? "overview"} className="w-full">
-        <TabsList className="flex w-full flex-wrap h-auto justify-start">
-          <TabTrigger value="overview" icon={<User className="h-3.5 w-3.5" />} label="Profile" clientId={clientId} />
-          <TabTrigger value="plan" icon={<Sparkles className="h-3.5 w-3.5" />} label="Plan & goals" clientId={clientId} />
-          <TabTrigger value="codes" icon={<FileText className="h-3.5 w-3.5" />} label="Billing codes" clientId={clientId} />
-          <TabTrigger value="caseload" icon={<Users className="h-3.5 w-3.5" />} label="Caseload" clientId={clientId} />
-          <TabTrigger value="shifts" icon={<Clock className="h-3.5 w-3.5" />} label="Shifts" clientId={clientId} />
-          <TabTrigger value="logs" icon={<ClipboardList className="h-3.5 w-3.5" />} label="Daily logs" clientId={clientId} />
-          <TabTrigger value="incidents" icon={<AlertTriangle className="h-3.5 w-3.5" />} label="Incidents" clientId={clientId} />
-          <TabTrigger value="summaries" icon={<Stethoscope className="h-3.5 w-3.5" />} label="Summaries" clientId={clientId} />
-          {isHostHome ? (
-            <TabTrigger value="hhcert" icon={<HomeIcon className="h-3.5 w-3.5" />} label="Host-home cert" clientId={clientId} />
-          ) : null}
-          <TabTrigger value="deadlines" icon={<CalendarClock className="h-3.5 w-3.5" />} label="Deadlines" clientId={clientId} />
-          <TabTrigger value="files" icon={<FolderOpen className="h-3.5 w-3.5" />} label="Files" clientId={clientId} />
-        </TabsList>
-
-        <TabsContent value="overview" className="mt-6">
-          <ClientProfileTab
-            clientId={clientId}
-            onOpenFiles={() => router.navigate({ to: "/dashboard/clients/$clientId", params: { clientId }, search: { tab: "files" } })}
-          />
-        </TabsContent>
-        <TabsContent value="plan" className="mt-6">
-          <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
-        </TabsContent>
-        <TabsContent value="codes" className="mt-6">
-          <BillingCodesPanel clientId={clientId} />
-        </TabsContent>
-        <TabsContent value="caseload" className="mt-6">
-          <CaseloadEditor clientId={clientId} />
-        </TabsContent>
-        <TabsContent value="shifts" className="mt-6">
-          <ShiftsPanel clientId={clientId} orgId={orgId} />
-        </TabsContent>
-        <TabsContent value="logs" className="mt-6">
-          <DailyLogsPanel clientId={clientId} orgId={orgId} />
-        </TabsContent>
-        <TabsContent value="incidents" className="mt-6">
-          <IncidentsPanel clientId={clientId} orgId={orgId} />
-        </TabsContent>
-        <TabsContent value="summaries" className="mt-6">
-          <SummariesPanel clientId={clientId} orgId={orgId} client={client} />
-        </TabsContent>
-        {isHostHome ? (
-          <TabsContent value="hhcert" className="mt-6">
-            <HostHomeCertPanel clientId={clientId} orgId={orgId} />
-          </TabsContent>
-        ) : null}
-        <TabsContent value="deadlines" className="mt-6">
-          <DeadlinesPanel clientId={clientId} />
-        </TabsContent>
-        <TabsContent value="files" className="mt-6">
+      {showFiles ? (
+        <div className="space-y-4">
+          <Button variant="ghost" size="sm" onClick={() => setShowFiles(false)}>
+            <ArrowLeft className="h-4 w-4 mr-1" /> Back to profile
+          </Button>
           <ClientDocumentsCard clientId={clientId} clientName={fullName} />
-        </TabsContent>
-      </Tabs>
+        </div>
+      ) : (
+        <ClientProfileTab
+          clientId={clientId}
+          onOpenFiles={() => setShowFiles(true)}
+        />
+      )}
     </div>
-  );
-}
-
-function TabTrigger({
-  value, icon, label, clientId,
-}: { value: string; icon: React.ReactNode; label: string; clientId: string }) {
-  return (
-    <TabsTrigger value={value} asChild>
-      <Link
-        to="/dashboard/clients/$clientId"
-        params={{ clientId }}
-        search={{ tab: value } as never}
-        className="flex items-center gap-1.5"
-      >
-        {icon}
-        {label}
-      </Link>
-    </TabsTrigger>
   );
 }
 

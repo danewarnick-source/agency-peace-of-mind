@@ -338,6 +338,9 @@ async function commitClient(
     gaps.push(...apply.suggested.map((s) => `Review: ${s}`));
   } catch (err) {
     gaps.push(`Autofill warning: ${(err as Error).message}`);
+    await audit(sb, jobId, orgId, subj.id,
+      `Autofill failed: ${(err as Error).message}`,
+      "admin_override", userId, "autofill_error");
   }
 
   return recordId;

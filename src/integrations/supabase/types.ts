@@ -2161,6 +2161,7 @@ export type Database = {
       client_medications: {
         Row: {
           adverse_effects: string | null
+          am_pm: string | null
           choking_risk: boolean
           choking_risk_details: string | null
           client_id: string
@@ -2196,12 +2197,16 @@ export type Database = {
           refill_threshold: number
           route: string | null
           rx_number: string | null
+          scheduled_time: string | null
           scheduled_times: string[]
           side_effects: string | null
           start_date: string | null
+          support_explanation: string | null
+          support_level: string | null
         }
         Insert: {
           adverse_effects?: string | null
+          am_pm?: string | null
           choking_risk?: boolean
           choking_risk_details?: string | null
           client_id: string
@@ -2237,12 +2242,16 @@ export type Database = {
           refill_threshold?: number
           route?: string | null
           rx_number?: string | null
+          scheduled_time?: string | null
           scheduled_times?: string[]
           side_effects?: string | null
           start_date?: string | null
+          support_explanation?: string | null
+          support_level?: string | null
         }
         Update: {
           adverse_effects?: string | null
+          am_pm?: string | null
           choking_risk?: boolean
           choking_risk_details?: string | null
           client_id?: string
@@ -2278,9 +2287,12 @@ export type Database = {
           refill_threshold?: number
           route?: string | null
           rx_number?: string | null
+          scheduled_time?: string | null
           scheduled_times?: string[]
           side_effects?: string | null
           start_date?: string | null
+          support_explanation?: string | null
+          support_level?: string | null
         }
         Relationships: []
       }
@@ -2626,7 +2638,12 @@ export type Database = {
           diagnoses: string[] | null
           disability_category: string | null
           discharge_date: string | null
+          dnr_location: string | null
+          dnr_status: string | null
           dysphagia: boolean
+          emergency_contact_2_instructions: string | null
+          emergency_contact_2_name: string | null
+          emergency_contact_2_phone: string | null
           emergency_contact_instructions: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
@@ -2634,7 +2651,11 @@ export type Database = {
           feature_config: Json | null
           field_confirmations: Json
           first_name: string
+          form_1056_approved_date: string | null
+          form_1056_number: string | null
           geofence_radius_feet: number
+          grievance_acknowledged: boolean | null
+          grievance_signed_date: string | null
           guardian_address: string | null
           guardian_email: string | null
           guardian_name: string | null
@@ -2643,6 +2664,7 @@ export type Database = {
           hhs_monthly_support_hours: number | null
           home_latitude: number | null
           home_longitude: number | null
+          hospice_status: string | null
           housing_voucher: string | null
           id: string
           immunizations: string[] | null
@@ -2650,16 +2672,20 @@ export type Database = {
           is_own_guardian: boolean
           job_code: string[]
           last_name: string
+          level_of_need: string | null
+          mailing_address: string | null
           medicaid_id: string | null
           medical_insurance: string | null
           neurologist_name: string | null
           neurologist_phone: string | null
           organization_id: string
+          palliative_care_status: string | null
           pcsp_goals: string[]
           personal_belongings_inventory: string[] | null
           phone_number: string | null
           physical_address: string | null
           plan_year: string | null
+          polst_status: string | null
           preferred_activities: string[] | null
           preferred_living: string | null
           prescriber_name: string | null
@@ -2671,6 +2697,7 @@ export type Database = {
           roommates: string[] | null
           self_admin_med_support: boolean
           special_directions: string | null
+          staff_ratio: string | null
           support_coordinator_email: string | null
           support_coordinator_name: string | null
           support_coordinator_phone: string | null
@@ -2695,7 +2722,12 @@ export type Database = {
           diagnoses?: string[] | null
           disability_category?: string | null
           discharge_date?: string | null
+          dnr_location?: string | null
+          dnr_status?: string | null
           dysphagia?: boolean
+          emergency_contact_2_instructions?: string | null
+          emergency_contact_2_name?: string | null
+          emergency_contact_2_phone?: string | null
           emergency_contact_instructions?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
@@ -2703,7 +2735,11 @@ export type Database = {
           feature_config?: Json | null
           field_confirmations?: Json
           first_name: string
+          form_1056_approved_date?: string | null
+          form_1056_number?: string | null
           geofence_radius_feet?: number
+          grievance_acknowledged?: boolean | null
+          grievance_signed_date?: string | null
           guardian_address?: string | null
           guardian_email?: string | null
           guardian_name?: string | null
@@ -2712,6 +2748,7 @@ export type Database = {
           hhs_monthly_support_hours?: number | null
           home_latitude?: number | null
           home_longitude?: number | null
+          hospice_status?: string | null
           housing_voucher?: string | null
           id?: string
           immunizations?: string[] | null
@@ -2719,16 +2756,20 @@ export type Database = {
           is_own_guardian?: boolean
           job_code?: string[]
           last_name: string
+          level_of_need?: string | null
+          mailing_address?: string | null
           medicaid_id?: string | null
           medical_insurance?: string | null
           neurologist_name?: string | null
           neurologist_phone?: string | null
           organization_id: string
+          palliative_care_status?: string | null
           pcsp_goals?: string[]
           personal_belongings_inventory?: string[] | null
           phone_number?: string | null
           physical_address?: string | null
           plan_year?: string | null
+          polst_status?: string | null
           preferred_activities?: string[] | null
           preferred_living?: string | null
           prescriber_name?: string | null
@@ -2740,6 +2781,7 @@ export type Database = {
           roommates?: string[] | null
           self_admin_med_support?: boolean
           special_directions?: string | null
+          staff_ratio?: string | null
           support_coordinator_email?: string | null
           support_coordinator_name?: string | null
           support_coordinator_phone?: string | null
@@ -2764,7 +2806,12 @@ export type Database = {
           diagnoses?: string[] | null
           disability_category?: string | null
           discharge_date?: string | null
+          dnr_location?: string | null
+          dnr_status?: string | null
           dysphagia?: boolean
+          emergency_contact_2_instructions?: string | null
+          emergency_contact_2_name?: string | null
+          emergency_contact_2_phone?: string | null
           emergency_contact_instructions?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
@@ -2772,7 +2819,11 @@ export type Database = {
           feature_config?: Json | null
           field_confirmations?: Json
           first_name?: string
+          form_1056_approved_date?: string | null
+          form_1056_number?: string | null
           geofence_radius_feet?: number
+          grievance_acknowledged?: boolean | null
+          grievance_signed_date?: string | null
           guardian_address?: string | null
           guardian_email?: string | null
           guardian_name?: string | null
@@ -2781,6 +2832,7 @@ export type Database = {
           hhs_monthly_support_hours?: number | null
           home_latitude?: number | null
           home_longitude?: number | null
+          hospice_status?: string | null
           housing_voucher?: string | null
           id?: string
           immunizations?: string[] | null
@@ -2788,16 +2840,20 @@ export type Database = {
           is_own_guardian?: boolean
           job_code?: string[]
           last_name?: string
+          level_of_need?: string | null
+          mailing_address?: string | null
           medicaid_id?: string | null
           medical_insurance?: string | null
           neurologist_name?: string | null
           neurologist_phone?: string | null
           organization_id?: string
+          palliative_care_status?: string | null
           pcsp_goals?: string[]
           personal_belongings_inventory?: string[] | null
           phone_number?: string | null
           physical_address?: string | null
           plan_year?: string | null
+          polst_status?: string | null
           preferred_activities?: string[] | null
           preferred_living?: string | null
           prescriber_name?: string | null
@@ -2809,6 +2865,7 @@ export type Database = {
           roommates?: string[] | null
           self_admin_med_support?: boolean
           special_directions?: string | null
+          staff_ratio?: string | null
           support_coordinator_email?: string | null
           support_coordinator_name?: string | null
           support_coordinator_phone?: string | null
@@ -13269,7 +13326,12 @@ export type Database = {
           diagnoses: string[] | null
           disability_category: string | null
           discharge_date: string | null
+          dnr_location: string | null
+          dnr_status: string | null
           dysphagia: boolean
+          emergency_contact_2_instructions: string | null
+          emergency_contact_2_name: string | null
+          emergency_contact_2_phone: string | null
           emergency_contact_instructions: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
@@ -13277,7 +13339,11 @@ export type Database = {
           feature_config: Json | null
           field_confirmations: Json
           first_name: string
+          form_1056_approved_date: string | null
+          form_1056_number: string | null
           geofence_radius_feet: number
+          grievance_acknowledged: boolean | null
+          grievance_signed_date: string | null
           guardian_address: string | null
           guardian_email: string | null
           guardian_name: string | null
@@ -13286,6 +13352,7 @@ export type Database = {
           hhs_monthly_support_hours: number | null
           home_latitude: number | null
           home_longitude: number | null
+          hospice_status: string | null
           housing_voucher: string | null
           id: string
           immunizations: string[] | null
@@ -13293,16 +13360,20 @@ export type Database = {
           is_own_guardian: boolean
           job_code: string[]
           last_name: string
+          level_of_need: string | null
+          mailing_address: string | null
           medicaid_id: string | null
           medical_insurance: string | null
           neurologist_name: string | null
           neurologist_phone: string | null
           organization_id: string
+          palliative_care_status: string | null
           pcsp_goals: string[]
           personal_belongings_inventory: string[] | null
           phone_number: string | null
           physical_address: string | null
           plan_year: string | null
+          polst_status: string | null
           preferred_activities: string[] | null
           preferred_living: string | null
           prescriber_name: string | null
@@ -13314,6 +13385,7 @@ export type Database = {
           roommates: string[] | null
           self_admin_med_support: boolean
           special_directions: string | null
+          staff_ratio: string | null
           support_coordinator_email: string | null
           support_coordinator_name: string | null
           support_coordinator_phone: string | null

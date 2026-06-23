@@ -440,6 +440,187 @@ export const publishClientSpecificTraining = createServerFn({ method: "POST" })
     return { training: updated };
   });
 
+// ── Support Strategies ─────────────────────────────────────────────────────
+// One row per client (training_type='support_strategies'). Admin-authored:
+// stub from PCSP goals (NECTAR verbatim), blank, or uploaded provider doc.
+
+async function assembleSupportStrategyStubs(
+  supabase: AnySupabase,
+  orgId: string,
+  clientId: string,
+): Promise<CSTContent> {
+  const { data: client } = await supabase
+    .from("clients")
+    .select("pcsp_goals")
+    .eq("id", clientId)
+    .maybeSingle();
+  const goals: string[] = Array.isArray(client?.pcsp_goals) ? (client!.pcsp_goals as string[]) : [];
+  const sections: CSTSection[] = goals.length
+    ? goals.map((g) => ({
+        id: sid(),
+        title: "Support strategy",
+        items: [
+          { kind: "text" as const, label: "Goal this supports", value: String(g) },
+          { kind: "text" as const, label: "Instructions to staff", value: "" },
+        ],
+      }))
+    : [{ id: sid(), title: "Support strategy", items: [
+        { kind: "text" as const, label: "Goal this supports", value: "" },
+        { kind: "text" as const, label: "Instructions to staff", value: "" },
+      ] }];
+  void orgId;
+  return { sections };
+}
+
+export const getSupportStrategiesTraining = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ clientId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+    await assertClientInOrg(supabase, data.clientId, m.organization_id);
+    const { data: row, error } = await supabase
+      .from("client_specific_trainings")
+      .select("*")
+      .eq("client_id", data.clientId)
+      .eq("training_type", "support_strategies")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return { training: row };
+  });
+
+export const draftSupportStrategies = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    clientId: z.string().uuid(),
+    mode: z.enum(["nectar", "blank", "rebuild"]),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+    await assertClientInOrg(supabase, data.clientId, m.organization_id);
+
+    let content: CSTContent;
+    if (data.mode === "blank") {
+      content = { sections: [
+        { id: sid(), title: "Support strategy", items: [
+          { kind: "text", label: "Goal this supports", value: "" },
+          { kind: "text", label: "Instructions to staff", value: "" },
+        ] },
+      ] };
+    } else {
+      content = await assembleSupportStrategyStubs(supabase, m.organization_id, data.clientId);
+    }
+
+    const { data: existing } = await supabase
+      .from("client_specific_trainings")
+      .select("id, version")
+      .eq("client_id", data.clientId)
+      .eq("training_type", "support_strategies")
+      .maybeSingle();
+
+    if (existing) {
+      const { data: updated, error: uErr } = await supabase
+        .from("client_specific_trainings")
+        .update({
+          content: content as unknown,
+          status: "draft",
+          version: (existing.version ?? 1) + (data.mode === "rebuild" ? 1 : 0),
+          approved_by: null,
+          approved_at: null,
+        })
+        .eq("id", existing.id)
+        .select("*")
+        .maybeSingle();
+      if (uErr) throw new Error(uErr.message);
+      return { training: updated };
+    }
+
+    const { data: inserted, error: iErr } = await supabase
+      .from("client_specific_trainings")
+      .insert({
+        organization_id: m.organization_id,
+        client_id: data.clientId,
+        training_type: "support_strategies",
+        title: "Support Strategies",
+        attestation_statement: "I have reviewed this client's support strategies and will implement them as written.",
+        content: content as unknown,
+        status: "draft",
+        version: 1,
+      })
+      .select("*")
+      .maybeSingle();
+    if (iErr) throw new Error(iErr.message);
+    return { training: inserted };
+  });
+
+export const attachSupportStrategyDocument = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    clientId: z.string().uuid(),
+    fileName: z.string().min(1).max(300),
+    storagePath: z.string().min(1).max(500),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+    await assertClientInOrg(supabase, data.clientId, m.organization_id);
+
+    const { data: doc, error: dErr } = await supabase
+      .from("client_documents")
+      .insert({
+        client_id: data.clientId,
+        organization_id: m.organization_id,
+        document_type: "support_strategy",
+        file_name: data.fileName,
+        file_url: data.storagePath,
+        storage_path: data.storagePath,
+        uploaded_by: userId,
+      })
+      .select("id")
+      .maybeSingle();
+    if (dErr) throw new Error(dErr.message);
+
+    const linkContent: CSTContent = { sections: [
+      { id: sid(), title: "Uploaded support strategy", items: [
+        { kind: "link", label: "Provider document", links: [{ label: data.fileName, href: null }] },
+      ] },
+    ] };
+
+    const { data: existing } = await supabase
+      .from("client_specific_trainings")
+      .select("id")
+      .eq("client_id", data.clientId)
+      .eq("training_type", "support_strategies")
+      .maybeSingle();
+
+    if (existing) {
+      const { error: uErr } = await supabase
+        .from("client_specific_trainings")
+        .update({ content: linkContent as unknown, status: "draft", approved_by: null, approved_at: null })
+        .eq("id", existing.id);
+      if (uErr) throw new Error(uErr.message);
+    } else {
+      const { error: iErr } = await supabase
+        .from("client_specific_trainings")
+        .insert({
+          organization_id: m.organization_id,
+          client_id: data.clientId,
+          training_type: "support_strategies",
+          title: "Support Strategies",
+          attestation_statement: "I have reviewed this client's support strategies and will implement them as written.",
+          content: linkContent as unknown,
+          status: "draft",
+          version: 1,
+        });
+      if (iErr) throw new Error(iErr.message);
+    }
+    return { ok: true, documentId: doc?.id ?? null };
+  });
+
 // ───────────────────────────────────────────────────────────────────────────
 // STAFF VIEWER + COMPLETION (Stage 2b)
 //

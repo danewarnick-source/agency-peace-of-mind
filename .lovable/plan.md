@@ -1,48 +1,35 @@
-## Goal
-Remove duplication on `/dashboard/smart-import/$jobId/done` where the finish-onboarding card repeats items already surfaced elsewhere on the page. Do not touch the upload screen.
+## Why you're still seeing the old layout
 
-## Changes (single file: `src/components/clients/finish-onboarding-card.tsx`)
+The Profile tab itself is already wired to the new `ClientProfileTab` component. What's making the page *look* old is leftover chrome rendered **above** the tabs on `/dashboard/clients/<id>`:
 
-### 1. `buildItems(s)` — drop the four duplicated rows
-"Needs attention" above the checklist already handles staff, home/geofence, billing rates, and guardian. Keep only the `sow` row so the checklist stops re-listing them.
+- `ClientReadinessCard` (line 124)
+- `FinishOnboardingCard` (line 125)
 
-```text
-return [
--  { key: "staff",    … },
--  { key: "home",     … },
--  { key: "rates",    … },
--  { key: "guardian", … },
-   { key: "sow",      … },
-].filter(…)   // existing sow-missing filter stays
-```
+Those two big cards belong to the smart-import "done" flow — per the rebuild contract they should not appear on the client profile page. They sit above every tab, so the Profile tab opens to the old readiness/onboarding banner instead of the new clean profile.
 
-The `StepRow` branches for `staff` / `home` / `rates` / `guardian` (and their forms: `CaseloadEditor`, `HomeForm`, `RatesForm`, `GuardianForm`) stay in the file — still imported by other call sites — they're just no longer rendered from this checklist.
+There is also a now-dead `OverviewPanel` function (lines 209–375) still sitting in the route file. It isn't rendered, but it keeps imports alive and creates confusion when reading the file.
 
-### 2. `unknowns` — exclude EOL keys
-The "Advanced care / end-of-life" group on the profile already manages these. Filter them out of the NECTAR questions list so they don't appear twice.
+## Changes
 
-```ts
-const EOL_KEYS = new Set([
-  "dnr_status",
-  "polst_status",
-  "palliative_care_status",
-  "hospice_status",
-]);
+**File: `src/routes/dashboard.clients.$clientId.tsx`**
 
-const unknowns = fieldStatesQ.data
-  ? TRACKED_FIELDS.filter(
-      (f) =>
-        fieldStatesQ.data!.states[f.key] === "unknown" &&
-        !EOL_KEYS.has(f.key),
-    )
-  : [];
-```
+1. Remove the two render lines:
+   ```
+   <ClientReadinessCard clientId={clientId} />
+   <FinishOnboardingCard clientId={clientId} />
+   ```
+2. Remove their imports.
+3. Delete the unused `OverviewPanel` function and any imports it was the sole user of (e.g. `Phone`, `Stethoscope` icons, `Field`, `QuickLink`, `TrackedFieldsCard`, `AdminHoursCard` — only if not used elsewhere in the file).
 
-## Out of scope
-- No changes to the upload screen (`dashboard.smart-import.index.tsx`).
-- No changes to `TRACKED_FIELDS`, `field-confirmations.ts`, the EOL group, or "Needs attention".
-- No changes to the underlying form components or server functions.
+Everything else stays as-is. The Profile tab continues to render `ClientProfileTab` (the new component).
 
 ## Verification
-- Open `/dashboard/smart-import/$jobId/done`: staff / home / billing / guardian appear once (in "Needs attention"); DNR / POLST / palliative / hospice appear once (in the EOL group); the SOW row still shows when SOW fields are missing.
-- `npm run build` green; `routeTree.gen.ts` unchanged (no route edits).
+
+- Open `/dashboard/clients/<any client>` → Profile tab.
+- Expect: header (name + badges) directly above the tabs, then the new profile cards (completeness bar, identity, contacts, at-a-glance, retention). No readiness card, no "Finish onboarding" card.
+- Other tabs (Plan & goals, Billing codes, etc.) unchanged.
+- `npm run build` passes; `routeTree.gen.ts` regenerated if needed.
+
+## Out of scope
+
+- The `/dashboard/workspace/<id>` "About" tab (staff portal) is a different component and was never part of the profile rebuild. Tell me if you also want that swapped.

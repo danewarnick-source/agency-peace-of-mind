@@ -1,24 +1,34 @@
-## Goal
-Replace the bare-bones HTML fallback used when SSR catastrophically fails (`src/lib/error-page.ts`) with a clearer, on-brand "preview/build failure" page that explains what's happening and offers a retry.
+Add a 25-word minimum on each review answer and a scroll-to-bottom gate to the client-specific training viewer. All edits stay inside `src/routes/dashboard.client-training.$clientId.tsx`.
 
-## Scope
-Frontend-only. No route, backend, or routing changes. Existing wiring in `src/server.ts` (`brandedErrorResponse`) and `src/start.ts` (`errorMiddleware`) already serves whatever `renderErrorPage()` returns — we just upgrade that HTML.
+## Change 1 — 25-word minimum per answer
 
-## Changes
+- Add helpers near the top of the file:
+  - `const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;`
+  - `const MIN_WORDS = 25;`
+- Replace the `allAnswered` gate:
+  - From: `answers.every((a) => a.answer.trim().length > 0)`
+  - To: `answers.every((a) => wordCount(a.answer) >= MIN_WORDS)`
+- Under each question's `<Textarea>` (inside the existing `.map`, before the relevance hints), render a live counter: `{wordCount(ans?.answer ?? "")}/{MIN_WORDS} words minimum`, emerald when met, muted otherwise.
+- Update the footer hint copy from "Please answer all review questions above before signing." to "Please answer all review questions (at least 25 words each) before signing."
 
-**`src/lib/error-page.ts`** — rewrite `renderErrorPage()` to return a self-contained HTML document (no external CSS/JS, since this fires when the app bundle itself may have failed) with:
-- HIVE-aligned dark header band using the existing brand color `#0d112b` (already used in `__root.tsx` theme-color and the mobile shell).
-- Clear copy: title "This preview didn't load", short explanation that the latest build may still be deploying or hit an error, and that retrying usually resolves it.
-- Two actions:
-  - Primary: **Try again** → `location.reload()`.
-  - Secondary: **Go home** → `href="/"`.
-- A small auto-retry helper: on first load, sets a `sessionStorage` flag and reloads once after ~4s; on the second hit (flag present) it stops auto-retrying and just shows the manual buttons. Mirrors the loop-guard pattern already used in `src/lib/chunk-reload.ts` so we don't create a refresh loop.
-- Inline system-font styles, mobile-friendly, no external requests.
+## Change 2 — Scroll-to-bottom gate
 
-**No other files change.** Routes, `__root.tsx` `ErrorComponent`, and the chunk-reload behavior stay as-is — those already handle in-app React errors; this plan only improves the hard-failure SSR fallback.
+- Add `const [contentRead, setContentRead] = useState(false);` next to the existing `useState` calls.
+- Add a `scrollRef` (`useRef<HTMLDivElement | null>`) and attach it to the scrollable content container (`flex-1 min-h-0 overflow-y-auto ...`).
+- On that container, add:
+  ```
+  onScroll={(e) => {
+    const el = e.currentTarget;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 24) setContentRead(true);
+  }}
+  ```
+- Short-content safety: a `useEffect` keyed on the loaded training checks `scrollHeight <= clientHeight` and auto-sets `contentRead = true` so short trainings remain signable.
+- Inside the existing `if (training?.id && training.id !== lastTrainingId)` reset block, also call `setContentRead(false)` so switching training type re-requires scrolling.
+- Gate only the Sign & Complete button: append `|| !contentRead` to its `disabled` expression. Answering and the relevance check remain unaffected.
+- When `!contentRead`, show a small amber hint above the signature row: "Scroll through the full training above before signing."
 
 ## Verification
-- Visually load `/` after temporarily forcing `brandedErrorResponse()` in dev (manual check) — page renders with brand color, copy, and both buttons.
-- Click **Try again** reloads; **Go home** navigates to `/`.
-- Auto-retry fires once then stops (no infinite reload loop) — confirmed via the `sessionStorage` guard.
-- No new network requests from the error page (fully inline).
+
+- Run `tsgo --noEmit`; expect zero errors.
+- No other file is created, renamed, moved, or modified.
+- Relevance check, training-type switching, completion mutation, attestation text, `GoalsView`/`SectionsView` rendering, the `alreadyCurrent` completed-state UI, and all server functions remain untouched.

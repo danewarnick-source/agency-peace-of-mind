@@ -22,6 +22,9 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { previewClientUpdateFromDocument, applySelectedClientFields } from "@/lib/import-checklist.functions";
 
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -155,6 +158,7 @@ function ClientProfileHub() {
         </TabsList>
 
         <TabsContent value="profile" className="space-y-4">
+          <UpdateInfoFromDocumentCard clientId={clientId} orgId={orgId} />
           <ClientProfileTab clientId={clientId} onOpenFiles={() => setTab("files")} />
         </TabsContent>
 
@@ -1385,5 +1389,271 @@ function ReadOnlyTable<R extends Record<string, unknown>>({
         </TableBody>
       </Table>
     </div>
+  );
+}
+
+// ── Update info from document (review-then-apply) ──────────────────────
+// Admin uploads a doc, NECTAR extracts proposed field updates, and admin
+// reviews against current values before any write. Distinct from manual
+// "edit" — this is bulk-from-document with explicit per-field approval.
+type UpdateProposal = {
+  field_key: string;
+  label: string;
+  incomingValue: string;
+  currentValue: string | null;
+  changed: boolean;
+  confidence: number;
+  field: {
+    field_key: string;
+    value_text?: string | null;
+    value_number?: number | null;
+    value_date?: string | null;
+    value_bool?: boolean | null;
+    value_array?: string[] | null;
+    value_json?: unknown;
+    confidence?: number | null;
+  };
+};
+
+function UpdateInfoFromDocumentCard({ clientId, orgId }: { clientId: string; orgId?: string }) {
+  const qc = useQueryClient();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [open, setOpen] = useState(false);
+  const [documentType, setDocumentType] = useState<"pcsp" | "1056_budget" | "other">("pcsp");
+  const [uploading, setUploading] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [reason, setReason] = useState<string | null>(null);
+  const [proposals, setProposals] = useState<UpdateProposal[] | null>(null);
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+
+  const previewFn = useServerFn(previewClientUpdateFromDocument);
+  const applyFn = useServerFn(applySelectedClientFields);
+
+  const reset = () => {
+    setProposals(null);
+    setReason(null);
+    setChecked({});
+    setUploading(false);
+    setPreviewing(false);
+  };
+
+  const onPickFile = async (file: File) => {
+    if (!orgId) return;
+    setReason(null);
+    setProposals(null);
+    setUploading(true);
+    try {
+      const safeName = file.name.replace(/[^\w.\-]+/g, "_");
+      const storagePath = `${orgId}/${clientId}/update/${Date.now()}_${safeName}`;
+      const { error: upErr } = await supabase.storage
+        .from("client-documents")
+        .upload(storagePath, file, { upsert: false });
+      if (upErr) throw upErr;
+      setUploading(false);
+      setPreviewing(true);
+      const res = await previewFn({
+        data: {
+          clientId,
+          documentType,
+          fileName: file.name,
+          storagePath,
+        },
+      });
+      if (!res.ok) {
+        setReason(res.reason);
+      } else {
+        setProposals(res.proposals);
+        const init: Record<string, boolean> = {};
+        for (const p of res.proposals) {
+          init[p.field_key] = p.changed && !!p.incomingValue;
+        }
+        setChecked(init);
+      }
+    } catch (e) {
+      setReason((e as Error).message || "Upload or extraction failed.");
+    } finally {
+      setUploading(false);
+      setPreviewing(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  const applyMut = useMutation({
+    mutationFn: async () => {
+      if (!proposals) return { appliedCount: 0 } as { appliedCount: number };
+      const fields = proposals
+        .filter((p) => checked[p.field_key])
+        .map((p) => p.field);
+      if (!fields.length) return { appliedCount: 0 } as { appliedCount: number };
+      return applyFn({ data: { clientId, fields } });
+    },
+    onSuccess: (res) => {
+      const n = (res as { appliedCount?: number })?.appliedCount ?? 0;
+      toast.success(n > 0 ? `Profile updated (${n} fields applied)` : "Nothing selected");
+      qc.invalidateQueries({ queryKey: ["client-profile", orgId, clientId] });
+      qc.invalidateQueries({ queryKey: ["client", clientId] });
+      setOpen(false);
+      reset();
+    },
+    onError: (e: unknown) => toast.error((e as Error).message || "Failed to apply updates"),
+  });
+
+  const selectedCount = proposals
+    ? proposals.filter((p) => checked[p.field_key]).length
+    : 0;
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+        <div>
+          <CardTitle className="text-base">Update info from document</CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            Upload a PCSP, 1056, or intake document and review NECTAR's proposed changes before applying.
+          </p>
+        </div>
+        <Button size="sm" onClick={() => { reset(); setOpen(true); }} disabled={!orgId}>
+          <Upload className="h-4 w-4 mr-1" /> Update info from document (NECTAR)
+        </Button>
+      </CardHeader>
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          setOpen(v);
+          if (!v) reset();
+        }}
+      >
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Update client info from document</DialogTitle>
+            <DialogDescription>
+              NECTAR extracts proposed updates. Nothing is written to the client until you click "Apply selected".
+            </DialogDescription>
+          </DialogHeader>
+
+          {!proposals && !reason && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label className="text-xs">Document type</Label>
+                <select
+                  className="w-full border rounded-md h-9 px-2 text-sm bg-background"
+                  value={documentType}
+                  onChange={(e) => setDocumentType(e.target.value as typeof documentType)}
+                  disabled={uploading || previewing}
+                >
+                  <option value="pcsp">PCSP</option>
+                  <option value="1056_budget">1056</option>
+                  <option value="other">Intake / other</option>
+                </select>
+              </div>
+              <div className="rounded-md border border-dashed p-6 text-center">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.txt"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void onPickFile(f);
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading || previewing || !orgId}
+                >
+                  {uploading ? (
+                    <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Uploading…</>
+                  ) : previewing ? (
+                    <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Extracting…</>
+                  ) : (
+                    <><Upload className="h-4 w-4 mr-1" /> Choose document</>
+                  )}
+                </Button>
+                <p className="text-xs text-muted-foreground mt-2">PDF, DOCX, or TXT</p>
+              </div>
+            </div>
+          )}
+
+          {reason && (
+            <div className="space-y-3">
+              <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm">
+                <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                <div>{reason}</div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => { setReason(null); }}>Try another file</Button>
+                <Button size="sm" onClick={() => { setOpen(false); reset(); }}>Close</Button>
+              </div>
+            </div>
+          )}
+
+          {proposals && (
+            <div className="space-y-3">
+              {proposals.length === 0 ? (
+                <div className="rounded-md border p-4 text-sm text-muted-foreground">
+                  NECTAR didn't find any profile fields to update from this document.
+                </div>
+              ) : (
+                <>
+                  <div className="text-xs text-muted-foreground">
+                    Review proposed changes. Pre-checked rows are fields where the document differs from the current value. Untick anything you don't want applied.
+                  </div>
+                  <div className="border rounded-md divide-y max-h-[50vh] overflow-y-auto">
+                    {proposals.map((p) => (
+                      <label
+                        key={p.field_key}
+                        className={`flex items-start gap-3 p-3 cursor-pointer hover:bg-muted/40 ${p.changed ? "bg-amber-50/50" : ""}`}
+                      >
+                        <Checkbox
+                          className="mt-1"
+                          checked={!!checked[p.field_key]}
+                          onCheckedChange={(v) =>
+                            setChecked((c) => ({ ...c, [p.field_key]: v === true }))
+                          }
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium">{p.label}</span>
+                            {p.changed ? (
+                              <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700">changed</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px]">unchanged</Badge>
+                            )}
+                          </div>
+                          <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <div className="text-muted-foreground">Current</div>
+                              <div className="break-words">{p.currentValue ?? <span className="text-muted-foreground">—</span>}</div>
+                            </div>
+                            <div>
+                              <div className="text-muted-foreground">From document</div>
+                              <div className="break-words">{p.incomingValue}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </>
+              )}
+              <DialogFooter className="gap-2">
+                <Button variant="outline" size="sm" onClick={() => { setOpen(false); reset(); }}>Cancel</Button>
+                <Button
+                  size="sm"
+                  onClick={() => applyMut.mutate()}
+                  disabled={applyMut.isPending || selectedCount === 0}
+                >
+                  {applyMut.isPending ? (
+                    <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Applying…</>
+                  ) : (
+                    <>Apply selected ({selectedCount})</>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }

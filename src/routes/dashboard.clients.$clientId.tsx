@@ -28,16 +28,18 @@ import {
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
-import { SectionsView, ClientSpecificTrainingCard } from "@/components/clients/client-specific-training-card";
-import { ArrowLeft, CheckCircle2, Loader2, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
+import { SectionsView, ClientSpecificTrainingCard, ReviewQuestionsEditor } from "@/components/clients/client-specific-training-card";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
 import { clientFeatureVisible } from "@/lib/client-features";
 import {
+  getClientSpecificTraining,
   getSupportStrategiesTraining,
   draftSupportStrategies,
   attachSupportStrategyDocument,
   updateClientSpecificTraining,
   publishClientSpecificTraining,
   type CSTContent,
+  type CSTReviewQuestion,
 } from "@/lib/client-specific-training.functions";
 
 const search = z.object({
@@ -154,6 +156,7 @@ function ClientProfileHub() {
         </TabsContent>
 
         <TabsContent value="care" className="space-y-4">
+          <TrainingSetupBadge clientId={clientId} />
           <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
           <SupportStrategiesPanel client={client} clientId={clientId} orgId={orgId} />
           <Card>
@@ -192,6 +195,41 @@ function ClientProfileHub() {
 
 type ClientRow = Record<string, unknown> | null | undefined;
 
+function TrainingSetupBadge({ clientId }: { clientId: string }) {
+  const getFn = useServerFn(getClientSpecificTraining);
+  const getSS = useServerFn(getSupportStrategiesTraining);
+
+  const { data: psData } = useQuery({
+    queryKey: ["client-specific-training", clientId],
+    queryFn: () => getFn({ data: { clientId } }),
+    staleTime: 60_000,
+  });
+  const { data: ssData } = useQuery({
+    queryKey: ["support-strategies-training", clientId],
+    queryFn: () => getSS({ data: { clientId } }),
+    staleTime: 60_000,
+  });
+
+  const psStatus = (psData?.training as { status?: string } | null)?.status;
+  const ssStatus = (ssData?.training as { status?: string } | null)?.status;
+
+  if (psStatus === "published" && ssStatus === "published") return null;
+
+  const msgs: string[] = [];
+  if (!psStatus) msgs.push("Person-specific: not set up");
+  else if (psStatus !== "published") msgs.push("Person-specific: draft");
+  if (!ssStatus) msgs.push("Support strategies: not set up");
+  else if (ssStatus !== "published") msgs.push("Support strategies: draft");
+
+  if (!msgs.length) return null;
+
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
+      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+      <span>Trainings need setup: {msgs.join(" · ")}</span>
+    </div>
+  );
+}
 
 function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; clientId: string; orgId?: string }) {
   const qc = useQueryClient();
@@ -342,6 +380,7 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
   const [uploading, setUploading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draftContent, setDraftContent] = useState<CSTContent | null>(null);
+  const [editingQuestions, setEditingQuestions] = useState(false);
 
   const queryKey = useMemo(() => ["support-strategies-training", clientId], [clientId]);
 
@@ -352,6 +391,7 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
 
   type SSRow = {
     id: string; title: string; content: CSTContent;
+    review_questions: CSTReviewQuestion[] | null;
     status: string; version: number;
     approved_by: string | null; approved_at: string | null; updated_at: string;
   };
@@ -549,12 +589,51 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
           )}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <SectionsView
           content={workingContent}
           editing={editing}
           onChange={setDraftContent}
         />
+        {/* Review questions */}
+        <div className="space-y-2 pt-2 border-t border-border/40">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="text-sm font-semibold">Review questions</h4>
+            <span className="text-xs text-muted-foreground">
+              {(training.review_questions ?? []).length} question{(training.review_questions ?? []).length === 1 ? "" : "s"}
+            </span>
+            <div className="ml-auto">
+              {!editingQuestions ? (
+                <Button variant="outline" size="sm" onClick={() => setEditingQuestions(true)}>
+                  {(training.review_questions ?? []).length > 0 ? "Edit questions" : "Add questions"}
+                </Button>
+              ) : (
+                <Button variant="ghost" size="sm" onClick={() => setEditingQuestions(false)}>Cancel</Button>
+              )}
+            </div>
+          </div>
+          {editingQuestions ? (
+            <ReviewQuestionsEditor
+              trainingId={training.id}
+              questions={(training.review_questions ?? []) as CSTReviewQuestion[]}
+              defaultTab="support_strategies"
+              onSaved={() => { setEditingQuestions(false); qc.invalidateQueries({ queryKey }); }}
+            />
+          ) : (training.review_questions ?? []).length > 0 ? (
+            <div className="space-y-1">
+              {((training.review_questions ?? []) as CSTReviewQuestion[]).map((q, i) => (
+                <div key={q.id} className="rounded border border-border/40 px-2 py-1 text-sm text-muted-foreground">
+                  {q.prompt}
+                  <span className="ml-1 text-xs text-muted-foreground/50">Q{i + 1}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-md border border-dashed border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
+              No review questions yet. Add applied-reasoning prompts for staff to answer when completing this training.
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

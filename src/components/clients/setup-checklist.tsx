@@ -245,7 +245,7 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
 
   if (
     readinessQ.isLoading || codesQ.isLoading || clientQ.isLoading ||
-    sowSuppQ.isLoading || onbStateQ.isLoading
+    sowSuppQ.isLoading || onbStateQ.isLoading || fieldStatesQ.isLoading
   ) {
     return (
       <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
@@ -253,13 +253,22 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
       </div>
     );
   }
-  if (!readiness || !client || !sowSupp) {
+  if (!readiness || !client || !sowSupp || !fieldStatesQ.data) {
     return (
       <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
         Couldn&apos;t load setup checklist for this client.
       </div>
     );
   }
+
+  const fieldStates: FieldStateMap = fieldStatesQ.data.states;
+  const askPass = {
+    medications: fieldStates.medications !== "unknown",
+    allergies: fieldStates.allergies !== "unknown",
+    immunizations: fieldStates.immunizations !== "unknown",
+    advanced_directives: fieldStates.advanced_directives !== "unknown",
+    court_orders: fieldStates.court_orders !== "unknown",
+  };
 
   // Required-row passing flags (Group 1).
   const rowPass = {
@@ -278,10 +287,13 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
     rowPass.code, rowPass.rates, rowPass.goals, rowPass.staff, rowPass.guardian,
     ...(evvApplicable ? [rowPass.evv] : []),
     rowPass.sow, rowPass.lon, rowPass.ec2, rowPass.grievance,
+    askPass.medications, askPass.allergies, askPass.immunizations,
+    askPass.advanced_directives, askPass.court_orders,
   ];
   const doneCount = requiredFlags.filter(Boolean).length;
   const totalCount = requiredFlags.length;
   const pct = totalCount === 0 ? 0 : Math.round((doneCount / totalCount) * 100);
+
 
 
   return (

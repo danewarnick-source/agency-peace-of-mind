@@ -420,12 +420,6 @@ function RightsRestrictionRow({
   );
 }
 
-// useServerFnSafe — useServerFn returns a stable callable; we wrap it so
-// React Query's queryFn can call it without smuggling hooks into the body.
-function useServerFnSafe<T extends (...args: never[]) => unknown>(fn: T): T {
-  // useServerFn is hook-safe at call sites; this indirection keeps types tidy.
-  return useServerFn(fn as unknown as Parameters<typeof useServerFn>[0]) as T;
-}
 
 // ── Advanced care / end-of-life (collapsed by default, never blocks) ────
 type EolField = "dnr_status" | "polst_status" | "palliative_care_status" | "hospice_status";

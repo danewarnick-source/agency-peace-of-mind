@@ -39,7 +39,18 @@ const PAGE_SIZE = 100;
 const FETCH_CAP = 2000;
 
 type Mode = "attention" | "all";
-type RecordType = "all" | "evv" | "non_evv" | "hhs_daily";
+type RecordType = "all" | "evv" | "non_evv" | "hhs_daily" | "non_billable";
+
+type GeneralRow = {
+  id: string;
+  staff_id: string;
+  staff_name: string;
+  category: string;
+  note: string;
+  clock_in_timestamp: string;
+  clock_out_timestamp: string | null;
+  duration_min: number;
+};
 
 type Row = {
   id: string;
@@ -204,7 +215,7 @@ export function RecordsTab() {
 
   // ── Main query ──────────────────────────────────────────────────────────
   const rowsQ = useQuery({
-    enabled: !!orgId && isAdmin && type !== "hhs_daily",
+    enabled: !!orgId && isAdmin && type !== "hhs_daily" && type !== "non_billable",
     queryKey: [
       "records", orgId, mode, type, staff, client, code, team, from, to,
     ],
@@ -282,6 +293,39 @@ export function RecordsTab() {
     },
   });
 
+  const generalQ = useQuery({
+    enabled: !!orgId && isAdmin && (type === "non_billable" || type === "all"),
+    queryKey: ["general-shifts-records", orgId, staff, from, to],
+    queryFn: async () => {
+      const fromIso = new Date(`${from}T00:00:00`).toISOString();
+      const toIso = new Date(`${to}T23:59:59.999`).toISOString();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let q = (supabase as any)
+        .from("general_shifts")
+        .select("id, user_id, category, note, clock_in_timestamp, clock_out_timestamp")
+        .eq("organization_id", orgId!)
+        .gte("clock_in_timestamp", fromIso)
+        .lte("clock_in_timestamp", toIso)
+        .order("clock_in_timestamp", { ascending: false })
+        .limit(FETCH_CAP);
+      if (staff.length) q = q.in("user_id", staff);
+      const { data, error } = await q;
+      if (error) throw error;
+      const staffMap = new Map((staffOptionsQ.data ?? []).map((s) => [s.value, s.label]));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return ((data ?? []) as any[]).map((g): GeneralRow => ({
+        id: g.id,
+        staff_id: g.user_id,
+        staff_name: staffMap.get(g.user_id) ?? String(g.user_id).slice(0, 8),
+        category: g.category ?? "general",
+        note: g.note ?? "",
+        clock_in_timestamp: g.clock_in_timestamp,
+        clock_out_timestamp: g.clock_out_timestamp,
+        duration_min: durationMin(g.clock_in_timestamp, g.clock_out_timestamp),
+      }));
+    },
+  });
+
   if (!isAdmin) {
     return (
       <div className="rounded-md border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
@@ -324,6 +368,33 @@ export function RecordsTab() {
       ].map((v) => esc(String(v))).join(",")),
     ).join("\r\n");
     downloadCsv(`agency-records_${from}_${to}.csv`, body);
+  };
+
+  const handleHoursExport = (option: "total" | "billable" | "non_billable") => {
+    const esc = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+    const header = ["Caregiver", "Type", "Category/Code", "Date", "Clock in", "Clock out", "Hours"];
+    const billableRows = visibleSet.map((r) => [
+      r.staff_name, "Billable", r.service_type_code,
+      fmtDate(r.clock_in_timestamp),
+      fmtTs(r.corrected_clock_in ?? r.clock_in_timestamp),
+      fmtTs(r.corrected_clock_out ?? r.clock_out_timestamp),
+      (r.duration_min / 60).toFixed(2),
+    ]);
+    const nonBillableRows = (generalQ.data ?? []).map((g) => [
+      g.staff_name, "Non-billable", g.category,
+      fmtDate(g.clock_in_timestamp),
+      fmtTs(g.clock_in_timestamp),
+      fmtTs(g.clock_out_timestamp),
+      (g.duration_min / 60).toFixed(2),
+    ]);
+    const dataRows = option === "billable" ? billableRows
+      : option === "non_billable" ? nonBillableRows
+      : [...billableRows, ...nonBillableRows];
+    if (dataRows.length === 0) { toast.info("Nothing to export — adjust filters first."); return; }
+    const body = [header.join(",")].concat(
+      dataRows.map((row) => row.map((v) => esc(String(v))).join(","))
+    ).join("\r\n");
+    downloadCsv(`hours-${option}_${from}_${to}.csv`, body);
   };
 
   const reDownloadBatch = async (batch: any) => {
@@ -445,6 +516,10 @@ export function RecordsTab() {
     batchesQ.refetch();
   };
 
+  const billableMin = visibleSet.reduce((sum, r) => sum + r.duration_min, 0);
+  const nonBillableMin = (generalQ.data ?? []).reduce((sum, g) => sum + g.duration_min, 0);
+  const totalHoursMin = billableMin + nonBillableMin;
+
   const dateLabel = `${fmtShort(from)} – ${fmtShort(to)}`;
 
   const filterControls = (
@@ -533,13 +608,14 @@ export function RecordsTab() {
         </button>
       </div>
 
-      {/* Type control — 4 buttons, fixed order */}
+      {/* Type control — 5 buttons, fixed order */}
       <div className="flex flex-wrap items-center gap-1 rounded-md border border-border bg-card p-1">
         {([
           ["all", "All types"],
           ["evv", "EVV timesheets"],
           ["non_evv", "Non-EVV timesheets"],
           ["hhs_daily", "Daily logs (HHS)"],
+          ["non_billable", "Non-billable"],
         ] as const).map(([k, label]) => (
           <button
             key={k}
@@ -581,14 +657,32 @@ export function RecordsTab() {
             </Sheet>
           </div>
 
+          {/* Hours summary bar */}
+          <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
+              <span className="font-medium text-foreground">
+                Billable <span className="tabular-nums text-[#137182]">{(billableMin / 60).toFixed(1)}h</span>
+              </span>
+              <span className="text-muted-foreground">·</span>
+              <span className="font-medium text-foreground">
+                Non-billable <span className="tabular-nums text-muted-foreground">{(nonBillableMin / 60).toFixed(1)}h</span>
+              </span>
+              <span className="text-muted-foreground">·</span>
+              <span className="font-medium text-foreground">
+                Total <span className="tabular-nums">{(totalHoursMin / 60).toFixed(1)}h</span>
+              </span>
+            </div>
+
           {/* Count + exports */}
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <span className="text-xs text-muted-foreground">
-              {rowsQ.isLoading ? "Loading…" : `${total.toLocaleString()} record${total === 1 ? "" : "s"} match`}
-              {total > PAGE_SIZE && ` — showing first ${PAGE_SIZE}`}
+              {type === "non_billable"
+                ? (generalQ.isLoading ? "Loading…" : `${(generalQ.data ?? []).length.toLocaleString()} record${(generalQ.data ?? []).length === 1 ? "" : "s"} match`)
+                : (rowsQ.isLoading ? "Loading…" : `${total.toLocaleString()} record${total === 1 ? "" : "s"} match`)
+              }
+              {type !== "non_billable" && total > PAGE_SIZE && ` — showing first ${PAGE_SIZE}`}
             </span>
             <div className="flex flex-wrap items-center gap-2">
-              {canDhhsExport ? (
+              {type !== "non_billable" && (canDhhsExport ? (
                 <Button
                   type="button" size="sm" variant="default"
                   onClick={() => setUtahDialogOpen(true)}
@@ -603,97 +697,166 @@ export function RecordsTab() {
                 >
                   DHHS EVV export hidden (mixed/non-EVV codes in result)
                 </span>
+              ))}
+              {type !== "non_billable" && (
+                <Button
+                  type="button" size="sm" variant="outline"
+                  onClick={handleMasterCsv}
+                  disabled={rowsQ.isLoading || total === 0}
+                  title={total === 0 ? "No records in the current view to export" : undefined}
+                  className="gap-2"
+                >
+                  <Download className="h-4 w-4" /> Export Master Agency Ledger CSV
+                </Button>
               )}
-              <Button
-                type="button" size="sm" variant="outline"
-                onClick={handleMasterCsv}
-                disabled={rowsQ.isLoading || total === 0}
-                title={total === 0 ? "No records in the current view to export" : undefined}
-                className="gap-2"
-              >
-                <Download className="h-4 w-4" /> Export Master Agency Ledger CSV
-              </Button>
+              {/* Export hours — separate from the DHHS export, payroll-shaped CSV */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button type="button" size="sm" variant="outline" className="gap-2">
+                    <Download className="h-4 w-4" /> Export hours
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-[200px] p-1">
+                  <button
+                    type="button"
+                    onClick={() => handleHoursExport("total")}
+                    className="w-full rounded px-3 py-2 text-left text-sm hover:bg-accent"
+                  >
+                    Total (billable + non-billable)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleHoursExport("billable")}
+                    className="w-full rounded px-3 py-2 text-left text-sm hover:bg-accent"
+                  >
+                    Billable only
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleHoursExport("non_billable")}
+                    className="w-full rounded px-3 py-2 text-left text-sm hover:bg-accent"
+                  >
+                    Non-billable only
+                  </button>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 
-          {/* Results table */}
-          <div className="overflow-x-auto rounded-lg border border-border bg-card">
-            <table className="w-full min-w-[900px] text-sm">
-              <thead className="bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2">Caregiver</th>
-                  <th className="px-3 py-2">Client</th>
-                  <th className="px-3 py-2">Code</th>
-                  <th className="px-3 py-2">Date</th>
-                  <th className="px-3 py-2">In → Out</th>
-                  <th className="px-3 py-2">Duration</th>
-                  <th className="px-3 py-2">Geofence</th>
-                  <th className="px-3 py-2">{mode === "attention" ? "Why flagged" : "Flags"}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rowsQ.isLoading && (
-                  <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
-                )}
-                {!rowsQ.isLoading && rows.length === 0 && (
-                  <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
-                    {mode === "attention" ? "No exceptions — everything is clean for these filters." : "No records match these filters."}
-                  </td></tr>
-                )}
-                {rows.map((r) => {
-                  const inTs = r.corrected_clock_in ?? r.clock_in_timestamp;
-                  const outTs = r.corrected_clock_out ?? r.clock_out_timestamp;
-                  return (
-                    <tr key={r.id} className="border-t border-border hover:bg-accent/40">
-                      <td className="px-3 py-2">{r.staff_name}</td>
-                      <td className="px-3 py-2">
-                        <Link
-                          to="/dashboard/shift/$shiftId"
-                          params={{ shiftId: r.id }}
-                          target="_blank"
-                          className="text-[#137182] hover:underline"
-                        >
-                          {r.client_name}
-                        </Link>
-                        {r.team_name && (
-                          <span className="ml-1 text-xs text-muted-foreground">· {r.team_name}</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 font-mono text-xs">{r.service_type_code}</td>
-                      <td className="px-3 py-2">{fmtDate(r.clock_in_timestamp)}</td>
-                      <td className="px-3 py-2">
-                        {fmtTs(inTs)} → {fmtTs(outTs)}
-                        {r.is_edited_by_admin && (
-                          <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-amber-700">edited</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 tabular-nums">{fmtDur(r.duration_min)}</td>
-                      <td className="px-3 py-2">
-                        {r.is_out_of_bounds ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-amber-700">
-                            <AlertTriangle className="h-3 w-3" /> out
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                            <MapPin className="h-3 w-3" /> in
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        {r.exceptions.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {r.exceptions.map((e) => <ReasonBadge key={e.code} ex={e} />)}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </td>
+          {/* Results table — non-billable (general_shifts) */}
+          {type === "non_billable" ? (
+            <div className="overflow-x-auto rounded-lg border border-border bg-card">
+              <table className="w-full min-w-[700px] text-sm">
+                <thead className="bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2">Caregiver</th>
+                    <th className="px-3 py-2">Category</th>
+                    <th className="px-3 py-2">Date</th>
+                    <th className="px-3 py-2">In → Out</th>
+                    <th className="px-3 py-2">Duration</th>
+                    <th className="px-3 py-2">Note</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {generalQ.isLoading && (
+                    <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
+                  )}
+                  {!generalQ.isLoading && (generalQ.data ?? []).length === 0 && (
+                    <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">No non-billable records match these filters.</td></tr>
+                  )}
+                  {(generalQ.data ?? []).map((g) => (
+                    <tr key={g.id} className="border-t border-border hover:bg-accent/40">
+                      <td className="px-3 py-2">{g.staff_name}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{g.category}</td>
+                      <td className="px-3 py-2">{fmtDate(g.clock_in_timestamp)}</td>
+                      <td className="px-3 py-2">{fmtTs(g.clock_in_timestamp)} → {fmtTs(g.clock_out_timestamp)}</td>
+                      <td className="px-3 py-2 tabular-nums">{fmtDur(g.duration_min)}</td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">{g.note || "—"}</td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            /* Results table — client records (evv_timesheets) */
+            <div className="overflow-x-auto rounded-lg border border-border bg-card">
+              <table className="w-full min-w-[900px] text-sm">
+                <thead className="bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2">Caregiver</th>
+                    <th className="px-3 py-2">Client</th>
+                    <th className="px-3 py-2">Code</th>
+                    <th className="px-3 py-2">Date</th>
+                    <th className="px-3 py-2">In → Out</th>
+                    <th className="px-3 py-2">Duration</th>
+                    <th className="px-3 py-2">Geofence</th>
+                    <th className="px-3 py-2">{mode === "attention" ? "Why flagged" : "Flags"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rowsQ.isLoading && (
+                    <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
+                  )}
+                  {!rowsQ.isLoading && rows.length === 0 && (
+                    <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
+                      {mode === "attention" ? "No exceptions — everything is clean for these filters." : "No records match these filters."}
+                    </td></tr>
+                  )}
+                  {rows.map((r) => {
+                    const inTs = r.corrected_clock_in ?? r.clock_in_timestamp;
+                    const outTs = r.corrected_clock_out ?? r.clock_out_timestamp;
+                    return (
+                      <tr key={r.id} className="border-t border-border hover:bg-accent/40">
+                        <td className="px-3 py-2">{r.staff_name}</td>
+                        <td className="px-3 py-2">
+                          <Link
+                            to="/dashboard/shift/$shiftId"
+                            params={{ shiftId: r.id }}
+                            target="_blank"
+                            className="text-[#137182] hover:underline"
+                          >
+                            {r.client_name}
+                          </Link>
+                          {r.team_name && (
+                            <span className="ml-1 text-xs text-muted-foreground">· {r.team_name}</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-xs">{r.service_type_code}</td>
+                        <td className="px-3 py-2">{fmtDate(r.clock_in_timestamp)}</td>
+                        <td className="px-3 py-2">
+                          {fmtTs(inTs)} → {fmtTs(outTs)}
+                          {r.is_edited_by_admin && (
+                            <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-amber-700">edited</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 tabular-nums">{fmtDur(r.duration_min)}</td>
+                        <td className="px-3 py-2">
+                          {r.is_out_of_bounds ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-amber-700">
+                              <AlertTriangle className="h-3 w-3" /> out
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                              <MapPin className="h-3 w-3" /> in
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          {r.exceptions.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {r.exceptions.map((e) => <ReasonBadge key={e.code} ex={e} />)}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </>
       )}
 

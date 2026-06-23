@@ -7,10 +7,12 @@ import {
   updateClientSpecificTraining,
   publishClientSpecificTraining,
   extractPcspGoalsForTraining,
+  saveReviewQuestions,
   type CSTContent,
   type CSTSection,
   type CSTItem,
   type CSTGoal,
+  type CSTReviewQuestion,
 } from "@/lib/client-specific-training.functions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +26,7 @@ type Training = {
   title: string;
   content: CSTContent;
   goals: CSTGoal[] | null;
+  review_questions: CSTReviewQuestion[] | null;
   attestation_statement: string;
   status: "draft" | "published";
   version: number;
@@ -53,6 +56,7 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
   const [draftTitle, setDraftTitle] = useState<string>("");
   const [editingGoals, setEditingGoals] = useState(false);
   const [draftGoals, setDraftGoals] = useState<CSTGoal[] | null>(null);
+  const [editingQuestions, setEditingQuestions] = useState(false);
 
   const workingContent: CSTContent = useMemo(() => {
     if (editing && draftContent) return draftContent;
@@ -255,6 +259,48 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
         ) : (
           <div className="rounded-md border border-dashed border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
             No in-depth goals yet. Click "Extract goals from PCSP (NECTAR)" to pull them from the uploaded PCSP document, or add them manually after clicking "Edit goals."
+          </div>
+        )}
+      </div>
+
+      {/* Review questions */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h4 className="text-sm font-semibold">Review questions</h4>
+          <span className="text-xs text-muted-foreground">
+            {(training.review_questions ?? []).length} question{(training.review_questions ?? []).length === 1 ? "" : "s"}
+          </span>
+          <div className="ml-auto">
+            {!editingQuestions ? (
+              <Button variant="outline" size="sm" onClick={() => setEditingQuestions(true)}>
+                <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                {(training.review_questions ?? []).length > 0 ? "Edit questions" : "Add questions"}
+              </Button>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={() => setEditingQuestions(false)}>Cancel</Button>
+            )}
+          </div>
+        </div>
+        {editingQuestions ? (
+          <ReviewQuestionsEditor
+            trainingId={training.id}
+            questions={(training.review_questions ?? []) as CSTReviewQuestion[]}
+            defaultTab="pcsp_goals"
+            onSaved={() => { setEditingQuestions(false); qc.invalidateQueries({ queryKey }); }}
+          />
+        ) : (training.review_questions ?? []).length > 0 ? (
+          <div className="space-y-1">
+            {((training.review_questions ?? []) as CSTReviewQuestion[]).map((q, i) => (
+              <div key={q.id} className="rounded border border-border/40 px-2 py-1 text-sm text-muted-foreground">
+                <span className="font-mono text-[10px] text-accent mr-2">{q.tab}</span>
+                {q.prompt}
+                <span className="ml-1 text-xs text-muted-foreground/50">Q{i + 1}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-md border border-dashed border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
+            No review questions yet. Add applied-reasoning prompts to require staff to reflect on what they've read.
           </div>
         )}
       </div>
@@ -462,7 +508,7 @@ function ItemView({
 }
 
 // ── Goals read-only view ────────────────────────────────────────────────────
-function GoalsView({ goals }: { goals: CSTGoal[] }) {
+export function GoalsView({ goals }: { goals: CSTGoal[] }) {
   return (
     <div className="space-y-3">
       {goals.map((g) => (
@@ -495,6 +541,7 @@ function GoalsView({ goals }: { goals: CSTGoal[] }) {
     </div>
   );
 }
+
 
 // ── Goals editor ─────────────────────────────────────────────────────────────
 function GoalsEditor({ goals, onChange }: { goals: CSTGoal[]; onChange: (next: CSTGoal[]) => void }) {
@@ -563,6 +610,89 @@ function GoalsEditor({ goals, onChange }: { goals: CSTGoal[]; onChange: (next: C
       <Button variant="outline" size="sm" onClick={addGoal}>
         <Plus className="mr-1.5 h-3.5 w-3.5" />Add goal
       </Button>
+    </div>
+  );
+}
+
+// ── Review questions editor ───────────────────────────────────────────────────
+export function ReviewQuestionsEditor({
+  trainingId,
+  questions,
+  defaultTab,
+  onSaved,
+}: {
+  trainingId: string;
+  questions: CSTReviewQuestion[];
+  defaultTab?: string;
+  onSaved: () => void;
+}) {
+  const saveQFn = useServerFn(saveReviewQuestions);
+  const [draft, setDraft] = useState<CSTReviewQuestion[]>(() => structuredClone(questions));
+  const [saving, setSaving] = useState(false);
+
+  function addQ() {
+    setDraft((prev) => [...prev, { id: `q_${Math.random().toString(36).slice(2, 10)}`, tab: defaultTab ?? "pcsp_goals", prompt: "" }]);
+  }
+  function removeQ(idx: number) { setDraft((prev) => prev.filter((_, i) => i !== idx)); }
+  function patchQ(idx: number, patch: Partial<CSTReviewQuestion>) {
+    setDraft((prev) => { const next = [...prev]; next[idx] = { ...next[idx], ...patch }; return next; });
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      await saveQFn({ data: { id: trainingId, review_questions: draft } });
+      onSaved();
+      toast.success("Review questions saved.");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Save failed.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">
+        Ask staff to apply the information — e.g. "What will you do on shift to support this goal?" — not simple recall.
+        The tab label maps to the content tab the question relates to.
+      </p>
+      {draft.map((q, idx) => (
+        <div key={q.id} className="rounded-lg border border-border/60 bg-card p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Question {idx + 1}</span>
+            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => removeQ(idx)}>
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Tab label</label>
+            <Input
+              value={q.tab}
+              onChange={(e) => patchQ(idx, { tab: e.target.value })}
+              placeholder="e.g. pcsp_goals, medications, safety, support_strategies"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Question prompt</label>
+            <Textarea
+              value={q.prompt}
+              rows={2}
+              onChange={(e) => patchQ(idx, { prompt: e.target.value })}
+              placeholder="Applied-reasoning question for staff"
+            />
+          </div>
+        </div>
+      ))}
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" onClick={addQ}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" />Add question
+        </Button>
+        <Button size="sm" onClick={save} disabled={saving}>
+          {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+          Save questions
+        </Button>
+      </div>
     </div>
   );
 }

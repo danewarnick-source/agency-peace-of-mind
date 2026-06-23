@@ -1,12 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PlayCircle, Award, UserPlus, BookOpen, GraduationCap } from "lucide-react";
+import { PlayCircle, Award, UserPlus, BookOpen, GraduationCap, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { getMyClientTrainingStatuses } from "@/lib/client-specific-training.functions";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 
 export const Route = createFileRoute("/dashboard/training/")({ component: CourseLibrary });
@@ -23,6 +25,14 @@ function CourseLibrary() {
   const qc = useQueryClient();
   const isAdmin = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
   const [selectedUser, setSelectedUser] = useState<string>("");
+
+  const getMyTrainingsFn = useServerFn(getMyClientTrainingStatuses);
+
+  const { data: myTrainings } = useQuery({
+    queryKey: ["my-client-training-statuses"],
+    queryFn: () => getMyTrainingsFn({ data: undefined }),
+    staleTime: 60_000,
+  });
 
   const { data: modules, isLoading } = useQuery({
     queryKey: ["training-modules"],
@@ -101,6 +111,59 @@ function CourseLibrary() {
         subtitle="The six required compliance modules for every direct-support professional."
       />
 
+
+      {/* Client-Specific Training panel */}
+      {(myTrainings?.items ?? []).length > 0 && (
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+          <div className="flex items-center gap-2 mb-4">
+            <BookOpen className="h-4 w-4 text-accent" />
+            <h3 className="text-sm font-semibold">Client-Specific Training</h3>
+          </div>
+          <div className="space-y-3">
+            {(myTrainings?.items ?? []).map((item) => (
+              <div key={item.clientId} className="rounded-lg border border-border/60 bg-muted/20 p-3">
+                <div className="font-medium text-sm mb-2">{item.clientName}</div>
+                <div className="flex flex-wrap gap-2">
+                  {item.trainings.map((t) => {
+                    if (t.setupStatus === "not_setup") {
+                      return (
+                        <span key={t.type} className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                          <AlertTriangle className="h-3 w-3" />{t.label}: not set up
+                        </span>
+                      );
+                    }
+                    if (t.setupStatus === "draft") {
+                      return (
+                        <span key={t.type} className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-xs">
+                          <Clock className="h-3 w-3" />{t.label}: draft
+                        </span>
+                      );
+                    }
+                    if (t.completionStatus === "completed") {
+                      return (
+                        <span key={t.type} className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs">
+                          <CheckCircle2 className="h-3 w-3" />{t.label}: done {t.completedAt ? new Date(t.completedAt).toLocaleDateString() : ""}
+                        </span>
+                      );
+                    }
+                    return (
+                      <Link
+                        key={t.type}
+                        to="/dashboard/client-training/$clientId"
+                        params={{ clientId: item.clientId }}
+                        search={{ type: t.type }}
+                        className="inline-flex items-center gap-1 rounded-full bg-accent/15 text-accent px-2 py-0.5 text-xs hover:bg-accent/25 transition"
+                      >
+                        <PlayCircle className="h-3 w-3" />{t.label}: start
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {isAdmin && (
         <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">

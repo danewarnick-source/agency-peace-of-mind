@@ -100,8 +100,6 @@ const ReviewQuestionSchema = z.object({
   tab: z.string(),
   prompt: z.string(),
 });
-// ReviewQuestionSchema is defined for use in later pieces.
-void ReviewQuestionSchema;
 
 function sid(): string { return `s_${Math.random().toString(36).slice(2, 10)}`; }
 
@@ -568,6 +566,67 @@ export const publishClientSpecificTraining = createServerFn({ method: "POST" })
     return { training: updated };
   });
 
+// ── SAVE review questions (admin) ─────────────────────────────────────────
+export const saveReviewQuestions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    id: z.string().uuid(),
+    review_questions: z.array(ReviewQuestionSchema),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+    const { data: row, error } = await supabase
+      .from("client_specific_trainings")
+      .select("organization_id, status")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error || !row) throw new Error("Training not found.");
+    if (row.organization_id !== m.organization_id) throw new Error("Forbidden.");
+    const patch: Record<string, unknown> = { review_questions: data.review_questions };
+    if (row.status === "published") { patch.status = "draft"; patch.approved_by = null; patch.approved_at = null; }
+    const { error: uErr } = await supabase.from("client_specific_trainings").update(patch).eq("id", data.id);
+    if (uErr) throw new Error(uErr.message);
+    return { ok: true };
+  });
+
+// ── NECTAR relevance check (staff) — fail-open ────────────────────────────
+export const checkAnswerRelevance = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    question: z.string().min(1).max(2000),
+    answer: z.string().min(1).max(4000),
+    context: z.string().max(8000).optional(),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const { gatewayFetch } = await import("@/lib/ai-bedrock.server");
+    const system = [
+      "You check whether a direct-support worker's written answer is RELEVANT to the question about a specific client.",
+      "Be FORGIVING. Any genuine, on-topic attempt passes. Only fail answers that are clearly off-topic, empty filler, or unrelated to the question/client.",
+      "Do NOT grade quality, grammar, or completeness. Relevance only.",
+      'Respond ONLY with JSON: { "relevant": true|false, "hint": "one short sentence if not relevant, else empty" }',
+    ].join("\n");
+    try {
+      const res = await gatewayFetch({
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: `QUESTION: ${data.question}\n\nANSWER: ${data.answer}\n\nCLIENT CONTEXT: ${data.context ?? "(none)"}` },
+        ],
+        response_format: { type: "json_object" },
+      });
+      if (!res.ok) return { relevant: true, hint: "" };
+      const body = await res.json();
+      const content: string = body?.choices?.[0]?.message?.content ?? "{}";
+      const clean = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+      const parsed = JSON.parse(clean || "{}") as { relevant?: boolean; hint?: string };
+      if (parsed.relevant === false) return { relevant: false, hint: String(parsed.hint ?? "Try connecting your answer to the client's goal.") };
+      return { relevant: true, hint: "" };
+    } catch {
+      return { relevant: true, hint: "" };
+    }
+  });
+
 // ── Support Strategies ─────────────────────────────────────────────────────
 // One row per client (training_type='support_strategies'). Admin-authored:
 // stub from PCSP goals (NECTAR verbatim), blank, or uploaded provider doc.
@@ -849,23 +908,28 @@ async function ensureClientTrainingRequirementId(
 // ── STAFF: get published training for an assigned client ───────────────────
 export const getStaffClientSpecificTraining = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ clientId: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) => z.object({
+    clientId: z.string().uuid(),
+    trainingType: z.enum(["person_specific", "support_strategies"]).optional(),
+  }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
     const m = await getMembership(supabase, userId);
     // HARD scope check — admin/manager bypass; staff must be assigned.
     await assertStaffMayViewClient(supabase, m.organization_id, userId, m.role, data.clientId);
 
+    const trainingType = data.trainingType ?? "person_specific";
+
     const { data: training, error } = await supabase
       .from("client_specific_trainings")
-      .select("id, organization_id, client_id, title, content, attestation_statement, status, version, updated_at")
+      .select("id, organization_id, client_id, title, content, goals, review_questions, attestation_statement, status, version, updated_at")
       .eq("client_id", data.clientId)
-      .eq("training_type", "person_specific")
+      .eq("training_type", trainingType)
       .maybeSingle();
     if (error) throw new Error(error.message);
     // Staff only see PUBLISHED versions. Admin/manager get null too if not published yet — they can use admin path.
     if (!training || training.status !== "published") {
-      return { training: null, completion: null, hash: null };
+      return { training: null, completion: null, hash: null, pinnedToCurrent: false };
     }
     if (training.organization_id !== m.organization_id) throw new Error("Forbidden.");
 
@@ -889,6 +953,8 @@ export const getStaffClientSpecificTraining = createServerFn({ method: "GET" })
         client_id: training.client_id,
         title: training.title,
         content: training.content,
+        goals: training.goals,
+        review_questions: training.review_questions,
         attestation_statement: training.attestation_statement,
         version: training.version,
         updated_at: training.updated_at,
@@ -905,7 +971,9 @@ export const completeClientSpecificTraining = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({
     clientId: z.string().uuid(),
+    trainingType: z.enum(["person_specific", "support_strategies"]).optional(),
     typedSignature: z.string().trim().min(3).max(120),
+    questionAnswers: z.array(z.object({ question: z.string(), answer: z.string(), tab: z.string() })).optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
@@ -913,17 +981,21 @@ export const completeClientSpecificTraining = createServerFn({ method: "POST" })
     // Re-verify assignment scope at write time.
     await assertStaffMayViewClient(supabase, m.organization_id, userId, m.role, data.clientId);
 
+    const trainingType = data.trainingType ?? "person_specific";
+
     const { data: training, error } = await supabase
       .from("client_specific_trainings")
       .select("id, organization_id, client_id, title, content, attestation_statement, status, version")
       .eq("client_id", data.clientId)
-      .eq("training_type", "person_specific")
+      .eq("training_type", trainingType)
       .maybeSingle();
     if (error || !training) throw new Error("Training not found.");
     if (training.organization_id !== m.organization_id) throw new Error("Forbidden.");
     if (training.status !== "published") throw new Error("This training is not published yet.");
 
     const hash = await contentHashOf(training as { id: string; version: number; content: unknown; attestation_statement: string });
+
+    const topicCode = trainingType === "support_strategies" ? "support_strategies_training" : "client_specific_training";
 
     // 1) Signed completion (immutable; trigger marks prior versions not-current).
     const { data: tc, error: tcErr } = await supabase
@@ -932,7 +1004,7 @@ export const completeClientSpecificTraining = createServerFn({ method: "POST" })
         user_id: userId,
         topic_kind: "person",
         ref_id: training.id,
-        topic_code: "client_specific_training",
+        topic_code: topicCode,
         topic_title: training.title,
         attestation_statement: training.attestation_statement,
         typed_signature: data.typedSignature,
@@ -941,6 +1013,7 @@ export const completeClientSpecificTraining = createServerFn({ method: "POST" })
         consent_accepted: true,
         content_version: String(training.version),
         content_hash: hash,
+        question_answers: data.questionAnswers ?? [],
       })
       .select("id")
       .maybeSingle();
@@ -993,4 +1066,95 @@ export const completeClientSpecificTraining = createServerFn({ method: "POST" })
     }
 
     return { ok: true, completionId: tc.id, requirementId, contentHash: hash };
+  });
+
+// ── STAFF/ADMIN: list assigned clients with per-training completion status ──
+// Used by the staff training hub to show "Start" / "Completed" links.
+export const getMyClientTrainingStatuses = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+
+    let clientIds: string[] = [];
+    if (["admin", "manager", "super_admin"].includes(m.role)) {
+      // Admins: show all clients that have at least one training row.
+      const { data: rows } = await supabase
+        .from("client_specific_trainings")
+        .select("client_id")
+        .eq("organization_id", m.organization_id);
+      clientIds = [...new Set((rows ?? []).map((r: { client_id: string }) => r.client_id))];
+    } else {
+      // Staff: direct assignments.
+      const { data: assigns } = await supabase
+        .from("staff_assignments")
+        .select("client_id")
+        .eq("organization_id", m.organization_id)
+        .eq("staff_id", userId);
+      clientIds = [...new Set((assigns ?? []).map((a: { client_id: string }) => a.client_id))];
+      // Group-home fallback via RPC.
+      try {
+        const { data: rpcClients } = await supabase.rpc("clients_for_staff", { _org: m.organization_id, _staff: userId });
+        if (Array.isArray(rpcClients)) {
+          const rpcIds = (rpcClients as Array<{ id: string }>).map((c) => c.id);
+          clientIds = [...new Set([...clientIds, ...rpcIds])];
+        }
+      } catch { /* ignore */ }
+    }
+
+    if (!clientIds.length) return { items: [] as Array<{ clientId: string; clientName: string; trainings: Array<{ type: "person_specific" | "support_strategies"; label: string; setupStatus: "not_setup" | "draft" | "published"; completionStatus: "not_started" | "completed"; completedAt: string | null }> }> };
+
+    const { data: clients } = await supabase
+      .from("clients")
+      .select("id, first_name, last_name")
+      .in("id", clientIds);
+    const clientMap: Record<string, string> = {};
+    for (const c of (clients ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null }>) {
+      clientMap[c.id] = `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim();
+    }
+
+    const { data: trainings } = await supabase
+      .from("client_specific_trainings")
+      .select("id, client_id, training_type, status")
+      .in("client_id", clientIds);
+
+    const trainingIds = (trainings ?? []).map((t: { id: string }) => t.id);
+    const completionMap: Record<string, string> = {};
+    if (trainingIds.length) {
+      const { data: completions } = await supabase
+        .from("training_completions")
+        .select("ref_id, completed_at")
+        .eq("user_id", userId)
+        .eq("topic_kind", "person")
+        .eq("is_current", true)
+        .in("ref_id", trainingIds);
+      for (const c of (completions ?? []) as Array<{ ref_id: string; completed_at: string }>) {
+        completionMap[c.ref_id] = c.completed_at;
+      }
+    }
+
+    type TrainingRow = { id: string; client_id: string; training_type: string; status: string };
+    const byClient: Record<string, Record<string, TrainingRow>> = {};
+    for (const t of (trainings ?? []) as TrainingRow[]) {
+      if (!byClient[t.client_id]) byClient[t.client_id] = {};
+      byClient[t.client_id][t.training_type] = t;
+    }
+
+    const items = clientIds.map((cid) => {
+      const ct = byClient[cid] ?? {};
+      return {
+        clientId: cid,
+        clientName: clientMap[cid] ?? cid,
+        trainings: (["person_specific", "support_strategies"] as const).map((type) => {
+          const t = ct[type];
+          const label = type === "person_specific" ? "Person-specific" : "Support strategies";
+          if (!t) return { type, label, setupStatus: "not_setup" as const, completionStatus: "not_started" as const, completedAt: null as string | null };
+          if (t.status !== "published") return { type, label, setupStatus: "draft" as const, completionStatus: "not_started" as const, completedAt: null as string | null };
+          const completedAt = completionMap[t.id] ?? null;
+          return { type, label, setupStatus: "published" as const, completionStatus: completedAt ? "completed" as const : "not_started" as const, completedAt };
+        }),
+      };
+    });
+
+    return { items };
   });

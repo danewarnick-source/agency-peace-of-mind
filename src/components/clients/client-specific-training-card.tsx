@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   getClientSpecificTraining,
   draftClientSpecificTrainingWithNectar,
+  draftClientSpecificTrainingBlank,
+  attachClientSpecificTrainingDocument,
   updateClientSpecificTraining,
   publishClientSpecificTraining,
   extractPcspGoalsForTraining,
@@ -14,11 +16,13 @@ import {
   type CSTGoal,
   type CSTReviewQuestion,
 } from "@/lib/client-specific-training.functions";
+import { supabase } from "@/integrations/supabase/client";
+import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Sparkles, Loader2, CheckCircle2, RefreshCw, Pencil, Trash2, Plus, ArrowUp, ArrowDown, Shield, BookOpen } from "lucide-react";
+import { Sparkles, Loader2, CheckCircle2, RefreshCw, Pencil, Trash2, Plus, ArrowUp, ArrowDown, Shield, BookOpen, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 type Training = {
@@ -37,11 +41,18 @@ type Training = {
 
 export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
   const qc = useQueryClient();
+  const { data: org } = useCurrentOrg();
+  const orgId = org?.organization_id;
   const getFn = useServerFn(getClientSpecificTraining);
   const draftFn = useServerFn(draftClientSpecificTrainingWithNectar);
+  const draftBlankFn = useServerFn(draftClientSpecificTrainingBlank);
+  const attachDocFn = useServerFn(attachClientSpecificTrainingDocument);
   const updateFn = useServerFn(updateClientSpecificTraining);
   const publishFn = useServerFn(publishClientSpecificTraining);
   const extractGoalsFn = useServerFn(extractPcspGoalsForTraining);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   const queryKey = ["client-specific-training", clientId];
 
@@ -71,6 +82,35 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const blankMut = useMutation({
+    mutationFn: () => draftBlankFn({ data: { clientId } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey });
+      toast.success("Blank draft created — start writing.");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  async function handleFileUpload(file: File) {
+    if (!orgId) return;
+    setUploading(true);
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `${orgId}/${clientId}/person-specific/${Date.now()}_${safeName}`;
+      const { error: upErr } = await supabase.storage
+        .from("client-documents")
+        .upload(path, file, { upsert: false });
+      if (upErr) throw upErr;
+      await attachDocFn({ data: { clientId, fileName: file.name, storagePath: path } });
+      qc.invalidateQueries({ queryKey });
+      toast.success("Document attached.");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   const updateMut = useMutation({
     mutationFn: (payload: { id: string; title?: string; content?: CSTContent }) => updateFn({ data: payload }),
@@ -141,10 +181,40 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
         <div className="rounded-md border border-dashed border-border/60 bg-muted/30 p-4 text-sm text-muted-foreground">
           No client-specific training yet. NECTAR will assemble a draft from this client's own authoritative data (intake, PCSP goals, billing codes, active meds, BSP status & published behaviors, rights summary, documents). NECTAR <strong>presents verbatim</strong> — it does not author care guidance.
         </div>
-        <Button onClick={() => draftMut.mutate(false)} disabled={draftMut.isPending}>
-          {draftMut.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4 text-amber-500" />}
-          Draft with NECTAR
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={() => draftMut.mutate(false)} disabled={draftMut.isPending}>
+            {draftMut.isPending
+              ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              : <Sparkles className="mr-1.5 h-3.5 w-3.5 text-amber-500" />}
+            Build from PCSP goals (NECTAR)
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => blankMut.mutate()} disabled={blankMut.isPending}>
+            {blankMut.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+            Write manually
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading || !orgId}
+          >
+            {uploading
+              ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              : <Upload className="mr-1.5 h-3.5 w-3.5" />}
+            Upload document
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            accept=".pdf,.docx,.txt,.doc"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void handleFileUpload(file);
+              e.target.value = "";
+            }}
+          />
+        </div>
       </div>
     );
   }

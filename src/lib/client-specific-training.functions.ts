@@ -497,6 +497,124 @@ export const draftClientSpecificTrainingWithNectar = createServerFn({ method: "P
     return { training: inserted };
   });
 
+// ── DRAFT BLANK person-specific training (admin) ────────────────────────────
+// Mirrors draftSupportStrategies mode "blank" but for training_type = "person_specific".
+export const draftClientSpecificTrainingBlank = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ clientId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+    await assertClientInOrg(supabase, data.clientId, m.organization_id);
+
+    const content: CSTContent = { sections: [
+      { id: sid(), title: "Client-specific training", items: [
+        { kind: "text", label: "Notes", value: "" },
+      ] },
+    ] };
+
+    const { data: existing } = await supabase
+      .from("client_specific_trainings")
+      .select("id")
+      .eq("client_id", data.clientId)
+      .eq("training_type", "person_specific")
+      .maybeSingle();
+
+    if (existing) {
+      const { data: updated, error: uErr } = await supabase
+        .from("client_specific_trainings")
+        .update({ content: content as unknown, status: "draft", approved_by: null, approved_at: null })
+        .eq("id", existing.id)
+        .select("*")
+        .maybeSingle();
+      if (uErr) throw new Error(uErr.message);
+      return { training: updated };
+    }
+
+    const { data: inserted, error: iErr } = await supabase
+      .from("client_specific_trainings")
+      .insert({
+        organization_id: m.organization_id,
+        client_id: data.clientId,
+        training_type: "person_specific",
+        title: "Client-Specific Training",
+        content: content as unknown,
+        status: "draft",
+        version: 1,
+      })
+      .select("*")
+      .maybeSingle();
+    if (iErr) throw new Error(iErr.message);
+    return { training: inserted };
+  });
+
+// ── ATTACH uploaded document as person-specific training (admin) ────────────
+// Mirrors attachSupportStrategyDocument but for training_type = "person_specific".
+export const attachClientSpecificTrainingDocument = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    clientId: z.string().uuid(),
+    fileName: z.string().min(1).max(300),
+    storagePath: z.string().min(1).max(500),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+    await assertClientInOrg(supabase, data.clientId, m.organization_id);
+
+    const { data: doc, error: dErr } = await supabase
+      .from("client_documents")
+      .insert({
+        client_id: data.clientId,
+        organization_id: m.organization_id,
+        document_type: "person_specific_training",
+        file_name: data.fileName,
+        file_url: data.storagePath,
+        storage_path: data.storagePath,
+        uploaded_by: userId,
+      })
+      .select("id")
+      .maybeSingle();
+    if (dErr) throw new Error(dErr.message);
+
+    const linkContent: CSTContent = { sections: [
+      { id: sid(), title: "Uploaded client-specific training", items: [
+        { kind: "link", label: "Provider document", links: [{ label: data.fileName, href: null }] },
+      ] },
+    ] };
+
+    const { data: existing } = await supabase
+      .from("client_specific_trainings")
+      .select("id")
+      .eq("client_id", data.clientId)
+      .eq("training_type", "person_specific")
+      .maybeSingle();
+
+    if (existing) {
+      const { error: uErr } = await supabase
+        .from("client_specific_trainings")
+        .update({ content: linkContent as unknown, status: "draft", approved_by: null, approved_at: null })
+        .eq("id", existing.id);
+      if (uErr) throw new Error(uErr.message);
+    } else {
+      const { error: iErr } = await supabase
+        .from("client_specific_trainings")
+        .insert({
+          organization_id: m.organization_id,
+          client_id: data.clientId,
+          training_type: "person_specific",
+          title: "Client-Specific Training",
+          content: linkContent as unknown,
+          status: "draft",
+          version: 1,
+        });
+      if (iErr) throw new Error(iErr.message);
+    }
+    return { ok: true, documentId: doc?.id ?? null };
+  });
+
 // ── UPDATE content/title/goals (admin) ─────────────────────────────────────
 export const updateClientSpecificTraining = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

@@ -151,7 +151,7 @@ function CourseLibrary() {
                         key={t.type}
                         to="/dashboard/client-training/$clientId"
                         params={{ clientId: item.clientId }}
-                        search={{ type: t.type }}
+                        search={{ trainingType: t.type as "person_specific" | "support_strategies" }}
                         className="inline-flex items-center gap-1 rounded-full bg-accent/15 text-accent px-2 py-0.5 text-xs hover:bg-accent/25 transition"
                       >
                         <PlayCircle className="h-3 w-3" />{t.label}: start

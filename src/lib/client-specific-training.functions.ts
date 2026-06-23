@@ -1083,7 +1083,7 @@ export const getMyClientTrainingStatuses = createServerFn({ method: "GET" })
         .from("client_specific_trainings")
         .select("client_id")
         .eq("organization_id", m.organization_id);
-      clientIds = [...new Set((rows ?? []).map((r: { client_id: string }) => r.client_id))];
+      clientIds = [...new Set((rows ?? []).map((r: { client_id: string }) => r.client_id))] as string[];
     } else {
       // Staff: direct assignments.
       const { data: assigns } = await supabase
@@ -1091,7 +1091,7 @@ export const getMyClientTrainingStatuses = createServerFn({ method: "GET" })
         .select("client_id")
         .eq("organization_id", m.organization_id)
         .eq("staff_id", userId);
-      clientIds = [...new Set((assigns ?? []).map((a: { client_id: string }) => a.client_id))];
+      clientIds = [...new Set((assigns ?? []).map((a: { client_id: string }) => a.client_id))] as string[];
       // Group-home fallback via RPC.
       try {
         const { data: rpcClients } = await supabase.rpc("clients_for_staff", { _org: m.organization_id, _staff: userId });

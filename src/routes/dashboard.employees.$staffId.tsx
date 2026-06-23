@@ -1,22 +1,56 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, CalendarDays, Users as UsersIcon, ShieldAlert, FileText, Clock, AlertTriangle, ClipboardList, Upload } from "lucide-react";
+import {
+  ArrowLeft,
+  ShieldAlert,
+  FileText,
+  Clock,
+  AlertTriangle,
+  ClipboardList,
+  Upload,
+  Pencil,
+  Eye,
+  ChevronDown,
+  Download,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { RequirePermission } from "@/components/rbac-guard";
-import { StaffHrChecklistCard } from "@/components/hr/staff-hr-checklist-card";
-import { OtherAssignmentsAdminSection } from "@/components/training/other-assignments-section";
 import { StaffTypeEditor } from "@/components/hr/staff-type-editor";
-import { getStaffChecklist } from "@/lib/hr-staff.functions";
-import { SmartImportRemindersPanel } from "@/components/smart-import/reminders-panel";
-
+import {
+  getStaffChecklist,
+  getStaffPii,
+  updateStaffPii,
+  createHrDocumentUploadUrl,
+  getHrDocumentUrl,
+} from "@/lib/hr-staff.functions";
+import {
+  attachBaselineCertificate,
+  setBaselineExpiration,
+  adminSignOffBaselineCompletion,
+  revokeBaselineSignOff,
+} from "@/lib/staff-training-requirements.functions";
+import { parseBaselineId, baselineByKey } from "@/lib/staff-training-requirements";
+import { AnnualHoursSection } from "@/components/hr/annual-hours-progress";
 
 export const Route = createFileRoute("/dashboard/employees/$staffId")({
   component: () => (
@@ -29,9 +63,12 @@ export const Route = createFileRoute("/dashboard/employees/$staffId")({
 function StaffProfilePage() {
   const { staffId } = Route.useParams();
   const { data: org } = useCurrentOrg();
+  const { user } = useAuth();
   const router = useRouter();
+  const qc = useQueryClient();
 
   const orgId = org?.organization_id;
+  const isSelf = user?.id === staffId;
 
   // Membership + basic non-PII profile. Org-scoped — RLS denies cross-org reads.
   const memberQ = useQuery({
@@ -49,7 +86,7 @@ function StaffProfilePage() {
       const { data: p } = await supabase
         .from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, employee_id, position, positions, department, hire_date, account_status, worker_type, team_id" as any)
+        .select("id, full_name, email, username, employee_id, position, positions, department, hire_date, account_status, worker_type, team_id, phone" as any)
         .eq("id", staffId)
         .maybeSingle();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -129,6 +166,16 @@ function StaffProfilePage() {
   const p = memberQ.data!.profile;
   const name = p?.full_name ?? "—";
 
+  const positions = (() => {
+    const list = ((p?.positions as string[] | null) ?? []).filter(Boolean);
+    const fallback = p?.position ? [p.position as string] : [];
+    return list.length ? list : fallback;
+  })();
+
+  const invalidateProfile = () => {
+    qc.invalidateQueries({ queryKey: ["staff-profile", orgId, staffId] });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -140,12 +187,7 @@ function StaffProfilePage() {
             <h1 className="text-xl font-semibold">{name}</h1>
             <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <Badge variant="secondary" className="uppercase">{m.role}</Badge>
-              {(() => {
-                const list = ((p?.positions as string[] | null) ?? []).filter(Boolean);
-                const fallback = p?.position ? [p.position as string] : [];
-                const positions = list.length ? list : fallback;
-                return positions.map((pos) => <Badge key={pos} variant="outline">{pos}</Badge>);
-              })()}
+              {positions.map((pos) => <Badge key={pos} variant="outline">{pos}</Badge>)}
               <span>{m.active ? "Active" : "Deactivated"}</span>
               {p?.hire_date && <span>· Hired {p.hire_date}</span>}
             </div>
@@ -165,126 +207,84 @@ function StaffProfilePage() {
           <TabsTrigger value="deadlines">Deadlines</TabsTrigger>
         </TabsList>
 
-        {/* ----- PROFILE ----- */}
-        <TabsContent value="profile" className="mt-4 space-y-4">
+        {/* ----- OVERVIEW ----- */}
+        <TabsContent value="profile" className="mt-4">
           <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader><CardTitle className="text-base">Contact & position</CardTitle></CardHeader>
-              <CardContent className="grid gap-2 text-sm">
-                <Row label="Email" value={p?.email ?? "—"} />
-                <Row label="Login" value={p?.username ?? p?.email ?? "—"} />
-                <Row label="Employee ID" value={p?.employee_id ?? "—"} />
-                <Row label="Position" value={(() => {
-                  const list = ((p?.positions as string[] | null) ?? []).filter(Boolean);
-                  const fallback = p?.position ? [p.position as string] : [];
-                  const positions = list.length ? list : fallback;
-                  return positions.length ? positions.join(", ") : "—";
-                })()} />
-                <Row label="System role" value={m.role} />
-                <Row label="Worker type" value={p?.worker_type === "1099" ? "1099 contractor" : "W-2 employee"} />
-                <Row label="Status" value={m.active ? "Active" : "Deactivated"} />
-                <Row label="Department" value={p?.department ?? "—"} />
-              </CardContent>
-            </Card>
 
-            <Card>
-              <CardHeader><CardTitle className="text-base">Team</CardTitle></CardHeader>
-              <CardContent className="grid gap-2 text-sm">
-                {teamId ? (
-                  <>
-                    <Row label="Team" value={teamQ.data?.team_name ?? "…"} />
-                    <Row label="Reports to" value={teamQ.data?.manager_name ?? "—"} />
-                    <div>
-                      <Button variant="link" size="sm" className="px-0" asChild>
-                        <Link to="/dashboard/teams">Manage team membership →</Link>
-                      </Button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-muted-foreground">
-                    Not assigned to a team.{" "}
-                    <Link to="/dashboard/teams" className="underline">Manage teams</Link>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {/* Card 1 — Contact & Position */}
+            <ContactCard
+              orgId={orgId}
+              staffId={staffId}
+              p={p}
+              m={m}
+              positions={positions}
+              onSaved={invalidateProfile}
+            />
 
+            {/* Card 2 — HR Sensitive */}
+            <HrSensitiveCard
+              orgId={orgId}
+              staffId={staffId}
+              isSelf={isSelf}
+              orgRole={org?.role}
+            />
+
+            {/* Card 3 — Caseload */}
             <Card className="lg:col-span-2">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base">Caseload</CardTitle>
-                <Button variant="link" size="sm" asChild>
-                  <Link to="/dashboard/employees"><UsersIcon className="mr-1 h-3.5 w-3.5" /> Manage caseload →</Link>
-                </Button>
-              </CardHeader>
+              <CardHeader><CardTitle className="text-base">Caseload</CardTitle></CardHeader>
               <CardContent>
                 {caseloadQ.isLoading ? (
                   <div className="text-sm text-muted-foreground">Loading…</div>
                 ) : (caseloadQ.data ?? []).length === 0 ? (
                   <p className="text-sm text-muted-foreground">No clients assigned.</p>
                 ) : (
-                  <ul className="divide-y">
+                  <div className="flex flex-wrap gap-2">
                     {(caseloadQ.data ?? []).map((c) => (
-                      <li key={c.id} className="flex items-center justify-between py-2 text-sm">
-                        <Link
-                          to="/dashboard/workspace/$clientId"
-                          params={{ clientId: c.id }}
-                          className="font-medium hover:underline"
-                        >
-                          {c.name}
-                        </Link>
-                        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                          {c.is_gh && <Badge variant="outline">Group home</Badge>}
-                          {c.codes.slice(0, 4).map((code) => (
-                            <Badge key={code} variant="secondary" className="text-[10px]">{code}</Badge>
-                          ))}
-                          {c.codes.length > 4 && <span>+{c.codes.length - 4}</span>}
-                        </div>
-                      </li>
+                      <Link
+                        key={c.id}
+                        to="/dashboard/workspace/$clientId"
+                        params={{ clientId: c.id }}
+                        className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/30 px-3 py-1 text-sm hover:bg-muted"
+                      >
+                        {c.name}
+                        {c.codes.slice(0, 2).map((code) => (
+                          <span key={code} className="ml-1 rounded bg-muted px-1 text-[10px] text-muted-foreground">{code}</span>
+                        ))}
+                      </Link>
                     ))}
-                  </ul>
+                  </div>
                 )}
+                <p className="mt-3 text-xs text-muted-foreground">Manage assignments in the Employees list.</p>
               </CardContent>
             </Card>
 
+            {/* Card 4 — Staff types */}
             <Card className="lg:col-span-2">
-              <CardHeader><CardTitle className="text-base">Schedule</CardTitle></CardHeader>
-              <CardContent className="text-sm">
-                <p className="text-muted-foreground">
-                  View shifts and scheduled time for this staffer in the schedule view.
-                </p>
-                <div className="mt-3 flex gap-2">
-                  <Button variant="outline" size="sm" asChild>
-                    <Link to="/dashboard/schedule"><CalendarDays className="mr-1 h-3.5 w-3.5" /> Open schedule →</Link>
-                  </Button>
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link to="/dashboard/scheduling">Scheduling tools →</Link>
-                  </Button>
-                </div>
+              <CardHeader>
+                <CardTitle className="text-base">
+                  Staff types
+                  <span className="ml-2 text-[10px] font-normal text-muted-foreground">
+                    Union rule: required for any type selected
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <StaffTypeEditor organizationId={orgId} staffId={staffId} />
               </CardContent>
             </Card>
+
           </div>
-
-          {/* Staff type selector (UNION rule). Unchanged. */}
-          <StaffTypeEditor organizationId={orgId} staffId={staffId} />
-
-          {/* HR — Sensitive Information block. Permission gating intact;
-              server fail-closes for non-admin/non-manager/non-self. */}
-          <StaffHrChecklistCard organizationId={orgId} staffId={staffId} view="pii" />
         </TabsContent>
 
-        {/* ----- REQUIREMENTS ----- */}
-        <TabsContent value="requirements" className="mt-4 space-y-4">
-          <SmartImportRemindersPanel scope="admin" relatedRecordId={staffId} compact />
-          <RequirementsTab organizationId={orgId} staffId={staffId} />
+        {/* ----- CERTS & TRAININGS ----- */}
+        <TabsContent value="requirements" className="mt-4">
+          <CertsTab organizationId={orgId} staffId={staffId} caseload={caseloadQ.data ?? []} orgRole={org?.role} />
         </TabsContent>
-
 
         {/* ----- ACTIVITY ----- */}
         <TabsContent value="activity" className="mt-4">
           <ActivityFeed organizationId={orgId} staffId={staffId} />
         </TabsContent>
-
-
 
         {/* ----- HR DOCS ----- */}
         <TabsContent value="hrdocs" className="mt-4">
@@ -308,86 +308,984 @@ function StaffProfilePage() {
   );
 }
 
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
+/* ======================================================================
+ * Contact & Position card — read view + inline edit for non-PII fields.
+ * ====================================================================*/
+function ContactCard({
+  orgId,
+  staffId,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  p,
+  m,
+  positions,
+  onSaved,
+}: {
+  orgId: string;
+  staffId: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  p: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  m: any;
+  positions: string[];
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({
+    phone: "",
+    employee_id: "",
+    department: "",
+    worker_type: "w2_employee",
+    hire_date: "",
+  });
+
+  const startEdit = () => {
+    setDraft({
+      phone: p?.phone ?? "",
+      employee_id: p?.employee_id ?? "",
+      department: p?.department ?? "",
+      worker_type: p?.worker_type ?? "w2_employee",
+      hire_date: p?.hire_date ?? "",
+    });
+    setEditing(true);
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("profiles")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update({
+          phone: draft.phone || null,
+          employee_id: draft.employee_id || null,
+          department: draft.department || null,
+          worker_type: draft.worker_type || null,
+          hire_date: draft.hire_date || null,
+        } as any)
+        .eq("id", staffId);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      toast.success("Saved");
+      setEditing(false);
+      onSaved();
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-border/40 pb-1 last:border-0">
-      <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
-      <span className="text-right">{value}</span>
-    </div>
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+          Contact &amp; position
+        </CardTitle>
+        <RequirePermission perm="manage_users">
+          <button
+            type="button"
+            aria-label="Edit contact"
+            onClick={editing ? () => setEditing(false) : startEdit}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-transparent text-muted-foreground hover:bg-muted hover:border-muted-foreground/40"
+          >
+            {editing ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+          </button>
+        </RequirePermission>
+      </CardHeader>
+      <CardContent>
+        {!editing ? (
+          <div className="space-y-0">
+            <Row label="Email" value={p?.email ?? "—"} />
+            <Row label="Phone" value={p?.phone ?? "—"} />
+            <Row label="Employee ID" value={p?.employee_id ?? "—"} />
+            <Row label="Position" value={positions.length ? positions.join(", ") : "—"} />
+            <Row label="Worker type" value={p?.worker_type === "1099" ? "1099 contractor" : "W-2 employee"} />
+            <Row label="Status" value={m.active ? "Active" : "Deactivated"} />
+            <Row label="Department" value={p?.department ?? "—"} />
+            <Row label="Hire date" value={p?.hire_date ?? "—"} />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Phone</Label>
+              <Input
+                type="tel"
+                value={draft.phone}
+                onChange={(e) => setDraft({ ...draft, phone: e.target.value })}
+                placeholder="(801) 555-0100"
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Employee ID</Label>
+              <Input
+                type="text"
+                value={draft.employee_id}
+                onChange={(e) => setDraft({ ...draft, employee_id: e.target.value })}
+                placeholder="EMP-001"
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Department</Label>
+              <Input
+                type="text"
+                value={draft.department}
+                onChange={(e) => setDraft({ ...draft, department: e.target.value })}
+                placeholder="Direct Support"
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Worker type</Label>
+              <Select
+                value={draft.worker_type}
+                onValueChange={(v) => setDraft({ ...draft, worker_type: v })}
+              >
+                <SelectTrigger className="text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="w2_employee">W-2 employee</SelectItem>
+                  <SelectItem value="1099">1099 contractor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Hire date</Label>
+              <Input
+                type="date"
+                value={draft.hire_date}
+                onChange={(e) => setDraft({ ...draft, hire_date: e.target.value })}
+                className="text-sm"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+                Save
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
 /* ======================================================================
- * Requirements tab — summary + filter chips above the existing checklist.
- * Reuses the SAME getStaffChecklist server fn and the SAME expiry logic
- * (60-day window, status === "complete" && !expired = current). Computes
- * counts only — does not write or mutate anything.
+ * HR — sensitive info card. Phone (personal), hourly rate, daily rate.
+ * Uses getStaffPii server fn (fail-closed). Edit gated to admin/manager.
  * ====================================================================*/
-function RequirementsTab({ organizationId, staffId }: { organizationId: string; staffId: string }) {
-  const [filter, setFilter] = useState<"all" | "needs_action" | "current">("all");
+function HrSensitiveCard({
+  orgId,
+  staffId,
+  isSelf,
+  orgRole,
+}: {
+  orgId: string;
+  staffId: string;
+  isSelf: boolean;
+  orgRole: string | undefined;
+}) {
+  const qc = useQueryClient();
+  const fetchPii = useServerFn(getStaffPii);
+  const updatePiiFn = useServerFn(updateStaffPii);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({ phone: "", hourly_rate: "", daily_rate: "" });
+
+  const piiQ = useQuery({
+    queryKey: ["staff-pii", orgId, staffId],
+    queryFn: () => fetchPii({ data: { organization_id: orgId, staff_id: staffId } }),
+  });
+
+  const canEdit = !isSelf && (orgRole === "admin" || orgRole === "manager");
+
+  const startEdit = () => {
+    setDraft({
+      phone: piiQ.data?.staff_id ? "" : "",
+      hourly_rate: piiQ.data?.hourly_rate != null ? String(piiQ.data.hourly_rate) : "",
+      daily_rate: piiQ.data?.daily_rate != null ? String(piiQ.data.daily_rate) : "",
+    });
+    setEditing(true);
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      await updatePiiFn({
+        data: {
+          organization_id: orgId,
+          staff_id: staffId,
+          hourly_rate: draft.hourly_rate ? Number(draft.hourly_rate) : null,
+          daily_rate: draft.daily_rate ? Number(draft.daily_rate) : null,
+        },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Saved");
+      setEditing(false);
+      qc.invalidateQueries({ queryKey: ["staff-pii", orgId, staffId] });
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  if (piiQ.isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-sm text-muted-foreground">Loading…</CardContent>
+      </Card>
+    );
+  }
+  if (piiQ.error || !piiQ.data) {
+    return (
+      <Card className="border-rose-200 bg-rose-50/30">
+        <CardContent className="p-5 text-sm text-rose-700">
+          <ShieldAlert className="mr-2 inline h-4 w-4" />
+          No access to sensitive HR data.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const pii = piiQ.data;
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+          HR — sensitive info
+        </CardTitle>
+        {canEdit && (
+          <button
+            type="button"
+            aria-label="Edit HR"
+            onClick={editing ? () => setEditing(false) : startEdit}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-transparent text-muted-foreground hover:bg-muted hover:border-muted-foreground/40"
+          >
+            {editing ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+          </button>
+        )}
+      </CardHeader>
+      <CardContent>
+        {!editing ? (
+          <div className="space-y-0">
+            <Row label="Hourly rate" value={pii.hourly_rate != null ? `$${Number(pii.hourly_rate).toFixed(2)}/hr` : "—"} />
+            <Row label="Daily rate" value={pii.daily_rate != null ? `$${Number(pii.daily_rate).toFixed(2)}/day` : "—"} />
+            <p className="mt-3 text-[11px] text-muted-foreground">Visible to admins and team managers only.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Hourly rate ($)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={draft.hourly_rate}
+                  onChange={(e) => setDraft({ ...draft, hourly_rate: e.target.value })}
+                  placeholder="0.00"
+                  className="text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Daily rate ($)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={draft.daily_rate}
+                  onChange={(e) => setDraft({ ...draft, daily_rate: e.target.value })}
+                  placeholder="0.00"
+                  className="text-sm"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+                Save
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ======================================================================
+ * Certs & Trainings tab — summary stats, filter chips, audit panel,
+ * flat cert list, and client-specific training section.
+ * ====================================================================*/
+function CertsTab({
+  organizationId,
+  staffId,
+  caseload,
+  orgRole,
+}: {
+  organizationId: string;
+  staffId: string;
+  caseload: Array<{ id: string; name: string; is_gh: boolean; codes: string[] }>;
+  orgRole: string | undefined;
+}) {
   const fetchChecklist = useServerFn(getStaffChecklist);
+  const fetchPii = useServerFn(getStaffPii);
+  const attachBaselineFn = useServerFn(attachBaselineCertificate);
+  const setBaselineExpFn = useServerFn(setBaselineExpiration);
+  const signOffBaselineFn = useServerFn(adminSignOffBaselineCompletion);
+  const revokeBaselineFn = useServerFn(revokeBaselineSignOff);
+  const createUpload = useServerFn(createHrDocumentUploadUrl);
+  const getDocUrl = useServerFn(getHrDocumentUrl);
+
+  const [filter, setFilter] = useState<"all" | "action" | "current" | "na">("all");
+  const [auditOpen, setAuditOpen] = useState(false);
+
   const checklistQ = useQuery({
     queryKey: ["staff-checklist", organizationId, staffId],
     queryFn: () => fetchChecklist({ data: { organization_id: organizationId, staff_id: staffId } }),
   });
 
+  const piiQ = useQuery({
+    queryKey: ["staff-pii", organizationId, staffId],
+    queryFn: () => fetchPii({ data: { organization_id: organizationId, staff_id: staffId } }),
+  });
+
+  const invalidate = () => {
+    checklistQ.refetch();
+    piiQ.refetch();
+  };
+
+  const todayMs = Date.now();
+  const in60Ms = todayMs + 60 * 86400_000;
+
+  type StatusKind = "current" | "expiring" | "overdue" | "todo" | "na";
+
+  function rowStatusKind(row: NonNullable<typeof checklistQ.data>[number]): StatusKind {
+    if (row.applicable === false) return "na";
+    const status = row.completion.status;
+    const expMs = row.completion.expires_at ? new Date(row.completion.expires_at).getTime() : null;
+    const isExpired = status === "expired" || (expMs !== null && expMs < todayMs);
+    const isSoon = expMs !== null && expMs >= todayMs && expMs <= in60Ms;
+    if (status === "complete" && !isExpired) {
+      return isSoon ? "expiring" : "current";
+    }
+    if (isExpired) return "overdue";
+    if (isSoon) return "expiring";
+    return "todo";
+  }
+
   const counts = useMemo(() => {
-    const todayMs = Date.now();
-    const in60Ms = todayMs + 60 * 86400_000;
     const c = { current: 0, expiring: 0, overdue: 0, todo: 0 };
     for (const row of checklistQ.data ?? []) {
       if (row.applicable === false) continue;
-      const status = row.completion.status;
-      const expMs = row.completion.expires_at ? new Date(row.completion.expires_at).getTime() : null;
-      const isExpired = status === "expired" || (expMs !== null && expMs < todayMs);
-      const isSoon = expMs !== null && expMs >= todayMs && expMs <= in60Ms;
-      if (status === "complete" && !isExpired) c.current++;
-      else if (isExpired) c.overdue++;
-      else if (isSoon) c.expiring++;
+      const kind = rowStatusKind(row);
+      if (kind === "current") c.current++;
+      else if (kind === "expiring") c.expiring++;
+      else if (kind === "overdue") c.overdue++;
       else c.todo++;
     }
     return c;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checklistQ.data]);
+
+  const needsActionCount = counts.overdue + counts.expiring + counts.todo;
+
+  function passesFilter(row: NonNullable<typeof checklistQ.data>[number]): boolean {
+    if (filter === "all") return true;
+    const kind = rowStatusKind(row);
+    if (filter === "action") return kind !== "current" && kind !== "na";
+    if (filter === "current") return kind === "current";
+    if (filter === "na") return kind === "na";
+    return true;
+  }
+
+  function dotColor(kind: StatusKind): string {
+    if (kind === "current") return "bg-emerald-500";
+    if (kind === "expiring") return "bg-amber-500";
+    if (kind === "overdue") return "bg-rose-500";
+    if (kind === "na") return "bg-transparent border-2 border-muted-foreground/40";
+    return "bg-rose-500";
+  }
+
+  function expDateColor(kind: StatusKind): string {
+    if (kind === "overdue") return "text-rose-600 font-medium";
+    if (kind === "expiring") return "text-amber-700 font-medium";
+    return "text-muted-foreground";
+  }
+
+  const allRows = checklistQ.data ?? [];
+
+  // The 5 fixed required baseline rows, in order.
+  const REQUIRED_BASELINE_KEYS = [
+    "thirty_day",
+    "cpr_first_aid",
+    "pct",
+    "annual_12h",
+    "deescalation",
+  ] as const;
+
+  // Suppress state_base duplicates that the baseline rows already cover.
+  const BASELINE_DUPLICATE_TITLES_LC = new Set([
+    "cpr & first aid",
+    "cpr certification",
+    "first aid certification",
+    "person-centered thinking",
+    "person-centered thinking & practices",
+    "person centered thinking",
+  ]);
+
+  const baselineRows = REQUIRED_BASELINE_KEYS.map((key) =>
+    allRows.find((r) => r.requirement_id === `baseline:${key}`) ?? null,
+  );
+
+  // Other rows (state_base / company_custom) excluding baseline duplicates.
+  const baselineIds = new Set(REQUIRED_BASELINE_KEYS.map((k) => `baseline:${k}`));
+  const otherRows = allRows.filter(
+    (r) =>
+      !baselineIds.has(r.requirement_id) &&
+      !BASELINE_DUPLICATE_TITLES_LC.has(r.title.trim().toLowerCase()),
+  );
+
+  // Group other rows by category.
+  const otherByCategory = new Map<string, typeof otherRows>();
+  for (const r of otherRows) {
+    const cat = r.category ?? "Other";
+    if (!otherByCategory.has(cat)) otherByCategory.set(cat, []);
+    otherByCategory.get(cat)!.push(r);
+  }
+
+  // Audit CSV export.
+  const exportAudit = () => {
+    const cols = ["Requirement", "SOW ref", "Status", "Completed", "Expires"];
+    const rows = allRows.map((r) => {
+      const kind = rowStatusKind(r);
+      const label = kind === "current" ? "Current" : kind === "expiring" ? "Expiring" : kind === "overdue" ? "Overdue" : kind === "na" ? "N/A" : "To do";
+      const esc = (v: unknown) => {
+        const s = v == null ? "" : String(v);
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      return [r.title, r.source_citation ?? "—", label, r.completion.completed_date ?? "—", r.completion.expires_at ?? "—"].map(esc).join(",");
+    });
+    const csv = [cols.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cert-audit-${staffId}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  if (checklistQ.isLoading) {
+    return <div className="py-10 text-center text-sm text-muted-foreground">Loading checklist…</div>;
+  }
+
+  const canEdit = orgRole === "admin" || orgRole === "manager";
 
   return (
     <div className="space-y-4">
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <SummaryStat label="Current" value={counts.current} tone="emerald" />
+        <SummaryStat label="Expiring soon" value={counts.expiring} tone="amber" />
+        <SummaryStat label="Overdue" value={counts.overdue} tone="rose" />
+        <SummaryStat label="To do" value={counts.todo} tone="muted" />
+      </div>
+
+      {/* Filter row */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Certs &amp; trainings
-        </h2>
-        <p className="text-[11px] text-muted-foreground">
-          Upload PDFs, Word docs, or certificate images directly on each checklist item below.
-        </p>
+        <div className="flex flex-wrap gap-2">
+          <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>All</FilterChip>
+          <FilterChip active={filter === "action"} onClick={() => setFilter("action")}>
+            Needs action ({needsActionCount})
+          </FilterChip>
+          <FilterChip active={filter === "current"} onClick={() => setFilter("current")}>
+            Current ({counts.current})
+          </FilterChip>
+          <FilterChip active={filter === "na"} onClick={() => setFilter("na")}>N/A</FilterChip>
+        </div>
+        <button
+          type="button"
+          onClick={() => setAuditOpen((v) => !v)}
+          className="inline-flex items-center gap-1.5 rounded-md border border-[#137182] px-3 py-1.5 text-xs text-[#137182] hover:bg-[#E1F5EE]"
+        >
+          <Download className="h-3.5 w-3.5" /> Audit report
+        </button>
       </div>
 
-      <Card>
-        <CardContent className="grid grid-cols-2 gap-3 p-4 md:grid-cols-4">
-          <SummaryStat label="Current" value={counts.current} tone="emerald" />
-          <SummaryStat label="Expiring" value={counts.expiring} tone="amber" />
-          <SummaryStat label="Overdue" value={counts.overdue} tone="rose" />
-          <SummaryStat label="To do" value={counts.todo} tone="muted" />
-        </CardContent>
-      </Card>
+      {/* Audit panel */}
+      {auditOpen && (
+        <div className="rounded-lg border border-border bg-card p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-sm font-medium">Cert &amp; training audit</span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={exportAudit}
+                className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+              >
+                <FileText className="h-3 w-3" /> Export CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuditOpen(false)}
+                className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="pb-2 text-left font-medium text-muted-foreground">Requirement</th>
+                  <th className="pb-2 text-left font-medium text-muted-foreground">SOW ref</th>
+                  <th className="pb-2 text-left font-medium text-muted-foreground">Status</th>
+                  <th className="pb-2 text-left font-medium text-muted-foreground">Completed</th>
+                  <th className="pb-2 text-left font-medium text-muted-foreground">Expires</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allRows.map((r) => {
+                  const kind = rowStatusKind(r);
+                  return (
+                    <tr key={r.requirement_id} className="border-b border-border/40 last:border-0">
+                      <td className="py-1.5 pr-3">{r.title}</td>
+                      <td className="py-1.5 pr-3 text-muted-foreground">{r.source_citation ?? "—"}</td>
+                      <td className="py-1.5 pr-3">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                          kind === "current" ? "bg-emerald-100 text-emerald-800" :
+                          kind === "expiring" ? "bg-amber-100 text-amber-800" :
+                          kind === "overdue" ? "bg-rose-100 text-rose-800" :
+                          kind === "na" ? "bg-muted text-muted-foreground" :
+                          "bg-rose-100 text-rose-800"
+                        }`}>
+                          {kind === "current" ? "Current" : kind === "expiring" ? "Expiring" : kind === "overdue" ? "Overdue" : kind === "na" ? "N/A" : "To do"}
+                        </span>
+                      </td>
+                      <td className="py-1.5 pr-3 text-muted-foreground">{r.completion.completed_date ?? "—"}</td>
+                      <td className="py-1.5 text-muted-foreground">{r.completion.expires_at ?? "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-[11px] text-muted-foreground">
+            CPR &amp; First Aid and Person-Centered Thinking each satisfy both the training (SOW 1.8(4)) and certification (SOW 1.8(5)) requirements — one upload covers both.
+          </p>
+        </div>
+      )}
 
+      {/* Required trainings section */}
+      <div>
+        <div className="flex items-center justify-between border-b border-border pb-1 pt-2">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Required trainings (SOW §1.8)</span>
+          <span className="text-[11px] text-muted-foreground">
+            {baselineRows.filter((r) => r && rowStatusKind(r) === "current").length} of {REQUIRED_BASELINE_KEYS.length}
+          </span>
+        </div>
 
-      <div className="flex flex-wrap gap-2">
-        <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>All</FilterChip>
-        <FilterChip active={filter === "needs_action"} onClick={() => setFilter("needs_action")}>
-          Needs action ({counts.overdue + counts.expiring + counts.todo})
-        </FilterChip>
-        <FilterChip active={filter === "current"} onClick={() => setFilter("current")}>
-          Current ({counts.current})
-        </FilterChip>
+        {REQUIRED_BASELINE_KEYS.map((key, i) => {
+          const row = baselineRows[i];
+
+          // Derive display info by key (not from raw row titles).
+          const metaByKey: Record<string, { meta: string; title: string }> = {
+            thirty_day: {
+              title: "30-Day Training",
+              meta: "Due within 30 days of hire · Renews every 12 mo",
+            },
+            cpr_first_aid: {
+              title: "CPR & First Aid",
+              meta: "Due within 90 days of hire · Renews every 24 mo · Satisfies SOW 1.8(4) training and 1.8(5)(A)(B) cert — one upload covers both",
+            },
+            pct: {
+              title: "Person-Centered Thinking",
+              meta: "Due within 90 days of hire · Renews every 12 mo · Satisfies SOW 1.8(4) training and 1.8(5)(C) cert — one upload covers both",
+            },
+            annual_12h: {
+              title: "Ongoing Training",
+              meta: "12 hours required per year · Admin can log sessions anytime",
+            },
+            deescalation: {
+              title: "Behavior De-escalation",
+              meta: "MANDT, SOAR, CPI, PART, or Safety Care · Due within 180 days of trigger · Renews every 12 mo",
+            },
+          };
+
+          const display = metaByKey[key];
+          if (!row) {
+            // Row not yet in checklist (edge case — always show placeholder).
+            if (!passesFilter({ applicable: true, completion: { status: "not_started", expires_at: null, completed_date: null }, requirement_id: `baseline:${key}` } as any)) return null;
+            return (
+              <div key={key} className="flex items-start gap-3 border-b border-border/30 py-3 last:border-0">
+                <span className="mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full bg-rose-500" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-sm">{display.title}</div>
+                  <div className="mt-0.5 text-[11px] text-muted-foreground">{display.meta}</div>
+                </div>
+                <span className="text-[11px] text-rose-600 font-medium">Overdue</span>
+              </div>
+            );
+          }
+
+          const kind = rowStatusKind(row);
+          if (!passesFilter(row)) return null;
+
+          // De-escalation: special handling when not triggered.
+          const isDeescalation = key === "deescalation";
+          const notTriggered = isDeescalation && row.applicable === false;
+          const notTriggeredMeta = notTriggered ? ` · Not triggered — no behavior-coded client currently assigned` : "";
+
+          const isAnnual12h = key === "annual_12h";
+
+          return (
+            <div key={key} className="flex items-start gap-3 border-b border-border/30 py-3 last:border-0">
+              <span className={`mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full ${dotColor(notTriggered ? "na" : kind)}`} />
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-sm">{display.title}</div>
+                <div className="mt-0.5 text-[11px] text-muted-foreground">
+                  {display.meta}{isDeescalation ? notTriggeredMeta : ""}
+                </div>
+                {isAnnual12h && (
+                  <div className="mt-2">
+                    <AnnualHoursSection
+                      organizationId={organizationId}
+                      staffId={staffId}
+                      canEdit={canEdit}
+                    />
+                  </div>
+                )}
+              </div>
+              {!isAnnual12h && !notTriggered && (
+                <div className="flex shrink-0 flex-col items-end gap-1.5 pt-0.5">
+                  {row.completion.expires_at && (
+                    <span className={`text-[11px] ${expDateColor(kind)}`}>
+                      {kind === "overdue" ? "Overdue" : `Exp ${row.completion.expires_at}`}
+                    </span>
+                  )}
+                  {!row.completion.expires_at && kind === "overdue" && (
+                    <span className="text-[11px] text-rose-600 font-medium">Overdue</span>
+                  )}
+                  <CertBaselineAction
+                    organizationId={organizationId}
+                    staffId={staffId}
+                    trainingKey={key}
+                    currentEvidenceDocId={row.completion.evidence_document_id}
+                    nectarValidationStatus={row.completion.nectar_validation_status}
+                    onChanged={invalidate}
+                    attachBaselineFn={attachBaselineFn}
+                    createUpload={createUpload}
+                    getDocUrl={getDocUrl}
+                  />
+                </div>
+              )}
+              {notTriggered && (
+                <span className="text-[11px] text-muted-foreground pt-0.5">Not triggered</span>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      <StaffHrChecklistCard
-        organizationId={organizationId}
-        staffId={staffId}
-        view="checklist"
-        filter={filter}
+      {/* Other rows by category */}
+      {Array.from(otherByCategory.entries()).map(([cat, items]) => {
+        const visibleItems = items.filter(passesFilter);
+        if (visibleItems.length === 0) return null;
+        const completedCount = items.filter((r) => rowStatusKind(r) === "current").length;
+        return (
+          <div key={cat}>
+            <div className="flex items-center justify-between border-b border-border pb-1 pt-2">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{cat}</span>
+              <span className="text-[11px] text-muted-foreground">{completedCount} of {items.length}</span>
+            </div>
+            {visibleItems.map((row) => {
+              const kind = rowStatusKind(row);
+              const bKey = parseBaselineId(row.requirement_id);
+              return (
+                <div key={row.requirement_id} className="flex items-start gap-3 border-b border-border/30 py-3 last:border-0">
+                  <span className={`mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full ${dotColor(kind)}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-sm">{row.title}</div>
+                    <div className="mt-0.5 text-[11px] text-muted-foreground">
+                      {row.is_renewable && row.renewal_interval_months && `Renews every ${row.renewal_interval_months} mo`}
+                      {row.source_citation && ` · ${row.source_citation}`}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1.5 pt-0.5">
+                    {row.completion.expires_at && (
+                      <span className={`text-[11px] ${expDateColor(kind)}`}>
+                        {kind === "overdue" ? "Overdue" : `Exp ${row.completion.expires_at}`}
+                      </span>
+                    )}
+                    {!row.completion.expires_at && kind === "overdue" && (
+                      <span className="text-[11px] text-rose-600 font-medium">Overdue</span>
+                    )}
+                    {row.applicable !== false && bKey && (
+                      <CertBaselineAction
+                        organizationId={organizationId}
+                        staffId={staffId}
+                        trainingKey={bKey}
+                        currentEvidenceDocId={row.completion.evidence_document_id}
+                        nectarValidationStatus={row.completion.nectar_validation_status}
+                        onChanged={invalidate}
+                        attachBaselineFn={attachBaselineFn}
+                        createUpload={createUpload}
+                        getDocUrl={getDocUrl}
+                      />
+                    )}
+                    {row.applicable === false && (
+                      <span className="text-[11px] text-muted-foreground">N/A</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+
+      {/* Client-specific training */}
+      {caseload.length > 0 && (
+        <div className="mt-6 space-y-2">
+          <div className="border-b border-border pb-1">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Client-specific training</span>
+          </div>
+          {caseload.map((client) => (
+            <ClientTrainingCard
+              key={client.id}
+              client={client}
+              organizationId={organizationId}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ======================================================================
+ * Simplified baseline cert action buttons (upload / view / replace).
+ * ====================================================================*/
+function CertBaselineAction({
+  organizationId,
+  staffId,
+  trainingKey,
+  currentEvidenceDocId,
+  nectarValidationStatus,
+  onChanged,
+  attachBaselineFn,
+  createUpload,
+  getDocUrl,
+}: {
+  organizationId: string;
+  staffId: string;
+  trainingKey: string;
+  currentEvidenceDocId: string | null;
+  nectarValidationStatus: string | null;
+  onChanged: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  attachBaselineFn: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  createUpload: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getDocUrl: any;
+}) {
+  const [working, setWorking] = useState(false);
+  const hasCert = !!currentEvidenceDocId;
+  const validationFailed = nectarValidationStatus === "failed";
+
+  const handleUpload = async (file: File) => {
+    try {
+      setWorking(true);
+      const r = await createUpload({
+        data: {
+          organization_id: organizationId,
+          staff_id: staffId,
+          requirement_id: null,
+          document_kind: `baseline:${trainingKey}`,
+          file_name: file.name,
+          mime_type: file.type,
+          size_bytes: file.size,
+        },
+      });
+      const up = await fetch(r.upload.signed_url, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (!up.ok) throw new Error(`Upload failed (${up.status})`);
+      const att = await attachBaselineFn({
+        data: {
+          organization_id: organizationId,
+          staff_id: staffId,
+          training_key: trainingKey,
+          hr_document_id: r.hr_document_id,
+          run_ocr: true,
+        },
+      });
+      if (att?.validation_status === "failed") {
+        const reasons: string[] = Array.isArray(att?.reasons) ? att.reasons : [];
+        toast.error(`Nectar rejected: ${reasons.join(", ") || "Unknown reason"}`, { duration: 8000 });
+      } else {
+        toast.success("Certificate uploaded — awaiting admin sign-off");
+      }
+      onChanged();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const handleView = async () => {
+    if (!currentEvidenceDocId) return;
+    try {
+      const r = await getDocUrl({
+        data: { organization_id: organizationId, hr_document_id: currentEvidenceDocId },
+      });
+      window.open(r.signed_url, "_blank", "noopener");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  if (hasCert && !validationFailed) {
+    return (
+      <button
+        type="button"
+        onClick={handleView}
+        className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-transparent px-2 py-1 text-[11px] text-emerald-700 hover:bg-emerald-50"
+      >
+        <Eye className="h-3 w-3" /> View cert
+      </button>
+    );
+  }
+
+  return (
+    <label
+      className={`relative z-0 inline-flex cursor-pointer items-center gap-1 rounded-md border px-2 py-1 text-[11px] hover:bg-muted ${
+        validationFailed
+          ? "border-rose-300 text-rose-700 hover:bg-rose-50"
+          : "border-border/60 text-muted-foreground"
+      } ${working ? "opacity-50 pointer-events-none" : ""}`}
+      title={validationFailed ? "Nectar rejected this cert — upload a replacement" : "Upload certificate (PDF or photo)"}
+    >
+      <Upload className="h-3 w-3" />
+      <span>{validationFailed ? "Replace cert" : hasCert ? "Replace" : "Upload"}</span>
+      <input
+        type="file"
+        className="hidden"
+        accept=".pdf,image/png,image/jpeg,image/jpg"
+        disabled={working}
+        onChange={async (e) => {
+          const f = e.target.files?.[0];
+          if (!f) return;
+          await handleUpload(f);
+          e.target.value = "";
+        }}
       />
+    </label>
+  );
+}
 
-      <OtherAssignmentsAdminSection organizationId={organizationId} staffId={staffId} />
+/* ======================================================================
+ * Client-specific training collapsible card.
+ * ====================================================================*/
+function ClientTrainingCard({
+  client,
+  organizationId,
+}: {
+  client: { id: string; name: string; codes: string[] };
+  organizationId: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const trainingsQ = useQuery({
+    enabled: open,
+    queryKey: ["client-specific-trainings", organizationId, client.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_specific_trainings")
+        .select("id, title, status, approved_at, updated_at")
+        .eq("organization_id", organizationId)
+        .eq("client_id", client.id)
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const initials = client.name
+    .split(" ")
+    .map((w) => w[0] ?? "")
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  const primaryCode = client.codes[0];
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-border">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-muted/30"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <div className="flex items-center gap-2">
+          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#E1F5EE] text-[11px] font-medium text-[#0F6E56]">
+            {initials}
+          </span>
+          <span className="text-sm font-medium">{client.name}</span>
+          {primaryCode && (
+            <span className="rounded-full border border-border/60 bg-muted/30 px-2 py-0.5 text-[10px] text-muted-foreground">
+              {primaryCode}
+            </span>
+          )}
+        </div>
+        <ChevronDown
+          className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="border-t border-border/60 px-4 pb-3 pt-1">
+          {trainingsQ.isLoading ? (
+            <p className="py-3 text-xs text-muted-foreground">Loading…</p>
+          ) : (trainingsQ.data ?? []).length === 0 ? (
+            <p className="py-3 text-xs text-muted-foreground">
+              No client-specific training on file. Add via client profile.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border/40">
+              {(trainingsQ.data ?? []).map((t) => {
+                const isApproved = t.status === "approved" || t.status === "published";
+                return (
+                  <li key={t.id} className="flex items-center gap-2 py-2 text-xs">
+                    <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${isApproved ? "bg-emerald-500" : "bg-amber-500"}`} />
+                    <span className="flex-1">{t.title}</span>
+                    <span className="text-muted-foreground">
+                      {isApproved && t.approved_at
+                        ? `Approved ${new Date(t.approved_at).toLocaleDateString()}`
+                        : t.status}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b border-border/40 pb-1 last:border-0">
+      <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-right text-sm">{value}</span>
     </div>
   );
 }
@@ -659,9 +1557,6 @@ function KindBadge({ kind }: { kind: ActivityItem["kind"] }) {
     </span>
   );
 }
-
-
-
 
 /* ======================================================================
  * Staff HR documents — read-only list. Storage URLs not surfaced here;

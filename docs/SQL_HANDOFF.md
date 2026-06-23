@@ -6,6 +6,18 @@ it worked before moving on.
 
 ---
 
+## 0. Add `phone` column to `profiles` (Employee Profile v2 — 2026-06-23)
+
+Required for the contact card edit mode on the employee profile page.
+
+```sql
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone text;
+```
+
+**What you'll see:** `ALTER TABLE` — no rows changed. Column is nullable; existing rows are unaffected.
+
+---
+
 ## 1. Locations cleanup — rebuild `locations` from `teams` (revised 2026-06-11)
 
 `locations` was polluted with staff-role labels (DSP / House Manager / Lead /

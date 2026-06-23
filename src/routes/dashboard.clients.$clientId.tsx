@@ -608,18 +608,18 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
             Support strategies are required for each PCSP goal (SOW §1.24). NECTAR pulls your goals verbatim; you write the staff instructions.
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => draftMut.mutate("nectar")} disabled={draftMut.isPending}>
+            <Button size="sm" onClick={() => pcspReady ? draftMut.mutate("nectar") : setShowPcspPrompt(true)} disabled={draftMut.isPending}>
               {draftMut.isPending
                 ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                 : <Sparkles className="mr-1.5 h-3.5 w-3.5 text-amber-500" />}
               Build from PCSP goals (NECTAR)
             </Button>
-            <Button size="sm" variant="outline" onClick={() => draftMut.mutate("blank")} disabled={draftMut.isPending}>
+            <Button size="sm" variant="outline" onClick={() => pcspReady ? draftMut.mutate("blank") : setShowPcspPrompt(true)} disabled={draftMut.isPending}>
               Write manually
             </Button>
             <Button
               size="sm" variant="outline"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => pcspReady ? fileInputRef.current?.click() : setShowPcspPrompt(true)}
               disabled={uploading || !orgId}
             >
               {uploading

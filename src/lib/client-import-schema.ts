@@ -120,9 +120,57 @@ export async function applyExtractedFieldsToClient(
   ctx: ApplyExtractedCtx,
 ): Promise<{ autofilled: string[]; suggested: string[]; customCreated: string[] }> {
   const { supabase, organizationId, clientId, fields } = ctx;
+  const sourceDocumentType = ctx.sourceDocumentType ?? null;
+  const importJobId = ctx.importJobId ?? null;
   const autofilled: string[] = [];
   const suggested: string[] = [];
   const customCreated: string[] = [];
+
+  const onError = async (action: string, message: string) => {
+    try {
+      if (ctx.onError) await ctx.onError(action, message);
+    } catch { /* never let an audit failure break a save */ }
+  };
+
+  const writeScalarConflict = async (
+    field: string,
+    existing: unknown,
+    incoming: unknown,
+  ) => {
+    try {
+      await supabase.from("import_merge_flags").insert({
+        organization_id: organizationId,
+        client_id: clientId,
+        import_job_id: importJobId,
+        field,
+        kind: "scalar_conflict",
+        existing_value: existing == null ? null : String(existing).slice(0, 4000),
+        incoming_value: incoming == null ? null : String(incoming).slice(0, 4000),
+        suggested_value: incoming == null ? null : String(incoming).slice(0, 4000),
+        source_document_type: sourceDocumentType,
+      });
+    } catch (e) {
+      await onError("merge_flag_insert_error", (e as Error).message);
+    }
+  };
+
+  const writeDuplicateFlag = async (field: string, existing: string, incoming: string) => {
+    try {
+      await supabase.from("import_merge_flags").insert({
+        organization_id: organizationId,
+        client_id: clientId,
+        import_job_id: importJobId,
+        field,
+        kind: "possible_duplicate",
+        existing_value: existing.slice(0, 4000),
+        incoming_value: incoming.slice(0, 4000),
+        source_document_type: sourceDocumentType,
+      });
+    } catch (e) {
+      await onError("merge_flag_insert_error", (e as Error).message);
+    }
+  };
+
 
 
   const ok = fields.filter((f) => (f.confidence ?? 0) >= CONFIDENCE_THRESHOLD);

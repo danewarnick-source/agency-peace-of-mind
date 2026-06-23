@@ -32,6 +32,15 @@ import {
   setFieldConfirmation,
 } from "@/lib/field-confirmations.functions";
 import { TRACKED_FIELDS } from "@/lib/field-confirmations";
+
+// EOL fields are surfaced by the "Advanced care / end-of-life" group on the
+// profile; exclude them here so they don't appear twice.
+const EOL_CONFIRMATION_KEYS = new Set<string>([
+  "dnr_status",
+  "polst_status",
+  "palliative_care_status",
+  "hospice_status",
+]);
 import {
   PROFILE_FIELD_BY_KEY,
   getProfileFieldValue,

@@ -403,7 +403,8 @@ function IdentityCard({ clientId, client }: { clientId: string; client: ClientRo
         admission_date: draft.admission_date || null,
         discharge_date: draft.discharge_date || null,
       };
-      const { error } = await supabase.from("clients").update(payload).eq("id", clientId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await supabase.from("clients").update(payload as any).eq("id", clientId);
       if (error) throw error;
     },
     onSuccess: () => {

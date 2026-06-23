@@ -172,8 +172,8 @@ function DonePage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <Link to="/dashboard/smart-import" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> Smart Import
+        <Link to="/dashboard/smart-import/$jobId/review" params={{ jobId }} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" /> Back to review
         </Link>
         <Badge variant="outline" className="gap-1 capitalize"><Sparkles className="h-3 w-3" /> {job.status.replace("_", " ")}</Badge>
       </div>

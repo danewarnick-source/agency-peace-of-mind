@@ -100,8 +100,8 @@ const ReviewQuestionSchema = z.object({
   tab: z.string(),
   prompt: z.string(),
 });
-// GoalSchema and ReviewQuestionSchema are defined for use in later pieces.
-void GoalSchema; void ReviewQuestionSchema;
+// ReviewQuestionSchema is defined for use in later pieces.
+void ReviewQuestionSchema;
 
 function sid(): string { return `s_${Math.random().toString(36).slice(2, 10)}`; }
 
@@ -296,6 +296,132 @@ async function assembleVerbatim(
   return { sections };
 }
 
+// ── Verbatim PCSP goal extractor (admin, NECTAR) ────────────────────────────
+// Reads the uploaded PCSP document and returns one CSTGoal per goal/objective
+// row. Every field is STRICTLY verbatim — no summarisation, no authored prose.
+async function extractGoalsVerbatim(documentText: string): Promise<CSTGoal[]> {
+  const { gatewayFetch } = await import("@/lib/ai-bedrock.server");
+  const system = [
+    "You are NECTAR, a STRICTLY VERBATIM extraction engine for a Utah DSPD PCSP.",
+    "Extract each goal from the PCSP as a structured object. Use ONLY text that appears in the document.",
+    "Do NOT summarize, paraphrase, infer, or author any care guidance. Quote the document.",
+    "PCSP goals typically appear in a table or section with columns/fields like Goal/Objective, Supports/Support Strategy, Details, and Support/Service Code.",
+    "For EACH distinct goal emit one object with:",
+    "  goal: the goal/objective statement, verbatim.",
+    "  supports: what will be done to assist the person (the support strategy text), verbatim. Empty string if not present.",
+    "  details: objective detail such as measures, frequency, target, timeline, verbatim. Empty string if not present.",
+    "  job_codes: array of any service/support code(s) shown for that goal (e.g. 'SLN','DSI'). Empty array if none.",
+    "Omit administrative boilerplate (headers, addresses, signatures). Only the goal rows.",
+    'Respond ONLY with JSON: { "goals": [ { "goal": "...", "supports": "...", "details": "...", "job_codes": ["..."] } ] }',
+    "No preamble, no markdown fences.",
+  ].join("\n");
+
+  const res = await gatewayFetch({
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: `PCSP DOCUMENT TEXT:\n\n${documentText.slice(0, 120_000)}` },
+    ],
+    response_format: { type: "json_object" },
+  });
+  if (!res.ok) throw new Error(`NECTAR extraction failed (${res.status}).`);
+  const body = await res.json();
+  const content: string = body?.choices?.[0]?.message?.content ?? "{}";
+  let parsed: { goals?: Array<{ goal?: string; supports?: string; details?: string; job_codes?: string[] }> };
+  try {
+    const clean = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    parsed = JSON.parse(clean || "{}");
+  } catch {
+    throw new Error("NECTAR returned malformed JSON extracting goals.");
+  }
+  const rows = Array.isArray(parsed.goals) ? parsed.goals : [];
+  return rows.map((r) => ({
+    id: sid(),
+    goal: String(r.goal ?? "").slice(0, 4000),
+    supports: String(r.supports ?? "").slice(0, 4000),
+    details: String(r.details ?? "").slice(0, 4000),
+    job_codes: Array.isArray(r.job_codes) ? r.job_codes.map((c) => String(c).slice(0, 40)) : [],
+  }));
+}
+
+// ── EXTRACT PCSP goals for person-specific training (admin) ─────────────────
+// Downloads the client's most-recent PCSP document, runs extractGoalsVerbatim,
+// and stores the result on the client_specific_trainings.goals column.
+// Creates a draft training row if none exists.
+export const extractPcspGoalsForTraining = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ clientId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+    await assertClientInOrg(supabase, data.clientId, m.organization_id);
+
+    // 1) Find the most recent PCSP document for this client.
+    const { data: docs, error: dErr } = await supabase
+      .from("client_documents")
+      .select("id, document_type, file_name, storage_path, file_url, created_at")
+      .eq("client_id", data.clientId)
+      .order("created_at", { ascending: false });
+    if (dErr) throw new Error(dErr.message);
+    const pcsp = (docs ?? []).find((d: { document_type: string | null }) =>
+      (d.document_type ?? "").toLowerCase().includes("pcsp"),
+    );
+    if (!pcsp) {
+      return { ok: false as const, reason: "No PCSP document found on this client. Upload the PCSP first, or enter goals manually." };
+    }
+
+    // 2) Download + extract text.
+    const path = (pcsp.storage_path as string) || (pcsp.file_url as string);
+    const { data: file, error: dlErr } = await supabase.storage.from("client-documents").download(path);
+    if (dlErr || !file) {
+      return { ok: false as const, reason: `Could not download the PCSP document: ${dlErr?.message ?? "no file"}` };
+    }
+    const buf = Buffer.from(await file.arrayBuffer());
+    const { extractTextFromUpload } = await import("@/lib/document-text.server");
+    const text = await extractTextFromUpload(buf, pcsp.file_name as string);
+    if (!text || text.trim().length < 20) {
+      return { ok: false as const, reason: "NECTAR couldn't read the PCSP text (scanned PDF?). Enter goals manually." };
+    }
+
+    // 3) Verbatim goal extraction.
+    const goals = await extractGoalsVerbatim(text);
+
+    // 4) Store on the person_specific training row (create draft if none exists).
+    const { data: existing } = await supabase
+      .from("client_specific_trainings")
+      .select("id")
+      .eq("client_id", data.clientId)
+      .eq("training_type", "person_specific")
+      .maybeSingle();
+
+    if (existing) {
+      const { error: uErr } = await supabase
+        .from("client_specific_trainings")
+        .update({ goals: goals as unknown, status: "draft", approved_by: null, approved_at: null })
+        .eq("id", existing.id);
+      if (uErr) throw new Error(uErr.message);
+      return { ok: true as const, goalCount: goals.length, trainingId: existing.id as string };
+    } else {
+      const content = await assembleVerbatim(supabase, m.organization_id, data.clientId);
+      const { data: inserted, error: iErr } = await supabase
+        .from("client_specific_trainings")
+        .insert({
+          organization_id: m.organization_id,
+          client_id: data.clientId,
+          training_type: "person_specific",
+          title: "Client-Specific Training",
+          content: content as unknown,
+          goals: goals as unknown,
+          status: "draft",
+          version: 1,
+        })
+        .select("id")
+        .maybeSingle();
+      if (iErr) throw new Error(iErr.message);
+      return { ok: true as const, goalCount: goals.length, trainingId: (inserted?.id ?? null) as string | null };
+    }
+  });
+
 // ── GET current training (admin) ────────────────────────────────────────────
 export const getClientSpecificTraining = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -373,13 +499,14 @@ export const draftClientSpecificTrainingWithNectar = createServerFn({ method: "P
     return { training: inserted };
   });
 
-// ── UPDATE content/title (admin) ────────────────────────────────────────────
+// ── UPDATE content/title/goals (admin) ─────────────────────────────────────
 export const updateClientSpecificTraining = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({
     id: z.string().uuid(),
     title: z.string().min(1).max(200).optional(),
     content: ContentSchema.optional(),
+    goals: z.array(GoalSchema).optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
@@ -395,6 +522,7 @@ export const updateClientSpecificTraining = createServerFn({ method: "POST" })
     const patch: Record<string, unknown> = {};
     if (data.title !== undefined) patch.title = data.title;
     if (data.content !== undefined) patch.content = data.content;
+    if (data.goals !== undefined) patch.goals = data.goals;
     // Editing a published version returns it to draft (requires re-approval).
     if (row.status === "published") {
       patch.status = "draft";

@@ -805,9 +805,10 @@ export async function applyExtractedFieldsToClient(
         });
       }
       customCreated.push(f.field_key);
-    } catch {
-      // Non-fatal: surface as a soft suggestion instead of blocking the commit.
+    } catch (err) {
+      // Non-fatal: surface as a soft suggestion AND audit so it can't vanish.
       suggested.push(`custom:${f.field_key}`);
+      await onError("custom_field_unknown_error", `${f.field_key}: ${(err as Error).message}`);
     }
   }
 
@@ -894,8 +895,8 @@ export async function applyExtractedFieldsToClient(
           .eq("id", clientId);
       }
     }
-  } catch {
-    // Non-fatal — confirmation sweep is advisory.
+  } catch (err) {
+    await onError("confirmation_sweep_error", (err as Error).message);
   }
 
   return { autofilled, suggested, customCreated };

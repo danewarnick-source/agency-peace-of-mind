@@ -337,8 +337,40 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
               onChanged={invalidateAll}
             />
           ) : null}
+          <SowFieldsRow
+            clientId={clientId}
+            missingKeys={sowMissingKeys}
+            passing={rowPass.sow}
+            onChanged={invalidateAll}
+          />
+          <LevelOfNeedRow
+            clientId={clientId}
+            initial={sowSupp.level_of_need ?? ""}
+            passing={rowPass.lon}
+            onChanged={invalidateAll}
+          />
+          <EmergencyContact2Row
+            clientId={clientId}
+            initial={{
+              name: sowSupp.emergency_contact_2_name ?? "",
+              phone: sowSupp.emergency_contact_2_phone ?? "",
+              instructions: sowSupp.emergency_contact_2_instructions ?? "",
+            }}
+            passing={rowPass.ec2}
+            onChanged={invalidateAll}
+          />
+          <GrievanceRow
+            clientId={clientId}
+            initial={{
+              acknowledged: !!sowSupp.grievance_acknowledged,
+              date: sowSupp.grievance_signed_date ?? "",
+            }}
+            passing={rowPass.grievance}
+            onChanged={invalidateAll}
+          />
         </div>
       </div>
+
 
       {/* Footer */}
       <div className="flex flex-wrap items-center justify-end gap-2 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">

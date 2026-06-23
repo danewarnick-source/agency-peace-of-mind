@@ -5,17 +5,17 @@
  * silently assumed satisfied. Numbers (e.g. 24h incident deadline) come from
  * the database (`state_submission_deadline`) — NOT hardcoded here.
  *
- * R1 — ABI training       — profiles.requires_abi = true + no current "abi" training
+ * R1 — ABI training       — staff assigned to a client with disability_category "ABI" + no current "abi" training
+ *                           (profiles.requires_abi honored as manual fallback)
  * R2 — De-escalation cert — profiles.requires_deescalation OR assigned to a
  *                           behavior_support_client + no current "deescalation" training
  * R3 — 30-day training    — active org member + no current "thirty_day" training
  * R4 — Incident timeframe — incident_reports past state_submission_deadline
  * R5 — Generic SOW        — nectar_requirements with unmet tracking cadence
  *
- * NOTE: clients.is_abi does not exist in the current schema. R1 uses
- * profiles.requires_abi (set by admins when assigning staff to ABI clients).
- * A clients.is_abi column would allow more precise per-assignment checking —
- * flagged as a needed DB field.
+ * NOTE: R1 derives the ABI requirement from clients.disability_category = 'ABI'
+ * via staff_assignments (set automatically during PCSP import). profiles.requires_abi
+ * is honored as a manual fallback so existing data is not broken.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";

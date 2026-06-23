@@ -447,18 +447,45 @@ export function SetupChecklist({ clientId, jobId }: { clientId: string; jobId: s
             passing={askPass.court_orders}
             onChanged={invalidateAll}
           />
+          <RightsRestrictionRow
+            clientId={clientId}
+            state={rightsState}
+            passing={rowPass.rights}
+            onChanged={invalidateAll}
+          />
         </div>
       </div>
 
-
-
+      {/* Group 3 — Optional Advanced care / end-of-life */}
+      <EndOfLifeGroup clientId={clientId} />
 
       {/* Footer */}
-      <div className="flex flex-wrap items-center justify-end gap-2 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-        <Button disabled={!readiness.isLive} title={readiness.isLive ? "" : "Resolve required items first"}>
-          Submit for setup
-        </Button>
-      </div>
+      <SubmitFooter jobId={jobId} canSubmit={allRequiredPass} />
+    </div>
+  );
+}
+
+function SubmitFooter({ jobId, canSubmit }: { jobId: string; canSubmit: boolean }) {
+  const submitFn = useServerFn(submitForSetup);
+  const m = useMutation({
+    mutationFn: () => submitFn({ data: { jobId } }),
+    onSuccess: () => toast.success("Submitted for setup."),
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-3 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      {!canSubmit && (
+        <div className="mr-auto text-xs text-muted-foreground">
+          Answer all required items to submit.
+        </div>
+      )}
+      <Button
+        disabled={!canSubmit || m.isPending}
+        onClick={() => m.mutate()}
+      >
+        {m.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+        Submit for setup
+      </Button>
     </div>
   );
 }

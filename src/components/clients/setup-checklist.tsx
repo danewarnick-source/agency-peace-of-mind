@@ -209,12 +209,20 @@ export function SetupChecklist({ clientId, jobId: _jobId }: { clientId: string; 
     queryFn: () => onbFn({ data: { clientId } }),
   });
 
+  const fieldStatesFn = useServerFn(getClientFieldStates);
+  const fieldStatesQ = useQuery({
+    queryKey: ["client-field-states", clientId],
+    queryFn: () => fieldStatesFn({ data: { clientId } }),
+  });
+
   const invalidateAll = () => {
     qc.invalidateQueries({ queryKey: ["client-readiness", clientId] });
     qc.invalidateQueries({ queryKey: ["client-billing-codes", clientId] });
     qc.invalidateQueries({ queryKey: ["client-setup-checklist-row", clientId] });
     qc.invalidateQueries({ queryKey: ["client-sow-supp", clientId] });
     qc.invalidateQueries({ queryKey: ["client-onboarding-state", clientId] });
+    qc.invalidateQueries({ queryKey: ["client-field-states", clientId] });
+    qc.invalidateQueries({ queryKey: ["client-medications", clientId] });
   };
 
   const readiness = readinessQ.data;

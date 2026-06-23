@@ -1931,6 +1931,44 @@ export type Database = {
           },
         ]
       }
+      client_emergency_contacts: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          name: string
+          organization_id: string
+          phone: string | null
+          relationship: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          name: string
+          organization_id: string
+          phone?: string | null
+          relationship?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          organization_id?: string
+          phone?: string | null
+          relationship?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_emergency_contacts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_intake_completion: {
         Row: {
           client_id: string
@@ -2680,6 +2718,7 @@ export type Database = {
           neurologist_phone: string | null
           organization_id: string
           palliative_care_status: string | null
+          pcsp_expiration_date: string | null
           pcsp_goals: string[]
           personal_belongings_inventory: string[] | null
           phone_number: string | null
@@ -2764,6 +2803,7 @@ export type Database = {
           neurologist_phone?: string | null
           organization_id: string
           palliative_care_status?: string | null
+          pcsp_expiration_date?: string | null
           pcsp_goals?: string[]
           personal_belongings_inventory?: string[] | null
           phone_number?: string | null
@@ -2848,6 +2888,7 @@ export type Database = {
           neurologist_phone?: string | null
           organization_id?: string
           palliative_care_status?: string | null
+          pcsp_expiration_date?: string | null
           pcsp_goals?: string[]
           personal_belongings_inventory?: string[] | null
           phone_number?: string | null
@@ -13437,6 +13478,7 @@ export type Database = {
           neurologist_phone: string | null
           organization_id: string
           palliative_care_status: string | null
+          pcsp_expiration_date: string | null
           pcsp_goals: string[]
           personal_belongings_inventory: string[] | null
           phone_number: string | null

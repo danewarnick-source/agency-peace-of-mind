@@ -53,8 +53,24 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [showPcspPrompt, setShowPcspPrompt] = useState(false);
 
   const queryKey = ["client-specific-training", clientId];
+
+  const { data: hasPcsp } = useQuery({
+    queryKey: ["client-has-pcsp", clientId],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("client_documents")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", clientId)
+        .eq("document_type", "pcsp");
+      if (error) throw error;
+      return (count ?? 0) > 0;
+    },
+    staleTime: 30_000,
+  });
+  const pcspReady = hasPcsp === true;
 
   const { data, isLoading } = useQuery({
     queryKey,

@@ -528,22 +528,23 @@ function ContactsCard({
 
   const mut = useMutation({
     mutationFn: async () => {
-      const ops: Promise<unknown>[] = [];
       for (const c of draft) {
         if (c._deleted && c.id) {
-          ops.push(supabase.from("client_emergency_contacts").delete().eq("id", c.id).then((r) => { if (r.error) throw r.error; }));
+          const { error } = await supabase.from("client_emergency_contacts").delete().eq("id", c.id);
+          if (error) throw error;
         } else if (!c._deleted) {
           const name = c.name.trim();
           if (!name) continue;
           const payload = { organization_id: orgId, client_id: clientId, name, phone: c.phone.trim() || null, relationship: c.relationship.trim() || null };
           if (c.id) {
-            ops.push(supabase.from("client_emergency_contacts").update(payload).eq("id", c.id).then((r) => { if (r.error) throw r.error; }));
+            const { error } = await supabase.from("client_emergency_contacts").update(payload).eq("id", c.id);
+            if (error) throw error;
           } else {
-            ops.push(supabase.from("client_emergency_contacts").insert(payload).then((r) => { if (r.error) throw r.error; }));
+            const { error } = await supabase.from("client_emergency_contacts").insert(payload);
+            if (error) throw error;
           }
         }
       }
-      await Promise.all(ops);
     },
     onSuccess: () => {
       toast.success("Contacts updated.");

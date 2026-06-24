@@ -82,7 +82,7 @@ function resolveTab(raw: string | undefined): "profile" | "care" | "activity" | 
   return "profile";
 }
 
-function CollapsibleSimpleCard({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
+function CollapsibleSimpleCard({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <Card>

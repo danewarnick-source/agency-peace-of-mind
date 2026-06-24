@@ -1857,7 +1857,7 @@ function ClientTrainingCard({
       const { data, error } = await supabase
         .from("training_completions")
         .select(
-          "id, ref_id, topic_title, topic_code, completed_at, attestation_statement, consent_statement, typed_signature, signer_full_name, signer_email, content_version, content_hash, time_zone, ip_address, user_agent, consent_accepted, question_answers",
+          "id, ref_id, topic_title, topic_code, completed_at, attestation_statement, consent_statement, typed_signature, signer_full_name, signer_email, content_version, content_hash, time_zone, ip_address, user_agent, consent_accepted, question_answers, content_snapshot",
         )
         .eq("user_id", staffId)
         .eq("topic_kind", "person")

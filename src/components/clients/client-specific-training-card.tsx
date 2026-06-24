@@ -87,6 +87,7 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
   const [editingGoals, setEditingGoals] = useState(false);
   const [draftGoals, setDraftGoals] = useState<CSTGoal[] | null>(null);
   const [editingQuestions, setEditingQuestions] = useState(false);
+  const [showPublishDialog, setShowPublishDialog] = useState(false);
 
   const workingContent: CSTContent = useMemo(() => {
     if (editing && draftContent) return draftContent;

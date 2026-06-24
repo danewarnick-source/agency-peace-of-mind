@@ -1044,9 +1044,10 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
             {training && training.status !== "published" && (
               <Button size="sm" onClick={() => setShowPublish(true)} disabled={publishMut.isPending}>
                 {publishMut.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
-                Approve & Publish
+                Review & Publish
               </Button>
             )}
+
           </div>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">

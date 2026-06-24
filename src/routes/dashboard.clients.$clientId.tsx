@@ -991,13 +991,14 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
     queryFn: async () => {
       const { data, error } = await supabase
         .from("client_specific_trainings")
-        .select("id, status, version, updated_at, approved_at")
+        .select("id, status, version, updated_at, approved_at, review_questions")
         .eq("client_id", clientId)
         .eq("training_type", "person_centered")
         .maybeSingle();
       if (error) throw error;
-      return data as { id: string; status: string; version: number; updated_at: string | null; approved_at: string | null } | null;
+      return data as { id: string; status: string; version: number; updated_at: string | null; approved_at: string | null; review_questions: Array<{ id: string; tab?: string; prompt: string }> | null } | null;
     },
+
   });
 
   const createMut = useMutation({

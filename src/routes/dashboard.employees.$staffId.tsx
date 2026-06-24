@@ -2139,6 +2139,7 @@ function ClientTrainingCard({
         onOpenChange={(v) => !v && setOpenCert(null)}
         record={openCert}
         staffId={staffId}
+        staffName={staffName}
       />
     </div>
   );

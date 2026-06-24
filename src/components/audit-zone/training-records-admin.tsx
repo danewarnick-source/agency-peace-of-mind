@@ -40,6 +40,7 @@ import {
   type CeRosterRow,
 } from "@/lib/ce.functions";
 import { toast } from "sonner";
+import { TrainingCertificateDialog } from "@/components/training/training-certificate-dialog";
 
 type Topic = {
   id: string;

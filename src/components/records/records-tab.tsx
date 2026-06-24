@@ -578,9 +578,6 @@ export function RecordsTab() {
             Every work record in one place. Default view is the exception queue; switch to All records to search the archive.
           </p>
         </div>
-        <div className="w-full md:w-[440px]">
-          <NectarSearchBar nav={[]} isAdminCapable variant="desktop" />
-        </div>
       </div>
 
       {/* Mode toggle — two-way */}

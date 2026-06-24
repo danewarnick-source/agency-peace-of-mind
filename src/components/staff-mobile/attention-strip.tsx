@@ -140,7 +140,7 @@ export function AttentionStrip() {
     if (clientsWithDue > 0) {
       chips.push({
         key: "client-training-due",
-        to: "/dashboard",
+        to: "/dashboard/my-client-trainings",
         icon: GraduationCap,
         tone: "warn",
         label: `${totalDue} training${totalDue === 1 ? "" : "s"} due`,

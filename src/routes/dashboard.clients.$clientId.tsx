@@ -32,7 +32,7 @@ import {
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
-import { SectionsView, ClientSpecificTrainingCard, ReviewQuestionsEditor, GoalsEditor, PublishConfirmDialog } from "@/components/clients/client-specific-training-card";
+import { SectionsView, ClientSpecificTrainingCard, GoalsEditor, PublishConfirmDialog } from "@/components/clients/client-specific-training-card";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
 import { clientFeatureVisible } from "@/lib/client-features";
 import {
@@ -79,6 +79,28 @@ function resolveTab(raw: string | undefined): "profile" | "care" | "activity" | 
   if (raw === "funds" || raw === "codes") return "funds";
   if (raw === "files" || raw === "documents") return "files";
   return "profile";
+}
+
+function CollapsibleSimpleCard({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-label={open ? "Collapse" : "Expand"}
+            className="rounded p-1 hover:bg-muted"
+          >
+            {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </button>
+          <CardTitle className="text-base">{title}</CardTitle>
+        </div>
+      </CardHeader>
+      {open && <CardContent>{children}</CardContent>}
+    </Card>
+  );
 }
 
 function ClientProfileHub() {
@@ -167,14 +189,9 @@ function ClientProfileHub() {
           <TrainingSetupBadge clientId={clientId} />
           <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
           <SupportStrategiesPanel client={client} clientId={clientId} orgId={orgId} />
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Client-specific training</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ClientSpecificTrainingCard clientId={clientId} />
-            </CardContent>
-          </Card>
+          <CollapsibleSimpleCard title="Client-specific training">
+            <ClientSpecificTrainingCard clientId={clientId} />
+          </CollapsibleSimpleCard>
           <CaseloadEditor clientId={clientId} />
         </TabsContent>
 
@@ -656,7 +673,7 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
   const [uploading, setUploading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draftContent, setDraftContent] = useState<CSTContent | null>(null);
-  const [editingQuestions, setEditingQuestions] = useState(false);
+  const [bodyOpen, setBodyOpen] = useState(true);
   const [showPcspPrompt, setShowPcspPrompt] = useState(false);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
 
@@ -819,9 +836,20 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
       <>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">Support strategies</CardTitle>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setBodyOpen((v) => !v)}
+                aria-label={bodyOpen ? "Collapse" : "Expand"}
+                className="rounded p-1 hover:bg-muted"
+              >
+                {bodyOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </button>
+              <CardTitle className="text-base">Support strategies</CardTitle>
+            </div>
             <SSStatusBadge status={training.status} version={training.version} />
           </CardHeader>
+          {bodyOpen && (
           <CardContent className="space-y-3">
             <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 p-3 text-sm">
               <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -848,6 +876,7 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
               {fileInput}
             </div>
           </CardContent>
+          )}
         </Card>
         {pcspDialog}
         <PublishConfirmDialog
@@ -869,7 +898,17 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
     <>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Support strategies</CardTitle>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setBodyOpen((v) => !v)}
+              aria-label={bodyOpen ? "Collapse" : "Expand"}
+              className="rounded p-1 hover:bg-muted"
+            >
+              {bodyOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </button>
+            <CardTitle className="text-base">Support strategies</CardTitle>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <SSStatusBadge status={training.status} version={training.version} />
             {!editing ? (
@@ -915,52 +954,15 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
             )}
           </div>
         </CardHeader>
+        {bodyOpen && (
         <CardContent className="space-y-4">
           <SectionsView
             content={workingContent}
             editing={editing}
             onChange={setDraftContent}
           />
-          {/* Review questions */}
-          <div className="space-y-2 pt-2 border-t border-border/40">
-            <div className="flex flex-wrap items-center gap-2">
-              <h4 className="text-sm font-semibold">Review questions</h4>
-              <span className="text-xs text-muted-foreground">
-                {(training.review_questions ?? []).length} question{(training.review_questions ?? []).length === 1 ? "" : "s"}
-              </span>
-              <div className="ml-auto">
-                {!editingQuestions ? (
-                  <Button variant="outline" size="sm" onClick={() => setEditingQuestions(true)}>
-                    {(training.review_questions ?? []).length > 0 ? "Edit questions" : "Add questions"}
-                  </Button>
-                ) : (
-                  <Button variant="ghost" size="sm" onClick={() => setEditingQuestions(false)}>Cancel</Button>
-                )}
-              </div>
-            </div>
-            {editingQuestions ? (
-              <ReviewQuestionsEditor
-                trainingId={training.id}
-                questions={(training.review_questions ?? []) as CSTReviewQuestion[]}
-                defaultTab="support_strategies"
-                onSaved={() => { setEditingQuestions(false); qc.invalidateQueries({ queryKey }); }}
-              />
-            ) : (training.review_questions ?? []).length > 0 ? (
-              <div className="space-y-1">
-                {((training.review_questions ?? []) as CSTReviewQuestion[]).map((q, i) => (
-                  <div key={q.id} className="rounded border border-border/40 px-2 py-1 text-sm text-muted-foreground">
-                    {q.prompt}
-                    <span className="ml-1 text-xs text-muted-foreground/50">Q{i + 1}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-md border border-dashed border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
-                No review questions yet. Add applied-reasoning prompts for staff to answer when completing this training.
-              </div>
-            )}
-          </div>
         </CardContent>
+        )}
       </Card>
       {pcspDialog}
       <PublishConfirmDialog

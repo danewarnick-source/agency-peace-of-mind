@@ -269,11 +269,10 @@ function ClientTrainingViewer() {
               return (
                 <div key={q.id} className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
                   <div className="flex items-start gap-2">
-                    <span className="text-xs font-mono text-accent shrink-0 mt-0.5">{q.tab}</span>
                     <p className="text-sm font-medium">{q.prompt}</p>
                   </div>
                   <Textarea
-                    placeholder="Your answer..."
+                    placeholder={trainingType === "person_centered" ? "Individual's answer..." : "Your answer..."}
                     value={ans?.answer ?? ""}
                     rows={3}
                     onChange={(e) => patchAnswer(idx, { answer: e.target.value, relevant: null, hint: "" })}

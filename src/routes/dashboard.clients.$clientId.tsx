@@ -81,6 +81,28 @@ function resolveTab(raw: string | undefined): "profile" | "care" | "activity" | 
   return "profile";
 }
 
+function CollapsibleSimpleCard({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-label={open ? "Collapse" : "Expand"}
+            className="rounded p-1 hover:bg-muted"
+          >
+            {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </button>
+          <CardTitle className="text-base">{title}</CardTitle>
+        </div>
+      </CardHeader>
+      {open && <CardContent>{children}</CardContent>}
+    </Card>
+  );
+}
+
 function ClientProfileHub() {
   const { clientId } = Route.useParams();
   const { tab: rawTab } = Route.useSearch();

@@ -749,6 +749,44 @@ export const checkAnswerRelevance = createServerFn({ method: "POST" })
 // One row per client (training_type='support_strategies'). Admin-authored:
 // stub from PCSP goals (NECTAR verbatim), blank, or uploaded provider doc.
 
+// NECTAR drafts "Instructions to staff" for each PCSP goal. This is an
+// AI-drafted starting point only — the agency admin MUST review, edit, and
+// attest before publishing. NECTAR never auto-publishes; status stays "draft".
+async function draftSupportStrategyInstructions(goals: string[]): Promise<string[]> {
+  if (!goals.length) return [];
+  try {
+    const { gatewayFetch } = await import("@/lib/ai-bedrock.server");
+    const system = [
+      "You are NECTAR, drafting staff support strategies for a Utah DSPD direct-support worker.",
+      "For each PCSP goal, write clear, practical 'instructions to staff' — what the worker should DO on shift to help the client work toward that goal.",
+      "Ground every instruction in the goal as written; do not invent diagnoses, clinical interventions, behavioral protocols, or medical procedures.",
+      "Write in plain, natural language a support worker can follow. 2–5 sentences per goal.",
+      "This is a DRAFT the agency admin will review, edit, and attest to before it reaches staff.",
+      'Respond ONLY with JSON: { "strategies": [ { "goal": "...", "instructions": "..." } ] } preserving goal order.',
+      "No preamble, no markdown fences.",
+    ].join("\n");
+    const user = `PCSP GOALS (in order):\n${goals.map((g, i) => `${i + 1}. ${g}`).join("\n")}`;
+    const res = await gatewayFetch({
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+      response_format: { type: "json_object" },
+    });
+    if (!res.ok) return goals.map(() => "");
+    const body = await res.json();
+    const content: string = body?.choices?.[0]?.message?.content ?? "{}";
+    const clean = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    const parsed = JSON.parse(clean || "{}") as {
+      strategies?: Array<{ goal?: string; instructions?: string }>;
+    };
+    const rows = Array.isArray(parsed.strategies) ? parsed.strategies : [];
+    return goals.map((_, i) => String(rows[i]?.instructions ?? "").slice(0, 4000));
+  } catch {
+    return goals.map(() => "");
+  }
+}
+
 async function assembleSupportStrategyStubs(
   supabase: AnySupabase,
   orgId: string,
@@ -760,22 +798,27 @@ async function assembleSupportStrategyStubs(
     .eq("id", clientId)
     .maybeSingle();
   const goals: string[] = Array.isArray(client?.pcsp_goals) ? (client!.pcsp_goals as string[]) : [];
-  const sections: CSTSection[] = goals.length
-    ? goals.map((g) => ({
-        id: sid(),
-        title: "Support strategy",
-        items: [
-          { kind: "text" as const, label: "Goal this supports", value: String(g) },
-          { kind: "text" as const, label: "Instructions to staff", value: "" },
-        ],
-      }))
-    : [{ id: sid(), title: "Support strategy", items: [
-        { kind: "text" as const, label: "Goal this supports", value: "" },
-        { kind: "text" as const, label: "Instructions to staff", value: "" },
-      ] }];
+  if (!goals.length) {
+    void orgId;
+    return { sections: [{ id: sid(), title: "Support strategy", items: [
+      { kind: "text" as const, label: "Goal this supports", value: "" },
+      { kind: "text" as const, label: "Instructions to staff", value: "" },
+    ] }] };
+  }
+  // AI-drafted starting point; admin reviews/edits/attests before publish.
+  const instructions = await draftSupportStrategyInstructions(goals);
+  const sections: CSTSection[] = goals.map((g, i) => ({
+    id: sid(),
+    title: "Support strategy",
+    items: [
+      { kind: "text" as const, label: "Goal this supports", value: String(g) },
+      { kind: "text" as const, label: "Instructions to staff", value: instructions[i] ?? "" },
+    ],
+  }));
   void orgId;
   return { sections };
 }
+
 
 export const getSupportStrategiesTraining = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

@@ -927,7 +927,8 @@ function StaffRecordTable({
 
   type Row =
     | { kind: "core"; topic: Topic; letter?: string }
-    | { kind: "person"; module: PersonModule; letter: string };
+    | { kind: "person"; module: PersonModule; letter: string }
+    | { kind: "completion"; completion: Completion };
 
   const dspdRows: Row[] = [
     ...dspdTopics.map((t) => ({
@@ -946,6 +947,22 @@ function StaffRecordTable({
     kind: "core" as const,
     topic: t,
   }));
+
+  // Surface client-specific & support-strategies completions that don't map to a training_topic row.
+  const SPECIAL_CODES = new Set(["client_specific_training", "support_strategies_training"]);
+  const matchedCompletionKeys = new Set<string>();
+  [...dspdRows, ...extraRows].forEach((r) => {
+    if (r.kind === "core") matchedCompletionKeys.add(`core:${r.topic.id}`);
+    else if (r.kind === "person") matchedCompletionKeys.add(`person:${r.module.id}`);
+  });
+  const specialCompletionRows: Row[] = completions
+    .filter(
+      (c) =>
+        SPECIAL_CODES.has(c.topic_code ?? "") &&
+        !matchedCompletionKeys.has(`${c.topic_kind}:${c.ref_id}`),
+    )
+    .map((c) => ({ kind: "completion" as const, completion: c }));
+  const allExtraRows: Row[] = [...extraRows, ...specialCompletionRows];
 
   const passesFilter = (row: Row): boolean => {
     if (statusFilter === "all") return true;

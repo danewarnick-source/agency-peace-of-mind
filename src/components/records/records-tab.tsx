@@ -26,7 +26,7 @@ import { EVV_SERVICE_CODES, isEvvLockedCode, padMemberId } from "@/lib/evv-codes
 import { buildUtahCsv, downloadCsv, isValidIso, type UtahExportLine } from "@/lib/utah-evv-export";
 import { reviewExceptions, type ReviewException } from "@/lib/records-review-rules";
 import { ResidentialDailyTab } from "@/components/residential/residential-daily-tab";
-import { NectarSearchBar } from "@/components/nectar/nectar-search-bar";
+
 import { UtahExportDialog } from "@/components/evv/utah-export-dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";

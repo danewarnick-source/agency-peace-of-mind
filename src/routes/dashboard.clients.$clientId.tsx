@@ -915,52 +915,15 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
             )}
           </div>
         </CardHeader>
+        {open && (
         <CardContent className="space-y-4">
           <SectionsView
             content={workingContent}
             editing={editing}
             onChange={setDraftContent}
           />
-          {/* Review questions */}
-          <div className="space-y-2 pt-2 border-t border-border/40">
-            <div className="flex flex-wrap items-center gap-2">
-              <h4 className="text-sm font-semibold">Review questions</h4>
-              <span className="text-xs text-muted-foreground">
-                {(training.review_questions ?? []).length} question{(training.review_questions ?? []).length === 1 ? "" : "s"}
-              </span>
-              <div className="ml-auto">
-                {!editingQuestions ? (
-                  <Button variant="outline" size="sm" onClick={() => setEditingQuestions(true)}>
-                    {(training.review_questions ?? []).length > 0 ? "Edit questions" : "Add questions"}
-                  </Button>
-                ) : (
-                  <Button variant="ghost" size="sm" onClick={() => setEditingQuestions(false)}>Cancel</Button>
-                )}
-              </div>
-            </div>
-            {editingQuestions ? (
-              <ReviewQuestionsEditor
-                trainingId={training.id}
-                questions={(training.review_questions ?? []) as CSTReviewQuestion[]}
-                defaultTab="support_strategies"
-                onSaved={() => { setEditingQuestions(false); qc.invalidateQueries({ queryKey }); }}
-              />
-            ) : (training.review_questions ?? []).length > 0 ? (
-              <div className="space-y-1">
-                {((training.review_questions ?? []) as CSTReviewQuestion[]).map((q, i) => (
-                  <div key={q.id} className="rounded border border-border/40 px-2 py-1 text-sm text-muted-foreground">
-                    {q.prompt}
-                    <span className="ml-1 text-xs text-muted-foreground/50">Q{i + 1}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-md border border-dashed border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
-                No review questions yet. Add applied-reasoning prompts for staff to answer when completing this training.
-              </div>
-            )}
-          </div>
         </CardContent>
+        )}
       </Card>
       {pcspDialog}
       <PublishConfirmDialog

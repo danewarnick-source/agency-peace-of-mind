@@ -183,7 +183,7 @@ export function NectarSearchBar({
   return (
     <div ref={wrapRef} className={wrapCls}>
       <div className="relative">
-        <Hexagon className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#d97a1c]" fill="currentColor" />
+        <Hexagon className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#f4a93a]" fill="currentColor" />
         <input
           ref={inputRef}
           type="text"
@@ -199,11 +199,11 @@ export function NectarSearchBar({
           aria-autocomplete="list"
           className={
             isDesktop
-              ? "h-9 w-full rounded-md border border-[#fed7aa] bg-[#fff7ed]/60 pl-8 pr-9 text-sm text-[#0f1b3d] placeholder:text-[#9a3412]/60 shadow-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#d97a1c]/40"
+              ? "h-9 w-full rounded-md border border-white/15 bg-[#0B1126] pl-8 pr-9 text-sm text-white placeholder:text-white/55 shadow-sm focus:bg-[#0d1430] focus:outline-none focus:ring-2 focus:ring-[#f4a93a]/40"
               : "h-11 w-full rounded-md border border-white/20 bg-white/[0.08] pl-8 pr-9 text-sm text-white placeholder:text-white/60 focus:bg-white/15 focus:outline-none focus:ring-2 focus:ring-[#f4a93a]/40"
           }
         />
-        <Search className={`pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 ${isDesktop ? "text-muted-foreground" : "text-white/60"}`} />
+        <Search className={`pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 ${isDesktop ? "text-white/55" : "text-white/60"}`} />
       </div>
 
       {open && (query.trim().length >= 1 || results.length > 0) && (

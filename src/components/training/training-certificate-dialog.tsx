@@ -24,6 +24,11 @@ export type TrainingCertificateRecord = {
   user_agent?: string | null;
   consent_accepted?: boolean | null;
   question_answers?: Array<{ question: string; answer: string }> | null;
+  content_snapshot?: {
+    client_name?: string | null;
+    section_titles?: string[];
+    captured_at?: string;
+  } | null;
 };
 
 type Props = {

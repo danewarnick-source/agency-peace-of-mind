@@ -936,10 +936,26 @@ export function PublishConfirmDialog({
         </DialogHeader>
 
         <div className="space-y-3 max-h-[55vh] overflow-y-auto">
+          {questions && questions.length > 0 && (
+            <div className="rounded border border-border/60 bg-muted/30 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+                Questions staff will complete with the client ({questions.length})
+              </p>
+              <ol className="list-decimal pl-5 space-y-1 text-sm">
+                {questions.map((q) => (
+                  <li key={q.id}>{q.prompt}</li>
+                ))}
+              </ol>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Staff complete these together with the person and attest the responses reflect the individual's own perspective.
+              </p>
+            </div>
+          )}
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
               Currently assigned
             </p>
+
             {loading ? (
               <p className="text-sm text-muted-foreground"><Loader2 className="inline h-3.5 w-3.5 animate-spin mr-1.5" />Loading…</p>
             ) : assignedStaff.length === 0 ? (

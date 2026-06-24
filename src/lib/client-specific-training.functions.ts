@@ -1316,7 +1316,7 @@ export const completeClientSpecificTraining = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({
     clientId: z.string().uuid(),
-    trainingType: z.enum(["person_specific", "support_strategies"]).optional(),
+    trainingType: z.enum(["person_specific", "support_strategies", "person_centered"]).optional(),
     typedSignature: z.string().trim().min(3).max(120),
     questionAnswers: z.array(z.object({ question: z.string(), answer: z.string(), tab: z.string() })).optional(),
   }).parse(d))

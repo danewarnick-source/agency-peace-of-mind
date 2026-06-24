@@ -140,6 +140,7 @@ async function assembleVerbatim(
   }
 
   // 2. Intake summary (most recent intake form submissions — verbatim answers)
+  const intakeHighlights: string[] = [];
   try {
     const { data: subs } = await supabase
       .from("form_submissions")
@@ -154,6 +155,9 @@ async function assembleVerbatim(
           .filter(([, v]) => v != null && String(v).trim().length)
           .slice(0, 12)
           .map(([k, v]) => ({ label: String(k).slice(0, 80), value: String(v).slice(0, 400) }));
+        for (const p of pairs.slice(0, 6)) {
+          intakeHighlights.push(`${p.label}: ${p.value}`);
+        }
         return {
           kind: "kv" as const,
           label: `${s.forms?.name ?? "Intake form"} (${s.submitted_at?.slice(0, 10) ?? ""})`,

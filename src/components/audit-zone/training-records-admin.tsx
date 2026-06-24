@@ -1083,7 +1083,7 @@ function StaffRecordTable({
         </table>
       </div>
 
-      {extraRows.filter(passesFilter).length > 0 && (
+      {allExtraRows.filter(passesFilter).length > 0 && (
         <div>
           <h4 className="mt-4 text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
             Additional HIVE training topics
@@ -1102,7 +1102,7 @@ function StaffRecordTable({
                   <th className="py-2 pr-3 text-right"></th>
                 </tr>
               </thead>
-              <tbody>{extraRows.filter(passesFilter).map(renderRow)}</tbody>
+              <tbody>{allExtraRows.filter(passesFilter).map(renderRow)}</tbody>
             </table>
           </div>
         </div>
@@ -1113,37 +1113,14 @@ function StaffRecordTable({
         {staffId.slice(0, 8)}…
       </p>
 
-      <Dialog open={!!openRecord} onOpenChange={(v) => !v && setOpenRecord(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Signed training record</DialogTitle>
-          </DialogHeader>
-          {openRecord && (
-            <div className="space-y-2 text-sm">
-              <div>
-                <span className="font-semibold">Topic:</span>{" "}
-                {openRecord.topic_title}
-              </div>
-              <div>
-                <span className="font-semibold">Completed:</span>{" "}
-                {new Date(openRecord.completed_at).toLocaleString()}
-              </div>
-              <div>
-                <span className="font-semibold">Signature:</span>{" "}
-                {openRecord.typed_signature}
-              </div>
-              <div className="italic text-muted-foreground">
-                "{openRecord.attestation_statement}"
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenRecord(null)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TrainingCertificateDialog
+        open={!!openRecord}
+        onOpenChange={(v) => !v && setOpenRecord(null)}
+        record={openRecord}
+        staffId={staffId}
+        staffName={staffLabel}
+      />
+
     </div>
   );
 }

@@ -27,6 +27,7 @@ const sourceIcon: Record<DeadlineItem["source"], typeof AlarmClock> = {
   incident: Activity,
   billing_code: AlarmClock,
   sow_perimeter: ShieldCheck,
+  pcsp_support_strategies: FileSignature,
 };
 
 const sourceLabel: Record<DeadlineItem["source"], string> = {
@@ -36,6 +37,7 @@ const sourceLabel: Record<DeadlineItem["source"], string> = {
   incident: "Incident clock",
   billing_code: "Billing-code deliverable",
   sow_perimeter: "SOW perimeter",
+  pcsp_support_strategies: "Support Strategies renewal",
 };
 
 function fmtDue(d: Date): string {

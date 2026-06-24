@@ -18,7 +18,8 @@ export type DeadlineSource =
   | "staff_cert"
   | "incident"
   | "billing_code"
-  | "sow_perimeter";
+  | "sow_perimeter"
+  | "pcsp_support_strategies";
 
 export type DeadlineItem = {
   key: string;
@@ -74,10 +75,10 @@ export function useDeadlines() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, first_name, last_name, is_own_guardian")
+        .select("id, first_name, last_name, is_own_guardian, pcsp_expiration_date")
         .eq("organization_id", orgId!);
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; first_name: string; last_name: string; is_own_guardian: boolean | null }>;
+      return (data ?? []) as Array<{ id: string; first_name: string; last_name: string; is_own_guardian: boolean | null; pcsp_expiration_date: string | null }>;
     },
   });
 
@@ -246,6 +247,28 @@ export function useDeadlines() {
     queryFn: () => computeSowFn({ data: { organizationId: orgId! } }),
   });
 
+  // 10. Support Strategies published approval dates per client (for PCSP renewal reminder).
+  const ssApprovalsQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "ss_approvals", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_specific_trainings")
+        .select("client_id, approved_at")
+        .eq("organization_id", orgId!)
+        .eq("training_type", "support_strategies")
+        .eq("status", "published")
+        .not("approved_at", "is", null)
+        .order("approved_at", { ascending: false });
+      if (error) throw error;
+      const latest = new Map<string, string>();
+      for (const row of (data ?? []) as Array<{ client_id: string; approved_at: string }>) {
+        if (!latest.has(row.client_id)) latest.set(row.client_id, row.approved_at);
+      }
+      return latest;
+    },
+  });
+
   const items = useMemo<DeadlineItem[]>(() => {
     if (!orgId) return [];
     const now = new Date();
@@ -375,6 +398,28 @@ export function useDeadlines() {
       });
     }
 
+    // PCSP-driven Support Strategies annual renewal reminder.
+    // Surfaces ON the PCSP expiration date; auto-clears when SS is re-published on/after that date.
+    const ssLatest = ssApprovalsQ.data ?? new Map<string, string>();
+    for (const c of clientsQ.data ?? []) {
+      if (!c.pcsp_expiration_date) continue;
+      const pcspExp = new Date(`${c.pcsp_expiration_date}T23:59:59`);
+      if (now < pcspExp) continue; // not yet expired
+      const ssApprovedAt = ssLatest.get(c.id);
+      if (ssApprovedAt && new Date(ssApprovedAt) >= pcspExp) continue; // already renewed
+      out.push({
+        key: `pcsp-ss:${c.id}`,
+        source: "pcsp_support_strategies",
+        title: "Support Strategies renewal due — PCSP expired",
+        subject: nameOf(c.id),
+        subjectKind: "client",
+        dueAt: pcspExp,
+        status: bucketStatus(pcspExp, now),
+        href: `/dashboard/clients/${c.id}?tab=care`,
+        clientId: c.id,
+      });
+    }
+
     out.sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
     return out;
   }, [
@@ -388,6 +433,7 @@ export function useDeadlines() {
     incidentsQ.data,
     bcQ.data,
     sowQ.data,
+    ssApprovalsQ.data,
   ]);
 
   return {

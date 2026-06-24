@@ -17,11 +17,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CheckCircle2, Shield, Loader2, AlertTriangle, BookOpen } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Shield, Loader2, AlertTriangle, BookOpen, Users } from "lucide-react";
 import { toast } from "sonner";
 
 const searchSchema = z.object({
-  trainingType: z.enum(["person_specific", "support_strategies"]).optional(),
+  trainingType: z.enum(["person_specific", "support_strategies", "person_centered"]).optional(),
 });
 
 export const Route = createFileRoute("/dashboard/client-training/$clientId")({
@@ -127,9 +127,25 @@ function ClientTrainingViewer() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const typeLabel = trainingType === "support_strategies" ? "Support Strategies" : "Client-Specific Training";
-  const otherType = trainingType === "support_strategies" ? "person_specific" : "support_strategies";
-  const otherLabel = otherType === "support_strategies" ? "Support Strategies" : "Client-Specific Training";
+  const typeLabel =
+    trainingType === "support_strategies"
+      ? "Support Strategies"
+      : trainingType === "person_centered"
+        ? "Person-Centered Profile"
+        : "Client-Specific Training";
+  // Cycle person_specific → support_strategies → person_centered → person_specific.
+  const otherType =
+    trainingType === "person_specific"
+      ? "support_strategies"
+      : trainingType === "support_strategies"
+        ? "person_centered"
+        : "person_specific";
+  const otherLabel =
+    otherType === "support_strategies"
+      ? "Support Strategies"
+      : otherType === "person_centered"
+        ? "Person-Centered Profile"
+        : "Client-Specific Training";
 
   if (isLoading) {
     return (
@@ -209,6 +225,15 @@ function ClientTrainingViewer() {
         }}
         className="flex-1 min-h-0 overflow-y-auto bg-card px-4 py-4 space-y-6"
       >
+        {trainingType === "person_centered" && (
+          <div className="rounded-md border-2 border-amber-400 bg-amber-50 px-3 py-3 text-sm text-amber-900 flex gap-2 shadow-sm">
+            <Users className="h-5 w-5 shrink-0 mt-0.5" />
+            <span>
+              <strong>Complete this profile WITH the person.</strong> These questions should be answered from the individual's own perspective and in their own words wherever possible — like an interview where you ask and they respond. If the person communicates differently or with support, include the perspectives of those who know them best. This is about understanding who they are and how they want to be supported.
+            </span>
+          </div>
+        )}
+
         <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900 flex gap-2">
           <Shield className="h-4 w-4 shrink-0 mt-0.5" />
           <span>

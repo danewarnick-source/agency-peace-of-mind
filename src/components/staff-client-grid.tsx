@@ -17,7 +17,7 @@ import { billingUnitLabel, isClockableServiceCode, isDailyServiceCode } from "@/
 import { isEvvLockedCode } from "@/lib/evv-codes";
 
 type ClientTraining = {
-  type: "person_specific" | "support_strategies";
+  type: "person_specific" | "support_strategies" | "person_centered";
   label: string;
   setupStatus: "not_setup" | "draft" | "published";
   completionStatus: "not_started" | "completed";

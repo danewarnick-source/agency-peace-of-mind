@@ -1315,7 +1315,7 @@ function CertsTab({
             </table>
           </div>
           <p className="mt-3 text-[11px] text-muted-foreground">
-            CPR &amp; First Aid and Person-Centered Thinking each satisfy both the training (SOW 1.8(4)) and certification (SOW 1.8(5)) requirements — one upload covers both.
+            CPR &amp; First Aid satisfies both the training (SOW 1.8(4)) and certification (SOW 1.8(5)(A)(B)) requirements — one upload covers both.
           </p>
         </div>
       )}

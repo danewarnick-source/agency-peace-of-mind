@@ -301,6 +301,12 @@ function ClientRow({
                 No shift today
               </span>
             )}
+            {hasTrainingDue && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                <GraduationCap className="h-3 w-3" />
+                Training due
+              </span>
+            )}
           </div>
           <p className="mt-0.5 truncate text-xs text-muted-foreground">{address}</p>
         </div>

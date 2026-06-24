@@ -935,18 +935,18 @@ export function PublishConfirmDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 max-h-[55vh] overflow-y-auto">
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
           {questions && questions.length > 0 && (
-            <div className="rounded border border-border/60 bg-muted/30 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+            <div className="rounded-md border border-border/60 bg-muted/30 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
                 Questions staff will complete with the client ({questions.length})
               </p>
-              <ol className="list-decimal pl-5 space-y-1 text-sm">
+              <ol className="list-decimal pl-5 space-y-2.5 text-sm leading-relaxed marker:text-muted-foreground">
                 {questions.map((q) => (
-                  <li key={q.id}>{q.prompt}</li>
+                  <li key={q.id} className="pl-1">{q.prompt}</li>
                 ))}
               </ol>
-              <p className="mt-2 text-xs text-muted-foreground">
+              <p className="mt-3 border-t border-border/60 pt-2 text-xs text-muted-foreground">
                 Staff complete these together with the person and attest the responses reflect the individual's own perspective.
               </p>
             </div>

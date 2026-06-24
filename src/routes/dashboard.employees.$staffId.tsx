@@ -2009,10 +2009,12 @@ function ClientTrainingCard({
   client,
   organizationId,
   staffId,
+  staffName,
 }: {
   client: { id: string; name: string; codes: string[] };
   organizationId: string;
   staffId: string;
+  staffName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [openCert, setOpenCert] = useState<TrainingCertificateRecord | null>(null);
@@ -2043,7 +2045,8 @@ function ClientTrainingCard({
         )
         .eq("user_id", staffId)
         .eq("topic_kind", "person")
-        .eq("is_current", true);
+        .eq("is_current", true)
+        .order("completed_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },

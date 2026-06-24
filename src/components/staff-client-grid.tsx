@@ -335,7 +335,7 @@ function ClientRow({
 
       {isOpen && (
         <div className="border-t border-border bg-background/60">
-          <ClientDetail c={c} activeShift={activeShift} assignments={assignments} />
+          <ClientDetail c={c} activeShift={activeShift} assignments={assignments} trainings={trainings} />
         </div>
       )}
     </article>

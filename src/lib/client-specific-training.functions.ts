@@ -140,6 +140,7 @@ async function assembleVerbatim(
   }
 
   // 2. Intake summary (most recent intake form submissions — verbatim answers)
+  const intakeHighlights: string[] = [];
   try {
     const { data: subs } = await supabase
       .from("form_submissions")
@@ -154,6 +155,9 @@ async function assembleVerbatim(
           .filter(([, v]) => v != null && String(v).trim().length)
           .slice(0, 12)
           .map(([k, v]) => ({ label: String(k).slice(0, 80), value: String(v).slice(0, 400) }));
+        for (const p of pairs.slice(0, 6)) {
+          intakeHighlights.push(`${p.label}: ${p.value}`);
+        }
         return {
           kind: "kv" as const,
           label: `${s.forms?.name ?? "Intake form"} (${s.submitted_at?.slice(0, 10) ?? ""})`,
@@ -289,9 +293,80 @@ async function assembleVerbatim(
     });
   }
 
+  // NECTAR-composed narrative overview (prepended). Uses ONLY non-safety-critical
+  // facts (identity, goals, special directions, intake highlights). NEVER touches
+  // meds / behavior / rights / codes / documents — those remain exact records.
+  try {
+    if (client) {
+      const fullName = `${client.first_name ?? ""} ${client.last_name ?? ""}`.trim() || "This person";
+      const goals: string[] = Array.isArray(client.pcsp_goals) ? (client.pcsp_goals as unknown[]).map(String) : [];
+      let ageBand = "";
+      if (client.date_of_birth) {
+        const yrs = Math.floor((Date.now() - new Date(String(client.date_of_birth)).getTime()) / (365.25 * 24 * 3600 * 1000));
+        if (yrs > 0 && yrs < 120) {
+          ageBand = yrs < 18 ? "under 18" : yrs < 30 ? "in their 20s" : yrs < 40 ? "in their 30s" : yrs < 50 ? "in their 40s" : yrs < 60 ? "in their 50s" : yrs < 70 ? "in their 60s" : "70+";
+        }
+      }
+      const facts = [
+        `Name: ${fullName}`,
+        ageBand ? `Age band: ${ageBand}` : "",
+        client.special_directions ? `Special directions: ${String(client.special_directions)}` : "",
+        goals.length ? `PCSP goals:\n${goals.map((g, i) => `  ${i + 1}. ${g}`).join("\n")}` : "",
+        intakeHighlights.length ? `Intake highlights:\n${intakeHighlights.slice(0, 12).map((h) => `  - ${h}`).join("\n")}` : "",
+      ].filter(Boolean).join("\n");
+      const narrative = await draftTrainingNarrative(facts);
+      if (narrative && narrative.trim()) {
+        sections.unshift({
+          id: sid(),
+          title: "About this person & how to support them",
+          items: [
+            { kind: "note", label: "AI draft — review & edit before publishing", value: "NECTAR drafted this overview from this client's records. Review, correct, and attest before it reaches staff." },
+            { kind: "text", label: "Overview", value: narrative.trim() },
+          ],
+        });
+      }
+    }
+  } catch { /* never block assembly on narrative */ }
+
   // org scope reference (suppress unused warning)
   void orgId;
   return { sections };
+}
+
+// NECTAR composes a flowing person-centered overview narrative for the TOP of
+// a person-specific training. AI-drafted only — admin must review/edit/attest
+// before publishing. Returns "" on any AI failure so assembly degrades safely.
+// Deliberately excludes meds, behavior protocols, and legal restrictions —
+// those remain as exact structured records elsewhere in the training.
+async function draftTrainingNarrative(facts: string): Promise<string> {
+  if (!facts.trim()) return "";
+  try {
+    const { gatewayFetch } = await import("@/lib/ai-bedrock.server");
+    const system = [
+      "You are NECTAR, writing a brief, warm, professional orientation narrative for a Utah DSPD direct-support worker about to support a specific person.",
+      "Using ONLY the facts provided, write 1–3 short flowing paragraphs introducing the person: who they are, what matters to them, their goals, and the general approach to supporting them.",
+      "Use natural, respectful, person-centered language — not a bulleted data dump.",
+      "Do NOT invent facts that are not provided.",
+      "Do NOT state medications, doses, behavior protocols, or legal restrictions — those are presented separately as exact records.",
+      "This is a DRAFT the agency admin will review, edit, and attest to before it reaches staff.",
+      'Respond ONLY with JSON: { "narrative": "..." }. No preamble, no markdown fences.',
+    ].join("\n");
+    const res = await gatewayFetch({
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: `FACTS:\n${facts}` },
+      ],
+      response_format: { type: "json_object" },
+    });
+    if (!res.ok) return "";
+    const body = await res.json();
+    const content: string = body?.choices?.[0]?.message?.content ?? "{}";
+    const clean = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    const parsed = JSON.parse(clean || "{}") as { narrative?: string };
+    return String(parsed.narrative ?? "").slice(0, 6000);
+  } catch {
+    return "";
+  }
 }
 
 // ── Verbatim PCSP goal extractor (admin, NECTAR) ────────────────────────────

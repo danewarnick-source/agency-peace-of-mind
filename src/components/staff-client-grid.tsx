@@ -452,6 +452,7 @@ export function StaffClientGrid() {
                 todayShift={todayByClient.get(c.id) ?? null}
                 isOpen={openId === c.id}
                 onToggle={() => setOpenId((id) => (id === c.id ? null : c.id))}
+                trainings={trainingsByClient.get(c.id) ?? []}
               />
             </li>
           ))}

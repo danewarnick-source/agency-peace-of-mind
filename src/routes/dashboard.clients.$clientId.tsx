@@ -819,9 +819,20 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
       <>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">Support strategies</CardTitle>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setBodyOpen((v) => !v)}
+                aria-label={bodyOpen ? "Collapse" : "Expand"}
+                className="rounded p-1 hover:bg-muted"
+              >
+                {bodyOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </button>
+              <CardTitle className="text-base">Support strategies</CardTitle>
+            </div>
             <SSStatusBadge status={training.status} version={training.version} />
           </CardHeader>
+          {bodyOpen && (
           <CardContent className="space-y-3">
             <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 p-3 text-sm">
               <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -848,6 +859,7 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
               {fileInput}
             </div>
           </CardContent>
+          )}
         </Card>
         {pcspDialog}
         <PublishConfirmDialog

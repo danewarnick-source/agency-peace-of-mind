@@ -439,10 +439,10 @@ function DashboardLayout() {
                 type="button"
                 onClick={() => setTaskCenterOpen(true)}
                 data-tour="nav.help"
-                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-md border border-[#fed7aa] bg-[#fff7ed] px-2.5 py-1 text-xs font-medium text-[#9a3412] hover:bg-[#ffedd5]"
+                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-md border border-white/15 bg-[#0B1126] px-2.5 py-1 text-xs font-medium text-white hover:bg-[#0d1430]"
                 title="Open NECTAR Task Center"
               >
-                <ListChecks className="h-3.5 w-3.5" /> <span className="hidden md:inline">Guide me</span>
+                <ListChecks className="h-3.5 w-3.5 text-[#f4a93a]" /> <span className="hidden md:inline">Guide me</span>
               </button>
               {isAdminCapable && effectiveView === "admin" && <NotificationBell />}
               <Button onClick={signOut} variant="ghost" size="sm" className="md:hidden">

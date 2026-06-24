@@ -89,26 +89,6 @@ export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
     },
   },
   {
-    key: "pct",
-    title: "Person-Centered Thinking",
-    due_days: 90,
-    tracks_expiration: true,
-    default_validity_months: 12,
-    conditional: "all",
-    category: "Required trainings",
-    validation: {
-      cert_type_label: "Person-Centered Thinking",
-      required_keyword_groups: [
-        {
-          label: "Person-Centered Thinking wording",
-          any_of: ["person-centered thinking", "person centered thinking", "pct"],
-        },
-      ],
-      requires_completion_date: true,
-      requires_expiration_date: false,
-    },
-  },
-  {
     key: "deescalation",
     title:
       "De-escalation Certification (MANDT, SOAR, CPI, PART, or Safety Care)",

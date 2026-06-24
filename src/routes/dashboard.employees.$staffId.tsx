@@ -1115,7 +1115,6 @@ function CertsTab({
   const REQUIRED_BASELINE_KEYS = [
     "thirty_day",
     "cpr_first_aid",
-    "pct",
     "annual_12h",
     "deescalation",
   ] as const;
@@ -1316,7 +1315,7 @@ function CertsTab({
             </table>
           </div>
           <p className="mt-3 text-[11px] text-muted-foreground">
-            CPR &amp; First Aid and Person-Centered Thinking each satisfy both the training (SOW 1.8(4)) and certification (SOW 1.8(5)) requirements — one upload covers both.
+            CPR &amp; First Aid satisfies both the training (SOW 1.8(4)) and certification (SOW 1.8(5)(A)(B)) requirements — one upload covers both.
           </p>
         </div>
       )}
@@ -1342,10 +1341,6 @@ function CertsTab({
             cpr_first_aid: {
               title: "CPR & First Aid",
               meta: "Due within 90 days of hire · Renews every 24 mo · Satisfies SOW 1.8(4) training and 1.8(5)(A)(B) cert — one upload covers both",
-            },
-            pct: {
-              title: "Person-Centered Thinking",
-              meta: "Due within 90 days of hire · Renews every 12 mo · Satisfies SOW 1.8(4) training and 1.8(5)(C) cert — one upload covers both",
             },
             annual_12h: {
               title: "Ongoing Training",

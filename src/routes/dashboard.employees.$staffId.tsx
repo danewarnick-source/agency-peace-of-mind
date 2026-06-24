@@ -1115,7 +1115,6 @@ function CertsTab({
   const REQUIRED_BASELINE_KEYS = [
     "thirty_day",
     "cpr_first_aid",
-    "pct",
     "annual_12h",
     "deescalation",
   ] as const;

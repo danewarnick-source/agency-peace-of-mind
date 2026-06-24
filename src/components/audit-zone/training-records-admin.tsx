@@ -72,6 +72,11 @@ type Completion = {
   time_zone: string | null;
   content_hash: string | null;
   question_answers: Array<{ question: string; answer: string }> | null;
+  content_snapshot: {
+    client_name?: string | null;
+    section_titles?: string[];
+    captured_at?: string;
+  } | null;
 };
 
 type PersonModule = { id: string; title: string; user_id: string };

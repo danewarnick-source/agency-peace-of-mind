@@ -2100,7 +2100,7 @@ function ClientTrainingCard({
             <ul className="divide-y divide-border/40">
               {(trainingsQ.data ?? []).map((t) => {
                 const isApproved = t.status === "approved" || t.status === "published";
-                const completion = completionByRef.get(t.id);
+                const completion = findCompletionFor(t);
                 return (
                   <li key={t.id} className="flex items-center gap-2 py-2 text-xs">
                     <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${isApproved ? "bg-emerald-500" : "bg-amber-500"}`} />

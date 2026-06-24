@@ -124,6 +124,7 @@ function ClientTrainingViewer() {
     },
     onSuccess: () => {
       toast.success("Training completed — record saved.");
+      setJustCompleted(true);
       qc.invalidateQueries({ queryKey });
       setSignature("");
     },

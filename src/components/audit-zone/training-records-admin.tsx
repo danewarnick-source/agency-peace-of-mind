@@ -964,20 +964,38 @@ function StaffRecordTable({
     .map((c) => ({ kind: "completion" as const, completion: c }));
   const allExtraRows: Row[] = [...extraRows, ...specialCompletionRows];
 
+  const rowKey = (row: Row): string => {
+    if (row.kind === "core") return `core:${row.topic.id}`;
+    if (row.kind === "person") return `person:${row.module.id}`;
+    return `${row.completion.topic_kind}:${row.completion.ref_id}`;
+  };
+
   const passesFilter = (row: Row): boolean => {
     if (statusFilter === "all") return true;
-    const key =
-      row.kind === "core" ? `core:${row.topic.id}` : `person:${row.module.id}`;
-    const s = progressMap.get(key) ?? "not_started";
+    if (row.kind === "completion") return statusFilter === "completed";
+    const s = progressMap.get(rowKey(row)) ?? "not_started";
     return s === statusFilter;
   };
 
   const renderRow = (row: Row, idx: number) => {
-    const refId = row.kind === "core" ? row.topic.id : row.module.id;
-    const key = `${row.kind}:${refId}`;
-    const status = progressMap.get(key) ?? "not_started";
-    const completion = completionMap.get(key);
-    const title = row.kind === "core" ? row.topic.title : row.module.title;
+    const key = rowKey(row);
+    const refId =
+      row.kind === "core"
+        ? row.topic.id
+        : row.kind === "person"
+          ? row.module.id
+          : row.completion.ref_id;
+    const status =
+      row.kind === "completion" ? "completed" : (progressMap.get(key) ?? "not_started");
+    const completion =
+      row.kind === "completion" ? row.completion : completionMap.get(key);
+    const title =
+      row.kind === "core"
+        ? row.topic.title
+        : row.kind === "person"
+          ? row.module.title
+          : row.completion.topic_title;
+    const letter = row.kind === "completion" ? undefined : row.letter;
     const isDone = status === "completed";
     const isProg = status === "in_progress";
 
@@ -987,7 +1005,7 @@ function StaffRecordTable({
         className="border-b border-border/60 last:border-0 align-top"
       >
         <td className="py-2 pr-3 text-center text-xs font-bold uppercase tabular-nums">
-          {row.letter ? `(${row.letter})` : "—"}
+          {letter ? `(${letter})` : "—"}
         </td>
         <td className="py-2 pr-3">
           {isDone ? (
@@ -1035,6 +1053,7 @@ function StaffRecordTable({
       </tr>
     );
   };
+
 
   return (
     <div className="mt-4 space-y-3 print:mt-0">

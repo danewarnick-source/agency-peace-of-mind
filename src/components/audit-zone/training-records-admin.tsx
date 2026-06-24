@@ -20,7 +20,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   CheckCircle2,
@@ -40,6 +39,7 @@ import {
   type CeRosterRow,
 } from "@/lib/ce.functions";
 import { toast } from "sonner";
+import { TrainingCertificateDialog } from "@/components/training/training-certificate-dialog";
 
 type Topic = {
   id: string;
@@ -71,6 +71,7 @@ type Completion = {
   user_agent: string | null;
   time_zone: string | null;
   content_hash: string | null;
+  question_answers: Array<{ question: string; answer: string }> | null;
 };
 
 type PersonModule = { id: string; title: string; user_id: string };
@@ -202,7 +203,7 @@ export function TrainingRecordsAdmin() {
       const { data } = await supabase
         .from("training_completions")
         .select(
-          "id, user_id, topic_kind, ref_id, topic_code, topic_title, dspd_letter, attestation_statement, typed_signature, completed_at, is_current, signer_full_name, signer_email, consent_statement, consent_accepted, content_version, ip_address, user_agent, time_zone, content_hash",
+          "id, user_id, topic_kind, ref_id, topic_code, topic_title, dspd_letter, attestation_statement, typed_signature, completed_at, is_current, signer_full_name, signer_email, consent_statement, consent_accepted, content_version, ip_address, user_agent, time_zone, content_hash, question_answers",
         )
         .in("user_id", memberIds)
         .eq("is_current", true)
@@ -925,7 +926,8 @@ function StaffRecordTable({
 
   type Row =
     | { kind: "core"; topic: Topic; letter?: string }
-    | { kind: "person"; module: PersonModule; letter: string };
+    | { kind: "person"; module: PersonModule; letter: string }
+    | { kind: "completion"; completion: Completion };
 
   const dspdRows: Row[] = [
     ...dspdTopics.map((t) => ({
@@ -945,20 +947,54 @@ function StaffRecordTable({
     topic: t,
   }));
 
+  // Surface client-specific & support-strategies completions that don't map to a training_topic row.
+  const SPECIAL_CODES = new Set(["client_specific_training", "support_strategies_training"]);
+  const matchedCompletionKeys = new Set<string>();
+  [...dspdRows, ...extraRows].forEach((r) => {
+    if (r.kind === "core") matchedCompletionKeys.add(`core:${r.topic.id}`);
+    else if (r.kind === "person") matchedCompletionKeys.add(`person:${r.module.id}`);
+  });
+  const specialCompletionRows: Row[] = completions
+    .filter(
+      (c) =>
+        SPECIAL_CODES.has(c.topic_code ?? "") &&
+        !matchedCompletionKeys.has(`${c.topic_kind}:${c.ref_id}`),
+    )
+    .map((c) => ({ kind: "completion" as const, completion: c }));
+  const allExtraRows: Row[] = [...extraRows, ...specialCompletionRows];
+
+  const rowKey = (row: Row): string => {
+    if (row.kind === "core") return `core:${row.topic.id}`;
+    if (row.kind === "person") return `person:${row.module.id}`;
+    return `${row.completion.topic_kind}:${row.completion.ref_id}`;
+  };
+
   const passesFilter = (row: Row): boolean => {
     if (statusFilter === "all") return true;
-    const key =
-      row.kind === "core" ? `core:${row.topic.id}` : `person:${row.module.id}`;
-    const s = progressMap.get(key) ?? "not_started";
+    if (row.kind === "completion") return statusFilter === "completed";
+    const s = progressMap.get(rowKey(row)) ?? "not_started";
     return s === statusFilter;
   };
 
   const renderRow = (row: Row, idx: number) => {
-    const refId = row.kind === "core" ? row.topic.id : row.module.id;
-    const key = `${row.kind}:${refId}`;
-    const status = progressMap.get(key) ?? "not_started";
-    const completion = completionMap.get(key);
-    const title = row.kind === "core" ? row.topic.title : row.module.title;
+    const key = rowKey(row);
+    const refId =
+      row.kind === "core"
+        ? row.topic.id
+        : row.kind === "person"
+          ? row.module.id
+          : row.completion.ref_id;
+    const status =
+      row.kind === "completion" ? "completed" : (progressMap.get(key) ?? "not_started");
+    const completion =
+      row.kind === "completion" ? row.completion : completionMap.get(key);
+    const title =
+      row.kind === "core"
+        ? row.topic.title
+        : row.kind === "person"
+          ? row.module.title
+          : row.completion.topic_title;
+    const letter = row.kind === "completion" ? undefined : row.letter;
     const isDone = status === "completed";
     const isProg = status === "in_progress";
 
@@ -968,7 +1004,7 @@ function StaffRecordTable({
         className="border-b border-border/60 last:border-0 align-top"
       >
         <td className="py-2 pr-3 text-center text-xs font-bold uppercase tabular-nums">
-          {row.letter ? `(${row.letter})` : "—"}
+          {letter ? `(${letter})` : "—"}
         </td>
         <td className="py-2 pr-3">
           {isDone ? (
@@ -1017,6 +1053,7 @@ function StaffRecordTable({
     );
   };
 
+
   return (
     <div className="mt-4 space-y-3 print:mt-0">
       <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
@@ -1045,7 +1082,7 @@ function StaffRecordTable({
         </table>
       </div>
 
-      {extraRows.filter(passesFilter).length > 0 && (
+      {allExtraRows.filter(passesFilter).length > 0 && (
         <div>
           <h4 className="mt-4 text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
             Additional HIVE training topics
@@ -1064,7 +1101,7 @@ function StaffRecordTable({
                   <th className="py-2 pr-3 text-right"></th>
                 </tr>
               </thead>
-              <tbody>{extraRows.filter(passesFilter).map(renderRow)}</tbody>
+              <tbody>{allExtraRows.filter(passesFilter).map(renderRow)}</tbody>
             </table>
           </div>
         </div>
@@ -1075,37 +1112,14 @@ function StaffRecordTable({
         {staffId.slice(0, 8)}…
       </p>
 
-      <Dialog open={!!openRecord} onOpenChange={(v) => !v && setOpenRecord(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Signed training record</DialogTitle>
-          </DialogHeader>
-          {openRecord && (
-            <div className="space-y-2 text-sm">
-              <div>
-                <span className="font-semibold">Topic:</span>{" "}
-                {openRecord.topic_title}
-              </div>
-              <div>
-                <span className="font-semibold">Completed:</span>{" "}
-                {new Date(openRecord.completed_at).toLocaleString()}
-              </div>
-              <div>
-                <span className="font-semibold">Signature:</span>{" "}
-                {openRecord.typed_signature}
-              </div>
-              <div className="italic text-muted-foreground">
-                "{openRecord.attestation_statement}"
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenRecord(null)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TrainingCertificateDialog
+        open={!!openRecord}
+        onOpenChange={(v) => !v && setOpenRecord(null)}
+        record={openRecord}
+        staffId={staffId}
+        staffName={staffLabel}
+      />
+
     </div>
   );
 }

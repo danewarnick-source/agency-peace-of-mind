@@ -1700,6 +1700,7 @@ function CertsTab({
               client={client}
               organizationId={organizationId}
               staffId={staffId}
+              staffName={staffName}
             />
           ))}
         </CertSection>

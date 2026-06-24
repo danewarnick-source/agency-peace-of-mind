@@ -624,6 +624,101 @@ export const draftClientSpecificTrainingBlank = createServerFn({ method: "POST" 
     return { training: inserted };
   });
 
+// ── CREATE Person-Centered Profile (admin) ──────────────────────────────────
+// Hive-original person-centered profile completed WITH the person. Substance
+// lives in the staff's answers to review_questions; content is intentionally
+// minimal. Upserts one row per client at training_type = 'person_centered'.
+export const createPersonCenteredProfile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ clientId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId);
+    adminGuard(m.role);
+    await assertClientInOrg(supabase, data.clientId, m.organization_id);
+
+    const attestation_statement =
+      "I completed this person-centered profile together with the person and/or those who know them best, reflecting their own preferences and words to the greatest extent possible. I will use this understanding to support them in the ways that matter to them.";
+
+    const prompts: string[] = [
+      "What are this person's strengths, gifts, and talents?",
+      "What do people who know them well like and admire about them?",
+      "What activities, interests, or routines bring them joy?",
+      "What does a good day look like for them — and what makes a bad day?",
+      "What support do they need to stay healthy and safe?",
+      "Are there routines, accommodations, or precautions staff must follow?",
+      "Who are the important people in their life, and who should be involved in decisions?",
+      "How does this person communicate, and how do they prefer to be supported?",
+      "What should staff do — and not do — when supporting them?",
+      "What does this person want more of, and what's their vision of a good life?",
+    ];
+    const review_questions: CSTReviewQuestion[] = prompts.map((prompt) => ({
+      id: sid(),
+      tab: "profile",
+      prompt,
+    }));
+
+    const content: CSTContent = {
+      sections: [
+        {
+          id: sid(),
+          title: "Person-Centered Profile",
+          items: [
+            {
+              kind: "note",
+              label: "About",
+              value:
+                "Complete this profile WITH the person (and/or those who know them best). Answer each question in their own words wherever possible.",
+            },
+          ],
+        },
+      ],
+    };
+
+    const { data: existing } = await supabase
+      .from("client_specific_trainings")
+      .select("id")
+      .eq("client_id", data.clientId)
+      .eq("training_type", "person_centered")
+      .maybeSingle();
+
+    if (existing) {
+      const { data: updated, error: uErr } = await supabase
+        .from("client_specific_trainings")
+        .update({
+          content: content as unknown,
+          review_questions: review_questions as unknown,
+          attestation_statement,
+          status: "draft",
+          approved_by: null,
+          approved_at: null,
+        })
+        .eq("id", existing.id)
+        .select("*")
+        .maybeSingle();
+      if (uErr) throw new Error(uErr.message);
+      return { training: updated };
+    }
+
+    const { data: inserted, error: iErr } = await supabase
+      .from("client_specific_trainings")
+      .insert({
+        organization_id: m.organization_id,
+        client_id: data.clientId,
+        training_type: "person_centered",
+        title: "Person-Centered Profile",
+        content: content as unknown,
+        review_questions: review_questions as unknown,
+        attestation_statement,
+        status: "draft",
+        version: 1,
+      })
+      .select("*")
+      .maybeSingle();
+    if (iErr) throw new Error(iErr.message);
+    return { training: inserted };
+  });
+
 // ── ATTACH uploaded document as person-specific training (admin) ────────────
 // Mirrors attachSupportStrategyDocument but for training_type = "person_specific".
 export const attachClientSpecificTrainingDocument = createServerFn({ method: "POST" })

@@ -348,6 +348,19 @@ export function StaffClientGrid() {
   const { data: nectar } = useNectarPayPeriod();
   const { data: assignments } = useMyAssignments();
   const { data: todayShifts = [] } = useTodayShifts();
+  const fetchCT = useServerFn(getMyClientTrainingStatuses);
+  const { data: ct } = useQuery({
+    queryKey: ["my-client-training-statuses"],
+    queryFn: () => fetchCT(),
+    staleTime: 60_000,
+  });
+  const trainingsByClient = useMemo(() => {
+    const m = new Map<string, ClientTraining[]>();
+    for (const it of (ct?.items ?? []) as Array<{ clientId: string; trainings: ClientTraining[] }>) {
+      m.set(it.clientId, it.trainings ?? []);
+    }
+    return m;
+  }, [ct]);
   const [q, setQ] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
 

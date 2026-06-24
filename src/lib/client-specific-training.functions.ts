@@ -682,7 +682,7 @@ export const createPersonCenteredProfile = createServerFn({ method: "POST" })
               kind: "note",
               label: "About",
               value:
-                "Complete this profile WITH the person (and/or those who know them best). Answer each question in their own words wherever possible.",
+                "Complete this Person-Centered Thinking profile WITH the person (and/or those who know them best). Answer each question in their own words wherever possible.",
             },
           ],
         },

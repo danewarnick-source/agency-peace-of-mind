@@ -398,6 +398,28 @@ export function useDeadlines() {
       });
     }
 
+    // PCSP-driven Support Strategies annual renewal reminder.
+    // Surfaces ON the PCSP expiration date; auto-clears when SS is re-published on/after that date.
+    const ssLatest = ssApprovalsQ.data ?? new Map<string, string>();
+    for (const c of clientsQ.data ?? []) {
+      if (!c.pcsp_expiration_date) continue;
+      const pcspExp = new Date(`${c.pcsp_expiration_date}T23:59:59`);
+      if (now < pcspExp) continue; // not yet expired
+      const ssApprovedAt = ssLatest.get(c.id);
+      if (ssApprovedAt && new Date(ssApprovedAt) >= pcspExp) continue; // already renewed
+      out.push({
+        key: `pcsp-ss:${c.id}`,
+        source: "pcsp_support_strategies",
+        title: "Support Strategies renewal due — PCSP expired",
+        subject: nameOf(c.id),
+        subjectKind: "client",
+        dueAt: pcspExp,
+        status: bucketStatus(pcspExp, now),
+        href: `/dashboard/clients/${c.id}?tab=care`,
+        clientId: c.id,
+      });
+    }
+
     out.sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
     return out;
   }, [
@@ -411,6 +433,7 @@ export function useDeadlines() {
     incidentsQ.data,
     bcQ.data,
     sowQ.data,
+    ssApprovalsQ.data,
   ]);
 
   return {

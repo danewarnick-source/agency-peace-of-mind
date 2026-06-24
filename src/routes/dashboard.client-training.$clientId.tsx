@@ -17,11 +17,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CheckCircle2, Shield, Loader2, AlertTriangle, BookOpen } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Shield, Loader2, AlertTriangle, BookOpen, Users } from "lucide-react";
 import { toast } from "sonner";
 
 const searchSchema = z.object({
-  trainingType: z.enum(["person_specific", "support_strategies"]).optional(),
+  trainingType: z.enum(["person_specific", "support_strategies", "person_centered"]).optional(),
 });
 
 export const Route = createFileRoute("/dashboard/client-training/$clientId")({

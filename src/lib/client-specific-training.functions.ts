@@ -1455,7 +1455,7 @@ export const getMyClientTrainingStatuses = createServerFn({ method: "GET" })
       } catch { /* ignore */ }
     }
 
-    if (!clientIds.length) return { items: [] as Array<{ clientId: string; clientName: string; trainings: Array<{ type: "person_specific" | "support_strategies"; label: string; setupStatus: "not_setup" | "draft" | "published"; completionStatus: "not_started" | "completed"; completedAt: string | null }> }> };
+    if (!clientIds.length) return { items: [] as Array<{ clientId: string; clientName: string; trainings: Array<{ type: "person_specific" | "support_strategies" | "person_centered"; label: string; setupStatus: "not_setup" | "draft" | "published"; completionStatus: "not_started" | "completed"; completedAt: string | null }> }> };
 
     const { data: clients } = await supabase
       .from("clients")

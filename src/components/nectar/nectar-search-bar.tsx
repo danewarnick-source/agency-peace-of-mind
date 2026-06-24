@@ -199,7 +199,7 @@ export function NectarSearchBar({
           aria-autocomplete="list"
           className={
             isDesktop
-              ? "h-9 w-full rounded-md border border-[#fed7aa] bg-[#fff7ed]/60 pl-8 pr-9 text-sm text-[#0f1b3d] placeholder:text-[#9a3412]/60 shadow-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#d97a1c]/40"
+              ? "h-9 w-full rounded-md border border-white/15 bg-[#0B1126] pl-8 pr-9 text-sm text-white placeholder:text-white/55 shadow-sm focus:bg-[#0d1430] focus:outline-none focus:ring-2 focus:ring-[#f4a93a]/40"
               : "h-11 w-full rounded-md border border-white/20 bg-white/[0.08] pl-8 pr-9 text-sm text-white placeholder:text-white/60 focus:bg-white/15 focus:outline-none focus:ring-2 focus:ring-[#f4a93a]/40"
           }
         />

@@ -33,7 +33,7 @@ import { ClientDocumentsCard } from "@/components/clients/client-documents-card"
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
 import { SectionsView, ClientSpecificTrainingCard, GoalsEditor, PublishConfirmDialog } from "@/components/clients/client-specific-training-card";
-import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, RefreshCw, Sparkles, Trash2, Upload, UserCircle2 } from "lucide-react";
 import { clientFeatureVisible } from "@/lib/client-features";
 import {
   getClientSpecificTraining,
@@ -44,6 +44,7 @@ import {
   publishClientSpecificTraining,
   extractPcspGoalsForTraining,
   draftClientSpecificTrainingBlank,
+  createPersonCenteredProfile,
   type CSTContent,
   type CSTGoal,
   type CSTReviewQuestion,
@@ -192,6 +193,7 @@ function ClientProfileHub() {
           <CollapsibleSimpleCard title="Client-specific training">
             <ClientSpecificTrainingCard clientId={clientId} />
           </CollapsibleSimpleCard>
+          <PersonCenteredProfilePanel clientId={clientId} orgId={orgId} />
           <CaseloadEditor clientId={clientId} />
         </TabsContent>
 
@@ -974,6 +976,110 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
         isPublishing={publishMut.isPending}
         publishAsync={() => publishMut.mutateAsync(training.id)}
       />
+    </>
+  );
+}
+
+function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; orgId?: string }) {
+  const qc = useQueryClient();
+  const createFn = useServerFn(createPersonCenteredProfile);
+  const publishFn = useServerFn(publishClientSpecificTraining);
+  const [showPublish, setShowPublish] = useState(false);
+
+  const q = useQuery({
+    queryKey: ["person-centered-profile", clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_specific_trainings")
+        .select("id, status, version, updated_at, approved_at")
+        .eq("client_id", clientId)
+        .eq("training_type", "person_centered")
+        .maybeSingle();
+      if (error) throw error;
+      return data as { id: string; status: string; version: number; updated_at: string | null; approved_at: string | null } | null;
+    },
+  });
+
+  const createMut = useMutation({
+    mutationFn: () => createFn({ data: { clientId } }),
+    onSuccess: () => {
+      toast.success("Person-centered profile created");
+      qc.invalidateQueries({ queryKey: ["person-centered-profile", clientId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to create profile"),
+  });
+
+  const publishMut = useMutation({
+    mutationFn: (id: string) => publishFn({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Person-centered profile published");
+      qc.invalidateQueries({ queryKey: ["person-centered-profile", clientId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to publish profile"),
+  });
+
+  const training = q.data;
+
+  return (
+    <>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div className="flex items-center gap-2">
+            <UserCircle2 className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-base">Person-Centered Profile</CardTitle>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {training && (
+              <Badge variant={training.status === "published" ? "default" : "secondary"}>
+                {training.status === "published" ? `Published v${training.version}` : "Draft"}
+              </Badge>
+            )}
+            {!training && !q.isLoading && (
+              <Button size="sm" onClick={() => createMut.mutate()} disabled={createMut.isPending}>
+                {createMut.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                Create profile
+              </Button>
+            )}
+            {training && training.status !== "published" && (
+              <Button size="sm" onClick={() => setShowPublish(true)} disabled={publishMut.isPending}>
+                {publishMut.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
+                Approve & Publish
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          {q.isLoading ? (
+            <span className="inline-flex items-center gap-2"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…</span>
+          ) : !training ? (
+            <p>
+              A person-centered profile is completed by staff together with the client, capturing
+              who they are and how they want to be supported. Create the profile to publish the
+              10 standard questions for staff to complete.
+            </p>
+          ) : training.status === "published" ? (
+            <p>
+              Published{training.approved_at ? ` on ${new Date(training.approved_at).toLocaleDateString()}` : ""}.
+              Staff can complete the profile from their client training list.
+            </p>
+          ) : (
+            <p>
+              Draft ready. Publish to assign this profile to staff for completion with the person.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+      {training && (
+        <PublishConfirmDialog
+          open={showPublish}
+          onOpenChange={setShowPublish}
+          clientId={clientId}
+          orgId={orgId}
+          kindLabel="person-centered profile"
+          isPublishing={publishMut.isPending}
+          publishAsync={() => publishMut.mutateAsync(training.id)}
+        />
+      )}
     </>
   );
 }

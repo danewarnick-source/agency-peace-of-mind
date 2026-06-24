@@ -132,6 +132,8 @@ export function TrainingCertificateDialog({
                 attested version.
               </p>
             )}
+          </section>
+
 
           {/* Completed */}
           <section className="mt-4 rounded-md border border-border bg-muted/40 px-3 py-2 print:bg-transparent">

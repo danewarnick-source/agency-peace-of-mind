@@ -167,14 +167,9 @@ function ClientProfileHub() {
           <TrainingSetupBadge clientId={clientId} />
           <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
           <SupportStrategiesPanel client={client} clientId={clientId} orgId={orgId} />
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Client-specific training</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ClientSpecificTrainingCard clientId={clientId} />
-            </CardContent>
-          </Card>
+          <CollapsibleSimpleCard title="Client-specific training">
+            <ClientSpecificTrainingCard clientId={clientId} />
+          </CollapsibleSimpleCard>
           <CaseloadEditor clientId={clientId} />
         </TabsContent>
 

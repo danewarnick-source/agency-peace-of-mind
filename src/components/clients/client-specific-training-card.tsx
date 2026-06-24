@@ -820,7 +820,7 @@ export function ReviewQuestionsEditor({
 // assigns additional staff before publishing. Assignment remains the single
 // source of truth for access.
 export function PublishConfirmDialog({
-  open, onOpenChange, clientId, orgId, kindLabel, isPublishing, publishAsync,
+  open, onOpenChange, clientId, orgId, kindLabel, isPublishing, publishAsync, questions,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -829,7 +829,9 @@ export function PublishConfirmDialog({
   kindLabel: string;
   isPublishing: boolean;
   publishAsync: () => Promise<unknown>;
+  questions?: Array<{ id: string; prompt: string }>;
 }) {
+
   const qc = useQueryClient();
   const setCaseloadFn = useServerFn(setClientCaseload);
   const [stagedAdds, setStagedAdds] = useState<Set<string>>(new Set());

@@ -658,6 +658,7 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
   const [draftContent, setDraftContent] = useState<CSTContent | null>(null);
   const [editingQuestions, setEditingQuestions] = useState(false);
   const [showPcspPrompt, setShowPcspPrompt] = useState(false);
+  const [showPublishDialog, setShowPublishDialog] = useState(false);
 
   const { data: hasPcsp } = useQuery({
     queryKey: ["client-has-pcsp", clientId],

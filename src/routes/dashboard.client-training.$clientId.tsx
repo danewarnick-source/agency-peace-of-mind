@@ -207,7 +207,7 @@ function ClientTrainingViewer() {
           <p className="text-[11px] font-semibold uppercase tracking-wider text-accent">
             {typeLabel} · v{training.version}
           </p>
-          <h1 className="mt-0.5 text-base font-semibold leading-snug tracking-tight">{training.title}</h1>
+          <h1 className="mt-0.5 text-base font-semibold leading-snug tracking-tight">{trainingType === "person_centered" ? typeLabel : training.title}</h1>
         </div>
         {alreadyCurrent && (
           <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-700">

@@ -183,7 +183,7 @@ export function NectarSearchBar({
   return (
     <div ref={wrapRef} className={wrapCls}>
       <div className="relative">
-        <Hexagon className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#d97a1c]" fill="currentColor" />
+        <Hexagon className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#f4a93a]" fill="currentColor" />
         <input
           ref={inputRef}
           type="text"

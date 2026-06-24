@@ -35,12 +35,14 @@ export function AttentionStrip() {
   const fetchBell = useServerFn(getMyFormNotifications);
   const fetchOther = useServerFn(getMyOtherAssignmentsSummary);
   const fetchSI = useServerFn(listSmartImportReminders);
+  const fetchCT = useServerFn(getMyClientTrainingStatuses);
 
   const { data: ce } = useQuery({ queryKey: ["ce-status"], queryFn: () => fetchCe(), staleTime: 60_000 });
   const { data: formsData } = useQuery({ queryKey: ["my-forms"], queryFn: () => fetchForms(), staleTime: 60_000 });
   const { data: bell } = useQuery({ queryKey: ["my-form-notifs"], queryFn: () => fetchBell(), staleTime: 60_000 });
   const { data: other } = useQuery({ queryKey: ["my-other-assignments-summary"], queryFn: () => fetchOther() });
   const { data: si } = useQuery({ queryKey: ["my-smart-import-reminders"], queryFn: () => fetchSI({ data: { scope: "mine" } }), staleTime: 60_000 });
+  const { data: ct } = useQuery({ queryKey: ["my-client-training-statuses"], queryFn: () => fetchCT(), staleTime: 60_000 });
 
 
   const chips: Chip[] = [];

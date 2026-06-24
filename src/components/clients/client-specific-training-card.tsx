@@ -23,8 +23,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Sparkles, Loader2, CheckCircle2, RefreshCw, Pencil, Trash2, Plus, ArrowUp, ArrowDown, Shield, BookOpen, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { setClientCaseload } from "@/lib/scheduler/setup.functions";
 
 type Training = {
   id: string;

@@ -1330,7 +1330,7 @@ export const completeClientSpecificTraining = createServerFn({ method: "POST" })
 
     const { data: training, error } = await supabase
       .from("client_specific_trainings")
-      .select("id, organization_id, client_id, title, content, attestation_statement, status, version")
+      .select("id, organization_id, client_id, title, content, attestation_statement, status, version, review_questions")
       .eq("client_id", data.clientId)
       .eq("training_type", trainingType)
       .maybeSingle();
@@ -1352,13 +1352,18 @@ export const completeClientSpecificTraining = createServerFn({ method: "POST" })
       `${snapClient?.first_name ?? ""} ${snapClient?.last_name ?? ""}`.trim() || null;
     const sections =
       (training.content as { sections?: Array<{ title?: string }> } | null)?.sections ?? [];
+    const reviewQs = ((training as { review_questions?: Array<{ prompt?: string }> | null }).review_questions ?? []);
+    const topics =
+      trainingType === "person_centered"
+        ? reviewQs.map((q) => String(q?.prompt ?? "")).filter(Boolean)
+        : sections.map((s) => String(s?.title ?? "")).filter(Boolean);
     const contentSnapshot = {
       client_name: clientName,
       client_id: training.client_id,
       training_type: trainingType,
       title: training.title,
       version: training.version,
-      section_titles: sections.map((s) => String(s?.title ?? "")).filter(Boolean),
+      section_titles: topics,
       content: training.content,
       captured_at: new Date().toISOString(),
     };

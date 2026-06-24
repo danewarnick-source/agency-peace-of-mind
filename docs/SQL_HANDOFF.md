@@ -268,3 +268,26 @@ Note form both gain a new "Medication observation" card. If the client has
 active medications, the staff member must answer Yes/No, log any unlogged
 scheduled passes (Yes path), or enter a reason (No path), then sign and
 attest before submitting. Without active medications, the card stays hidden.
+
+---
+
+## Rename existing Person-Centered Profile section title → "Person-Centered Thinking"
+
+New rows already use the new label; existing rows have stale `content.sections[].title = 'Person-Centered Profile'` and stale body wording. Run once:
+
+```sql
+UPDATE client_specific_trainings
+SET content = jsonb_set(
+  jsonb_set(
+    content,
+    '{sections,0,title}',
+    '"Person-Centered Thinking"'::jsonb,
+    false
+  ),
+  '{sections,0,items,0,value}',
+  '"Complete this Person-Centered Thinking profile WITH the person (and/or those who know them best). Answer each question in their own words wherever possible."'::jsonb,
+  false
+)
+WHERE training_type = 'person_centered'
+  AND content #>> '{sections,0,title}' = 'Person-Centered Profile';
+```

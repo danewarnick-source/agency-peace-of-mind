@@ -1131,7 +1131,7 @@ async function ensureClientTrainingRequirementId(
       category: "client_specific_training",
       applies_to: "staff",
       verified: true,
-      review_status: "approved",
+      review_status: "confirmed",
       approval_state: "provider_confirmed",
       metadata: { managed: "system" },
     })

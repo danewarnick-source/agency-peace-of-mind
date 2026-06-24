@@ -150,6 +150,41 @@ function ClientDetail({
 
       <ClientCapBars clientId={c.id} codes={codes} />
 
+      {trainings.filter((t) => t.setupStatus === "published").length > 0 && (
+        <div className="space-y-1.5 rounded-lg border border-border bg-muted/30 p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Trainings
+          </p>
+          {trainings
+            .filter((t) => t.setupStatus === "published")
+            .map((t) =>
+              t.completionStatus === "completed" ? (
+                <div
+                  key={t.type}
+                  className="flex items-center gap-2 text-xs text-emerald-700"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span className="font-medium">{t.label}</span>
+                  <span className="text-muted-foreground">· Completed</span>
+                </div>
+              ) : (
+                <Link
+                  key={t.type}
+                  to="/dashboard/client-training/$clientId"
+                  params={{ clientId: c.id }}
+                  search={{ trainingType: t.type }}
+                  className="flex items-center gap-2 rounded-md border border-amber-300/60 bg-amber-500/5 px-2 py-1.5 text-xs font-semibold text-amber-800 transition hover:border-amber-400"
+                >
+                  <GraduationCap className="h-3.5 w-3.5" />
+                  <span>Review required · {t.label}</span>
+                  <ChevronRight className="ml-auto h-3 w-3 opacity-60" />
+                </Link>
+              ),
+            )}
+        </div>
+      )}
+
+
       <div>
         <Button
           asChild

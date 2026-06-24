@@ -48,6 +48,7 @@ import {
   updateStaffPii,
   createHrDocumentUploadUrl,
   getHrDocumentUrl,
+  upsertChecklistCompletion,
 } from "@/lib/hr-staff.functions";
 import {
   attachBaselineCertificate,

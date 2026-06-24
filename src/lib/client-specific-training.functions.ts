@@ -1132,7 +1132,7 @@ async function ensureClientTrainingRequirementId(
       applies_to: "staff",
       verified: true,
       review_status: "approved",
-      approval_state: "approved",
+      approval_state: "provider_confirmed",
       metadata: { managed: "system" },
     })
     .select("id")

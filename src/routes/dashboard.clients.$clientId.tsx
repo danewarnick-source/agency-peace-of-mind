@@ -881,7 +881,17 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
     <>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Support strategies</CardTitle>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setBodyOpen((v) => !v)}
+              aria-label={bodyOpen ? "Collapse" : "Expand"}
+              className="rounded p-1 hover:bg-muted"
+            >
+              {bodyOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </button>
+            <CardTitle className="text-base">Support strategies</CardTitle>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <SSStatusBadge status={training.status} version={training.version} />
             {!editing ? (

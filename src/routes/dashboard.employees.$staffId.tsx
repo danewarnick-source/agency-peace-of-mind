@@ -327,7 +327,7 @@ function StaffProfilePage() {
 
         {/* ----- CERTS & TRAININGS ----- */}
         <TabsContent value="requirements" className="mt-4">
-          <CertsTab organizationId={orgId} staffId={staffId} caseload={caseloadQ.data ?? []} orgRole={org?.role} />
+          <CertsTab organizationId={orgId} staffId={staffId} staffName={name} caseload={caseloadQ.data ?? []} orgRole={org?.role} />
         </TabsContent>
 
         {/* ----- ACTIVITY ----- */}

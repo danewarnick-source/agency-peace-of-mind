@@ -27,6 +27,7 @@ export type TrainingCertificateRecord = {
   content_snapshot?: {
     client_name?: string | null;
     section_titles?: string[];
+    training_type?: string;
     captured_at?: string;
   } | null;
 };

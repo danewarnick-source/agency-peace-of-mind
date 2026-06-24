@@ -58,10 +58,12 @@ function ClientDetail({
   c,
   activeShift,
   assignments,
+  trainings,
 }: {
   c: CaseloadClient;
   activeShift: ActiveShift | null;
   assignments: AssignmentMap | undefined;
+  trainings: ClientTraining[];
 }) {
   const allCodes = (Array.isArray(c.job_code) ? c.job_code : []).filter(Boolean);
   const codes = allowedCodesFor(assignments, c.id, allCodes);

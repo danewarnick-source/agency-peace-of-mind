@@ -1559,6 +1559,9 @@ function CertsTab({
           );
         })}
       </div>
+          </CertSection>
+        );
+      })()}
 
       {/* Other rows by category */}
       {Array.from(otherByCategory.entries())

@@ -9,7 +9,7 @@ export const Route = createFileRoute("/dashboard/my-client-trainings")({
   component: MyClientTrainings,
 });
 
-type TrainingType = "person_specific" | "support_strategies";
+type TrainingType = "person_specific" | "support_strategies" | "person_centered";
 
 type TrainingItem = {
   type: TrainingType;

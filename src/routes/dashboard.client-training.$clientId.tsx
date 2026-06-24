@@ -207,7 +207,7 @@ function ClientTrainingViewer() {
           <p className="text-[11px] font-semibold uppercase tracking-wider text-accent">
             {typeLabel} · v{training.version}
           </p>
-          <h1 className="mt-0.5 text-base font-semibold leading-snug tracking-tight">{training.title}</h1>
+          <h1 className="mt-0.5 text-base font-semibold leading-snug tracking-tight">{trainingType === "person_centered" ? typeLabel : training.title}</h1>
         </div>
         {alreadyCurrent && (
           <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-700">
@@ -269,11 +269,10 @@ function ClientTrainingViewer() {
               return (
                 <div key={q.id} className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
                   <div className="flex items-start gap-2">
-                    <span className="text-xs font-mono text-accent shrink-0 mt-0.5">{q.tab}</span>
                     <p className="text-sm font-medium">{q.prompt}</p>
                   </div>
                   <Textarea
-                    placeholder="Your answer..."
+                    placeholder={trainingType === "person_centered" ? "Individual's answer..." : "Your answer..."}
                     value={ans?.answer ?? ""}
                     rows={3}
                     onChange={(e) => patchAnswer(idx, { answer: e.target.value, relevant: null, hint: "" })}

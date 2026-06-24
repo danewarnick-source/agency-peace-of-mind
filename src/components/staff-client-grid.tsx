@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useCaseload, type CaseloadClient } from "@/hooks/use-caseload";
 import { useActiveShift, type ActiveShift } from "@/hooks/use-active-shift";
 import { useNectarPayPeriod } from "@/hooks/use-nectar-pay-period";
@@ -7,11 +9,20 @@ import { useMyAssignments, allowedCodesFor, type AssignmentMap } from "@/hooks/u
 import { useTodayShifts, type TodayShiftRow } from "@/hooks/use-today-shifts";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { User, Search, Clock, Home, Info, ChevronDown, CalendarCheck2 } from "lucide-react";
+import { User, Search, Clock, Home, Info, ChevronDown, CalendarCheck2, CheckCircle2, GraduationCap, ChevronRight } from "lucide-react";
 import { ClientQuickInfoSheet } from "@/components/staff-mobile/client-quick-info-sheet";
 import { ClientCapBars } from "@/components/staff-mobile/client-cap-bars";
+import { getMyClientTrainingStatuses } from "@/lib/client-specific-training.functions";
 import { billingUnitLabel, isClockableServiceCode, isDailyServiceCode } from "@/lib/service-billing";
 import { isEvvLockedCode } from "@/lib/evv-codes";
+
+type ClientTraining = {
+  type: "person_specific" | "support_strategies";
+  label: string;
+  setupStatus: "not_setup" | "draft" | "published";
+  completionStatus: "not_started" | "completed";
+  completedAt?: string | null;
+};
 
 function fmtElapsed(ms: number) {
   if (ms < 0) ms = 0;
@@ -47,10 +58,12 @@ function ClientDetail({
   c,
   activeShift,
   assignments,
+  trainings,
 }: {
   c: CaseloadClient;
   activeShift: ActiveShift | null;
   assignments: AssignmentMap | undefined;
+  trainings: ClientTraining[];
 }) {
   const allCodes = (Array.isArray(c.job_code) ? c.job_code : []).filter(Boolean);
   const codes = allowedCodesFor(assignments, c.id, allCodes);
@@ -137,6 +150,41 @@ function ClientDetail({
 
       <ClientCapBars clientId={c.id} codes={codes} />
 
+      {trainings.filter((t) => t.setupStatus === "published").length > 0 && (
+        <div className="space-y-1.5 rounded-lg border border-border bg-muted/30 p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Trainings
+          </p>
+          {trainings
+            .filter((t) => t.setupStatus === "published")
+            .map((t) =>
+              t.completionStatus === "completed" ? (
+                <div
+                  key={t.type}
+                  className="flex items-center gap-2 text-xs text-emerald-700"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span className="font-medium">{t.label}</span>
+                  <span className="text-muted-foreground">· Completed</span>
+                </div>
+              ) : (
+                <Link
+                  key={t.type}
+                  to="/dashboard/client-training/$clientId"
+                  params={{ clientId: c.id }}
+                  search={{ trainingType: t.type }}
+                  className="flex items-center gap-2 rounded-md border border-amber-300/60 bg-amber-500/5 px-2 py-1.5 text-xs font-semibold text-amber-800 transition hover:border-amber-400"
+                >
+                  <GraduationCap className="h-3.5 w-3.5" />
+                  <span>Review required · {t.label}</span>
+                  <ChevronRight className="ml-auto h-3 w-3 opacity-60" />
+                </Link>
+              ),
+            )}
+        </div>
+      )}
+
+
       <div>
         <Button
           asChild
@@ -183,6 +231,7 @@ function ClientRow({
   todayShift,
   isOpen,
   onToggle,
+  trainings,
 }: {
   c: CaseloadClient;
   activeShift: ActiveShift | null;
@@ -191,9 +240,14 @@ function ClientRow({
   todayShift: TodayShiftRow | null;
   isOpen: boolean;
   onToggle: () => void;
+  trainings: ClientTraining[];
 }) {
   const isOnTheClock = !!activeShift && activeShift.client_id === c.id;
   useTick(isOnTheClock);
+
+  const hasTrainingDue = trainings.some(
+    (t) => t.setupStatus === "published" && t.completionStatus === "not_started",
+  );
 
   const fullName = `${c.first_name} ${c.last_name}`.trim();
   const address = c.physical_address?.trim() || "No primary house on file";
@@ -247,6 +301,12 @@ function ClientRow({
                 No shift today
               </span>
             )}
+            {hasTrainingDue && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                <GraduationCap className="h-3 w-3" />
+                Training due
+              </span>
+            )}
           </div>
           <p className="mt-0.5 truncate text-xs text-muted-foreground">{address}</p>
         </div>
@@ -275,7 +335,7 @@ function ClientRow({
 
       {isOpen && (
         <div className="border-t border-border bg-background/60">
-          <ClientDetail c={c} activeShift={activeShift} assignments={assignments} />
+          <ClientDetail c={c} activeShift={activeShift} assignments={assignments} trainings={trainings} />
         </div>
       )}
     </article>
@@ -288,6 +348,19 @@ export function StaffClientGrid() {
   const { data: nectar } = useNectarPayPeriod();
   const { data: assignments } = useMyAssignments();
   const { data: todayShifts = [] } = useTodayShifts();
+  const fetchCT = useServerFn(getMyClientTrainingStatuses);
+  const { data: ct } = useQuery({
+    queryKey: ["my-client-training-statuses"],
+    queryFn: () => fetchCT(),
+    staleTime: 60_000,
+  });
+  const trainingsByClient = useMemo(() => {
+    const m = new Map<string, ClientTraining[]>();
+    for (const it of (ct?.items ?? []) as Array<{ clientId: string; trainings: ClientTraining[] }>) {
+      m.set(it.clientId, it.trainings ?? []);
+    }
+    return m;
+  }, [ct]);
   const [q, setQ] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -379,6 +452,7 @@ export function StaffClientGrid() {
                 todayShift={todayByClient.get(c.id) ?? null}
                 isOpen={openId === c.id}
                 onToggle={() => setOpenId((id) => (id === c.id ? null : c.id))}
+                trainings={trainingsByClient.get(c.id) ?? []}
               />
             </li>
           ))}

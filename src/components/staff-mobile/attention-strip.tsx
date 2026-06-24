@@ -6,6 +6,7 @@ import { getMyCeStatus } from "@/lib/ce.functions";
 import { listMyForms, getMyFormNotifications } from "@/lib/forms.functions";
 import { getMyOtherAssignmentsSummary } from "@/lib/other-assignments.functions";
 import { listSmartImportReminders } from "@/lib/smart-import-reminders.functions";
+import { getMyClientTrainingStatuses } from "@/lib/client-specific-training.functions";
 import {
   periodKeyFor, dueDateFor, isOverdue,
   type Frequency, type Schedule,
@@ -34,12 +35,14 @@ export function AttentionStrip() {
   const fetchBell = useServerFn(getMyFormNotifications);
   const fetchOther = useServerFn(getMyOtherAssignmentsSummary);
   const fetchSI = useServerFn(listSmartImportReminders);
+  const fetchCT = useServerFn(getMyClientTrainingStatuses);
 
   const { data: ce } = useQuery({ queryKey: ["ce-status"], queryFn: () => fetchCe(), staleTime: 60_000 });
   const { data: formsData } = useQuery({ queryKey: ["my-forms"], queryFn: () => fetchForms(), staleTime: 60_000 });
   const { data: bell } = useQuery({ queryKey: ["my-form-notifs"], queryFn: () => fetchBell(), staleTime: 60_000 });
   const { data: other } = useQuery({ queryKey: ["my-other-assignments-summary"], queryFn: () => fetchOther() });
   const { data: si } = useQuery({ queryKey: ["my-smart-import-reminders"], queryFn: () => fetchSI({ data: { scope: "mine" } }), staleTime: 60_000 });
+  const { data: ct } = useQuery({ queryKey: ["my-client-training-statuses"], queryFn: () => fetchCT(), staleTime: 60_000 });
 
 
   const chips: Chip[] = [];
@@ -122,6 +125,30 @@ export function AttentionStrip() {
       label: `${siCount} cert reminder${siCount === 1 ? "" : "s"}`,
     });
   }
+
+  // Client-specific training & support strategies — published trainings the staff hasn't completed yet.
+  {
+    let clientsWithDue = 0;
+    let totalDue = 0;
+    for (const it of (ct?.items ?? [])) {
+      const due = (it.trainings ?? []).filter(
+        (t: { setupStatus: string; completionStatus: string }) =>
+          t.setupStatus === "published" && t.completionStatus === "not_started",
+      ).length;
+      if (due > 0) { clientsWithDue++; totalDue += due; }
+    }
+    if (clientsWithDue > 0) {
+      chips.push({
+        key: "client-training-due",
+        to: "/dashboard",
+        icon: GraduationCap,
+        tone: "warn",
+        label: `${totalDue} training${totalDue === 1 ? "" : "s"} due`,
+      });
+    }
+  }
+
+
 
 
   // If nothing needs attention, render the NECTAR card on its own (slim).

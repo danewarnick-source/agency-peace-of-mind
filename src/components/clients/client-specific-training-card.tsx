@@ -417,6 +417,15 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
         <div className="italic">"{training.attestation_statement}"</div>
       </div>
       {pcspDialog}
+      <PublishConfirmDialog
+        open={showPublishDialog}
+        onOpenChange={setShowPublishDialog}
+        clientId={clientId}
+        orgId={orgId}
+        kindLabel="training"
+        isPublishing={publishMut.isPending}
+        publishAsync={() => publishMut.mutateAsync(training.id)}
+      />
     </div>
   );
 }

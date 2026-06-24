@@ -985,6 +985,7 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
   const createFn = useServerFn(createPersonCenteredProfile);
   const publishFn = useServerFn(publishClientSpecificTraining);
   const [showPublish, setShowPublish] = useState(false);
+  const [bodyOpen, setBodyOpen] = useState(false);
 
   const q = useQuery({
     queryKey: ["person-centered-profile", clientId],

@@ -1634,6 +1634,7 @@ function CertsTab({
               key={client.id}
               client={client}
               organizationId={organizationId}
+              staffId={staffId}
             />
           ))}
         </div>

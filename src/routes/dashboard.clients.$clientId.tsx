@@ -193,6 +193,7 @@ function ClientProfileHub() {
           <CollapsibleSimpleCard title="Client-specific training">
             <ClientSpecificTrainingCard clientId={clientId} />
           </CollapsibleSimpleCard>
+          <PersonCenteredProfilePanel clientId={clientId} orgId={orgId} />
           <CaseloadEditor clientId={clientId} />
         </TabsContent>
 

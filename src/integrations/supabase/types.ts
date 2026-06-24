@@ -2507,6 +2507,7 @@ export type Database = {
           goals: Json
           id: string
           organization_id: string
+          review_questions: Json
           status: string
           title: string
           training_type: string
@@ -2523,6 +2524,7 @@ export type Database = {
           goals?: Json
           id?: string
           organization_id: string
+          review_questions?: Json
           status?: string
           title?: string
           training_type?: string
@@ -2539,6 +2541,7 @@ export type Database = {
           goals?: Json
           id?: string
           organization_id?: string
+          review_questions?: Json
           status?: string
           title?: string
           training_type?: string
@@ -12851,6 +12854,7 @@ export type Database = {
           id: string
           ip_address: string | null
           is_current: boolean
+          question_answers: Json
           ref_id: string
           signer_email: string | null
           signer_full_name: string | null
@@ -12873,6 +12877,7 @@ export type Database = {
           id?: string
           ip_address?: string | null
           is_current?: boolean
+          question_answers?: Json
           ref_id: string
           signer_email?: string | null
           signer_full_name?: string | null
@@ -12895,6 +12900,7 @@ export type Database = {
           id?: string
           ip_address?: string | null
           is_current?: boolean
+          question_answers?: Json
           ref_id?: string
           signer_email?: string | null
           signer_full_name?: string | null

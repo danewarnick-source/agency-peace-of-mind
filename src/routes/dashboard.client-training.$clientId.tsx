@@ -184,7 +184,7 @@ function ClientTrainingViewer() {
     );
   }
 
-  const alreadyCurrent = completion?.is_current && pinned;
+  const alreadyCurrent = (completion?.is_current && pinned) || justCompleted;
   const goals = (training as { goals?: CSTGoal[] | null }).goals ?? null;
 
   const allAnswered = questions.length === 0 || answers.every((a) => wordCount(a.answer) >= MIN_WORDS);

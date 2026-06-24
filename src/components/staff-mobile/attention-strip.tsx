@@ -6,6 +6,7 @@ import { getMyCeStatus } from "@/lib/ce.functions";
 import { listMyForms, getMyFormNotifications } from "@/lib/forms.functions";
 import { getMyOtherAssignmentsSummary } from "@/lib/other-assignments.functions";
 import { listSmartImportReminders } from "@/lib/smart-import-reminders.functions";
+import { getMyClientTrainingStatuses } from "@/lib/client-specific-training.functions";
 import {
   periodKeyFor, dueDateFor, isOverdue,
   type Frequency, type Schedule,

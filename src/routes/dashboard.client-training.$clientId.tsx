@@ -127,9 +127,25 @@ function ClientTrainingViewer() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const typeLabel = trainingType === "support_strategies" ? "Support Strategies" : "Client-Specific Training";
-  const otherType = trainingType === "support_strategies" ? "person_specific" : "support_strategies";
-  const otherLabel = otherType === "support_strategies" ? "Support Strategies" : "Client-Specific Training";
+  const typeLabel =
+    trainingType === "support_strategies"
+      ? "Support Strategies"
+      : trainingType === "person_centered"
+        ? "Person-Centered Profile"
+        : "Client-Specific Training";
+  // Cycle person_specific → support_strategies → person_centered → person_specific.
+  const otherType =
+    trainingType === "person_specific"
+      ? "support_strategies"
+      : trainingType === "support_strategies"
+        ? "person_centered"
+        : "person_specific";
+  const otherLabel =
+    otherType === "support_strategies"
+      ? "Support Strategies"
+      : otherType === "person_centered"
+        ? "Person-Centered Profile"
+        : "Client-Specific Training";
 
   if (isLoading) {
     return (

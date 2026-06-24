@@ -126,6 +126,30 @@ export function AttentionStrip() {
     });
   }
 
+  // Client-specific training & support strategies — published trainings the staff hasn't completed yet.
+  {
+    let clientsWithDue = 0;
+    let totalDue = 0;
+    for (const it of (ct?.items ?? [])) {
+      const due = (it.trainings ?? []).filter(
+        (t: { setupStatus: string; completionStatus: string }) =>
+          t.setupStatus === "published" && t.completionStatus === "not_started",
+      ).length;
+      if (due > 0) { clientsWithDue++; totalDue += due; }
+    }
+    if (clientsWithDue > 0) {
+      chips.push({
+        key: "client-training-due",
+        to: "/dashboard",
+        icon: GraduationCap,
+        tone: "warn",
+        label: `${totalDue} training${totalDue === 1 ? "" : "s"} due`,
+      });
+    }
+  }
+
+
+
 
   // If nothing needs attention, render the NECTAR card on its own (slim).
   return (

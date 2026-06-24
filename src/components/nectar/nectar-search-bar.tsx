@@ -203,7 +203,7 @@ export function NectarSearchBar({
               : "h-11 w-full rounded-md border border-white/20 bg-white/[0.08] pl-8 pr-9 text-sm text-white placeholder:text-white/60 focus:bg-white/15 focus:outline-none focus:ring-2 focus:ring-[#f4a93a]/40"
           }
         />
-        <Search className={`pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 ${isDesktop ? "text-muted-foreground" : "text-white/60"}`} />
+        <Search className={`pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 ${isDesktop ? "text-white/55" : "text-white/60"}`} />
       </div>
 
       {open && (query.trim().length >= 1 || results.length > 0) && (

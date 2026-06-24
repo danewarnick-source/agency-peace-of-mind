@@ -13,6 +13,7 @@ import {
   Pencil,
   Eye,
   ChevronDown,
+  ChevronRight,
   FileSignature,
   Download,
   X,
@@ -980,6 +981,39 @@ function HrSensitiveCard({
  * Certs & Trainings tab — summary stats, filter chips, audit panel,
  * flat cert list, and client-specific training section.
  * ====================================================================*/
+function CertSection({
+  title, count, total, hasAction, actionCount, defaultOpen, children,
+}: {
+  title: string; count?: number; total?: number;
+  hasAction: boolean; actionCount?: number;
+  defaultOpen: boolean; children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between border-b border-border pb-1 pt-2 text-left"
+      >
+        <span className="flex items-center gap-2">
+          {open ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{title}</span>
+          {hasAction && actionCount ? (
+            <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">{actionCount} need{actionCount === 1 ? "s" : ""} action</span>
+          ) : null}
+        </span>
+        {typeof count === "number" ? (
+          <span className="text-[11px] text-muted-foreground">
+            {typeof total === "number" ? `${count} of ${total}` : `${count}${title === "Client-specific training" ? " clients" : ""}`}
+          </span>
+        ) : null}
+      </button>
+      {open && <div className="space-y-2 pt-2">{children}</div>}
+    </div>
+  );
+}
+
 function CertsTab({
   organizationId,
   staffId,
@@ -1321,13 +1355,19 @@ function CertsTab({
       )}
 
       {/* Required trainings section */}
+      {(() => {
+        const reqActionCount = baselineRows.filter((r) => r && ["overdue", "expiring", "todo"].includes(rowStatusKind(r))).length;
+        const reqCurrent = baselineRows.filter((r) => r && rowStatusKind(r) === "current").length;
+        return (
+          <CertSection
+            title="Required trainings (SOW §1.8)"
+            count={reqCurrent}
+            total={REQUIRED_BASELINE_KEYS.length}
+            hasAction={reqActionCount > 0}
+            actionCount={reqActionCount}
+            defaultOpen={reqActionCount > 0}
+          >
       <div>
-        <div className="flex items-center justify-between border-b border-border pb-1 pt-2">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Required trainings (SOW §1.8)</span>
-          <span className="text-[11px] text-muted-foreground">
-            {baselineRows.filter((r) => r && rowStatusKind(r) === "current").length} of {REQUIRED_BASELINE_KEYS.length}
-          </span>
-        </div>
 
         {REQUIRED_BASELINE_KEYS.map((key, i) => {
           const row = baselineRows[i];
@@ -1552,6 +1592,9 @@ function CertsTab({
           );
         })}
       </div>
+          </CertSection>
+        );
+      })()}
 
       {/* Other rows by category */}
       {Array.from(otherByCategory.entries())
@@ -1560,12 +1603,17 @@ function CertsTab({
         const visibleItems = items.filter(passesFilter);
         if (visibleItems.length === 0) return null;
         const completedCount = items.filter((r) => rowStatusKind(r) === "current").length;
+        const catActionCount = items.filter((r) => ["overdue", "expiring", "todo"].includes(rowStatusKind(r))).length;
         return (
-          <div key={cat}>
-            <div className="flex items-center justify-between border-b border-border pb-1 pt-2">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{cat}</span>
-              <span className="text-[11px] text-muted-foreground">{completedCount} of {items.length}</span>
-            </div>
+          <CertSection
+            key={cat}
+            title={cat}
+            count={completedCount}
+            total={items.length}
+            hasAction={catActionCount > 0}
+            actionCount={catActionCount}
+            defaultOpen={catActionCount > 0}
+          >
             {visibleItems.map((row) => {
               const kind = rowStatusKind(row);
               const bKey = parseBaselineId(row.requirement_id);
@@ -1632,16 +1680,18 @@ function CertsTab({
                 </div>
               );
             })}
-          </div>
+          </CertSection>
         );
       })}
 
       {/* Client-specific training */}
       {caseload.length > 0 && (
-        <div className="mt-6 space-y-2">
-          <div className="border-b border-border pb-1">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Client-specific training</span>
-          </div>
+        <CertSection
+          title="Client-specific training"
+          count={caseload.length}
+          hasAction={false}
+          defaultOpen={false}
+        >
           {caseload.map((client) => (
             <ClientTrainingCard
               key={client.id}
@@ -1650,7 +1700,7 @@ function CertsTab({
               staffId={staffId}
             />
           ))}
-        </div>
+        </CertSection>
       )}
     </div>
   );

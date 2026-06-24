@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useCaseload, type CaseloadClient } from "@/hooks/use-caseload";
 import { useActiveShift, type ActiveShift } from "@/hooks/use-active-shift";
 import { useNectarPayPeriod } from "@/hooks/use-nectar-pay-period";
@@ -7,11 +9,20 @@ import { useMyAssignments, allowedCodesFor, type AssignmentMap } from "@/hooks/u
 import { useTodayShifts, type TodayShiftRow } from "@/hooks/use-today-shifts";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { User, Search, Clock, Home, Info, ChevronDown, CalendarCheck2 } from "lucide-react";
+import { User, Search, Clock, Home, Info, ChevronDown, CalendarCheck2, CheckCircle2, GraduationCap, ChevronRight } from "lucide-react";
 import { ClientQuickInfoSheet } from "@/components/staff-mobile/client-quick-info-sheet";
 import { ClientCapBars } from "@/components/staff-mobile/client-cap-bars";
+import { getMyClientTrainingStatuses } from "@/lib/client-specific-training.functions";
 import { billingUnitLabel, isClockableServiceCode, isDailyServiceCode } from "@/lib/service-billing";
 import { isEvvLockedCode } from "@/lib/evv-codes";
+
+type ClientTraining = {
+  type: "person_specific" | "support_strategies";
+  label: string;
+  setupStatus: "not_setup" | "draft" | "published";
+  completionStatus: "not_started" | "completed";
+  completedAt?: string | null;
+};
 
 function fmtElapsed(ms: number) {
   if (ms < 0) ms = 0;

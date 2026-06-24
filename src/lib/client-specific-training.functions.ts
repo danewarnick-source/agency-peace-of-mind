@@ -1255,7 +1255,7 @@ export const getStaffClientSpecificTraining = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({
     clientId: z.string().uuid(),
-    trainingType: z.enum(["person_specific", "support_strategies"]).optional(),
+    trainingType: z.enum(["person_specific", "support_strategies", "person_centered"]).optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };

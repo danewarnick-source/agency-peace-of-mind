@@ -247,6 +247,28 @@ export function useDeadlines() {
     queryFn: () => computeSowFn({ data: { organizationId: orgId! } }),
   });
 
+  // 10. Support Strategies published approval dates per client (for PCSP renewal reminder).
+  const ssApprovalsQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "ss_approvals", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_specific_trainings")
+        .select("client_id, approved_at")
+        .eq("organization_id", orgId!)
+        .eq("training_type", "support_strategies")
+        .eq("status", "published")
+        .not("approved_at", "is", null)
+        .order("approved_at", { ascending: false });
+      if (error) throw error;
+      const latest = new Map<string, string>();
+      for (const row of (data ?? []) as Array<{ client_id: string; approved_at: string }>) {
+        if (!latest.has(row.client_id)) latest.set(row.client_id, row.approved_at);
+      }
+      return latest;
+    },
+  });
+
   const items = useMemo<DeadlineItem[]>(() => {
     if (!orgId) return [];
     const now = new Date();

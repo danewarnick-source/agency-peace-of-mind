@@ -991,13 +991,14 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
     queryFn: async () => {
       const { data, error } = await supabase
         .from("client_specific_trainings")
-        .select("id, status, version, updated_at, approved_at")
+        .select("id, status, version, updated_at, approved_at, review_questions")
         .eq("client_id", clientId)
         .eq("training_type", "person_centered")
         .maybeSingle();
       if (error) throw error;
-      return data as { id: string; status: string; version: number; updated_at: string | null; approved_at: string | null } | null;
+      return data as { id: string; status: string; version: number; updated_at: string | null; approved_at: string | null; review_questions: Array<{ id: string; tab?: string; prompt: string }> | null } | null;
     },
+
   });
 
   const createMut = useMutation({
@@ -1043,9 +1044,10 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
             {training && training.status !== "published" && (
               <Button size="sm" onClick={() => setShowPublish(true)} disabled={publishMut.isPending}>
                 {publishMut.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
-                Approve & Publish
+                Review & Publish
               </Button>
             )}
+
           </div>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
@@ -1064,7 +1066,7 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
             </p>
           ) : (
             <p>
-              Draft ready. Publish to assign this profile to staff for completion with the person.
+              Review the questions and publish to assign this profile to staff for completion with the person.
             </p>
           )}
         </CardContent>
@@ -1078,8 +1080,10 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
           kindLabel="person-centered profile"
           isPublishing={publishMut.isPending}
           publishAsync={() => publishMut.mutateAsync(training.id)}
+          questions={(training.review_questions ?? []).map((q) => ({ id: q.id, prompt: q.prompt }))}
         />
       )}
+
     </>
   );
 }

@@ -17,7 +17,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CheckCircle2, Shield, Loader2, AlertTriangle, BookOpen, Users } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Shield, Loader2, AlertTriangle, BookOpen, Users, FileSignature } from "lucide-react";
+import { TrainingCertificateDialog, type TrainingCertificateRecord } from "@/components/training/training-certificate-dialog";
 import { toast } from "sonner";
 
 const searchSchema = z.object({
@@ -48,6 +49,8 @@ function ClientTrainingViewer() {
   const [answers, setAnswers] = useState<QAnswer[]>([]);
   const [lastTrainingId, setLastTrainingId] = useState<string | null>(null);
   const [contentRead, setContentRead] = useState(false);
+  const [justCompleted, setJustCompleted] = useState(false);
+  const [certOpen, setCertOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const queryKey = ["staff-client-training", clientId, trainingType];
@@ -121,6 +124,7 @@ function ClientTrainingViewer() {
     },
     onSuccess: () => {
       toast.success("Training completed — record saved.");
+      setJustCompleted(true);
       qc.invalidateQueries({ queryKey });
       setSignature("");
     },
@@ -180,7 +184,7 @@ function ClientTrainingViewer() {
     );
   }
 
-  const alreadyCurrent = completion?.is_current && pinned;
+  const alreadyCurrent = (completion?.is_current && pinned) || justCompleted;
   const goals = (training as { goals?: CSTGoal[] | null }).goals ?? null;
 
   const allAnswered = questions.length === 0 || answers.every((a) => wordCount(a.answer) >= MIN_WORDS);
@@ -217,95 +221,123 @@ function ClientTrainingViewer() {
         )}
       </header>
 
-      <div
-        ref={scrollRef}
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          if (el.scrollTop + el.clientHeight >= el.scrollHeight - 24) setContentRead(true);
-        }}
-        className="flex-1 min-h-0 overflow-y-auto bg-card px-4 py-4 space-y-6"
-      >
-        {trainingType === "person_centered" && (
-          <div className="rounded-md border-2 border-amber-400 bg-amber-50 px-3 py-3 text-sm text-amber-900 flex gap-2 shadow-sm">
-            <Users className="h-5 w-5 shrink-0 mt-0.5" />
-            <span>
-              <strong>Complete this profile WITH the person.</strong> These questions should be answered from the individual's own perspective and in their own words wherever possible — like an interview where you ask and they respond. If the person communicates differently or with support, include the perspectives of those who know them best. This is about understanding who they are and how they want to be supported.
-            </span>
+      {alreadyCurrent ? (
+        <div className="flex-1 min-h-0 overflow-y-auto bg-card px-4 py-10">
+          <div className="mx-auto flex max-w-md flex-col items-center text-center space-y-4">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
+              <CheckCircle2 className="h-10 w-10 text-emerald-600" />
+            </div>
+            <h2 className="text-xl font-semibold tracking-tight">Training completed</h2>
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">{trainingType === "person_centered" ? typeLabel : training.title}</span>
+              {completion?.completed_at ? ` · ${new Date(completion.completed_at).toLocaleDateString()}` : ""}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              This training has been recorded and saved to your completion history.
+            </p>
+            <div className="flex flex-col gap-2 w-full pt-2 sm:flex-row sm:justify-center">
+              {completion && (
+                <Button variant="outline" onClick={() => setCertOpen(true)}>
+                  <FileSignature className="mr-1 h-4 w-4" /> View certificate
+                </Button>
+              )}
+              <Button
+                onClick={() => navigate({ to: "/dashboard" })}
+                className="bg-[image:var(--gradient-brand)] text-primary-foreground"
+              >
+                Back to My Caseload
+              </Button>
+            </div>
           </div>
-        )}
-
-        <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900 flex gap-2">
-          <Shield className="h-4 w-4 shrink-0 mt-0.5" />
-          <span>
-            This content is your agency's published snapshot of this client's documented needs. Review every section carefully -- your typed-name attestation is recorded.
-          </span>
+          <TrainingCertificateDialog
+            open={certOpen}
+            onOpenChange={setCertOpen}
+            record={(completion ?? null) as TrainingCertificateRecord | null}
+          />
         </div>
+      ) : (
+        <>
+          <div
+            ref={scrollRef}
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              if (el.scrollTop + el.clientHeight >= el.scrollHeight - 24) setContentRead(true);
+            }}
+            className="flex-1 min-h-0 overflow-y-auto bg-card px-4 py-4 space-y-6"
+          >
+            {trainingType === "person_centered" && (
+              <div className="rounded-md border-2 border-amber-400 bg-amber-50 px-3 py-3 text-sm text-amber-900 flex gap-2 shadow-sm">
+                <Users className="h-5 w-5 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Complete this profile WITH the person.</strong> These questions should be answered from the individual's own perspective and in their own words wherever possible — like an interview where you ask and they respond. If the person communicates differently or with support, include the perspectives of those who know them best. This is about understanding who they are and how they want to be supported.
+                </span>
+              </div>
+            )}
 
-        <SectionsView
-          content={training.content as CSTContent}
-          editing={false}
-          onChange={() => {}}
-        />
-
-        {trainingType === "person_specific" && goals && goals.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-4 w-4 text-accent" />
-              <h3 className="text-sm font-semibold">PCSP Goals</h3>
-              <Badge variant="outline" className="text-xs">{goals.length}</Badge>
+            <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900 flex gap-2">
+              <Shield className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>
+                This content is your agency's published snapshot of this client's documented needs. Review every section carefully -- your typed-name attestation is recorded.
+              </span>
             </div>
-            <GoalsView goals={goals} />
-          </div>
-        )}
 
-        {questions.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold">Review questions</h3>
-              <span className="text-xs text-muted-foreground">Answer before signing</span>
-            </div>
-            {questions.map((q, idx) => {
-              const ans = answers[idx];
-              return (
-                <div key={q.id} className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
-                  <div className="flex items-start gap-2">
-                    <p className="text-sm font-medium">{q.prompt}</p>
-                  </div>
-                  <Textarea
-                    placeholder={trainingType === "person_centered" ? "Individual's answer..." : "Your answer..."}
-                    value={ans?.answer ?? ""}
-                    rows={3}
-                    onChange={(e) => patchAnswer(idx, { answer: e.target.value, relevant: null, hint: "" })}
-                    className={ans?.relevant === false ? "border-destructive" : ""}
-                    disabled={alreadyCurrent}
-                  />
-                  <p className={`text-[11px] ${wordCount(ans?.answer ?? "") >= MIN_WORDS ? "text-emerald-700" : "text-muted-foreground"}`}>
-                    {wordCount(ans?.answer ?? "")}/{MIN_WORDS} words minimum
-                  </p>
-                  {ans?.checking && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Checking relevance...</p>
-                  )}
-                  {ans?.relevant === false && ans.hint && (
-                    <p className="text-xs text-destructive flex items-center gap-1"><AlertTriangle className="h-3 w-3" />{ans.hint}</p>
-                  )}
-                  {ans?.relevant === true && ans.answer.trim() && (
-                    <p className="text-xs text-emerald-700 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />Looks good.</p>
-                  )}
+            <SectionsView
+              content={training.content as CSTContent}
+              editing={false}
+              onChange={() => {}}
+            />
+
+            {trainingType === "person_specific" && goals && goals.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-accent" />
+                  <h3 className="text-sm font-semibold">PCSP Goals</h3>
+                  <Badge variant="outline" className="text-xs">{goals.length}</Badge>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                <GoalsView goals={goals} />
+              </div>
+            )}
 
-      <footer className="border-t border-border bg-card px-4 py-3 space-y-2">
-        {alreadyCurrent ? (
-          <div className="flex items-center justify-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
-            <CheckCircle2 className="h-4 w-4" /> Completed for the current version on{" "}
-            {completion?.completed_at ? new Date(completion.completed_at).toLocaleDateString() : ""}.
+            {questions.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold">Review questions</h3>
+                  <span className="text-xs text-muted-foreground">Answer before signing</span>
+                </div>
+                {questions.map((q, idx) => {
+                  const ans = answers[idx];
+                  return (
+                    <div key={q.id} className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
+                      <div className="flex items-start gap-2">
+                        <p className="text-sm font-medium">{q.prompt}</p>
+                      </div>
+                      <Textarea
+                        placeholder={trainingType === "person_centered" ? "Individual's answer..." : "Your answer..."}
+                        value={ans?.answer ?? ""}
+                        rows={3}
+                        onChange={(e) => patchAnswer(idx, { answer: e.target.value, relevant: null, hint: "" })}
+                        className={ans?.relevant === false ? "border-destructive" : ""}
+                      />
+                      <p className={`text-[11px] ${wordCount(ans?.answer ?? "") >= MIN_WORDS ? "text-emerald-700" : "text-muted-foreground"}`}>
+                        {wordCount(ans?.answer ?? "")}/{MIN_WORDS} words minimum
+                      </p>
+                      {ans?.checking && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Checking relevance...</p>
+                      )}
+                      {ans?.relevant === false && ans.hint && (
+                        <p className="text-xs text-destructive flex items-center gap-1"><AlertTriangle className="h-3 w-3" />{ans.hint}</p>
+                      )}
+                      {ans?.relevant === true && ans.answer.trim() && (
+                        <p className="text-xs text-emerald-700 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />Looks good.</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        ) : (
-          <>
+
+          <footer className="border-t border-border bg-card px-4 py-3 space-y-2">
             {completion && !pinned && (
               <p className="text-[11px] text-amber-800">
                 You previously completed an earlier version. The training has been updated -- please re-attest.
@@ -346,9 +378,9 @@ function ClientTrainingViewer() {
                 {completeMut.isPending ? "Saving..." : anyChecking ? "Checking..." : "Sign & Complete"}
               </Button>
             </div>
-          </>
-        )}
-      </footer>
+          </footer>
+        </>
+      )}
     </div>
   );
 }

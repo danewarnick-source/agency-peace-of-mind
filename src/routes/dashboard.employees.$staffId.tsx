@@ -1970,7 +1970,7 @@ function ClientTrainingCard({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("client_specific_trainings")
-        .select("id, title, status, approved_at, updated_at")
+        .select("id, title, status, approved_at, updated_at, training_type")
         .eq("organization_id", organizationId)
         .eq("client_id", client.id)
         .order("updated_at", { ascending: false });
@@ -2051,7 +2051,7 @@ function ClientTrainingCard({
                 return (
                   <li key={t.id} className="flex items-center gap-2 py-2 text-xs">
                     <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${isApproved ? "bg-emerald-500" : "bg-amber-500"}`} />
-                    <span className="flex-1">{t.title}</span>
+                    <span className="flex-1">{(t as { training_type?: string }).training_type === "person_centered" ? "Person-Centered Thinking" : t.title}</span>
                     <span className="text-muted-foreground">
                       {isApproved && t.approved_at
                         ? `Approved ${new Date(t.approved_at).toLocaleDateString()}`

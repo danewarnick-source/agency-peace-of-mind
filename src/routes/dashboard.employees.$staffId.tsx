@@ -13,6 +13,7 @@ import {
   Pencil,
   Eye,
   ChevronDown,
+  ChevronRight,
   FileSignature,
   Download,
   X,

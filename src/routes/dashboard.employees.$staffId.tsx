@@ -1647,16 +1647,18 @@ function CertsTab({
                 </div>
               );
             })}
-          </div>
+          </CertSection>
         );
       })}
 
       {/* Client-specific training */}
       {caseload.length > 0 && (
-        <div className="mt-6 space-y-2">
-          <div className="border-b border-border pb-1">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Client-specific training</span>
-          </div>
+        <CertSection
+          title="Client-specific training"
+          count={caseload.length}
+          hasAction={false}
+          defaultOpen={false}
+        >
           {caseload.map((client) => (
             <ClientTrainingCard
               key={client.id}
@@ -1665,7 +1667,7 @@ function CertsTab({
               staffId={staffId}
             />
           ))}
-        </div>
+        </CertSection>
       )}
     </div>
   );

@@ -1342,10 +1342,6 @@ function CertsTab({
               title: "CPR & First Aid",
               meta: "Due within 90 days of hire · Renews every 24 mo · Satisfies SOW 1.8(4) training and 1.8(5)(A)(B) cert — one upload covers both",
             },
-            pct: {
-              title: "Person-Centered Thinking",
-              meta: "Due within 90 days of hire · Renews every 12 mo · Satisfies SOW 1.8(4) training and 1.8(5)(C) cert — one upload covers both",
-            },
             annual_12h: {
               title: "Ongoing Training",
               meta: "12 hours required per year · Admin can log sessions anytime",

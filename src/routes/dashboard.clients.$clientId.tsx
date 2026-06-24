@@ -1066,7 +1066,7 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
             </p>
           ) : (
             <p>
-              Draft ready. Publish to assign this profile to staff for completion with the person.
+              Review the questions and publish to assign this profile to staff for completion with the person.
             </p>
           )}
         </CardContent>
@@ -1080,8 +1080,10 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
           kindLabel="person-centered profile"
           isPublishing={publishMut.isPending}
           publishAsync={() => publishMut.mutateAsync(training.id)}
+          questions={(training.review_questions ?? []).map((q) => ({ id: q.id, prompt: q.prompt }))}
         />
       )}
+
     </>
   );
 }

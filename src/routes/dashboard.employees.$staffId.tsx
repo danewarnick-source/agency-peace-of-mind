@@ -327,7 +327,7 @@ function StaffProfilePage() {
 
         {/* ----- CERTS & TRAININGS ----- */}
         <TabsContent value="requirements" className="mt-4">
-          <CertsTab organizationId={orgId} staffId={staffId} caseload={caseloadQ.data ?? []} orgRole={org?.role} />
+          <CertsTab organizationId={orgId} staffId={staffId} staffName={name} caseload={caseloadQ.data ?? []} orgRole={org?.role} />
         </TabsContent>
 
         {/* ----- ACTIVITY ----- */}
@@ -1017,11 +1017,13 @@ function CertSection({
 function CertsTab({
   organizationId,
   staffId,
+  staffName,
   caseload,
   orgRole,
 }: {
   organizationId: string;
   staffId: string;
+  staffName: string;
   caseload: Array<{ id: string; name: string; is_gh: boolean; codes: string[] }>;
   orgRole: string | undefined;
 }) {
@@ -1698,6 +1700,7 @@ function CertsTab({
               client={client}
               organizationId={organizationId}
               staffId={staffId}
+              staffName={staffName}
             />
           ))}
         </CertSection>
@@ -2006,10 +2009,12 @@ function ClientTrainingCard({
   client,
   organizationId,
   staffId,
+  staffName,
 }: {
   client: { id: string; name: string; codes: string[] };
   organizationId: string;
   staffId: string;
+  staffName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [openCert, setOpenCert] = useState<TrainingCertificateRecord | null>(null);
@@ -2040,7 +2045,8 @@ function ClientTrainingCard({
         )
         .eq("user_id", staffId)
         .eq("topic_kind", "person")
-        .eq("is_current", true);
+        .eq("is_current", true)
+        .order("completed_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
@@ -2133,6 +2139,7 @@ function ClientTrainingCard({
         onOpenChange={(v) => !v && setOpenCert(null)}
         record={openCert}
         staffId={staffId}
+        staffName={staffName}
       />
     </div>
   );

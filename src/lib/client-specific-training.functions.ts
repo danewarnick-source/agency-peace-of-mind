@@ -113,33 +113,71 @@ async function assembleVerbatim(
 ): Promise<CSTContent> {
   const sections: CSTSection[] = [];
 
-  // 1. Identity & support overview (clients core)
+  // Identity & support overview (clients core) — used by the narrative
+  // prepend; not rendered as its own section anymore (name/age is covered by
+  // the narrative, goals/directions get their own dedicated sections below).
   const { data: client } = await supabase
     .from("clients")
     .select("first_name, last_name, date_of_birth, special_directions, pcsp_goals")
     .eq("id", clientId)
     .maybeSingle();
-  if (client) {
-    const items: CSTItem[] = [];
-    const fullName = `${client.first_name ?? ""} ${client.last_name ?? ""}`.trim();
-    items.push({
-      kind: "kv",
-      label: "Identity",
-      pairs: [
-        { label: "Name", value: fullName || "—" },
-        { label: "Date of birth", value: client.date_of_birth ? String(client.date_of_birth) : "—" },
+
+  // a. Goals & desired outcomes ─────────────────────────────────────────────
+  // Prefer richer training-local goals (jsonb on client_specific_trainings)
+  // when present — each goal carries supports/details and is the substantive
+  // centerpiece. Fall back to the flat clients.pcsp_goals string list.
+  try {
+    let richGoals: Array<{ goal?: string; supports?: string; details?: string }> = [];
+    try {
+      const { data: existingTraining } = await supabase
+        .from("client_specific_trainings")
+        .select("goals")
+        .eq("client_id", clientId)
+        .eq("training_type", "person_specific")
+        .maybeSingle();
+      const g = existingTraining?.goals;
+      if (Array.isArray(g)) {
+        richGoals = g as Array<{ goal?: string; supports?: string; details?: string }>;
+      }
+    } catch { /* table/column may differ — fall through */ }
+
+    if (richGoals.length) {
+      const items: CSTItem[] = richGoals
+        .filter((g) => (g?.goal ?? "").toString().trim().length)
+        .map((g) => ({
+          kind: "kv" as const,
+          label: String(g.goal).slice(0, 200),
+          pairs: [
+            { label: "Supports", value: (g.supports ?? "").toString().trim() || "—" },
+            { label: "Detail / measure / timeline", value: (g.details ?? "").toString().trim() || "—" },
+          ],
+        }));
+      if (items.length) sections.push({ id: sid(), title: "Goals & desired outcomes", items });
+    } else if (client && Array.isArray(client.pcsp_goals) && client.pcsp_goals.length) {
+      sections.push({
+        id: sid(),
+        title: "Goals & desired outcomes",
+        items: [{
+          kind: "list",
+          label: "Goals",
+          values: (client.pcsp_goals as unknown[]).map(String).filter((s) => s.trim().length),
+        }],
+      });
+    }
+  } catch { /* ignore */ }
+
+  // b. Support approach & directions ────────────────────────────────────────
+  if (client?.special_directions && String(client.special_directions).trim().length) {
+    sections.push({
+      id: sid(),
+      title: "Support approach & directions",
+      items: [
+        { kind: "text", label: "Special directions", value: String(client.special_directions).trim() },
       ],
     });
-    if (client.special_directions) {
-      items.push({ kind: "text", label: "Special directions", value: String(client.special_directions) });
-    }
-    if (Array.isArray(client.pcsp_goals) && client.pcsp_goals.length) {
-      items.push({ kind: "list", label: "PCSP goals", values: (client.pcsp_goals as unknown[]).map(String) });
-    }
-    if (items.length) sections.push({ id: sid(), title: "Support overview", items });
   }
 
-  // 2. Intake summary (most recent intake form submissions — verbatim answers)
+  // c. Intake & background (most recent intake form submissions — verbatim)
   const intakeHighlights: string[] = [];
   try {
     const { data: subs } = await supabase
@@ -164,11 +202,11 @@ async function assembleVerbatim(
           pairs,
         };
       }).filter((it: CSTItem) => (it.kind === "kv" ? it.pairs.length > 0 : true));
-      if (items.length) sections.push({ id: sid(), title: "Intake summary", items });
+      if (items.length) sections.push({ id: sid(), title: "Intake & background", items });
     }
   } catch { /* table may be absent in some orgs */ }
 
-  // 3. Authorized billing codes
+  // d. Authorized services (factual list)
   try {
     const { data: codes } = await supabase
       .from("client_billing_codes")
@@ -181,7 +219,7 @@ async function assembleVerbatim(
       if (active.length) {
         sections.push({
           id: sid(),
-          title: "Authorized service codes",
+          title: "Authorized services",
           items: [{
             kind: "list",
             label: "Codes",
@@ -192,7 +230,7 @@ async function assembleVerbatim(
     }
   } catch { /* ignore */ }
 
-  // 4. Medications (name/dose/frequency/PRN/choking risk — verbatim only)
+  // e. Medications — SAFETY-CRITICAL — exact structured facts only
   try {
     const { data: meds } = await supabase
       .from("client_medications")
@@ -212,12 +250,12 @@ async function assembleVerbatim(
             { label: "Choking risk flagged", value: m.choking_risk ? "Yes" : "No" },
           ],
         }));
-        sections.push({ id: sid(), title: "Active medications", items });
+        sections.push({ id: sid(), title: "Medications", items });
       }
     }
   } catch { /* ignore */ }
 
-  // 5. Behavior support — status + published behaviors (NO bc_data_entries)
+  // f. Behavior support — SAFETY-CRITICAL — status + published behaviors, exact
   try {
     const { data: bsc } = await supabase
       .from("behavior_support_clients")
@@ -241,11 +279,10 @@ async function assembleVerbatim(
         })),
       });
     }
-    if (items.length) sections.push({ id: sid(), title: "Behavior support — status & published behaviors", items });
+    if (items.length) sections.push({ id: sid(), title: "Behavior support", items });
   } catch { /* ignore */ }
 
-
-  // 6. Rights & safeguards summary (restriction_summary + status only)
+  // g. Rights & safeguards — SAFETY-CRITICAL — HRC status + restriction_summary, exact
   try {
     const { data: hrc } = await supabase
       .from("hrc_reviews")
@@ -258,30 +295,7 @@ async function assembleVerbatim(
       const items: CSTItem[] = [];
       if (hrc.status) items.push({ kind: "text", label: "Status", value: String(hrc.status) });
       if (hrc.restriction_summary) items.push({ kind: "text", label: "Restriction summary", value: String(hrc.restriction_summary) });
-      sections.push({ id: sid(), title: "Rights & safeguards summary", items });
-    }
-  } catch { /* ignore */ }
-
-  // 7. Client documents — filenames + links only (verbatim)
-  try {
-    const { data: docs } = await supabase
-      .from("client_documents")
-      .select("file_name, file_url")
-      .eq("client_id", clientId)
-      .limit(25);
-    if (docs && docs.length) {
-      sections.push({
-        id: sid(),
-        title: "Documents on file",
-        items: [{
-          kind: "link",
-          label: "Files",
-          links: (docs as Array<{ file_name: string; file_url: string | null }>).map((d) => ({
-            label: d.file_name,
-            href: d.file_url ?? null,
-          })),
-        }],
-      });
+      sections.push({ id: sid(), title: "Rights & safeguards", items });
     }
   } catch { /* ignore */ }
 

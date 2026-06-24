@@ -1027,8 +1027,16 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setBodyOpen((v) => !v)}
+              aria-label={bodyOpen ? "Collapse" : "Expand"}
+              className="rounded p-1 hover:bg-muted"
+            >
+              {bodyOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </button>
             <UserCircle2 className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-base">Person-Centered Profile</CardTitle>
+            <CardTitle className="text-base">Person-Centered Thinking</CardTitle>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {training && (
@@ -1051,26 +1059,28 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
 
           </div>
         </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          {q.isLoading ? (
-            <span className="inline-flex items-center gap-2"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…</span>
-          ) : !training ? (
-            <p>
-              A person-centered profile is completed by staff together with the client, capturing
-              who they are and how they want to be supported. Create the profile to publish the
-              10 standard questions for staff to complete.
-            </p>
-          ) : training.status === "published" ? (
-            <p>
-              Published{training.approved_at ? ` on ${new Date(training.approved_at).toLocaleDateString()}` : ""}.
-              Staff can complete the profile from their client training list.
-            </p>
-          ) : (
-            <p>
-              Review the questions and publish to assign this profile to staff for completion with the person.
-            </p>
-          )}
-        </CardContent>
+        {bodyOpen && (
+          <CardContent className="text-sm text-muted-foreground">
+            {q.isLoading ? (
+              <span className="inline-flex items-center gap-2"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…</span>
+            ) : !training ? (
+              <p>
+                A person-centered profile is completed by staff together with the client, capturing
+                who they are and how they want to be supported. Create the profile to publish the
+                10 standard questions for staff to complete.
+              </p>
+            ) : training.status === "published" ? (
+              <p>
+                Published{training.approved_at ? ` on ${new Date(training.approved_at).toLocaleDateString()}` : ""}.
+                Staff can complete the profile from their client training list.
+              </p>
+            ) : (
+              <p>
+                Review the questions and publish to assign this profile to staff for completion with the person.
+              </p>
+            )}
+          </CardContent>
+        )}
       </Card>
       {training && (
         <PublishConfirmDialog

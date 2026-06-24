@@ -1034,7 +1034,7 @@ export const attachSupportStrategyDocument = createServerFn({ method: "POST" })
           client_id: data.clientId,
           training_type: "support_strategies",
           title: "Support Strategies",
-          attestation_statement: "I have reviewed this client's support strategies and will implement them as written.",
+          attestation_statement: "I have personally reviewed the support strategies for this client. I understand the instructions for each goal and will implement them as written while supporting this client.",
           content: linkContent as unknown,
           status: "draft",
           version: 1,

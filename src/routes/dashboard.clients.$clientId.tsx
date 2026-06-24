@@ -963,6 +963,15 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
         </CardContent>
       </Card>
       {pcspDialog}
+      <PublishConfirmDialog
+        open={showPublishDialog}
+        onOpenChange={setShowPublishDialog}
+        clientId={clientId}
+        orgId={orgId}
+        kindLabel="support strategies"
+        isPublishing={publishMut.isPending}
+        publishAsync={() => publishMut.mutateAsync(training.id)}
+      />
     </>
   );
 }

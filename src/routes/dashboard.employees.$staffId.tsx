@@ -2029,10 +2029,9 @@ function ClientTrainingCard({
     },
   });
 
-  const trainingIds = (trainingsQ.data ?? []).map((t) => t.id);
   const completionsQ = useQuery({
-    enabled: open && trainingIds.length > 0,
-    queryKey: ["client-training-completions", staffId, trainingIds.join(",")],
+    enabled: open,
+    queryKey: ["client-training-completions", staffId, client.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("training_completions")
@@ -2041,16 +2040,20 @@ function ClientTrainingCard({
         )
         .eq("user_id", staffId)
         .eq("topic_kind", "person")
-        .eq("is_current", true)
-        .in("ref_id", trainingIds);
+        .eq("is_current", true);
       if (error) throw error;
       return data ?? [];
     },
   });
 
-  const completionByRef = new Map<string, TrainingCertificateRecord>();
-  for (const c of completionsQ.data ?? []) {
-    completionByRef.set(c.ref_id as string, c as unknown as TrainingCertificateRecord);
+  const completions = (completionsQ.data ?? []) as unknown as TrainingCertificateRecord[];
+  function findCompletionFor(t: { id: string; training_type?: string }): TrainingCertificateRecord | undefined {
+    const exact = completions.find((c) => (c as { ref_id?: string }).ref_id === t.id);
+    if (exact) return exact;
+    return completions.find((c) => {
+      const snap = (c as { content_snapshot?: { training_type?: string; client_id?: string } }).content_snapshot;
+      return !!snap && snap.training_type === t.training_type && snap.client_id === client.id;
+    });
   }
 
   const initials = client.name
@@ -2097,7 +2100,7 @@ function ClientTrainingCard({
             <ul className="divide-y divide-border/40">
               {(trainingsQ.data ?? []).map((t) => {
                 const isApproved = t.status === "approved" || t.status === "published";
-                const completion = completionByRef.get(t.id);
+                const completion = findCompletionFor(t);
                 return (
                   <li key={t.id} className="flex items-center gap-2 py-2 text-xs">
                     <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${isApproved ? "bg-emerald-500" : "bg-amber-500"}`} />

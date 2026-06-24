@@ -203,15 +203,23 @@ export function TrainingCertificateDialog({
 
           {/* Review answers */}
           {qa.length > 0 && (
-            <section className="mt-4 space-y-2">
+            <section className="mt-4 space-y-2 print:break-inside-auto">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Review answers
+                {record.content_snapshot?.training_type === "person_centered"
+                  ? "Documented responses (completed with the individual)"
+                  : "Review answers"}
               </span>
-              <ol className="space-y-2 list-decimal pl-5">
+              <ol className="space-y-3">
                 {qa.map((a, i) => (
-                  <li key={i}>
-                    <p className="font-medium">{a.question}</p>
-                    <p className="mt-0.5 whitespace-pre-wrap text-muted-foreground">
+                  <li
+                    key={i}
+                    className="border-t border-border/60 pt-2 first:border-t-0 first:pt-0 print:break-inside-avoid"
+                  >
+                    <p className="text-sm font-semibold text-foreground">
+                      <span className="mr-1 text-muted-foreground">{i + 1}.</span>
+                      {a.question}
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">
                       {a.answer}
                     </p>
                   </li>

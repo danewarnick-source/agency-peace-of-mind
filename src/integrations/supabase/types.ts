@@ -12849,6 +12849,7 @@ export type Database = {
           consent_accepted: boolean
           consent_statement: string | null
           content_hash: string | null
+          content_snapshot: Json | null
           content_version: string | null
           dspd_letter: string | null
           id: string
@@ -12872,6 +12873,7 @@ export type Database = {
           consent_accepted?: boolean
           consent_statement?: string | null
           content_hash?: string | null
+          content_snapshot?: Json | null
           content_version?: string | null
           dspd_letter?: string | null
           id?: string
@@ -12895,6 +12897,7 @@ export type Database = {
           consent_accepted?: boolean
           consent_statement?: string | null
           content_hash?: string | null
+          content_snapshot?: Json | null
           content_version?: string | null
           dspd_letter?: string | null
           id?: string

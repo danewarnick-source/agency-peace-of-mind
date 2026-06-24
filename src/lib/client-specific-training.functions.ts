@@ -1233,6 +1233,27 @@ export const completeClientSpecificTraining = createServerFn({ method: "POST" })
 
     const topicCode = trainingType === "support_strategies" ? "support_strategies_training" : "client_specific_training";
 
+    // Frozen snapshot of exactly what the staff member attested to.
+    const { data: snapClient } = await supabase
+      .from("clients")
+      .select("first_name, last_name")
+      .eq("id", training.client_id)
+      .maybeSingle();
+    const clientName =
+      `${snapClient?.first_name ?? ""} ${snapClient?.last_name ?? ""}`.trim() || null;
+    const sections =
+      (training.content as { sections?: Array<{ title?: string }> } | null)?.sections ?? [];
+    const contentSnapshot = {
+      client_name: clientName,
+      client_id: training.client_id,
+      training_type: trainingType,
+      title: training.title,
+      version: training.version,
+      section_titles: sections.map((s) => String(s?.title ?? "")).filter(Boolean),
+      content: training.content,
+      captured_at: new Date().toISOString(),
+    };
+
     // 1) Signed completion (immutable; trigger marks prior versions not-current).
     const { data: tc, error: tcErr } = await supabase
       .from("training_completions")
@@ -1249,6 +1270,7 @@ export const completeClientSpecificTraining = createServerFn({ method: "POST" })
         consent_accepted: true,
         content_version: String(training.version),
         content_hash: hash,
+        content_snapshot: contentSnapshot,
         question_answers: data.questionAnswers ?? [],
       })
       .select("id")

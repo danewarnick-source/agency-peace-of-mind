@@ -430,7 +430,7 @@ function DashboardLayout() {
                   aria-label={mobileSearchOpen ? "Close NECTAR search" : "Open NECTAR search"}
                   aria-expanded={mobileSearchOpen}
                   onClick={() => setMobileSearchOpen((v) => !v)}
-                  className="grid h-11 w-11 place-items-center rounded-md border border-[#fed7aa] bg-[#fff7ed] text-[#9a3412] hover:bg-[#ffedd5] md:hidden"
+                  className="grid h-11 w-11 place-items-center rounded-md border border-white/15 bg-[#0B1126] text-white hover:bg-[#0d1430] md:hidden"
                 >
                   <Search className="h-4 w-4" />
                 </button>

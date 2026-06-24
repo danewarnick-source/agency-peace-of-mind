@@ -49,6 +49,8 @@ function ClientTrainingViewer() {
   const [answers, setAnswers] = useState<QAnswer[]>([]);
   const [lastTrainingId, setLastTrainingId] = useState<string | null>(null);
   const [contentRead, setContentRead] = useState(false);
+  const [justCompleted, setJustCompleted] = useState(false);
+  const [certOpen, setCertOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const queryKey = ["staff-client-training", clientId, trainingType];

@@ -131,7 +131,7 @@ function ClientTrainingViewer() {
     trainingType === "support_strategies"
       ? "Support Strategies"
       : trainingType === "person_centered"
-        ? "Person-Centered Profile"
+        ? "Person-Centered Thinking"
         : "Client-Specific Training";
   // Cycle person_specific → support_strategies → person_centered → person_specific.
   const otherType =
@@ -144,7 +144,7 @@ function ClientTrainingViewer() {
     otherType === "support_strategies"
       ? "Support Strategies"
       : otherType === "person_centered"
-        ? "Person-Centered Profile"
+        ? "Person-Centered Thinking"
         : "Client-Specific Training";
 
   if (isLoading) {

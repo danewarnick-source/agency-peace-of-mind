@@ -104,8 +104,34 @@ export function TrainingCertificateDialog({
               {friendlyLabel && (
                 <p className="text-xs text-muted-foreground">{friendlyLabel}</p>
               )}
+              {record.content_snapshot?.client_name && (
+                <p className="mt-1 text-sm font-semibold">
+                  <span className="text-muted-foreground font-normal">For: </span>
+                  {record.content_snapshot.client_name}
+                </p>
+              )}
             </div>
           </section>
+
+          {/* Topics covered / material reviewed */}
+          <section className="mt-4 space-y-1">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Topics covered / material reviewed
+            </span>
+            {record.content_snapshot?.section_titles &&
+            record.content_snapshot.section_titles.length > 0 ? (
+              <ul className="list-disc pl-5 space-y-0.5">
+                {record.content_snapshot.section_titles.map((t, i) => (
+                  <li key={i}>{t}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs italic text-muted-foreground">
+                Detailed topic list not captured for this completion (recorded
+                before snapshotting). The content fingerprint below verifies the
+                attested version.
+              </p>
+            )}
 
           {/* Completed */}
           <section className="mt-4 rounded-md border border-border bg-muted/40 px-3 py-2 print:bg-transparent">

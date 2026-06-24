@@ -13,6 +13,7 @@ import {
   Pencil,
   Eye,
   ChevronDown,
+  FileSignature,
   Download,
   X,
   Loader2,
@@ -22,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { TrainingCertificateDialog, type TrainingCertificateRecord } from "@/components/training/training-certificate-dialog";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1632,6 +1634,7 @@ function CertsTab({
               key={client.id}
               client={client}
               organizationId={organizationId}
+              staffId={staffId}
             />
           ))}
         </div>
@@ -1822,11 +1825,14 @@ function AttestationGate({
 function ClientTrainingCard({
   client,
   organizationId,
+  staffId,
 }: {
   client: { id: string; name: string; codes: string[] };
   organizationId: string;
+  staffId: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [openCert, setOpenCert] = useState<TrainingCertificateRecord | null>(null);
 
   const trainingsQ = useQuery({
     enabled: open,
@@ -1842,6 +1848,30 @@ function ClientTrainingCard({
       return data ?? [];
     },
   });
+
+  const trainingIds = (trainingsQ.data ?? []).map((t) => t.id);
+  const completionsQ = useQuery({
+    enabled: open && trainingIds.length > 0,
+    queryKey: ["client-training-completions", staffId, trainingIds.join(",")],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("training_completions")
+        .select(
+          "id, ref_id, topic_title, topic_code, completed_at, attestation_statement, consent_statement, typed_signature, signer_full_name, signer_email, content_version, content_hash, time_zone, ip_address, user_agent, consent_accepted, question_answers",
+        )
+        .eq("user_id", staffId)
+        .eq("topic_kind", "person")
+        .eq("is_current", true)
+        .in("ref_id", trainingIds);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const completionByRef = new Map<string, TrainingCertificateRecord>();
+  for (const c of completionsQ.data ?? []) {
+    completionByRef.set(c.ref_id as string, c as unknown as TrainingCertificateRecord);
+  }
 
   const initials = client.name
     .split(" ")
@@ -1887,6 +1917,7 @@ function ClientTrainingCard({
             <ul className="divide-y divide-border/40">
               {(trainingsQ.data ?? []).map((t) => {
                 const isApproved = t.status === "approved" || t.status === "published";
+                const completion = completionByRef.get(t.id);
                 return (
                   <li key={t.id} className="flex items-center gap-2 py-2 text-xs">
                     <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${isApproved ? "bg-emerald-500" : "bg-amber-500"}`} />
@@ -1896,6 +1927,16 @@ function ClientTrainingCard({
                         ? `Approved ${new Date(t.approved_at).toLocaleDateString()}`
                         : t.status}
                     </span>
+                    {completion && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 px-2 text-[11px]"
+                        onClick={() => setOpenCert(completion)}
+                      >
+                        <FileSignature className="mr-1 h-3 w-3" /> View certificate
+                      </Button>
+                    )}
                   </li>
                 );
               })}
@@ -1903,9 +1944,17 @@ function ClientTrainingCard({
           )}
         </div>
       )}
+
+      <TrainingCertificateDialog
+        open={!!openCert}
+        onOpenChange={(v) => !v && setOpenCert(null)}
+        record={openCert}
+        staffId={staffId}
+      />
     </div>
   );
 }
+
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (

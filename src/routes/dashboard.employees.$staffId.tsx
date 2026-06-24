@@ -1017,11 +1017,13 @@ function CertSection({
 function CertsTab({
   organizationId,
   staffId,
+  staffName,
   caseload,
   orgRole,
 }: {
   organizationId: string;
   staffId: string;
+  staffName: string;
   caseload: Array<{ id: string; name: string; is_gh: boolean; codes: string[] }>;
   orgRole: string | undefined;
 }) {

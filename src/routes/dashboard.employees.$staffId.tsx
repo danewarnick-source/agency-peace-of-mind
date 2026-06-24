@@ -48,6 +48,7 @@ import {
   updateStaffPii,
   createHrDocumentUploadUrl,
   getHrDocumentUrl,
+  upsertChecklistCompletion,
 } from "@/lib/hr-staff.functions";
 import {
   attachBaselineCertificate,
@@ -994,6 +995,7 @@ function CertsTab({
   const revokeBaselineFn = useServerFn(revokeBaselineSignOff);
   const createUpload = useServerFn(createHrDocumentUploadUrl);
   const getDocUrl = useServerFn(getHrDocumentUrl);
+  const upsertChecklistFn = useServerFn(upsertChecklistCompletion);
   const fetchAnnualHours = useServerFn(getStaffAnnualHoursDetail);
   const addHoursFn = useServerFn(addStaffHoursEntry);
   const delHoursFn = useServerFn(deleteStaffHoursEntry);
@@ -1600,6 +1602,18 @@ function CertsTab({
                         getDocUrl={getDocUrl}
                       />
                     )}
+                    {row.applicable !== false && !bKey && (
+                      <DocUploadAction
+                        organizationId={organizationId}
+                        staffId={staffId}
+                        requirementId={row.requirement_id}
+                        currentEvidenceDocId={row.completion.evidence_document_id}
+                        onChanged={invalidate}
+                        createUpload={createUpload}
+                        getDocUrl={getDocUrl}
+                        upsertChecklistFn={upsertChecklistFn}
+                      />
+                    )}
                     {row.applicable !== false && !!row.completion.evidence_document_id && row.completion.nectar_validation_status !== "failed" && (
                       <AttestationGate
                         organizationId={organizationId}
@@ -1765,6 +1779,123 @@ function CertBaselineAction({
         }}
       />
     </label>
+  );
+}
+
+/* ======================================================================
+ * Doc upload action for non-cert checklist rows (Background & Eligibility,
+ * Employment Documents). Uploads the file, links it onto the staff's
+ * checklist completion as the evidence document, then offers "View document".
+ * ====================================================================*/
+function DocUploadAction({
+  organizationId,
+  staffId,
+  requirementId,
+  currentEvidenceDocId,
+  onChanged,
+  createUpload,
+  getDocUrl,
+  upsertChecklistFn,
+}: {
+  organizationId: string;
+  staffId: string;
+  requirementId: string;
+  currentEvidenceDocId: string | null;
+  onChanged: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  createUpload: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getDocUrl: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  upsertChecklistFn: any;
+}) {
+  const [working, setWorking] = useState(false);
+  const hasDoc = !!currentEvidenceDocId;
+
+  const handleUpload = async (file: File) => {
+    try {
+      setWorking(true);
+      const r = await createUpload({
+        data: {
+          organization_id: organizationId,
+          staff_id: staffId,
+          requirement_id: requirementId,
+          document_kind: `checklist_doc:${requirementId}`,
+          file_name: file.name,
+          mime_type: file.type,
+          size_bytes: file.size,
+        },
+      });
+      const up = await fetch(r.upload.signed_url, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (!up.ok) throw new Error(`Upload failed (${up.status})`);
+      await upsertChecklistFn({
+        data: {
+          organization_id: organizationId,
+          staff_id: staffId,
+          requirement_id: requirementId,
+          status: "complete",
+          completed_date: new Date().toISOString().slice(0, 10),
+          evidence_document_id: r.hr_document_id,
+        },
+      });
+      toast.success("Document uploaded");
+      onChanged();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const handleView = async () => {
+    if (!currentEvidenceDocId) return;
+    try {
+      const r = await getDocUrl({
+        data: { organization_id: organizationId, hr_document_id: currentEvidenceDocId },
+      });
+      window.open(r.signed_url, "_blank", "noopener");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1.5">
+      {hasDoc && (
+        <button
+          type="button"
+          onClick={handleView}
+          className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-transparent px-2 py-1 text-[11px] text-emerald-700 hover:bg-emerald-50"
+        >
+          <Eye className="h-3 w-3" /> View document
+        </button>
+      )}
+      <label
+        className={`relative z-0 inline-flex cursor-pointer items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted ${
+          working ? "opacity-50 pointer-events-none" : ""
+        }`}
+        title={hasDoc ? "Replace document" : "Upload document (PDF, image, or document)"}
+      >
+        <Upload className="h-3 w-3" />
+        <span>{hasDoc ? "Replace" : "Upload document"}</span>
+        <input
+          type="file"
+          className="hidden"
+          accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.doc,.docx,.csv,.xls,.xlsx,image/*,application/pdf"
+          disabled={working}
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            await handleUpload(f);
+            e.target.value = "";
+          }}
+        />
+      </label>
+    </div>
   );
 }
 

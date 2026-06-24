@@ -1570,12 +1570,17 @@ function CertsTab({
         const visibleItems = items.filter(passesFilter);
         if (visibleItems.length === 0) return null;
         const completedCount = items.filter((r) => rowStatusKind(r) === "current").length;
+        const catActionCount = items.filter((r) => ["overdue", "expiring", "todo"].includes(rowStatusKind(r))).length;
         return (
-          <div key={cat}>
-            <div className="flex items-center justify-between border-b border-border pb-1 pt-2">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{cat}</span>
-              <span className="text-[11px] text-muted-foreground">{completedCount} of {items.length}</span>
-            </div>
+          <CertSection
+            key={cat}
+            title={cat}
+            count={completedCount}
+            total={items.length}
+            hasAction={catActionCount > 0}
+            actionCount={catActionCount}
+            defaultOpen={catActionCount > 0}
+          >
             {visibleItems.map((row) => {
               const kind = rowStatusKind(row);
               const bKey = parseBaselineId(row.requirement_id);

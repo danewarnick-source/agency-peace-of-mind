@@ -18,7 +18,8 @@ export type DeadlineSource =
   | "staff_cert"
   | "incident"
   | "billing_code"
-  | "sow_perimeter";
+  | "sow_perimeter"
+  | "pcsp_support_strategies";
 
 export type DeadlineItem = {
   key: string;

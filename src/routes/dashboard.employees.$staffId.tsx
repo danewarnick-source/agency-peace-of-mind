@@ -1970,7 +1970,7 @@ function ClientTrainingCard({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("client_specific_trainings")
-        .select("id, title, status, approved_at, updated_at")
+        .select("id, title, status, approved_at, updated_at, training_type")
         .eq("organization_id", organizationId)
         .eq("client_id", client.id)
         .order("updated_at", { ascending: false });

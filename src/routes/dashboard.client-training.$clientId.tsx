@@ -17,7 +17,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CheckCircle2, Shield, Loader2, AlertTriangle, BookOpen, Users } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Shield, Loader2, AlertTriangle, BookOpen, Users, FileSignature } from "lucide-react";
+import { TrainingCertificateDialog, type TrainingCertificateRecord } from "@/components/training/training-certificate-dialog";
 import { toast } from "sonner";
 
 const searchSchema = z.object({

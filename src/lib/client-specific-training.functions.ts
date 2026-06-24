@@ -676,7 +676,7 @@ export const createPersonCenteredProfile = createServerFn({ method: "POST" })
       sections: [
         {
           id: sid(),
-          title: "Person-Centered Profile",
+          title: "Person-Centered Thinking",
           items: [
             {
               kind: "note",
@@ -720,7 +720,7 @@ export const createPersonCenteredProfile = createServerFn({ method: "POST" })
         organization_id: m.organization_id,
         client_id: data.clientId,
         training_type: "person_centered",
-        title: "Person-Centered Profile",
+        title: "Person-Centered Thinking",
         content: content as unknown,
         review_questions: review_questions as unknown,
         attestation_statement,
@@ -1519,7 +1519,7 @@ export const getMyClientTrainingStatuses = createServerFn({ method: "GET" })
               ? "Person-specific"
               : type === "support_strategies"
                 ? "Support strategies"
-                : "Person-Centered Profile";
+                : "Person-Centered Thinking";
           if (!t) return { type, label, setupStatus: "not_setup" as const, completionStatus: "not_started" as const, completedAt: null as string | null };
           if (t.status !== "published") return { type, label, setupStatus: "draft" as const, completionStatus: "not_started" as const, completedAt: null as string | null };
           const completedAt = completionMap[t.id] ?? null;

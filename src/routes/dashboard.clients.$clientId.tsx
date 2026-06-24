@@ -32,7 +32,7 @@ import {
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
-import { SectionsView, ClientSpecificTrainingCard, ReviewQuestionsEditor, GoalsEditor } from "@/components/clients/client-specific-training-card";
+import { SectionsView, ClientSpecificTrainingCard, ReviewQuestionsEditor, GoalsEditor, PublishConfirmDialog } from "@/components/clients/client-specific-training-card";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
 import { clientFeatureVisible } from "@/lib/client-features";
 import {
@@ -658,6 +658,7 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
   const [draftContent, setDraftContent] = useState<CSTContent | null>(null);
   const [editingQuestions, setEditingQuestions] = useState(false);
   const [showPcspPrompt, setShowPcspPrompt] = useState(false);
+  const [showPublishDialog, setShowPublishDialog] = useState(false);
 
   const { data: hasPcsp } = useQuery({
     queryKey: ["client-has-pcsp", clientId],
@@ -831,7 +832,7 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
             </div>
             <div className="flex flex-wrap gap-2">
               {training.status !== "published" && (
-                <Button size="sm" onClick={() => publishMut.mutate(training.id)} disabled={publishMut.isPending}>
+                <Button size="sm" onClick={() => setShowPublishDialog(true)} disabled={publishMut.isPending}>
                   {publishMut.isPending
                     ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                     : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
@@ -849,6 +850,15 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
           </CardContent>
         </Card>
         {pcspDialog}
+        <PublishConfirmDialog
+          open={showPublishDialog}
+          onOpenChange={setShowPublishDialog}
+          clientId={clientId}
+          orgId={orgId}
+          kindLabel="support strategies"
+          isPublishing={publishMut.isPending}
+          publishAsync={() => publishMut.mutateAsync(training.id)}
+        />
       </>
     );
   }
@@ -884,7 +894,7 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
                   Rebuild from goals
                 </Button>
                 {training.status !== "published" && (
-                  <Button size="sm" onClick={() => publishMut.mutate(training.id)} disabled={publishMut.isPending}>
+                  <Button size="sm" onClick={() => setShowPublishDialog(true)} disabled={publishMut.isPending}>
                     {publishMut.isPending
                       ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                       : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
@@ -953,6 +963,15 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
         </CardContent>
       </Card>
       {pcspDialog}
+      <PublishConfirmDialog
+        open={showPublishDialog}
+        onOpenChange={setShowPublishDialog}
+        clientId={clientId}
+        orgId={orgId}
+        kindLabel="support strategies"
+        isPublishing={publishMut.isPending}
+        publishAsync={() => publishMut.mutateAsync(training.id)}
+      />
     </>
   );
 }

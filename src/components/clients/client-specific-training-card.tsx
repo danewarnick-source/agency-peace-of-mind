@@ -23,8 +23,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Sparkles, Loader2, CheckCircle2, RefreshCw, Pencil, Trash2, Plus, ArrowUp, ArrowDown, Shield, BookOpen, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { setClientCaseload } from "@/lib/scheduler/setup.functions";
 
 type Training = {
   id: string;
@@ -85,6 +87,7 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
   const [editingGoals, setEditingGoals] = useState(false);
   const [draftGoals, setDraftGoals] = useState<CSTGoal[] | null>(null);
   const [editingQuestions, setEditingQuestions] = useState(false);
+  const [showPublishDialog, setShowPublishDialog] = useState(false);
 
   const workingContent: CSTContent = useMemo(() => {
     if (editing && draftContent) return draftContent;
@@ -274,7 +277,7 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
                 Rebuild with NECTAR
               </Button>
               {training.status !== "published" && (
-                <Button size="sm" onClick={() => publishMut.mutate(training.id)} disabled={publishMut.isPending}>
+                <Button size="sm" onClick={() => setShowPublishDialog(true)} disabled={publishMut.isPending}>
                   {publishMut.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
                   Approve & Publish
                 </Button>
@@ -414,6 +417,15 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
         <div className="italic">"{training.attestation_statement}"</div>
       </div>
       {pcspDialog}
+      <PublishConfirmDialog
+        open={showPublishDialog}
+        onOpenChange={setShowPublishDialog}
+        clientId={clientId}
+        orgId={orgId}
+        kindLabel="training"
+        isPublishing={publishMut.isPending}
+        publishAsync={() => publishMut.mutateAsync(training.id)}
+      />
     </div>
   );
 }
@@ -799,5 +811,198 @@ export function ReviewQuestionsEditor({
         </Button>
       </div>
     </div>
+  );
+}
+
+// ── Publish confirmation dialog ────────────────────────────────────────────
+// Shown when admin clicks "Approve & Publish" on a draft training. Confirms
+// who currently receives the training (= assigned caseload) and optionally
+// assigns additional staff before publishing. Assignment remains the single
+// source of truth for access.
+export function PublishConfirmDialog({
+  open, onOpenChange, clientId, orgId, kindLabel, isPublishing, publishAsync,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  clientId: string;
+  orgId?: string;
+  kindLabel: string;
+  isPublishing: boolean;
+  publishAsync: () => Promise<unknown>;
+}) {
+  const qc = useQueryClient();
+  const setCaseloadFn = useServerFn(setClientCaseload);
+  const [stagedAdds, setStagedAdds] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+
+  const staffQ = useQuery({
+    enabled: !!orgId && open,
+    queryKey: ["caseload-editor-staff", orgId],
+    queryFn: async (): Promise<{ id: string; name: string }[]> => {
+      const { data: members, error: mErr } = await supabase
+        .from("organization_members")
+        .select("user_id")
+        .eq("organization_id", orgId!)
+        .eq("active", true);
+      if (mErr) throw mErr;
+      const ids = (members ?? [])
+        .map((m) => (m as { user_id: string | null }).user_id)
+        .filter((x): x is string => !!x);
+      if (ids.length === 0) return [];
+      const { data: profs, error: pErr } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, full_name, is_active")
+        .in("id", ids);
+      if (pErr) throw pErr;
+      return ((profs ?? []) as Array<{
+        id: string; first_name: string | null; last_name: string | null;
+        full_name: string | null; is_active: boolean | null;
+      }>)
+        .filter((p) => p.is_active !== false)
+        .map((p) => ({
+          id: p.id,
+          name:
+            (p.full_name?.trim()) ||
+            [p.first_name, p.last_name].filter(Boolean).join(" ").trim() ||
+            "Staff",
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    },
+  });
+
+  const currentQ = useQuery({
+    enabled: !!orgId && !!clientId && open,
+    queryKey: ["caseload-editor-current", orgId, clientId],
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase
+        .from("staff_assignments")
+        .select("staff_id")
+        .eq("organization_id", orgId!)
+        .eq("client_id", clientId);
+      if (error) throw error;
+      return (data ?? []).map((r) => (r as { staff_id: string }).staff_id);
+    },
+  });
+
+  const staff = staffQ.data ?? [];
+  const currentIds = currentQ.data ?? [];
+  const currentSet = new Set(currentIds);
+  const assignedStaff = staff.filter((s) => currentSet.has(s.id));
+  const availableStaff = staff.filter((s) => !currentSet.has(s.id));
+  const totalAfter = currentIds.length + stagedAdds.size;
+  const zeroWarn = totalAfter === 0;
+  const loading = staffQ.isLoading || currentQ.isLoading;
+
+  async function handleConfirm() {
+    if (!orgId) return;
+    setBusy(true);
+    try {
+      const adds = Array.from(stagedAdds);
+      if (adds.length > 0) {
+        await setCaseloadFn({
+          data: {
+            organization_id: orgId,
+            client_id: clientId,
+            staff_ids: [...currentIds, ...adds],
+          },
+        });
+        qc.invalidateQueries({ queryKey: ["caseload-editor-current"] });
+        qc.invalidateQueries({ queryKey: ["caseload"] });
+        qc.invalidateQueries({ queryKey: ["my-assignments"] });
+        qc.invalidateQueries({ queryKey: ["scheduler-data"] });
+      }
+      await publishAsync();
+      const total = currentIds.length + adds.length;
+      toast.success(`Published — ${total} assigned staff will receive it.`);
+      setStagedAdds(new Set());
+      onOpenChange(false);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Publish failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!busy && !isPublishing) onOpenChange(v); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Approve &amp; publish — who will get this?</DialogTitle>
+          <DialogDescription>
+            Staff assigned to this client automatically receive this {kindLabel} when published.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 max-h-[55vh] overflow-y-auto">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+              Currently assigned
+            </p>
+            {loading ? (
+              <p className="text-sm text-muted-foreground"><Loader2 className="inline h-3.5 w-3.5 animate-spin mr-1.5" />Loading…</p>
+            ) : assignedStaff.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">No staff assigned yet.</p>
+            ) : (
+              <ul className="space-y-1">
+                {assignedStaff.map((s) => (
+                  <li key={s.id} className="flex items-center justify-between gap-2 text-sm rounded border border-border/60 bg-muted/30 px-2 py-1">
+                    <span>{s.name}</span>
+                    <span className="text-xs text-muted-foreground">will receive automatically</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+              Add more staff (assigns them to this client)
+            </p>
+            {loading ? null : availableStaff.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">All active staff are already assigned.</p>
+            ) : (
+              <div className="space-y-1 max-h-48 overflow-y-auto rounded border p-2">
+                {availableStaff.map((s) => {
+                  const checked = stagedAdds.has(s.id);
+                  return (
+                    <label key={s.id} className="flex items-center gap-2 text-sm cursor-pointer rounded px-1.5 py-1 hover:bg-muted">
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          setStagedAdds((prev) => {
+                            const next = new Set(prev);
+                            if (v) next.add(s.id); else next.delete(s.id);
+                            return next;
+                          });
+                        }}
+                      />
+                      <span>{s.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {zeroWarn && !loading && (
+            <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
+              No staff are assigned to this client yet. You can publish now — staff will receive this {kindLabel} automatically once you assign them. Publish anyway?
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy || isPublishing}>
+            Cancel
+          </Button>
+          <Button onClick={handleConfirm} disabled={busy || isPublishing || loading || !orgId}>
+            {(busy || isPublishing)
+              ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
+            Approve &amp; publish
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

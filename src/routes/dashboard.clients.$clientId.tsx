@@ -832,7 +832,7 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
             </div>
             <div className="flex flex-wrap gap-2">
               {training.status !== "published" && (
-                <Button size="sm" onClick={() => publishMut.mutate(training.id)} disabled={publishMut.isPending}>
+                <Button size="sm" onClick={() => setShowPublishDialog(true)} disabled={publishMut.isPending}>
                   {publishMut.isPending
                     ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                     : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}

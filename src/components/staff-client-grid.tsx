@@ -231,6 +231,7 @@ function ClientRow({
   todayShift,
   isOpen,
   onToggle,
+  trainings,
 }: {
   c: CaseloadClient;
   activeShift: ActiveShift | null;
@@ -239,9 +240,14 @@ function ClientRow({
   todayShift: TodayShiftRow | null;
   isOpen: boolean;
   onToggle: () => void;
+  trainings: ClientTraining[];
 }) {
   const isOnTheClock = !!activeShift && activeShift.client_id === c.id;
   useTick(isOnTheClock);
+
+  const hasTrainingDue = trainings.some(
+    (t) => t.setupStatus === "published" && t.completionStatus === "not_started",
+  );
 
   const fullName = `${c.first_name} ${c.last_name}`.trim();
   const address = c.physical_address?.trim() || "No primary house on file";

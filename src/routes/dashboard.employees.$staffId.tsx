@@ -1322,13 +1322,19 @@ function CertsTab({
       )}
 
       {/* Required trainings section */}
+      {(() => {
+        const reqActionCount = baselineRows.filter((r) => r && ["overdue", "expiring", "todo"].includes(rowStatusKind(r))).length;
+        const reqCurrent = baselineRows.filter((r) => r && rowStatusKind(r) === "current").length;
+        return (
+          <CertSection
+            title="Required trainings (SOW §1.8)"
+            count={reqCurrent}
+            total={REQUIRED_BASELINE_KEYS.length}
+            hasAction={reqActionCount > 0}
+            actionCount={reqActionCount}
+            defaultOpen={reqActionCount > 0}
+          >
       <div>
-        <div className="flex items-center justify-between border-b border-border pb-1 pt-2">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Required trainings (SOW §1.8)</span>
-          <span className="text-[11px] text-muted-foreground">
-            {baselineRows.filter((r) => r && rowStatusKind(r) === "current").length} of {REQUIRED_BASELINE_KEYS.length}
-          </span>
-        </div>
 
         {REQUIRED_BASELINE_KEYS.map((key, i) => {
           const row = baselineRows[i];

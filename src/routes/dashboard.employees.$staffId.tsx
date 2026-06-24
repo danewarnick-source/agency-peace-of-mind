@@ -206,7 +206,11 @@ function StaffProfilePage() {
 
   const m = memberQ.data!.member;
   const p = memberQ.data!.profile;
-  const name = p?.full_name ?? "—";
+  const name =
+    (p?.full_name && String(p.full_name).trim()) ||
+    (p?.username && String(p.username).trim()) ||
+    (p?.email && String(p.email).trim()) ||
+    "Name not set";
 
   const positions = (() => {
     const list = ((p?.positions as string[] | null) ?? []).filter(Boolean);

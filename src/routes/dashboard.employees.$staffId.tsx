@@ -995,6 +995,7 @@ function CertsTab({
   const revokeBaselineFn = useServerFn(revokeBaselineSignOff);
   const createUpload = useServerFn(createHrDocumentUploadUrl);
   const getDocUrl = useServerFn(getHrDocumentUrl);
+  const upsertChecklistFn = useServerFn(upsertChecklistCompletion);
   const fetchAnnualHours = useServerFn(getStaffAnnualHoursDetail);
   const addHoursFn = useServerFn(addStaffHoursEntry);
   const delHoursFn = useServerFn(deleteStaffHoursEntry);

@@ -915,7 +915,7 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
             )}
           </div>
         </CardHeader>
-        {open && (
+        {bodyOpen && (
         <CardContent className="space-y-4">
           <SectionsView
             content={workingContent}

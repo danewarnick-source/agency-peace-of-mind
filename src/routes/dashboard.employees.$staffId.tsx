@@ -1602,6 +1602,18 @@ function CertsTab({
                         getDocUrl={getDocUrl}
                       />
                     )}
+                    {row.applicable !== false && !bKey && (
+                      <DocUploadAction
+                        organizationId={organizationId}
+                        staffId={staffId}
+                        requirementId={row.requirement_id}
+                        currentEvidenceDocId={row.completion.evidence_document_id}
+                        onChanged={invalidate}
+                        createUpload={createUpload}
+                        getDocUrl={getDocUrl}
+                        upsertChecklistFn={upsertChecklistFn}
+                      />
+                    )}
                     {row.applicable !== false && !!row.completion.evidence_document_id && row.completion.nectar_validation_status !== "failed" && (
                       <AttestationGate
                         organizationId={organizationId}

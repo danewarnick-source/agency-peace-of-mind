@@ -1,96 +1,72 @@
 
-# Simplify Pending-Client Finalization
+## Scope
 
-Preserves §2 (verified working pieces). Fixes guardianship at the data layer, unifies review issues, and makes Finalize Client the single normal-path action.
+Touch only the Funds → "Billing authorizations (1056)" surface:
+- `src/components/clients/billing-codes-detail.tsx` (the per-client card with `CodeRow`)
+- `src/routes/dashboard.billing.$clientId.tsx` (the "Full billing editor" table that edits the same rows)
 
-## 1. Shared guardian normalizer (data layer, not UI)
+No DB migration. No changes to billing math, unit ledger, EVV/daily-log pulls, submissions, or RLS. Column `client_billing_codes.service_end_date` stays nullable; the requirement is enforced in the UI only. No hard deletes.
 
-Add `normalizeGuardianFields(draft)` in `src/lib/import-validation.ts`:
+## 1. Derived status helper (shared, render-time only)
 
-- `isGuardianValueEmpty(v)` = empty/whitespace, OR `isNonAnswer(v)` (from `nectar-quality.ts`), OR matches `/own guardian|self[- ]?guardian|^n\/?a$/i`.
-- If `is_own_guardian === true`, OR `guardian_name` empty-after-normalization with no other real guardian field → set `is_own_guardian = true`; null `guardian_name/phone/relationship/email`.
-- If `is_own_guardian === false` and a real guardian name exists → keep as-is.
-- Only case left producing the `guardian_self_vs_named` issue: `is_own_guardian === true` AND a real, non-self guardian name present — demoted from blocking error to **confirmation** (see §2).
-
-Wire the helper into all three layers so they agree:
-
-- `buildDraftFromExtractedFields` (`smart-import-review.functions.ts:126`) — normalize the assembled draft before returning, so `validateClientDraft` runs against post-normalization values.
-- `applyClientFields` (`smart-import-review.functions.ts:755`) — normalize the merged payload before writing/re-validating.
-- `commitClient` (`smart-import-commit.functions.ts:281-312, 326-340`) — replace inline `normalizeGuardianship` with the shared helper; keep `defaultSelf` semantics by calling it before the existing trigger-safety pass.
-
-In `findClientContradictions` (`import-validation.ts:76`), reclassify `guardian_self_vs_named` from a blocking contradiction to a `category: "confirmation"` item (still emitted; consumer decides severity).
-
-## 2. Unified "Items needing review" model
-
-Extend `getPendingClientSubject` to return a single `reviewItems` array (no schema changes):
+Add a small helper local to `billing-codes-detail.tsx` (and re-used by the full editor via a tiny export, or duplicated — it's ~10 lines):
 
 ```ts
-type ReviewItem = {
-  id: string;
-  category: "required" | "confirmation" | "optional";
-  field?: string;
-  message: string;
-  source: "validation" | "contradiction" | "nectar_question" | "field_confirmation";
-};
+type AuthStatus = "active" | "expired" | "upcoming" | "end-needed";
+
+function getAuthStatus(start?: string | null, end?: string | null): AuthStatus {
+  const today = new Date(); today.setHours(0,0,0,0);
+  if (!end) return "end-needed";
+  const e = new Date(end); if (e < today) return "expired";
+  if (start) { const s = new Date(start); if (s > today) return "upcoming"; }
+  return "active";
+}
 ```
 
-Assemble by merging, after normalization:
+Badge styles:
+- active → green outline
+- expired → red/destructive
+- upcoming → slate/blue
+- end-needed → amber, with inline "Set end date" affordance
 
-1. `validateClientDraft` blocking issues → `required`.
-2. `findClientContradictions` (post-normalization) → `confirmation`, except a real hard contradiction stays `required`.
-3. Open `import_nectar_questions` for the subject (the source behind review.tsx "No clarifying questions" + "needs you to confirm" sections — verify both during implementation; both feed this list).
-4. Validation warnings → `optional`.
+## 2. `billing-codes-detail.tsx` — display changes
 
-`FinalizeClientEditor` renders one panel grouped Required / Needs confirmation / Optional. Drop the prior separate "blocking summary" + "unmapped issues" blocks. Resolving an item (editing a field, answering a question, picking self-guardian) calls `applyClientFields` / `answerNectarQuestion`, re-fetches the subject, and the list updates live.
+In the main render (around line 132), split `budgets` by status:
 
-Add a "Client is their own guardian" confirmation control inside the panel for the `guardian_self_vs_named` item that toggles `is_own_guardian` via `applyClientFields` (nulls guardian fields via the shared normalizer) — single binary choice.
+- `currentBudgets` = active + upcoming + end-needed
+- `previousBudgets` = expired
 
-## 3. Single "Finalize Client" action
+Render `currentBudgets.map(...)` as today. Below the list, render a collapsible (shadcn `Collapsible` or a `<details>`) titled `Previous authorizations (N)`, default collapsed, that maps `previousBudgets` with the same `CodeRow` in a read-only variant (pass `readOnly` prop that hides the Edit button and disables the inline date editor added in §3).
 
-`FinalizeClientEditor`:
+In `CodeRow`:
+- Add a status badge next to the existing badges (computed from `code.service_start_date`/`service_end_date`).
+- Replace the bottom-line `plan window … → …` text to use the real end date when set; when end is null, render `plan window {start ?? "—"} → End date needed` in amber.
+- When status is `end-needed` and not `readOnly`, show a compact inline "Set end date" row: a `<Input type="date">` + Save button that PATCHes only `service_end_date` on `client_billing_codes` (validates `> service_start_date`). Re-uses the existing `qc.invalidateQueries` set. Never auto-fill a value.
+- When `readOnly`, hide Edit/inline-date-set; everything else renders unchanged so previous authorizations remain auditable.
 
-- Primary button text → **Finalize Client**. Same engine as today: `applyClientFields → setSubjectReady → commitSingleSubject`, stopping if still blocking after re-validation.
-- On success, invalidate `pending-client-subjects` + `clients`, close, and `navigate({ to: "/dashboard/clients/$clientId", params: { clientId: newId } })`; fall back to `/dashboard/clients` if id not resolvable.
-- Keep **Save progress** and **Discard** as secondaries. Remove no other paths (Mark ready / Submit for setup / Retry commit are not exposed in the Pending flow already; this change just ensures we never add them back).
-- Idempotency preserved via existing `committed_at` guard in `runJobCommit`.
+## 3. Full billing editor (`dashboard.billing.$clientId.tsx`) — validation
 
-## 4. Pending Clients page
+In the existing rows table (line ~216) and the new-row row (line ~259):
+- Mark the End date input `required`.
+- On blur/change, if `!end` or `end <= start`, toast an error and refuse the `upsert`. Keep the input controlled so the bad value isn't persisted.
+- Add the same status badge next to each row's code (reusing the helper).
+- Optionally segment the table the same way (Current vs Previous authorizations collapsible) — yes, do this for consistency since admins also work here. Same `getAuthStatus` split; previous rows remain editable here (this is the admin's full editor) but render under the collapsed section.
 
-- Default action is **Finalize** → opens the editor.
-- Demote `Open in review` to a small secondary link **Open full import (advanced)** with a tooltip noting it's for billing-code / complex blocks.
-- Replace raw `it.review_status` rendering with `clientPendingStatusLabel(subject)` (new helper in `src/lib/smart-import-status.ts`):
-  - `discarded_at` → "Discarded"
-  - `approved`/committed → "Finalized"
-  - `in_progress`/`ready` with zero blocking → "Ready to finalize"
-  - else → "Needs review"
-- Remove "Possible duplicate" raw badge wording only if it currently leaks ids; keep the badge.
+## 4. NECTAR upload flow (§2 guardrail)
 
-## 5. Done page cleanup (`dashboard.smart-import.$jobId.done.tsx`)
+In `BudgetUploadButton.handleApply`, when `r.end_date` is missing, still write the row (so rates/units land) but do NOT set `service_end_date`. The row then surfaces as `end-needed` (amber) in the card with the inline prompt — matches the "never fabricate" rule.
 
-- Header logic: when `committedCount === 0`, render "{n} imported client{s} still need review before joining your directory." Primary CTA: **Review pending clients** → `/dashboard/clients/pending`. Only show "Records committed" when `committedCount > 0`.
-- Retry commit visible only when no subject has blocking validation items (transient/system error case). Otherwise hide; show the Pending link instead.
-- Keep audit trail + undo.
+## 5. Acceptance / QA
 
-## 6. Status translation helper (UI only)
+- Editor (both card inline-set and full editor) blocks save without an end date, and rejects `end <= start` with a toast.
+- Existing rows with `service_end_date = null` show amber "End date needed" badge + inline "Set end date" prompt; no auto-fill.
+- Status badges render correctly for active / expired / upcoming.
+- Expired rows disappear from the main list and appear under a collapsible "Previous authorizations (N)" section, read-only on the Funds card, editable (but grouped) in the full editor.
+- No deletes anywhere. Unit ledger, rates math, EVV, and submissions untouched.
+- `npx tsgo --noEmit` clean; `npm run build` ok; `src/routeTree.gen.ts` unchanged (no new routes).
 
-`src/lib/smart-import-status.ts` exports `clientPendingStatusLabel`. Used in Pending page, done page, history wording. DB CHECK constraint untouched.
+## Out of scope
 
-## 7. Out of scope (call out as FUTURE)
-
-- Inline billing-code editing in finalize editor.
-- New merge UI.
-- NECTAR free-text "why can't this finalize."
-
-## 8. Files touched
-
-- `src/lib/import-validation.ts` — add `normalizeGuardianFields`, reclassify guardian contradiction.
-- `src/lib/smart-import-review.functions.ts` — call normalizer in `buildDraftFromExtractedFields` + `applyClientFields`; extend `getPendingClientSubject` with `reviewItems`.
-- `src/lib/smart-import-commit.functions.ts` — replace inline `normalizeGuardianship` with shared helper at both call sites.
-- `src/lib/smart-import-status.ts` — new label helper.
-- `src/components/clients/finalize-client-editor.tsx` — unified panel, Finalize Client button, success navigation, guardian self-toggle, question answering.
-- `src/routes/dashboard.clients.pending.tsx` — friendly labels, demoted "Open in review".
-- `src/routes/dashboard.smart-import.$jobId.done.tsx` — header + primary CTA + Retry visibility.
-
-## 9. Acceptance (per §14)
-
-Verified by: self-guardian-with-junk-string finalizes in one click; unified panel with no contradictory "none" message; double-click safety; done page never lies about commits; no `mark ready` / `submit for setup` / `retry commit` in normal path; roster + RBAC + §2 invariants untouched; `tsgo --noEmit` clean; `npm run build` regenerates routes.
+- No DB migration (column stays nullable).
+- No changes to `client_billing_codes` RLS, the UNIQUE `(organization_id, client_id, service_code)` constraint, or any submission/billing pipeline.
+- No edits to host-home or AI-PDF importer flows beyond what §4 specifies inside the Funds card itself.

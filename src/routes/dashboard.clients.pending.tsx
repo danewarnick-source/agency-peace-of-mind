@@ -31,7 +31,7 @@ export const Route = createFileRoute("/dashboard/clients/pending")({
 });
 
 function PendingClientsPage() {
-  const org = useCurrentOrg();
+  const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
   const list = useServerFn(listPendingClientSubjects);
   const discardFn = useServerFn(discardImportSubject);

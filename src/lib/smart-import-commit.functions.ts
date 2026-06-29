@@ -233,8 +233,20 @@ export async function runJobCommit(sbIn: any, userId: string, jobId: string, opt
 
     await applyAssignmentMap(sb, orgId, jobId, userId);
 
-    const stillOpen = (results || []).filter((r) => !r.committed).length;
-    if (stillOpen === 0) {
+    // When committing a single subject in isolation, results only describes
+    // that subject — re-check job-wide pending count before marking the whole
+    // job committed.
+    let jobCommitted = (results || []).filter((r) => !r.committed).length === 0;
+    if (jobCommitted && opts?.subjectId) {
+      const { count: stillOpenJobWide } = await sb
+        .from("import_subjects")
+        .select("id", { count: "exact", head: true })
+        .eq("import_job_id", jobId)
+        .is("committed_at", null)
+        .is("discarded_at", null);
+      jobCommitted = (stillOpenJobWide ?? 0) === 0;
+    }
+    if (jobCommitted) {
       await sb.from("import_jobs").update({
         status: "committed",
         committed_at: new Date().toISOString(),
@@ -242,7 +254,7 @@ export async function runJobCommit(sbIn: any, userId: string, jobId: string, opt
       }).eq("id", jobId);
     }
 
-    return { results, jobCommitted: stillOpen === 0 };
+    return { results, jobCommitted };
 }
 
 

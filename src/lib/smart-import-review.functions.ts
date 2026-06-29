@@ -866,7 +866,9 @@ export const listPendingClientSubjects = createServerFn({ method: "POST" })
       commit_error: string | null; validation_overrides: Record<string, boolean> | null;
       created_at: string;
     }>;
-    if (rows.length === 0) return { items: [] as Array<Record<string, unknown>>, jobs: {} as Record<string, { created_at: string; source: string | null; status: string }> };
+    if (rows.length === 0) {
+      return { items: [], jobs: {} as Record<string, { created_at: string; source: string | null; status: string }> };
+    }
 
     const jobIds = Array.from(new Set(rows.map((r) => r.import_job_id)));
     const { data: jobs } = await sb

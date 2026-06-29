@@ -771,7 +771,7 @@ function AddClientDialog({
           disabled={!canSubmit || pending}
         >
           {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {mode === "intake" ? "Create & Start Intake" : "Create Profile"}
+          {mode === "intake" ? "Create & Start Intake" : "Create draft client"}
         </Button>
       </DialogFooter>
     </DialogContent>

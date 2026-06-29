@@ -1001,12 +1001,13 @@ export const getPendingClientSubject = createServerFn({ method: "POST" })
         source: isContradiction ? "contradiction" : "validation",
       });
     }
-    for (const q of (questions ?? []) as Array<{ id: string; question: string; answer: string | null; field_path: string | null }>) {
+    for (const q of (questions ?? []) as Array<{ id: string; question: string; answer: string | null }>) {
       if (q.answer && q.answer.trim()) continue;
       reviewItems.push({
         id: `q:${q.id}`,
         category: "confirmation",
-        field: q.field_path,
+        field: null,
+
         message: q.question,
         source: "nectar_question",
         questionId: q.id,

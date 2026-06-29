@@ -122,6 +122,7 @@ export function FinalizeClientEditor({
   const [values, setValues] = useState<Record<string, string>>({});
   const [isOwn, setIsOwn] = useState(true);
   const [questionDrafts, setQuestionDrafts] = useState<Record<string, string>>({});
+  const [draftAssignments, setDraftAssignments] = useState<CaseloadDraftValue>(new Map());
 
   useEffect(() => {
     if (!subjectQ.data) return;

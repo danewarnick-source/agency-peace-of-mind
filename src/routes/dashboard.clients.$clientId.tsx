@@ -834,6 +834,11 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
             <p className="text-sm text-muted-foreground">
               Support strategies are required for each PCSP goal (SOW §1.24). NECTAR pulls your goals verbatim; you write the staff instructions.
             </p>
+            {!pcspReady && (
+              <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
+                Upload a PCSP to get started — drafting is disabled until a PCSP is on file (add it from the client's Files tab).
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
               <Button size="sm" onClick={() => pcspReady ? draftMut.mutate("nectar") : setShowPcspPrompt(true)} disabled={draftMut.isPending}>
                 {draftMut.isPending
@@ -896,14 +901,14 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
             </div>
             <div className="flex flex-wrap gap-2">
               {training.status !== "published" && (
-                <Button size="sm" onClick={() => setShowPublishDialog(true)} disabled={publishMut.isPending}>
+                <Button size="sm" onClick={() => pcspReady ? setShowPublishDialog(true) : setShowPcspPrompt(true)} disabled={publishMut.isPending}>
                   {publishMut.isPending
                     ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                     : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
                   Approve & Publish
                 </Button>
               )}
-              <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading || !orgId}>
+              <Button size="sm" variant="outline" onClick={() => pcspReady ? fileInputRef.current?.click() : setShowPcspPrompt(true)} disabled={uploading || !orgId}>
                 {uploading
                   ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                   : <Upload className="mr-1.5 h-3.5 w-3.5" />}
@@ -911,6 +916,9 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
               </Button>
               {fileInput}
             </div>
+            {!pcspReady && (
+              <p className="text-xs text-amber-700">Upload a PCSP to get started — publishing is disabled until a PCSP is on file.</p>
+            )}
           </CardContent>
           )}
         </Card>
@@ -950,6 +958,7 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
             {!editing ? (
               <>
                 <Button variant="outline" size="sm" onClick={() => {
+                  if (!pcspReady) { setShowPcspPrompt(true); return; }
                   setDraftContent(structuredClone(content));
                   setEditing(true);
                 }}>Edit</Button>
@@ -969,7 +978,7 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
                   Rebuild from goals
                 </Button>
                 {training.status !== "published" && (
-                  <Button size="sm" onClick={() => setShowPublishDialog(true)} disabled={publishMut.isPending}>
+                  <Button size="sm" onClick={() => pcspReady ? setShowPublishDialog(true) : setShowPcspPrompt(true)} disabled={publishMut.isPending}>
                     {publishMut.isPending
                       ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                       : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
@@ -992,6 +1001,11 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
         </CardHeader>
         {bodyOpen && (
         <CardContent className="space-y-4">
+          {!pcspReady && (
+            <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
+              Upload a PCSP to get started — editing and publishing are disabled until a PCSP is on file (add it from the client's Files tab).
+            </div>
+          )}
           <SectionsView
             content={workingContent}
             editing={editing}
@@ -1020,6 +1034,22 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
   const publishFn = useServerFn(publishClientSpecificTraining);
   const [showPublish, setShowPublish] = useState(false);
   const [bodyOpen, setBodyOpen] = useState(false);
+  const [showPcspPrompt, setShowPcspPrompt] = useState(false);
+
+  const { data: hasPcsp } = useQuery({
+    queryKey: ["client-has-pcsp", clientId],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("client_documents")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", clientId)
+        .ilike("document_type", "pcsp");
+      if (error) throw error;
+      return (count ?? 0) > 0;
+    },
+    staleTime: 30_000,
+  });
+  const pcspReady = hasPcsp === true;
 
   const q = useQuery({
     queryKey: ["person-centered-profile", clientId],
@@ -1079,13 +1109,13 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
               </Badge>
             )}
             {!training && !q.isLoading && (
-              <Button size="sm" onClick={() => createMut.mutate()} disabled={createMut.isPending}>
+              <Button size="sm" onClick={() => pcspReady ? createMut.mutate() : setShowPcspPrompt(true)} disabled={createMut.isPending}>
                 {createMut.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
                 Create profile
               </Button>
             )}
             {training && training.status !== "published" && (
-              <Button size="sm" onClick={() => setShowPublish(true)} disabled={publishMut.isPending}>
+              <Button size="sm" onClick={() => pcspReady ? setShowPublish(true) : setShowPcspPrompt(true)} disabled={publishMut.isPending}>
                 {publishMut.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
                 Review & Publish
               </Button>
@@ -1094,7 +1124,12 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
           </div>
         </CardHeader>
         {bodyOpen && (
-          <CardContent className="text-sm text-muted-foreground">
+          <CardContent className="text-sm text-muted-foreground space-y-3">
+            {!pcspReady && (
+              <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
+                Upload a PCSP to get started — this profile is part of the PCSP-derived workflow. Creating and publishing are disabled until a PCSP is on file (add it from the client's Files tab).
+              </div>
+            )}
             {q.isLoading ? (
               <span className="inline-flex items-center gap-2"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…</span>
             ) : !training ? (
@@ -1128,7 +1163,19 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
           questions={(training.review_questions ?? []).map((q) => ({ id: q.id, prompt: q.prompt }))}
         />
       )}
-
+      <Dialog open={showPcspPrompt} onOpenChange={setShowPcspPrompt}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Upload the PCSP first</DialogTitle>
+            <DialogDescription>
+              This client has no PCSP on file. The Person-Centered Profile is part of the PCSP-derived workflow, so upload the PCSP before creating or publishing. Add it under the client's Files tab.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPcspPrompt(false)}>Got it</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

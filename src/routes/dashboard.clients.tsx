@@ -641,9 +641,9 @@ function AddClientDialog({
             onClick={() => setMode("profile-only")}
             className="w-full rounded-lg border border-border bg-background p-4 text-left transition hover:border-primary hover:bg-primary/5"
           >
-            <div className="font-semibold">Create profile only (not ready for intake)</div>
+            <div className="font-semibold">Create as draft — finish later</div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Save the client profile now and complete the intake procedure later.
+              Saves an incomplete client profile (intake not started). It will show as <strong>Needs review</strong> in the directory until you finalize it.
             </p>
           </button>
         </div>

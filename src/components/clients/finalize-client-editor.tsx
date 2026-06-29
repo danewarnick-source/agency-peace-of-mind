@@ -224,7 +224,7 @@ export function FinalizeClientEditor({
       const res = await commitOne({ data: { subjectId: subjectId! } });
       return { stage: "committed" as const, results: res.results };
     },
-    onSuccess: (out) => {
+    onSuccess: async (out) => {
       if (out.stage === "blocked") {
         toast.error(`Still ${out.blocking.length} item${out.blocking.length === 1 ? "" : "s"} blocking finalize — see panel.`);
         subjectQ.refetch();

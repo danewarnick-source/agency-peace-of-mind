@@ -201,12 +201,45 @@ export const generateSmartImportReminders = createServerFn({ method: "POST" })
       });
     }
 
-    // Upsert by (organization_id, recurrence_key)
+    // Manual upsert by (organization_id, recurrence_key). The live unique
+    // index is partial (WHERE recurrence_key IS NOT NULL), and PostgREST's
+    // onConflict cannot target partial indexes — it errors with
+    // "no unique or exclusion constraint matching the ON CONFLICT
+    // specification". So we look up existing rows by recurrence_key and
+    // split into updates vs. inserts.
     if (inserts.length === 0) return { generated: 0 };
-    const { error } = await sb
+    const keys = Array.from(new Set(inserts.map((r) => r.recurrence_key)));
+    const { data: existing, error: exErr } = await sb
       .from("notifications")
-      .upsert(inserts, { onConflict: "organization_id,recurrence_key", ignoreDuplicates: false });
-    if (error) throw new Error(error.message);
+      .select("id, organization_id, recurrence_key")
+      .in("recurrence_key", keys);
+    if (exErr) throw new Error(exErr.message);
+    const existingByKey = new Map(
+      (existing ?? []).map((r) => [`${r.organization_id}::${r.recurrence_key}`, r.id as string]),
+    );
+    const toInsert: typeof inserts = [];
+    for (const row of inserts) {
+      const id = existingByKey.get(`${row.organization_id}::${row.recurrence_key}`);
+      if (id) {
+        const { error: updErr } = await sb
+          .from("notifications")
+          .update({
+            title: row.title,
+            body: row.body,
+            link_to: row.link_to,
+            urgency: row.urgency,
+            next_remind_at: row.next_remind_at,
+          })
+          .eq("id", id);
+        if (updErr) throw new Error(updErr.message);
+      } else {
+        toInsert.push(row);
+      }
+    }
+    if (toInsert.length > 0) {
+      const { error } = await sb.from("notifications").insert(toInsert);
+      if (error) throw new Error(error.message);
+    }
 
     return { generated: inserts.length };
   });

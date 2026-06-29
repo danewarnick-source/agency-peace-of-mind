@@ -238,10 +238,35 @@ export function FinalizeClientEditor({
         toast.error(err ? `Commit failed: ${err}` : "Commit returned no new record.");
         return;
       }
+
+      // Write any draft staff assignments AFTER the client row exists.
+      // Failure here doesn't undo the commit — surface a toast and let the
+      // admin retry on the detail-page caseload tab.
+      if (first?.record_id && draftAssignments.size > 0 && org?.organization_id) {
+        try {
+          const assignments = Array.from(draftAssignments.entries()).map(([staff_id, service_codes]) => ({
+            staff_id, service_codes,
+          }));
+          await saveCaseload({
+            data: {
+              organization_id: org.organization_id,
+              client_id: first.record_id,
+              assignments,
+            },
+          });
+        } catch (e) {
+          toast.error(
+            `Client created, but staff assignment failed: ${(e as Error).message}. You can assign on the client's Caseload tab.`,
+          );
+        }
+      }
+
       qc.invalidateQueries({ queryKey: ["clients"] });
       qc.invalidateQueries({ queryKey: ["clients-uncommitted-imports"] });
       qc.invalidateQueries({ queryKey: ["pending-client-subjects"] });
       qc.invalidateQueries({ queryKey: ["smart-import-done"] });
+      qc.invalidateQueries({ queryKey: ["caseload"] });
+      qc.invalidateQueries({ queryKey: ["my-assignments"] });
       onFinalized?.();
       onOpenChange(false);
       if (first?.record_id) {

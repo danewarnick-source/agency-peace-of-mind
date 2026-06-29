@@ -8,7 +8,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { z } from "zod";
 import { applyExtractedFieldsToClient } from "@/lib/client-import-schema";
-import { validateClientDraft, filterBlocking, type ClientDraft } from "@/lib/import-validation";
+import { validateClientDraft, filterBlocking, normalizeGuardianFields, type ClientDraft } from "@/lib/import-validation";
 
 
 const JobId = z.object({ jobId: z.string().uuid() });

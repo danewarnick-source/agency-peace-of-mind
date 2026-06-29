@@ -1000,9 +1000,12 @@ export const getPendingClientSubject = createServerFn({ method: "POST" })
     for (const issue of validation.issues) {
       if (overrides[issue.key]) continue;
       const isContradiction = contradictionKeys.has(issue.key);
+      // Unknown self-guardian status is a required confirmation (binary
+      // choice) — show under "Needs confirmation" even though it blocks.
+      const isConfirmation = isContradiction || issue.key === "guardian.unknown_status";
       let category: ReviewItem["category"];
-      if (issue.severity === "error") category = "required";
-      else if (isContradiction) category = "confirmation";
+      if (issue.severity === "error" && !isConfirmation) category = "required";
+      else if (isConfirmation) category = "confirmation";
       else category = "optional";
       reviewItems.push({
         id: issue.key,
@@ -1012,6 +1015,7 @@ export const getPendingClientSubject = createServerFn({ method: "POST" })
         source: isContradiction ? "contradiction" : "validation",
       });
     }
+
     for (const q of (questions ?? []) as Array<{ id: string; question: string; answer: string | null }>) {
       if (q.answer && q.answer.trim()) continue;
       reviewItems.push({

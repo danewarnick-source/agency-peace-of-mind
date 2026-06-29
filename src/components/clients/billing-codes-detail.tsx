@@ -41,6 +41,8 @@ import {
   type ParsedBudget,
   type ParsedBudgetRow,
 } from "@/lib/billing-budget-parse.functions";
+import { getAuthStatus, AuthStatusBadge } from "@/lib/billing-auth-status";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 type Props = {
   clientId: string;
@@ -128,11 +130,31 @@ export function BillingCodesDetail({ clientId, clientName, medicaidId }: Props) 
             </Button>
           </div>
         ) : (
-          <div className="space-y-3">
-            {budgets.map((b) => (
-              <CodeRow key={b.code.id} clientId={clientId} budget={b} />
-            ))}
-          </div>
+          (() => {
+            const current = budgets.filter(
+              (b) =>
+                getAuthStatus(b.code.service_start_date, b.code.service_end_date) !== "expired",
+            );
+            const previous = budgets.filter(
+              (b) =>
+                getAuthStatus(b.code.service_start_date, b.code.service_end_date) === "expired",
+            );
+            return (
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  {current.length === 0 && (
+                    <div className="rounded-xl border border-dashed border-border bg-background/40 p-4 text-center text-xs text-muted-foreground">
+                      No active authorizations. See Previous authorizations below.
+                    </div>
+                  )}
+                  {current.map((b) => (
+                    <CodeRow key={b.code.id} clientId={clientId} budget={b} />
+                  ))}
+                </div>
+                {previous.length > 0 && <PreviousAuthorizations clientId={clientId} budgets={previous} />}
+              </div>
+            );
+          })()
         )}
       </CardContent>
     </Card>
@@ -424,7 +446,35 @@ function BudgetUploadButton({ clientId }: { clientId: string }) {
 
 type Budget = NonNullable<ReturnType<typeof useClientBudget>["data"]>[number];
 
-function CodeRow({ clientId: _clientId, budget }: { clientId: string; budget: Budget }) {
+function PreviousAuthorizations({ clientId, budgets }: { clientId: string; budgets: Budget[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-xl border border-border bg-muted/20">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+      >
+        <span className="flex items-center gap-2">
+          {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          Previous authorizations ({budgets.length})
+        </span>
+        <span className="text-[10px] font-normal normal-case text-muted-foreground">
+          Retained for Medicaid records — read-only
+        </span>
+      </button>
+      {open && (
+        <div className="space-y-3 border-t border-border p-3">
+          {budgets.map((b) => (
+            <CodeRow key={b.code.id} clientId={clientId} budget={b} readOnly />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CodeRow({ clientId: _clientId, budget, readOnly = false }: { clientId: string; budget: Budget; readOnly?: boolean }) {
   const qc = useQueryClient();
   const { data: org } = useCurrentOrg();
   const code = budget.code as Budget["code"] & {
@@ -433,11 +483,15 @@ function CodeRow({ clientId: _clientId, budget }: { clientId: string; budget: Bu
   };
   const isDaily = isDailyServiceCode(code.service_code);
   const isVariable = isVariableRateCode(code.service_code);
+  const status = getAuthStatus(code.service_start_date, code.service_end_date);
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [annual, setAnnual] = useState<string>(String(code.annual_unit_authorization ?? 0));
   const [rate, setRate] = useState<string>(String(code.rate_per_unit ?? 0));
+  const [endDateDraft, setEndDateDraft] = useState<string>("");
+  const [savingEnd, setSavingEnd] = useState(false);
+
 
   const usedUnits = budget.used_units;
   const annualUnits = code.annual_unit_authorization ?? 0;
@@ -486,6 +540,27 @@ function CodeRow({ clientId: _clientId, budget }: { clientId: string; budget: Bu
     setEditing(false);
   }
 
+  async function handleSaveEndDate() {
+    if (!org?.organization_id) return;
+    if (!endDateDraft) return toast.error("Pick an end date");
+    if (code.service_start_date && new Date(endDateDraft) <= new Date(code.service_start_date)) {
+      return toast.error("End date must be after the start date");
+    }
+    setSavingEnd(true);
+    const { error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .from("client_billing_codes" as any)
+      .update({ service_end_date: endDateDraft })
+      .eq("id", code.id)
+      .eq("organization_id", org.organization_id);
+    setSavingEnd(false);
+    if (error) return toast.error(error.message);
+    toast.success(`${code.service_code} end date set`);
+    qc.invalidateQueries({ queryKey: ["all-client-billing-codes"] });
+    qc.invalidateQueries({ queryKey: ["client-billing-codes"] });
+    qc.invalidateQueries({ queryKey: ["client-budget"] });
+  }
+
   const unitLabel = isDaily ? "days" : "units";
 
   return (
@@ -514,8 +589,9 @@ function CodeRow({ clientId: _clientId, budget }: { clientId: string; budget: Bu
           {!exhausted && isEmpty && (
             <Badge variant="outline" className="text-[10px]">No usage logged yet</Badge>
           )}
+          <AuthStatusBadge status={status} />
         </div>
-        {editing ? (
+        {readOnly ? null : editing ? (
           <div className="flex items-center gap-1">
             <Button size="sm" variant="ghost" onClick={handleCancel} disabled={saving} className="h-7 gap-1 text-xs">
               <X className="h-3.5 w-3.5" /> Cancel
@@ -590,6 +666,25 @@ function CodeRow({ clientId: _clientId, budget }: { clientId: string; budget: Bu
         </p>
       )}
 
+      {status === "end-needed" && !readOnly && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2">
+          <span className="text-[11px] font-medium text-amber-800 dark:text-amber-200">
+            <AlertTriangle className="mr-1 inline h-3 w-3" />
+            This authorization has no end date. Set one to make it valid.
+          </span>
+          <Input
+            type="date"
+            value={endDateDraft}
+            min={code.service_start_date ?? undefined}
+            onChange={(e) => setEndDateDraft(e.target.value)}
+            className="h-7 w-40 text-xs"
+          />
+          <Button size="sm" className="h-7 text-xs" onClick={handleSaveEndDate} disabled={savingEnd || !endDateDraft}>
+            {savingEnd ? "Saving…" : "Set end date"}
+          </Button>
+        </div>
+      )}
+
       {annualUnits > 0 && (
         <div className="mt-3">
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -602,8 +697,13 @@ function CodeRow({ clientId: _clientId, budget }: { clientId: string; budget: Bu
           </div>
           <p className="mt-1 text-[10px] text-muted-foreground">
             {pct.toFixed(0)}% of authorization used
-            {code.service_start_date && code.service_end_date && (
-              <> · plan window {code.service_start_date} → {code.service_end_date}</>
+            {(code.service_start_date || code.service_end_date) && (
+              <>
+                {" "}· plan window {code.service_start_date ?? "—"} →{" "}
+                {code.service_end_date ?? (
+                  <span className="font-semibold text-amber-700 dark:text-amber-300">End date needed</span>
+                )}
+              </>
             )}
           </p>
         </div>

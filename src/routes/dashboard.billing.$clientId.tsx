@@ -19,10 +19,11 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { fmtHours, fmtUnits, unitsToHours, UNITS_PER_HOUR } from "@/lib/billing-units";
 import { isDailyServiceCode } from "@/lib/service-billing";
-import { ArrowLeft, Plus, Trash2, AlertTriangle, CheckCircle2, Clock, CalendarDays, History } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, AlertTriangle, CheckCircle2, Clock, CalendarDays, History, ChevronDown, ChevronRight } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { listRateHistory, type RateHistoryRow } from "@/lib/billing-rates.functions";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { getAuthStatus, AuthStatusBadge } from "@/lib/billing-auth-status";
 
 export const Route = createFileRoute("/dashboard/billing/$clientId")({
   head: () => ({ meta: [{ title: "Client Billing — HIVE" }] }),
@@ -56,6 +57,9 @@ function ClientBillingDetail() {
   });
 
   const codes = (allCodes ?? []).filter((c) => c.client_id === clientId);
+  const currentCodes = codes.filter((c) => getAuthStatus(c.service_start_date, c.service_end_date) !== "expired");
+  const previousCodes = codes.filter((c) => getAuthStatus(c.service_start_date, c.service_end_date) === "expired");
+  const [showPrevious, setShowPrevious] = useState(false);
 
   const [newRow, setNewRow] = useState<Draft>({
     service_code: "",
@@ -67,6 +71,12 @@ function ClientBillingDetail() {
   const upsert = async (row: Draft) => {
     if (!org?.organization_id || !clientId) return;
     if (!row.service_code) return toast.error("Service code required");
+    const start = row.service_start_date || null;
+    const end = row.service_end_date || null;
+    if (!end) return toast.error("End date is required for every authorization");
+    if (start && new Date(end) <= new Date(start)) {
+      return toast.error("End date must be after the start date");
+    }
     const payload = {
       organization_id: org.organization_id,
       client_id: clientId,
@@ -82,8 +92,8 @@ function ClientBillingDetail() {
         row.weekly_cap_units == null || (row.weekly_cap_units as unknown) === ""
           ? null
           : Number(row.weekly_cap_units),
-      service_start_date: row.service_start_date || null,
-      service_end_date: row.service_end_date || null,
+      service_start_date: start,
+      service_end_date: end,
       sce: row.sce || null,
       provider_approver_email: row.provider_approver_email || null,
     };
@@ -182,15 +192,20 @@ function ClientBillingDetail() {
               </tr>
             </thead>
             <tbody>
-              {codes.map((row) => (
+              {currentCodes.map((row) => {
+                const status = getAuthStatus(row.service_start_date, row.service_end_date);
+                return (
                 <tr key={row.id} className="border-t border-border">
                   <td className="p-2 font-mono font-semibold">
-                    {row.service_code}
-                    {isDailyServiceCode(row.service_code) ? (
-                      <span className="ml-1 rounded bg-[#fde9c8] px-1 py-0.5 text-[10px] font-bold text-[#7a4308]">DAILY</span>
-                    ) : (
-                      <span className="ml-1 rounded bg-[#e1efff] px-1 py-0.5 text-[10px] font-bold text-[#11498e]">Q</span>
-                    )}
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span>{row.service_code}</span>
+                      {isDailyServiceCode(row.service_code) ? (
+                        <span className="rounded bg-[#fde9c8] px-1 py-0.5 text-[10px] font-bold text-[#7a4308]">DAILY</span>
+                      ) : (
+                        <span className="rounded bg-[#e1efff] px-1 py-0.5 text-[10px] font-bold text-[#11498e]">Q</span>
+                      )}
+                      <AuthStatusBadge status={status} />
+                    </div>
                   </td>
                   <td className="p-2">
                     <Input type="number" step="0.01" defaultValue={row.rate_per_unit}
@@ -218,9 +233,9 @@ function ClientBillingDetail() {
                       className="h-8 w-36" />
                   </td>
                   <td className="p-2">
-                    <Input type="date" defaultValue={row.service_end_date ?? ""}
+                    <Input type="date" required defaultValue={row.service_end_date ?? ""}
                       onBlur={(e) => upsert({ ...row, service_end_date: e.target.value || null })}
-                      className="h-8 w-36" />
+                      className={`h-8 w-36 ${!row.service_end_date ? "border-amber-500/60 bg-amber-500/5" : ""}`} />
                   </td>
                   <td className="p-2">
                     <Input defaultValue={row.sce ?? ""}
@@ -236,7 +251,8 @@ function ClientBillingDetail() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               <tr className="border-t border-border bg-muted/30">
                 <td className="p-2">
                   <Input placeholder="DSI / HHS / …" value={newRow.service_code}
@@ -258,7 +274,7 @@ function ClientBillingDetail() {
                 <td className="p-2"><Input type="date" className="h-8 w-36"
                   value={newRow.service_start_date ?? ""}
                   onChange={(e) => setNewRow({ ...newRow, service_start_date: e.target.value || null })} /></td>
-                <td className="p-2"><Input type="date" className="h-8 w-36"
+                <td className="p-2"><Input type="date" required className="h-8 w-36"
                   value={newRow.service_end_date ?? ""}
                   onChange={(e) => setNewRow({ ...newRow, service_end_date: e.target.value || null })} /></td>
                 <td className="p-2"><Input className="h-8 w-24"
@@ -277,8 +293,61 @@ function ClientBillingDetail() {
           </table>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Unit type Q = {UNITS_PER_HOUR} units/hr · Period dates define the per-client renewal window used by the calculator.
+          Unit type Q = {UNITS_PER_HOUR} units/hr · End date is required on every authorization. Expired rows move into Previous authorizations below.
         </p>
+
+        {previousCodes.length > 0 && (
+          <div className="mt-4 rounded-xl border border-border bg-muted/20">
+            <button
+              type="button"
+              onClick={() => setShowPrevious((v) => !v)}
+              className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+            >
+              <span className="flex items-center gap-2">
+                {showPrevious ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                Previous authorizations ({previousCodes.length})
+              </span>
+              <span className="text-[10px] font-normal normal-case text-muted-foreground">
+                Retained for Medicaid records
+              </span>
+            </button>
+            {showPrevious && (
+              <div className="overflow-x-auto border-t border-border">
+                <table className="w-full min-w-[720px] text-sm">
+                  <thead className="text-left text-xs uppercase text-muted-foreground">
+                    <tr>
+                      <th className="p-2">Code</th>
+                      <th className="p-2">Rate / unit</th>
+                      <th className="p-2">Annual units</th>
+                      <th className="p-2">Period start</th>
+                      <th className="p-2">Renewal date</th>
+                      <th className="p-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previousCodes.map((row) => (
+                      <tr key={row.id} className="border-t border-border text-muted-foreground">
+                        <td className="p-2 font-mono font-semibold">
+                          {row.service_code}
+                          {isDailyServiceCode(row.service_code) ? (
+                            <span className="ml-1 rounded bg-[#fde9c8] px-1 py-0.5 text-[10px] font-bold text-[#7a4308]">DAILY</span>
+                          ) : (
+                            <span className="ml-1 rounded bg-[#e1efff] px-1 py-0.5 text-[10px] font-bold text-[#11498e]">Q</span>
+                          )}
+                        </td>
+                        <td className="p-2 font-mono">{row.rate_per_unit ?? "—"}</td>
+                        <td className="p-2 font-mono">{row.annual_unit_authorization ?? "—"}</td>
+                        <td className="p-2 font-mono text-xs">{row.service_start_date ?? "—"}</td>
+                        <td className="p-2 font-mono text-xs">{row.service_end_date ?? "—"}</td>
+                        <td className="p-2"><AuthStatusBadge status="expired" /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </section>
     </div>
   );

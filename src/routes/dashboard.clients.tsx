@@ -160,9 +160,9 @@ export function ClientsPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
-  
+  const [rosterTab, setRosterTab] = useState<"active" | "archived">("active");
 
-  const { data: clients = [], isLoading } = useQuery({
+  const { data: allClients = [], isLoading } = useQuery({
     enabled: !!org,
     queryKey: ["clients", org?.organization_id],
     queryFn: async (): Promise<Client[]> => {
@@ -172,13 +172,41 @@ export function ClientsPage() {
         .eq("organization_id", org!.organization_id)
         .order("last_name", { ascending: true });
       if (error) throw error;
-      return ((data ?? []) as any[])
-        .filter((c) => (c.account_status ?? "active") !== "archived")
-        .map((c) => ({
-          ...c,
-          job_code: (c.authorized_dspd_codes?.length ? c.authorized_dspd_codes : c.job_code) ?? [],
-        })) as Client[];
+      return ((data ?? []) as any[]).map((c) => ({
+        ...c,
+        job_code: (c.authorized_dspd_codes?.length ? c.authorized_dspd_codes : c.job_code) ?? [],
+      })) as Client[];
     },
+  });
+
+  const clients = useMemo(
+    () => allClients.filter((c) =>
+      rosterTab === "archived"
+        ? (c.account_status ?? "active") === "archived"
+        : (c.account_status ?? "active") !== "archived",
+    ),
+    [allClients, rosterTab],
+  );
+  const archivedCount = useMemo(
+    () => allClients.filter((c) => (c.account_status ?? "active") === "archived").length,
+    [allClients],
+  );
+
+  const reactivateM = useMutation({
+    mutationFn: async (clientId: string) => {
+      const { error } = await (supabase as any)
+        .from("clients")
+        .update({ account_status: "active" })
+        .eq("id", clientId)
+        .eq("organization_id", org!.organization_id);
+      if (error) throw error;
+      return clientId;
+    },
+    onSuccess: () => {
+      toast.success("Client reactivated.");
+      qc.invalidateQueries({ queryKey: ["clients"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   // Count of pending client subjects (not jobs) across the org — banner

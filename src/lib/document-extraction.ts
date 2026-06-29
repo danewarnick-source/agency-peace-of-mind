@@ -216,6 +216,10 @@ export async function parseDocumentWithAI(
       },
     ],
     response_format: { type: "json_object" },
+    // PCSPs frequently produce large JSON envelopes (goals, meds, billing rows).
+    // The 4096 default truncated responses mid-string and tripped JSON.parse,
+    // surfacing to users as "AI returned malformed JSON". Give real headroom.
+    max_tokens: 16000,
   });
   if (res.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
   if (res.status === 401)
@@ -226,20 +230,73 @@ export async function parseDocumentWithAI(
     const t = await res.text().catch(() => "");
     throw new Error(`AI gateway error ${res.status}: ${t.slice(0, 200)}`);
   }
-  const body = await res.json();
+  const body = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
+  };
   const content: string = body?.choices?.[0]?.message?.content ?? "{}";
+  const finishReason = body?.choices?.[0]?.finish_reason ?? "unknown";
   if (!content || content === "{}") {
     console.error("[document-extraction] Bedrock returned empty content");
   }
+  const clean = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
   let parsed: unknown;
   try {
-    const clean = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
     parsed = JSON.parse(clean || "{}");
   } catch {
-    throw new Error("AI returned malformed JSON. The document may be unreadable.");
+    // Best-effort salvage: response was almost certainly truncated mid-JSON
+    // (finish_reason === "length"). Close any unterminated string and balance
+    // braces/brackets, then re-parse. tolerantParseExtraction drops any
+    // half-written trailing row.
+    const salvaged = tryCloseTruncatedJson(clean);
+    if (salvaged) {
+      try {
+        parsed = JSON.parse(salvaged);
+      } catch {
+        /* fall through */
+      }
+    }
+    if (parsed === undefined) {
+      console.error(
+        `[document-extraction] JSON.parse failed; finish_reason=${finishReason}; contentLength=${content.length}; tail=${JSON.stringify(content.slice(-200))}`,
+      );
+      if (finishReason === "length") {
+        throw new Error(
+          "The document was too long for one extraction pass and the AI response was cut off. Please retry — if it keeps failing, split the PDF.",
+        );
+      }
+      throw new Error("AI returned malformed JSON. The document may be unreadable.");
+    }
   }
   return tolerantParseExtraction(parsed, documentText.trim().length, content);
 }
+
+// Close an unterminated JSON object/array string well enough for JSON.parse to
+// accept the prefix. Returns null if the input doesn't look like JSON.
+function tryCloseTruncatedJson(s: string): string | null {
+  if (!s || (s[0] !== "{" && s[0] !== "[")) return null;
+  let out = s;
+  let inStr = false;
+  let esc = false;
+  const stack: string[] = [];
+  for (let i = 0; i < out.length; i++) {
+    const c = out[i];
+    if (esc) { esc = false; continue; }
+    if (c === "\\") { esc = true; continue; }
+    if (c === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (c === "{" || c === "[") stack.push(c);
+    else if (c === "}" || c === "]") stack.pop();
+  }
+  if (inStr) out += '"';
+  // Trim trailing partial tokens like `, "field_key":` or a dangling comma.
+  out = out.replace(/,\s*"[^"]*"\s*:?\s*$/g, "").replace(/,\s*$/g, "");
+  while (stack.length) {
+    const open = stack.pop();
+    out += open === "{" ? "}" : "]";
+  }
+  return out;
+}
+
 
 // ---------------------------------------------------------------
 // Tolerant per-field parser.

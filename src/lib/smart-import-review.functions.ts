@@ -128,6 +128,7 @@ export const getReviewSubject = createServerFn({ method: "POST" })
 // smart-import-commit.functions.ts; kept inline to avoid cross-file imports.
 function buildDraftFromExtractedFields(
   rows: Array<{ target_field: string; value: string | null }>,
+  displayName?: string | null,
 ): ClientDraft & {
   guardian_phone?: string | null;
   guardian_relationship?: string | null;
@@ -145,6 +146,9 @@ function buildDraftFromExtractedFields(
     switch (r.target_field) {
       case "first_name": d.first_name = v; break;
       case "last_name": d.last_name = v; break;
+      case "full_name":
+      case "name":
+        d.full_name = v; break;
       case "physical_address":
       case "address":
         d.physical_address = v; break;
@@ -181,10 +185,12 @@ function buildDraftFromExtractedFields(
     }
   }
   if (codes.length) d.billing_codes = codes;
+  if (displayName) d.display_name = displayName;
   // Normalize so review-time validation matches commit-time reality.
   normalizeGuardianFields(d);
   return d;
 }
+
 
 
 // Keep ValidationIssue importable from the route file via this re-export.

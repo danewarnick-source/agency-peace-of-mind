@@ -41,6 +41,8 @@ import {
   type ParsedBudget,
   type ParsedBudgetRow,
 } from "@/lib/billing-budget-parse.functions";
+import { getAuthStatus, AuthStatusBadge } from "@/lib/billing-auth-status";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 type Props = {
   clientId: string;

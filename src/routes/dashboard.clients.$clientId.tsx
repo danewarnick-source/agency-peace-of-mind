@@ -276,6 +276,19 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
     queryFn: () => getCST({ data: { clientId } }),
     staleTime: 30_000,
   });
+  const { data: planHasPcsp } = useQuery({
+    queryKey: ["client-has-pcsp", clientId],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("client_documents")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", clientId)
+        .ilike("document_type", "pcsp");
+      if (error) throw error;
+      return (count ?? 0) > 0;
+    },
+    staleTime: 30_000,
+  });
   const extractedGoals = ((cstData?.training as { goals?: CSTGoal[] } | null)?.goals ?? []) as CSTGoal[];
   const goalIsIncomplete = (g: CSTGoal) => !g.supports?.trim() || !g.details?.trim();
   const missingLabel = (g: CSTGoal) => {

@@ -20,6 +20,8 @@ import {
   discardImportSubject,
 } from "@/lib/smart-import-review.functions";
 import { FinalizeClientEditor } from "@/components/clients/finalize-client-editor";
+import { clientPendingStatusLabel } from "@/lib/smart-import-status";
+
 
 export const Route = createFileRoute("/dashboard/clients/pending")({
   head: () => ({ meta: [{ title: "Pending Clients" }] }),

@@ -309,9 +309,10 @@ function UploadDocDialog({
   clientName: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onUploaded: (docId?: string) => void;
+  onUploaded: (docId?: string, sourceKind?: "nectar" | "client") => void;
 }) {
   const ingest = useServerFn(ingestDocument);
+  const attachClient = useServerFn(attachClientDocument);
   const [title, setTitle] = useState("");
   const [docType, setDocType] = useState("pcsp");
   const [fiscalYear, setFiscalYear] = useState("");
@@ -325,6 +326,29 @@ function UploadDocDialog({
   const mut = useMutation({
     mutationFn: async () => {
       if (!orgId || !file) throw new Error("Pick a file first");
+      // PCSP is a single source of truth — write into client_documents +
+      // client-documents bucket so it shows in BOTH Care and Files and is
+      // usable by goal extraction. Everything else stays in nectar_documents.
+      if (docType === "pcsp") {
+        const safe = file.name.replace(/[^\w.\-]+/g, "_");
+        const path = `${orgId}/${clientId}/pcsp/${Date.now()}_${safe}`;
+        const up = await supabase.storage
+          .from("client-documents")
+          .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
+        if (up.error) throw up.error;
+        await attachClient({
+          data: {
+            organizationId: orgId,
+            clientId,
+            documentType: "pcsp",
+            fileName: file.name,
+            storagePath: path,
+            fileUrl: `storage://client-documents/${path}`,
+            fileSizeBytes: file.size,
+          },
+        });
+        return { __pcsp: true } as const;
+      }
       const b64 = await fileToBase64(file);
       return ingest({
         data: {
@@ -343,6 +367,13 @@ function UploadDocDialog({
       });
     },
     onSuccess: (res) => {
+      if ((res as { __pcsp?: boolean })?.__pcsp) {
+        toast.success(`PCSP uploaded — visible in Care and Files`);
+        setTitle(""); setFile(null); setFiscalYear("");
+        onOpenChange(false);
+        onUploaded(undefined, "client");
+        return;
+      }
       const r = res as {
         document?: { id?: string };
         extracted?: unknown[];
@@ -359,7 +390,7 @@ function UploadDocDialog({
       );
       setTitle(""); setFile(null); setFiscalYear("");
       onOpenChange(false);
-      onUploaded(r.document?.id);
+      onUploaded(r.document?.id, "nectar");
     },
     onError: (e: Error) => toast.error(e.message),
   });

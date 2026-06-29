@@ -128,8 +128,16 @@ export const getReviewSubject = createServerFn({ method: "POST" })
 // smart-import-commit.functions.ts; kept inline to avoid cross-file imports.
 function buildDraftFromExtractedFields(
   rows: Array<{ target_field: string; value: string | null }>,
-): ClientDraft {
-  const d: ClientDraft = {};
+): ClientDraft & {
+  guardian_phone?: string | null;
+  guardian_relationship?: string | null;
+  guardian_email?: string | null;
+} {
+  const d: ClientDraft & {
+    guardian_phone?: string | null;
+    guardian_relationship?: string | null;
+    guardian_email?: string | null;
+  } = {};
   const codes: NonNullable<ClientDraft["billing_codes"]> = [];
   for (const r of rows) {
     const v = (r.value ?? "").trim();
@@ -152,6 +160,9 @@ function buildDraftFromExtractedFields(
         catch { d.is_own_guardian = v === "true"; }
         break;
       case "guardian_name": d.guardian_name = v; break;
+      case "guardian_phone": d.guardian_phone = v; break;
+      case "guardian_relationship": d.guardian_relationship = v; break;
+      case "guardian_email": d.guardian_email = v; break;
       case "billing_code_row":
         try {
           const j = JSON.parse(v) as Record<string, unknown>;
@@ -170,8 +181,11 @@ function buildDraftFromExtractedFields(
     }
   }
   if (codes.length) d.billing_codes = codes;
+  // Normalize so review-time validation matches commit-time reality.
+  normalizeGuardianFields(d);
   return d;
 }
+
 
 // Keep ValidationIssue importable from the route file via this re-export.
 export type { ValidationIssue };

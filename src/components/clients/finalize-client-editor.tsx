@@ -110,6 +110,8 @@ export function FinalizeClientEditor({
   const markReady = useServerFn(setSubjectReady);
   const commitOne = useServerFn(commitSingleSubject);
   const answerQ = useServerFn(answerNectarQuestion);
+  const saveCaseload = useServerFn(setClientCaseload);
+  const { data: org } = useCurrentOrg();
 
   const subjectQ = useQuery({
     enabled: open && !!subjectId,

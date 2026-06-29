@@ -19,10 +19,11 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { fmtHours, fmtUnits, unitsToHours, UNITS_PER_HOUR } from "@/lib/billing-units";
 import { isDailyServiceCode } from "@/lib/service-billing";
-import { ArrowLeft, Plus, Trash2, AlertTriangle, CheckCircle2, Clock, CalendarDays, History } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, AlertTriangle, CheckCircle2, Clock, CalendarDays, History, ChevronDown, ChevronRight } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { listRateHistory, type RateHistoryRow } from "@/lib/billing-rates.functions";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { getAuthStatus, AuthStatusBadge } from "@/lib/billing-auth-status";
 
 export const Route = createFileRoute("/dashboard/billing/$clientId")({
   head: () => ({ meta: [{ title: "Client Billing — HIVE" }] }),

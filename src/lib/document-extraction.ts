@@ -336,7 +336,7 @@ function topLevelKeys(parsed: unknown): string[] {
   return Object.keys(parsed as Record<string, unknown>);
 }
 
-function tolerantParseExtraction(
+export function tolerantParseExtraction(
   parsed: unknown,
   documentTextLength: number,
   rawModelContent: string,

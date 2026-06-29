@@ -289,7 +289,7 @@ export function FinalizeClientEditor({
                       tone="warning"
                       items={grouped.confirmation}
                       renderItem={(it) => {
-                        if (it.id === "contradiction.guardian_self_vs_named") {
+                        if (it.id === "contradiction.guardian_self_vs_named" || it.id === "guardian.unknown_status") {
                           return (
                             <div className="space-y-2">
                               <div className="text-xs">{it.message}</div>

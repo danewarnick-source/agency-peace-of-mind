@@ -30,6 +30,9 @@ import {
   ISSUE_KEY_TO_TARGET,
 } from "@/lib/smart-import-review.functions";
 import { commitSingleSubject } from "@/lib/smart-import-commit.functions";
+import { setClientCaseload } from "@/lib/scheduler/setup.functions";
+import { useCurrentOrg } from "@/hooks/use-org";
+import { CaseloadEditor, type CaseloadDraftValue } from "@/components/clients/caseload-editor";
 
 type FieldKey =
   | "first_name" | "last_name" | "date_of_birth" | "physical_address"
@@ -107,6 +110,8 @@ export function FinalizeClientEditor({
   const markReady = useServerFn(setSubjectReady);
   const commitOne = useServerFn(commitSingleSubject);
   const answerQ = useServerFn(answerNectarQuestion);
+  const saveCaseload = useServerFn(setClientCaseload);
+  const { data: org } = useCurrentOrg();
 
   const subjectQ = useQuery({
     enabled: open && !!subjectId,
@@ -117,6 +122,7 @@ export function FinalizeClientEditor({
   const [values, setValues] = useState<Record<string, string>>({});
   const [isOwn, setIsOwn] = useState(true);
   const [questionDrafts, setQuestionDrafts] = useState<Record<string, string>>({});
+  const [draftAssignments, setDraftAssignments] = useState<CaseloadDraftValue>(new Map());
 
   useEffect(() => {
     if (!subjectQ.data) return;
@@ -137,6 +143,19 @@ export function FinalizeClientEditor({
   const reviewItems = (subjectQ.data?.reviewItems ?? []) as ReviewItem[];
   const blocking = subjectQ.data?.blocking ?? [];
   const displayName = subjectQ.data?.subject?.display_name?.trim() || "Unnamed imported client";
+
+  // Best-effort: derive the client's authorized codes from extracted values so
+  // the draft-mode CaseloadEditor can offer per-code scoping pre-commit.
+  // Codes a staff is scoped to must be a subset of this set, validated again
+  // server-side after the client row exists.
+  const draftAuthorizedCodes = useMemo(() => {
+    const v = subjectQ.data?.values ?? {};
+    const raw = (v.authorized_dspd_codes ?? v.job_code ?? "") as string;
+    if (!raw) return [] as string[];
+    return Array.from(new Set(
+      raw.split(/[,\s;]+/).map((s) => s.trim().toUpperCase()).filter(Boolean),
+    ));
+  }, [subjectQ.data]);
 
   const grouped = useMemo(() => {
     const required: ReviewItem[] = [];
@@ -205,7 +224,7 @@ export function FinalizeClientEditor({
       const res = await commitOne({ data: { subjectId: subjectId! } });
       return { stage: "committed" as const, results: res.results };
     },
-    onSuccess: (out) => {
+    onSuccess: async (out) => {
       if (out.stage === "blocked") {
         toast.error(`Still ${out.blocking.length} item${out.blocking.length === 1 ? "" : "s"} blocking finalize — see panel.`);
         subjectQ.refetch();
@@ -219,10 +238,35 @@ export function FinalizeClientEditor({
         toast.error(err ? `Commit failed: ${err}` : "Commit returned no new record.");
         return;
       }
+
+      // Write any draft staff assignments AFTER the client row exists.
+      // Failure here doesn't undo the commit — surface a toast and let the
+      // admin retry on the detail-page caseload tab.
+      if (first?.record_id && draftAssignments.size > 0 && org?.organization_id) {
+        try {
+          const assignments = Array.from(draftAssignments.entries()).map(([staff_id, service_codes]) => ({
+            staff_id, service_codes,
+          }));
+          await saveCaseload({
+            data: {
+              organization_id: org.organization_id,
+              client_id: first.record_id,
+              assignments,
+            },
+          });
+        } catch (e) {
+          toast.error(
+            `Client created, but staff assignment failed: ${(e as Error).message}. You can assign on the client's Caseload tab.`,
+          );
+        }
+      }
+
       qc.invalidateQueries({ queryKey: ["clients"] });
       qc.invalidateQueries({ queryKey: ["clients-uncommitted-imports"] });
       qc.invalidateQueries({ queryKey: ["pending-client-subjects"] });
       qc.invalidateQueries({ queryKey: ["smart-import-done"] });
+      qc.invalidateQueries({ queryKey: ["caseload"] });
+      qc.invalidateQueries({ queryKey: ["my-assignments"] });
       onFinalized?.();
       onOpenChange(false);
       if (first?.record_id) {
@@ -395,6 +439,28 @@ export function FinalizeClientEditor({
                 })}
               </div>
             ))}
+
+            {/* Pre-commit staff assignment — written after the client row is
+                created. Optional; admin can also assign later on the Caseload
+                tab. Scoped per service code: default "All codes" per staff. */}
+            <div className="rounded-lg border border-border p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Assign staff (optional)
+                </div>
+                {draftAssignments.size === 0 && (
+                  <span className="text-[11px] text-muted-foreground">
+                    You can also assign later on the Caseload tab.
+                  </span>
+                )}
+              </div>
+              <CaseloadEditor
+                draftMode
+                authorizedCodes={draftAuthorizedCodes}
+                value={draftAssignments}
+                onChange={setDraftAssignments}
+              />
+            </div>
           </div>
         )}
 

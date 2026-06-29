@@ -9,73 +9,134 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 // Diffs the current staff_assignments rows for this client and applies the
 // minimum set of inserts/deletes. Idempotent.
 // ──────────────────────────────────────────────────────────────────────────────
+// Per the column comment on staff_assignments.service_codes:
+//   • NULL    → all of the client's authorized codes (legacy / default)
+//   • [a, b]  → assignment scoped to exactly those codes
+//   • []      → INVALID; the row must be deleted instead
+//
+// Inputs (back-compat):
+//   • { staff_ids: uuid[] }                     → each staff = "All codes" (NULL)
+//   • { assignments: [{staff_id, service_codes|null}], ... } → per-staff scope
 export const setClientCaseload = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: {
     organization_id: string;
     client_id: string;
-    staff_ids: string[];
+    staff_ids?: string[];
+    assignments?: Array<{ staff_id: string; service_codes: string[] | null }>;
   }) =>
     z.object({
       organization_id: z.string().uuid(),
       client_id: z.string().uuid(),
-      staff_ids: z.array(z.string().uuid()),
+      staff_ids: z.array(z.string().uuid()).optional(),
+      assignments: z.array(z.object({
+        staff_id: z.string().uuid(),
+        service_codes: z.array(z.string()).nullable(),
+      })).optional(),
+    }).refine((v) => Array.isArray(v.staff_ids) || Array.isArray(v.assignments), {
+      message: "Provide either staff_ids or assignments",
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase } = context as any;
+
+    // Authoritative set of codes this client may be scoped to.
+    const { data: clientRow } = await supabase
+      .from("clients")
+      .select("authorized_dspd_codes, job_code")
+      .eq("id", data.client_id)
+      .maybeSingle();
+    const allCodes: string[] = Array.from(new Set([
+      ...(((clientRow as { authorized_dspd_codes?: string[] } | null)?.authorized_dspd_codes) ?? []),
+      ...(((clientRow as { job_code?: string[] } | null)?.job_code) ?? []),
+    ].filter(Boolean)));
+    const allCodesSet = new Set(allCodes);
+
+    // Desired state per staff_id.
+    const desired = new Map<string, string[] | null>();
+    if (data.assignments && !data.staff_ids) {
+      for (const a of data.assignments) {
+        let codes: string[] | null = a.service_codes;
+        if (codes !== null) {
+          codes = Array.from(new Set(codes));
+          const unknown = codes.filter((c) => !allCodesSet.has(c));
+          if (unknown.length > 0) {
+            throw new Error(
+              `Service code${unknown.length === 1 ? "" : "s"} not authorized for this client: ${unknown.join(", ")}`,
+            );
+          }
+          if (codes.length === 0) continue; // drop staff w/ empty scope
+          if (allCodes.length > 0 && codes.length === allCodes.length) codes = null;
+        }
+        desired.set(a.staff_id, codes);
+      }
+    } else if (data.staff_ids) {
+      for (const id of data.staff_ids) desired.set(id, null);
+    }
+
     const { data: existing, error: rErr } = await supabase
       .from("staff_assignments")
-      .select("id, staff_id")
+      .select("id, staff_id, service_codes")
       .eq("organization_id", data.organization_id)
       .eq("client_id", data.client_id);
     if (rErr) throw rErr;
 
-    const have = new Set(
-      ((existing ?? []) as Array<{ staff_id: string }>).map((r) => r.staff_id),
-    );
-    const want = new Set(data.staff_ids);
+    type Existing = { id: string; staff_id: string; service_codes: string[] | null };
+    const existingByStaff = new Map<string, Existing>();
+    for (const r of (existing ?? []) as Existing[]) existingByStaff.set(r.staff_id, r);
 
-    const toAdd = data.staff_ids.filter((id) => !have.has(id));
-    const toRemoveIds = ((existing ?? []) as Array<{ id: string; staff_id: string }>)
-      .filter((r) => !want.has(r.staff_id))
-      .map((r) => r.id);
+    let added = 0, removed = 0, updated = 0;
 
-    if (toAdd.length > 0) {
-      // Pull the client's authorized service codes so new assignments are
-      // immediately clockable for those codes (no manual table edit needed).
-      const { data: clientRow } = await supabase
-        .from("clients")
-        .select("authorized_dspd_codes")
-        .eq("id", data.client_id)
-        .maybeSingle();
-      const codes = Array.isArray((clientRow as { authorized_dspd_codes?: string[] } | null)?.authorized_dspd_codes)
-        ? ((clientRow as { authorized_dspd_codes: string[] }).authorized_dspd_codes)
-        : [];
-
-      const rows = toAdd.map((staffId) => ({
-        organization_id: data.organization_id,
-        client_id: data.client_id,
-        staff_id: staffId,
-        is_group_home_assignment: false,
-        service_codes: codes,
-      }));
+    const toInsert: Array<{
+      organization_id: string; client_id: string; staff_id: string;
+      is_group_home_assignment: boolean; service_codes: string[] | null;
+    }> = [];
+    for (const [staffId, codes] of desired.entries()) {
+      const prev = existingByStaff.get(staffId);
+      if (!prev) {
+        toInsert.push({
+          organization_id: data.organization_id,
+          client_id: data.client_id,
+          staff_id: staffId,
+          is_group_home_assignment: false,
+          service_codes: codes,
+        });
+      } else {
+        const a = JSON.stringify(prev.service_codes ?? null);
+        const b = JSON.stringify(codes ?? null);
+        if (a !== b) {
+          const { error: uErr } = await supabase
+            .from("staff_assignments")
+            .update({ service_codes: codes })
+            .eq("id", prev.id);
+          if (uErr) throw uErr;
+          updated++;
+        }
+      }
+    }
+    if (toInsert.length > 0) {
       const { error: iErr } = await supabase
         .from("staff_assignments")
-        .upsert(rows, { onConflict: "staff_id,client_id", ignoreDuplicates: true });
+        .upsert(toInsert, { onConflict: "staff_id,client_id", ignoreDuplicates: false });
       if (iErr) throw iErr;
+      added = toInsert.length;
     }
 
+    const toRemoveIds: string[] = [];
+    for (const [staffId, row] of existingByStaff.entries()) {
+      if (!desired.has(staffId)) toRemoveIds.push(row.id);
+    }
     if (toRemoveIds.length > 0) {
       const { error: dErr } = await supabase
         .from("staff_assignments")
         .delete()
         .in("id", toRemoveIds);
       if (dErr) throw dErr;
+      removed = toRemoveIds.length;
     }
 
-    return { added: toAdd.length, removed: toRemoveIds.length };
+    return { added, removed, updated };
   });
 
 // ──────────────────────────────────────────────────────────────────────────────

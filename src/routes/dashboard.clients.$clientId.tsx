@@ -468,19 +468,37 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
             </div>
           ) : extractedGoals.length === 0 ? (
             <div className="space-y-2">
-              <p className="text-muted-foreground">
-                No goals yet — upload a PCSP so NECTAR can pull them, or add them manually.
-              </p>
+              {planHasPcsp ? (
+                <p className="text-muted-foreground">
+                  PCSP on file — pull goals from it, or add them manually.
+                </p>
+              ) : (
+                <p className="text-muted-foreground">
+                  No goals yet — upload a PCSP so NECTAR can pull them, or add them manually.
+                </p>
+              )}
               <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={busy || !orgId}
-                  className="gap-2"
-                >
-                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  {busy ? "Extracting…" : "Upload PCSP & extract goals (NECTAR)"}
-                </Button>
+                {planHasPcsp ? (
+                  <Button
+                    type="button"
+                    onClick={() => void runExtract()}
+                    disabled={busy}
+                    className="gap-2"
+                  >
+                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    {busy ? "Extracting…" : "Extract goals from existing PCSP"}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={busy || !orgId}
+                    className="gap-2"
+                  >
+                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    {busy ? "Extracting…" : "Upload PCSP & extract goals (NECTAR)"}
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="outline"

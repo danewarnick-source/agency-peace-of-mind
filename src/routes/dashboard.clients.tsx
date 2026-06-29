@@ -280,17 +280,16 @@ export function ClientsPage() {
       <OnboardingReturnBar />
       <OnboardingGuidanceBanner step={4} />
 
-      {stuckImports.length > 0 && (
+      {pendingClientCount > 0 && (
         <Link
-          to="/dashboard/smart-import/$jobId/done"
-          params={{ jobId: stuckImports[0] }}
+          to="/dashboard/clients/pending"
           className="flex items-center justify-between gap-3 rounded-lg border border-amber-300/60 bg-amber-50/60 px-4 py-2.5 text-sm hover:bg-amber-50 dark:bg-amber-950/20 dark:hover:bg-amber-950/30"
         >
           <span className="flex items-center gap-2 text-amber-900 dark:text-amber-300">
             <AlertTriangle className="h-4 w-4" />
-            {stuckImports.length} Smart Import {stuckImports.length === 1 ? "job has" : "jobs have"} uncommitted client{stuckImports.length === 1 ? "" : "s"} — finish import to add them here.
+            {pendingClientCount} imported client{pendingClientCount === 1 ? "" : "s"} need{pendingClientCount === 1 ? "s" : ""} finishing before {pendingClientCount === 1 ? "it joins" : "they join"} your directory.
           </span>
-          <span className="font-medium text-amber-900 dark:text-amber-300">Finish import →</span>
+          <span className="font-medium text-amber-900 dark:text-amber-300">Review pending →</span>
         </Link>
       )}
 

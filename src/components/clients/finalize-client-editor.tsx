@@ -439,6 +439,28 @@ export function FinalizeClientEditor({
                 })}
               </div>
             ))}
+
+            {/* Pre-commit staff assignment — written after the client row is
+                created. Optional; admin can also assign later on the Caseload
+                tab. Scoped per service code: default "All codes" per staff. */}
+            <div className="rounded-lg border border-border p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Assign staff (optional)
+                </div>
+                {draftAssignments.size === 0 && (
+                  <span className="text-[11px] text-muted-foreground">
+                    You can also assign later on the Caseload tab.
+                  </span>
+                )}
+              </div>
+              <CaseloadEditor
+                draftMode
+                authorizedCodes={draftAuthorizedCodes}
+                value={draftAssignments}
+                onChange={setDraftAssignments}
+              />
+            </div>
           </div>
         )}
 

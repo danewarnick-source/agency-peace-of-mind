@@ -666,6 +666,25 @@ function CodeRow({ clientId: _clientId, budget, readOnly = false }: { clientId: 
         </p>
       )}
 
+      {status === "end-needed" && !readOnly && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2">
+          <span className="text-[11px] font-medium text-amber-800 dark:text-amber-200">
+            <AlertTriangle className="mr-1 inline h-3 w-3" />
+            This authorization has no end date. Set one to make it valid.
+          </span>
+          <Input
+            type="date"
+            value={endDateDraft}
+            min={code.service_start_date ?? undefined}
+            onChange={(e) => setEndDateDraft(e.target.value)}
+            className="h-7 w-40 text-xs"
+          />
+          <Button size="sm" className="h-7 text-xs" onClick={handleSaveEndDate} disabled={savingEnd || !endDateDraft}>
+            {savingEnd ? "Saving…" : "Set end date"}
+          </Button>
+        </div>
+      )}
+
       {annualUnits > 0 && (
         <div className="mt-3">
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -678,8 +697,13 @@ function CodeRow({ clientId: _clientId, budget, readOnly = false }: { clientId: 
           </div>
           <p className="mt-1 text-[10px] text-muted-foreground">
             {pct.toFixed(0)}% of authorization used
-            {code.service_start_date && code.service_end_date && (
-              <> · plan window {code.service_start_date} → {code.service_end_date}</>
+            {(code.service_start_date || code.service_end_date) && (
+              <>
+                {" "}· plan window {code.service_start_date ?? "—"} →{" "}
+                {code.service_end_date ?? (
+                  <span className="font-semibold text-amber-700 dark:text-amber-300">End date needed</span>
+                )}
+              </>
             )}
           </p>
         </div>

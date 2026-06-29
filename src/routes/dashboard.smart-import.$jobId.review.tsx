@@ -459,6 +459,27 @@ function DedupBanner({
     onError: (e: Error) => toast.error(e.message),
   });
   if (subject.match_status === "new") return null;
+  // Once a decision is made, dismiss the banner so the admin moves on.
+  // create_new / update both proceed via downstream commit; skip means the
+  // admin has acknowledged the match and chosen to do nothing here.
+  if (subject.review_decision === "skip") {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+        <span>Match acknowledged — skipped. This subject will not be committed.</span>
+        <Button size="sm" variant="ghost" onClick={() => m.mutate("create_new")} disabled={m.isPending}>Change decision</Button>
+      </div>
+    );
+  }
+  if (subject.review_decision === "update" || subject.review_decision === "create_new") {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-300/50 bg-emerald-50/40 px-3 py-2 text-xs dark:bg-emerald-950/20">
+        <span className="text-emerald-800 dark:text-emerald-300">
+          Decision: <strong className="capitalize">{subject.review_decision.replace("_", " ")}</strong>.
+        </span>
+        <Button size="sm" variant="ghost" onClick={() => m.mutate("skip")} disabled={m.isPending}>Change</Button>
+      </div>
+    );
+  }
   const existingName = matched
     ? [(matched as Record<string, string | null>).first_name, (matched as Record<string, string | null>).last_name].filter(Boolean).join(" ")
       || ((matched as Record<string, string | null>).full_name as string)
@@ -477,8 +498,8 @@ function DedupBanner({
         </div>
       </div>
       <div className="flex gap-2">
-        <Button size="sm" variant={subject.review_decision === "update" ? "default" : "outline"} onClick={() => m.mutate("update")} disabled={m.isPending}>Update existing</Button>
-        <Button size="sm" variant={subject.review_decision === "create_new" ? "default" : "outline"} onClick={() => m.mutate("create_new")} disabled={m.isPending}>Create new</Button>
+        <Button size="sm" variant="outline" onClick={() => m.mutate("update")} disabled={m.isPending}>Update existing</Button>
+        <Button size="sm" variant="outline" onClick={() => m.mutate("create_new")} disabled={m.isPending}>Create new</Button>
         <Button size="sm" variant="ghost" onClick={() => m.mutate("skip")} disabled={m.isPending}>Skip</Button>
       </div>
     </div>

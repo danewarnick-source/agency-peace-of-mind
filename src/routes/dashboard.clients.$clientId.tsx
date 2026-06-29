@@ -1109,13 +1109,13 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
               </Badge>
             )}
             {!training && !q.isLoading && (
-              <Button size="sm" onClick={() => createMut.mutate()} disabled={createMut.isPending}>
+              <Button size="sm" onClick={() => pcspReady ? createMut.mutate() : setShowPcspPrompt(true)} disabled={createMut.isPending}>
                 {createMut.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
                 Create profile
               </Button>
             )}
             {training && training.status !== "published" && (
-              <Button size="sm" onClick={() => setShowPublish(true)} disabled={publishMut.isPending}>
+              <Button size="sm" onClick={() => pcspReady ? setShowPublish(true) : setShowPcspPrompt(true)} disabled={publishMut.isPending}>
                 {publishMut.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
                 Review & Publish
               </Button>
@@ -1124,7 +1124,12 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
           </div>
         </CardHeader>
         {bodyOpen && (
-          <CardContent className="text-sm text-muted-foreground">
+          <CardContent className="text-sm text-muted-foreground space-y-3">
+            {!pcspReady && (
+              <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
+                Upload a PCSP to get started — this profile is part of the PCSP-derived workflow. Creating and publishing are disabled until a PCSP is on file (add it from the client's Files tab).
+              </div>
+            )}
             {q.isLoading ? (
               <span className="inline-flex items-center gap-2"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…</span>
             ) : !training ? (

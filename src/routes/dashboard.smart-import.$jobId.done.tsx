@@ -185,7 +185,8 @@ function DonePage() {
   const pendingCommit = subjects.filter(
     (s) => !s.committed && s.review_status === "ready",
   ).length;
-  const fullSuccess = subjects.length > 0 && committedCount === subjects.length;
+
+
 
 
 

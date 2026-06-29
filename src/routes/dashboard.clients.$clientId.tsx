@@ -408,6 +408,9 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
         storage_path: path,
       });
       if (insErr) throw insErr;
+      // PCSP is one document shown in both Care and Files — refresh both.
+      qc.invalidateQueries({ queryKey: ["client-docs", orgId, clientId] });
+      qc.invalidateQueries({ queryKey: ["client-has-pcsp", clientId] });
       const res = await extractFn({ data: { clientId } });
       if (!res?.ok) {
         toast.error(res?.reason ?? "Extraction failed");

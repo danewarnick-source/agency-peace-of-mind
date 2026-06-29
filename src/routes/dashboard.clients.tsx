@@ -160,9 +160,9 @@ export function ClientsPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
-  
+  const [rosterTab, setRosterTab] = useState<"active" | "archived">("active");
 
-  const { data: clients = [], isLoading } = useQuery({
+  const { data: allClients = [], isLoading } = useQuery({
     enabled: !!org,
     queryKey: ["clients", org?.organization_id],
     queryFn: async (): Promise<Client[]> => {
@@ -172,13 +172,41 @@ export function ClientsPage() {
         .eq("organization_id", org!.organization_id)
         .order("last_name", { ascending: true });
       if (error) throw error;
-      return ((data ?? []) as any[])
-        .filter((c) => (c.account_status ?? "active") !== "archived")
-        .map((c) => ({
-          ...c,
-          job_code: (c.authorized_dspd_codes?.length ? c.authorized_dspd_codes : c.job_code) ?? [],
-        })) as Client[];
+      return ((data ?? []) as any[]).map((c) => ({
+        ...c,
+        job_code: (c.authorized_dspd_codes?.length ? c.authorized_dspd_codes : c.job_code) ?? [],
+      })) as Client[];
     },
+  });
+
+  const clients = useMemo(
+    () => allClients.filter((c) =>
+      rosterTab === "archived"
+        ? (c.account_status ?? "active") === "archived"
+        : (c.account_status ?? "active") !== "archived",
+    ),
+    [allClients, rosterTab],
+  );
+  const archivedCount = useMemo(
+    () => allClients.filter((c) => (c.account_status ?? "active") === "archived").length,
+    [allClients],
+  );
+
+  const reactivateM = useMutation({
+    mutationFn: async (clientId: string) => {
+      const { error } = await (supabase as any)
+        .from("clients")
+        .update({ account_status: "active" })
+        .eq("id", clientId)
+        .eq("organization_id", org!.organization_id);
+      if (error) throw error;
+      return clientId;
+    },
+    onSuccess: () => {
+      toast.success("Client reactivated.");
+      qc.invalidateQueries({ queryKey: ["clients"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   // Count of pending client subjects (not jobs) across the org — banner
@@ -252,11 +280,14 @@ export function ClientsPage() {
       return { id: data!.id as string, mode: input.intake_mode };
     },
     onSuccess: ({ id, mode }) => {
-      toast.success(mode === "intake" ? "Client created — starting intake." : "Client added.");
+      toast.success(mode === "intake" ? "Client created — starting intake." : "Draft client saved. Finish required fields when you're ready.");
       qc.invalidateQueries({ queryKey: ["clients"] });
       setAddOpen(false);
       if (mode === "intake") {
         navigate({ to: "/dashboard/client-intake/$clientId", params: { clientId: id } });
+      } else {
+        // Land on the new client so the draft state (missing fields, intake_status=pending) is visible.
+        navigate({ to: "/dashboard/clients/$clientId", params: { clientId: id }, search: { tab: "overview" } });
       }
     },
     onError: (e: Error) => toast.error(e.message),
@@ -334,6 +365,30 @@ export function ClientsPage() {
         />
       </div>
 
+      {/* Active / Archived tabs */}
+      <div className="inline-flex rounded-md border border-border bg-muted/40 p-0.5 text-xs">
+        {(["active", "archived"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setRosterTab(t)}
+            className={
+              "rounded px-3 py-1 font-medium capitalize transition-colors " +
+              (rosterTab === t
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground")
+            }
+          >
+            {t}
+            {t === "archived" && archivedCount > 0 && (
+              <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums">
+                {archivedCount}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
       {/* Table */}
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         {isLoading ? (
@@ -343,7 +398,13 @@ export function ClientsPage() {
         ) : !filtered.length ? (
           <div className="flex flex-col items-center gap-2 p-12 text-center text-sm text-muted-foreground">
             <Contact2 className="h-8 w-8 text-muted-foreground/40" />
-            <p>{search ? "No clients match your search." : "No clients yet. Add your first client to get started."}</p>
+            <p>
+              {search
+                ? "No clients match your search."
+                : rosterTab === "archived"
+                  ? "No archived clients."
+                  : "No clients yet. Add your first client to get started."}
+            </p>
           </div>
         ) : (
           <div className="max-h-[calc(100vh-16rem)] overflow-auto">
@@ -427,11 +488,26 @@ export function ClientsPage() {
                       </TableCell>
                       <TableCell className="text-right py-2 w-[220px]" data-no-row-nav onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
-                          <IntakeAction
-                            organizationId={org?.organization_id}
-                            clientId={c.id}
-                            intakeStatus={c.intake_status}
-                          />
+                          {rosterTab === "archived" ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs"
+                              disabled={reactivateM.isPending}
+                              onClick={(e) => { e.stopPropagation(); reactivateM.mutate(c.id); }}
+                            >
+                              {reactivateM.isPending && reactivateM.variables === c.id
+                                ? <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                : null}
+                              Reactivate
+                            </Button>
+                          ) : (
+                            <IntakeAction
+                              organizationId={org?.organization_id}
+                              clientId={c.id}
+                              intakeStatus={c.intake_status}
+                            />
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -565,9 +641,9 @@ function AddClientDialog({
             onClick={() => setMode("profile-only")}
             className="w-full rounded-lg border border-border bg-background p-4 text-left transition hover:border-primary hover:bg-primary/5"
           >
-            <div className="font-semibold">Create profile only (not ready for intake)</div>
+            <div className="font-semibold">Create as draft — finish later</div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Save the client profile now and complete the intake procedure later.
+              Saves an incomplete client profile (intake not started). It will show as <strong>Needs review</strong> in the directory until you finalize it.
             </p>
           </button>
         </div>
@@ -579,7 +655,7 @@ function AddClientDialog({
     <DialogContent className="max-h-[90vh] overflow-y-auto max-w-lg">
       <DialogHeader>
         <DialogTitle>
-          {mode === "intake" ? "New Client — Begin Intake" : "New Client — Profile Only"}
+          {mode === "intake" ? "New Client — Begin Intake" : "New Client — Save as Draft"}
         </DialogTitle>
       </DialogHeader>
       <button
@@ -695,7 +771,7 @@ function AddClientDialog({
           disabled={!canSubmit || pending}
         >
           {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {mode === "intake" ? "Create & Start Intake" : "Create Profile"}
+          {mode === "intake" ? "Create & Start Intake" : "Create draft client"}
         </Button>
       </DialogFooter>
     </DialogContent>

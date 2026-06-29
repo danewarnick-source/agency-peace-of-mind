@@ -197,12 +197,16 @@ export function findClientContradictions(d: ClientDraft): ValidationIssue[] {
 export function validateClientDraft(d: ClientDraft): ValidationResult {
   const issues: ValidationIssue[] = [];
 
-  // ── Person name
-  if (d.first_name) {
-    const msg = validatePersonName(`${d.first_name} placeholder`);
-    // validatePersonName requires 2 tokens; for a first-name-only field that's
-    // unfair. Use isNonAnswer directly here.
-    if (isNonAnswer(d.first_name)) {
+  // ── Person name — derive from full_name / display_name when first or last
+  // is missing. The roster card renders display_name, so a subject visibly
+  // named "Caleb Swanson" should not be flagged name.first_missing just
+  // because the parser didn't split it.
+  const derived = deriveNameParts(d.first_name && d.last_name ? null : (d.full_name || d.display_name));
+  const effectiveFirst = (d.first_name && d.first_name.trim()) || derived.first || "";
+  const effectiveLast = (d.last_name && d.last_name.trim()) || derived.last || "";
+
+  if (effectiveFirst) {
+    if (isNonAnswer(effectiveFirst)) {
       issues.push({
         key: "name.first_invalid",
         severity: "error",
@@ -210,7 +214,6 @@ export function validateClientDraft(d: ClientDraft): ValidationResult {
         message: "First name looks like a placeholder.",
       });
     }
-    void msg;
   } else {
     issues.push({
       key: "name.first_missing",
@@ -219,8 +222,8 @@ export function validateClientDraft(d: ClientDraft): ValidationResult {
       message: "First name is required.",
     });
   }
-  if (d.last_name) {
-    if (isNonAnswer(d.last_name)) {
+  if (effectiveLast) {
+    if (isNonAnswer(effectiveLast)) {
       issues.push({
         key: "name.last_invalid",
         severity: "error",
@@ -236,6 +239,7 @@ export function validateClientDraft(d: ClientDraft): ValidationResult {
       message: "Last name is required.",
     });
   }
+
 
   // ── Address (required for EVV-mandated clients; warn otherwise)
   if (d.physical_address && d.physical_address.trim()) {

@@ -7114,6 +7114,8 @@ export type Database = {
           committed_at: string | null
           committed_record_id: string | null
           created_at: string
+          discarded_at: string | null
+          discarded_by: string | null
           display_name: string
           id: string
           import_job_id: string
@@ -7133,6 +7135,8 @@ export type Database = {
           committed_at?: string | null
           committed_record_id?: string | null
           created_at?: string
+          discarded_at?: string | null
+          discarded_by?: string | null
           display_name: string
           id?: string
           import_job_id: string
@@ -7152,6 +7156,8 @@ export type Database = {
           committed_at?: string | null
           committed_record_id?: string | null
           created_at?: string
+          discarded_at?: string | null
+          discarded_by?: string | null
           display_name?: string
           id?: string
           import_job_id?: string

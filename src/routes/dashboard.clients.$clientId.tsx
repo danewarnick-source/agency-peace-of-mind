@@ -896,14 +896,14 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
             </div>
             <div className="flex flex-wrap gap-2">
               {training.status !== "published" && (
-                <Button size="sm" onClick={() => setShowPublishDialog(true)} disabled={publishMut.isPending}>
+                <Button size="sm" onClick={() => pcspReady ? setShowPublishDialog(true) : setShowPcspPrompt(true)} disabled={publishMut.isPending}>
                   {publishMut.isPending
                     ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                     : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
                   Approve & Publish
                 </Button>
               )}
-              <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading || !orgId}>
+              <Button size="sm" variant="outline" onClick={() => pcspReady ? fileInputRef.current?.click() : setShowPcspPrompt(true)} disabled={uploading || !orgId}>
                 {uploading
                   ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                   : <Upload className="mr-1.5 h-3.5 w-3.5" />}
@@ -911,6 +911,9 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
               </Button>
               {fileInput}
             </div>
+            {!pcspReady && (
+              <p className="text-xs text-amber-700">Upload a PCSP to get started — publishing is disabled until a PCSP is on file.</p>
+            )}
           </CardContent>
           )}
         </Card>

@@ -763,7 +763,11 @@ export const ISSUE_KEY_TO_TARGET: Record<string, EditableTarget> = {
   "dates.admission_discharge_invalid": "admission_date",
   "dates.form_1056_future": "form_1056_approved_date",
   "contradiction.guardian_self_vs_named": "is_own_guardian",
+  "guardian.name_missing": "guardian_name",
+  "guardian.phone_missing": "guardian_phone",
+  "guardian.unknown_status": "is_own_guardian",
 };
+
 
 const ApplyFields = z.object({
   subjectId: z.string().uuid(),

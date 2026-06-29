@@ -8,9 +8,12 @@ import { z } from "zod";
 import {
   validateClientDraft,
   filterBlocking,
+  findClientContradictions,
+  normalizeGuardianFields,
   type ClientDraft,
   type ValidationIssue,
 } from "@/lib/import-validation";
+
 
 const JobId = z.object({ jobId: z.string().uuid() });
 const SubjectId = z.object({ subjectId: z.string().uuid() });

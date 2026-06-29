@@ -31,6 +31,8 @@ export interface ValidationIssue {
 export interface ClientDraft {
   first_name?: string | null;
   last_name?: string | null;
+  full_name?: string | null;
+  display_name?: string | null;
   physical_address?: string | null;
   medicaid_id?: string | null;
   date_of_birth?: string | null;
@@ -39,6 +41,9 @@ export interface ClientDraft {
   form_1056_approved_date?: string | null;
   is_own_guardian?: boolean | null;
   guardian_name?: string | null;
+  guardian_phone?: string | null;
+  guardian_relationship?: string | null;
+  guardian_email?: string | null;
   pcsp_has_medications?: boolean | null;
   medication_count?: number | null;
   dysphagia?: boolean | null;
@@ -53,6 +58,25 @@ export interface ClientDraft {
   }>;
   known_addresses?: string[];
 }
+
+// Best-effort split of a free-form name into first/last. Last token is the
+// last name; everything before is the first name. Returns nulls if input is
+// blank or a known placeholder. Used by the validator + the import readout so
+// "Caleb Swanson" never trips name.first_missing / name.last_missing.
+export function deriveNameParts(
+  raw: string | null | undefined,
+): { first: string | null; last: string | null } {
+  if (!raw) return { first: null, last: null };
+  const trimmed = raw.trim();
+  if (!trimmed || isNonAnswer(trimmed)) return { first: null, last: null };
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { first: null, last: null };
+  if (parts.length === 1) return { first: parts[0], last: null };
+  const last = parts[parts.length - 1];
+  const first = parts.slice(0, -1).join(" ");
+  return { first, last };
+}
+
 
 export interface ValidationResult {
   ok: boolean;

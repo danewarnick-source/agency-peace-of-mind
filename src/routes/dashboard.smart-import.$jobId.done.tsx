@@ -10,18 +10,15 @@ import { toast } from "sonner";
 import { RequirePermission } from "@/components/rbac-guard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { getDoneReadout, commitSmartImportJob, recommitSmartImportJob } from "@/lib/smart-import-commit.functions";
-import { applyMissingClientFields } from "@/lib/smart-import-review.functions";
 import { generateSmartImportReminders } from "@/lib/smart-import-reminders.functions";
 import { previewUndoImport, undoCommittedImport } from "@/lib/smart-import-history.functions";
 import { ClientLiveBadge } from "@/components/clients/client-readiness-card";
 import { SetupChecklist } from "@/components/clients/setup-checklist";
+import { FinalizeClientEditor } from "@/components/clients/finalize-client-editor";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/done")({
   head: () => ({ meta: [{ title: "Smart Import — Done" }] }),

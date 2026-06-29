@@ -31,11 +31,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { supabase } from "@/integrations/supabase/client";
 import {
   ingestDocument,
   queryDocuments,
   deleteDocument,
 } from "@/lib/nectar-documents.functions";
+import { attachClientDocument } from "@/lib/import-checklist.functions";
 import { NectarDocumentActionsDialog } from "@/components/nectar/document-actions-dialog";
 
 const CLIENT_DOC_TYPES = [
@@ -59,6 +61,8 @@ type DocRow = {
   parse_status: string;
   uploaded_by_name: string | null;
   created_at: string;
+  source: "nectar" | "client";
+  storage_path?: string;
 };
 
 async function fileToBase64(file: File): Promise<string> {
@@ -87,32 +91,86 @@ export function ClientDocumentsCard({
   const [uploadOpen, setUploadOpen] = useState(false);
   const [offerDocId, setOfferDocId] = useState<string | null>(null);
 
+  const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: ["client-docs", orgId, clientId] });
+    qc.invalidateQueries({ queryKey: ["nectar-docs"] });
+    qc.invalidateQueries({ queryKey: ["client-has-pcsp", clientId] });
+    qc.invalidateQueries({ queryKey: ["client-specific-training", clientId] });
+  };
+
   const { data, isLoading } = useQuery({
     queryKey: ["client-docs", orgId, clientId],
     enabled: !!orgId && !!clientId,
-    queryFn: () =>
-      queryFn({
-        data: {
-          organizationId: orgId!,
-          clientId,
-          ownerKind: "client",
-          currentOnly: true,
-          limit: 100,
-        },
-      }),
+    queryFn: async () => {
+      const [nectarRes, clientRes] = await Promise.all([
+        queryFn({
+          data: {
+            organizationId: orgId!,
+            clientId,
+            ownerKind: "client",
+            currentOnly: true,
+            limit: 100,
+          },
+        }),
+        supabase
+          .from("client_documents")
+          .select("id, document_type, file_name, storage_path, file_url, uploaded_at")
+          .eq("client_id", clientId)
+          .order("uploaded_at", { ascending: false }),
+      ]);
+      const nectarDocs: DocRow[] = (nectarRes?.documents ?? []).map((d: Record<string, unknown>) => ({
+        id: d.id as string,
+        document_type: (d.document_type as string) ?? "other",
+        title: (d.title as string) ?? (d.file_name as string) ?? "Document",
+        version: (d.version as number) ?? 1,
+        fiscal_year: (d.fiscal_year as string | null) ?? null,
+        file_name: (d.file_name as string) ?? "",
+        parse_status: (d.parse_status as string) ?? "",
+        uploaded_by_name: (d.uploaded_by_name as string | null) ?? null,
+        created_at: (d.created_at as string) ?? new Date().toISOString(),
+        source: "nectar",
+      }));
+      const clientDocs: DocRow[] = ((clientRes.data ?? []) as Array<Record<string, unknown>>).map((d) => ({
+        id: d.id as string,
+        document_type: ((d.document_type as string) ?? "other").toLowerCase(),
+        title: ((d.document_type as string) ?? "Document").toUpperCase() + " — " + clientName,
+        version: 1,
+        fiscal_year: null,
+        file_name: (d.file_name as string) ?? "",
+        parse_status: "",
+        uploaded_by_name: null,
+        created_at: ((d.uploaded_at as string) ?? (d.created_at as string) ?? new Date().toISOString()),
+        source: "client",
+        storage_path: ((d.storage_path as string) ?? (d.file_url as string)) ?? "",
+      }));
+      const merged = [...nectarDocs, ...clientDocs].sort((a, b) =>
+        (b.created_at ?? "").localeCompare(a.created_at ?? ""),
+      );
+      return { documents: merged };
+    },
   });
 
   const docs = (data?.documents ?? []) as DocRow[];
 
   const del = useMutation({
-    mutationFn: (id: string) => delFn({ data: { documentId: id } }),
+    mutationFn: async (row: DocRow) => {
+      if (row.source === "client") {
+        if (row.storage_path) {
+          await supabase.storage.from("client-documents").remove([row.storage_path]).catch(() => null);
+        }
+        const { error } = await supabase.from("client_documents").delete().eq("id", row.id);
+        if (error) throw error;
+        return;
+      }
+      await delFn({ data: { documentId: row.id } });
+    },
     onSuccess: () => {
       toast.success("Document removed");
-      qc.invalidateQueries({ queryKey: ["client-docs", orgId, clientId] });
-      qc.invalidateQueries({ queryKey: ["nectar-docs"] });
+      invalidateAll();
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   return (
     <Card>
@@ -127,10 +185,9 @@ export function ClientDocumentsCard({
             clientName={clientName}
             open={uploadOpen}
             onOpenChange={setUploadOpen}
-            onUploaded={(docId) => {
-              qc.invalidateQueries({ queryKey: ["client-docs", orgId, clientId] });
-              qc.invalidateQueries({ queryKey: ["nectar-docs"] });
-              if (docId) setOfferDocId(docId);
+            onUploaded={(docId, sourceKind) => {
+              invalidateAll();
+              if (docId && sourceKind === "nectar") setOfferDocId(docId);
             }}
           />
           <NectarDocumentActionsDialog
@@ -191,7 +248,16 @@ export function ClientDocumentsCard({
                 size="sm"
                 variant="ghost"
                 className="h-7 gap-1 text-xs"
-                onClick={() => window.open(`/dashboard/nectar-docs?doc=${d.id}`, "_blank")}
+                onClick={async () => {
+                  if (d.source === "client" && d.storage_path) {
+                    const { data: signed } = await supabase.storage
+                      .from("client-documents")
+                      .createSignedUrl(d.storage_path, 300);
+                    if (signed?.signedUrl) window.open(signed.signedUrl, "_blank");
+                    return;
+                  }
+                  window.open(`/dashboard/nectar-docs?doc=${d.id}`, "_blank");
+                }}
               >
                 <ExternalLink className="h-3 w-3" /> Open
               </Button>
@@ -200,7 +266,7 @@ export function ClientDocumentsCard({
                 variant="ghost"
                 className="h-7 text-destructive"
                 onClick={() => {
-                  if (confirm(`Remove "${d.title}"?`)) del.mutate(d.id);
+                  if (confirm(`Remove "${d.title}"?`)) del.mutate(d);
                 }}
               >
                 <X className="h-3 w-3" />
@@ -243,9 +309,10 @@ function UploadDocDialog({
   clientName: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onUploaded: (docId?: string) => void;
+  onUploaded: (docId?: string, sourceKind?: "nectar" | "client") => void;
 }) {
   const ingest = useServerFn(ingestDocument);
+  const attachClient = useServerFn(attachClientDocument);
   const [title, setTitle] = useState("");
   const [docType, setDocType] = useState("pcsp");
   const [fiscalYear, setFiscalYear] = useState("");
@@ -259,6 +326,26 @@ function UploadDocDialog({
   const mut = useMutation({
     mutationFn: async () => {
       if (!orgId || !file) throw new Error("Pick a file first");
+      // PCSP is a single source of truth — write into client_documents +
+      // client-documents bucket so it shows in BOTH Care and Files and is
+      // usable by goal extraction. Everything else stays in nectar_documents.
+      if (docType === "pcsp") {
+        const safe = file.name.replace(/[^\w.\-]+/g, "_");
+        const path = `${orgId}/${clientId}/pcsp/${Date.now()}_${safe}`;
+        const up = await supabase.storage
+          .from("client-documents")
+          .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
+        if (up.error) throw up.error;
+        await attachClient({
+          data: {
+            clientId,
+            documentType: "pcsp",
+            fileName: file.name,
+            storagePath: path,
+          },
+        });
+        return { __pcsp: true } as const;
+      }
       const b64 = await fileToBase64(file);
       return ingest({
         data: {
@@ -277,6 +364,13 @@ function UploadDocDialog({
       });
     },
     onSuccess: (res) => {
+      if ((res as { __pcsp?: boolean })?.__pcsp) {
+        toast.success(`PCSP uploaded — visible in Care and Files`);
+        setTitle(""); setFile(null); setFiscalYear("");
+        onOpenChange(false);
+        onUploaded(undefined, "client");
+        return;
+      }
       const r = res as {
         document?: { id?: string };
         extracted?: unknown[];
@@ -293,7 +387,7 @@ function UploadDocDialog({
       );
       setTitle(""); setFile(null); setFiscalYear("");
       onOpenChange(false);
-      onUploaded(r.document?.id);
+      onUploaded(r.document?.id, "nectar");
     },
     onError: (e: Error) => toast.error(e.message),
   });

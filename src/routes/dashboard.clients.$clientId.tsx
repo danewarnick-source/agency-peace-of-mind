@@ -276,6 +276,19 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
     queryFn: () => getCST({ data: { clientId } }),
     staleTime: 30_000,
   });
+  const { data: planHasPcsp } = useQuery({
+    queryKey: ["client-has-pcsp", clientId],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("client_documents")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", clientId)
+        .ilike("document_type", "pcsp");
+      if (error) throw error;
+      return (count ?? 0) > 0;
+    },
+    staleTime: 30_000,
+  });
   const extractedGoals = ((cstData?.training as { goals?: CSTGoal[] } | null)?.goals ?? []) as CSTGoal[];
   const goalIsIncomplete = (g: CSTGoal) => !g.supports?.trim() || !g.details?.trim();
   const missingLabel = (g: CSTGoal) => {
@@ -395,6 +408,9 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
         storage_path: path,
       });
       if (insErr) throw insErr;
+      // PCSP is one document shown in both Care and Files — refresh both.
+      qc.invalidateQueries({ queryKey: ["client-docs", orgId, clientId] });
+      qc.invalidateQueries({ queryKey: ["client-has-pcsp", clientId] });
       const res = await extractFn({ data: { clientId } });
       if (!res?.ok) {
         toast.error(res?.reason ?? "Extraction failed");
@@ -455,19 +471,37 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
             </div>
           ) : extractedGoals.length === 0 ? (
             <div className="space-y-2">
-              <p className="text-muted-foreground">
-                No goals yet — upload a PCSP so NECTAR can pull them, or add them manually.
-              </p>
+              {planHasPcsp ? (
+                <p className="text-muted-foreground">
+                  PCSP on file — pull goals from it, or add them manually.
+                </p>
+              ) : (
+                <p className="text-muted-foreground">
+                  No goals yet — upload a PCSP so NECTAR can pull them, or add them manually.
+                </p>
+              )}
               <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={busy || !orgId}
-                  className="gap-2"
-                >
-                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  {busy ? "Extracting…" : "Upload PCSP & extract goals (NECTAR)"}
-                </Button>
+                {planHasPcsp ? (
+                  <Button
+                    type="button"
+                    onClick={() => void runExtract()}
+                    disabled={busy}
+                    className="gap-2"
+                  >
+                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    {busy ? "Extracting…" : "Extract goals from existing PCSP"}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={busy || !orgId}
+                    className="gap-2"
+                  >
+                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    {busy ? "Extracting…" : "Upload PCSP & extract goals (NECTAR)"}
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="outline"
@@ -686,7 +720,7 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
         .from("client_documents")
         .select("id", { count: "exact", head: true })
         .eq("client_id", clientId)
-        .eq("document_type", "pcsp");
+        .ilike("document_type", "pcsp");
       if (error) throw error;
       return (count ?? 0) > 0;
     },

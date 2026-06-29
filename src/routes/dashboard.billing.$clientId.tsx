@@ -67,6 +67,12 @@ function ClientBillingDetail() {
   const upsert = async (row: Draft) => {
     if (!org?.organization_id || !clientId) return;
     if (!row.service_code) return toast.error("Service code required");
+    const start = row.service_start_date || null;
+    const end = row.service_end_date || null;
+    if (!end) return toast.error("End date is required for every authorization");
+    if (start && new Date(end) <= new Date(start)) {
+      return toast.error("End date must be after the start date");
+    }
     const payload = {
       organization_id: org.organization_id,
       client_id: clientId,
@@ -82,8 +88,8 @@ function ClientBillingDetail() {
         row.weekly_cap_units == null || (row.weekly_cap_units as unknown) === ""
           ? null
           : Number(row.weekly_cap_units),
-      service_start_date: row.service_start_date || null,
-      service_end_date: row.service_end_date || null,
+      service_start_date: start,
+      service_end_date: end,
       sce: row.sce || null,
       provider_approver_email: row.provider_approver_email || null,
     };

@@ -144,6 +144,19 @@ export function FinalizeClientEditor({
   const blocking = subjectQ.data?.blocking ?? [];
   const displayName = subjectQ.data?.subject?.display_name?.trim() || "Unnamed imported client";
 
+  // Best-effort: derive the client's authorized codes from extracted values so
+  // the draft-mode CaseloadEditor can offer per-code scoping pre-commit.
+  // Codes a staff is scoped to must be a subset of this set, validated again
+  // server-side after the client row exists.
+  const draftAuthorizedCodes = useMemo(() => {
+    const v = subjectQ.data?.values ?? {};
+    const raw = (v.authorized_dspd_codes ?? v.job_code ?? "") as string;
+    if (!raw) return [] as string[];
+    return Array.from(new Set(
+      raw.split(/[,\s;]+/).map((s) => s.trim().toUpperCase()).filter(Boolean),
+    ));
+  }, [subjectQ.data]);
+
   const grouped = useMemo(() => {
     const required: ReviewItem[] = [];
     const confirmation: ReviewItem[] = [];

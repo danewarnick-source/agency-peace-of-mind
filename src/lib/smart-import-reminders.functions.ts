@@ -215,7 +215,7 @@ export const generateSmartImportReminders = createServerFn({ method: "POST" })
       .in("recurrence_key", keys);
     if (exErr) throw new Error(exErr.message);
     const existingByKey = new Map(
-      (existing ?? []).map((r) => [`${r.organization_id}::${r.recurrence_key}`, r.id as string]),
+      (existing ?? []).map((r: { id: string; organization_id: string; recurrence_key: string }) => [`${r.organization_id}::${r.recurrence_key}`, r.id]),
     );
     const toInsert: typeof inserts = [];
     for (const row of inserts) {

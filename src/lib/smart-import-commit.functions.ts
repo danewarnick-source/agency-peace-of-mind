@@ -65,11 +65,40 @@ export const recommitSmartImportJob = createServerFn({ method: "POST" })
     return runJobCommit(sb, context.userId, data.jobId);
   });
 
+// Commit a single pending subject (used by the Pending Clients workspace's
+// "Save & finalize" path). Same engine; just filters candidates to one
+// row so unrelated ready siblings are not auto-committed.
+const SingleSubject = z.object({ subjectId: z.string().uuid() });
+export const commitSingleSubject = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => SingleSubject.parse(i))
+  .handler(async ({ data, context }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = context.supabase as any;
+    const { data: subj, error } = await sb
+      .from("import_subjects")
+      .select("id, import_job_id, org_id")
+      .eq("id", data.subjectId)
+      .single();
+    if (error || !subj) throw new Error("Subject not found");
+    const { data: job } = await sb
+      .from("import_jobs")
+      .select("id, org_id, target_org_id, source")
+      .eq("id", subj.import_job_id)
+      .single();
+    const orgId = (job?.source === "white_glove" ? job.target_org_id : job?.org_id) as string;
+    if (!orgId) throw new Error("Job has no organization to commit into.");
+    await requireOrgMembership(sb, context.userId, orgId, "admin");
+    return runJobCommit(sb, context.userId, subj.import_job_id, { subjectId: data.subjectId });
+  });
+
 // Internal helper — usable from other server fns (e.g. submitForSetup) so
 // the self-service path can commit in one shot without re-entering the
-// server-fn boundary.
+// server-fn boundary. `opts.subjectId` narrows the commit to a single
+// subject (workspace per-row finalize); without it, all ready subjects in
+// the job are attempted as before.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function runJobCommit(sbIn: any, userId: string, jobId: string) {
+export async function runJobCommit(sbIn: any, userId: string, jobId: string, opts?: { subjectId?: string }) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = sbIn as any;
 
@@ -93,10 +122,12 @@ export async function runJobCommit(sbIn: any, userId: string, jobId: string) {
       }
     }
 
-    const { data: subjects } = await sb
+    let subjectsQ = sb
       .from("import_subjects")
       .select("*")
       .eq("import_job_id", jobId);
+    if (opts?.subjectId) subjectsQ = subjectsQ.eq("id", opts.subjectId);
+    const { data: subjects } = await subjectsQ;
 
     const orgId = (job.source === "white_glove" ? job.target_org_id : job.org_id) as string;
     const results: Array<{

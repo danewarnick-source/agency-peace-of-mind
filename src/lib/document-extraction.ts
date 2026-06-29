@@ -220,6 +220,111 @@ export async function parseDocumentWithAI(
   } catch {
     throw new Error("AI returned malformed JSON. The document may be unreadable.");
   }
-  const result = ParseOut.safeParse(parsed);
-  return result.success ? result.data : { fields: [] };
+  return tolerantParseExtraction(parsed);
 }
+
+// ---------------------------------------------------------------
+// Tolerant per-field parser.
+//
+// The model frequently emits one-off violations (confidence: 95, a goal
+// longer than 2000 chars, a numeric string instead of a number). The
+// previous all-or-nothing safeParse would substitute { fields: [] } on
+// ANY violation — silently discarding an entire extraction because a
+// single row was malformed. That was the empty-subject root cause.
+//
+// We now coerce/normalize per field, keep the valid rows, drop only the
+// individual rows that can't be salvaged, and surface a real error if
+// the model returned content but produced zero usable fields.
+// ---------------------------------------------------------------
+function coerceConfidence(v: unknown): number {
+  let n: number | null = null;
+  if (typeof v === "number" && Number.isFinite(v)) n = v;
+  else if (typeof v === "string") {
+    const m = v.match(/-?\d+(\.\d+)?/);
+    if (m) n = Number(m[0]);
+  }
+  if (n === null || !Number.isFinite(n)) return 0.8;
+  if (n > 1) n = n / 100;
+  if (n < 0) n = 0;
+  if (n > 1) n = 1;
+  return n;
+}
+
+function coerceNumber(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const m = v.replace(/[^0-9.\-]/g, "");
+    if (m) {
+      const n = Number(m);
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return null;
+}
+
+function coerceField(raw: unknown): { field?: ExtractedFieldOut; reason?: string } {
+  if (!raw || typeof raw !== "object") return { reason: "not an object" };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const r = raw as Record<string, any>;
+  const key = typeof r.field_key === "string" ? r.field_key.trim().slice(0, 80) : "";
+  if (!key) return { reason: "missing field_key" };
+  const out: ExtractedFieldOut = {
+    field_key: key,
+    field_group: typeof r.field_group === "string" ? r.field_group.slice(0, 80) : null,
+    value_text:
+      typeof r.value_text === "string"
+        ? r.value_text.slice(0, 2000)
+        : r.value_text == null
+          ? null
+          : String(r.value_text).slice(0, 2000),
+    value_number: coerceNumber(r.value_number),
+    value_date: typeof r.value_date === "string" ? r.value_date.slice(0, 40) : null,
+    value_bool: typeof r.value_bool === "boolean" ? r.value_bool : null,
+    value_array: Array.isArray(r.value_array)
+      ? r.value_array
+          .slice(0, 50)
+          .map((x: unknown) => (typeof x === "string" ? x.slice(0, 500) : String(x ?? "").slice(0, 500)))
+      : null,
+    value_json: r.value_json ?? null,
+    source_locator: typeof r.source_locator === "string" ? r.source_locator.slice(0, 200) : null,
+    confidence: coerceConfidence(r.confidence),
+  };
+  return { field: out };
+}
+
+function tolerantParseExtraction(parsed: unknown): ParseOutT {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const p = (parsed ?? {}) as Record<string, any>;
+  const rawFields: unknown[] = Array.isArray(p.fields) ? p.fields : [];
+  const kept: ExtractedFieldOut[] = [];
+  const dropped: string[] = [];
+  for (const rf of rawFields) {
+    const { field, reason } = coerceField(rf);
+    if (field) kept.push(field);
+    else if (reason) dropped.push(reason);
+  }
+  if (dropped.length) {
+    console.warn(
+      `[document-extraction] dropped ${dropped.length}/${rawFields.length} field(s): ${dropped.slice(0, 5).join("; ")}`,
+    );
+  }
+  // If the model returned a non-empty fields array but nothing survived,
+  // surface a real error instead of silently returning an empty subject.
+  if (rawFields.length > 0 && kept.length === 0) {
+    throw new Error(
+      `AI returned ${rawFields.length} field(s) but none could be parsed (${dropped.slice(0, 3).join("; ") || "unknown reasons"}).`,
+    );
+  }
+  const strOrNull = (v: unknown, max: number) =>
+    typeof v === "string" ? v.slice(0, max) : null;
+  return {
+    document_type: strOrNull(p.document_type, 40),
+    fiscal_year: strOrNull(p.fiscal_year, 20),
+    effective_start: strOrNull(p.effective_start, 40),
+    effective_end: strOrNull(p.effective_end, 40),
+    medicaid_id: strOrNull(p.medicaid_id, 50),
+    title: strOrNull(p.title, 200),
+    fields: kept,
+  };
+}
+

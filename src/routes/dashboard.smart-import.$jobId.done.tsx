@@ -329,23 +329,28 @@ function DonePage() {
         </div>
       </div>
 
-      {/* Audit trail */}
-      <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-        <div className="mb-3 text-sm font-semibold">Audit trail</div>
-        <div className="max-h-[400px] space-y-1 overflow-auto text-xs">
-          {audit.map((a: { id: string; item: string; action: string; traces_to: string | null; created_at: string }) => (
-            <div key={a.id} className="flex items-start justify-between gap-3 rounded-md border border-border/60 px-2 py-1.5">
-              <div className="min-w-0">
-                <div className="truncate">{a.item}</div>
-                <div className="mt-0.5 text-[10px] text-muted-foreground">
-                  {a.action} · traces to {a.traces_to ?? "—"} · {new Date(a.created_at).toLocaleString()}
+      {/* Technical audit trail — collapsed by default; admins rarely need it. */}
+      <details className="group rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
+        <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground">
+          Technical audit trail ({audit.length})
+        </summary>
+        <div className="border-t border-border p-4">
+          <div className="max-h-[400px] space-y-1 overflow-auto text-xs">
+            {audit.map((a: { id: string; item: string; action: string; traces_to: string | null; created_at: string }) => (
+              <div key={a.id} className="flex items-start justify-between gap-3 rounded-md border border-border/60 px-2 py-1.5">
+                <div className="min-w-0">
+                  <div className="truncate">{a.item}</div>
+                  <div className="mt-0.5 text-[10px] text-muted-foreground">
+                    {a.action} · traces to {a.traces_to ?? "—"} · {new Date(a.created_at).toLocaleString()}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-          {audit.length === 0 && <div className="text-muted-foreground">No audit rows yet.</div>}
+            ))}
+            {audit.length === 0 && <div className="text-muted-foreground">No audit rows yet.</div>}
+          </div>
         </div>
-      </div>
+      </details>
+
 
       <Dialog open={undoOpen} onOpenChange={setUndoOpen}>
         <DialogContent className="max-w-lg">

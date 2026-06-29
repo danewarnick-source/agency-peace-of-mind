@@ -344,8 +344,44 @@ export function validateClientDraft(d: ClientDraft): ValidationResult {
     }
   }
 
+  // ── Guardianship (mirrors the validate_client_guardian Postgres trigger)
+  // If we're sure they have a separate guardian, both name and phone are
+  // required — the trigger raises otherwise and commit fails. If self-guardian
+  // status was never positively determined (null/undefined) AND no real
+  // guardian is on file, surface a confirmation so the admin answers
+  // "is this person their own guardian?" before commit relies on the column
+  // default of false.
+  const guardianNameEmpty = isGuardianValueEmpty(d.guardian_name);
+  const guardianPhoneEmpty = isGuardianValueEmpty(d.guardian_phone);
+  if (d.is_own_guardian === false) {
+    if (guardianNameEmpty) {
+      issues.push({
+        key: "guardian.name_missing",
+        severity: "error",
+        field: "guardian_name",
+        message: "Guardian name is required when the client is not their own guardian.",
+      });
+    }
+    if (guardianPhoneEmpty) {
+      issues.push({
+        key: "guardian.phone_missing",
+        severity: "error",
+        field: "guardian_phone",
+        message: "Guardian phone is required when the client is not their own guardian.",
+      });
+    }
+  } else if (d.is_own_guardian == null && guardianNameEmpty && guardianPhoneEmpty) {
+    issues.push({
+      key: "guardian.unknown_status",
+      severity: "error",
+      field: "is_own_guardian",
+      message: "Is this client their own guardian? Confirm before finalizing.",
+    });
+  }
+
   // ── Contradictions
   issues.push(...findClientContradictions(d));
+
 
   // Only errors actually block; warnings show but don't fail the gate unless
   // overrides are explicitly requested. We return ok=false on ANY error.

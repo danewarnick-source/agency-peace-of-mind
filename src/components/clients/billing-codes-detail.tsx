@@ -130,11 +130,31 @@ export function BillingCodesDetail({ clientId, clientName, medicaidId }: Props) 
             </Button>
           </div>
         ) : (
-          <div className="space-y-3">
-            {budgets.map((b) => (
-              <CodeRow key={b.code.id} clientId={clientId} budget={b} />
-            ))}
-          </div>
+          (() => {
+            const current = budgets.filter(
+              (b) =>
+                getAuthStatus(b.code.service_start_date, b.code.service_end_date) !== "expired",
+            );
+            const previous = budgets.filter(
+              (b) =>
+                getAuthStatus(b.code.service_start_date, b.code.service_end_date) === "expired",
+            );
+            return (
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  {current.length === 0 && (
+                    <div className="rounded-xl border border-dashed border-border bg-background/40 p-4 text-center text-xs text-muted-foreground">
+                      No active authorizations. See Previous authorizations below.
+                    </div>
+                  )}
+                  {current.map((b) => (
+                    <CodeRow key={b.code.id} clientId={clientId} budget={b} />
+                  ))}
+                </div>
+                {previous.length > 0 && <PreviousAuthorizations clientId={clientId} budgets={previous} />}
+              </div>
+            );
+          })()
         )}
       </CardContent>
     </Card>

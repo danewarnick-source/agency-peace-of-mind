@@ -969,8 +969,9 @@ export const getPendingClientSubject = createServerFn({ method: "POST" })
     // (Needs confirmation), and any open NECTAR clarifying questions.
     const { data: questions } = await sb
       .from("import_nectar_questions")
-      .select("id, question, answer, field_path")
+      .select("id, question, answer")
       .eq("import_subject_id", data.subjectId);
+
 
     type ReviewItem = {
       id: string;

@@ -181,16 +181,21 @@ function DonePage() {
           <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
             <CheckCircle2 className="h-5 w-5" />
             <div className="text-lg font-semibold">
-              {runState === "error" ? "Records committed with issues" : "Records committed"}
+              {committedCount === 0 && job.mode === "client"
+                ? `${subjects.length} imported client${subjects.length === 1 ? "" : "s"} still need review before joining your directory`
+                : runState === "error"
+                  ? "Records committed with issues"
+                  : "Records committed"}
             </div>
           </div>
           <p className="mt-1 text-sm">
             {committedCount} of {subjects.length} {job.mode === "client" ? "client" : "staff"} profile{subjects.length === 1 ? "" : "s"} saved.
-            Each {job.mode === "client" ? "client" : "staff"} below shows its true readiness — only profiles passing
-            the live checks (schedulable, staff assigned, EVV-ready) are marked <strong>live</strong>.
+            {job.mode === "client" && committedCount < subjects.length && (
+              <> Finish the rest from the <strong>Pending Clients</strong> workspace.</>
+            )}
           </p>
 
-          {pendingCommit > 0 && (
+          {pendingCommit > 0 && committedCount > 0 && (
             <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
               {pendingCommit} marked-ready {pendingCommit === 1 ? "subject was" : "subjects were"} not saved — click <strong>Retry commit</strong> to finish.
             </p>
@@ -198,8 +203,15 @@ function DonePage() {
           {runError && <p className="mt-1 text-xs text-destructive">{runError}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
-          {pendingCommit > 0 && (
-            <Button onClick={() => retryM.mutate()} disabled={retryM.isPending}>
+          {job.mode === "client" && committedCount < subjects.length && (
+            <Button asChild>
+              <Link to="/dashboard/clients/pending">
+                Review pending clients
+              </Link>
+            </Button>
+          )}
+          {pendingCommit > 0 && committedCount > 0 && (
+            <Button variant="outline" onClick={() => retryM.mutate()} disabled={retryM.isPending}>
               {retryM.isPending
                 ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 : <RotateCw className="mr-2 h-4 w-4" />}
@@ -208,6 +220,7 @@ function DonePage() {
           )}
           <Button asChild variant="outline">
             <Link to={job.mode === "client" ? "/dashboard/clients" : "/dashboard/employees"}>
+
               <Users className="mr-2 h-4 w-4" /> Open {job.mode === "client" ? "clients" : "employees"}
             </Link>
           </Button>

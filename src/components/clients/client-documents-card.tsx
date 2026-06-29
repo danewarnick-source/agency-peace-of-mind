@@ -114,7 +114,7 @@ export function ClientDocumentsCard({
         }),
         supabase
           .from("client_documents")
-          .select("id, document_type, file_name, storage_path, file_url, uploaded_at, created_at")
+          .select("id, document_type, file_name, storage_path, file_url, uploaded_at")
           .eq("client_id", clientId)
           .order("uploaded_at", { ascending: false }),
       ]);

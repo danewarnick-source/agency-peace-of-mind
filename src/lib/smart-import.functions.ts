@@ -391,6 +391,11 @@ export const runSmartExtraction = createServerFn({ method: "POST" })
 
       for (const blob of realTextBlobs) {
         const extracted = await aiExtractFieldsFromText(blob.text, mode);
+        if (extracted.fields.length === 0) {
+          throw new Error(
+            `Extraction returned no usable fields from ${blob.file_name}. The document text was read, but no client fields could be saved.`,
+          );
+        }
         const { data: subj, error: serr } = await sb
           .from("import_subjects")
           .insert({

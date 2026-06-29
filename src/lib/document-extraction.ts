@@ -86,12 +86,30 @@ export const SYSTEM_PROMPT = `You are NECTAR, an extraction engine for a Utah DS
 You receive raw text from a document (PCSP, 1056 budget, SOW, referral, intake, assessment, certification, contract, etc.).
 Take your time. Accuracy is more important than speed. Extract EVERY field that appears in the document.
 
-Return STRICT JSON only. Use these conventions:
+OUTPUT CONTRACT — Return STRICT JSON only, using exactly this envelope:
+{
+  "document_type": "pcsp",
+  "fiscal_year": "FY26",
+  "medicaid_id": "1029384756",
+  "title": "Person-Centered Support Plan",
+  "fields": [
+    { "field_key": "first_name", "field_group": "person", "value_text": "Marcus", "confidence": 0.95 },
+    { "field_key": "last_name",  "field_group": "person", "value_text": "Rivera", "confidence": 0.95 },
+    { "field_key": "medicaid_id","field_group": "person", "value_text": "1029384756", "confidence": 0.95 },
+    { "field_key": "billing_code_row", "field_group": "billing_code",
+      "value_json": { "service_code": "SLH", "unit_type": "15 min", "max_units": 5000 }, "confidence": 0.9 }
+  ]
+}
+
+Return a single JSON object with a top-level array named fields. EVERY extracted field — person, address, guardian, goals, medications, billing codes — MUST be an element of fields. Do not nest fields under any other key, do not return a bare array, do not group fields by category at the top level.
+
+Use these conventions:
 
 document_type: one of pcsp | 1056_budget | sow | referral | intake | assessment | certification | training | contract | evv_report | timesheet | incident_report | billing_record | other
 fiscal_year: e.g. "FY26"
 effective_start / effective_end: ISO yyyy-mm-dd
 medicaid_id: digits only if present
+title: the document title/name if present (for example "Person-Centered Support Plan" or "Service Authorization")
 
 Each extracted field has: field_key, field_group, optional value_text / value_number / value_date / value_bool / value_array / value_json, source_locator, confidence (0..1).
 - Dates in value_date as ISO yyyy-mm-dd.
@@ -220,7 +238,7 @@ export async function parseDocumentWithAI(
   } catch {
     throw new Error("AI returned malformed JSON. The document may be unreadable.");
   }
-  return tolerantParseExtraction(parsed);
+  return tolerantParseExtraction(parsed, documentText.trim().length, content);
 }
 
 // ---------------------------------------------------------------
@@ -292,10 +310,50 @@ function coerceField(raw: unknown): { field?: ExtractedFieldOut; reason?: string
   return { field: out };
 }
 
-function tolerantParseExtraction(parsed: unknown): ParseOutT {
+function isFieldObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && "field_key" in value;
+}
+
+function recoverFieldArray(parsed: unknown): unknown[] {
+  if (Array.isArray(parsed)) return parsed;
+  if (!parsed || typeof parsed !== "object") return [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const p = parsed as Record<string, any>;
+  if (Array.isArray(p.fields) && p.fields.length > 0) return p.fields;
+
+  for (const value of Object.values(p)) {
+    if (Array.isArray(value) && value.some(isFieldObject)) return value;
+  }
+
+  if (p.data && typeof p.data === "object" && Array.isArray(p.data.fields)) return p.data.fields;
+  if (p.result && typeof p.result === "object" && Array.isArray(p.result.fields)) return p.result.fields;
+  return [];
+}
+
+function topLevelKeys(parsed: unknown): string[] {
+  if (Array.isArray(parsed)) return ["<array>"];
+  if (!parsed || typeof parsed !== "object") return [];
+  return Object.keys(parsed as Record<string, unknown>);
+}
+
+export function tolerantParseExtraction(
+  parsed: unknown,
+  documentTextLength: number,
+  rawModelContent: string,
+): ParseOutT {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const p = (parsed ?? {}) as Record<string, any>;
-  const rawFields: unknown[] = Array.isArray(p.fields) ? p.fields : [];
+  const rawFields: unknown[] = recoverFieldArray(parsed);
+  if (rawFields.length === 0) {
+    console.error(
+      `[document-extraction] recovered zero fields; documentText.length=${documentTextLength}; topLevelKeys=${JSON.stringify(topLevelKeys(parsed))}; bedrockModelId=${process.env.BEDROCK_MODEL_ID || "not configured"}; rawContentHead=${rawModelContent.slice(0, 1500)}`,
+    );
+    if (documentTextLength >= 50) {
+      throw new Error(
+        `Extraction returned no usable fields from a ${documentTextLength}-char document; model envelope did not contain a 'fields' array.`,
+      );
+    }
+  }
   const kept: ExtractedFieldOut[] = [];
   const dropped: string[] = [];
   for (const rf of rawFields) {

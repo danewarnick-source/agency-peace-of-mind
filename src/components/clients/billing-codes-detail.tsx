@@ -446,7 +446,35 @@ function BudgetUploadButton({ clientId }: { clientId: string }) {
 
 type Budget = NonNullable<ReturnType<typeof useClientBudget>["data"]>[number];
 
-function CodeRow({ clientId: _clientId, budget }: { clientId: string; budget: Budget }) {
+function PreviousAuthorizations({ clientId, budgets }: { clientId: string; budgets: Budget[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-xl border border-border bg-muted/20">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+      >
+        <span className="flex items-center gap-2">
+          {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          Previous authorizations ({budgets.length})
+        </span>
+        <span className="text-[10px] font-normal normal-case text-muted-foreground">
+          Retained for Medicaid records — read-only
+        </span>
+      </button>
+      {open && (
+        <div className="space-y-3 border-t border-border p-3">
+          {budgets.map((b) => (
+            <CodeRow key={b.code.id} clientId={clientId} budget={b} readOnly />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CodeRow({ clientId: _clientId, budget, readOnly = false }: { clientId: string; budget: Budget; readOnly?: boolean }) {
   const qc = useQueryClient();
   const { data: org } = useCurrentOrg();
   const code = budget.code as Budget["code"] & {
@@ -455,11 +483,15 @@ function CodeRow({ clientId: _clientId, budget }: { clientId: string; budget: Bu
   };
   const isDaily = isDailyServiceCode(code.service_code);
   const isVariable = isVariableRateCode(code.service_code);
+  const status = getAuthStatus(code.service_start_date, code.service_end_date);
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [annual, setAnnual] = useState<string>(String(code.annual_unit_authorization ?? 0));
   const [rate, setRate] = useState<string>(String(code.rate_per_unit ?? 0));
+  const [endDateDraft, setEndDateDraft] = useState<string>("");
+  const [savingEnd, setSavingEnd] = useState(false);
+
 
   const usedUnits = budget.used_units;
   const annualUnits = code.annual_unit_authorization ?? 0;

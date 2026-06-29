@@ -964,14 +964,66 @@ export const getPendingClientSubject = createServerFn({ method: "POST" })
     const overrides = (subj.validation_overrides as Record<string, boolean>) ?? {};
     const blocking = filterBlocking(validation.issues, overrides);
 
+    // ── Unified review items ─────────────────────────────────────────
+    // Merge: blocking validation (Required), warnings + contradictions
+    // (Needs confirmation), and any open NECTAR clarifying questions.
+    const { data: questions } = await sb
+      .from("import_nectar_questions")
+      .select("id, question, answer, field_path")
+      .eq("import_subject_id", data.subjectId);
+
+    type ReviewItem = {
+      id: string;
+      category: "required" | "confirmation" | "optional";
+      field: string | null;
+      message: string;
+      source: "validation" | "contradiction" | "nectar_question";
+      questionId?: string;
+    };
+    const reviewItems: ReviewItem[] = [];
+
+    const contradictionKeys = new Set(
+      findClientContradictions(draft).map((c) => c.key),
+    );
+    for (const issue of validation.issues) {
+      if (overrides[issue.key]) continue;
+      const isContradiction = contradictionKeys.has(issue.key);
+      let category: ReviewItem["category"];
+      if (issue.severity === "error") category = "required";
+      else if (isContradiction) category = "confirmation";
+      else category = "optional";
+      reviewItems.push({
+        id: issue.key,
+        category,
+        field: issue.field ?? null,
+        message: issue.message,
+        source: isContradiction ? "contradiction" : "validation",
+      });
+    }
+    for (const q of (questions ?? []) as Array<{ id: string; question: string; answer: string | null; field_path: string | null }>) {
+      if (q.answer && q.answer.trim()) continue;
+      reviewItems.push({
+        id: `q:${q.id}`,
+        category: "confirmation",
+        field: q.field_path,
+        message: q.question,
+        source: "nectar_question",
+        questionId: q.id,
+      });
+    }
+
+    const readyToFinalize = blocking.length === 0 && !subj.committed_at && !subj.discarded_at;
+
     return {
       subject: subj,
       values,
       issues: validation.issues,
       blocking: blocking.map((b) => ({ key: b.key, field: b.field ?? null, message: b.message })),
-      readyToFinalize: blocking.length === 0 && !subj.committed_at && !subj.discarded_at,
+      reviewItems,
+      readyToFinalize,
     };
   });
+
 
 // Per-subject discard. Sets discarded_at/discarded_by (additive columns from
 // migration) so the workspace filters the row out, the staging audit/history

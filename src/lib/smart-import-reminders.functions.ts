@@ -208,12 +208,13 @@ export const generateSmartImportReminders = createServerFn({ method: "POST" })
     // specification". So we look up existing rows by recurrence_key and
     // split into updates vs. inserts.
     if (inserts.length === 0) return { generated: 0 };
-    // Use the service-role client for the write side: notifications RLS is
-    // tightened to admin-recipient inserts, and these system-generated
-    // reminders are written on behalf of the org, not the calling user.
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Write through the authenticated request client, not the admin client.
+    // The live notifications policy validates the caller is a member of the
+    // notification's organization; using the caller-scoped client keeps that
+    // RLS check intact and avoids local/preview service-role drift causing
+    // "new row violates row-level security policy" on reminder inserts.
     const keys = Array.from(new Set(inserts.map((r) => r.recurrence_key)));
-    const { data: existing, error: exErr } = await supabaseAdmin
+    const { data: existing, error: exErr } = await sb
       .from("notifications")
       .select("id, organization_id, recurrence_key")
       .in("recurrence_key", keys);
@@ -226,7 +227,7 @@ export const generateSmartImportReminders = createServerFn({ method: "POST" })
     for (const row of inserts) {
       const id = existingByKey.get(`${row.organization_id}::${row.recurrence_key}`);
       if (id) {
-        const { error: updErr } = await supabaseAdmin
+        const { error: updErr } = await sb
           .from("notifications")
           .update({
             title: row.title,
@@ -242,7 +243,7 @@ export const generateSmartImportReminders = createServerFn({ method: "POST" })
       }
     }
     if (toInsert.length > 0) {
-      const { error } = await supabaseAdmin.from("notifications").insert(toInsert);
+      const { error } = await sb.from("notifications").insert(toInsert);
       if (error) throw new Error(error.message);
     }
 

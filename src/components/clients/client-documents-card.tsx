@@ -185,10 +185,9 @@ export function ClientDocumentsCard({
             clientName={clientName}
             open={uploadOpen}
             onOpenChange={setUploadOpen}
-            onUploaded={(docId) => {
-              qc.invalidateQueries({ queryKey: ["client-docs", orgId, clientId] });
-              qc.invalidateQueries({ queryKey: ["nectar-docs"] });
-              if (docId) setOfferDocId(docId);
+            onUploaded={(docId, sourceKind) => {
+              invalidateAll();
+              if (docId && sourceKind === "nectar") setOfferDocId(docId);
             }}
           />
           <NectarDocumentActionsDialog

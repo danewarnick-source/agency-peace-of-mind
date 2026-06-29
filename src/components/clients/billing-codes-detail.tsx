@@ -589,8 +589,9 @@ function CodeRow({ clientId: _clientId, budget, readOnly = false }: { clientId: 
           {!exhausted && isEmpty && (
             <Badge variant="outline" className="text-[10px]">No usage logged yet</Badge>
           )}
+          <AuthStatusBadge status={status} />
         </div>
-        {editing ? (
+        {readOnly ? null : editing ? (
           <div className="flex items-center gap-1">
             <Button size="sm" variant="ghost" onClick={handleCancel} disabled={saving} className="h-7 gap-1 text-xs">
               <X className="h-3.5 w-3.5" /> Cancel

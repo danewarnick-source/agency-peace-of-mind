@@ -65,6 +65,10 @@ jobs:
       STAGING_TRACK_SLUG: ${{ secrets.STAGING_TRACK_SLUG }}
       STAGING_TRAINING_ID: ${{ secrets.STAGING_TRAINING_ID }}
       STAGING_STATE_CODE: ${{ secrets.STAGING_STATE_CODE }}
+      # PCSP-gate spec (e2e/pcsp-gate.spec.ts) — set to staging clients with
+      # and without a PCSP on file. Unset = spec is skipped.
+      STAGING_CLIENT_ID_NO_PCSP: ${{ secrets.STAGING_CLIENT_ID_NO_PCSP }}
+      STAGING_CLIENT_ID_WITH_PCSP: ${{ secrets.STAGING_CLIENT_ID_WITH_PCSP }}
 
     steps:
       - uses: actions/checkout@v4

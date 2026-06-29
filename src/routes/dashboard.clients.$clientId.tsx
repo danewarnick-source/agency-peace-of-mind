@@ -686,7 +686,7 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
         .from("client_documents")
         .select("id", { count: "exact", head: true })
         .eq("client_id", clientId)
-        .eq("document_type", "pcsp");
+        .ilike("document_type", "pcsp");
       if (error) throw error;
       return (count ?? 0) > 0;
     },

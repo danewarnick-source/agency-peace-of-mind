@@ -309,35 +309,53 @@ function SubjectReview({
       )}
 
 
-      <Tabs defaultValue="placement">
-        <TabsList className={jobMode === "employee" ? "grid grid-cols-5" : "grid grid-cols-4"}>
-          <TabsTrigger value="placement">Placement</TabsTrigger>
-          {jobMode === "employee" && (
-            <TabsTrigger value="certs">Certs / training</TabsTrigger>
-          )}
-          <TabsTrigger value="questions">NECTAR asks {questions.length > 0 && <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px]">{questions.length}</Badge>}</TabsTrigger>
-          <TabsTrigger value="unfiled">Additional info {unfiled.length > 0 && <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px]">{unfiled.length}</Badge>}</TabsTrigger>
-          <TabsTrigger value="provision">Forecast</TabsTrigger>
-        </TabsList>
+      <details
+        className="group rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]"
+        open={questions.length > 0 || unfiled.length > 0}
+      >
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-medium">
+          <span className="flex items-center gap-2">
+            <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
+            Advanced setup details
+          </span>
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            {questions.length > 0 && <Badge variant="outline" className="h-5 px-1.5 text-[10px]">{questions.length} ask{questions.length === 1 ? "" : "s"}</Badge>}
+            {unfiled.length > 0 && <Badge variant="outline" className="h-5 px-1.5 text-[10px]">{unfiled.length} extra</Badge>}
+          </span>
+        </summary>
+        <div className="border-t border-border px-4 py-3">
+          <Tabs defaultValue={jobMode === "employee" ? "certs" : "placement"}>
+            <TabsList className={jobMode === "employee" ? "grid grid-cols-5" : "grid grid-cols-4"}>
+              <TabsTrigger value="placement">Placement</TabsTrigger>
+              {jobMode === "employee" && (
+                <TabsTrigger value="certs">Certs / training</TabsTrigger>
+              )}
+              <TabsTrigger value="questions">NECTAR asks {questions.length > 0 && <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px]">{questions.length}</Badge>}</TabsTrigger>
+              <TabsTrigger value="unfiled">Additional info {unfiled.length > 0 && <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px]">{unfiled.length}</Badge>}</TabsTrigger>
+              <TabsTrigger value="provision">Forecast</TabsTrigger>
+            </TabsList>
 
-        <TabsContent value="placement" className="mt-3">
-          <PlacementLineup fields={fields} targetFields={targetFields} matched={matched} decision={subject.review_decision} onChanged={refresh} />
-        </TabsContent>
-        {jobMode === "employee" && (
-          <TabsContent value="certs" className="mt-3">
-            <CertsPanel subjectId={subjectId} certs={certs} onChanged={refresh} />
-          </TabsContent>
-        )}
-        <TabsContent value="questions" className="mt-3">
-          <QuestionsPanel questions={questions} onChanged={refresh} />
-        </TabsContent>
-        <TabsContent value="unfiled" className="mt-3">
-          <UnfiledPanel items={unfiled} onChanged={refresh} />
-        </TabsContent>
-        <TabsContent value="provision" className="mt-3">
-          <ProvisioningPanel subjectId={subjectId} onChanged={refresh} />
-        </TabsContent>
-      </Tabs>
+            <TabsContent value="placement" className="mt-3">
+              <PlacementLineup fields={fields} targetFields={targetFields} matched={matched} decision={subject.review_decision} onChanged={refresh} />
+            </TabsContent>
+            {jobMode === "employee" && (
+              <TabsContent value="certs" className="mt-3">
+                <CertsPanel subjectId={subjectId} certs={certs} onChanged={refresh} />
+              </TabsContent>
+            )}
+            <TabsContent value="questions" className="mt-3">
+              <QuestionsPanel questions={questions} onChanged={refresh} />
+            </TabsContent>
+            <TabsContent value="unfiled" className="mt-3">
+              <UnfiledPanel items={unfiled} onChanged={refresh} />
+            </TabsContent>
+            <TabsContent value="provision" className="mt-3">
+              <ProvisioningPanel subjectId={subjectId} onChanged={refresh} />
+            </TabsContent>
+          </Tabs>
+        </div>
+      </details>
+
     </div>
   );
 }

@@ -398,7 +398,13 @@ export function ClientsPage() {
         ) : !filtered.length ? (
           <div className="flex flex-col items-center gap-2 p-12 text-center text-sm text-muted-foreground">
             <Contact2 className="h-8 w-8 text-muted-foreground/40" />
-            <p>{search ? "No clients match your search." : "No clients yet. Add your first client to get started."}</p>
+            <p>
+              {search
+                ? "No clients match your search."
+                : rosterTab === "archived"
+                  ? "No archived clients."
+                  : "No clients yet. Add your first client to get started."}
+            </p>
           </div>
         ) : (
           <div className="max-h-[calc(100vh-16rem)] overflow-auto">

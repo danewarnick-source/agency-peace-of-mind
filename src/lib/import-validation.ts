@@ -70,16 +70,71 @@ function dateOrder(
   return b < a ? "swapped" : "ok";
 }
 
+// ── Shared guardian normalizer ────────────────────────────────
+// Detect "empty" guardian values: blank, isNonAnswer placeholders, or
+// self-referential phrasing like "N/A — individual is their own guardian".
+const SELF_GUARDIAN_PHRASE = /own\s+guardian|self[-\s]?guardian|^n\/?a\b/i;
+
+export function isGuardianValueEmpty(v: unknown): boolean {
+  if (typeof v !== "string") return v == null;
+  const trimmed = v.trim();
+  if (!trimmed) return true;
+  if (isNonAnswer(trimmed)) return true;
+  if (SELF_GUARDIAN_PHRASE.test(trimmed)) return true;
+  return false;
+}
+
+// One canonical normalizer used by review, applyFields, and commit. Mutates
+// the draft in place AND returns it for chaining. Idempotent.
+export function normalizeGuardianFields<T extends ClientDraft & {
+  guardian_phone?: string | null;
+  guardian_relationship?: string | null;
+  guardian_email?: string | null;
+}>(d: T): T {
+  const nameEmpty = isGuardianValueEmpty(d.guardian_name);
+  const phoneEmpty = isGuardianValueEmpty(d.guardian_phone);
+  const relEmpty = isGuardianValueEmpty(d.guardian_relationship);
+  const emailEmpty = isGuardianValueEmpty(d.guardian_email);
+  const noRealGuardian = nameEmpty && phoneEmpty && relEmpty && emailEmpty;
+
+  // Strip self-referential / placeholder strings out of the actual fields
+  // so commit + validation see clean nulls.
+  if (nameEmpty) d.guardian_name = null;
+  if (phoneEmpty) d.guardian_phone = null;
+  if (relEmpty) d.guardian_relationship = null;
+  if (emailEmpty) d.guardian_email = null;
+
+  if (d.is_own_guardian === true || noRealGuardian) {
+    d.is_own_guardian = true;
+    d.guardian_name = null;
+    d.guardian_phone = null;
+    d.guardian_relationship = null;
+    d.guardian_email = null;
+  } else if (d.is_own_guardian === false && !nameEmpty) {
+    // keep guardian fields as-is
+  }
+  // If is_own_guardian is null/undefined and a real guardian name exists,
+  // leave is_own_guardian alone — the commit layer defaults appropriately.
+  return d;
+}
+
 export function findClientContradictions(d: ClientDraft): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
 
-  if (d.is_own_guardian === true && d.guardian_name && d.guardian_name.trim()) {
+  // Only fire when self-guardian is explicitly true AND a real (non-empty,
+  // non-self-referential) guardian name is present. Demoted to "warning" so
+  // the unified review panel renders it as "Needs confirmation" rather than
+  // a hard block — the admin resolves with a binary choice.
+  if (
+    d.is_own_guardian === true &&
+    !isGuardianValueEmpty(d.guardian_name)
+  ) {
     issues.push({
       key: "contradiction.guardian_self_vs_named",
-      severity: "error",
+      severity: "warning",
       field: "is_own_guardian",
       message:
-        "Client is marked as their own guardian, but a guardian name is also set. Pick one.",
+        "Marked as own guardian, but a guardian name is also set. Confirm which is correct.",
     });
   }
 
@@ -113,6 +168,7 @@ export function findClientContradictions(d: ClientDraft): ValidationIssue[] {
 
   return issues;
 }
+
 
 export function validateClientDraft(d: ClientDraft): ValidationResult {
   const issues: ValidationIssue[] = [];

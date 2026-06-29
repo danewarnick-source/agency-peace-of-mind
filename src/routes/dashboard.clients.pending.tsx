@@ -20,6 +20,8 @@ import {
   discardImportSubject,
 } from "@/lib/smart-import-review.functions";
 import { FinalizeClientEditor } from "@/components/clients/finalize-client-editor";
+import { clientPendingStatusLabel } from "@/lib/smart-import-status";
+
 
 export const Route = createFileRoute("/dashboard/clients/pending")({
   head: () => ({ meta: [{ title: "Pending Clients" }] }),
@@ -138,7 +140,7 @@ function PendingClientsPage() {
                       <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">Ready to finalize</Badge>
                     ) : (
                       <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-300">
-                        Needs info
+                        Needs review
                       </Badge>
                     )}
                     {it.matched_record_id && (
@@ -147,7 +149,7 @@ function PendingClientsPage() {
                   </div>
                   <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1"><FileText className="h-3 w-3" /> Imported {importDate}</span>
-                    <span>Status: {it.review_status}</span>
+                    <span>Status: {clientPendingStatusLabel(it)}</span>
                     {it.source && <span>Source: {it.source.replace("_", " ")}</span>}
                   </div>
                   {it.blockingIssues.length > 0 && (
@@ -167,13 +169,8 @@ function PendingClientsPage() {
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button asChild size="sm" variant="outline">
-                    <Link to="/dashboard/smart-import/$jobId/review" params={{ jobId: it.jobId }}>
-                      Open in review
-                    </Link>
-                  </Button>
                   <Button size="sm" onClick={() => setEditingId(it.subjectId)}>
-                    <Wrench className="mr-2 h-3.5 w-3.5" /> {it.readyToFinalize ? "Finalize" : "Complete & finalize"}
+                    <Wrench className="mr-2 h-3.5 w-3.5" /> Finalize Client
                   </Button>
                   <Button
                     size="sm"
@@ -183,7 +180,13 @@ function PendingClientsPage() {
                   >
                     <Trash2 className="mr-2 h-3.5 w-3.5" /> Discard
                   </Button>
+                  <Button asChild size="sm" variant="ghost" className="text-xs text-muted-foreground">
+                    <Link to="/dashboard/smart-import/$jobId/review" params={{ jobId: it.jobId }}>
+                      Open full import (advanced)
+                    </Link>
+                  </Button>
                 </div>
+
               </div>
             </div>
           );

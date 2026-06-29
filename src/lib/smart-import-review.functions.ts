@@ -8,9 +8,12 @@ import { z } from "zod";
 import {
   validateClientDraft,
   filterBlocking,
+  findClientContradictions,
+  normalizeGuardianFields,
   type ClientDraft,
   type ValidationIssue,
 } from "@/lib/import-validation";
+
 
 const JobId = z.object({ jobId: z.string().uuid() });
 const SubjectId = z.object({ subjectId: z.string().uuid() });
@@ -125,8 +128,16 @@ export const getReviewSubject = createServerFn({ method: "POST" })
 // smart-import-commit.functions.ts; kept inline to avoid cross-file imports.
 function buildDraftFromExtractedFields(
   rows: Array<{ target_field: string; value: string | null }>,
-): ClientDraft {
-  const d: ClientDraft = {};
+): ClientDraft & {
+  guardian_phone?: string | null;
+  guardian_relationship?: string | null;
+  guardian_email?: string | null;
+} {
+  const d: ClientDraft & {
+    guardian_phone?: string | null;
+    guardian_relationship?: string | null;
+    guardian_email?: string | null;
+  } = {};
   const codes: NonNullable<ClientDraft["billing_codes"]> = [];
   for (const r of rows) {
     const v = (r.value ?? "").trim();
@@ -149,6 +160,9 @@ function buildDraftFromExtractedFields(
         catch { d.is_own_guardian = v === "true"; }
         break;
       case "guardian_name": d.guardian_name = v; break;
+      case "guardian_phone": d.guardian_phone = v; break;
+      case "guardian_relationship": d.guardian_relationship = v; break;
+      case "guardian_email": d.guardian_email = v; break;
       case "billing_code_row":
         try {
           const j = JSON.parse(v) as Record<string, unknown>;
@@ -167,8 +181,11 @@ function buildDraftFromExtractedFields(
     }
   }
   if (codes.length) d.billing_codes = codes;
+  // Normalize so review-time validation matches commit-time reality.
+  normalizeGuardianFields(d);
   return d;
 }
+
 
 // Keep ValidationIssue importable from the route file via this re-export.
 export type { ValidationIssue };
@@ -947,14 +964,68 @@ export const getPendingClientSubject = createServerFn({ method: "POST" })
     const overrides = (subj.validation_overrides as Record<string, boolean>) ?? {};
     const blocking = filterBlocking(validation.issues, overrides);
 
+    // ── Unified review items ─────────────────────────────────────────
+    // Merge: blocking validation (Required), warnings + contradictions
+    // (Needs confirmation), and any open NECTAR clarifying questions.
+    const { data: questions } = await sb
+      .from("import_nectar_questions")
+      .select("id, question, answer")
+      .eq("import_subject_id", data.subjectId);
+
+
+    type ReviewItem = {
+      id: string;
+      category: "required" | "confirmation" | "optional";
+      field: string | null;
+      message: string;
+      source: "validation" | "contradiction" | "nectar_question";
+      questionId?: string;
+    };
+    const reviewItems: ReviewItem[] = [];
+
+    const contradictionKeys = new Set(
+      findClientContradictions(draft).map((c) => c.key),
+    );
+    for (const issue of validation.issues) {
+      if (overrides[issue.key]) continue;
+      const isContradiction = contradictionKeys.has(issue.key);
+      let category: ReviewItem["category"];
+      if (issue.severity === "error") category = "required";
+      else if (isContradiction) category = "confirmation";
+      else category = "optional";
+      reviewItems.push({
+        id: issue.key,
+        category,
+        field: issue.field ?? null,
+        message: issue.message,
+        source: isContradiction ? "contradiction" : "validation",
+      });
+    }
+    for (const q of (questions ?? []) as Array<{ id: string; question: string; answer: string | null }>) {
+      if (q.answer && q.answer.trim()) continue;
+      reviewItems.push({
+        id: `q:${q.id}`,
+        category: "confirmation",
+        field: null,
+
+        message: q.question,
+        source: "nectar_question",
+        questionId: q.id,
+      });
+    }
+
+    const readyToFinalize = blocking.length === 0 && !subj.committed_at && !subj.discarded_at;
+
     return {
       subject: subj,
       values,
       issues: validation.issues,
       blocking: blocking.map((b) => ({ key: b.key, field: b.field ?? null, message: b.message })),
-      readyToFinalize: blocking.length === 0 && !subj.committed_at && !subj.discarded_at,
+      reviewItems,
+      readyToFinalize,
     };
   });
+
 
 // Per-subject discard. Sets discarded_at/discarded_by (additive columns from
 // migration) so the workspace filters the row out, the staging audit/history

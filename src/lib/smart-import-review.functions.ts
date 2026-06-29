@@ -249,6 +249,11 @@ export const setSubjectDecision = createServerFn({ method: "POST" })
   });
 
 // ---------- Mark subject ready / approved ----------
+// Gated: when marking READY, we re-run the same validator the commit uses
+// (validateClientDraft + filterBlocking honoring validation_overrides). If any
+// blocking error remains, we leave the subject at "in_progress", store a human
+// summary in commit_error, and return { ok:false, blocking } so the caller can
+// surface the gaps instead of silently flipping ready.
 const MarkReady = z.object({ subjectId: z.string().uuid(), ready: z.boolean() });
 export const setSubjectReady = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -256,12 +261,53 @@ export const setSubjectReady = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
-    const { data: subj } = await sb.from("import_subjects").select("import_job_id, org_id").eq("id", data.subjectId).single();
+    const { data: subj } = await sb
+      .from("import_subjects")
+      .select("import_job_id, org_id, subject_type, validation_overrides, committed_at")
+      .eq("id", data.subjectId)
+      .single();
     if (!subj) throw new Error("Subject not found");
+    if (subj.committed_at) {
+      // Already committed — refuse to flip state from under it.
+      return { ok: true, alreadyCommitted: true };
+    }
+
+    if (data.ready && subj.subject_type === "client") {
+      const { data: rows } = await sb
+        .from("extracted_fields")
+        .select("target_field, value")
+        .eq("import_subject_id", data.subjectId);
+      const draft = buildDraftFromExtractedFields(rows ?? []);
+      const { issues } = validateClientDraft(draft);
+      const overrides = (subj.validation_overrides as Record<string, boolean>) ?? {};
+      const blocking = filterBlocking(issues, overrides);
+      if (blocking.length > 0) {
+        const msg = `Cannot mark ready: ${blocking.map((b) => b.message).join(" | ")}`;
+        await sb.from("import_subjects").update({
+          review_status: "in_progress",
+          commit_error: msg,
+        }).eq("id", data.subjectId);
+        await sb.from("import_audit").insert({
+          import_job_id: subj.import_job_id,
+          org_id: subj.org_id,
+          subject_id: data.subjectId,
+          item: msg,
+          traces_to: "admin_override",
+          actor: context.userId,
+          action: "mark_ready_blocked",
+        });
+        return {
+          ok: false,
+          blocking: blocking.map((b) => ({ key: b.key, field: b.field ?? null, message: b.message })),
+        };
+      }
+    }
+
     await sb.from("import_subjects").update({
       review_status: data.ready ? "ready" : "in_progress",
       reviewed_by: data.ready ? context.userId : null,
       reviewed_at: data.ready ? new Date().toISOString() : null,
+      commit_error: data.ready ? null : undefined,
     }).eq("id", data.subjectId);
     await sb.from("import_audit").insert({
       import_job_id: subj.import_job_id,

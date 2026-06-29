@@ -540,6 +540,27 @@ function CodeRow({ clientId: _clientId, budget, readOnly = false }: { clientId: 
     setEditing(false);
   }
 
+  async function handleSaveEndDate() {
+    if (!org?.organization_id) return;
+    if (!endDateDraft) return toast.error("Pick an end date");
+    if (code.service_start_date && new Date(endDateDraft) <= new Date(code.service_start_date)) {
+      return toast.error("End date must be after the start date");
+    }
+    setSavingEnd(true);
+    const { error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .from("client_billing_codes" as any)
+      .update({ service_end_date: endDateDraft })
+      .eq("id", code.id)
+      .eq("organization_id", org.organization_id);
+    setSavingEnd(false);
+    if (error) return toast.error(error.message);
+    toast.success(`${code.service_code} end date set`);
+    qc.invalidateQueries({ queryKey: ["all-client-billing-codes"] });
+    qc.invalidateQueries({ queryKey: ["client-billing-codes"] });
+    qc.invalidateQueries({ queryKey: ["client-budget"] });
+  }
+
   const unitLabel = isDaily ? "days" : "units";
 
   return (

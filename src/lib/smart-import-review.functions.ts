@@ -965,7 +965,8 @@ export const getPendingClientSubject = createServerFn({ method: "POST" })
     const values: Record<string, string | null> = {};
     for (const f of fields ?? []) values[f.target_field] = f.value;
 
-    const draft = buildDraftFromExtractedFields(fields ?? []);
+    const draft = buildDraftFromExtractedFields(fields ?? [], subj.display_name);
+
     const validation = validateClientDraft(draft);
     const overrides = (subj.validation_overrides as Record<string, boolean>) ?? {};
     const blocking = filterBlocking(validation.issues, overrides);

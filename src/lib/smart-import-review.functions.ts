@@ -83,7 +83,7 @@ export const getReviewSubject = createServerFn({ method: "POST" })
 
 
     // ── Validation issues + merge flags (prompt 3 triple-check) ──────────
-    const draft = buildDraftFromExtractedFields(fields ?? []);
+    const draft = buildDraftFromExtractedFields(fields ?? [], (subject as { display_name?: string | null }).display_name);
     const validation = validateClientDraft(draft);
     const overrides = ((subject as { validation_overrides?: Record<string, boolean> }).validation_overrides) ?? {};
     const blockingIssues = filterBlocking(validation.issues, overrides);

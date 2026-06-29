@@ -338,13 +338,10 @@ function UploadDocDialog({
         if (up.error) throw up.error;
         await attachClient({
           data: {
-            organizationId: orgId,
             clientId,
             documentType: "pcsp",
             fileName: file.name,
             storagePath: path,
-            fileUrl: `storage://client-documents/${path}`,
-            fileSizeBytes: file.size,
           },
         });
         return { __pcsp: true } as const;

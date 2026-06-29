@@ -181,30 +181,23 @@ export function ClientsPage() {
     },
   });
 
-  // Surface Smart Import jobs whose ready subjects never finished committing,
-  // so the directory makes their absence obvious instead of silently hiding them.
-  const { data: stuckImports = [] } = useQuery({
+  // Count of pending client subjects (not jobs) across the org — banner
+  // language and link now point to the Pending Clients workspace so admins
+  // can finish or discard them instead of routing into one job's done page.
+  const { data: pendingClientCount = 0 } = useQuery({
     enabled: !!org,
     queryKey: ["clients-uncommitted-imports", org?.organization_id],
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
+      const { count, error } = await (supabase as any)
         .from("import_subjects")
-        .select("import_job_id, import_jobs!inner(id, org_id, mode, status)")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", org!.organization_id)
         .eq("subject_type", "client")
-        .eq("review_status", "ready")
         .is("committed_at", null)
-        .eq("import_jobs.org_id", org!.organization_id);
-      if (error) return [];
-      const seen = new Set<string>();
-      const jobs: string[] = [];
-      for (const row of (data ?? []) as Array<{ import_job_id: string }>) {
-        if (!seen.has(row.import_job_id)) {
-          seen.add(row.import_job_id);
-          jobs.push(row.import_job_id);
-        }
-      }
-      return jobs;
+        .is("discarded_at", null);
+      if (error) return 0;
+      return count ?? 0;
     },
   });
 

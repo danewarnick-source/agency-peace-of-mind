@@ -655,7 +655,7 @@ function AddClientDialog({
     <DialogContent className="max-h-[90vh] overflow-y-auto max-w-lg">
       <DialogHeader>
         <DialogTitle>
-          {mode === "intake" ? "New Client — Begin Intake" : "New Client — Profile Only"}
+          {mode === "intake" ? "New Client — Begin Intake" : "New Client — Save as Draft"}
         </DialogTitle>
       </DialogHeader>
       <button

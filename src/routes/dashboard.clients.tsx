@@ -252,11 +252,14 @@ export function ClientsPage() {
       return { id: data!.id as string, mode: input.intake_mode };
     },
     onSuccess: ({ id, mode }) => {
-      toast.success(mode === "intake" ? "Client created — starting intake." : "Client added.");
+      toast.success(mode === "intake" ? "Client created — starting intake." : "Draft client saved. Finish required fields when you're ready.");
       qc.invalidateQueries({ queryKey: ["clients"] });
       setAddOpen(false);
       if (mode === "intake") {
         navigate({ to: "/dashboard/client-intake/$clientId", params: { clientId: id } });
+      } else {
+        // Land on the new client so the draft state (missing fields, intake_status=pending) is visible.
+        navigate({ to: "/dashboard/clients/$clientId", params: { clientId: id }, search: { tab: "overview" } });
       }
     },
     onError: (e: Error) => toast.error(e.message),

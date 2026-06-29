@@ -422,6 +422,71 @@ async function commitClient(
       "admin_override", userId, "autofill_error");
   }
 
+  // ─── PCSP single-source-of-truth ──────────────────────────────────────
+  // If this subject's PCSP-typed fields trace to one or more
+  // import_documents, copy each file into the client-documents bucket and
+  // register a client_documents row (document_type='pcsp') for this client.
+  // After this, the same document is visible in BOTH Care and Files with
+  // no re-upload needed. Idempotent: skipped if a row with the same
+  // file_name already exists for this client.
+  try {
+    const pcspFieldPrefix = (k: string) => k.startsWith("pcsp_");
+    const pcspDocIds = Array.from(new Set(
+      fields
+        .filter((f) => pcspFieldPrefix(f.target_field) && f.source_document_id)
+        .map((f) => f.source_document_id as string),
+    ));
+    if (pcspDocIds.length > 0) {
+      const { data: importDocs } = await sb
+        .from("import_documents")
+        .select("id, storage_path, file_name, file_type")
+        .in("id", pcspDocIds);
+      for (const doc of (importDocs ?? []) as Array<{
+        id: string; storage_path: string; file_name: string; file_type: string | null;
+      }>) {
+        if (!doc?.storage_path) continue;
+        const { data: existing } = await sb
+          .from("client_documents")
+          .select("id")
+          .eq("client_id", recordId)
+          .eq("file_name", doc.file_name)
+          .ilike("document_type", "pcsp")
+          .limit(1)
+          .maybeSingle();
+        if (existing?.id) continue;
+        const dl = await sb.storage.from("import-documents").download(doc.storage_path);
+        if (dl.error || !dl.data) {
+          gaps.push(`PCSP copy skipped (${doc.file_name}): ${dl.error?.message ?? "no file"}`);
+          continue;
+        }
+        const safe = (doc.file_name || "pcsp.pdf").replace(/[^\w.\-]+/g, "_");
+        const destPath = `${orgId}/${recordId}/pcsp/${Date.now()}_${safe}`;
+        const up = await sb.storage.from("client-documents").upload(destPath, dl.data, {
+          contentType: doc.file_type || "application/pdf",
+          upsert: false,
+        });
+        if (up.error) {
+          gaps.push(`PCSP copy failed (${doc.file_name}): ${up.error.message}`);
+          continue;
+        }
+        const { error: insErr } = await sb.from("client_documents").insert({
+          client_id: recordId,
+          organization_id: orgId,
+          document_type: "pcsp",
+          file_name: doc.file_name,
+          file_url: destPath,
+          storage_path: destPath,
+          uploaded_by: userId,
+        });
+        if (insErr) {
+          gaps.push(`PCSP register failed (${doc.file_name}): ${insErr.message}`);
+        }
+      }
+    }
+  } catch (err) {
+    gaps.push(`PCSP carry-over warning: ${(err as Error).message}`);
+  }
+
   return recordId;
 }
 

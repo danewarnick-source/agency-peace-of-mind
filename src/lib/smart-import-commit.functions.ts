@@ -278,8 +278,9 @@ async function commitClient(
     mapped[col] = f.value;
   }
 
-  // Coerce/normalize guardianship so the validate_client_guardianship trigger always passes.
-  const normalizeGuardianship = (m: Record<string, unknown>, defaultSelf: boolean) => {
+  // Coerce/normalize guardianship via the shared helper so the trigger,
+  // validator, and reviewer agree on what "self-guardian" means.
+  const normalize = (m: Record<string, unknown>, defaultSelf: boolean) => {
     const guardianTouched =
       "is_own_guardian" in m ||
       "guardian_name" in m ||
@@ -287,30 +288,27 @@ async function commitClient(
       "guardian_relationship" in m ||
       "guardian_email" in m;
     if (!guardianTouched) return; // non-destructive on update path
-    const hasGuardianName = typeof m.guardian_name === "string" && (m.guardian_name as string).trim() !== "";
-    const extractedSelf =
-      m.is_own_guardian === true ||
-      m.is_own_guardian === "true" ||
-      m.is_own_guardian === undefined ||
-      m.is_own_guardian === null
-        ? defaultSelf || m.is_own_guardian === true || m.is_own_guardian === "true"
-        : false;
-    if (hasGuardianName && !extractedSelf) {
-      m.is_own_guardian = false;
-    } else {
+    // Coerce string booleans first so normalizeGuardianFields sees real bools.
+    if (m.is_own_guardian === "true") m.is_own_guardian = true;
+    else if (m.is_own_guardian === "false") m.is_own_guardian = false;
+    if (
+      defaultSelf &&
+      (m.is_own_guardian === undefined || m.is_own_guardian === null)
+    ) {
       m.is_own_guardian = true;
-      m.guardian_name = null;
-      m.guardian_phone = null;
-      m.guardian_relationship = null;
-      m.guardian_email = null;
     }
+    normalizeGuardianFields(m as ClientDraft & {
+      guardian_phone?: string | null;
+      guardian_relationship?: string | null;
+      guardian_email?: string | null;
+    });
   };
 
   let recordId: string;
   if (subj.matched_record_id && subj.review_decision === "update") {
     recordId = subj.matched_record_id;
     if (Object.keys(mapped).length > 0) {
-      normalizeGuardianship(mapped, false);
+      normalize(mapped, false);
       const { error } = await sb.from("clients").update(mapped).eq("id", recordId).eq("organization_id", orgId);
       if (error) throw new Error(`clients update: ${error.message}`);
     }
@@ -322,22 +320,8 @@ async function commitClient(
       mapped.first_name = parts[0] ?? "Imported";
       mapped.last_name = parts.slice(1).join(" ") || "Client";
     }
-    // Default to self-guardian on new clients unless the doc clearly named a separate guardian.
-    const hasGuardianName = typeof mapped.guardian_name === "string" && (mapped.guardian_name as string).trim() !== "";
-    const extractedSelf =
-      mapped.is_own_guardian === true ||
-      mapped.is_own_guardian === "true" ||
-      mapped.is_own_guardian === undefined ||
-      mapped.is_own_guardian === null;
-    if (hasGuardianName && !extractedSelf) {
-      mapped.is_own_guardian = false;
-    } else {
-      mapped.is_own_guardian = true;
-      mapped.guardian_name = null;
-      mapped.guardian_phone = null;
-      mapped.guardian_relationship = null;
-      mapped.guardian_email = null;
-    }
+    // Default to self-guardian on new clients unless a real guardian is named.
+    normalize(mapped, true);
     mapped.organization_id = orgId;
     mapped.account_status = "active";
     mapped.intake_status = "pending";
@@ -346,6 +330,7 @@ async function commitClient(
     recordId = row.id;
     await audit(sb, jobId, orgId, subj.id, "Created new client", "source", userId, "create_client");
   }
+
 
   // Provenance rows for each core field
   for (const f of fields) {

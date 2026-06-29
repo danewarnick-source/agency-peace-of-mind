@@ -953,6 +953,7 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
             {!editing ? (
               <>
                 <Button variant="outline" size="sm" onClick={() => {
+                  if (!pcspReady) { setShowPcspPrompt(true); return; }
                   setDraftContent(structuredClone(content));
                   setEditing(true);
                 }}>Edit</Button>
@@ -972,7 +973,7 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
                   Rebuild from goals
                 </Button>
                 {training.status !== "published" && (
-                  <Button size="sm" onClick={() => setShowPublishDialog(true)} disabled={publishMut.isPending}>
+                  <Button size="sm" onClick={() => pcspReady ? setShowPublishDialog(true) : setShowPcspPrompt(true)} disabled={publishMut.isPending}>
                     {publishMut.isPending
                       ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                       : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}

@@ -271,13 +271,13 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
         <div className="ml-auto flex flex-wrap gap-2">
           {!editing && (
             <>
-              <Button variant="outline" size="sm" onClick={startEdit}><Pencil className="mr-1.5 h-3.5 w-3.5" />Edit</Button>
-              <Button variant="outline" size="sm" onClick={() => draftMut.mutate(true)} disabled={draftMut.isPending}>
+              <Button variant="outline" size="sm" onClick={() => pcspReady ? startEdit() : setShowPcspPrompt(true)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Edit</Button>
+              <Button variant="outline" size="sm" onClick={() => pcspReady ? draftMut.mutate(true) : setShowPcspPrompt(true)} disabled={draftMut.isPending}>
                 {draftMut.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
                 Rebuild with NECTAR
               </Button>
               {training.status !== "published" && (
-                <Button size="sm" onClick={() => setShowPublishDialog(true)} disabled={publishMut.isPending}>
+                <Button size="sm" onClick={() => pcspReady ? setShowPublishDialog(true) : setShowPcspPrompt(true)} disabled={publishMut.isPending}>
                   {publishMut.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
                   Approve & Publish
                 </Button>
@@ -295,6 +295,12 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
           )}
         </div>
       </div>
+
+      {!pcspReady && (
+        <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
+          Upload a PCSP to get started — this training is built from the PCSP. Publishing and editing are disabled until a PCSP is on file (add it from the client's Files tab).
+        </div>
+      )}
 
       <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900 flex gap-2">
         <Shield className="h-4 w-4 shrink-0 mt-0.5" />

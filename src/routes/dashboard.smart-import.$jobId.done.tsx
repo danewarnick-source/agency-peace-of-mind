@@ -146,6 +146,25 @@ function DonePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRun, runState, jobId]);
 
+  // §5 — On full success this page is not the admin's destination. As soon
+  // as the readout shows every subject committed, route to the directory.
+  useEffect(() => {
+    const subjects = q.data?.subjects;
+    if (!subjects || subjects.length === 0) return;
+    const committed = subjects.filter((s) => s.committed);
+    if (committed.length !== subjects.length) return;
+    const mode = q.data?.job?.mode;
+    if (mode === "client" && committed.length === 1 && committed[0].record_id) {
+      navigate({ to: "/dashboard/clients/$clientId", params: { clientId: committed[0].record_id } }).catch(() => navigate({ to: "/dashboard/clients" }));
+    } else if (mode === "client") {
+      navigate({ to: "/dashboard/clients" });
+    } else {
+      navigate({ to: "/dashboard/employees" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q.data?.subjects, q.data?.job?.mode]);
+
+
   if (runState === "running") {
     return (
       <div className="rounded-2xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">

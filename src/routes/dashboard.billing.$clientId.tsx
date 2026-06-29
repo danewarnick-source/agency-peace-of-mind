@@ -57,6 +57,9 @@ function ClientBillingDetail() {
   });
 
   const codes = (allCodes ?? []).filter((c) => c.client_id === clientId);
+  const currentCodes = codes.filter((c) => getAuthStatus(c.service_start_date, c.service_end_date) !== "expired");
+  const previousCodes = codes.filter((c) => getAuthStatus(c.service_start_date, c.service_end_date) === "expired");
+  const [showPrevious, setShowPrevious] = useState(false);
 
   const [newRow, setNewRow] = useState<Draft>({
     service_code: "",

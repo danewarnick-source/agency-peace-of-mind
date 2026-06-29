@@ -274,7 +274,7 @@ function ClientBillingDetail() {
                 <td className="p-2"><Input type="date" className="h-8 w-36"
                   value={newRow.service_start_date ?? ""}
                   onChange={(e) => setNewRow({ ...newRow, service_start_date: e.target.value || null })} /></td>
-                <td className="p-2"><Input type="date" className="h-8 w-36"
+                <td className="p-2"><Input type="date" required className="h-8 w-36"
                   value={newRow.service_end_date ?? ""}
                   onChange={(e) => setNewRow({ ...newRow, service_end_date: e.target.value || null })} /></td>
                 <td className="p-2"><Input className="h-8 w-24"
@@ -293,8 +293,61 @@ function ClientBillingDetail() {
           </table>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Unit type Q = {UNITS_PER_HOUR} units/hr · Period dates define the per-client renewal window used by the calculator.
+          Unit type Q = {UNITS_PER_HOUR} units/hr · End date is required on every authorization. Expired rows move into Previous authorizations below.
         </p>
+
+        {previousCodes.length > 0 && (
+          <div className="mt-4 rounded-xl border border-border bg-muted/20">
+            <button
+              type="button"
+              onClick={() => setShowPrevious((v) => !v)}
+              className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+            >
+              <span className="flex items-center gap-2">
+                {showPrevious ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                Previous authorizations ({previousCodes.length})
+              </span>
+              <span className="text-[10px] font-normal normal-case text-muted-foreground">
+                Retained for Medicaid records
+              </span>
+            </button>
+            {showPrevious && (
+              <div className="overflow-x-auto border-t border-border">
+                <table className="w-full min-w-[720px] text-sm">
+                  <thead className="text-left text-xs uppercase text-muted-foreground">
+                    <tr>
+                      <th className="p-2">Code</th>
+                      <th className="p-2">Rate / unit</th>
+                      <th className="p-2">Annual units</th>
+                      <th className="p-2">Period start</th>
+                      <th className="p-2">Renewal date</th>
+                      <th className="p-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previousCodes.map((row) => (
+                      <tr key={row.id} className="border-t border-border text-muted-foreground">
+                        <td className="p-2 font-mono font-semibold">
+                          {row.service_code}
+                          {isDailyServiceCode(row.service_code) ? (
+                            <span className="ml-1 rounded bg-[#fde9c8] px-1 py-0.5 text-[10px] font-bold text-[#7a4308]">DAILY</span>
+                          ) : (
+                            <span className="ml-1 rounded bg-[#e1efff] px-1 py-0.5 text-[10px] font-bold text-[#11498e]">Q</span>
+                          )}
+                        </td>
+                        <td className="p-2 font-mono">{row.rate_per_unit ?? "—"}</td>
+                        <td className="p-2 font-mono">{row.annual_unit_authorization ?? "—"}</td>
+                        <td className="p-2 font-mono text-xs">{row.service_start_date ?? "—"}</td>
+                        <td className="p-2 font-mono text-xs">{row.service_end_date ?? "—"}</td>
+                        <td className="p-2"><AuthStatusBadge status="expired" /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </section>
     </div>
   );

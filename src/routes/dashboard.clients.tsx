@@ -365,6 +365,30 @@ export function ClientsPage() {
         />
       </div>
 
+      {/* Active / Archived tabs */}
+      <div className="inline-flex rounded-md border border-border bg-muted/40 p-0.5 text-xs">
+        {(["active", "archived"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setRosterTab(t)}
+            className={
+              "rounded px-3 py-1 font-medium capitalize transition-colors " +
+              (rosterTab === t
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground")
+            }
+          >
+            {t}
+            {t === "archived" && archivedCount > 0 && (
+              <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums">
+                {archivedCount}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
       {/* Table */}
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         {isLoading ? (

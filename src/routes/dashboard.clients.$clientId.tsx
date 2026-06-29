@@ -834,6 +834,11 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
             <p className="text-sm text-muted-foreground">
               Support strategies are required for each PCSP goal (SOW §1.24). NECTAR pulls your goals verbatim; you write the staff instructions.
             </p>
+            {!pcspReady && (
+              <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
+                Upload a PCSP to get started — drafting is disabled until a PCSP is on file (add it from the client's Files tab).
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
               <Button size="sm" onClick={() => pcspReady ? draftMut.mutate("nectar") : setShowPcspPrompt(true)} disabled={draftMut.isPending}>
                 {draftMut.isPending

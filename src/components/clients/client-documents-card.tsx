@@ -258,7 +258,7 @@ export function ClientDocumentsCard({
                 variant="ghost"
                 className="h-7 text-destructive"
                 onClick={() => {
-                  if (confirm(`Remove "${d.title}"?`)) del.mutate(d.id);
+                  if (confirm(`Remove "${d.title}"?`)) del.mutate(d);
                 }}
               >
                 <X className="h-3 w-3" />

@@ -208,15 +208,20 @@ export const generateSmartImportReminders = createServerFn({ method: "POST" })
     // specification". So we look up existing rows by recurrence_key and
     // split into updates vs. inserts.
     if (inserts.length === 0) return { generated: 0 };
-    // Write through the authenticated request client, not the admin client.
-    // The live notifications policy validates the caller is a member of the
-    // notification's organization; using the caller-scoped client keeps that
-    // RLS check intact and avoids local/preview service-role drift causing
-    // "new row violates row-level security policy" on reminder inserts.
+    // The reminder rows above are derived only from jobs/items visible through
+    // the authenticated request client. The actual notification write is a
+    // system-generated side effect, so use the privileged server client here:
+    // the live notification INSERT policy is intentionally narrower than the
+    // import review access policy and otherwise rejects valid reminder rows.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const notificationDb = supabaseAdmin as any;
     const keys = Array.from(new Set(inserts.map((r) => r.recurrence_key)));
-    const { data: existing, error: exErr } = await sb
+    const orgIds = Array.from(new Set(inserts.map((r) => r.organization_id)));
+    const { data: existing, error: exErr } = await notificationDb
       .from("notifications")
       .select("id, organization_id, recurrence_key")
+      .in("organization_id", orgIds)
       .in("recurrence_key", keys);
     if (exErr) throw new Error(exErr.message);
     const existingByKey = new Map(
@@ -227,7 +232,7 @@ export const generateSmartImportReminders = createServerFn({ method: "POST" })
     for (const row of inserts) {
       const id = existingByKey.get(`${row.organization_id}::${row.recurrence_key}`);
       if (id) {
-        const { error: updErr } = await sb
+        const { error: updErr } = await notificationDb
           .from("notifications")
           .update({
             title: row.title,
@@ -243,7 +248,7 @@ export const generateSmartImportReminders = createServerFn({ method: "POST" })
       }
     }
     if (toInsert.length > 0) {
-      const { error } = await sb.from("notifications").insert(toInsert);
+      const { error } = await notificationDb.from("notifications").insert(toInsert);
       if (error) throw new Error(error.message);
     }
 

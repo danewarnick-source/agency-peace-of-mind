@@ -192,15 +192,20 @@ function ClientBillingDetail() {
               </tr>
             </thead>
             <tbody>
-              {codes.map((row) => (
+              {currentCodes.map((row) => {
+                const status = getAuthStatus(row.service_start_date, row.service_end_date);
+                return (
                 <tr key={row.id} className="border-t border-border">
                   <td className="p-2 font-mono font-semibold">
-                    {row.service_code}
-                    {isDailyServiceCode(row.service_code) ? (
-                      <span className="ml-1 rounded bg-[#fde9c8] px-1 py-0.5 text-[10px] font-bold text-[#7a4308]">DAILY</span>
-                    ) : (
-                      <span className="ml-1 rounded bg-[#e1efff] px-1 py-0.5 text-[10px] font-bold text-[#11498e]">Q</span>
-                    )}
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span>{row.service_code}</span>
+                      {isDailyServiceCode(row.service_code) ? (
+                        <span className="rounded bg-[#fde9c8] px-1 py-0.5 text-[10px] font-bold text-[#7a4308]">DAILY</span>
+                      ) : (
+                        <span className="rounded bg-[#e1efff] px-1 py-0.5 text-[10px] font-bold text-[#11498e]">Q</span>
+                      )}
+                      <AuthStatusBadge status={status} />
+                    </div>
                   </td>
                   <td className="p-2">
                     <Input type="number" step="0.01" defaultValue={row.rate_per_unit}
@@ -228,9 +233,9 @@ function ClientBillingDetail() {
                       className="h-8 w-36" />
                   </td>
                   <td className="p-2">
-                    <Input type="date" defaultValue={row.service_end_date ?? ""}
+                    <Input type="date" required defaultValue={row.service_end_date ?? ""}
                       onBlur={(e) => upsert({ ...row, service_end_date: e.target.value || null })}
-                      className="h-8 w-36" />
+                      className={`h-8 w-36 ${!row.service_end_date ? "border-amber-500/60 bg-amber-500/5" : ""}`} />
                   </td>
                   <td className="p-2">
                     <Input defaultValue={row.sce ?? ""}
@@ -246,7 +251,8 @@ function ClientBillingDetail() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               <tr className="border-t border-border bg-muted/30">
                 <td className="p-2">
                   <Input placeholder="DSI / HHS / …" value={newRow.service_code}

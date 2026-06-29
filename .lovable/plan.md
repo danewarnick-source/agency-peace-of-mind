@@ -1,72 +1,69 @@
+## Goal
 
-## Scope
+Add Playwright e2e coverage that proves the PCSP gate works on the client Care tab for all three PCSP-derived workflows: **Support Strategies**, **Client-Specific Training**, and **Person-Centered Thinking**.
 
-Touch only the Funds → "Billing authorizations (1056)" surface:
-- `src/components/clients/billing-codes-detail.tsx` (the per-client card with `CodeRow`)
-- `src/routes/dashboard.billing.$clientId.tsx` (the "Full billing editor" table that edits the same rows)
+Tests are **read-only against staging** (matching the existing crawler pattern in `e2e/smoke.spec.ts`) and use two seeded clients identified by env vars — no uploads, no writes.
 
-No DB migration. No changes to billing math, unit ledger, EVV/daily-log pulls, submissions, or RLS. Column `client_billing_codes.service_end_date` stays nullable; the requirement is enforced in the UI only. No hard deletes.
+## New env vars (CI secrets + `.env.test`)
 
-## 1. Derived status helper (shared, render-time only)
+- `STAGING_CLIENT_ID_NO_PCSP` — a client in staging with **no** PCSP on file.
+- `STAGING_CLIENT_ID_WITH_PCSP` — a client in staging **with** a PCSP on file.
 
-Add a small helper local to `billing-codes-detail.tsx` (and re-used by the full editor via a tiny export, or duplicated — it's ~10 lines):
+If either is unset, the relevant spec is skipped (`test.skip`) with a clear message so CI doesn't false-fail before the secrets are wired up. Add both to `.github/workflows/e2e.yml` env block alongside the existing `STAGING_CLIENT_ID`.
 
-```ts
-type AuthStatus = "active" | "expired" | "upcoming" | "end-needed";
+## New file: `e2e/pcsp-gate.spec.ts`
 
-function getAuthStatus(start?: string | null, end?: string | null): AuthStatus {
-  const today = new Date(); today.setHours(0,0,0,0);
-  if (!end) return "end-needed";
-  const e = new Date(end); if (e < today) return "expired";
-  if (start) { const s = new Date(start); if (s > today) return "upcoming"; }
-  return "active";
-}
+Each Care-tab card is expanded (they default to collapsed) before assertions, since the gate UI lives inside each collapsible section.
+
+### Spec 1 — No PCSP: actions are gated
+
+For `STAGING_CLIENT_ID_NO_PCSP`, navigate to `/dashboard/clients/{id}` and assert, for each of the three cards:
+
+1. The amber warning banner is visible with the canonical phrase `Upload a PCSP to get started`.
+2. The primary action buttons are interactable but **route to the "Upload the PCSP first" dialog** instead of acting. The spec clicks each gated control and asserts:
+   - A dialog appears with title `Upload the PCSP first`.
+   - The dialog body contains `This client has no PCSP on file`.
+   - Dialog is dismissed before the next assertion.
+
+Gated controls covered (one click per card is enough to prove the wiring; the banner assertion covers the rest):
+- Support Strategies card: `Build from PCSP goals (NECTAR)` and `Approve & Publish` (when a draft exists) — fall back to whichever is rendered.
+- Client-Specific Training card: `Build from PCSP goals (NECTAR)` / `Edit` / `Approve & Publish`.
+- Person-Centered Thinking card: `Create profile` / `Review & Publish`.
+
+### Spec 2 — With PCSP: gate is lifted
+
+For `STAGING_CLIENT_ID_WITH_PCSP`, navigate to the same page and assert, for each card:
+
+1. The amber `Upload a PCSP to get started` banner is **not** present.
+2. Clicking a primary action does **not** open the `Upload the PCSP first` dialog (assert the dialog with that title is not visible within a short timeout).
+3. The PCSP-goals card on the Care tab shows the "PCSP on file" copy (`PCSP on file — pull goals from it`), confirming the gate query returned true.
+
+### Cross-cutting
+
+- Reuse the existing `storageState` auth bootstrap from `e2e/global-setup.ts`; no new login flow.
+- Selectors prefer accessible text (`getByRole('button', { name: ... })`, `getByText(/Upload a PCSP to get started/)`, `getByRole('dialog', { name: /Upload the PCSP first/ })`).
+- Keep the file self-contained — no shared helpers required beyond what Playwright provides.
+- Each spec sets a 30s navigation timeout, uses `waitUntil: "domcontentloaded"`, and tolerates the card-default-collapsed state by clicking the card header first.
+
+## CI wiring
+
+Edit `.github/workflows/e2e.yml` `crawl` job env block to pass through:
+
+```yaml
+STAGING_CLIENT_ID_NO_PCSP: ${{ secrets.STAGING_CLIENT_ID_NO_PCSP }}
+STAGING_CLIENT_ID_WITH_PCSP: ${{ secrets.STAGING_CLIENT_ID_WITH_PCSP }}
 ```
 
-Badge styles:
-- active → green outline
-- expired → red/destructive
-- upcoming → slate/blue
-- end-needed → amber, with inline "Set end date" affordance
-
-## 2. `billing-codes-detail.tsx` — display changes
-
-In the main render (around line 132), split `budgets` by status:
-
-- `currentBudgets` = active + upcoming + end-needed
-- `previousBudgets` = expired
-
-Render `currentBudgets.map(...)` as today. Below the list, render a collapsible (shadcn `Collapsible` or a `<details>`) titled `Previous authorizations (N)`, default collapsed, that maps `previousBudgets` with the same `CodeRow` in a read-only variant (pass `readOnly` prop that hides the Edit button and disables the inline date editor added in §3).
-
-In `CodeRow`:
-- Add a status badge next to the existing badges (computed from `code.service_start_date`/`service_end_date`).
-- Replace the bottom-line `plan window … → …` text to use the real end date when set; when end is null, render `plan window {start ?? "—"} → End date needed` in amber.
-- When status is `end-needed` and not `readOnly`, show a compact inline "Set end date" row: a `<Input type="date">` + Save button that PATCHes only `service_end_date` on `client_billing_codes` (validates `> service_start_date`). Re-uses the existing `qc.invalidateQueries` set. Never auto-fill a value.
-- When `readOnly`, hide Edit/inline-date-set; everything else renders unchanged so previous authorizations remain auditable.
-
-## 3. Full billing editor (`dashboard.billing.$clientId.tsx`) — validation
-
-In the existing rows table (line ~216) and the new-row row (line ~259):
-- Mark the End date input `required`.
-- On blur/change, if `!end` or `end <= start`, toast an error and refuse the `upsert`. Keep the input controlled so the bad value isn't persisted.
-- Add the same status badge next to each row's code (reusing the helper).
-- Optionally segment the table the same way (Current vs Previous authorizations collapsible) — yes, do this for consistency since admins also work here. Same `getAuthStatus` split; previous rows remain editable here (this is the admin's full editor) but render under the collapsed section.
-
-## 4. NECTAR upload flow (§2 guardrail)
-
-In `BudgetUploadButton.handleApply`, when `r.end_date` is missing, still write the row (so rates/units land) but do NOT set `service_end_date`. The row then surfaces as `end-needed` (amber) in the card with the inline prompt — matches the "never fabricate" rule.
-
-## 5. Acceptance / QA
-
-- Editor (both card inline-set and full editor) blocks save without an end date, and rejects `end <= start` with a toast.
-- Existing rows with `service_end_date = null` show amber "End date needed" badge + inline "Set end date" prompt; no auto-fill.
-- Status badges render correctly for active / expired / upcoming.
-- Expired rows disappear from the main list and appear under a collapsible "Previous authorizations (N)" section, read-only on the Funds card, editable (but grouped) in the full editor.
-- No deletes anywhere. Unit ledger, rates math, EVV, and submissions untouched.
-- `npx tsgo --noEmit` clean; `npm run build` ok; `src/routeTree.gen.ts` unchanged (no new routes).
+No changes to `playwright.config.ts` (the new file lives under the existing `testDir: "./e2e"`).
 
 ## Out of scope
 
-- No DB migration (column stays nullable).
-- No changes to `client_billing_codes` RLS, the UNIQUE `(organization_id, client_id, service_code)` constraint, or any submission/billing pipeline.
-- No edits to host-home or AI-PDF importer flows beyond what §4 specifies inside the Funds card itself.
+- No DB seeding, no PCSP upload, no cleanup logic.
+- No assertions on the actual draft/publish server behavior — UI gate only, which is exactly the contract the previous change established.
+- No mobile-viewport variants (the card layout is the same; the gate is purely conditional rendering).
+
+## Manual setup the user does once
+
+1. Pick (or create) two staging clients — one with a PCSP document in Files, one without.
+2. Add their UUIDs to GitHub Actions secrets as `STAGING_CLIENT_ID_NO_PCSP` and `STAGING_CLIENT_ID_WITH_PCSP`.
+3. Re-run the workflow; the two new specs will execute alongside the existing crawler.

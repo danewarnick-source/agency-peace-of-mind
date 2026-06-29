@@ -1163,7 +1163,19 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
           questions={(training.review_questions ?? []).map((q) => ({ id: q.id, prompt: q.prompt }))}
         />
       )}
-
+      <Dialog open={showPcspPrompt} onOpenChange={setShowPcspPrompt}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Upload the PCSP first</DialogTitle>
+            <DialogDescription>
+              This client has no PCSP on file. The Person-Centered Profile is part of the PCSP-derived workflow, so upload the PCSP before creating or publishing. Add it under the client's Files tab.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPcspPrompt(false)}>Got it</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -13,9 +13,9 @@
 
 import {
   isNonAnswer,
-  validatePersonName,
   validateAddress,
 } from "@/lib/nectar-quality";
+
 import { EVV_SERVICE_CODES, padMemberId } from "@/lib/evv-codes";
 import { isDailyServiceCode } from "@/lib/service-billing";
 
@@ -31,6 +31,8 @@ export interface ValidationIssue {
 export interface ClientDraft {
   first_name?: string | null;
   last_name?: string | null;
+  full_name?: string | null;
+  display_name?: string | null;
   physical_address?: string | null;
   medicaid_id?: string | null;
   date_of_birth?: string | null;
@@ -39,6 +41,9 @@ export interface ClientDraft {
   form_1056_approved_date?: string | null;
   is_own_guardian?: boolean | null;
   guardian_name?: string | null;
+  guardian_phone?: string | null;
+  guardian_relationship?: string | null;
+  guardian_email?: string | null;
   pcsp_has_medications?: boolean | null;
   medication_count?: number | null;
   dysphagia?: boolean | null;
@@ -53,6 +58,25 @@ export interface ClientDraft {
   }>;
   known_addresses?: string[];
 }
+
+// Best-effort split of a free-form name into first/last. Last token is the
+// last name; everything before is the first name. Returns nulls if input is
+// blank or a known placeholder. Used by the validator + the import readout so
+// "Caleb Swanson" never trips name.first_missing / name.last_missing.
+export function deriveNameParts(
+  raw: string | null | undefined,
+): { first: string | null; last: string | null } {
+  if (!raw) return { first: null, last: null };
+  const trimmed = raw.trim();
+  if (!trimmed || isNonAnswer(trimmed)) return { first: null, last: null };
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { first: null, last: null };
+  if (parts.length === 1) return { first: parts[0], last: null };
+  const last = parts[parts.length - 1];
+  const first = parts.slice(0, -1).join(" ");
+  return { first, last };
+}
+
 
 export interface ValidationResult {
   ok: boolean;
@@ -173,12 +197,16 @@ export function findClientContradictions(d: ClientDraft): ValidationIssue[] {
 export function validateClientDraft(d: ClientDraft): ValidationResult {
   const issues: ValidationIssue[] = [];
 
-  // ── Person name
-  if (d.first_name) {
-    const msg = validatePersonName(`${d.first_name} placeholder`);
-    // validatePersonName requires 2 tokens; for a first-name-only field that's
-    // unfair. Use isNonAnswer directly here.
-    if (isNonAnswer(d.first_name)) {
+  // ── Person name — derive from full_name / display_name when first or last
+  // is missing. The roster card renders display_name, so a subject visibly
+  // named "Caleb Swanson" should not be flagged name.first_missing just
+  // because the parser didn't split it.
+  const derived = deriveNameParts(d.first_name && d.last_name ? null : (d.full_name || d.display_name));
+  const effectiveFirst = (d.first_name && d.first_name.trim()) || derived.first || "";
+  const effectiveLast = (d.last_name && d.last_name.trim()) || derived.last || "";
+
+  if (effectiveFirst) {
+    if (isNonAnswer(effectiveFirst)) {
       issues.push({
         key: "name.first_invalid",
         severity: "error",
@@ -186,7 +214,6 @@ export function validateClientDraft(d: ClientDraft): ValidationResult {
         message: "First name looks like a placeholder.",
       });
     }
-    void msg;
   } else {
     issues.push({
       key: "name.first_missing",
@@ -195,8 +222,8 @@ export function validateClientDraft(d: ClientDraft): ValidationResult {
       message: "First name is required.",
     });
   }
-  if (d.last_name) {
-    if (isNonAnswer(d.last_name)) {
+  if (effectiveLast) {
+    if (isNonAnswer(effectiveLast)) {
       issues.push({
         key: "name.last_invalid",
         severity: "error",
@@ -212,6 +239,7 @@ export function validateClientDraft(d: ClientDraft): ValidationResult {
       message: "Last name is required.",
     });
   }
+
 
   // ── Address (required for EVV-mandated clients; warn otherwise)
   if (d.physical_address && d.physical_address.trim()) {
@@ -316,8 +344,44 @@ export function validateClientDraft(d: ClientDraft): ValidationResult {
     }
   }
 
+  // ── Guardianship (mirrors the validate_client_guardian Postgres trigger)
+  // If we're sure they have a separate guardian, both name and phone are
+  // required — the trigger raises otherwise and commit fails. If self-guardian
+  // status was never positively determined (null/undefined) AND no real
+  // guardian is on file, surface a confirmation so the admin answers
+  // "is this person their own guardian?" before commit relies on the column
+  // default of false.
+  const guardianNameEmpty = isGuardianValueEmpty(d.guardian_name);
+  const guardianPhoneEmpty = isGuardianValueEmpty(d.guardian_phone);
+  if (d.is_own_guardian === false) {
+    if (guardianNameEmpty) {
+      issues.push({
+        key: "guardian.name_missing",
+        severity: "error",
+        field: "guardian_name",
+        message: "Guardian name is required when the client is not their own guardian.",
+      });
+    }
+    if (guardianPhoneEmpty) {
+      issues.push({
+        key: "guardian.phone_missing",
+        severity: "error",
+        field: "guardian_phone",
+        message: "Guardian phone is required when the client is not their own guardian.",
+      });
+    }
+  } else if (d.is_own_guardian == null && guardianNameEmpty && guardianPhoneEmpty) {
+    issues.push({
+      key: "guardian.unknown_status",
+      severity: "error",
+      field: "is_own_guardian",
+      message: "Is this client their own guardian? Confirm before finalizing.",
+    });
+  }
+
   // ── Contradictions
   issues.push(...findClientContradictions(d));
+
 
   // Only errors actually block; warnings show but don't fail the gate unless
   // overrides are explicitly requested. We return ok=false on ANY error.

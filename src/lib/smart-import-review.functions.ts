@@ -83,7 +83,7 @@ export const getReviewSubject = createServerFn({ method: "POST" })
 
 
     // ── Validation issues + merge flags (prompt 3 triple-check) ──────────
-    const draft = buildDraftFromExtractedFields(fields ?? []);
+    const draft = buildDraftFromExtractedFields(fields ?? [], (subject as { display_name?: string | null }).display_name);
     const validation = validateClientDraft(draft);
     const overrides = ((subject as { validation_overrides?: Record<string, boolean> }).validation_overrides) ?? {};
     const blockingIssues = filterBlocking(validation.issues, overrides);
@@ -128,6 +128,7 @@ export const getReviewSubject = createServerFn({ method: "POST" })
 // smart-import-commit.functions.ts; kept inline to avoid cross-file imports.
 function buildDraftFromExtractedFields(
   rows: Array<{ target_field: string; value: string | null }>,
+  displayName?: string | null,
 ): ClientDraft & {
   guardian_phone?: string | null;
   guardian_relationship?: string | null;
@@ -145,6 +146,9 @@ function buildDraftFromExtractedFields(
     switch (r.target_field) {
       case "first_name": d.first_name = v; break;
       case "last_name": d.last_name = v; break;
+      case "full_name":
+      case "name":
+        d.full_name = v; break;
       case "physical_address":
       case "address":
         d.physical_address = v; break;
@@ -181,10 +185,12 @@ function buildDraftFromExtractedFields(
     }
   }
   if (codes.length) d.billing_codes = codes;
+  if (displayName) d.display_name = displayName;
   // Normalize so review-time validation matches commit-time reality.
   normalizeGuardianFields(d);
   return d;
 }
+
 
 
 // Keep ValidationIssue importable from the route file via this re-export.
@@ -757,7 +763,11 @@ export const ISSUE_KEY_TO_TARGET: Record<string, EditableTarget> = {
   "dates.admission_discharge_invalid": "admission_date",
   "dates.form_1056_future": "form_1056_approved_date",
   "contradiction.guardian_self_vs_named": "is_own_guardian",
+  "guardian.name_missing": "guardian_name",
+  "guardian.phone_missing": "guardian_phone",
+  "guardian.unknown_status": "is_own_guardian",
 };
+
 
 const ApplyFields = z.object({
   subjectId: z.string().uuid(),
@@ -909,7 +919,7 @@ export const listPendingClientSubjects = createServerFn({ method: "POST" })
 
     const items = rows.map((r) => {
       const flds = fieldsBySubject.get(r.id) ?? [];
-      const draft = buildDraftFromExtractedFields(flds);
+      const draft = buildDraftFromExtractedFields(flds, r.display_name);
       const { issues } = validateClientDraft(draft);
       const overrides = r.validation_overrides ?? {};
       const blocking = filterBlocking(issues, overrides);
@@ -959,7 +969,8 @@ export const getPendingClientSubject = createServerFn({ method: "POST" })
     const values: Record<string, string | null> = {};
     for (const f of fields ?? []) values[f.target_field] = f.value;
 
-    const draft = buildDraftFromExtractedFields(fields ?? []);
+    const draft = buildDraftFromExtractedFields(fields ?? [], subj.display_name);
+
     const validation = validateClientDraft(draft);
     const overrides = (subj.validation_overrides as Record<string, boolean>) ?? {};
     const blocking = filterBlocking(validation.issues, overrides);
@@ -989,9 +1000,12 @@ export const getPendingClientSubject = createServerFn({ method: "POST" })
     for (const issue of validation.issues) {
       if (overrides[issue.key]) continue;
       const isContradiction = contradictionKeys.has(issue.key);
+      // Unknown self-guardian status is a required confirmation (binary
+      // choice) — show under "Needs confirmation" even though it blocks.
+      const isConfirmation = isContradiction || issue.key === "guardian.unknown_status";
       let category: ReviewItem["category"];
-      if (issue.severity === "error") category = "required";
-      else if (isContradiction) category = "confirmation";
+      if (issue.severity === "error" && !isConfirmation) category = "required";
+      else if (isConfirmation) category = "confirmation";
       else category = "optional";
       reviewItems.push({
         id: issue.key,
@@ -1001,6 +1015,7 @@ export const getPendingClientSubject = createServerFn({ method: "POST" })
         source: isContradiction ? "contradiction" : "validation",
       });
     }
+
     for (const q of (questions ?? []) as Array<{ id: string; question: string; answer: string | null }>) {
       if (q.answer && q.answer.trim()) continue;
       reviewItems.push({

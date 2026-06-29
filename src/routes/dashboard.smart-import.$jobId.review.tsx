@@ -128,10 +128,36 @@ function RosterSummary({
   const navigate = useNavigate();
   const m = useMutation({
     mutationFn: () => submit({ data: { jobId } }),
-    onSuccess: () => {
-      toast.success("Submitted for setup — running commit.");
+    onSuccess: (res: { ok: boolean; committed?: boolean; results?: Array<{ committed: boolean; record_id?: string | null; subject_type?: string }> }) => {
       qc.invalidateQueries({ queryKey: ["smart-import-review", jobId] });
-      navigate({ to: "/dashboard/smart-import/$jobId/done", params: { jobId }, search: { commit: "1" } as never });
+      qc.invalidateQueries({ queryKey: ["clients"] });
+      qc.invalidateQueries({ queryKey: ["clients-uncommitted-imports"] });
+      qc.invalidateQueries({ queryKey: ["pending-client-subjects"] });
+      const results = res.results ?? [];
+      const committedRows = results.filter((r) => r.committed && r.record_id);
+      const partial = results.length > 0 && committedRows.length < results.length;
+
+      // White-glove path: no commit happens yet — fall back to the done page,
+      // which renders the awaiting-signoff state.
+      if (results.length === 0) {
+        navigate({ to: "/dashboard/smart-import/$jobId/done", params: { jobId } });
+        return;
+      }
+
+      if (!partial && committedRows.length > 0) {
+        toast.success(`Client setup complete — ${committedRows.length === 1 ? "added to directory" : `${committedRows.length} clients added`}.`);
+        if (committedRows.length === 1 && mode === "client" && committedRows[0].record_id) {
+          navigate({ to: "/dashboard/clients/$clientId", params: { clientId: committedRows[0].record_id! } }).catch(() => navigate({ to: "/dashboard/clients" }));
+        } else if (mode === "client") {
+          navigate({ to: "/dashboard/clients" });
+        } else {
+          navigate({ to: "/dashboard/employees" });
+        }
+        return;
+      }
+
+      // Partial — stay on the review page; per-subject errors render inline.
+      toast.warning(`${committedRows.length} of ${results.length} saved — review the remaining ${results.length - committedRows.length} below.`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -148,11 +174,12 @@ function RosterSummary({
       </div>
       <Button onClick={() => m.mutate()} disabled={commitDisabled} size="lg" title={whiteGlove && !signedOff ? "Waiting for provider sign-off" : undefined}>
         {m.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        <Send className="mr-2 h-4 w-4" /> Submit for setup
+        <Send className="mr-2 h-4 w-4" /> Complete {mode === "client" ? "client" : "staff"} setup
       </Button>
     </div>
   );
 }
+
 
 // ---------------------------- WhiteGloveBanner (HIVE migration) ----------------------------
 function WhiteGloveBanner({

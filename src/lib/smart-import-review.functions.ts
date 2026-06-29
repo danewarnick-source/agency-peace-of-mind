@@ -915,7 +915,7 @@ export const listPendingClientSubjects = createServerFn({ method: "POST" })
 
     const items = rows.map((r) => {
       const flds = fieldsBySubject.get(r.id) ?? [];
-      const draft = buildDraftFromExtractedFields(flds);
+      const draft = buildDraftFromExtractedFields(flds, r.display_name);
       const { issues } = validateClientDraft(draft);
       const overrides = r.validation_overrides ?? {};
       const blocking = filterBlocking(issues, overrides);

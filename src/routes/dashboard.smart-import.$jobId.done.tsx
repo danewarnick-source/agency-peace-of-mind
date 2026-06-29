@@ -63,6 +63,7 @@ function DonePage() {
   const [runState, setRunState] = useState<"idle" | "running" | "done" | "error">(autoRun ? "running" : "idle");
   const [runError, setRunError] = useState<string | null>(null);
   const [undoOpen, setUndoOpen] = useState(false);
+  const [fixSubject, setFixSubject] = useState<string | null>(null);
 
   const q = useQuery({
     queryKey: ["smart-import-done", jobId, runState],

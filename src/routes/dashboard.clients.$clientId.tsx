@@ -996,6 +996,11 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
         </CardHeader>
         {bodyOpen && (
         <CardContent className="space-y-4">
+          {!pcspReady && (
+            <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
+              Upload a PCSP to get started — editing and publishing are disabled until a PCSP is on file (add it from the client's Files tab).
+            </div>
+          )}
           <SectionsView
             content={workingContent}
             editing={editing}

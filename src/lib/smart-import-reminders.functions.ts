@@ -208,20 +208,25 @@ export const generateSmartImportReminders = createServerFn({ method: "POST" })
     // specification". So we look up existing rows by recurrence_key and
     // split into updates vs. inserts.
     if (inserts.length === 0) return { generated: 0 };
+    // Use the service-role client for the write side: notifications RLS is
+    // tightened to admin-recipient inserts, and these system-generated
+    // reminders are written on behalf of the org, not the calling user.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const keys = Array.from(new Set(inserts.map((r) => r.recurrence_key)));
-    const { data: existing, error: exErr } = await sb
+    const { data: existing, error: exErr } = await supabaseAdmin
       .from("notifications")
       .select("id, organization_id, recurrence_key")
       .in("recurrence_key", keys);
     if (exErr) throw new Error(exErr.message);
     const existingByKey = new Map(
-      (existing ?? []).map((r: { id: string; organization_id: string; recurrence_key: string }) => [`${r.organization_id}::${r.recurrence_key}`, r.id]),
+      (existing ?? []).map((r: { id: string; organization_id: string; recurrence_key: string | null }) => [`${r.organization_id}::${r.recurrence_key ?? ""}`, r.id]),
     );
+
     const toInsert: typeof inserts = [];
     for (const row of inserts) {
       const id = existingByKey.get(`${row.organization_id}::${row.recurrence_key}`);
       if (id) {
-        const { error: updErr } = await sb
+        const { error: updErr } = await supabaseAdmin
           .from("notifications")
           .update({
             title: row.title,
@@ -237,9 +242,10 @@ export const generateSmartImportReminders = createServerFn({ method: "POST" })
       }
     }
     if (toInsert.length > 0) {
-      const { error } = await sb.from("notifications").insert(toInsert);
+      const { error } = await supabaseAdmin.from("notifications").insert(toInsert);
       if (error) throw new Error(error.message);
     }
+
 
     return { generated: inserts.length };
   });

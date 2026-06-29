@@ -248,7 +248,16 @@ export function ClientDocumentsCard({
                 size="sm"
                 variant="ghost"
                 className="h-7 gap-1 text-xs"
-                onClick={() => window.open(`/dashboard/nectar-docs?doc=${d.id}`, "_blank")}
+                onClick={async () => {
+                  if (d.source === "client" && d.storage_path) {
+                    const { data: signed } = await supabase.storage
+                      .from("client-documents")
+                      .createSignedUrl(d.storage_path, 300);
+                    if (signed?.signedUrl) window.open(signed.signedUrl, "_blank");
+                    return;
+                  }
+                  window.open(`/dashboard/nectar-docs?doc=${d.id}`, "_blank");
+                }}
               >
                 <ExternalLink className="h-3 w-3" /> Open
               </Button>

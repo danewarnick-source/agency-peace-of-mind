@@ -31,11 +31,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { supabase } from "@/integrations/supabase/client";
 import {
   ingestDocument,
   queryDocuments,
   deleteDocument,
 } from "@/lib/nectar-documents.functions";
+import { attachClientDocument } from "@/lib/import-checklist.functions";
 import { NectarDocumentActionsDialog } from "@/components/nectar/document-actions-dialog";
 
 const CLIENT_DOC_TYPES = [

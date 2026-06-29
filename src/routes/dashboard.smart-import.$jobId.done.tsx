@@ -230,11 +230,10 @@ function DonePage() {
         </div>
         <div className="space-y-2">
           {subjects.map((s) => {
-            const missingGuardian =
-              !s.committed &&
-              s.subject_type === "client" &&
-              typeof s.error === "string" &&
-              /guardian/i.test(s.error);
+            // Generalized fixer: open the shared editor for ANY uncommitted
+            // client subject (not only guardianship gaps), so we never leave
+            // the admin staring at a dead-end "Retry commit".
+            const canFix = !s.committed && s.subject_type === "client";
             return (
               <div key={s.id} className="rounded-lg border border-border p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -264,14 +263,11 @@ function DonePage() {
                     ))}
                   </ul>
                 )}
-                {missingGuardian && (
+                {canFix && (
                   <div className="mt-2">
-                    <MissingInfoButton
-                      subjectId={s.id}
-                      displayName={s.display_name}
-                      jobId={jobId}
-                      onFixed={() => { invalidateAfterCommit(); q.refetch(); }}
-                    />
+                    <Button size="sm" onClick={() => setFixSubject(s.id)}>
+                      <Wrench className="mr-2 h-3.5 w-3.5" /> Complete missing info
+                    </Button>
                   </div>
                 )}
                 {s.record_id && (

@@ -1034,6 +1034,22 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
   const publishFn = useServerFn(publishClientSpecificTraining);
   const [showPublish, setShowPublish] = useState(false);
   const [bodyOpen, setBodyOpen] = useState(false);
+  const [showPcspPrompt, setShowPcspPrompt] = useState(false);
+
+  const { data: hasPcsp } = useQuery({
+    queryKey: ["client-has-pcsp", clientId],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("client_documents")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", clientId)
+        .ilike("document_type", "pcsp");
+      if (error) throw error;
+      return (count ?? 0) > 0;
+    },
+    staleTime: 30_000,
+  });
+  const pcspReady = hasPcsp === true;
 
   const q = useQuery({
     queryKey: ["person-centered-profile", clientId],

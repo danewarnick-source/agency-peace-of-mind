@@ -199,7 +199,10 @@ export function findClientContradictions(d: ClientDraft): ValidationIssue[] {
 }
 
 
-export function validateClientDraft(d: ClientDraft): ValidationResult {
+export function validateClientDraft(
+  d: ClientDraft,
+  ctx?: { tenant?: TenantIdentity },
+): ValidationResult {
   const issues: ValidationIssue[] = [];
 
   // ── Person name — derive from full_name / display_name when first or last

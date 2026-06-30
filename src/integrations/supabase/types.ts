@@ -2745,6 +2745,7 @@ export type Database = {
           diagnoses: string[] | null
           disability_category: string | null
           discharge_date: string | null
+          dnr_applicable: boolean
           dnr_location: string | null
           dnr_status: string | null
           dysphagia: boolean
@@ -2768,11 +2769,13 @@ export type Database = {
           guardian_name: string | null
           guardian_phone: string | null
           guardian_relationship: string | null
+          has_abi: boolean
           hhs_monthly_support_hours: number | null
           home_latitude: number | null
           home_longitude: number | null
           hospice_status: string | null
           housing_voucher: string | null
+          hr_applicable: boolean
           id: string
           immunizations: string[] | null
           intake_status: string
@@ -2781,12 +2784,16 @@ export type Database = {
           last_name: string
           level_of_need: string | null
           mailing_address: string | null
+          med_prescriber_name: string | null
+          med_prescriber_phone: string | null
           medicaid_id: string | null
           medical_insurance: string | null
           neurologist_name: string | null
           neurologist_phone: string | null
           organization_id: string
           palliative_care_status: string | null
+          pcp_name: string | null
+          pcp_phone: string | null
           pcsp_expiration_date: string | null
           pcsp_goals: string[]
           personal_belongings_inventory: string[] | null
@@ -2805,6 +2812,8 @@ export type Database = {
           roommates: string[] | null
           self_admin_med_support: boolean
           special_directions: string | null
+          specialist_name: string | null
+          specialist_phone: string | null
           staff_ratio: string | null
           support_coordinator_company: string | null
           support_coordinator_email: string | null
@@ -2831,6 +2840,7 @@ export type Database = {
           diagnoses?: string[] | null
           disability_category?: string | null
           discharge_date?: string | null
+          dnr_applicable?: boolean
           dnr_location?: string | null
           dnr_status?: string | null
           dysphagia?: boolean
@@ -2854,11 +2864,13 @@ export type Database = {
           guardian_name?: string | null
           guardian_phone?: string | null
           guardian_relationship?: string | null
+          has_abi?: boolean
           hhs_monthly_support_hours?: number | null
           home_latitude?: number | null
           home_longitude?: number | null
           hospice_status?: string | null
           housing_voucher?: string | null
+          hr_applicable?: boolean
           id?: string
           immunizations?: string[] | null
           intake_status?: string
@@ -2867,12 +2879,16 @@ export type Database = {
           last_name: string
           level_of_need?: string | null
           mailing_address?: string | null
+          med_prescriber_name?: string | null
+          med_prescriber_phone?: string | null
           medicaid_id?: string | null
           medical_insurance?: string | null
           neurologist_name?: string | null
           neurologist_phone?: string | null
           organization_id: string
           palliative_care_status?: string | null
+          pcp_name?: string | null
+          pcp_phone?: string | null
           pcsp_expiration_date?: string | null
           pcsp_goals?: string[]
           personal_belongings_inventory?: string[] | null
@@ -2891,6 +2907,8 @@ export type Database = {
           roommates?: string[] | null
           self_admin_med_support?: boolean
           special_directions?: string | null
+          specialist_name?: string | null
+          specialist_phone?: string | null
           staff_ratio?: string | null
           support_coordinator_company?: string | null
           support_coordinator_email?: string | null
@@ -2917,6 +2935,7 @@ export type Database = {
           diagnoses?: string[] | null
           disability_category?: string | null
           discharge_date?: string | null
+          dnr_applicable?: boolean
           dnr_location?: string | null
           dnr_status?: string | null
           dysphagia?: boolean
@@ -2940,11 +2959,13 @@ export type Database = {
           guardian_name?: string | null
           guardian_phone?: string | null
           guardian_relationship?: string | null
+          has_abi?: boolean
           hhs_monthly_support_hours?: number | null
           home_latitude?: number | null
           home_longitude?: number | null
           hospice_status?: string | null
           housing_voucher?: string | null
+          hr_applicable?: boolean
           id?: string
           immunizations?: string[] | null
           intake_status?: string
@@ -2953,12 +2974,16 @@ export type Database = {
           last_name?: string
           level_of_need?: string | null
           mailing_address?: string | null
+          med_prescriber_name?: string | null
+          med_prescriber_phone?: string | null
           medicaid_id?: string | null
           medical_insurance?: string | null
           neurologist_name?: string | null
           neurologist_phone?: string | null
           organization_id?: string
           palliative_care_status?: string | null
+          pcp_name?: string | null
+          pcp_phone?: string | null
           pcsp_expiration_date?: string | null
           pcsp_goals?: string[]
           personal_belongings_inventory?: string[] | null
@@ -2977,6 +3002,8 @@ export type Database = {
           roommates?: string[] | null
           self_admin_med_support?: boolean
           special_directions?: string | null
+          specialist_name?: string | null
+          specialist_phone?: string | null
           staff_ratio?: string | null
           support_coordinator_company?: string | null
           support_coordinator_email?: string | null
@@ -13579,6 +13606,7 @@ export type Database = {
           diagnoses: string[] | null
           disability_category: string | null
           discharge_date: string | null
+          dnr_applicable: boolean
           dnr_location: string | null
           dnr_status: string | null
           dysphagia: boolean
@@ -13602,11 +13630,13 @@ export type Database = {
           guardian_name: string | null
           guardian_phone: string | null
           guardian_relationship: string | null
+          has_abi: boolean
           hhs_monthly_support_hours: number | null
           home_latitude: number | null
           home_longitude: number | null
           hospice_status: string | null
           housing_voucher: string | null
+          hr_applicable: boolean
           id: string
           immunizations: string[] | null
           intake_status: string
@@ -13615,12 +13645,16 @@ export type Database = {
           last_name: string
           level_of_need: string | null
           mailing_address: string | null
+          med_prescriber_name: string | null
+          med_prescriber_phone: string | null
           medicaid_id: string | null
           medical_insurance: string | null
           neurologist_name: string | null
           neurologist_phone: string | null
           organization_id: string
           palliative_care_status: string | null
+          pcp_name: string | null
+          pcp_phone: string | null
           pcsp_expiration_date: string | null
           pcsp_goals: string[]
           personal_belongings_inventory: string[] | null
@@ -13639,6 +13673,8 @@ export type Database = {
           roommates: string[] | null
           self_admin_med_support: boolean
           special_directions: string | null
+          specialist_name: string | null
+          specialist_phone: string | null
           staff_ratio: string | null
           support_coordinator_company: string | null
           support_coordinator_email: string | null

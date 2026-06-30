@@ -445,8 +445,11 @@ function SubjectWizard({
         jobMode === "employee" ? (
           <CertsPanel subjectId={subjectId} certs={certs} onChanged={onChanged} />
         ) : (
-          <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-[var(--shadow-card)]">
-            Assign staff and scope service codes in the <strong>Assignment map</strong> below. Per-client training (Support strategies, Client-specific training, Person-Centered Thinking) becomes available after the PCSP is uploaded.
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground shadow-[var(--shadow-card)]">
+              Assign staff and scope each one to the codes they're authorized for. Per-client training (Support strategies, Client-specific training, Person-Centered Thinking) unlocks after PCSP upload.
+            </div>
+            <AssignmentMapPanel jobId={jobId} subjects={subjects} assignments={assignments} onChanged={onChanged} />
           </div>
         )
       )}

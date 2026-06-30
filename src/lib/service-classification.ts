@@ -129,3 +129,77 @@ export function classifyExtractedService(args: {
     reason: `${code} is not on this org's awarded codes.`,
   };
 }
+
+/**
+ * Fetch the tenant identity for an organization — legal/display names plus
+ * any aliases, and the codes_held list from provider_interest_outline.
+ * Returns sensible empties when nothing is configured.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function fetchTenantIdentity(sb: any, orgId: string): Promise<TenantIdentity> {
+  const { data: org } = await sb
+    .from("organizations")
+    .select("name, legal_name, aliases")
+    .eq("id", orgId)
+    .maybeSingle();
+  const { data: outline } = await sb
+    .from("provider_interest_outline")
+    .select("codes_held")
+    .eq("organization_id", orgId)
+    .eq("name", "Default")
+    .maybeSingle();
+  const names: string[] = [];
+  if (org?.name) names.push(org.name);
+  if (org?.legal_name) names.push(org.legal_name);
+  if (Array.isArray(org?.aliases)) for (const a of org.aliases) if (a) names.push(String(a));
+  return {
+    names,
+    codesHeld: Array.isArray(outline?.codes_held) ? outline.codes_held.map((c: string) => String(c).toUpperCase()) : [],
+  };
+}
+
+/**
+ * Partition resolved code rows into the three buckets, honoring admin
+ * overrides set in the review UI. Override keys:
+ *   code.bill_as_ours.<CODE>  → force OURS
+ *   code.coordination.<CODE>  → force OTHER_PROVIDER
+ *   code.ignore.<CODE>        → drop (not billed, not stored)
+ */
+export interface CodeRowLike {
+  service_code: string;
+  provider_name?: string | null;
+  [k: string]: unknown;
+}
+
+export function partitionCodeRows<T extends CodeRowLike>(
+  rows: T[],
+  tenant: TenantIdentity,
+  overrides: Record<string, boolean> = {},
+): {
+  ours: T[];
+  other: Array<T & { _classification: ServiceClassification }>;
+  ignored: T[];
+  needsReview: Array<T & { _classification: ServiceClassification }>;
+} {
+  const ours: T[] = [];
+  const other: Array<T & { _classification: ServiceClassification }> = [];
+  const ignored: T[] = [];
+  const needsReview: Array<T & { _classification: ServiceClassification }> = [];
+  for (const row of rows) {
+    const code = (row.service_code ?? "").toUpperCase();
+    if (overrides[`code.ignore.${code}`]) { ignored.push(row); continue; }
+    if (overrides[`code.bill_as_ours.${code}`]) { ours.push(row); continue; }
+    if (overrides[`code.coordination.${code}`]) {
+      other.push({ ...row, _classification: { bucket: "other_provider", confident: true, reason: "Admin chose coordination only." } });
+      continue;
+    }
+    const c = classifyExtractedService({ serviceCode: code, providerName: row.provider_name, tenant });
+    if (!c.confident) {
+      needsReview.push({ ...row, _classification: c });
+      continue;
+    }
+    if (c.bucket === "ours") ours.push(row);
+    else other.push({ ...row, _classification: c });
+  }
+  return { ours, other, ignored, needsReview };
+}

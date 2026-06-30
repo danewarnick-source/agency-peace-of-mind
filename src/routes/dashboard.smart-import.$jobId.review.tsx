@@ -21,7 +21,7 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import {
   getReviewJob, getReviewSubject, editExtractedField, setSubjectDecision,
   setSubjectReady, upsertCertDocument, answerNectarQuestion, fileUnfiledItem,
-  computeProvisioningForecast, togglePlanItem, confirmAssignment, submitForSetup,
+  computeProvisioningForecast, togglePlanItem, submitForSetup,
   saveBillingCodeRow, removeExtractedField, restoreExtractedField,
   getJobAssigner, upsertManualAssignment, removeAssignmentMapRow,
 } from "@/lib/smart-import-review.functions";

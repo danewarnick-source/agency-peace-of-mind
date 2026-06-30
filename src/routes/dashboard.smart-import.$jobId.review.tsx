@@ -99,13 +99,19 @@ function ReviewPage() {
         <SubjectQueue subjects={subjects} selectedId={selectedId} onSelect={setSelectedId} />
         <div className="space-y-4">
           {selectedId ? (
-            <SubjectReview subjectId={selectedId} jobMode={mode} onChanged={() => job.refetch()} />
+            <SubjectReview
+              subjectId={selectedId}
+              jobMode={mode}
+              jobId={jobId}
+              subjects={subjects}
+              assignments={job.data.assignments ?? []}
+              onChanged={() => job.refetch()}
+            />
           ) : (
             <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground shadow-[var(--shadow-card)]">
               Select a person from the queue to begin review.
             </div>
           )}
-          <AssignmentMapPanel jobId={jobId} subjects={subjects} assignments={job.data.assignments ?? []} onChanged={() => job.refetch()} />
         </div>
       </div>
     </div>
@@ -285,8 +291,15 @@ function StatusDot({ status }: { status: SubjectRow["review_status"] }) {
 
 // ---------------------------- SubjectReview ----------------------------
 function SubjectReview({
-  subjectId, jobMode, onChanged,
-}: { subjectId: string; jobMode: "employee" | "client"; onChanged: () => void }) {
+  subjectId, jobMode, jobId, subjects, assignments, onChanged,
+}: {
+  subjectId: string;
+  jobMode: "employee" | "client";
+  jobId: string;
+  subjects: SubjectRow[];
+  assignments: Array<{ id: string; relation_type: string; staff_subject_id: string | null; client_subject_id: string | null; status: string; inference_reason: string | null }>;
+  onChanged: () => void;
+}) {
   const getSubj = useServerFn(getReviewSubject);
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["smart-import-subject", subjectId], queryFn: () => getSubj({ data: { subjectId } }) });
@@ -330,6 +343,9 @@ function SubjectReview({
         questions={questions}
         unfiled={unfiled}
         validation={validation}
+        jobId={jobId}
+        subjects={subjects}
+        assignments={assignments}
         onChanged={refresh}
       />
 
@@ -361,7 +377,7 @@ type WizardStepId = "person" | "services" | "plan" | "staff" | "review";
 
 function SubjectWizard({
   subjectId, jobMode, fields, targetFields, matched, decision, tenant,
-  certs, questions, unfiled, validation, onChanged,
+  certs, questions, unfiled, validation, jobId, subjects, assignments, onChanged,
 }: {
   subjectId: string;
   jobMode: "employee" | "client";
@@ -374,6 +390,9 @@ function SubjectWizard({
   questions: Array<{ id: string; question: string; context: string | null; answer: string | null }>;
   unfiled: Array<{ id: string; text: string; filed_to: string | null }>;
   validation: { ok: boolean; issues: Array<{ key: string; severity: "error" | "warning"; field?: string; message: string }>; blocking: string[] } | undefined;
+  jobId: string;
+  subjects: SubjectRow[];
+  assignments: Array<{ id: string; relation_type: string; staff_subject_id: string | null; client_subject_id: string | null; status: string; inference_reason: string | null }>;
   onChanged: () => void;
 }) {
   const [step, setStep] = useState<WizardStepId>("person");
@@ -426,8 +445,11 @@ function SubjectWizard({
         jobMode === "employee" ? (
           <CertsPanel subjectId={subjectId} certs={certs} onChanged={onChanged} />
         ) : (
-          <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-[var(--shadow-card)]">
-            Assign staff and scope service codes in the <strong>Assignment map</strong> below. Per-client training (Support strategies, Client-specific training, Person-Centered Thinking) becomes available after the PCSP is uploaded.
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground shadow-[var(--shadow-card)]">
+              Assign staff and scope each one to the codes they're authorized for. Per-client training (Support strategies, Client-specific training, Person-Centered Thinking) unlocks after PCSP upload.
+            </div>
+            <AssignmentMapPanel jobId={jobId} subjects={subjects} assignments={assignments} onChanged={onChanged} />
           </div>
         )
       )}

@@ -184,18 +184,18 @@ export async function applyExtractedFieldsToClient(
   const { data: client, error: cErr } = await supabase
     .from("clients")
     .select(
-      "id, first_name, last_name, date_of_birth, medicaid_id, phone_number, physical_address, " +
+      "id, first_name, last_name, date_of_birth, medicaid_id, phone_number, physical_address, mailing_address, " +
       "emergency_contact_name, emergency_contact_phone, emergency_contact_instructions, " +
       "is_own_guardian, guardian_name, guardian_phone, guardian_relationship, guardian_email, guardian_address, " +
       "special_directions, allergies, dysphagia, swallowing_alerts, self_admin_med_support, " +
       "pcsp_goals, authorized_dspd_codes, job_code, team_id, " +
-      "support_coordinator_name, support_coordinator_email, support_coordinator_phone, " +
+      "support_coordinator_name, support_coordinator_email, support_coordinator_phone, support_coordinator_company, " +
       "primary_care_name, primary_care_phone, " +
       "neurologist_name, neurologist_phone, " +
       "dentist_name, dentist_phone, " +
       "prescriber_name, prescriber_phone, " +
       "bsp_status, medical_insurance, housing_voucher, preferred_living, " +
-      "plan_year, disability_category, staff_ratio, level_of_need, " +
+      "plan_year, disability_category, staff_ratio, " +
       "advanced_directives, emergency_medical_treatment_authorization, " +
       "diagnoses, chronic_conditions, immunizations, court_orders, rights_restrictions, " +
       "preferred_activities, roommates, personal_belongings_inventory, " +
@@ -303,6 +303,7 @@ export async function applyExtractedFieldsToClient(
   setScalarText("medicaid_id", "medicaid_id");
   setScalarText("phone_number", "phone");
   setScalarText("physical_address", "physical_address");
+  setScalarText("mailing_address", "mailing_address");
   setScalarText("emergency_contact_name", "emergency_contact_name");
   setScalarText("emergency_contact_phone", "emergency_contact_phone");
 
@@ -345,6 +346,7 @@ export async function applyExtractedFieldsToClient(
   setScalarText("support_coordinator_name", "support_coordinator_name");
   setScalarText("support_coordinator_email", "support_coordinator_email");
   setScalarText("support_coordinator_phone", "support_coordinator_phone");
+  setScalarText("support_coordinator_company", "support_coordinator_company");
 
   // Medical providers
   setScalarText("primary_care_name", "primary_care_name");
@@ -368,7 +370,7 @@ export async function applyExtractedFieldsToClient(
   setScalarText("plan_year", "plan_year");
   setScalarText("disability_category", "disability_category");
   setScalarText("staff_ratio", "staff_ratio");
-  setScalarText("level_of_need", "level_of_need");
+
 
   // End-of-life / advanced care — extractor maps real document wording onto
   // these columns. Status values stay as-extracted (e.g. "Active", "On file");
@@ -416,10 +418,15 @@ export async function applyExtractedFieldsToClient(
     service_code: string;
     rate?: number | null;
     max_units?: number | null;
+    monthly_max_units?: number | null;
     unit_type?: string | null;
     weekly_cap_units?: number | null;
     plan_start?: string | null;
     plan_end?: string | null;
+    // Captured for prompt 15 (provider scoping). Not yet persisted to a column.
+    provider_name?: string | null;
+    financial_eligibility?: string | null;
+    daily_hours?: number | null;
   }> = [];
   for (const f of ok) {
     if (f.field_key === "billing_code_row" && f.value_json && typeof f.value_json === "object") {
@@ -429,10 +436,14 @@ export async function applyExtractedFieldsToClient(
           service_code: String(row.service_code).toUpperCase(),
           rate: toNum(row.rate),
           max_units: toNum(row.max_units),
+          monthly_max_units: toNum(row.monthly_max_units),
           unit_type: row.unit_type ? String(row.unit_type) : null,
           weekly_cap_units: toNum(row.weekly_cap_units),
           plan_start: row.plan_start ? String(row.plan_start).slice(0, 10) : null,
           plan_end: row.plan_end ? String(row.plan_end).slice(0, 10) : null,
+          provider_name: row.provider_name ? String(row.provider_name).trim() : null,
+          financial_eligibility: row.financial_eligibility ? String(row.financial_eligibility).trim() : null,
+          daily_hours: toNum(row.daily_hours),
         });
       }
     }
@@ -518,6 +529,7 @@ export async function applyExtractedFieldsToClient(
         service_code: r.service_code,
         unit_type: r.unit_type ?? (isDailyServiceCode(r.service_code) ? "day" : "unit"),
         annual_unit_authorization: annual ?? 0,
+        monthly_max_units: r.monthly_max_units ?? null,
         rate_per_unit: r.rate ?? 0,
         weekly_cap_units: r.weekly_cap_units ?? null,
         service_start_date: r.plan_start ?? null,
@@ -747,7 +759,8 @@ export async function applyExtractedFieldsToClient(
   // extracted is lost. Unknown keys are logged once so we can detect future drops.
   const KNOWN_CORE = new Set<string>([
     "first_name", "last_name", "full_name", "dob", "medicaid_id", "phone",
-    "physical_address", "emergency_contact_name", "emergency_contact_phone", "emergency_contact_instructions",
+    "physical_address", "mailing_address",
+    "emergency_contact_name", "emergency_contact_phone", "emergency_contact_instructions",
     "is_own_guardian", "guardian_name", "guardian_phone", "guardian_relationship",
     "guardian_email", "guardian_address",
     "clinical_alert", "special_directions", "dysphagia", "self_admin_med_support",
@@ -758,6 +771,7 @@ export async function applyExtractedFieldsToClient(
     "client_medication", "pcsp_has_medications",
     // Support coordinator
     "support_coordinator_name", "support_coordinator_email", "support_coordinator_phone",
+    "support_coordinator_company",
     // Medical providers
     "primary_care_name", "primary_care_phone",
     "neurologist_name", "neurologist_phone",

@@ -75,11 +75,15 @@ export const CORE_CLIENT_FIELD_KEYS = new Set<string>([
   "rights_restrictions", "bsp_status",
   "dnr_status", "dnr_location", "polst_status", "palliative_care_status", "hospice_status",
   // SOW supplemental
-  "level_of_need", "grievance_acknowledged", "grievance_signed_date",
+  "grievance_acknowledged", "grievance_signed_date",
   // Service plan
   "staff_ratio", "preferred_activities", "preferred_living", "roommates",
   "housing_voucher", "court_orders", "personal_belongings_inventory",
   "team_name",
+  // PCSP additions
+  "mailing_address", "support_coordinator_company", "representative_payee",
+  // Per-goal context
+  "goal_domain", "goal_current_status", "goal_strengths", "goal_barriers", "goal_success_criteria",
 ]);
 
 export const SYSTEM_PROMPT = `You are NECTAR, an extraction engine for a Utah DSPD provider compliance platform (HIVE).
@@ -124,22 +128,31 @@ Common field_key values to extract when present (use field_group to bucket relat
     Injury; omit this field entirely if the document does not state the population),
     admission_date (value_date — SOW §1.10 required; use the service/plan begin date if no explicit
     admission date is present; omit if not present in any form),
-    discharge_date (value_date — usually absent on intake; omit if not present)
-  Address (group "address"): physical_address  -- client's service/home street address
+    discharge_date (value_date — usually absent on intake; omit if not present).
+    IMPORTANT: a PCSP labels the client's Medicaid number as "PID:" or "Person ID:". Treat these
+    labels as Medicaid ID and extract the value into medicaid_id (digits only). Do NOT emit a
+    separate PID/person_id field — there is no such column.
+  Address (group "address"): physical_address  -- client's Residential Address (service/home street).
+    mailing_address (value_text) -- the client's Mailing Address when listed separately on the PCSP.
   Emergency contact (group "emergency_contact"): emergency_contact_name, emergency_contact_phone, emergency_contact_instructions.
     ALWAYS split name and phone into TWO separate fields. Never combine.
     If a SECOND emergency contact is listed, emit emergency_contact_2_name,
     emergency_contact_2_phone, emergency_contact_2_instructions for that person.
   Guardian (group "guardian"): is_own_guardian (value_bool), guardian_name, guardian_phone,
-    guardian_relationship, guardian_email, guardian_address
-  Level of need (group "person"): level_of_need (value_text) — the DSPD-assigned level/score
-    (e.g. "Level 4", "High", "Acuity 5") when stated in the PCSP, 1056, or assessment.
+    guardian_relationship, guardian_email, guardian_address.
+    CRITICAL: a "Representative Payee" / "Rep Payee" is a FINANCIAL arrangement, NOT a legal
+    guardian. NEVER place rep-payee names, phones, or addresses into guardian_* fields. If a rep
+    payee is listed, emit a separate field representative_payee (group "finance", value_text)
+    with the named person or entity.
   Grievance acknowledgment (group "rights"): grievance_acknowledged (value_bool true) and
     grievance_signed_date (value_date) when the document is a SIGNED grievance-policy
     acknowledgment form (SOW §1.10(11)). Omit unless explicitly signed.
   Goals (group "goals"): pcsp_goal -- emit ONE field per distinct goal/objective in value_text.
     PCSP goals often appear in a table (Goal / Objective / Support Code). Emit one pcsp_goal
-    per ROW, not one combined entry.
+    per ROW, not one combined entry. When the PCSP supplies per-goal context, ALSO emit any of
+    these as value_text fields (group "goals"): goal_domain (e.g. "Community Living",
+    "Healthy Living", "Safety"), goal_current_status, goal_strengths, goal_barriers,
+    goal_success_criteria. Omit those that aren't stated.
   Health (group "health"): allergies (value_array), dysphagia (value_bool),
     swallowing_alerts (value_array), self_admin_med_support (value_bool),
     clinical_alert (value_text — any high-priority safety/clinical notice, e.g. choking risk),
@@ -152,16 +165,29 @@ Common field_key values to extract when present (use field_group to bucket relat
     medications table, or there is no medications section at all). When uncertain, OMIT the
     pcsp_has_medications field rather than guessing.
   Billing (group "billing_code"): emit ONE field per authorized service code with
-    field_key = "billing_code_row" and
-    value_json = { service_code, rate, max_units, unit_type, weekly_cap_units, plan_start, plan_end, financial_eligibility }.
-    CRITICAL: For EVERY billing/authorization table row, read ALL columns and populate rate and
-    max_units. rate is the dollar rate per unit (a number, no "$" sign). max_units is the ANNUAL
-    unit authorization (an integer, e.g. 3120 for DSI, 960 for SEI). If the table has a rate
-    column and a units column for this code, you MUST fill both — do NOT emit the row with
-    rate/max_units null when the values appear in the table. Only leave rate/max_units null when
-    the document genuinely omits them for that code.
-    unit_type is "15 min" or "day" or "session" or "month" exactly as printed.
-    Read EVERY row of the authorization table; do not collapse multiple codes into one.
+    field_key = "billing_code_row" and value_json shaped as below.
+    PCSP service authorization table — columns are: Service Code | Kind | Provider |
+    Start Date | End Date | Financial Eligibility | Rate | Monthly Max Units | Units |
+    Prorated Units | Total $ | Daily Hours. Emit ONE billing_code_row per ROW with:
+      value_json = {
+        service_code,                 // e.g. "HHS"
+        provider_name,                // the Provider column, verbatim org name (AUTHORITATIVE
+                                      //   for who delivers this service — e.g.
+                                      //   "True North Supports Utah, LLC",
+                                      //   "Intermountain Support Coordination Services, LLC",
+                                      //   "Utah Transit Authority")
+        rate,                         // number, no "$"
+        max_units,                    // integer — the ANNUAL "Units" column
+        monthly_max_units,            // integer — "Monthly Max Units" column
+        unit_type,                    // translate Kind: Q→"15 min", D→"day", M→"month", S→"session"
+        plan_start, plan_end,         // ISO yyyy-mm-dd
+        financial_eligibility,        // e.g. "TM"
+        daily_hours                   // number when present, else null
+      }
+    Read EVERY row; do not collapse multiple codes into one. Provider column is authoritative.
+    On non-PCSP documents that still have a rate column and a units column, fill both
+    rate and max_units when the values appear; leave them null only when the document
+    genuinely omits them for that code.
   1056 / Service Authorization Form (group "form_1056"): when the document is a DSPD 1056
     Service Authorization Form (header reads "Service Authorization" or "Form 1056"), extract:
       form_1056_number (value_text — the 1056 form number from the header, e.g. "1056-12345")
@@ -184,7 +210,9 @@ Common field_key values to extract when present (use field_group to bucket relat
   SOW (group "sow_clause"): clause_number, required_document, obligation, deadline
   Certification (group "cert"): cert_name, issued_at, expires_at, issuing_body
   Support coordinator (group "support_coordinator"): support_coordinator_name,
-    support_coordinator_email, support_coordinator_phone
+    support_coordinator_email, support_coordinator_phone,
+    support_coordinator_company (value_text — the SC firm/agency name, e.g.
+    "INTERMOUNTAIN SUPPORT COORDINATION SERVICES, LLC")
   Medical (group "medical"): primary_care_name, primary_care_phone,
     neurologist_name, neurologist_phone, dentist_name, dentist_phone,
     prescriber_name, prescriber_phone, medical_insurance,

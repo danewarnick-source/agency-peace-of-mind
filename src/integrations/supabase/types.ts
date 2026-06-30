@@ -4621,6 +4621,8 @@ export type Database = {
       extracted_fields: {
         Row: {
           confidence: number | null
+          dismissed_at: string | null
+          dismissed_by: string | null
           edited_at: string | null
           edited_by: string | null
           id: string
@@ -4640,6 +4642,8 @@ export type Database = {
         }
         Insert: {
           confidence?: number | null
+          dismissed_at?: string | null
+          dismissed_by?: string | null
           edited_at?: string | null
           edited_by?: string | null
           id?: string
@@ -4659,6 +4663,8 @@ export type Database = {
         }
         Update: {
           confidence?: number | null
+          dismissed_at?: string | null
+          dismissed_by?: string | null
           edited_at?: string | null
           edited_by?: string | null
           id?: string

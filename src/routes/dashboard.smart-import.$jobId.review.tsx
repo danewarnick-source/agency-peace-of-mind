@@ -858,21 +858,17 @@ function parseBillingRow(f: FieldRow): BillingRowShape | null {
 }
 
 function BillingCodesEditor({
-  subjectId, rows, tenant, onChanged,
+  subjectId, rows, tenant: _tenant, onChanged,
 }: {
   subjectId: string; rows: FieldRow[]; tenant: TenantIdentity; onChanged: () => void;
 }) {
   type Parsed = { field: FieldRow; row: BillingRowShape };
+  // Prompt 24: show every extracted code as one editable row. The Provider
+  // column tells the admin whose code it is at a glance; deleting a row is
+  // how the admin opts out of billing it. No separate "confirm bucket" wall.
   const parsed: Parsed[] = rows
     .map((f) => { const row = parseBillingRow(f); return row ? { field: f, row } : null; })
     .filter((x): x is Parsed => x !== null);
-
-  // Partition by classification: only "ours" rows are editable here. Coordination /
-  // external rows render read-only below (filed via prompt 15 at commit time).
-  const partition = partitionCodeRows(parsed.map((p) => p.row), tenant, {});
-  const oursCodes = new Set(partition.ours.map((r) => r.service_code));
-  const ours = parsed.filter((p) => oursCodes.has(p.row.service_code));
-  const external = parsed.filter((p) => !oursCodes.has(p.row.service_code));
 
   const [adding, setAdding] = useState(false);
 
@@ -882,8 +878,9 @@ function BillingCodesEditor({
         <div>
           <div className="text-sm font-semibold">Billing codes (your authorization)</div>
           <div className="text-xs text-muted-foreground">
-            Pre-filled from the PCSP. Type into any blank cell — leaving rate or annual units empty
-            commits the row with a "rate / units pending" flag (advisory, never blocks billing setup).
+            Pre-filled from the PCSP. The Provider column shows whose code it is — delete (×)
+            any row you don't bill. Blank rate or annual units commit with a "pending" flag
+            (advisory; never blocks billing setup).
           </div>
         </div>
         <Button size="sm" variant="outline" onClick={() => setAdding(true)} disabled={adding}>
@@ -891,60 +888,55 @@ function BillingCodesEditor({
         </Button>
       </div>
 
-      {ours.length === 0 && !adding && (
+      {parsed.length === 0 && !adding && (
         <div className="rounded-md border border-dashed border-border bg-muted/30 p-3 text-sm text-muted-foreground">
-          No billable codes were found for your org in this document. Use "Add code" if the admin needs to enter them manually.
+          No billable codes were found in this document. Use "Add code" to enter them manually.
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[820px] text-left text-xs">
-          <thead className="text-muted-foreground">
-            <tr className="border-b border-border">
-              <th className="py-2 pr-2 font-medium">Code</th>
-              <th className="py-2 pr-2 font-medium">Provider</th>
-              <th className="py-2 pr-2 font-medium">Unit type</th>
-              <th className="py-2 pr-2 font-medium">Rate</th>
-              <th className="py-2 pr-2 font-medium">Annual units</th>
-              <th className="py-2 pr-2 font-medium">Monthly cap</th>
-              <th className="py-2 pr-2 font-medium">Start</th>
-              <th className="py-2 pr-2 font-medium">End</th>
-              <th className="py-2 pr-2 font-medium">Status</th>
-              <th className="py-2 pr-0" />
-            </tr>
-          </thead>
-          <tbody>
-            {ours.map((p) => (
-              <BillingRowEditor key={p.field.id} fieldId={p.field.id} subjectId={subjectId} initial={p.row} onChanged={onChanged} />
-            ))}
-            {adding && (
-              <BillingRowEditor
-                fieldId={null}
-                subjectId={subjectId}
-                initial={{ service_code: "" }}
-                isNew
-                onChanged={() => { setAdding(false); onChanged(); }}
-                onCancel={() => setAdding(false)}
-              />
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {external.length > 0 && (
-        <div className="mt-4 border-t border-border pt-3">
-          <div className="text-xs font-medium text-muted-foreground">
-            Other providers (coordination only — not billed by you)
-          </div>
-          <ul className="mt-2 space-y-1 text-xs">
-            {external.map((p) => (
-              <li key={p.field.id} className="flex items-center gap-2 text-muted-foreground">
-                <Badge variant="outline" className="font-mono">{p.row.service_code}</Badge>
-                <span>{p.row.provider_name ?? "Unknown provider"}</span>
-                <span className="opacity-60">· read-only</span>
-              </li>
-            ))}
-          </ul>
+      {(parsed.length > 0 || adding) && (
+        <div className="overflow-x-auto rounded-md border border-border/60">
+          <table className="w-full table-fixed text-left text-xs">
+            <colgroup>
+              <col className="w-[64px]" />
+              <col className="w-[18%]" />
+              <col className="w-[80px]" />
+              <col className="w-[72px]" />
+              <col className="w-[84px]" />
+              <col className="w-[76px]" />
+              <col className="w-[170px]" />
+              <col className="w-[96px]" />
+              <col className="w-[64px]" />
+            </colgroup>
+            <thead className="text-muted-foreground">
+              <tr className="border-b border-border">
+                <th className="py-2 px-1.5 font-medium">Code</th>
+                <th className="py-2 px-1.5 font-medium">Provider</th>
+                <th className="py-2 px-1.5 font-medium">Unit</th>
+                <th className="py-2 px-1.5 font-medium">Rate</th>
+                <th className="py-2 px-1.5 font-medium">Annual</th>
+                <th className="py-2 px-1.5 font-medium">Mo. cap</th>
+                <th className="py-2 px-1.5 font-medium">Term</th>
+                <th className="py-2 px-1.5 font-medium">Status</th>
+                <th className="py-2 px-1.5" />
+              </tr>
+            </thead>
+            <tbody>
+              {parsed.map((p) => (
+                <BillingRowEditor key={p.field.id} fieldId={p.field.id} subjectId={subjectId} initial={p.row} onChanged={onChanged} />
+              ))}
+              {adding && (
+                <BillingRowEditor
+                  fieldId={null}
+                  subjectId={subjectId}
+                  initial={{ service_code: "" }}
+                  isNew
+                  onChanged={() => { setAdding(false); onChanged(); }}
+                  onCancel={() => setAdding(false)}
+                />
+              )}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

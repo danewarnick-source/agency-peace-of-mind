@@ -320,8 +320,8 @@ function SubjectReview({
 
   // Lift wizard step up so we can render the rail directly under the name header.
   const [step, setStep] = useState<WizardStepId>("person");
-  const askCount = questions.filter((qq) => !qq.answer).length;
-  const extraCount = unfiled.filter((u) => !u.filed_to).length;
+  const askCount = (questions as Array<{ answer: string | null }>).filter((qq) => !qq.answer).length;
+  const extraCount = (unfiled as Array<{ filed_to: string | null }>).filter((u) => !u.filed_to).length;
   // Drop per-code routing issues — they're replaced by the inline billing table editor.
   const visibleIssues = (validation?.issues ?? []).filter(
     (i) => !/^code\.(confirm_owner|coordination|coordination_info|bill_as_ours|ignore)\./.test(i.key),

@@ -13,6 +13,7 @@ import {
   type ClientDraft,
   type ValidationIssue,
 } from "@/lib/import-validation";
+import { fetchTenantIdentity } from "@/lib/service-classification";
 
 
 const JobId = z.object({ jobId: z.string().uuid() });
@@ -84,7 +85,17 @@ export const getReviewSubject = createServerFn({ method: "POST" })
 
     // ── Validation issues + merge flags (prompt 3 triple-check) ──────────
     const draft = buildDraftFromExtractedFields(fields ?? [], (subject as { display_name?: string | null }).display_name);
-    const validation = validateClientDraft(draft);
+    const orgIdForTenant = (subject as { org_id?: string | null }).org_id ?? null;
+    const tenant = orgIdForTenant ? await fetchTenantIdentity(sb, orgIdForTenant) : { codesHeld: [], names: [] };
+    const validation = validateClientDraft(draft, { tenant });
+    if (Array.isArray(draft.billing_codes) && draft.billing_codes.length && tenant.codesHeld.length === 0) {
+      validation.issues.push({
+        key: "org.codes_held_missing",
+        severity: "warning",
+        field: "billing_codes",
+        message: "Awarded service codes aren't set for this org — code routing falls back to provider-name matching. Configure codes_held to enable automatic billing/coordination split.",
+      });
+    }
     const overrides = ((subject as { validation_overrides?: Record<string, boolean> }).validation_overrides) ?? {};
     const blockingIssues = filterBlocking(validation.issues, overrides);
 
@@ -178,6 +189,7 @@ function buildDraftFromExtractedFields(
               unit_type: j.unit_type ? String(j.unit_type) : null,
               plan_start: j.plan_start ? String(j.plan_start).slice(0, 10) : null,
               plan_end: j.plan_end ? String(j.plan_end).slice(0, 10) : null,
+              provider_name: j.provider_name ? String(j.provider_name) : null,
             });
           }
         } catch { /* malformed */ }
@@ -301,7 +313,8 @@ export const setSubjectReady = createServerFn({ method: "POST" })
         .select("target_field, value")
         .eq("import_subject_id", data.subjectId);
       const draft = buildDraftFromExtractedFields(rows ?? []);
-      const { issues } = validateClientDraft(draft);
+      const tenant = subj.org_id ? await fetchTenantIdentity(sb, subj.org_id) : { codesHeld: [], names: [] };
+      const { issues } = validateClientDraft(draft, { tenant });
       const overrides = (subj.validation_overrides as Record<string, boolean>) ?? {};
       const blocking = filterBlocking(issues, overrides);
       if (blocking.length > 0) {
@@ -858,7 +871,8 @@ export const applyClientFields = createServerFn({ method: "POST" })
       .select("target_field, value")
       .eq("import_subject_id", data.subjectId);
     const draft = buildDraftFromExtractedFields(rows ?? []);
-    const validation = validateClientDraft(draft);
+    const tenant = subj.org_id ? await fetchTenantIdentity(sb, subj.org_id) : { codesHeld: [], names: [] };
+    const validation = validateClientDraft(draft, { tenant });
     const overrides = (subj.validation_overrides as Record<string, boolean>) ?? {};
     const blocking = filterBlocking(validation.issues, overrides);
     return {
@@ -917,10 +931,11 @@ export const listPendingClientSubjects = createServerFn({ method: "POST" })
       fieldsBySubject.set(f.import_subject_id, arr);
     }
 
+    const tenantListing = await fetchTenantIdentity(sb, data.organizationId);
     const items = rows.map((r) => {
       const flds = fieldsBySubject.get(r.id) ?? [];
       const draft = buildDraftFromExtractedFields(flds, r.display_name);
-      const { issues } = validateClientDraft(draft);
+      const { issues } = validateClientDraft(draft, { tenant: tenantListing });
       const overrides = r.validation_overrides ?? {};
       const blocking = filterBlocking(issues, overrides);
       const missingRequiredFields = Array.from(new Set(
@@ -971,7 +986,8 @@ export const getPendingClientSubject = createServerFn({ method: "POST" })
 
     const draft = buildDraftFromExtractedFields(fields ?? [], subj.display_name);
 
-    const validation = validateClientDraft(draft);
+    const tenant = subj.org_id ? await fetchTenantIdentity(sb, subj.org_id) : { codesHeld: [], names: [] };
+    const validation = validateClientDraft(draft, { tenant });
     const overrides = (subj.validation_overrides as Record<string, boolean>) ?? {};
     const blocking = filterBlocking(validation.issues, overrides);
 

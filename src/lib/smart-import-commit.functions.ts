@@ -9,6 +9,7 @@ import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { z } from "zod";
 import { applyExtractedFieldsToClient } from "@/lib/client-import-schema";
 import { validateClientDraft, filterBlocking, normalizeGuardianFields, type ClientDraft } from "@/lib/import-validation";
+import { fetchTenantIdentity, type TenantIdentity } from "@/lib/service-classification";
 
 
 const JobId = z.object({ jobId: z.string().uuid() });
@@ -139,6 +140,10 @@ export async function runJobCommit(sbIn: any, userId: string, jobId: string, opt
       error?: string;
     }> = [];
 
+    const tenantIdentity: TenantIdentity = orgId
+      ? await fetchTenantIdentity(sb, orgId)
+      : { codesHeld: [], names: [] };
+
     for (const subj of subjects ?? []) {
       const gaps: string[] = [];
 
@@ -175,7 +180,7 @@ export async function runJobCommit(sbIn: any, userId: string, jobId: string, opt
           .select("target_field, value")
           .eq("import_subject_id", subj.id);
         const draft = buildClientDraftFromFields(subjFields ?? []);
-        const { issues } = validateClientDraft(draft);
+        const { issues } = validateClientDraft(draft, { tenant: tenantIdentity });
         const overrides = (subj.validation_overrides as Record<string, boolean>) ?? {};
         const blocking = filterBlocking(issues, overrides);
         if (blocking.length > 0) {
@@ -202,7 +207,7 @@ export async function runJobCommit(sbIn: any, userId: string, jobId: string, opt
         let recordId: string | null = null;
 
         if (subj.subject_type === "client") {
-          recordId = await commitClient(sb, orgId, subj, fieldsList, jobId, userId, gaps);
+          recordId = await commitClient(sb, orgId, subj, fieldsList, jobId, userId, gaps, tenantIdentity);
         } else {
           recordId = await commitEmployee(sb, orgId, subj, fieldsList, jobId, userId, gaps);
         }
@@ -264,11 +269,12 @@ async function commitClient(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sb: any,
   orgId: string,
-  subj: { id: string; matched_record_id: string | null; review_decision: string | null; display_name: string },
+  subj: { id: string; matched_record_id: string | null; review_decision: string | null; display_name: string; validation_overrides?: Record<string, boolean> | null },
   fields: Array<{ id: string; target_field: string; value: string | null; source_document_id: string | null; source_snippet: string | null; provenance: string; is_custom_attribute: boolean }>,
   jobId: string,
   userId: string,
   gaps: string[],
+  tenant?: TenantIdentity,
 ): Promise<string> {
   const mapped: Record<string, unknown> = {};
   for (const f of fields) {
@@ -410,6 +416,8 @@ async function commitClient(
       fields: norm,
       sourceDocumentType: inferredType,
       importJobId: jobId,
+      tenant: tenant ?? { codesHeld: [], names: [] },
+      overrides: (subj.validation_overrides as Record<string, boolean> | null) ?? {},
       onError: async (action, message) => {
         await audit(sb, jobId, orgId, subj.id, message, "admin_override", userId, action);
       },
@@ -530,6 +538,7 @@ function buildClientDraftFromFields(
               unit_type: j.unit_type ? String(j.unit_type) : null,
               plan_start: j.plan_start ? String(j.plan_start).slice(0, 10) : null,
               plan_end: j.plan_end ? String(j.plan_end).slice(0, 10) : null,
+              provider_name: j.provider_name ? String(j.provider_name) : null,
             });
           }
         } catch { /* malformed row — validator only checks codes it can read */ }

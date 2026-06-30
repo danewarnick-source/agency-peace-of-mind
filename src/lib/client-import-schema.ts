@@ -53,6 +53,10 @@ export interface ApplyExtractedCtx {
   importJobId?: string | null;
   /** Optional audit hook — called for every silently-handled error. */
   onError?: (action: string, message: string) => Promise<void> | void;
+  /** Tenant identity (codes_held + names/aliases) for code-routing. */
+  tenant?: { codesHeld: string[]; names: string[] };
+  /** Admin overrides from the review screen (code.bill_as_ours.* etc.). */
+  overrides?: Record<string, boolean>;
 }
 
 const CONFIDENCE_THRESHOLD = 0.6;
@@ -414,7 +418,7 @@ export async function applyExtractedFieldsToClient(
   setScalarDate("form_1056_approved_date", "form_1056_approved_date");
 
   // Billing-code rows
-  const codeRows: Array<{
+  let codeRows: Array<{
     service_code: string;
     rate?: number | null;
     max_units?: number | null;
@@ -465,6 +469,58 @@ export async function applyExtractedFieldsToClient(
         plan_end: byKey.get("plan_end") ? fieldDate(byKey.get("plan_end") as ExtractedField) : null,
       });
     }
+  }
+
+  if (codeRows.length) {
+    // ── Prompt 15: scope to the provider's own awarded codes ────────────────
+    // Anything not "ours" is filed as coordination info (or dropped if the
+    // admin explicitly chose to ignore). This narrows within the existing
+    // authoritative-set gate; it never widens it.
+    const { partitionCodeRows } = await import("@/lib/service-classification");
+    const tenant = ctx.tenant ?? { codesHeld: [], names: [] };
+    const overrides = ctx.overrides ?? {};
+    const partition = partitionCodeRows(codeRows, tenant, overrides);
+
+    // External / coordination-only services — preserve but do NOT bill.
+    if (partition.other.length) {
+      const externalRows = partition.other.map((r) => ({
+        organization_id: organizationId,
+        client_id: clientId,
+        service_code: r.service_code,
+        provider_name: r.provider_name ?? null,
+        note: r._classification.reason ?? null,
+      }));
+      // Replace this client's external set from this import to keep it
+      // idempotent without depending on a partial unique index.
+      const codesToReplace = Array.from(new Set(externalRows.map((r) => r.service_code)));
+      const { error: delErr } = await supabase
+        .from("client_external_services")
+        .delete()
+        .eq("organization_id", organizationId)
+        .eq("client_id", clientId)
+        .in("service_code", codesToReplace);
+      if (delErr) await onError("external_services_delete_error", delErr.message);
+      const { error: extErr } = await supabase
+        .from("client_external_services")
+        .insert(externalRows);
+      if (extErr) {
+        await onError("external_services_insert_error", extErr.message);
+      } else {
+        autofilled.push(`client_external_services(${externalRows.length})`);
+      }
+    }
+    if (partition.ignored.length) {
+      suggested.push(`Ignored ${partition.ignored.length} non-billing line(s) per admin choice.`);
+    }
+    if (partition.needsReview.length) {
+      // Defensive: validator should have blocked this. Surface as gap.
+      suggested.push(
+        `Skipped (needs owner confirmation): ${partition.needsReview.map((r) => r.service_code).join(", ")}`,
+      );
+    }
+
+    // Only "ours" rows continue through the billing-codes pipeline.
+    codeRows = partition.ours;
   }
 
   if (codeRows.length) {

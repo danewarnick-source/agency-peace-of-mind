@@ -931,10 +931,11 @@ export const listPendingClientSubjects = createServerFn({ method: "POST" })
       fieldsBySubject.set(f.import_subject_id, arr);
     }
 
+    const tenantListing = await fetchTenantIdentity(sb, data.organizationId);
     const items = rows.map((r) => {
       const flds = fieldsBySubject.get(r.id) ?? [];
       const draft = buildDraftFromExtractedFields(flds, r.display_name);
-      const { issues } = validateClientDraft(draft);
+      const { issues } = validateClientDraft(draft, { tenant: tenantListing });
       const overrides = r.validation_overrides ?? {};
       const blocking = filterBlocking(issues, overrides);
       const missingRequiredFields = Array.from(new Set(

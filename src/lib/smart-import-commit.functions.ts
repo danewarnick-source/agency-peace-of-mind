@@ -207,7 +207,7 @@ export async function runJobCommit(sbIn: any, userId: string, jobId: string, opt
         let recordId: string | null = null;
 
         if (subj.subject_type === "client") {
-          recordId = await commitClient(sb, orgId, subj, fieldsList, jobId, userId, gaps);
+          recordId = await commitClient(sb, orgId, subj, fieldsList, jobId, userId, gaps, tenantIdentity);
         } else {
           recordId = await commitEmployee(sb, orgId, subj, fieldsList, jobId, userId, gaps);
         }

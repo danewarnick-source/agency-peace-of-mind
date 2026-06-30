@@ -589,6 +589,11 @@ function CodeRow({ clientId: _clientId, budget, readOnly = false }: { clientId: 
           {!exhausted && isEmpty && (
             <Badge variant="outline" className="text-[10px]">No usage logged yet</Badge>
           )}
+          {(code as unknown as { authorization_pending?: boolean }).authorization_pending && (
+            <Badge variant="outline" className="gap-1 border-amber-500/60 bg-amber-500/15 text-[10px] font-semibold text-amber-800 dark:text-amber-200">
+              <AlertTriangle className="h-3 w-3" /> rate/units pending — enter to complete
+            </Badge>
+          )}
           <AuthStatusBadge status={status} />
         </div>
         {readOnly ? null : editing ? (

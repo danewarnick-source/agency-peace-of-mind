@@ -579,17 +579,23 @@ export async function applyExtractedFieldsToClient(
       } else {
         annual = r.max_units ?? prior ?? 0;
       }
+      const rate = r.rate ?? 0;
+      const annualOut = annual ?? 0;
+      // Prompt 18: advisory flag — admin can fill rate/units later when the
+      // 1056 lands or the PCSP gets amended. Never blocks commit.
+      const pending = !(rate > 0) || !(annualOut > 0);
       return {
         organization_id: organizationId,
         client_id: clientId,
         service_code: r.service_code,
         unit_type: r.unit_type ?? (isDailyServiceCode(r.service_code) ? "day" : "unit"),
-        annual_unit_authorization: annual ?? 0,
+        annual_unit_authorization: annualOut,
         monthly_max_units: r.monthly_max_units ?? null,
-        rate_per_unit: r.rate ?? 0,
+        rate_per_unit: rate,
         weekly_cap_units: r.weekly_cap_units ?? null,
         service_start_date: r.plan_start ?? null,
         service_end_date: r.plan_end ?? null,
+        authorization_pending: pending,
       };
     });
     const { error: bcErr } = await supabase

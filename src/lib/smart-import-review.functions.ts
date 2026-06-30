@@ -124,6 +124,7 @@ export const getReviewSubject = createServerFn({ method: "POST" })
       certs: certs ?? [],
       questions: questions ?? [],
       matched,
+      tenant, // Prompt 18: client-side billing editor uses this to scope rows.
       validation: {
         ok: blockingIssues.length === 0,
         issues: validation.issues,
@@ -254,6 +255,137 @@ export const editExtractedField = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
+// ---------- Prompt 18: editable billing-code rows during review ----------
+// One server fn handles both insert (no fieldId) and update (fieldId).
+// Writes value_json (used at commit) AND value (kept as JSON string for the
+// existing text-based FieldRow shape). Status flips to "edited" so the row
+// shows the same "admin edited" badge as other manual corrections.
+const BillingRowInput = z.object({
+  subjectId: z.string().uuid(),
+  fieldId: z.string().uuid().nullable().optional(),
+  row: z.object({
+    service_code: z.string().min(1),
+    provider_name: z.string().nullable().optional(),
+    unit_type: z.string().nullable().optional(),
+    rate: z.number().nullable().optional(),
+    max_units: z.number().nullable().optional(),
+    monthly_max_units: z.number().nullable().optional(),
+    plan_start: z.string().nullable().optional(),
+    plan_end: z.string().nullable().optional(),
+  }),
+});
+export const saveBillingCodeRow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => BillingRowInput.parse(i))
+  .handler(async ({ data, context }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = context.supabase as any;
+    const row = {
+      ...data.row,
+      service_code: data.row.service_code.toUpperCase(),
+    };
+    const valueText = JSON.stringify(row);
+
+    if (data.fieldId) {
+      const { data: existing } = await sb
+        .from("extracted_fields")
+        .select("id, import_job_id, org_id, import_subject_id, target_table, source_document_id")
+        .eq("id", data.fieldId)
+        .single();
+      if (!existing) throw new Error("Field not found");
+      const { error } = await sb
+        .from("extracted_fields")
+        .update({
+          value: valueText,
+          value_json: row,
+          target_field: "billing_code_row",
+          field_key: "billing_code_row",
+          status: "edited",
+          edited_by: context.userId,
+          edited_at: new Date().toISOString(),
+        })
+        .eq("id", data.fieldId);
+      if (error) throw new Error(error.message);
+      await sb.from("import_audit").insert({
+        import_job_id: existing.import_job_id,
+        org_id: existing.org_id,
+        subject_id: existing.import_subject_id,
+        item: `Edited billing code ${row.service_code}`,
+        traces_to: "admin_override",
+        actor: context.userId,
+        action: "edit_billing_code",
+      });
+      return { ok: true, fieldId: data.fieldId };
+    }
+
+    const { data: subj } = await sb
+      .from("import_subjects")
+      .select("import_job_id, org_id")
+      .eq("id", data.subjectId)
+      .single();
+    if (!subj) throw new Error("Subject not found");
+    const { data: inserted, error: insErr } = await sb
+      .from("extracted_fields")
+      .insert({
+        import_job_id: subj.import_job_id,
+        import_subject_id: data.subjectId,
+        org_id: subj.org_id,
+        target_table: "clients",
+        target_field: "billing_code_row",
+        field_key: "billing_code_row",
+        value: valueText,
+        value_json: row,
+        status: "edited",
+        confidence: 1,
+        provenance: "admin_added",
+        is_custom_attribute: false,
+        edited_by: context.userId,
+        edited_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+    if (insErr) throw new Error(insErr.message);
+    await sb.from("import_audit").insert({
+      import_job_id: subj.import_job_id,
+      org_id: subj.org_id,
+      subject_id: data.subjectId,
+      item: `Added billing code ${row.service_code} (manual entry)`,
+      traces_to: "admin_override",
+      actor: context.userId,
+      action: "add_billing_code",
+    });
+    return { ok: true, fieldId: inserted.id as string };
+  });
+
+const FieldIdInput = z.object({ fieldId: z.string().uuid() });
+export const removeExtractedField = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => FieldIdInput.parse(i))
+  .handler(async ({ data, context }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = context.supabase as any;
+    const { data: row } = await sb
+      .from("extracted_fields")
+      .select("id, import_job_id, org_id, import_subject_id, target_field, value")
+      .eq("id", data.fieldId)
+      .single();
+    if (!row) throw new Error("Field not found");
+    const { error } = await sb.from("extracted_fields").delete().eq("id", data.fieldId);
+    if (error) throw new Error(error.message);
+    await sb.from("import_audit").insert({
+      import_job_id: row.import_job_id,
+      org_id: row.org_id,
+      subject_id: row.import_subject_id,
+      item: `Removed ${row.target_field}`,
+      traces_to: "admin_override",
+      actor: context.userId,
+      action: "remove_field",
+    });
+    return { ok: true };
+  });
+
+
 
 // ---------- Set dedup decision (update existing vs create new) ----------
 const Decision = z.object({

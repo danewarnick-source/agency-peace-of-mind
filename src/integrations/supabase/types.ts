@@ -1723,6 +1723,7 @@ export type Database = {
       client_billing_codes: {
         Row: {
           annual_unit_authorization: number
+          authorization_pending: boolean
           client_id: string
           created_at: string
           id: string
@@ -1744,6 +1745,7 @@ export type Database = {
         }
         Insert: {
           annual_unit_authorization?: number
+          authorization_pending?: boolean
           client_id: string
           created_at?: string
           id?: string
@@ -1765,6 +1767,7 @@ export type Database = {
         }
         Update: {
           annual_unit_authorization?: number
+          authorization_pending?: boolean
           client_id?: string
           created_at?: string
           id?: string

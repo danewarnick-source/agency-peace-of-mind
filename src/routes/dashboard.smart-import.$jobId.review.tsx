@@ -22,8 +22,12 @@ import {
   getReviewJob, getReviewSubject, editExtractedField, setSubjectDecision,
   setSubjectReady, upsertCertDocument, answerNectarQuestion, fileUnfiledItem,
   computeProvisioningForecast, togglePlanItem, confirmAssignment, submitForSetup,
+  saveBillingCodeRow, removeExtractedField,
 } from "@/lib/smart-import-review.functions";
 import { resolveMergeFlag, overrideValidationIssue } from "@/lib/import-checklist.functions";
+import { partitionCodeRows, type TenantIdentity } from "@/lib/service-classification";
+import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
+import { Trash2, Plus } from "lucide-react";
 import { providerSignoff } from "@/lib/hive-migration.functions";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/review")({
@@ -291,6 +295,7 @@ function SubjectReview({
   if (q.isError || !q.data) return <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive">Failed to load subject.</div>;
 
   const { subject, fields, unfiled, certs, questions, matched } = q.data;
+  const tenant = (q.data as { tenant?: { codesHeld: string[]; names: string[] } }).tenant ?? { codesHeld: [], names: [] };
   const validation = (q.data as { validation?: { ok: boolean; issues: Array<{ key: string; severity: "error" | "warning"; field?: string; message: string }>; blocking: string[] } }).validation;
   const mergeFlags = (q.data as { mergeFlags?: Array<Record<string, string | number | boolean | null>> }).mergeFlags ?? [];
   const targetFields = jobMode === "client" ? CLIENT_FIELDS : EMPLOYEE_FIELDS;
@@ -336,7 +341,7 @@ function SubjectReview({
             </TabsList>
 
             <TabsContent value="placement" className="mt-3">
-              <PlacementLineup fields={fields} targetFields={targetFields} matched={matched} decision={subject.review_decision} onChanged={refresh} />
+              <PlacementLineup fields={fields} targetFields={targetFields} matched={matched} decision={subject.review_decision} subjectId={subjectId} tenant={tenant} onChanged={refresh} />
             </TabsContent>
             {jobMode === "employee" && (
               <TabsContent value="certs" className="mt-3">
@@ -584,17 +589,25 @@ type FieldRow = {
   id: string; target_field: string; value: string | null; status: string;
   confidence: number | null; source_snippet: string | null;
   is_custom_attribute: boolean; provenance: string;
+  value_json?: unknown;
+  field_key?: string | null;
 };
 function PlacementLineup({
-  fields, targetFields, matched, decision, onChanged,
+  fields, targetFields, matched, decision, subjectId, tenant, onChanged,
 }: {
   fields: FieldRow[]; targetFields: string[]; matched: Record<string, string | null> | null;
-  decision: SubjectRow["review_decision"]; onChanged: () => void;
+  decision: SubjectRow["review_decision"]; subjectId: string; tenant: TenantIdentity; onChanged: () => void;
 }) {
-  const core = fields.filter((f) => !f.is_custom_attribute);
-  const custom = fields.filter((f) => f.is_custom_attribute);
+  // Prompt 18: peel billing-code rows out of the generic field list so we can
+  // show them as a proper editable table. The remaining placement lineup keeps
+  // its existing value→field shape for every other field.
+  const billing = fields.filter((f) => f.target_field === "billing_code_row");
+  const rest = fields.filter((f) => f.target_field !== "billing_code_row");
+  const core = rest.filter((f) => !f.is_custom_attribute);
+  const custom = rest.filter((f) => f.is_custom_attribute);
   return (
     <div className="space-y-4">
+      <BillingCodesEditor subjectId={subjectId} rows={billing} tenant={tenant} onChanged={onChanged} />
       <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
         <div className="mb-3 flex items-center justify-between">
           <div className="text-sm font-semibold">Placement lineup</div>
@@ -623,6 +636,270 @@ function PlacementLineup({
     </div>
   );
 }
+
+// ---------------------------- BillingCodesEditor (Prompt 18) ----------------------------
+type BillingRowShape = {
+  service_code: string;
+  provider_name?: string | null;
+  unit_type?: string | null;
+  rate?: number | null;
+  max_units?: number | null;
+  monthly_max_units?: number | null;
+  plan_start?: string | null;
+  plan_end?: string | null;
+};
+const UNIT_TYPE_OPTIONS = ["15 min", "day", "month", "session", "hour", "unit"];
+
+function parseBillingRow(f: FieldRow): BillingRowShape | null {
+  // Prefer value_json (jsonb on the row), fall back to parsing the text value.
+  const raw = f.value_json ?? (() => { try { return f.value ? JSON.parse(f.value) : null; } catch { return null; } })();
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const sc = r.service_code ? String(r.service_code).toUpperCase() : "";
+  if (!sc) return null;
+  const num = (x: unknown): number | null => {
+    if (x === null || x === undefined || x === "") return null;
+    const n = typeof x === "number" ? x : Number(x);
+    return Number.isFinite(n) ? n : null;
+  };
+  const str = (x: unknown): string | null => (x === null || x === undefined ? null : String(x));
+  return {
+    service_code: sc,
+    provider_name: str(r.provider_name),
+    unit_type: str(r.unit_type),
+    rate: num(r.rate),
+    max_units: num(r.max_units),
+    monthly_max_units: num(r.monthly_max_units),
+    plan_start: r.plan_start ? String(r.plan_start).slice(0, 10) : null,
+    plan_end: r.plan_end ? String(r.plan_end).slice(0, 10) : null,
+  };
+}
+
+function BillingCodesEditor({
+  subjectId, rows, tenant, onChanged,
+}: {
+  subjectId: string; rows: FieldRow[]; tenant: TenantIdentity; onChanged: () => void;
+}) {
+  type Parsed = { field: FieldRow; row: BillingRowShape };
+  const parsed: Parsed[] = rows
+    .map((f) => { const row = parseBillingRow(f); return row ? { field: f, row } : null; })
+    .filter((x): x is Parsed => x !== null);
+
+  // Partition by classification: only "ours" rows are editable here. Coordination /
+  // external rows render read-only below (filed via prompt 15 at commit time).
+  const partition = partitionCodeRows(parsed.map((p) => p.row), tenant, {});
+  const oursCodes = new Set(partition.ours.map((r) => r.service_code));
+  const ours = parsed.filter((p) => oursCodes.has(p.row.service_code));
+  const external = parsed.filter((p) => !oursCodes.has(p.row.service_code));
+
+  const [adding, setAdding] = useState(false);
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-sm font-semibold">Billing codes (your authorization)</div>
+          <div className="text-xs text-muted-foreground">
+            Pre-filled from the PCSP. Type into any blank cell — leaving rate or annual units empty
+            commits the row with a "rate / units pending" flag (advisory, never blocks billing setup).
+          </div>
+        </div>
+        <Button size="sm" variant="outline" onClick={() => setAdding(true)} disabled={adding}>
+          <Plus className="mr-1 h-3 w-3" /> Add code
+        </Button>
+      </div>
+
+      {ours.length === 0 && !adding && (
+        <div className="rounded-md border border-dashed border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+          No billable codes were found for your org in this document. Use "Add code" if the admin needs to enter them manually.
+        </div>
+      )}
+
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[820px] text-left text-xs">
+          <thead className="text-muted-foreground">
+            <tr className="border-b border-border">
+              <th className="py-2 pr-2 font-medium">Code</th>
+              <th className="py-2 pr-2 font-medium">Provider</th>
+              <th className="py-2 pr-2 font-medium">Unit type</th>
+              <th className="py-2 pr-2 font-medium">Rate</th>
+              <th className="py-2 pr-2 font-medium">Annual units</th>
+              <th className="py-2 pr-2 font-medium">Monthly cap</th>
+              <th className="py-2 pr-2 font-medium">Start</th>
+              <th className="py-2 pr-2 font-medium">End</th>
+              <th className="py-2 pr-2 font-medium">Status</th>
+              <th className="py-2 pr-0" />
+            </tr>
+          </thead>
+          <tbody>
+            {ours.map((p) => (
+              <BillingRowEditor key={p.field.id} fieldId={p.field.id} subjectId={subjectId} initial={p.row} onChanged={onChanged} />
+            ))}
+            {adding && (
+              <BillingRowEditor
+                fieldId={null}
+                subjectId={subjectId}
+                initial={{ service_code: "" }}
+                isNew
+                onChanged={() => { setAdding(false); onChanged(); }}
+                onCancel={() => setAdding(false)}
+              />
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {external.length > 0 && (
+        <div className="mt-4 border-t border-border pt-3">
+          <div className="text-xs font-medium text-muted-foreground">
+            Other providers (coordination only — not billed by you)
+          </div>
+          <ul className="mt-2 space-y-1 text-xs">
+            {external.map((p) => (
+              <li key={p.field.id} className="flex items-center gap-2 text-muted-foreground">
+                <Badge variant="outline" className="font-mono">{p.row.service_code}</Badge>
+                <span>{p.row.provider_name ?? "Unknown provider"}</span>
+                <span className="opacity-60">· read-only</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function isPending(r: BillingRowShape): boolean {
+  return !(r.rate && r.rate > 0) || !(r.max_units && r.max_units > 0);
+}
+
+function BillingRowEditor({
+  fieldId, subjectId, initial, isNew, onChanged, onCancel,
+}: {
+  fieldId: string | null;
+  subjectId: string;
+  initial: BillingRowShape;
+  isNew?: boolean;
+  onChanged: () => void;
+  onCancel?: () => void;
+}) {
+  const [row, setRow] = useState<BillingRowShape>(initial);
+  const [dirty, setDirty] = useState(!!isNew);
+  const save = useServerFn(saveBillingCodeRow);
+  const remove = useServerFn(removeExtractedField);
+
+  const patch = <K extends keyof BillingRowShape>(k: K, v: BillingRowShape[K]) => {
+    setRow((prev) => ({ ...prev, [k]: v }));
+    setDirty(true);
+  };
+  const numOrNull = (s: string): number | null => {
+    const t = s.trim();
+    if (!t) return null;
+    const n = Number(t);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const saveMut = useMutation({
+    mutationFn: () =>
+      save({
+        data: {
+          subjectId,
+          fieldId: fieldId ?? null,
+          row: {
+            service_code: row.service_code.toUpperCase(),
+            provider_name: row.provider_name ?? null,
+            unit_type: row.unit_type ?? null,
+            rate: row.rate ?? null,
+            max_units: row.max_units ?? null,
+            monthly_max_units: row.monthly_max_units ?? null,
+            plan_start: row.plan_start ?? null,
+            plan_end: row.plan_end ?? null,
+          },
+        },
+      }),
+    onSuccess: () => { toast.success("Saved"); setDirty(false); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const removeMut = useMutation({
+    mutationFn: () => remove({ data: { fieldId: fieldId as string } }),
+    onSuccess: () => { toast.success("Removed"); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const pending = isPending(row);
+  const allCodes = EVV_SERVICE_CODES.map((c) => c.code);
+
+  return (
+    <tr className="border-b border-border/60 align-middle">
+      <td className="py-1.5 pr-2">
+        {isNew ? (
+          <Select value={row.service_code} onValueChange={(v) => patch("service_code", v)}>
+            <SelectTrigger className="h-8 w-24"><SelectValue placeholder="Code" /></SelectTrigger>
+            <SelectContent>
+              {allCodes.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        ) : (
+          <Badge variant="outline" className="font-mono">{row.service_code}</Badge>
+        )}
+      </td>
+      <td className="py-1.5 pr-2">
+        <Input className="h-8 w-36" value={row.provider_name ?? ""} onChange={(e) => patch("provider_name", e.target.value || null)} />
+      </td>
+      <td className="py-1.5 pr-2">
+        <Select value={row.unit_type ?? ""} onValueChange={(v) => patch("unit_type", v)}>
+          <SelectTrigger className="h-8 w-28"><SelectValue placeholder="Unit type" /></SelectTrigger>
+          <SelectContent>
+            {UNIT_TYPE_OPTIONS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </td>
+      <td className="py-1.5 pr-2">
+        <Input className="h-8 w-20" inputMode="decimal" value={row.rate ?? ""} onChange={(e) => patch("rate", numOrNull(e.target.value))} />
+      </td>
+      <td className="py-1.5 pr-2">
+        <Input className="h-8 w-24" inputMode="numeric" value={row.max_units ?? ""} onChange={(e) => patch("max_units", numOrNull(e.target.value))} />
+      </td>
+      <td className="py-1.5 pr-2">
+        <Input className="h-8 w-24" inputMode="numeric" value={row.monthly_max_units ?? ""} onChange={(e) => patch("monthly_max_units", numOrNull(e.target.value))} />
+      </td>
+      <td className="py-1.5 pr-2">
+        <Input className="h-8 w-32" type="date" value={row.plan_start ?? ""} onChange={(e) => patch("plan_start", e.target.value || null)} />
+      </td>
+      <td className="py-1.5 pr-2">
+        <Input className="h-8 w-32" type="date" value={row.plan_end ?? ""} onChange={(e) => patch("plan_end", e.target.value || null)} />
+      </td>
+      <td className="py-1.5 pr-2">
+        {pending ? (
+          <Badge variant="outline" className="text-amber-600">
+            <AlertTriangle className="mr-1 h-3 w-3" /> rate/units pending
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="text-emerald-600">complete</Badge>
+        )}
+      </td>
+      <td className="py-1.5 pr-0">
+        <div className="flex items-center justify-end gap-1">
+          {dirty && (
+            <Button size="sm" className="h-7" onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !row.service_code}>
+              {saveMut.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Save
+            </Button>
+          )}
+          {isNew && onCancel && (
+            <Button size="sm" variant="ghost" className="h-7" onClick={onCancel}>Cancel</Button>
+          )}
+          {!isNew && fieldId && (
+            <Button size="sm" variant="ghost" className="h-7 text-destructive" onClick={() => removeMut.mutate()} disabled={removeMut.isPending}>
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 function FieldRowEditor({
   field, targetFields, matchedValue, showDiff, onChanged,
 }: {

@@ -124,6 +124,7 @@ export const getReviewSubject = createServerFn({ method: "POST" })
       certs: certs ?? [],
       questions: questions ?? [],
       matched,
+      tenant, // Prompt 18: client-side billing editor uses this to scope rows.
       validation: {
         ok: blockingIssues.length === 0,
         issues: validation.issues,

@@ -419,6 +419,22 @@ function ValidationPanel({
       <ul className="mt-2 space-y-2 text-sm">
         {validation.issues.map((i) => {
           const isBlocking = blockingSet.has(i.key);
+          // Per-code routing buttons (Prompt 15): "code.confirm_owner.<CODE>",
+          // "code.coordination.<CODE>", "code.coordination_info.<CODE>".
+          // Each picks one of three explicit outcomes; only one override key
+          // is kept active per code, the others are cleared.
+          const codeMatch = i.key.match(/^code\.(confirm_owner|coordination|coordination_info)\.(.+)$/);
+          const setCodeBucket = (code: string, bucket: "bill_as_ours" | "coordination" | "ignore") => {
+            const all = ["bill_as_ours", "coordination", "ignore"] as const;
+            all.forEach((b) => {
+              const key = `code.${b}.${code}`;
+              if (b === bucket) m.mutate({ issueKey: key, overridden: true });
+              else m.mutate({ issueKey: key, overridden: false });
+            });
+            // Also clear the original blocking confirm_owner / coordination issue
+            // so it disappears from the panel after the admin picks an outcome.
+            m.mutate({ issueKey: i.key, overridden: true });
+          };
           return (
             <li key={i.key} className="flex flex-wrap items-start justify-between gap-2 rounded-md border border-border/70 bg-background/60 px-3 py-2">
               <div className="min-w-0 flex-1">
@@ -430,14 +446,26 @@ function ValidationPanel({
                 </div>
                 <div className="mt-1">{i.message}</div>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
-                {isBlocking ? (
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                {codeMatch ? (
+                  <>
+                    <Button size="sm" variant="default" disabled={m.isPending} onClick={() => setCodeBucket(codeMatch[2], "bill_as_ours")}>
+                      Bill this (ours)
+                    </Button>
+                    <Button size="sm" variant="outline" disabled={m.isPending} onClick={() => setCodeBucket(codeMatch[2], "coordination")}>
+                      Coordination only (won't bill)
+                    </Button>
+                    <Button size="sm" variant="ghost" disabled={m.isPending} onClick={() => setCodeBucket(codeMatch[2], "ignore")}>
+                      File as info / ignore
+                    </Button>
+                  </>
+                ) : isBlocking ? (
                   <Button size="sm" variant="outline" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: true })}>
-                    Override — I've checked
+                    Confirm — I've reviewed this
                   </Button>
                 ) : i.severity === "error" ? (
                   <Button size="sm" variant="ghost" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: false })}>
-                    Un-override
+                    Un-confirm
                   </Button>
                 ) : null}
               </div>

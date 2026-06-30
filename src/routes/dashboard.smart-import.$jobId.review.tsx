@@ -377,7 +377,7 @@ type WizardStepId = "person" | "services" | "plan" | "staff" | "review";
 
 function SubjectWizard({
   subjectId, jobMode, fields, targetFields, matched, decision, tenant,
-  certs, questions, unfiled, validation, onChanged,
+  certs, questions, unfiled, validation, jobId, subjects, assignments, onChanged,
 }: {
   subjectId: string;
   jobMode: "employee" | "client";
@@ -390,6 +390,9 @@ function SubjectWizard({
   questions: Array<{ id: string; question: string; context: string | null; answer: string | null }>;
   unfiled: Array<{ id: string; text: string; filed_to: string | null }>;
   validation: { ok: boolean; issues: Array<{ key: string; severity: "error" | "warning"; field?: string; message: string }>; blocking: string[] } | undefined;
+  jobId: string;
+  subjects: SubjectRow[];
+  assignments: Array<{ id: string; relation_type: string; staff_subject_id: string | null; client_subject_id: string | null; status: string; inference_reason: string | null }>;
   onChanged: () => void;
 }) {
   const [step, setStep] = useState<WizardStepId>("person");

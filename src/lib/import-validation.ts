@@ -59,6 +59,7 @@ export interface ClientDraft {
     unit_type?: string | null;
     plan_start?: string | null;
     plan_end?: string | null;
+    provider_name?: string | null;
   }>;
   known_addresses?: string[];
 }

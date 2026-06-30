@@ -418,10 +418,15 @@ export async function applyExtractedFieldsToClient(
     service_code: string;
     rate?: number | null;
     max_units?: number | null;
+    monthly_max_units?: number | null;
     unit_type?: string | null;
     weekly_cap_units?: number | null;
     plan_start?: string | null;
     plan_end?: string | null;
+    // Captured for prompt 15 (provider scoping). Not yet persisted to a column.
+    provider_name?: string | null;
+    financial_eligibility?: string | null;
+    daily_hours?: number | null;
   }> = [];
   for (const f of ok) {
     if (f.field_key === "billing_code_row" && f.value_json && typeof f.value_json === "object") {
@@ -431,10 +436,14 @@ export async function applyExtractedFieldsToClient(
           service_code: String(row.service_code).toUpperCase(),
           rate: toNum(row.rate),
           max_units: toNum(row.max_units),
+          monthly_max_units: toNum(row.monthly_max_units),
           unit_type: row.unit_type ? String(row.unit_type) : null,
           weekly_cap_units: toNum(row.weekly_cap_units),
           plan_start: row.plan_start ? String(row.plan_start).slice(0, 10) : null,
           plan_end: row.plan_end ? String(row.plan_end).slice(0, 10) : null,
+          provider_name: row.provider_name ? String(row.provider_name).trim() : null,
+          financial_eligibility: row.financial_eligibility ? String(row.financial_eligibility).trim() : null,
+          daily_hours: toNum(row.daily_hours),
         });
       }
     }

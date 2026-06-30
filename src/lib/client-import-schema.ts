@@ -472,6 +472,48 @@ export async function applyExtractedFieldsToClient(
   }
 
   if (codeRows.length) {
+    // ── Prompt 15: scope to the provider's own awarded codes ────────────────
+    // Anything not "ours" is filed as coordination info (or dropped if the
+    // admin explicitly chose to ignore). This narrows within the existing
+    // authoritative-set gate; it never widens it.
+    const { partitionCodeRows } = await import("@/lib/service-classification");
+    const tenant = ctx.tenant ?? { codesHeld: [], names: [] };
+    const overrides = ctx.overrides ?? {};
+    const partition = partitionCodeRows(codeRows, tenant, overrides);
+
+    // External / coordination-only services — preserve but do NOT bill.
+    if (partition.other.length) {
+      const externalRows = partition.other.map((r) => ({
+        organization_id: organizationId,
+        client_id: clientId,
+        service_code: r.service_code,
+        provider_name: r.provider_name ?? null,
+        note: r._classification.reason ?? null,
+      }));
+      const { error: extErr } = await supabase
+        .from("client_external_services")
+        .upsert(externalRows, { onConflict: "organization_id,client_id,service_code,provider_name" });
+      if (extErr) {
+        await onError("external_services_upsert_error", extErr.message);
+      } else {
+        autofilled.push(`client_external_services(${externalRows.length})`);
+      }
+    }
+    if (partition.ignored.length) {
+      suggested.push(`Ignored ${partition.ignored.length} non-billing line(s) per admin choice.`);
+    }
+    if (partition.needsReview.length) {
+      // Defensive: validator should have blocked this. Surface as gap.
+      suggested.push(
+        `Skipped (needs owner confirmation): ${partition.needsReview.map((r) => r.service_code).join(", ")}`,
+      );
+    }
+
+    // Only "ours" rows continue through the billing-codes pipeline.
+    codeRows = partition.ours;
+  }
+
+  if (codeRows.length) {
     const codes = Array.from(new Set(codeRows.map((r) => r.service_code)));
     // Only PCSP and 1056 are authoritative for the active code SET. Other
     // document types (MAR, BSP, immunization, allergy, end-of-life docs) must

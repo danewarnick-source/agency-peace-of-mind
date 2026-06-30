@@ -303,6 +303,9 @@ function SubjectReview({
   const getSubj = useServerFn(getReviewSubject);
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["smart-import-subject", subjectId], queryFn: () => getSubj({ data: { subjectId } }) });
+  // Lift wizard step up so we can render the rail directly under the name header.
+  // Must be declared before any early returns to keep hook order stable.
+  const [step, setStep] = useState<WizardStepId>("person");
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["smart-import-subject", subjectId] });
     onChanged();
@@ -318,8 +321,6 @@ function SubjectReview({
   const targetFields = jobMode === "client" ? CLIENT_FIELDS : EMPLOYEE_FIELDS;
   const canMarkReady = !validation || validation.ok;
 
-  // Lift wizard step up so we can render the rail directly under the name header.
-  const [step, setStep] = useState<WizardStepId>("person");
   const askCount = (questions as Array<{ answer: string | null }>).filter((qq) => !qq.answer).length;
   const extraCount = (unfiled as Array<{ filed_to: string | null }>).filter((u) => !u.filed_to).length;
   // Drop per-code routing issues — they're replaced by the inline billing table editor.

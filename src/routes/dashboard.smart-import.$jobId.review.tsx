@@ -21,13 +21,17 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import {
   getReviewJob, getReviewSubject, editExtractedField, setSubjectDecision,
   setSubjectReady, upsertCertDocument, answerNectarQuestion, fileUnfiledItem,
-  computeProvisioningForecast, togglePlanItem, confirmAssignment, submitForSetup,
+  computeProvisioningForecast, togglePlanItem, submitForSetup,
   saveBillingCodeRow, removeExtractedField, restoreExtractedField,
+  getJobAssigner, upsertManualAssignment, removeAssignmentMapRow,
 } from "@/lib/smart-import-review.functions";
 import { resolveMergeFlag, overrideValidationIssue } from "@/lib/import-checklist.functions";
 import { partitionCodeRows, type TenantIdentity } from "@/lib/service-classification";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
-import { Trash2, Plus, X, RotateCcw } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Trash2, Plus, X, RotateCcw, Tag, UserPlus } from "lucide-react";
+
 import { providerSignoff } from "@/lib/hive-migration.functions";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/review")({
@@ -1254,24 +1258,41 @@ function ProvisioningPanel({ subjectId, onChanged }: { subjectId: string; onChan
 }
 
 // ---------------------------- AssignmentMapPanel ----------------------------
+// Prompt 17: interactive per-client staff assigner. PCSPs don't name staff, so
+// NECTAR usually proposes nothing here — the admin picks staff and, per staff,
+// scopes the assignment to specific authorized codes (the client's "ours"
+// codes from prompt 15). Rows are staged in `assignment_map` and written to
+// `staff_assignments` only on commit.
+type AssignerAssignment = {
+  id: string; relation_type: string; status: string;
+  staff_subject_id: string | null; client_subject_id: string | null;
+  staff_record_id: string | null; service_codes: string[] | null;
+  inference_reason: string | null;
+  staff_name: string | null; client_name: string | null;
+};
+type AssignerClient = {
+  client_subject_id: string;
+  display_name: string;
+  authorized_codes: string[];
+};
+
 function AssignmentMapPanel({
-  jobId, subjects, assignments, onChanged,
+  jobId, subjects, assignments: _legacyAssignments, onChanged,
 }: {
   jobId: string;
   subjects: SubjectRow[];
   assignments: Array<{ id: string; relation_type: string; staff_subject_id: string | null; client_subject_id: string | null; status: string; inference_reason: string | null }>;
   onChanged: () => void;
 }) {
-  const confirm = useServerFn(confirmAssignment);
-  const m = useMutation({
-    mutationFn: (vars: { assignmentId: string; status: "confirmed" | "rejected" | "edited" }) => confirm({ data: vars }),
-    onSuccess: () => { toast.success("Assignment updated"); onChanged(); },
-    onError: (e: Error) => toast.error(e.message),
+  void _legacyAssignments; // superseded by getJobAssigner (richer payload)
+  const getAssigner = useServerFn(getJobAssigner);
+  const q = useQuery({
+    queryKey: ["smart-import-assigner", jobId],
+    queryFn: () => getAssigner({ data: { jobId } }),
   });
-  const nameOf = useMemo(() => {
-    const map = new Map(subjects.map((s) => [s.id, s.display_name]));
-    return (id: string | null) => (id ? map.get(id) ?? "(unknown)" : "—");
-  }, [subjects]);
+  const refresh = () => { q.refetch(); onChanged(); };
+
+  const clientSubjects = subjects.filter((s) => s.subject_type === "client");
 
   return (
     <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
@@ -1281,25 +1302,237 @@ function AssignmentMapPanel({
         <Badge variant="outline" className="ml-auto"><Users className="mr-1 h-3 w-3" />Job-level</Badge>
       </div>
       <p className="mb-3 text-xs text-muted-foreground">
-        Proposed staff ↔ client relationships from NECTAR. Confirm to populate caseloads on commit. {assignments.length === 0 && "No relationships proposed yet."}
+        Assign staff to each client — optionally scoped to specific authorized codes
+        (e.g. "Julie covers HHS only"). Staff↔client rows are written to caseloads
+        on commit. Coordination-only codes from other providers aren't selectable.
       </p>
-      <div className="space-y-2">
-        {assignments.map((a) => (
-          <div key={a.id} className="flex flex-col gap-2 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-sm font-medium capitalize">{a.relation_type}: <strong>{nameOf(a.staff_subject_id)}</strong> ↔ <strong>{nameOf(a.client_subject_id)}</strong></div>
-              {a.inference_reason && <div className="mt-0.5 text-xs text-muted-foreground">NECTAR: {a.inference_reason}</div>}
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="capitalize">{a.status}</Badge>
-              <Button size="sm" variant={a.status === "confirmed" ? "outline" : "default"} onClick={() => m.mutate({ assignmentId: a.id, status: "confirmed" })} disabled={m.isPending}>Confirm</Button>
-              <Button size="sm" variant="ghost" onClick={() => m.mutate({ assignmentId: a.id, status: "rejected" })} disabled={m.isPending}>Reject</Button>
-            </div>
-          </div>
-        ))}
-      </div>
-      {/* Job id reference for action audit context */}
-      <input type="hidden" value={jobId} readOnly />
+
+      {q.isLoading && <div className="text-xs text-muted-foreground">Loading assigner…</div>}
+      {q.isError && <div className="text-xs text-destructive">Failed to load: {(q.error as Error).message}</div>}
+
+      {q.data && clientSubjects.length === 0 && (
+        <div className="rounded-md border border-dashed border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+          No client subjects in this job to assign.
+        </div>
+      )}
+
+      {q.data && (
+        <div className="space-y-3">
+          {clientSubjects.map((cs) => {
+            const client = q.data.clients.find((c: AssignerClient) => c.client_subject_id === cs.id);
+            const rows = q.data.assignments.filter((a: AssignerAssignment) => a.client_subject_id === cs.id);
+            return (
+              <ClientAssignerBlock
+                key={cs.id}
+                jobId={jobId}
+                clientSubjectId={cs.id}
+                clientName={cs.display_name}
+                authorizedCodes={client?.authorized_codes ?? []}
+                staffPool={q.data.staffPool}
+                assignments={rows}
+                onChanged={refresh}
+              />
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
+
+function ClientAssignerBlock({
+  jobId, clientSubjectId, clientName, authorizedCodes, staffPool, assignments, onChanged,
+}: {
+  jobId: string;
+  clientSubjectId: string;
+  clientName: string;
+  authorizedCodes: string[];
+  staffPool: Array<{ id: string; name: string }>;
+  assignments: AssignerAssignment[];
+  onChanged: () => void;
+}) {
+  const upsert = useServerFn(upsertManualAssignment);
+  const remove = useServerFn(removeAssignmentMapRow);
+
+  const upsertM = useMutation({
+    mutationFn: (vars: { staffId: string; serviceCodes: string[] | null }) =>
+      upsert({ data: { jobId, clientSubjectId, staffId: vars.staffId, serviceCodes: vars.serviceCodes } }),
+    onSuccess: () => { toast.success("Assignment saved"); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const removeM = useMutation({
+    mutationFn: (assignmentId: string) => remove({ data: { assignmentId } }),
+    onSuccess: () => { toast.success("Removed"); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Caseload-style rows the admin can edit (staff_record_id set).
+  const editable = assignments.filter((a) => a.staff_record_id);
+  // NECTAR proposals (staff_subject_id only) — show read-only above for context.
+  const proposals = assignments.filter((a) => !a.staff_record_id && a.staff_subject_id);
+  const assignedIds = new Set(editable.map((a) => a.staff_record_id!));
+  const availableStaff = staffPool.filter((s) => !assignedIds.has(s.id));
+
+  const [adding, setAdding] = useState(false);
+  const [picked, setPicked] = useState<string>("");
+
+  return (
+    <div className="rounded-lg border border-border p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-sm font-semibold">{clientName}</div>
+        <div className="flex items-center gap-2">
+          {authorizedCodes.length > 0 ? (
+            <Badge variant="outline" className="font-mono text-[10px]">
+              {authorizedCodes.length} authorized code{authorizedCodes.length === 1 ? "" : "s"}
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-[10px] text-muted-foreground">
+              No own-org codes yet — staff default to all codes
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      {proposals.length > 0 && (
+        <div className="mt-2 space-y-1 rounded border border-dashed border-border bg-muted/30 p-2 text-xs">
+          <div className="font-medium text-muted-foreground">NECTAR proposals (subjects not yet committed)</div>
+          {proposals.map((p) => (
+            <div key={p.id} className="text-muted-foreground">
+              {p.relation_type}: <span className="font-medium">staff subject {p.staff_subject_id?.slice(0, 6)}…</span>
+              {p.inference_reason && <span className="opacity-70"> · {p.inference_reason}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-2 space-y-1.5">
+        {editable.length === 0 && !adding && (
+          <div className="text-xs text-muted-foreground">No staff assigned yet.</div>
+        )}
+        {editable.map((row) => (
+          <div key={row.id} className="flex flex-wrap items-center gap-2 rounded border border-border bg-background p-2 text-xs">
+            <Users className="h-3 w-3 text-muted-foreground" />
+            <span className="font-medium">{row.staff_name ?? "Staff"}</span>
+            <AssignerScopePopover
+              authorized={authorizedCodes}
+              value={row.service_codes}
+              onChange={(codes) => upsertM.mutate({ staffId: row.staff_record_id!, serviceCodes: codes })}
+              disabled={upsertM.isPending}
+            />
+            <Badge variant="outline" className="ml-auto text-[10px] capitalize">{row.status}</Badge>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+              onClick={() => removeM.mutate(row.id)}
+              disabled={removeM.isPending}
+              title="Remove"
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        ))}
+      </div>
+
+      {adding ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <Select value={picked} onValueChange={setPicked}>
+            <SelectTrigger className="h-8 w-[220px] text-xs">
+              <SelectValue placeholder={availableStaff.length === 0 ? "All staff already assigned" : "Pick staff…"} />
+            </SelectTrigger>
+            <SelectContent>
+              {availableStaff.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            disabled={!picked || upsertM.isPending}
+            onClick={() => {
+              upsertM.mutate({ staffId: picked, serviceCodes: null });
+              setPicked(""); setAdding(false);
+            }}
+          >
+            Assign (all codes)
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => { setPicked(""); setAdding(false); }}>Cancel</Button>
+        </div>
+      ) : (
+        <Button
+          size="sm"
+          variant="outline"
+          className="mt-2"
+          onClick={() => setAdding(true)}
+          disabled={availableStaff.length === 0}
+        >
+          <UserPlus className="mr-1 h-3 w-3" /> Add staff
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function AssignerScopePopover({
+  authorized, value, onChange, disabled,
+}: {
+  authorized: string[];
+  value: string[] | null;
+  onChange: (next: string[] | null) => void;
+  disabled?: boolean;
+}) {
+  const isAll = value === null || value === undefined;
+  const subset = new Set(value ?? []);
+  const summary = isAll
+    ? `All codes${authorized.length ? ` (${authorized.length})` : ""}`
+    : (value && value.length > 0 ? value.join(", ") : "No codes");
+
+  function toggle(code: string) {
+    const cur = new Set<string>(isAll ? authorized : (value ?? []));
+    if (cur.has(code)) cur.delete(code); else cur.add(code);
+    const arr = Array.from(cur);
+    if (arr.length === 0) { onChange([]); return; }
+    if (authorized.length > 0 && arr.length === authorized.length) onChange(null);
+    else onChange(arr);
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px] gap-1" disabled={disabled}>
+          <Tag className="h-3 w-3" />
+          <span className="max-w-[180px] truncate">{summary}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-2" align="end">
+        <div className="text-xs font-medium px-1 pb-1">Service-code scope</div>
+        {authorized.length === 0 ? (
+          <div className="px-1 py-2 text-xs text-muted-foreground">
+            No own-org authorized codes for this client yet. Staff is assigned with "All codes" — narrow later from the client's caseload tab once codes are in.
+          </div>
+        ) : (
+          <>
+            <button
+              type="button"
+              className={`w-full text-left text-xs rounded px-2 py-1.5 hover:bg-muted ${isAll ? "bg-muted font-medium" : ""}`}
+              onClick={() => onChange(null)}
+            >
+              All codes ({authorized.length})
+            </button>
+            <div className="my-1 h-px bg-border" />
+            <div className="max-h-56 overflow-y-auto space-y-0.5">
+              {authorized.map((c) => {
+                const on = isAll ? true : subset.has(c);
+                return (
+                  <label key={c} className="flex items-center gap-2 text-xs px-2 py-1 rounded hover:bg-muted cursor-pointer">
+                    <Checkbox checked={on} onCheckedChange={() => toggle(c)} />
+                    <span className="font-mono">{c}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+

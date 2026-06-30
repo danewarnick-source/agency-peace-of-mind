@@ -747,6 +747,198 @@ export const confirmAssignment = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// ---------- Prompt 17: per-client staff assigner during onboarding ----------
+//
+// The assignment map is no longer a passive read-out of NECTAR's proposals.
+// The admin can pick existing staff for each client subject and scope the
+// assignment to specific authorized codes — persisted as `assignment_map`
+// rows with `relation_type='caseload'`, `staff_record_id=<real staff id>`,
+// `status='confirmed'`. Real `staff_assignments` rows are written by
+// `applyAssignmentMap` on commit (so failed commits don't leak).
+import { partitionCodeRows } from "@/lib/service-classification";
+
+function parseBillingRowLoose(v: unknown): { service_code: string; provider_name: string | null } | null {
+  if (!v || typeof v !== "object") return null;
+  const r = v as Record<string, unknown>;
+  const sc = r.service_code ? String(r.service_code).toUpperCase() : "";
+  if (!sc) return null;
+  return { service_code: sc, provider_name: r.provider_name == null ? null : String(r.provider_name) };
+}
+
+export const getJobAssigner = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => JobId.parse(i))
+  .handler(async ({ data, context }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = context.supabase as any;
+
+    const { data: job } = await sb
+      .from("import_jobs")
+      .select("id, org_id, target_org_id")
+      .eq("id", data.jobId)
+      .single();
+    if (!job) throw new Error("Job not found");
+    const orgId: string = job.target_org_id ?? job.org_id;
+    const tenant = await fetchTenantIdentity(sb, orgId);
+
+    const { data: subjects } = await sb
+      .from("import_subjects")
+      .select("id, display_name, subject_type")
+      .eq("import_job_id", data.jobId)
+      .eq("subject_type", "client")
+      .order("created_at", { ascending: true });
+
+    const clientSubjectIds: string[] = ((subjects ?? []) as Array<{ id: string }>).map((s) => s.id);
+
+    const authorizedByClient = new Map<string, string[]>();
+    if (clientSubjectIds.length > 0) {
+      const { data: rows } = await sb
+        .from("extracted_fields")
+        .select("import_subject_id, value, value_json, dismissed_at")
+        .in("import_subject_id", clientSubjectIds)
+        .eq("target_field", "billing_code_row")
+        .is("dismissed_at", null);
+      const grouped = new Map<string, Array<{ service_code: string; provider_name: string | null }>>();
+      for (const row of (rows ?? []) as Array<{
+        import_subject_id: string; value: string | null; value_json: unknown;
+      }>) {
+        const raw = row.value_json ?? (() => { try { return row.value ? JSON.parse(row.value) : null; } catch { return null; } })();
+        const parsed = parseBillingRowLoose(raw);
+        if (!parsed) continue;
+        const list = grouped.get(row.import_subject_id) ?? [];
+        list.push(parsed);
+        grouped.set(row.import_subject_id, list);
+      }
+      for (const sid of clientSubjectIds) {
+        const part = partitionCodeRows(grouped.get(sid) ?? [], tenant, {});
+        authorizedByClient.set(sid, Array.from(new Set(part.ours.map((r) => r.service_code))));
+      }
+    }
+
+    const { data: members } = await sb
+      .from("organization_members")
+      .select("user_id")
+      .eq("organization_id", orgId)
+      .eq("active", true);
+    const staffIds = ((members ?? []) as Array<{ user_id: string | null }>)
+      .map((m) => m.user_id).filter((x): x is string => !!x);
+    let staffPool: Array<{ id: string; name: string }> = [];
+    if (staffIds.length > 0) {
+      const { data: profs } = await sb
+        .from("profiles")
+        .select("id, first_name, last_name, full_name, is_active")
+        .in("id", staffIds);
+      staffPool = ((profs ?? []) as Array<{
+        id: string; first_name: string | null; last_name: string | null;
+        full_name: string | null; is_active: boolean | null;
+      }>)
+        .filter((p) => p.is_active !== false)
+        .map((p) => ({
+          id: p.id,
+          name: (p.full_name?.trim()) ||
+            [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || "Staff",
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    const { data: amRows } = await sb
+      .from("assignment_map")
+      .select("id, relation_type, status, staff_subject_id, client_subject_id, staff_record_id, service_codes, inference_reason")
+      .eq("import_job_id", data.jobId);
+
+    const staffNameById = new Map(staffPool.map((s) => [s.id, s.name]));
+    const subjectNameById = new Map(((subjects ?? []) as Array<{ id: string; display_name: string }>).map((s) => [s.id, s.display_name]));
+
+    const assignments = ((amRows ?? []) as Array<{
+      id: string; relation_type: string; status: string;
+      staff_subject_id: string | null; client_subject_id: string | null;
+      staff_record_id: string | null; service_codes: string[] | null;
+      inference_reason: string | null;
+    }>).map((r) => ({
+      ...r,
+      staff_name: r.staff_record_id ? (staffNameById.get(r.staff_record_id) ?? "Staff") : null,
+      client_name: r.client_subject_id ? (subjectNameById.get(r.client_subject_id) ?? "Client") : null,
+    }));
+
+    return {
+      clients: ((subjects ?? []) as Array<{ id: string; display_name: string }>).map((s) => ({
+        client_subject_id: s.id,
+        display_name: s.display_name,
+        authorized_codes: authorizedByClient.get(s.id) ?? [],
+      })),
+      staffPool,
+      assignments,
+    };
+  });
+
+const UpsertManual = z.object({
+  jobId: z.string().uuid(),
+  clientSubjectId: z.string().uuid(),
+  staffId: z.string().uuid(),
+  serviceCodes: z.array(z.string()).nullable(),
+});
+export const upsertManualAssignment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => UpsertManual.parse(i))
+  .handler(async ({ data, context }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = context.supabase as any;
+    const { data: job } = await sb.from("import_jobs")
+      .select("org_id, target_org_id").eq("id", data.jobId).single();
+    if (!job) throw new Error("Job not found");
+    const orgId: string = job.target_org_id ?? job.org_id;
+
+    const { data: existing } = await sb.from("assignment_map")
+      .select("id")
+      .eq("import_job_id", data.jobId)
+      .eq("client_subject_id", data.clientSubjectId)
+      .eq("staff_record_id", data.staffId)
+      .eq("relation_type", "caseload")
+      .maybeSingle();
+
+    const codes = data.serviceCodes && data.serviceCodes.length === 0 ? null : data.serviceCodes;
+
+    if (existing?.id) {
+      const { error } = await sb.from("assignment_map").update({
+        service_codes: codes,
+        status: "confirmed",
+        confirmed_by: context.userId,
+        confirmed_at: new Date().toISOString(),
+      }).eq("id", existing.id);
+      if (error) throw error;
+      return { ok: true, id: existing.id, updated: true };
+    }
+
+    const { data: ins, error } = await sb.from("assignment_map").insert({
+      import_job_id: data.jobId,
+      org_id: orgId,
+      relation_type: "caseload",
+      client_subject_id: data.clientSubjectId,
+      staff_record_id: data.staffId,
+      service_codes: codes,
+      status: "confirmed",
+      confirmed_by: context.userId,
+      confirmed_at: new Date().toISOString(),
+      inference_reason: "Manually assigned by admin during onboarding.",
+    }).select("id").single();
+    if (error) throw error;
+    return { ok: true, id: ins.id, updated: false };
+  });
+
+const RemoveAssignment = z.object({ assignmentId: z.string().uuid() });
+export const removeAssignmentMapRow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => RemoveAssignment.parse(i))
+  .handler(async ({ data, context }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = context.supabase as any;
+    const { error } = await sb.from("assignment_map").delete().eq("id", data.assignmentId);
+    if (error) throw error;
+    return { ok: true };
+  });
+
+
+
 // ---------- Submit job for setup ----------
 // Self-service: the Company Admin IS the signer — commit immediately, reusing
 // the same engine as the Done page's auto-run path. Idempotent.

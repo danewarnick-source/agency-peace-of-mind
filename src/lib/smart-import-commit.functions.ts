@@ -530,6 +530,7 @@ function buildClientDraftFromFields(
               unit_type: j.unit_type ? String(j.unit_type) : null,
               plan_start: j.plan_start ? String(j.plan_start).slice(0, 10) : null,
               plan_end: j.plan_end ? String(j.plan_end).slice(0, 10) : null,
+              provider_name: j.provider_name ? String(j.provider_name) : null,
             });
           }
         } catch { /* malformed row — validator only checks codes it can read */ }

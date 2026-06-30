@@ -636,11 +636,31 @@ async function aiExtractFieldsFromText(
   const parsed = await parseDocumentWithAI(text, `subject=client`);
 
   const out: ExtractedFieldOut[] = [];
+  const unfiled: string[] = [];
   const ARRAY_KEYS = new Set([
     "allergies", "swallowing_alerts", "diagnoses", "chronic_conditions",
     "immunizations", "preferred_activities", "roommates",
     "personal_belongings_inventory",
   ]);
+
+  // Plan/meeting context that is NOT client-profile data. Anything matching is
+  // diverted to unfiled (read-only "Additional info") instead of becoming a
+  // placement-lineup mapping. Matches exact keys and common prefixes.
+  const PLAN_CONTEXT_KEYS = new Set([
+    "meeting_attendees", "attendees", "meeting_participants", "participants",
+    "meeting_minutes", "meeting_notes", "minutes", "agenda",
+    "plan_facilitator_notes", "facilitator_notes",
+    "ucans_label", "ucans_note", "ucans_category", "ucans_from",
+    "domain_label", "domain_note", "domain_category", "domain_from",
+  ]);
+  const isPlanContext = (key: string, group: string) => {
+    const k = key.toLowerCase();
+    const g = (group || "").toLowerCase();
+    if (PLAN_CONTEXT_KEYS.has(k)) return true;
+    if (g === "meeting" || g === "ucans" || g === "plan_context") return true;
+    if (k.startsWith("meeting_") || k.startsWith("ucans_")) return true;
+    return false;
+  };
 
   for (const f of parsed.fields ?? []) {
     const key = String(f.field_key || "").trim();

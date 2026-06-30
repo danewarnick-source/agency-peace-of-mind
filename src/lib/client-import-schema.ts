@@ -490,11 +490,21 @@ export async function applyExtractedFieldsToClient(
         provider_name: r.provider_name ?? null,
         note: r._classification.reason ?? null,
       }));
+      // Replace this client's external set from this import to keep it
+      // idempotent without depending on a partial unique index.
+      const codesToReplace = Array.from(new Set(externalRows.map((r) => r.service_code)));
+      const { error: delErr } = await supabase
+        .from("client_external_services")
+        .delete()
+        .eq("organization_id", organizationId)
+        .eq("client_id", clientId)
+        .in("service_code", codesToReplace);
+      if (delErr) await onError("external_services_delete_error", delErr.message);
       const { error: extErr } = await supabase
         .from("client_external_services")
-        .upsert(externalRows, { onConflict: "organization_id,client_id,service_code,provider_name" });
+        .insert(externalRows);
       if (extErr) {
-        await onError("external_services_upsert_error", extErr.message);
+        await onError("external_services_insert_error", extErr.message);
       } else {
         autofilled.push(`client_external_services(${externalRows.length})`);
       }

@@ -315,18 +315,57 @@ export function validateClientDraft(
   // ── Billing codes: rate-table sanity
   if (Array.isArray(d.billing_codes)) {
     const known = new Set(EVV_SERVICE_CODES.map((c) => c.code));
+  // ── Billing codes: classify into ours / other provider / not-a-service.
+  // Only "ours" lines go through rate/date sanity checks AND only those raise
+  // blocking billing errors. Other-provider and not-a-service lines surface
+  // as warnings — they'll be filed as coordination info, not billing codes.
+  if (Array.isArray(d.billing_codes)) {
+    const tenant = ctx?.tenant ?? { codesHeld: [], names: [] };
     for (const r of d.billing_codes) {
       const code = (r.service_code ?? "").toUpperCase();
       if (!code) continue;
-      if (!known.has(code)) {
+      const cls = classifyExtractedService({
+        serviceCode: code,
+        providerName: r.provider_name,
+        tenant,
+      });
+
+      if (cls.bucket === "not_a_service") {
         issues.push({
-          key: `code.unknown.${code}`,
-          severity: "error",
+          key: `code.coordination_info.${code}`,
+          severity: "warning",
           field: "billing_codes",
-          message: `Service code "${code}" isn't on the Utah DSPD master list.`,
+          message: `"${code}" isn't a DSPD billing code — will be filed as coordination info.`,
         });
         continue;
       }
+
+      if (cls.bucket === "other_provider" && cls.confident) {
+        issues.push({
+          key: `code.coordination.${code}`,
+          severity: "warning",
+          field: "billing_codes",
+          message: r.provider_name
+            ? `${code} is billed by ${r.provider_name} — will be filed as coordination only.`
+            : `${code} isn't on this org's awarded codes — will be filed as coordination only.`,
+        });
+        continue;
+      }
+
+      if (!cls.confident) {
+        // Ambiguous: admin must pick a bucket before commit.
+        issues.push({
+          key: `code.confirm_owner.${code}`,
+          severity: "error",
+          field: "billing_codes",
+          message: r.provider_name
+            ? `Confirm: is provider "${r.provider_name}" for ${code} this org?`
+            : `Confirm owner for ${code} — provider isn't named and this org's awarded codes aren't set.`,
+        });
+        continue;
+      }
+
+      // OURS — rate-band + plan-date checks as before.
       if (typeof r.rate === "number" && r.rate > 0) {
         const daily = isDailyServiceCode(code);
         const lo = daily ? 1 : 0.01;

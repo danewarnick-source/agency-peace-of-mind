@@ -23,11 +23,15 @@ import {
   setSubjectReady, upsertCertDocument, answerNectarQuestion, fileUnfiledItem,
   computeProvisioningForecast, togglePlanItem, confirmAssignment, submitForSetup,
   saveBillingCodeRow, removeExtractedField, restoreExtractedField,
+  getJobAssigner, upsertManualAssignment, removeAssignmentMapRow,
 } from "@/lib/smart-import-review.functions";
 import { resolveMergeFlag, overrideValidationIssue } from "@/lib/import-checklist.functions";
 import { partitionCodeRows, type TenantIdentity } from "@/lib/service-classification";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
-import { Trash2, Plus, X, RotateCcw } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Trash2, Plus, X, RotateCcw, Tag, UserPlus } from "lucide-react";
+
 import { providerSignoff } from "@/lib/hive-migration.functions";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/review")({

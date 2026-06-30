@@ -1969,6 +1969,60 @@ export type Database = {
           },
         ]
       }
+      client_external_services: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          import_subject_id: string | null
+          note: string | null
+          organization_id: string
+          provider_name: string | null
+          service_code: string | null
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          import_subject_id?: string | null
+          note?: string | null
+          organization_id: string
+          provider_name?: string | null
+          service_code?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          import_subject_id?: string | null
+          note?: string | null
+          organization_id?: string
+          provider_name?: string | null
+          service_code?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_external_services_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_external_services_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_intake_completion: {
         Row: {
           client_id: string
@@ -9182,6 +9236,7 @@ export type Database = {
           account_contact_email: string | null
           account_contact_name: string | null
           additional_state_codes: string[]
+          aliases: string[]
           approx_client_count: number | null
           billing_sms_phone: string | null
           created_at: string
@@ -9207,6 +9262,7 @@ export type Database = {
           account_contact_email?: string | null
           account_contact_name?: string | null
           additional_state_codes?: string[]
+          aliases?: string[]
           approx_client_count?: number | null
           billing_sms_phone?: string | null
           created_at?: string
@@ -9232,6 +9288,7 @@ export type Database = {
           account_contact_email?: string | null
           account_contact_name?: string | null
           additional_state_codes?: string[]
+          aliases?: string[]
           approx_client_count?: number | null
           billing_sms_phone?: string | null
           created_at?: string

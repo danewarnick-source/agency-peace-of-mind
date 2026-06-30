@@ -140,6 +140,10 @@ export async function runJobCommit(sbIn: any, userId: string, jobId: string, opt
       error?: string;
     }> = [];
 
+    const tenantIdentity: TenantIdentity = orgId
+      ? await fetchTenantIdentity(sb, orgId)
+      : { codesHeld: [], names: [] };
+
     for (const subj of subjects ?? []) {
       const gaps: string[] = [];
 

@@ -591,6 +591,7 @@ type FieldRow = {
   is_custom_attribute: boolean; provenance: string;
   value_json?: unknown;
   field_key?: string | null;
+  dismissed_at?: string | null;
 };
 function PlacementLineup({
   fields, targetFields, matched, decision, subjectId, tenant, onChanged,

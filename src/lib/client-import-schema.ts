@@ -195,6 +195,8 @@ export async function applyExtractedFieldsToClient(
       "pcsp_goals, authorized_dspd_codes, job_code, team_id, " +
       "support_coordinator_name, support_coordinator_email, support_coordinator_phone, support_coordinator_company, " +
       "primary_care_name, primary_care_phone, " +
+      "pcp_name, pcp_phone, specialist_name, specialist_phone, " +
+      "med_prescriber_name, med_prescriber_phone, " +
       "neurologist_name, neurologist_phone, " +
       "dentist_name, dentist_phone, " +
       "prescriber_name, prescriber_phone, " +

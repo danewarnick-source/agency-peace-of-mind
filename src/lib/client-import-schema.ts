@@ -418,7 +418,7 @@ export async function applyExtractedFieldsToClient(
   setScalarDate("form_1056_approved_date", "form_1056_approved_date");
 
   // Billing-code rows
-  const codeRows: Array<{
+  let codeRows: Array<{
     service_code: string;
     rate?: number | null;
     max_units?: number | null;

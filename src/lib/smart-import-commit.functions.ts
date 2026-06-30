@@ -269,11 +269,12 @@ async function commitClient(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sb: any,
   orgId: string,
-  subj: { id: string; matched_record_id: string | null; review_decision: string | null; display_name: string },
+  subj: { id: string; matched_record_id: string | null; review_decision: string | null; display_name: string; validation_overrides?: Record<string, boolean> | null },
   fields: Array<{ id: string; target_field: string; value: string | null; source_document_id: string | null; source_snippet: string | null; provenance: string; is_custom_attribute: boolean }>,
   jobId: string,
   userId: string,
   gaps: string[],
+  tenant?: TenantIdentity,
 ): Promise<string> {
   const mapped: Record<string, unknown> = {};
   for (const f of fields) {

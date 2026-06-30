@@ -291,6 +291,7 @@ function SubjectReview({
   if (q.isError || !q.data) return <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive">Failed to load subject.</div>;
 
   const { subject, fields, unfiled, certs, questions, matched } = q.data;
+  const tenant = (q.data as { tenant?: { codesHeld: string[]; names: string[] } }).tenant ?? { codesHeld: [], names: [] };
   const validation = (q.data as { validation?: { ok: boolean; issues: Array<{ key: string; severity: "error" | "warning"; field?: string; message: string }>; blocking: string[] } }).validation;
   const mergeFlags = (q.data as { mergeFlags?: Array<Record<string, string | number | boolean | null>> }).mergeFlags ?? [];
   const targetFields = jobMode === "client" ? CLIENT_FIELDS : EMPLOYEE_FIELDS;

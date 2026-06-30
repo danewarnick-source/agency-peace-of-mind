@@ -210,7 +210,9 @@ Common field_key values to extract when present (use field_group to bucket relat
   SOW (group "sow_clause"): clause_number, required_document, obligation, deadline
   Certification (group "cert"): cert_name, issued_at, expires_at, issuing_body
   Support coordinator (group "support_coordinator"): support_coordinator_name,
-    support_coordinator_email, support_coordinator_phone
+    support_coordinator_email, support_coordinator_phone,
+    support_coordinator_company (value_text — the SC firm/agency name, e.g.
+    "INTERMOUNTAIN SUPPORT COORDINATION SERVICES, LLC")
   Medical (group "medical"): primary_care_name, primary_care_phone,
     neurologist_name, neurologist_phone, dentist_name, dentist_phone,
     prescriber_name, prescriber_phone, medical_insurance,

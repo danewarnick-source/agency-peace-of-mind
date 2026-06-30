@@ -986,7 +986,8 @@ export const getPendingClientSubject = createServerFn({ method: "POST" })
 
     const draft = buildDraftFromExtractedFields(fields ?? [], subj.display_name);
 
-    const validation = validateClientDraft(draft);
+    const tenant = subj.org_id ? await fetchTenantIdentity(sb, subj.org_id) : { codesHeld: [], names: [] };
+    const validation = validateClientDraft(draft, { tenant });
     const overrides = (subj.validation_overrides as Record<string, boolean>) ?? {};
     const blocking = filterBlocking(validation.issues, overrides);
 

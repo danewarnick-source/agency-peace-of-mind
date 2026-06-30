@@ -229,7 +229,19 @@ Common field_key values to extract when present (use field_group to bucket relat
     team_name (value_text)
 
 For each field include source_locator (e.g. "page 3", "§4.2", "row 12 of budget table") and a confidence 0..1.
-Never invent data — omit fields not present. Return ONLY JSON, no commentary.`;
+Never invent data — omit fields not present. Return ONLY JSON, no commentary.
+
+CONTEXT vs PROFILE — DO NOT EXTRACT plan/meeting context as client-profile fields. The following
+content is NOT client-profile data and MUST be omitted from "fields" entirely (do not invent a
+field_key for them, do not place them under "person" or any group):
+  • Meeting attendees / participants / signatures present at the planning meeting
+  • Meeting minutes, meeting notes, agenda, discussion narrative
+  • UCANS domain narrative rows (Label, Note, Category, From) — these are an assessment instrument's
+    free-text rows, not profile fields
+  • Plan facilitator commentary, narrative summaries of the meeting itself
+If the document contains these items they belong to the plan, not the person. Omit them.
+Real client-profile fields (name, DOB, Medicaid ID, address, guardian, goals, medications, billing
+codes, allergies, diagnoses, etc.) stay in "fields" as usual.`;
 
 export async function parseDocumentWithAI(
   documentText: string,

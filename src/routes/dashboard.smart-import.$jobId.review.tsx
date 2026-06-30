@@ -22,12 +22,12 @@ import {
   getReviewJob, getReviewSubject, editExtractedField, setSubjectDecision,
   setSubjectReady, upsertCertDocument, answerNectarQuestion, fileUnfiledItem,
   computeProvisioningForecast, togglePlanItem, confirmAssignment, submitForSetup,
-  saveBillingCodeRow, removeExtractedField,
+  saveBillingCodeRow, removeExtractedField, restoreExtractedField,
 } from "@/lib/smart-import-review.functions";
 import { resolveMergeFlag, overrideValidationIssue } from "@/lib/import-checklist.functions";
 import { partitionCodeRows, type TenantIdentity } from "@/lib/service-classification";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, X, RotateCcw } from "lucide-react";
 import { providerSignoff } from "@/lib/hive-migration.functions";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/review")({
@@ -591,6 +591,7 @@ type FieldRow = {
   is_custom_attribute: boolean; provenance: string;
   value_json?: unknown;
   field_key?: string | null;
+  dismissed_at?: string | null;
 };
 function PlacementLineup({
   fields, targetFields, matched, decision, subjectId, tenant, onChanged,
@@ -906,13 +907,26 @@ function FieldRowEditor({
   field: FieldRow; targetFields: string[]; matchedValue: string | null; showDiff: boolean; onChanged: () => void;
 }) {
   const edit = useServerFn(editExtractedField);
+  const dismiss = useServerFn(removeExtractedField);
+  const restore = useServerFn(restoreExtractedField);
   const [value, setValue] = useState(field.value ?? "");
   const [target, setTarget] = useState(field.target_field);
   const [dirty, setDirty] = useState(false);
+  const dismissed = !!field.dismissed_at;
 
   const m = useMutation({
     mutationFn: () => edit({ data: { fieldId: field.id, value, target_field: target } }),
     onSuccess: () => { toast.success("Saved"); setDirty(false); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const dismissM = useMutation({
+    mutationFn: () => dismiss({ data: { fieldId: field.id } }),
+    onSuccess: () => { toast.success("Dismissed — will not commit"); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const restoreM = useMutation({
+    mutationFn: () => restore({ data: { fieldId: field.id } }),
+    onSuccess: () => { toast.success("Restored"); onChanged(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const flag = field.status === "flag";
@@ -920,29 +934,33 @@ function FieldRowEditor({
   const edited = field.status === "edited";
 
   let diffTag: React.ReactNode = null;
-  if (showDiff) {
+  if (showDiff && !dismissed) {
     if (!matchedValue) diffTag = <Badge variant="outline" className="text-emerald-600">new</Badge>;
     else if ((matchedValue ?? "") !== (value ?? "")) diffTag = <Badge variant="outline" className="text-amber-600">changed</Badge>;
     else diffTag = <Badge variant="outline" className="text-muted-foreground">same</Badge>;
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border p-2 sm:flex-row sm:items-center">
+    <div
+      className={`flex flex-col gap-2 rounded-lg border border-border p-2 sm:flex-row sm:items-center ${dismissed ? "bg-muted/40 opacity-60" : ""}`}
+    >
       <Input
-        className="sm:max-w-xs"
+        className={`sm:max-w-xs ${dismissed ? "line-through text-muted-foreground" : ""}`}
         value={value}
         onChange={(e) => { setValue(e.target.value); setDirty(true); }}
+        disabled={dismissed}
       />
       <span className="text-xs text-muted-foreground">→</span>
       {field.is_custom_attribute ? (
         <Input
-          className="sm:max-w-[200px]"
+          className={`sm:max-w-[200px] ${dismissed ? "line-through text-muted-foreground" : ""}`}
           value={target}
           onChange={(e) => { setTarget(e.target.value); setDirty(true); }}
+          disabled={dismissed}
         />
       ) : (
-        <Select value={target} onValueChange={(v) => { setTarget(v); setDirty(true); }}>
-          <SelectTrigger className="sm:max-w-[200px]"><SelectValue /></SelectTrigger>
+        <Select value={target} onValueChange={(v) => { setTarget(v); setDirty(true); }} disabled={dismissed}>
+          <SelectTrigger className={`sm:max-w-[200px] ${dismissed ? "line-through text-muted-foreground" : ""}`}><SelectValue /></SelectTrigger>
           <SelectContent>
             {targetFields.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
             {!targetFields.includes(target) && <SelectItem value={target}>{target}</SelectItem>}
@@ -950,17 +968,41 @@ function FieldRowEditor({
         </Select>
       )}
       <div className="flex flex-1 items-center gap-1.5 text-xs">
-        {placed && <Badge variant="outline" className="text-emerald-600">placed</Badge>}
-        {flag && <Badge variant="outline" className="text-amber-600"><AlertTriangle className="mr-1 h-3 w-3" />check</Badge>}
-        {edited && <Badge variant="outline" className="text-primary"><Pencil className="mr-1 h-3 w-3" />edited</Badge>}
+        {dismissed && <Badge variant="outline" className="text-muted-foreground">dismissed</Badge>}
+        {!dismissed && placed && <Badge variant="outline" className="text-emerald-600">placed</Badge>}
+        {!dismissed && flag && <Badge variant="outline" className="text-amber-600"><AlertTriangle className="mr-1 h-3 w-3" />check</Badge>}
+        {!dismissed && edited && <Badge variant="outline" className="text-primary"><Pencil className="mr-1 h-3 w-3" />edited</Badge>}
         {diffTag}
-        {showDiff && matchedValue && matchedValue !== value && (
+        {showDiff && !dismissed && matchedValue && matchedValue !== value && (
           <span className="text-muted-foreground">was: <span className="font-mono">{matchedValue}</span></span>
         )}
       </div>
-      {dirty && (
+      {dirty && !dismissed && (
         <Button size="sm" onClick={() => m.mutate()} disabled={m.isPending}>
           {m.isPending && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}Save
+        </Button>
+      )}
+      {dismissed ? (
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => restoreM.mutate()}
+          disabled={restoreM.isPending}
+          title="Restore this mapping"
+        >
+          <RotateCcw className="mr-1 h-3 w-3" /> Undo
+        </Button>
+      ) : (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+          onClick={() => dismissM.mutate()}
+          disabled={dismissM.isPending}
+          title="Exclude this row from commit"
+          aria-label="Dismiss row"
+        >
+          <X className="h-4 w-4" />
         </Button>
       )}
     </div>

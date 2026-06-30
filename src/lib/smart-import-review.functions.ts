@@ -84,7 +84,8 @@ export const getReviewSubject = createServerFn({ method: "POST" })
 
 
     // ── Validation issues + merge flags (prompt 3 triple-check) ──────────
-    const draft = buildDraftFromExtractedFields(fields ?? [], (subject as { display_name?: string | null }).display_name);
+    const activeFields = (fields ?? []).filter((f: { dismissed_at?: string | null }) => !f.dismissed_at);
+    const draft = buildDraftFromExtractedFields(activeFields, (subject as { display_name?: string | null }).display_name);
     const orgIdForTenant = (subject as { org_id?: string | null }).org_id ?? null;
     const tenant = orgIdForTenant ? await fetchTenantIdentity(sb, orgIdForTenant) : { codesHeld: [], names: [] };
     const validation = validateClientDraft(draft, { tenant });
@@ -359,6 +360,8 @@ export const saveBillingCodeRow = createServerFn({ method: "POST" })
   });
 
 const FieldIdInput = z.object({ fieldId: z.string().uuid() });
+// Soft-dismiss a placement row so it is skipped at commit, without hard-deleting
+// (7-year retention). Reversible via restoreExtractedField.
 export const removeExtractedField = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => FieldIdInput.parse(i))
@@ -371,16 +374,51 @@ export const removeExtractedField = createServerFn({ method: "POST" })
       .eq("id", data.fieldId)
       .single();
     if (!row) throw new Error("Field not found");
-    const { error } = await sb.from("extracted_fields").delete().eq("id", data.fieldId);
+    const { error } = await sb
+      .from("extracted_fields")
+      .update({
+        dismissed_at: new Date().toISOString(),
+        dismissed_by: context.userId,
+      })
+      .eq("id", data.fieldId);
     if (error) throw new Error(error.message);
     await sb.from("import_audit").insert({
       import_job_id: row.import_job_id,
       org_id: row.org_id,
       subject_id: row.import_subject_id,
-      item: `Removed ${row.target_field}`,
+      item: `Dismissed ${row.target_field} (excluded from commit)`,
       traces_to: "admin_override",
       actor: context.userId,
-      action: "remove_field",
+      action: "dismiss_field",
+    });
+    return { ok: true };
+  });
+
+export const restoreExtractedField = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => FieldIdInput.parse(i))
+  .handler(async ({ data, context }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = context.supabase as any;
+    const { data: row } = await sb
+      .from("extracted_fields")
+      .select("id, import_job_id, org_id, import_subject_id, target_field")
+      .eq("id", data.fieldId)
+      .single();
+    if (!row) throw new Error("Field not found");
+    const { error } = await sb
+      .from("extracted_fields")
+      .update({ dismissed_at: null, dismissed_by: null })
+      .eq("id", data.fieldId);
+    if (error) throw new Error(error.message);
+    await sb.from("import_audit").insert({
+      import_job_id: row.import_job_id,
+      org_id: row.org_id,
+      subject_id: row.import_subject_id,
+      item: `Restored ${row.target_field}`,
+      traces_to: "admin_override",
+      actor: context.userId,
+      action: "restore_field",
     });
     return { ok: true };
   });

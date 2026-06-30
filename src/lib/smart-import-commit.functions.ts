@@ -178,7 +178,8 @@ export async function runJobCommit(sbIn: any, userId: string, jobId: string, opt
         const { data: subjFields } = await sb
           .from("extracted_fields")
           .select("target_field, value")
-          .eq("import_subject_id", subj.id);
+          .eq("import_subject_id", subj.id)
+          .is("dismissed_at", null);
         const draft = buildClientDraftFromFields(subjFields ?? []);
         const { issues } = validateClientDraft(draft, { tenant: tenantIdentity });
         const overrides = (subj.validation_overrides as Record<string, boolean>) ?? {};
@@ -201,7 +202,7 @@ export async function runJobCommit(sbIn: any, userId: string, jobId: string, opt
 
       try {
         const { data: fields } = await sb.from("extracted_fields")
-          .select("*").eq("import_subject_id", subj.id).neq("status", "ignored");
+          .select("*").eq("import_subject_id", subj.id).neq("status", "ignored").is("dismissed_at", null);
         const fieldsList = fields ?? [];
 
         let recordId: string | null = null;

@@ -165,6 +165,7 @@ export type Database = {
           inference_reason: string | null
           org_id: string
           relation_type: string
+          service_codes: string[] | null
           staff_record_id: string | null
           staff_subject_id: string | null
           status: string
@@ -181,6 +182,7 @@ export type Database = {
           inference_reason?: string | null
           org_id: string
           relation_type: string
+          service_codes?: string[] | null
           staff_record_id?: string | null
           staff_subject_id?: string | null
           status?: string
@@ -197,6 +199,7 @@ export type Database = {
           inference_reason?: string | null
           org_id?: string
           relation_type?: string
+          service_codes?: string[] | null
           staff_record_id?: string | null
           staff_subject_id?: string | null
           status?: string

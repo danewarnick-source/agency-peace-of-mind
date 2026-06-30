@@ -416,6 +416,8 @@ async function commitClient(
       fields: norm,
       sourceDocumentType: inferredType,
       importJobId: jobId,
+      tenant: tenant ?? { codesHeld: [], names: [] },
+      overrides: (subj.validation_overrides as Record<string, boolean> | null) ?? {},
       onError: async (action, message) => {
         await audit(sb, jobId, orgId, subj.id, message, "admin_override", userId, action);
       },

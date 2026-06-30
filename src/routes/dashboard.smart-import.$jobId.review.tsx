@@ -26,7 +26,7 @@ import {
   getJobAssigner, upsertManualAssignment, removeAssignmentMapRow,
 } from "@/lib/smart-import-review.functions";
 import { resolveMergeFlag, overrideValidationIssue } from "@/lib/import-checklist.functions";
-import { partitionCodeRows, type TenantIdentity } from "@/lib/service-classification";
+import { type TenantIdentity } from "@/lib/service-classification";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -318,13 +318,36 @@ function SubjectReview({
   const targetFields = jobMode === "client" ? CLIENT_FIELDS : EMPLOYEE_FIELDS;
   const canMarkReady = !validation || validation.ok;
 
+  // Lift wizard step up so we can render the rail directly under the name header.
+  const [step, setStep] = useState<WizardStepId>("person");
+  const askCount = (questions as Array<{ answer: string | null }>).filter((qq) => !qq.answer).length;
+  const extraCount = (unfiled as Array<{ filed_to: string | null }>).filter((u) => !u.filed_to).length;
+  // Drop per-code routing issues — they're replaced by the inline billing table editor.
+  const visibleIssues = (validation?.issues ?? []).filter(
+    (i) => !/^code\.(confirm_owner|coordination|coordination_info|bill_as_ours|ignore)\./.test(i.key),
+  );
+  const issueCount = visibleIssues.length;
+  const steps: Array<{ id: WizardStepId; label: string; badge?: number }> = [
+    { id: "person", label: "Person & contacts" },
+    { id: "services", label: "Services & health" },
+    { id: "plan", label: "Plan & documents", badge: extraCount || undefined },
+    { id: "staff", label: jobMode === "employee" ? "Certs & training" : "Staff & training" },
+    { id: "review", label: "Review", badge: (askCount + issueCount) || undefined },
+  ];
+  const activeIdx = steps.findIndex((s) => s.id === step);
+
   return (
     <div className="space-y-4">
       <SubjectHeader subject={subject} onChanged={refresh} canMarkReady={canMarkReady} />
+      <StepRail steps={steps} activeIdx={activeIdx} onJump={(i) => setStep(steps[i].id)} />
       <DedupBanner subject={subject} matched={matched} onChanged={refresh} />
 
-      {validation && validation.issues.length > 0 && (
-        <ValidationPanel subjectId={subjectId} validation={validation} onChanged={refresh} />
+      {validation && visibleIssues.length > 0 && (
+        <ValidationPanel
+          subjectId={subjectId}
+          validation={{ ...validation, issues: visibleIssues }}
+          onChanged={refresh}
+        />
       )}
       {mergeFlags.length > 0 && (
         <MergeFlagsPanel flags={mergeFlags} onChanged={refresh} />
@@ -342,10 +365,12 @@ function SubjectReview({
         certs={certs}
         questions={questions}
         unfiled={unfiled}
-        validation={validation}
         jobId={jobId}
         subjects={subjects}
         assignments={assignments}
+        step={step}
+        setStep={setStep}
+        steps={steps}
         onChanged={refresh}
       />
 
@@ -377,7 +402,7 @@ type WizardStepId = "person" | "services" | "plan" | "staff" | "review";
 
 function SubjectWizard({
   subjectId, jobMode, fields, targetFields, matched, decision, tenant,
-  certs, questions, unfiled, validation, jobId, subjects, assignments, onChanged,
+  certs, questions, unfiled, jobId, subjects, assignments, step, setStep, steps, onChanged,
 }: {
   subjectId: string;
   jobMode: "employee" | "client";
@@ -389,37 +414,24 @@ function SubjectWizard({
   certs: Array<{ id: string; cert_key: string; state: "unverified"|"verified"|"provisional"; file_name?: string|null; expiry_date?: string|null }>;
   questions: Array<{ id: string; question: string; context: string | null; answer: string | null }>;
   unfiled: Array<{ id: string; text: string; filed_to: string | null }>;
-  validation: { ok: boolean; issues: Array<{ key: string; severity: "error" | "warning"; field?: string; message: string }>; blocking: string[] } | undefined;
   jobId: string;
   subjects: SubjectRow[];
   assignments: Array<{ id: string; relation_type: string; staff_subject_id: string | null; client_subject_id: string | null; status: string; inference_reason: string | null }>;
+  step: WizardStepId;
+  setStep: (s: WizardStepId) => void;
+  steps: Array<{ id: WizardStepId; label: string; badge?: number }>;
   onChanged: () => void;
 }) {
-  const [step, setStep] = useState<WizardStepId>("person");
-
   const personFields = fields.filter((f) => PERSON_FIELDS_SET.has(f.target_field));
   const servicesFields = fields.filter((f) => SERVICES_FIELDS_SET.has(f.target_field));
   const otherFields = fields.filter((f) => !PERSON_FIELDS_SET.has(f.target_field) && !SERVICES_FIELDS_SET.has(f.target_field) && !f.is_custom_attribute);
   // Anything we couldn't bucket falls into Person so nothing disappears.
   const personFieldsAll = [...personFields, ...otherFields, ...fields.filter((f) => f.is_custom_attribute)];
 
-  const askCount = questions.filter((q) => !q.answer).length;
-  const extraCount = unfiled.filter((u) => !u.filed_to).length;
-  const issueCount = validation?.issues.length ?? 0;
-
-  const steps: Array<{ id: WizardStepId; label: string; badge?: number }> = [
-    { id: "person", label: "Person & contacts" },
-    { id: "services", label: "Services & health" },
-    { id: "plan", label: "Plan & documents", badge: extraCount || undefined },
-    { id: "staff", label: jobMode === "employee" ? "Certs & training" : "Staff & training" },
-    { id: "review", label: "Review", badge: (askCount + issueCount) || undefined },
-  ];
   const idx = steps.findIndex((s) => s.id === step);
 
   return (
     <div className="space-y-4">
-      <StepRail steps={steps} activeIdx={idx} onJump={(i) => setStep(steps[i].id)} />
-
       {step === "person" && (
         <PlacementLineup
           fields={personFieldsAll.filter((f) => f.target_field !== "billing_code_row")}
@@ -769,7 +781,11 @@ function PlacementLineup({
   // its existing value→field shape for every other field.
   const billing = fields.filter((f) => f.target_field === "billing_code_row");
   const rest = fields.filter((f) => f.target_field !== "billing_code_row");
-  const core = rest.filter((f) => !f.is_custom_attribute);
+  // Prompt 24: limit lineup to SOW-required record fields. Incidental
+  // mappings (extras NECTAR pulled but aren't required by §1.10) are
+  // hidden here — they still live on the record as custom attributes.
+  const required = new Set(targetFields);
+  const core = rest.filter((f) => !f.is_custom_attribute && required.has(f.target_field));
   const custom = rest.filter((f) => f.is_custom_attribute);
   return (
     <div className="space-y-4">
@@ -777,10 +793,10 @@ function PlacementLineup({
       <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
         <div className="mb-3 flex items-center justify-between">
           <div className="text-sm font-semibold">Placement lineup</div>
-          <div className="text-xs text-muted-foreground">Value → field. Edit either side.</div>
+          <div className="text-xs text-muted-foreground">SOW-required fields only. Edit or × to remove.</div>
         </div>
         <div className="space-y-2">
-          {core.length === 0 && <div className="text-sm text-muted-foreground">No core fields extracted.</div>}
+          {core.length === 0 && <div className="text-sm text-muted-foreground">No required fields extracted.</div>}
           {core.map((f) => (
             <FieldRowEditor key={f.id} field={f} targetFields={targetFields} matchedValue={matched ? (matched[f.target_field] as string | null) ?? null : null} showDiff={decision === "update"} onChanged={onChanged} />
           ))}
@@ -842,21 +858,17 @@ function parseBillingRow(f: FieldRow): BillingRowShape | null {
 }
 
 function BillingCodesEditor({
-  subjectId, rows, tenant, onChanged,
+  subjectId, rows, tenant: _tenant, onChanged,
 }: {
   subjectId: string; rows: FieldRow[]; tenant: TenantIdentity; onChanged: () => void;
 }) {
   type Parsed = { field: FieldRow; row: BillingRowShape };
+  // Prompt 24: show every extracted code as one editable row. The Provider
+  // column tells the admin whose code it is at a glance; deleting a row is
+  // how the admin opts out of billing it. No separate "confirm bucket" wall.
   const parsed: Parsed[] = rows
     .map((f) => { const row = parseBillingRow(f); return row ? { field: f, row } : null; })
     .filter((x): x is Parsed => x !== null);
-
-  // Partition by classification: only "ours" rows are editable here. Coordination /
-  // external rows render read-only below (filed via prompt 15 at commit time).
-  const partition = partitionCodeRows(parsed.map((p) => p.row), tenant, {});
-  const oursCodes = new Set(partition.ours.map((r) => r.service_code));
-  const ours = parsed.filter((p) => oursCodes.has(p.row.service_code));
-  const external = parsed.filter((p) => !oursCodes.has(p.row.service_code));
 
   const [adding, setAdding] = useState(false);
 
@@ -866,8 +878,9 @@ function BillingCodesEditor({
         <div>
           <div className="text-sm font-semibold">Billing codes (your authorization)</div>
           <div className="text-xs text-muted-foreground">
-            Pre-filled from the PCSP. Type into any blank cell — leaving rate or annual units empty
-            commits the row with a "rate / units pending" flag (advisory, never blocks billing setup).
+            Pre-filled from the PCSP. The Provider column shows whose code it is — delete (×)
+            any row you don't bill. Blank rate or annual units commit with a "pending" flag
+            (advisory; never blocks billing setup).
           </div>
         </div>
         <Button size="sm" variant="outline" onClick={() => setAdding(true)} disabled={adding}>
@@ -875,60 +888,55 @@ function BillingCodesEditor({
         </Button>
       </div>
 
-      {ours.length === 0 && !adding && (
+      {parsed.length === 0 && !adding && (
         <div className="rounded-md border border-dashed border-border bg-muted/30 p-3 text-sm text-muted-foreground">
-          No billable codes were found for your org in this document. Use "Add code" if the admin needs to enter them manually.
+          No billable codes were found in this document. Use "Add code" to enter them manually.
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[820px] text-left text-xs">
-          <thead className="text-muted-foreground">
-            <tr className="border-b border-border">
-              <th className="py-2 pr-2 font-medium">Code</th>
-              <th className="py-2 pr-2 font-medium">Provider</th>
-              <th className="py-2 pr-2 font-medium">Unit type</th>
-              <th className="py-2 pr-2 font-medium">Rate</th>
-              <th className="py-2 pr-2 font-medium">Annual units</th>
-              <th className="py-2 pr-2 font-medium">Monthly cap</th>
-              <th className="py-2 pr-2 font-medium">Start</th>
-              <th className="py-2 pr-2 font-medium">End</th>
-              <th className="py-2 pr-2 font-medium">Status</th>
-              <th className="py-2 pr-0" />
-            </tr>
-          </thead>
-          <tbody>
-            {ours.map((p) => (
-              <BillingRowEditor key={p.field.id} fieldId={p.field.id} subjectId={subjectId} initial={p.row} onChanged={onChanged} />
-            ))}
-            {adding && (
-              <BillingRowEditor
-                fieldId={null}
-                subjectId={subjectId}
-                initial={{ service_code: "" }}
-                isNew
-                onChanged={() => { setAdding(false); onChanged(); }}
-                onCancel={() => setAdding(false)}
-              />
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {external.length > 0 && (
-        <div className="mt-4 border-t border-border pt-3">
-          <div className="text-xs font-medium text-muted-foreground">
-            Other providers (coordination only — not billed by you)
-          </div>
-          <ul className="mt-2 space-y-1 text-xs">
-            {external.map((p) => (
-              <li key={p.field.id} className="flex items-center gap-2 text-muted-foreground">
-                <Badge variant="outline" className="font-mono">{p.row.service_code}</Badge>
-                <span>{p.row.provider_name ?? "Unknown provider"}</span>
-                <span className="opacity-60">· read-only</span>
-              </li>
-            ))}
-          </ul>
+      {(parsed.length > 0 || adding) && (
+        <div className="overflow-x-auto rounded-md border border-border/60">
+          <table className="w-full table-fixed text-left text-xs">
+            <colgroup>
+              <col className="w-[64px]" />
+              <col className="w-[18%]" />
+              <col className="w-[80px]" />
+              <col className="w-[72px]" />
+              <col className="w-[84px]" />
+              <col className="w-[76px]" />
+              <col className="w-[170px]" />
+              <col className="w-[96px]" />
+              <col className="w-[64px]" />
+            </colgroup>
+            <thead className="text-muted-foreground">
+              <tr className="border-b border-border">
+                <th className="py-2 px-1.5 font-medium">Code</th>
+                <th className="py-2 px-1.5 font-medium">Provider</th>
+                <th className="py-2 px-1.5 font-medium">Unit</th>
+                <th className="py-2 px-1.5 font-medium">Rate</th>
+                <th className="py-2 px-1.5 font-medium">Annual</th>
+                <th className="py-2 px-1.5 font-medium">Mo. cap</th>
+                <th className="py-2 px-1.5 font-medium">Term</th>
+                <th className="py-2 px-1.5 font-medium">Status</th>
+                <th className="py-2 px-1.5" />
+              </tr>
+            </thead>
+            <tbody>
+              {parsed.map((p) => (
+                <BillingRowEditor key={p.field.id} fieldId={p.field.id} subjectId={subjectId} initial={p.row} onChanged={onChanged} />
+              ))}
+              {adding && (
+                <BillingRowEditor
+                  fieldId={null}
+                  subjectId={subjectId}
+                  initial={{ service_code: "" }}
+                  isNew
+                  onChanged={() => { setAdding(false); onChanged(); }}
+                  onCancel={() => setAdding(false)}
+                />
+              )}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
@@ -998,10 +1006,10 @@ function BillingRowEditor({
 
   return (
     <tr className="border-b border-border/60 align-middle">
-      <td className="py-1.5 pr-2">
+      <td className="py-1.5 px-1.5">
         {isNew ? (
           <Select value={row.service_code} onValueChange={(v) => patch("service_code", v)}>
-            <SelectTrigger className="h-8 w-24"><SelectValue placeholder="Code" /></SelectTrigger>
+            <SelectTrigger className="h-8 w-full px-1.5"><SelectValue placeholder="—" /></SelectTrigger>
             <SelectContent>
               {allCodes.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
@@ -1010,39 +1018,40 @@ function BillingRowEditor({
           <Badge variant="outline" className="font-mono">{row.service_code}</Badge>
         )}
       </td>
-      <td className="py-1.5 pr-2">
-        <Input className="h-8 w-36" value={row.provider_name ?? ""} onChange={(e) => patch("provider_name", e.target.value || null)} />
+      <td className="py-1.5 px-1.5">
+        <Input className="h-8 w-full px-2" value={row.provider_name ?? ""} onChange={(e) => patch("provider_name", e.target.value || null)} />
       </td>
-      <td className="py-1.5 pr-2">
+      <td className="py-1.5 px-1.5">
         <Select value={row.unit_type ?? ""} onValueChange={(v) => patch("unit_type", v)}>
-          <SelectTrigger className="h-8 w-28"><SelectValue placeholder="Unit type" /></SelectTrigger>
+          <SelectTrigger className="h-8 w-full px-1.5"><SelectValue placeholder="—" /></SelectTrigger>
           <SelectContent>
             {UNIT_TYPE_OPTIONS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
           </SelectContent>
         </Select>
       </td>
-      <td className="py-1.5 pr-2">
-        <Input className="h-8 w-20" inputMode="decimal" value={row.rate ?? ""} onChange={(e) => patch("rate", numOrNull(e.target.value))} />
+      <td className="py-1.5 px-1.5">
+        <Input className="h-8 w-full px-1.5" inputMode="decimal" value={row.rate ?? ""} onChange={(e) => patch("rate", numOrNull(e.target.value))} />
       </td>
-      <td className="py-1.5 pr-2">
-        <Input className="h-8 w-24" inputMode="numeric" value={row.max_units ?? ""} onChange={(e) => patch("max_units", numOrNull(e.target.value))} />
+      <td className="py-1.5 px-1.5">
+        <Input className="h-8 w-full px-1.5" inputMode="numeric" value={row.max_units ?? ""} onChange={(e) => patch("max_units", numOrNull(e.target.value))} />
       </td>
-      <td className="py-1.5 pr-2">
-        <Input className="h-8 w-24" inputMode="numeric" value={row.monthly_max_units ?? ""} onChange={(e) => patch("monthly_max_units", numOrNull(e.target.value))} />
+      <td className="py-1.5 px-1.5">
+        <Input className="h-8 w-full px-1.5" inputMode="numeric" value={row.monthly_max_units ?? ""} onChange={(e) => patch("monthly_max_units", numOrNull(e.target.value))} />
       </td>
-      <td className="py-1.5 pr-2">
-        <Input className="h-8 w-32" type="date" value={row.plan_start ?? ""} onChange={(e) => patch("plan_start", e.target.value || null)} />
+      <td className="py-1.5 px-1.5">
+        <div className="flex items-center gap-1">
+          <Input className="h-8 w-full px-1.5" type="date" value={row.plan_start ?? ""} onChange={(e) => patch("plan_start", e.target.value || null)} title="Start" />
+          <span className="text-muted-foreground">–</span>
+          <Input className="h-8 w-full px-1.5" type="date" value={row.plan_end ?? ""} onChange={(e) => patch("plan_end", e.target.value || null)} title="End" />
+        </div>
       </td>
-      <td className="py-1.5 pr-2">
-        <Input className="h-8 w-32" type="date" value={row.plan_end ?? ""} onChange={(e) => patch("plan_end", e.target.value || null)} />
-      </td>
-      <td className="py-1.5 pr-2">
+      <td className="py-1.5 px-1.5">
         {pending ? (
-          <Badge variant="outline" className="text-amber-600">
-            <AlertTriangle className="mr-1 h-3 w-3" /> rate/units pending
+          <Badge variant="outline" className="whitespace-nowrap text-amber-600">
+            <AlertTriangle className="mr-1 h-3 w-3" /> pending
           </Badge>
         ) : (
-          <Badge variant="outline" className="text-emerald-600">complete</Badge>
+          <Badge variant="outline" className="text-emerald-600">ready</Badge>
         )}
       </td>
       <td className="py-1.5 pr-0">

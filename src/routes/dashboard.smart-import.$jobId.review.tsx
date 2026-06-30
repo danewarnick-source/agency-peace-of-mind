@@ -291,8 +291,15 @@ function StatusDot({ status }: { status: SubjectRow["review_status"] }) {
 
 // ---------------------------- SubjectReview ----------------------------
 function SubjectReview({
-  subjectId, jobMode, onChanged,
-}: { subjectId: string; jobMode: "employee" | "client"; onChanged: () => void }) {
+  subjectId, jobMode, jobId, subjects, assignments, onChanged,
+}: {
+  subjectId: string;
+  jobMode: "employee" | "client";
+  jobId: string;
+  subjects: SubjectRow[];
+  assignments: Array<{ id: string; relation_type: string; staff_subject_id: string | null; client_subject_id: string | null; status: string; inference_reason: string | null }>;
+  onChanged: () => void;
+}) {
   const getSubj = useServerFn(getReviewSubject);
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["smart-import-subject", subjectId], queryFn: () => getSubj({ data: { subjectId } }) });
@@ -336,6 +343,9 @@ function SubjectReview({
         questions={questions}
         unfiled={unfiled}
         validation={validation}
+        jobId={jobId}
+        subjects={subjects}
+        assignments={assignments}
         onChanged={refresh}
       />
 

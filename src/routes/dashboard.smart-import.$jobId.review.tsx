@@ -337,7 +337,7 @@ function SubjectReview({
             </TabsList>
 
             <TabsContent value="placement" className="mt-3">
-              <PlacementLineup fields={fields} targetFields={targetFields} matched={matched} decision={subject.review_decision} onChanged={refresh} />
+              <PlacementLineup fields={fields} targetFields={targetFields} matched={matched} decision={subject.review_decision} subjectId={subjectId} tenant={tenant} onChanged={refresh} />
             </TabsContent>
             {jobMode === "employee" && (
               <TabsContent value="certs" className="mt-3">

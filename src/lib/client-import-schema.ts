@@ -346,6 +346,7 @@ export async function applyExtractedFieldsToClient(
   setScalarText("support_coordinator_name", "support_coordinator_name");
   setScalarText("support_coordinator_email", "support_coordinator_email");
   setScalarText("support_coordinator_phone", "support_coordinator_phone");
+  setScalarText("support_coordinator_company", "support_coordinator_company");
 
   // Medical providers
   setScalarText("primary_care_name", "primary_care_name");

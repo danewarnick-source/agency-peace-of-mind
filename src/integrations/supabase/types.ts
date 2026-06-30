@@ -2746,6 +2746,7 @@ export type Database = {
           self_admin_med_support: boolean
           special_directions: string | null
           staff_ratio: string | null
+          support_coordinator_company: string | null
           support_coordinator_email: string | null
           support_coordinator_name: string | null
           support_coordinator_phone: string | null
@@ -2831,6 +2832,7 @@ export type Database = {
           self_admin_med_support?: boolean
           special_directions?: string | null
           staff_ratio?: string | null
+          support_coordinator_company?: string | null
           support_coordinator_email?: string | null
           support_coordinator_name?: string | null
           support_coordinator_phone?: string | null
@@ -2916,6 +2918,7 @@ export type Database = {
           self_admin_med_support?: boolean
           special_directions?: string | null
           staff_ratio?: string | null
+          support_coordinator_company?: string | null
           support_coordinator_email?: string | null
           support_coordinator_name?: string | null
           support_coordinator_phone?: string | null
@@ -13568,6 +13571,7 @@ export type Database = {
           self_admin_med_support: boolean
           special_directions: string | null
           staff_ratio: string | null
+          support_coordinator_company: string | null
           support_coordinator_email: string | null
           support_coordinator_name: string | null
           support_coordinator_phone: string | null

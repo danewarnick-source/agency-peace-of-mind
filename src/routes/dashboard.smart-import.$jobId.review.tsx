@@ -1006,10 +1006,10 @@ function BillingRowEditor({
 
   return (
     <tr className="border-b border-border/60 align-middle">
-      <td className="py-1.5 pr-2">
+      <td className="py-1.5 px-1.5">
         {isNew ? (
           <Select value={row.service_code} onValueChange={(v) => patch("service_code", v)}>
-            <SelectTrigger className="h-8 w-24"><SelectValue placeholder="Code" /></SelectTrigger>
+            <SelectTrigger className="h-8 w-full px-1.5"><SelectValue placeholder="—" /></SelectTrigger>
             <SelectContent>
               {allCodes.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
@@ -1018,39 +1018,40 @@ function BillingRowEditor({
           <Badge variant="outline" className="font-mono">{row.service_code}</Badge>
         )}
       </td>
-      <td className="py-1.5 pr-2">
-        <Input className="h-8 w-36" value={row.provider_name ?? ""} onChange={(e) => patch("provider_name", e.target.value || null)} />
+      <td className="py-1.5 px-1.5">
+        <Input className="h-8 w-full px-2" value={row.provider_name ?? ""} onChange={(e) => patch("provider_name", e.target.value || null)} />
       </td>
-      <td className="py-1.5 pr-2">
+      <td className="py-1.5 px-1.5">
         <Select value={row.unit_type ?? ""} onValueChange={(v) => patch("unit_type", v)}>
-          <SelectTrigger className="h-8 w-28"><SelectValue placeholder="Unit type" /></SelectTrigger>
+          <SelectTrigger className="h-8 w-full px-1.5"><SelectValue placeholder="—" /></SelectTrigger>
           <SelectContent>
             {UNIT_TYPE_OPTIONS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
           </SelectContent>
         </Select>
       </td>
-      <td className="py-1.5 pr-2">
-        <Input className="h-8 w-20" inputMode="decimal" value={row.rate ?? ""} onChange={(e) => patch("rate", numOrNull(e.target.value))} />
+      <td className="py-1.5 px-1.5">
+        <Input className="h-8 w-full px-1.5" inputMode="decimal" value={row.rate ?? ""} onChange={(e) => patch("rate", numOrNull(e.target.value))} />
       </td>
-      <td className="py-1.5 pr-2">
-        <Input className="h-8 w-24" inputMode="numeric" value={row.max_units ?? ""} onChange={(e) => patch("max_units", numOrNull(e.target.value))} />
+      <td className="py-1.5 px-1.5">
+        <Input className="h-8 w-full px-1.5" inputMode="numeric" value={row.max_units ?? ""} onChange={(e) => patch("max_units", numOrNull(e.target.value))} />
       </td>
-      <td className="py-1.5 pr-2">
-        <Input className="h-8 w-24" inputMode="numeric" value={row.monthly_max_units ?? ""} onChange={(e) => patch("monthly_max_units", numOrNull(e.target.value))} />
+      <td className="py-1.5 px-1.5">
+        <Input className="h-8 w-full px-1.5" inputMode="numeric" value={row.monthly_max_units ?? ""} onChange={(e) => patch("monthly_max_units", numOrNull(e.target.value))} />
       </td>
-      <td className="py-1.5 pr-2">
-        <Input className="h-8 w-32" type="date" value={row.plan_start ?? ""} onChange={(e) => patch("plan_start", e.target.value || null)} />
+      <td className="py-1.5 px-1.5">
+        <div className="flex items-center gap-1">
+          <Input className="h-8 w-full px-1.5" type="date" value={row.plan_start ?? ""} onChange={(e) => patch("plan_start", e.target.value || null)} title="Start" />
+          <span className="text-muted-foreground">–</span>
+          <Input className="h-8 w-full px-1.5" type="date" value={row.plan_end ?? ""} onChange={(e) => patch("plan_end", e.target.value || null)} title="End" />
+        </div>
       </td>
-      <td className="py-1.5 pr-2">
-        <Input className="h-8 w-32" type="date" value={row.plan_end ?? ""} onChange={(e) => patch("plan_end", e.target.value || null)} />
-      </td>
-      <td className="py-1.5 pr-2">
+      <td className="py-1.5 px-1.5">
         {pending ? (
-          <Badge variant="outline" className="text-amber-600">
-            <AlertTriangle className="mr-1 h-3 w-3" /> rate/units pending
+          <Badge variant="outline" className="whitespace-nowrap text-amber-600">
+            <AlertTriangle className="mr-1 h-3 w-3" /> pending
           </Badge>
         ) : (
-          <Badge variant="outline" className="text-emerald-600">complete</Badge>
+          <Badge variant="outline" className="text-emerald-600">ready</Badge>
         )}
       </td>
       <td className="py-1.5 pr-0">

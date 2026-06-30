@@ -9,6 +9,7 @@ import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { z } from "zod";
 import { applyExtractedFieldsToClient } from "@/lib/client-import-schema";
 import { validateClientDraft, filterBlocking, normalizeGuardianFields, type ClientDraft } from "@/lib/import-validation";
+import { fetchTenantIdentity, type TenantIdentity } from "@/lib/service-classification";
 
 
 const JobId = z.object({ jobId: z.string().uuid() });

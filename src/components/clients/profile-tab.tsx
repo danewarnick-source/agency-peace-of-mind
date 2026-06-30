@@ -230,21 +230,25 @@ function RecordCompletenessBar({
   const isOwnGuardian = client.is_own_guardian === true;
   const hasRightsRestrictions = Array.isArray(client.rights_restrictions) && (client.rights_restrictions as string[]).length > 0;
   const dnrStatus = (client.dnr_status as string | null) ?? null;
+  const hrApplicable = client.hr_applicable === true;
+  const dnrApplicable = client.dnr_applicable === true;
 
   type RecState = "ok" | "missing" | "na";
   function stateFor(key: RecKey): { state: RecState; doc?: DocRow } {
     const doc = docs.find((d) => d.document_type === key);
     if (key === "guardian" && isOwnGuardian) return { state: "na" };
     if (key === "hrc_approval" && !hasRightsRestrictions) return { state: "na" };
+    if (key === "human_rights" && !hrApplicable) return { state: "na" };
     if (key === "dnr") {
       if (doc) return { state: "ok", doc };
+      if (dnrApplicable) return { state: "missing" };
       if (dnrStatus === "none" || dnrStatus === "not_applicable" || dnrStatus == null) return { state: "na" };
       return { state: "missing" };
     }
     return doc ? { state: "ok", doc } : { state: "missing" };
   }
 
-  const keys: RecKey[] = ["pcsp", "photograph", "grievance_acknowledgment", "guardian", "hrc_approval", "dnr"];
+  const keys: RecKey[] = ["pcsp", "photograph", "grievance_acknowledgment", "grievance_policy", "individualized_plan", "human_rights", "guardian", "hrc_approval", "dnr"];
   const states = keys.map((k) => ({ key: k, ...stateFor(k) }));
   const applicable = states.filter((s) => s.state !== "na");
   const completed = applicable.filter((s) => s.state === "ok").length;

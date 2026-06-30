@@ -665,6 +665,21 @@ async function aiExtractFieldsFromText(
   for (const f of parsed.fields ?? []) {
     const key = String(f.field_key || "").trim();
     if (!key) continue;
+    const group = String(f.field_group || "").trim();
+    // Guardrail: divert plan/meeting context (UCANS rows, meeting attendees,
+    // minutes, etc.) to unfiled "Additional info" instead of placing it on the
+    // client profile. The model is also prompted to omit these; this is a
+    // belt-and-braces defense.
+    if (isPlanContext(key, group)) {
+      const snippet = String(
+        f.value_text
+          || (Array.isArray(f.value_array) ? f.value_array.join("; ") : "")
+          || f.source_locator
+          || key,
+      ).slice(0, 500);
+      if (snippet.trim()) unfiled.push(`[${group || "plan"}] ${key}: ${snippet}`);
+      continue;
+    }
     const isKnown = CORE_CLIENT_FIELD_KEYS.has(key);
     const conf = typeof f.confidence === "number"
       ? Math.max(0, Math.min(1, f.confidence))

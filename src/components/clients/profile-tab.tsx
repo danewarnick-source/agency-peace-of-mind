@@ -408,6 +408,9 @@ function IdentityCard({ clientId, client }: { clientId: string; client: ClientRo
     support_coordinator_email: (client.support_coordinator_email as string) ?? "",
     admission_date: (client.admission_date as string) ?? "",
     discharge_date: (client.discharge_date as string) ?? "",
+    has_abi: client.has_abi === true,
+    hr_applicable: client.hr_applicable === true,
+    dnr_applicable: client.dnr_applicable === true,
   });
   const [draft, setDraft] = useState(baseline);
   const set = <K extends keyof ReturnType<typeof baseline>>(k: K, v: ReturnType<typeof baseline>[K]) => setDraft((d) => ({ ...d, [k]: v }));
@@ -428,6 +431,9 @@ function IdentityCard({ clientId, client }: { clientId: string; client: ClientRo
         support_coordinator_email: draft.support_coordinator_email.trim() || null,
         admission_date: draft.admission_date || null,
         discharge_date: draft.discharge_date || null,
+        has_abi: draft.has_abi,
+        hr_applicable: draft.hr_applicable,
+        dnr_applicable: draft.dnr_applicable,
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await supabase.from("clients").update(payload as any).eq("id", clientId);

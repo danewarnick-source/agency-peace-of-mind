@@ -303,6 +303,7 @@ export async function applyExtractedFieldsToClient(
   setScalarText("medicaid_id", "medicaid_id");
   setScalarText("phone_number", "phone");
   setScalarText("physical_address", "physical_address");
+  setScalarText("mailing_address", "mailing_address");
   setScalarText("emergency_contact_name", "emergency_contact_name");
   setScalarText("emergency_contact_phone", "emergency_contact_phone");
 

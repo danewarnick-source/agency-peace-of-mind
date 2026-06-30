@@ -53,7 +53,7 @@ export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; 
         .from("clients")
         .select(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          "id, first_name, last_name, medicaid_id, date_of_birth, phone_number, is_own_guardian, guardian_name, guardian_phone, support_coordinator_name, support_coordinator_phone, support_coordinator_email, admission_date, discharge_date, diagnoses, primary_care_name, special_directions, dnr_status, account_status, pcsp_expiration_date, rights_restrictions" as any,
+          "id, first_name, last_name, medicaid_id, date_of_birth, phone_number, is_own_guardian, guardian_name, guardian_phone, support_coordinator_name, support_coordinator_phone, support_coordinator_email, admission_date, discharge_date, diagnoses, primary_care_name, special_directions, dnr_status, account_status, pcsp_expiration_date, rights_restrictions, has_abi, hr_applicable, dnr_applicable, pcp_name, pcp_phone, specialist_name, specialist_phone, med_prescriber_name, med_prescriber_phone, medical_insurance" as any,
         )
         .eq("id", clientId)
         .maybeSingle();

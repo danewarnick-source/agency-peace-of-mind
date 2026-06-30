@@ -53,6 +53,10 @@ export interface ApplyExtractedCtx {
   importJobId?: string | null;
   /** Optional audit hook — called for every silently-handled error. */
   onError?: (action: string, message: string) => Promise<void> | void;
+  /** Tenant identity (codes_held + names/aliases) for code-routing. */
+  tenant?: { codesHeld: string[]; names: string[] };
+  /** Admin overrides from the review screen (code.bill_as_ours.* etc.). */
+  overrides?: Record<string, boolean>;
 }
 
 const CONFIDENCE_THRESHOLD = 0.6;

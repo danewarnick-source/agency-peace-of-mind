@@ -370,7 +370,7 @@ export async function applyExtractedFieldsToClient(
   setScalarText("plan_year", "plan_year");
   setScalarText("disability_category", "disability_category");
   setScalarText("staff_ratio", "staff_ratio");
-  setScalarText("level_of_need", "level_of_need");
+
 
   // End-of-life / advanced care — extractor maps real document wording onto
   // these columns. Status values stay as-extracted (e.g. "Active", "On file");

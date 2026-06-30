@@ -318,13 +318,36 @@ function SubjectReview({
   const targetFields = jobMode === "client" ? CLIENT_FIELDS : EMPLOYEE_FIELDS;
   const canMarkReady = !validation || validation.ok;
 
+  // Lift wizard step up so we can render the rail directly under the name header.
+  const [step, setStep] = useState<WizardStepId>("person");
+  const askCount = questions.filter((qq) => !qq.answer).length;
+  const extraCount = unfiled.filter((u) => !u.filed_to).length;
+  // Drop per-code routing issues — they're replaced by the inline billing table editor.
+  const visibleIssues = (validation?.issues ?? []).filter(
+    (i) => !/^code\.(confirm_owner|coordination|coordination_info|bill_as_ours|ignore)\./.test(i.key),
+  );
+  const issueCount = visibleIssues.length;
+  const steps: Array<{ id: WizardStepId; label: string; badge?: number }> = [
+    { id: "person", label: "Person & contacts" },
+    { id: "services", label: "Services & health" },
+    { id: "plan", label: "Plan & documents", badge: extraCount || undefined },
+    { id: "staff", label: jobMode === "employee" ? "Certs & training" : "Staff & training" },
+    { id: "review", label: "Review", badge: (askCount + issueCount) || undefined },
+  ];
+  const activeIdx = steps.findIndex((s) => s.id === step);
+
   return (
     <div className="space-y-4">
       <SubjectHeader subject={subject} onChanged={refresh} canMarkReady={canMarkReady} />
+      <StepRail steps={steps} activeIdx={activeIdx} onJump={(i) => setStep(steps[i].id)} />
       <DedupBanner subject={subject} matched={matched} onChanged={refresh} />
 
-      {validation && validation.issues.length > 0 && (
-        <ValidationPanel subjectId={subjectId} validation={validation} onChanged={refresh} />
+      {validation && visibleIssues.length > 0 && (
+        <ValidationPanel
+          subjectId={subjectId}
+          validation={{ ...validation, issues: visibleIssues }}
+          onChanged={refresh}
+        />
       )}
       {mergeFlags.length > 0 && (
         <MergeFlagsPanel flags={mergeFlags} onChanged={refresh} />
@@ -342,10 +365,12 @@ function SubjectReview({
         certs={certs}
         questions={questions}
         unfiled={unfiled}
-        validation={validation}
         jobId={jobId}
         subjects={subjects}
         assignments={assignments}
+        step={step}
+        setStep={setStep}
+        steps={steps}
         onChanged={refresh}
       />
 

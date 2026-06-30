@@ -85,7 +85,17 @@ export const getReviewSubject = createServerFn({ method: "POST" })
 
     // ── Validation issues + merge flags (prompt 3 triple-check) ──────────
     const draft = buildDraftFromExtractedFields(fields ?? [], (subject as { display_name?: string | null }).display_name);
-    const validation = validateClientDraft(draft);
+    const orgIdForTenant = (subject as { org_id?: string | null }).org_id ?? null;
+    const tenant = orgIdForTenant ? await fetchTenantIdentity(sb, orgIdForTenant) : { codesHeld: [], names: [] };
+    const validation = validateClientDraft(draft, { tenant });
+    if (Array.isArray(draft.billing_codes) && draft.billing_codes.length && tenant.codesHeld.length === 0) {
+      validation.issues.push({
+        key: "org.codes_held_missing",
+        severity: "warning",
+        field: "billing_codes",
+        message: "Awarded service codes aren't set for this org — code routing falls back to provider-name matching. Configure codes_held to enable automatic billing/coordination split.",
+      });
+    }
     const overrides = ((subject as { validation_overrides?: Record<string, boolean> }).validation_overrides) ?? {};
     const blockingIssues = filterBlocking(validation.issues, overrides);
 

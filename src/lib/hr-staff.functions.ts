@@ -202,13 +202,24 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
     const hasBehaviorClient = myClientIds.some((id) =>
       behaviorClientIds.has(id),
     );
-    // ABI: at present no flag column on clients — fall back to the manual
-    // override only. (When ABI client tagging lands, OR it in here.)
+    // ABI: OR in the per-client `has_abi` flag — any assigned client with
+    // ABI triggers the ABI training requirement for this staff member.
+    let hasAbiClient = false;
+    if (myClientIds.length > 0) {
+      const { data: abiClients } = await sb
+        .from("clients")
+        .select("id")
+        .eq("organization_id", data.organization_id)
+        .in("id", myClientIds)
+        .eq("has_abi", true)
+        .limit(1);
+      hasAbiClient = (abiClients ?? []).length > 0;
+    }
     const requiresDeescalation =
       (prof?.requires_deescalation as boolean | undefined) === true ||
       hasBehaviorClient;
     const requiresAbi =
-      (prof?.requires_abi as boolean | undefined) === true;
+      (prof?.requires_abi as boolean | undefined) === true || hasAbiClient;
 
     const compMap = new Map<string, Record<string, unknown>>();
     for (const c of comp ?? []) compMap.set(c.requirement_id as string, c);

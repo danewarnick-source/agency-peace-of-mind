@@ -25,14 +25,19 @@ type ClientRow = Record<string, unknown>;
 type DocRow = { id: string; document_type: string | null; file_name: string | null; storage_path: string | null; uploaded_at: string | null };
 
 // Required SOW §1.10 record types surfaced in the completeness bar.
-type RecKey = "pcsp" | "photograph" | "grievance_acknowledgment" | "guardian" | "hrc_approval" | "dnr";
+type RecKey =
+  | "pcsp" | "photograph" | "grievance_acknowledgment" | "guardian" | "hrc_approval" | "dnr"
+  | "human_rights" | "grievance_policy" | "individualized_plan";
 const RECORD_LABELS: Record<RecKey, { title: string; sub: string }> = {
   pcsp: { title: "Person-Centered Plan", sub: "Annual; renews each year" },
   photograph: { title: "Photograph", sub: "Current likeness on file" },
   grievance_acknowledgment: { title: "Grievance acknowledgment", sub: "Signed by client / guardian" },
   guardian: { title: "Guardianship docs", sub: "Letter or court order" },
   hrc_approval: { title: "HRC / rights restriction", sub: "Required when rights are restricted" },
-  dnr: { title: "DNR order", sub: "Only if applicable" },
+  dnr: { title: "DNR order", sub: "Required when DNR is on file" },
+  human_rights: { title: "Human Rights documentation", sub: "Required when Human Rights applies" },
+  grievance_policy: { title: "Grievance policy", sub: "A signed copy on file" },
+  individualized_plan: { title: "Individualized plans", sub: "Behavior support / IEP / similar" },
 };
 
 export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; onOpenFiles: () => void }) {
@@ -48,7 +53,7 @@ export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; 
         .from("clients")
         .select(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          "id, first_name, last_name, medicaid_id, date_of_birth, phone_number, is_own_guardian, guardian_name, guardian_phone, support_coordinator_name, support_coordinator_phone, support_coordinator_email, admission_date, discharge_date, diagnoses, primary_care_name, special_directions, dnr_status, account_status, pcsp_expiration_date, rights_restrictions" as any,
+          "id, first_name, last_name, medicaid_id, date_of_birth, phone_number, is_own_guardian, guardian_name, guardian_phone, support_coordinator_name, support_coordinator_phone, support_coordinator_email, admission_date, discharge_date, diagnoses, primary_care_name, special_directions, dnr_status, account_status, pcsp_expiration_date, rights_restrictions, has_abi, hr_applicable, dnr_applicable, pcp_name, pcp_phone, specialist_name, specialist_phone, med_prescriber_name, med_prescriber_phone, medical_insurance" as any,
         )
         .eq("id", clientId)
         .maybeSingle();
@@ -225,21 +230,25 @@ function RecordCompletenessBar({
   const isOwnGuardian = client.is_own_guardian === true;
   const hasRightsRestrictions = Array.isArray(client.rights_restrictions) && (client.rights_restrictions as string[]).length > 0;
   const dnrStatus = (client.dnr_status as string | null) ?? null;
+  const hrApplicable = client.hr_applicable === true;
+  const dnrApplicable = client.dnr_applicable === true;
 
   type RecState = "ok" | "missing" | "na";
   function stateFor(key: RecKey): { state: RecState; doc?: DocRow } {
     const doc = docs.find((d) => d.document_type === key);
     if (key === "guardian" && isOwnGuardian) return { state: "na" };
     if (key === "hrc_approval" && !hasRightsRestrictions) return { state: "na" };
+    if (key === "human_rights" && !hrApplicable) return { state: "na" };
     if (key === "dnr") {
       if (doc) return { state: "ok", doc };
+      if (dnrApplicable) return { state: "missing" };
       if (dnrStatus === "none" || dnrStatus === "not_applicable" || dnrStatus == null) return { state: "na" };
       return { state: "missing" };
     }
     return doc ? { state: "ok", doc } : { state: "missing" };
   }
 
-  const keys: RecKey[] = ["pcsp", "photograph", "grievance_acknowledgment", "guardian", "hrc_approval", "dnr"];
+  const keys: RecKey[] = ["pcsp", "photograph", "grievance_acknowledgment", "grievance_policy", "individualized_plan", "human_rights", "guardian", "hrc_approval", "dnr"];
   const states = keys.map((k) => ({ key: k, ...stateFor(k) }));
   const applicable = states.filter((s) => s.state !== "na");
   const completed = applicable.filter((s) => s.state === "ok").length;
@@ -399,6 +408,9 @@ function IdentityCard({ clientId, client }: { clientId: string; client: ClientRo
     support_coordinator_email: (client.support_coordinator_email as string) ?? "",
     admission_date: (client.admission_date as string) ?? "",
     discharge_date: (client.discharge_date as string) ?? "",
+    has_abi: client.has_abi === true,
+    hr_applicable: client.hr_applicable === true,
+    dnr_applicable: client.dnr_applicable === true,
   });
   const [draft, setDraft] = useState(baseline);
   const set = <K extends keyof ReturnType<typeof baseline>>(k: K, v: ReturnType<typeof baseline>[K]) => setDraft((d) => ({ ...d, [k]: v }));
@@ -419,6 +431,9 @@ function IdentityCard({ clientId, client }: { clientId: string; client: ClientRo
         support_coordinator_email: draft.support_coordinator_email.trim() || null,
         admission_date: draft.admission_date || null,
         discharge_date: draft.discharge_date || null,
+        has_abi: draft.has_abi,
+        hr_applicable: draft.hr_applicable,
+        dnr_applicable: draft.dnr_applicable,
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await supabase.from("clients").update(payload as any).eq("id", clientId);
@@ -484,6 +499,11 @@ function IdentityCard({ clientId, client }: { clientId: string; client: ClientRo
             <GroupHeader>Enrollment</GroupHeader>
             <Row label="Admitted">{fmtDate(client.admission_date as string | null)}</Row>
             <Row label="Discharge date">{client.discharge_date ? fmtDate(client.discharge_date as string) : <span className="text-muted-foreground italic font-normal">— active —</span>}</Row>
+
+            <GroupHeader>Flags</GroupHeader>
+            <Row label="Acquired brain injury (ABI)">{client.has_abi ? "Yes — staff need ABI training" : "No"}</Row>
+            <Row label="Human Rights documentation">{client.hr_applicable ? "Applicable" : "Not applicable"}</Row>
+            <Row label="DNR order">{client.dnr_applicable ? "On — document required" : "Off"}</Row>
           </>
         ) : (
           <div className="space-y-4">
@@ -522,6 +542,33 @@ function IdentityCard({ clientId, client }: { clientId: string; client: ClientRo
               <div className="grid grid-cols-2 gap-2 mt-2">
                 <LabeledInput label="Admitted" type="date" value={draft.admission_date} onChange={(v) => set("admission_date", v)} />
                 <LabeledInput label="Discharge date" type="date" value={draft.discharge_date} onChange={(v) => set("discharge_date", v)} />
+              </div>
+            </div>
+
+            <div>
+              <GroupHeader>Flags</GroupHeader>
+              <div className="space-y-2 mt-2">
+                <div className="flex items-start gap-3">
+                  <Switch id="has-abi" checked={draft.has_abi} onCheckedChange={(v) => set("has_abi", v)} />
+                  <Label htmlFor="has-abi" className="text-sm leading-tight">
+                    Acquired brain injury (ABI)
+                    <div className="text-xs text-muted-foreground font-normal">When on, staff need ABI training before being assigned.</div>
+                  </Label>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Switch id="hr-app" checked={draft.hr_applicable} onCheckedChange={(v) => set("hr_applicable", v)} />
+                  <Label htmlFor="hr-app" className="text-sm leading-tight">
+                    Human Rights documentation applicable
+                    <div className="text-xs text-muted-foreground font-normal">When on, a Human Rights document upload is required.</div>
+                  </Label>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Switch id="dnr-app" checked={draft.dnr_applicable} onCheckedChange={(v) => set("dnr_applicable", v)} />
+                  <Label htmlFor="dnr-app" className="text-sm leading-tight">
+                    DNR order on file
+                    <div className="text-xs text-muted-foreground font-normal">When on, a DNR document upload is required.</div>
+                  </Label>
+                </div>
               </div>
             </div>
           </div>

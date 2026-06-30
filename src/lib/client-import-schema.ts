@@ -195,6 +195,8 @@ export async function applyExtractedFieldsToClient(
       "pcsp_goals, authorized_dspd_codes, job_code, team_id, " +
       "support_coordinator_name, support_coordinator_email, support_coordinator_phone, support_coordinator_company, " +
       "primary_care_name, primary_care_phone, " +
+      "pcp_name, pcp_phone, specialist_name, specialist_phone, " +
+      "med_prescriber_name, med_prescriber_phone, " +
       "neurologist_name, neurologist_phone, " +
       "dentist_name, dentist_phone, " +
       "prescriber_name, prescriber_phone, " +
@@ -355,6 +357,13 @@ export async function applyExtractedFieldsToClient(
   // Medical providers
   setScalarText("primary_care_name", "primary_care_name");
   setScalarText("primary_care_phone", "primary_care_phone");
+  // PCP / specialist / med-prescriber (Prompt 22 additive columns).
+  setScalarText("pcp_name", "pcp_name");
+  setScalarText("pcp_phone", "pcp_phone");
+  setScalarText("specialist_name", "specialist_name");
+  setScalarText("specialist_phone", "specialist_phone");
+  setScalarText("med_prescriber_name", "med_prescriber_name");
+  setScalarText("med_prescriber_phone", "med_prescriber_phone");
   setScalarText("neurologist_name", "neurologist_name");
   setScalarText("neurologist_phone", "neurologist_phone");
   setScalarText("dentist_name", "dentist_name");

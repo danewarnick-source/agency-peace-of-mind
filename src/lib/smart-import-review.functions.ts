@@ -84,7 +84,8 @@ export const getReviewSubject = createServerFn({ method: "POST" })
 
 
     // ── Validation issues + merge flags (prompt 3 triple-check) ──────────
-    const draft = buildDraftFromExtractedFields(fields ?? [], (subject as { display_name?: string | null }).display_name);
+    const activeFields = (fields ?? []).filter((f: { dismissed_at?: string | null }) => !f.dismissed_at);
+    const draft = buildDraftFromExtractedFields(activeFields, (subject as { display_name?: string | null }).display_name);
     const orgIdForTenant = (subject as { org_id?: string | null }).org_id ?? null;
     const tenant = orgIdForTenant ? await fetchTenantIdentity(sb, orgIdForTenant) : { codesHeld: [], names: [] };
     const validation = validateClientDraft(draft, { tenant });

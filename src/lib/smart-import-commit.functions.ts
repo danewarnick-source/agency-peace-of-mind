@@ -180,7 +180,7 @@ export async function runJobCommit(sbIn: any, userId: string, jobId: string, opt
           .select("target_field, value")
           .eq("import_subject_id", subj.id);
         const draft = buildClientDraftFromFields(subjFields ?? []);
-        const { issues } = validateClientDraft(draft);
+        const { issues } = validateClientDraft(draft, { tenant: tenantIdentity });
         const overrides = (subj.validation_overrides as Record<string, boolean>) ?? {};
         const blocking = filterBlocking(issues, overrides);
         if (blocking.length > 0) {

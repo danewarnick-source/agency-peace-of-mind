@@ -729,7 +729,7 @@ async function aiExtractFieldsFromText(
   const ln = get("last_name");
   const display = (full || `${fn ?? ""} ${ln ?? ""}`.trim() || "Imported client").trim();
 
-  return { display_name: display, fields: out, unfiled: [] };
+  return { display_name: display, fields: out, unfiled };
 }
 
 // Employee path keeps the lighter flat-field prompt (no PCSP-specific structure).

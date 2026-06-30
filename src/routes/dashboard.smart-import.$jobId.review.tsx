@@ -781,7 +781,11 @@ function PlacementLineup({
   // its existing value→field shape for every other field.
   const billing = fields.filter((f) => f.target_field === "billing_code_row");
   const rest = fields.filter((f) => f.target_field !== "billing_code_row");
-  const core = rest.filter((f) => !f.is_custom_attribute);
+  // Prompt 24: limit lineup to SOW-required record fields. Incidental
+  // mappings (extras NECTAR pulled but aren't required by §1.10) are
+  // hidden here — they still live on the record as custom attributes.
+  const required = new Set(targetFields);
+  const core = rest.filter((f) => !f.is_custom_attribute && required.has(f.target_field));
   const custom = rest.filter((f) => f.is_custom_attribute);
   return (
     <div className="space-y-4">
@@ -789,10 +793,10 @@ function PlacementLineup({
       <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
         <div className="mb-3 flex items-center justify-between">
           <div className="text-sm font-semibold">Placement lineup</div>
-          <div className="text-xs text-muted-foreground">Value → field. Edit either side.</div>
+          <div className="text-xs text-muted-foreground">SOW-required fields only. Edit or × to remove.</div>
         </div>
         <div className="space-y-2">
-          {core.length === 0 && <div className="text-sm text-muted-foreground">No core fields extracted.</div>}
+          {core.length === 0 && <div className="text-sm text-muted-foreground">No required fields extracted.</div>}
           {core.map((f) => (
             <FieldRowEditor key={f.id} field={f} targetFields={targetFields} matchedValue={matched ? (matched[f.target_field] as string | null) ?? null : null} showDiff={decision === "update"} onChanged={onChanged} />
           ))}

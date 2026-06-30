@@ -871,7 +871,8 @@ export const applyClientFields = createServerFn({ method: "POST" })
       .select("target_field, value")
       .eq("import_subject_id", data.subjectId);
     const draft = buildDraftFromExtractedFields(rows ?? []);
-    const validation = validateClientDraft(draft);
+    const tenant = subj.org_id ? await fetchTenantIdentity(sb, subj.org_id) : { codesHeld: [], names: [] };
+    const validation = validateClientDraft(draft, { tenant });
     const overrides = (subj.validation_overrides as Record<string, boolean>) ?? {};
     const blocking = filterBlocking(validation.issues, overrides);
     return {

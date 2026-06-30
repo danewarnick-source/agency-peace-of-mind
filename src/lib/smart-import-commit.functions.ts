@@ -792,17 +792,41 @@ async function applyAssignmentMap(
     if (!staffId || !clientId) continue;
 
     const isGroupHome = r.relation_type === "home";
-    const { error } = await sb.from("staff_assignments").upsert({
-      organization_id: orgId,
-      staff_id: staffId,
-      client_id: clientId,
-      created_by: userId,
-      is_group_home_assignment: isGroupHome,
-    }, { onConflict: "staff_id,client_id" });
-    if (!error) {
-      await sb.from("assignment_map").update({ staff_record_id: staffId, client_record_id: clientId }).eq("id", r.id);
-      await audit(sb, jobId, orgId, null, `Wired assignment ${r.relation_type}`, "admin_override", userId, "wire_assignment");
+    // Per assignment_map.service_codes: NULL = all of the client's authorized
+    // codes (default); a populated array scopes to those codes; an empty array
+    // is invalid (treat as NULL).
+    const codes: string[] | null = Array.isArray(r.service_codes) && r.service_codes.length > 0
+      ? r.service_codes
+      : null;
+    // Existing row? Update service_codes (don't error on the unique pair).
+    const { data: prior } = await sb.from("staff_assignments")
+      .select("id, service_codes")
+      .eq("organization_id", orgId)
+      .eq("staff_id", staffId)
+      .eq("client_id", clientId)
+      .maybeSingle();
+    let writeError: { message: string } | null = null;
+    if (prior?.id) {
+      const { error } = await sb.from("staff_assignments")
+        .update({ service_codes: codes, is_group_home_assignment: isGroupHome })
+        .eq("id", prior.id);
+      writeError = error;
+    } else {
+      const { error } = await sb.from("staff_assignments").insert({
+        organization_id: orgId,
+        staff_id: staffId,
+        client_id: clientId,
+        created_by: userId,
+        is_group_home_assignment: isGroupHome,
+        service_codes: codes,
+      });
+      writeError = error;
     }
+    if (!writeError) {
+      await sb.from("assignment_map").update({ staff_record_id: staffId, client_record_id: clientId }).eq("id", r.id);
+      await audit(sb, jobId, orgId, null, `Wired assignment ${r.relation_type}${codes ? ` (codes: ${codes.join(", ")})` : ""}`, "admin_override", userId, "wire_assignment");
+    }
+
   }
 }
 

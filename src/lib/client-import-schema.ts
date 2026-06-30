@@ -184,18 +184,18 @@ export async function applyExtractedFieldsToClient(
   const { data: client, error: cErr } = await supabase
     .from("clients")
     .select(
-      "id, first_name, last_name, date_of_birth, medicaid_id, phone_number, physical_address, " +
+      "id, first_name, last_name, date_of_birth, medicaid_id, phone_number, physical_address, mailing_address, " +
       "emergency_contact_name, emergency_contact_phone, emergency_contact_instructions, " +
       "is_own_guardian, guardian_name, guardian_phone, guardian_relationship, guardian_email, guardian_address, " +
       "special_directions, allergies, dysphagia, swallowing_alerts, self_admin_med_support, " +
       "pcsp_goals, authorized_dspd_codes, job_code, team_id, " +
-      "support_coordinator_name, support_coordinator_email, support_coordinator_phone, " +
+      "support_coordinator_name, support_coordinator_email, support_coordinator_phone, support_coordinator_company, " +
       "primary_care_name, primary_care_phone, " +
       "neurologist_name, neurologist_phone, " +
       "dentist_name, dentist_phone, " +
       "prescriber_name, prescriber_phone, " +
       "bsp_status, medical_insurance, housing_voucher, preferred_living, " +
-      "plan_year, disability_category, staff_ratio, level_of_need, " +
+      "plan_year, disability_category, staff_ratio, " +
       "advanced_directives, emergency_medical_treatment_authorization, " +
       "diagnoses, chronic_conditions, immunizations, court_orders, rights_restrictions, " +
       "preferred_activities, roommates, personal_belongings_inventory, " +

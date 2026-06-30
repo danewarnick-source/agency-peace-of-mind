@@ -499,6 +499,11 @@ function IdentityCard({ clientId, client }: { clientId: string; client: ClientRo
             <GroupHeader>Enrollment</GroupHeader>
             <Row label="Admitted">{fmtDate(client.admission_date as string | null)}</Row>
             <Row label="Discharge date">{client.discharge_date ? fmtDate(client.discharge_date as string) : <span className="text-muted-foreground italic font-normal">— active —</span>}</Row>
+
+            <GroupHeader>Flags</GroupHeader>
+            <Row label="Acquired brain injury (ABI)">{client.has_abi ? "Yes — staff need ABI training" : "No"}</Row>
+            <Row label="Human Rights documentation">{client.hr_applicable ? "Applicable" : "Not applicable"}</Row>
+            <Row label="DNR order">{client.dnr_applicable ? "On — document required" : "Off"}</Row>
           </>
         ) : (
           <div className="space-y-4">

@@ -25,14 +25,19 @@ type ClientRow = Record<string, unknown>;
 type DocRow = { id: string; document_type: string | null; file_name: string | null; storage_path: string | null; uploaded_at: string | null };
 
 // Required SOW §1.10 record types surfaced in the completeness bar.
-type RecKey = "pcsp" | "photograph" | "grievance_acknowledgment" | "guardian" | "hrc_approval" | "dnr";
+type RecKey =
+  | "pcsp" | "photograph" | "grievance_acknowledgment" | "guardian" | "hrc_approval" | "dnr"
+  | "human_rights" | "grievance_policy" | "individualized_plan";
 const RECORD_LABELS: Record<RecKey, { title: string; sub: string }> = {
   pcsp: { title: "Person-Centered Plan", sub: "Annual; renews each year" },
   photograph: { title: "Photograph", sub: "Current likeness on file" },
   grievance_acknowledgment: { title: "Grievance acknowledgment", sub: "Signed by client / guardian" },
   guardian: { title: "Guardianship docs", sub: "Letter or court order" },
   hrc_approval: { title: "HRC / rights restriction", sub: "Required when rights are restricted" },
-  dnr: { title: "DNR order", sub: "Only if applicable" },
+  dnr: { title: "DNR order", sub: "Required when DNR is on file" },
+  human_rights: { title: "Human Rights documentation", sub: "Required when Human Rights applies" },
+  grievance_policy: { title: "Grievance policy", sub: "A signed copy on file" },
+  individualized_plan: { title: "Individualized plans", sub: "Behavior support / IEP / similar" },
 };
 
 export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; onOpenFiles: () => void }) {

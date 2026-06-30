@@ -529,6 +529,7 @@ export async function applyExtractedFieldsToClient(
         service_code: r.service_code,
         unit_type: r.unit_type ?? (isDailyServiceCode(r.service_code) ? "day" : "unit"),
         annual_unit_authorization: annual ?? 0,
+        monthly_max_units: r.monthly_max_units ?? null,
         rate_per_unit: r.rate ?? 0,
         weekly_cap_units: r.weekly_cap_units ?? null,
         service_start_date: r.plan_start ?? null,

@@ -338,6 +338,176 @@ function SubjectReview({
   );
 }
 
+// ---------------------------- SubjectWizard ----------------------------
+// Presentational wrapper: groups existing review panels into a guided
+// step rail. Reuses every existing piece (PlacementLineup, CertsPanel,
+// QuestionsPanel, UnfiledPanel, ProvisioningPanel) — no new server fns,
+// no rebuilt fields, no separate commit path.
+const PERSON_FIELDS_SET = new Set([
+  "first_name","last_name","full_name","date_of_birth","phone","address","mailing_address","medicaid_id",
+  "is_own_guardian","guardian_name","guardian_phone","guardian_email","guardian_address","guardian_relationship",
+  "emergency_contact_name","emergency_contact_phone",
+  "support_coordinator_name","support_coordinator_email","support_coordinator_phone","support_coordinator_company",
+  "admission_date","discharge_date","has_abi",
+]);
+const SERVICES_FIELDS_SET = new Set([
+  "billing_code_row","job_code","team_name",
+  "pcp_name","pcp_phone","specialist_name","specialist_phone",
+  "med_prescriber_name","med_prescriber_phone","medical_insurance",
+  "hr_applicable","dnr_applicable",
+]);
+
+type WizardStepId = "person" | "services" | "plan" | "staff" | "review";
+
+function SubjectWizard({
+  subjectId, jobMode, fields, targetFields, matched, decision, tenant,
+  certs, questions, unfiled, validation, onChanged,
+}: {
+  subjectId: string;
+  jobMode: "employee" | "client";
+  fields: FieldRow[];
+  targetFields: string[];
+  matched: Record<string, string | null> | null;
+  decision: SubjectRow["review_decision"];
+  tenant: TenantIdentity;
+  certs: Array<{ id: string; cert_key: string; state: "unverified"|"verified"|"provisional"; file_name?: string|null; expiry_date?: string|null }>;
+  questions: Array<{ id: string; question: string; context: string | null; answer: string | null }>;
+  unfiled: Array<{ id: string; text: string; filed_to: string | null }>;
+  validation: { ok: boolean; issues: Array<{ key: string; severity: "error" | "warning"; field?: string; message: string }>; blocking: string[] } | undefined;
+  onChanged: () => void;
+}) {
+  const [step, setStep] = useState<WizardStepId>("person");
+
+  const personFields = fields.filter((f) => PERSON_FIELDS_SET.has(f.target_field));
+  const servicesFields = fields.filter((f) => SERVICES_FIELDS_SET.has(f.target_field));
+  const otherFields = fields.filter((f) => !PERSON_FIELDS_SET.has(f.target_field) && !SERVICES_FIELDS_SET.has(f.target_field) && !f.is_custom_attribute);
+  // Anything we couldn't bucket falls into Person so nothing disappears.
+  const personFieldsAll = [...personFields, ...otherFields, ...fields.filter((f) => f.is_custom_attribute)];
+
+  const askCount = questions.filter((q) => !q.answer).length;
+  const extraCount = unfiled.filter((u) => !u.filed_to).length;
+  const issueCount = validation?.issues.length ?? 0;
+
+  const steps: Array<{ id: WizardStepId; label: string; badge?: number }> = [
+    { id: "person", label: "Person & contacts" },
+    { id: "services", label: "Services & health" },
+    { id: "plan", label: "Plan & documents", badge: extraCount || undefined },
+    { id: "staff", label: jobMode === "employee" ? "Certs & training" : "Staff & training" },
+    { id: "review", label: "Review", badge: (askCount + issueCount) || undefined },
+  ];
+  const idx = steps.findIndex((s) => s.id === step);
+
+  return (
+    <div className="space-y-4">
+      <StepRail steps={steps} activeIdx={idx} onJump={(i) => setStep(steps[i].id)} />
+
+      {step === "person" && (
+        <PlacementLineup
+          fields={personFieldsAll.filter((f) => f.target_field !== "billing_code_row")}
+          targetFields={targetFields} matched={matched} decision={decision}
+          subjectId={subjectId} tenant={tenant} onChanged={onChanged}
+        />
+      )}
+      {step === "services" && (
+        <PlacementLineup
+          fields={servicesFields} targetFields={targetFields} matched={matched}
+          decision={decision} subjectId={subjectId} tenant={tenant} onChanged={onChanged}
+        />
+      )}
+      {step === "plan" && (
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground shadow-[var(--shadow-card)]">
+            PCSP and supporting documents (Human Rights, grievance policy, individualized plans, DNR) — additional uploads land here.
+          </div>
+          <UnfiledPanel items={unfiled} onChanged={onChanged} />
+        </div>
+      )}
+      {step === "staff" && (
+        jobMode === "employee" ? (
+          <CertsPanel subjectId={subjectId} certs={certs} onChanged={onChanged} />
+        ) : (
+          <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-[var(--shadow-card)]">
+            Assign staff and scope service codes in the <strong>Assignment map</strong> below. Per-client training (Support strategies, Client-specific training, Person-Centered Thinking) becomes available after the PCSP is uploaded.
+          </div>
+        )
+      )}
+      {step === "review" && (
+        <div className="space-y-3">
+          {questions.length > 0 && (
+            <div>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">NECTAR asks</div>
+              <QuestionsPanel questions={questions} onChanged={onChanged} />
+            </div>
+          )}
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Provisioning forecast</div>
+            <ProvisioningPanel subjectId={subjectId} onChanged={onChanged} />
+          </div>
+          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
+            <div className="font-semibold text-emerald-700 dark:text-emerald-400">Ready to create</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Use <strong>Complete {jobMode === "client" ? "client" : "staff"} setup</strong> at the top of this page to commit. Open flags become "Needed" items on the person's file — only the last name blocks creation.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-2 pt-2">
+        <Button variant="outline" size="sm" onClick={() => setStep(steps[Math.max(0, idx - 1)].id)} disabled={idx === 0}>
+          <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Back
+        </Button>
+        <div className="text-xs text-muted-foreground">Step {idx + 1} of {steps.length}</div>
+        <Button size="sm" onClick={() => setStep(steps[Math.min(steps.length - 1, idx + 1)].id)} disabled={idx === steps.length - 1}>
+          Next <ChevronRight className="ml-1 h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function StepRail({
+  steps, activeIdx, onJump,
+}: { steps: Array<{ id: string; label: string; badge?: number }>; activeIdx: number; onJump: (i: number) => void }) {
+  return (
+    <ol className="flex flex-wrap items-center gap-1 rounded-2xl border border-border bg-card p-2 shadow-[var(--shadow-card)]">
+      {steps.map((s, i) => {
+        const done = i < activeIdx;
+        const active = i === activeIdx;
+        const allowJump = i <= activeIdx + 1;
+        return (
+          <li key={s.id} className="flex items-center">
+            <button
+              type="button"
+              onClick={() => allowJump && onJump(i)}
+              disabled={!allowJump}
+              className={[
+                "inline-flex min-h-[36px] items-center gap-2 rounded-full px-3 text-xs font-medium transition",
+                active ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 ring-1 ring-amber-500/40" :
+                done ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15" :
+                "text-muted-foreground hover:bg-muted",
+                allowJump ? "cursor-pointer" : "cursor-not-allowed opacity-60",
+              ].join(" ")}
+            >
+              <span className={[
+                "inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold",
+                done ? "bg-emerald-500 text-white" : active ? "bg-amber-500 text-white" : "bg-muted text-muted-foreground",
+              ].join(" ")}>
+                {done ? <CheckCircle2 className="h-3 w-3" /> : i + 1}
+              </span>
+              <span>{s.label}</span>
+              {s.badge ? (
+                <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-500/20 px-1 text-[10px] text-amber-700 dark:text-amber-400">{s.badge}</span>
+              ) : null}
+            </button>
+            {i < steps.length - 1 && <ChevronRight className="mx-0.5 h-3 w-3 text-muted-foreground/50" />}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+
 // ---------------------------- SubjectHeader ----------------------------
 function SubjectHeader({ subject, onChanged, canMarkReady = true }: { subject: SubjectRow; onChanged: () => void; canMarkReady?: boolean }) {
   const setReady = useServerFn(setSubjectReady);

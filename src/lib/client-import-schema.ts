@@ -759,7 +759,8 @@ export async function applyExtractedFieldsToClient(
   // extracted is lost. Unknown keys are logged once so we can detect future drops.
   const KNOWN_CORE = new Set<string>([
     "first_name", "last_name", "full_name", "dob", "medicaid_id", "phone",
-    "physical_address", "emergency_contact_name", "emergency_contact_phone", "emergency_contact_instructions",
+    "physical_address", "mailing_address",
+    "emergency_contact_name", "emergency_contact_phone", "emergency_contact_instructions",
     "is_own_guardian", "guardian_name", "guardian_phone", "guardian_relationship",
     "guardian_email", "guardian_address",
     "clinical_alert", "special_directions", "dysphagia", "self_admin_med_support",
@@ -770,6 +771,7 @@ export async function applyExtractedFieldsToClient(
     "client_medication", "pcsp_has_medications",
     // Support coordinator
     "support_coordinator_name", "support_coordinator_email", "support_coordinator_phone",
+    "support_coordinator_company",
     // Medical providers
     "primary_care_name", "primary_care_phone",
     "neurologist_name", "neurologist_phone",

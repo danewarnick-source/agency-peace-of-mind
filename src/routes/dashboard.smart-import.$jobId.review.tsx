@@ -99,13 +99,19 @@ function ReviewPage() {
         <SubjectQueue subjects={subjects} selectedId={selectedId} onSelect={setSelectedId} />
         <div className="space-y-4">
           {selectedId ? (
-            <SubjectReview subjectId={selectedId} jobMode={mode} onChanged={() => job.refetch()} />
+            <SubjectReview
+              subjectId={selectedId}
+              jobMode={mode}
+              jobId={jobId}
+              subjects={subjects}
+              assignments={job.data.assignments ?? []}
+              onChanged={() => job.refetch()}
+            />
           ) : (
             <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground shadow-[var(--shadow-card)]">
               Select a person from the queue to begin review.
             </div>
           )}
-          <AssignmentMapPanel jobId={jobId} subjects={subjects} assignments={job.data.assignments ?? []} onChanged={() => job.refetch()} />
         </div>
       </div>
     </div>

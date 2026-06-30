@@ -165,16 +165,29 @@ Common field_key values to extract when present (use field_group to bucket relat
     medications table, or there is no medications section at all). When uncertain, OMIT the
     pcsp_has_medications field rather than guessing.
   Billing (group "billing_code"): emit ONE field per authorized service code with
-    field_key = "billing_code_row" and
-    value_json = { service_code, rate, max_units, unit_type, weekly_cap_units, plan_start, plan_end, financial_eligibility }.
-    CRITICAL: For EVERY billing/authorization table row, read ALL columns and populate rate and
-    max_units. rate is the dollar rate per unit (a number, no "$" sign). max_units is the ANNUAL
-    unit authorization (an integer, e.g. 3120 for DSI, 960 for SEI). If the table has a rate
-    column and a units column for this code, you MUST fill both — do NOT emit the row with
-    rate/max_units null when the values appear in the table. Only leave rate/max_units null when
-    the document genuinely omits them for that code.
-    unit_type is "15 min" or "day" or "session" or "month" exactly as printed.
-    Read EVERY row of the authorization table; do not collapse multiple codes into one.
+    field_key = "billing_code_row" and value_json shaped as below.
+    PCSP service authorization table — columns are: Service Code | Kind | Provider |
+    Start Date | End Date | Financial Eligibility | Rate | Monthly Max Units | Units |
+    Prorated Units | Total $ | Daily Hours. Emit ONE billing_code_row per ROW with:
+      value_json = {
+        service_code,                 // e.g. "HHS"
+        provider_name,                // the Provider column, verbatim org name (AUTHORITATIVE
+                                      //   for who delivers this service — e.g.
+                                      //   "True North Supports Utah, LLC",
+                                      //   "Intermountain Support Coordination Services, LLC",
+                                      //   "Utah Transit Authority")
+        rate,                         // number, no "$"
+        max_units,                    // integer — the ANNUAL "Units" column
+        monthly_max_units,            // integer — "Monthly Max Units" column
+        unit_type,                    // translate Kind: Q→"15 min", D→"day", M→"month", S→"session"
+        plan_start, plan_end,         // ISO yyyy-mm-dd
+        financial_eligibility,        // e.g. "TM"
+        daily_hours                   // number when present, else null
+      }
+    Read EVERY row; do not collapse multiple codes into one. Provider column is authoritative.
+    On non-PCSP documents that still have a rate column and a units column, fill both
+    rate and max_units when the values appear; leave them null only when the document
+    genuinely omits them for that code.
   1056 / Service Authorization Form (group "form_1056"): when the document is a DSPD 1056
     Service Authorization Form (header reads "Service Authorization" or "Form 1056"), extract:
       form_1056_number (value_text — the 1056 form number from the header, e.g. "1056-12345")

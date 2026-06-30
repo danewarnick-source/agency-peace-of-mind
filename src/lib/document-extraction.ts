@@ -75,11 +75,15 @@ export const CORE_CLIENT_FIELD_KEYS = new Set<string>([
   "rights_restrictions", "bsp_status",
   "dnr_status", "dnr_location", "polst_status", "palliative_care_status", "hospice_status",
   // SOW supplemental
-  "level_of_need", "grievance_acknowledged", "grievance_signed_date",
+  "grievance_acknowledged", "grievance_signed_date",
   // Service plan
   "staff_ratio", "preferred_activities", "preferred_living", "roommates",
   "housing_voucher", "court_orders", "personal_belongings_inventory",
   "team_name",
+  // PCSP additions
+  "mailing_address", "support_coordinator_company", "representative_payee",
+  // Per-goal context
+  "goal_domain", "goal_current_status", "goal_strengths", "goal_barriers", "goal_success_criteria",
 ]);
 
 export const SYSTEM_PROMPT = `You are NECTAR, an extraction engine for a Utah DSPD provider compliance platform (HIVE).

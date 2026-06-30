@@ -128,22 +128,31 @@ Common field_key values to extract when present (use field_group to bucket relat
     Injury; omit this field entirely if the document does not state the population),
     admission_date (value_date — SOW §1.10 required; use the service/plan begin date if no explicit
     admission date is present; omit if not present in any form),
-    discharge_date (value_date — usually absent on intake; omit if not present)
-  Address (group "address"): physical_address  -- client's service/home street address
+    discharge_date (value_date — usually absent on intake; omit if not present).
+    IMPORTANT: a PCSP labels the client's Medicaid number as "PID:" or "Person ID:". Treat these
+    labels as Medicaid ID and extract the value into medicaid_id (digits only). Do NOT emit a
+    separate PID/person_id field — there is no such column.
+  Address (group "address"): physical_address  -- client's Residential Address (service/home street).
+    mailing_address (value_text) -- the client's Mailing Address when listed separately on the PCSP.
   Emergency contact (group "emergency_contact"): emergency_contact_name, emergency_contact_phone, emergency_contact_instructions.
     ALWAYS split name and phone into TWO separate fields. Never combine.
     If a SECOND emergency contact is listed, emit emergency_contact_2_name,
     emergency_contact_2_phone, emergency_contact_2_instructions for that person.
   Guardian (group "guardian"): is_own_guardian (value_bool), guardian_name, guardian_phone,
-    guardian_relationship, guardian_email, guardian_address
-  Level of need (group "person"): level_of_need (value_text) — the DSPD-assigned level/score
-    (e.g. "Level 4", "High", "Acuity 5") when stated in the PCSP, 1056, or assessment.
+    guardian_relationship, guardian_email, guardian_address.
+    CRITICAL: a "Representative Payee" / "Rep Payee" is a FINANCIAL arrangement, NOT a legal
+    guardian. NEVER place rep-payee names, phones, or addresses into guardian_* fields. If a rep
+    payee is listed, emit a separate field representative_payee (group "finance", value_text)
+    with the named person or entity.
   Grievance acknowledgment (group "rights"): grievance_acknowledged (value_bool true) and
     grievance_signed_date (value_date) when the document is a SIGNED grievance-policy
     acknowledgment form (SOW §1.10(11)). Omit unless explicitly signed.
   Goals (group "goals"): pcsp_goal -- emit ONE field per distinct goal/objective in value_text.
     PCSP goals often appear in a table (Goal / Objective / Support Code). Emit one pcsp_goal
-    per ROW, not one combined entry.
+    per ROW, not one combined entry. When the PCSP supplies per-goal context, ALSO emit any of
+    these as value_text fields (group "goals"): goal_domain (e.g. "Community Living",
+    "Healthy Living", "Safety"), goal_current_status, goal_strengths, goal_barriers,
+    goal_success_criteria. Omit those that aren't stated.
   Health (group "health"): allergies (value_array), dysphagia (value_bool),
     swallowing_alerts (value_array), self_admin_med_support (value_bool),
     clinical_alert (value_text — any high-priority safety/clinical notice, e.g. choking risk),

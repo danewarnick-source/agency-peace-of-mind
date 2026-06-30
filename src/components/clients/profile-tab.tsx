@@ -544,6 +544,33 @@ function IdentityCard({ clientId, client }: { clientId: string; client: ClientRo
                 <LabeledInput label="Discharge date" type="date" value={draft.discharge_date} onChange={(v) => set("discharge_date", v)} />
               </div>
             </div>
+
+            <div>
+              <GroupHeader>Flags</GroupHeader>
+              <div className="space-y-2 mt-2">
+                <div className="flex items-start gap-3">
+                  <Switch id="has-abi" checked={draft.has_abi} onCheckedChange={(v) => set("has_abi", v)} />
+                  <Label htmlFor="has-abi" className="text-sm leading-tight">
+                    Acquired brain injury (ABI)
+                    <div className="text-xs text-muted-foreground font-normal">When on, staff need ABI training before being assigned.</div>
+                  </Label>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Switch id="hr-app" checked={draft.hr_applicable} onCheckedChange={(v) => set("hr_applicable", v)} />
+                  <Label htmlFor="hr-app" className="text-sm leading-tight">
+                    Human Rights documentation applicable
+                    <div className="text-xs text-muted-foreground font-normal">When on, a Human Rights document upload is required.</div>
+                  </Label>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Switch id="dnr-app" checked={draft.dnr_applicable} onCheckedChange={(v) => set("dnr_applicable", v)} />
+                  <Label htmlFor="dnr-app" className="text-sm leading-tight">
+                    DNR order on file
+                    <div className="text-xs text-muted-foreground font-normal">When on, a DNR document upload is required.</div>
+                  </Label>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

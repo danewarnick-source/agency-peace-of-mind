@@ -402,7 +402,7 @@ type WizardStepId = "person" | "services" | "plan" | "staff" | "review";
 
 function SubjectWizard({
   subjectId, jobMode, fields, targetFields, matched, decision, tenant,
-  certs, questions, unfiled, validation, jobId, subjects, assignments, onChanged,
+  certs, questions, unfiled, jobId, subjects, assignments, step, setStep, steps, onChanged,
 }: {
   subjectId: string;
   jobMode: "employee" | "client";
@@ -414,37 +414,24 @@ function SubjectWizard({
   certs: Array<{ id: string; cert_key: string; state: "unverified"|"verified"|"provisional"; file_name?: string|null; expiry_date?: string|null }>;
   questions: Array<{ id: string; question: string; context: string | null; answer: string | null }>;
   unfiled: Array<{ id: string; text: string; filed_to: string | null }>;
-  validation: { ok: boolean; issues: Array<{ key: string; severity: "error" | "warning"; field?: string; message: string }>; blocking: string[] } | undefined;
   jobId: string;
   subjects: SubjectRow[];
   assignments: Array<{ id: string; relation_type: string; staff_subject_id: string | null; client_subject_id: string | null; status: string; inference_reason: string | null }>;
+  step: WizardStepId;
+  setStep: (s: WizardStepId) => void;
+  steps: Array<{ id: WizardStepId; label: string; badge?: number }>;
   onChanged: () => void;
 }) {
-  const [step, setStep] = useState<WizardStepId>("person");
-
   const personFields = fields.filter((f) => PERSON_FIELDS_SET.has(f.target_field));
   const servicesFields = fields.filter((f) => SERVICES_FIELDS_SET.has(f.target_field));
   const otherFields = fields.filter((f) => !PERSON_FIELDS_SET.has(f.target_field) && !SERVICES_FIELDS_SET.has(f.target_field) && !f.is_custom_attribute);
   // Anything we couldn't bucket falls into Person so nothing disappears.
   const personFieldsAll = [...personFields, ...otherFields, ...fields.filter((f) => f.is_custom_attribute)];
 
-  const askCount = questions.filter((q) => !q.answer).length;
-  const extraCount = unfiled.filter((u) => !u.filed_to).length;
-  const issueCount = validation?.issues.length ?? 0;
-
-  const steps: Array<{ id: WizardStepId; label: string; badge?: number }> = [
-    { id: "person", label: "Person & contacts" },
-    { id: "services", label: "Services & health" },
-    { id: "plan", label: "Plan & documents", badge: extraCount || undefined },
-    { id: "staff", label: jobMode === "employee" ? "Certs & training" : "Staff & training" },
-    { id: "review", label: "Review", badge: (askCount + issueCount) || undefined },
-  ];
   const idx = steps.findIndex((s) => s.id === step);
 
   return (
     <div className="space-y-4">
-      <StepRail steps={steps} activeIdx={idx} onJump={(i) => setStep(steps[i].id)} />
-
       {step === "person" && (
         <PlacementLineup
           fields={personFieldsAll.filter((f) => f.target_field !== "billing_code_row")}

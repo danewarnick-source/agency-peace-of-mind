@@ -2645,8 +2645,45 @@ function ClientAssignerBlock({
   const assignedIds = new Set(editable.map((a) => a.staff_record_id!));
   const availableStaff = staffPool.filter((s) => !assignedIds.has(s.id));
 
-  const [adding, setAdding] = useState(false);
-  const [picked, setPicked] = useState<string>("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const filteredStaff = availableStaff.filter((s) =>
+    s.name.toLowerCase().includes(search.trim().toLowerCase())
+  );
+  const allFilteredSelected = filteredStaff.length > 0 && filteredStaff.every((s) => selected.has(s.id));
+
+  function toggleOne(id: string) {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelected(next);
+  }
+  function toggleAllFiltered() {
+    const next = new Set(selected);
+    if (allFilteredSelected) filteredStaff.forEach((s) => next.delete(s.id));
+    else filteredStaff.forEach((s) => next.add(s.id));
+    setSelected(next);
+  }
+  function openPicker() {
+    setSelected(new Set());
+    setSearch("");
+    setPickerOpen(true);
+  }
+  async function assignSelected() {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    try {
+      for (const staffId of ids) {
+        await upsert({ data: { jobId, clientSubjectId, staffId, serviceCodes: null } });
+      }
+      toast.success(`Assigned ${ids.length} staff`);
+      setPickerOpen(false);
+      onChanged();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to assign");
+    }
+  }
 
   return (
     <div className="rounded-lg border border-border p-3">
@@ -2678,7 +2715,7 @@ function ClientAssignerBlock({
       )}
 
       <div className="mt-2 space-y-1.5">
-        {editable.length === 0 && !adding && (
+        {editable.length === 0 && (
           <div className="text-xs text-muted-foreground">No staff assigned yet.</div>
         )}
         {editable.map((row) => (
@@ -2706,42 +2743,77 @@ function ClientAssignerBlock({
         ))}
       </div>
 
-      {adding ? (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <Select value={picked} onValueChange={setPicked}>
-            <SelectTrigger className="h-8 w-[220px] text-xs">
-              <SelectValue placeholder={availableStaff.length === 0 ? "All staff already assigned" : "Pick staff…"} />
-            </SelectTrigger>
-            <SelectContent>
-              {availableStaff.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Button
-            size="sm"
-            disabled={!picked || upsertM.isPending}
-            onClick={() => {
-              upsertM.mutate({ staffId: picked, serviceCodes: null });
-              setPicked(""); setAdding(false);
-            }}
-          >
-            Assign (all codes)
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => { setPicked(""); setAdding(false); }}>Cancel</Button>
-        </div>
-      ) : (
-        <Button
-          size="sm"
-          variant="outline"
-          className="mt-2"
-          onClick={() => setAdding(true)}
-          disabled={availableStaff.length === 0}
-        >
-          <UserPlus className="mr-1 h-3 w-3" /> Add staff
-        </Button>
-      )}
+      <Button
+        size="sm"
+        variant="outline"
+        className="mt-2"
+        onClick={openPicker}
+        disabled={availableStaff.length === 0}
+      >
+        <UserPlus className="mr-1 h-3 w-3" />
+        {availableStaff.length === 0 ? "All staff assigned" : "Add staff"}
+      </Button>
+
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Assign staff to {clientName}</DialogTitle>
+            <DialogDescription>
+              Select one, several, or all employees. Each will be assigned to this client with access to all authorized codes — you can narrow the scope per staff after adding.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Input
+              placeholder="Search staff…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-9"
+            />
+            <div className="flex items-center justify-between text-xs">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={allFilteredSelected}
+                  onCheckedChange={toggleAllFiltered}
+                  disabled={filteredStaff.length === 0}
+                />
+                <span className="font-medium">
+                  Select all{search ? " (filtered)" : ""} ({filteredStaff.length})
+                </span>
+              </label>
+              <span className="text-muted-foreground">{selected.size} selected</span>
+            </div>
+            <div className="max-h-72 overflow-y-auto rounded border border-border divide-y divide-border">
+              {filteredStaff.length === 0 ? (
+                <div className="p-3 text-xs text-muted-foreground text-center">
+                  {availableStaff.length === 0 ? "No unassigned staff remaining." : "No staff match your search."}
+                </div>
+              ) : (
+                filteredStaff.map((s) => (
+                  <label key={s.id} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted cursor-pointer">
+                    <Checkbox checked={selected.has(s.id)} onCheckedChange={() => toggleOne(s.id)} />
+                    <span>{s.name}</span>
+                  </label>
+                ))
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPickerOpen(false)}>Cancel</Button>
+            <Button
+              onClick={assignSelected}
+              disabled={selected.size === 0 || upsertM.isPending}
+            >
+              {upsertM.isPending ? "Assigning…" : `Assign ${selected.size || ""} staff`.trim()}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 function AssignerScopePopover({
   authorized, value, onChange, disabled,

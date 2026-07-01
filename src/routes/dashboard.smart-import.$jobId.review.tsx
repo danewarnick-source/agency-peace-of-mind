@@ -747,12 +747,20 @@ function ValidationPanel({
   onNavigateStep?: (id: WizardStepId) => void;
 }) {
   const overrideFn = useServerFn(overrideValidationIssue);
+  const saveManualFn = useServerFn(saveManualReviewRow);
   const m = useMutation({
     mutationFn: (vars: { issueKey: string; overridden: boolean }) =>
       overrideFn({ data: { subjectId, issueKey: vars.issueKey, overridden: vars.overridden } }),
     onSuccess: () => { toast.success("Saved"); onChanged(); },
     onError: (e: Error) => toast.error(e.message),
   });
+  const addFieldM = useMutation({
+    mutationFn: (vars: { targetField: string; value: string }) =>
+      saveManualFn({ data: { subjectId, targetField: vars.targetField, value: vars.value } }),
+    onSuccess: () => { toast.success("Added"); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const [inlineValue, setInlineValue] = useState<Record<string, string>>({});
   const blockingSet = new Set(validation.blocking);
   // Sort: blocking errors first, then warnings.
   const sortedIssues = [...validation.issues].sort((a, b) => {

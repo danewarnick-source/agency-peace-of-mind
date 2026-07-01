@@ -1067,6 +1067,71 @@ function PlacementLineup({
   );
 }
 
+function AddMissingFieldPopover({
+  subjectId, targetFields, presentFields, onChanged,
+}: {
+  subjectId: string;
+  targetFields: string[];
+  presentFields: string[];
+  onChanged: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [field, setField] = useState<string>("");
+  const [value, setValue] = useState<string>("");
+  const saveFn = useServerFn(saveManualReviewRow);
+  const m = useMutation({
+    mutationFn: () => saveFn({ data: { subjectId, targetField: field, value: value.trim() } }),
+    onSuccess: () => {
+      toast.success(`Added ${labelForField(field).toLowerCase()}`);
+      setField(""); setValue(""); setOpen(false);
+      onChanged();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const present = new Set(presentFields);
+  const options = targetFields.filter((f) => !present.has(f)).sort((a, b) => labelForField(a).localeCompare(labelForField(b)));
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button size="sm" variant="outline" className="h-8">
+          <Plus className="mr-1 h-3.5 w-3.5" /> Add a field
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 space-y-3">
+        <div className="text-sm font-semibold">Add a field NECTAR missed</div>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">Field</label>
+          <Select value={field} onValueChange={setField}>
+            <SelectTrigger className="h-9"><SelectValue placeholder="Pick a field…" /></SelectTrigger>
+            <SelectContent className="max-h-72">
+              {options.length === 0 && <div className="px-2 py-1 text-xs text-muted-foreground">All required fields are already present.</div>}
+              {options.map((f) => (
+                <SelectItem key={f} value={f}>{labelForField(f)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">Value</label>
+          <Input
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={field ? `Type the ${labelForField(field).toLowerCase()}…` : "Pick a field first"}
+            disabled={!field}
+          />
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button size="sm" disabled={!field || !value.trim() || m.isPending} onClick={() => m.mutate()}>
+            {m.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+            Save
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // ---------------------------- Profile-shaped clinical review panels ----------------------------
 function parseJsonValue(f: FieldRow): Record<string, unknown> | null {
   if (!f.value) return null;

@@ -162,6 +162,7 @@ export function ClientsPage() {
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [rosterTab, setRosterTab] = useState<"active" | "archived">("active");
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const { data: allClients = [], isLoading } = useQuery({
     enabled: !!org,

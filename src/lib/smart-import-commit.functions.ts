@@ -547,6 +547,16 @@ async function commitClient(
       "admin_override", userId, "autofill_error");
   }
 
+  // The visible Profile > Contacts card reads client_emergency_contacts, not
+  // the legacy scalar emergency-contact columns on clients. Mirror reviewed
+  // PCSP emergency contacts there so finalization actually populates the UI.
+  try {
+    await seedEmergencyContacts(sb, orgId, recordId, fields);
+  } catch (err) {
+    gaps.push(`Contacts warning: ${(err as Error).message}`);
+    await audit(sb, jobId, orgId, subj.id, `Emergency contacts seed failed: ${(err as Error).message}`, "admin_override", userId, "contacts_seed_error");
+  }
+
   // ─── PCSP single-source-of-truth ──────────────────────────────────────
   // If this subject's PCSP-typed fields trace to one or more
   // import_documents, copy each file into the client-documents bucket and
@@ -613,6 +623,44 @@ async function commitClient(
   }
 
   return recordId;
+}
+
+async function seedEmergencyContacts(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  orgId: string,
+  clientId: string,
+  fields: Array<{ target_field: string; value: string | null; is_custom_attribute: boolean }>,
+) {
+  const active = fields.filter((f) => !f.is_custom_attribute);
+  const valueOf = (key: string) => active.find((f) => f.target_field === key)?.value?.trim() || null;
+  const rows = [
+    {
+      name: valueOf("emergency_contact_name"),
+      phone: valueOf("emergency_contact_phone"),
+      relationship: valueOf("emergency_contact_relationship"),
+    },
+    {
+      name: valueOf("emergency_contact_2_name"),
+      phone: valueOf("emergency_contact_2_phone"),
+      relationship: valueOf("emergency_contact_2_relationship"),
+    },
+  ].filter((r) => r.name);
+  if (!rows.length) return;
+
+  const { data: existing, error: existingErr } = await sb
+    .from("client_emergency_contacts")
+    .select("name, phone")
+    .eq("organization_id", orgId)
+    .eq("client_id", clientId);
+  if (existingErr) throw new Error(existingErr.message);
+  const seen = new Set((existing ?? []).map((r: { name: string; phone: string | null }) => `${r.name.trim().toLowerCase()}|${(r.phone ?? "").trim().toLowerCase()}`));
+  const inserts = rows
+    .filter((r) => !seen.has(`${r.name!.trim().toLowerCase()}|${(r.phone ?? "").trim().toLowerCase()}`))
+    .map((r) => ({ organization_id: orgId, client_id: clientId, name: r.name!, phone: r.phone, relationship: r.relationship }));
+  if (!inserts.length) return;
+  const { error } = await sb.from("client_emergency_contacts").insert(inserts);
+  if (error) throw new Error(error.message);
 }
 
 // Helper for the pre-commit validation gate. Builds a minimal ClientDraft

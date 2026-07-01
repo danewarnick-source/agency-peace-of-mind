@@ -1464,25 +1464,30 @@ function serializeGoal(g: GoalShape): GoalShape {
   return out;
 }
 
-function goalCompleteness(g: GoalShape): { filled: number; total: number; missing: string[] } {
-  const checks: Array<[string, unknown]> = [
-    ["Statement", g.text],
-    ["Domain", g.domain],
-    ["Why this goal", g.why],
-    ["Who's responsible", g.responsible_party],
-    ["Service codes", g.service_codes],
-    ["How staff support it", g.supports],
-    ["What to track in daily logs", g.data_capture],
-    ["Success criteria", g.success_criteria],
-  ];
+const GOAL_COMPLETENESS_CHECKS: Array<{ key: keyof GoalShape; label: string }> = [
+  { key: "text", label: "Statement" },
+  { key: "domain", label: "Domain" },
+  { key: "why", label: "Why this goal" },
+  { key: "responsible_party", label: "Who's responsible" },
+  { key: "service_codes", label: "Service codes" },
+  { key: "supports", label: "How staff support it" },
+  { key: "data_capture", label: "What to track in daily logs" },
+  { key: "success_criteria", label: "Success criteria" },
+];
+
+function goalCompleteness(g: GoalShape): { filled: number; total: number; missing: string[]; missingKeys: Set<keyof GoalShape> } {
   const missing: string[] = [];
+  const missingKeys = new Set<keyof GoalShape>();
   let filled = 0;
-  for (const [label, v] of checks) {
+  for (const { key, label } of GOAL_COMPLETENESS_CHECKS) {
+    const v = g[key];
     const has = Array.isArray(v) ? v.length > 0 : typeof v === "string" ? v.trim().length > 0 : !!v;
-    if (has) filled += 1; else missing.push(label);
+    if (has) filled += 1;
+    else { missing.push(label); missingKeys.add(key); }
   }
-  return { filled, total: checks.length, missing };
+  return { filled, total: GOAL_COMPLETENESS_CHECKS.length, missing, missingKeys };
 }
+
 
 function GoalsReviewPanel({ subjectId, fields, onChanged }: { subjectId: string; fields: FieldRow[]; onChanged: () => void }) {
   const [adding, setAdding] = useState(false);

@@ -150,7 +150,21 @@ export const saveManualReviewRow = createServerFn({ method: "POST" })
     const sb = context.supabase as any;
     const valueText = typeof data.value === "string" ? data.value.trim() : JSON.stringify(data.value);
     if (!valueText) throw new Error("Enter a value before saving.");
-    const label = data.targetField === "pcsp_goal" ? "PCSP goal" : "medication";
+    const label = data.targetField === "pcsp_goal"
+      ? "PCSP goal"
+      : data.targetField === "client_medication"
+      ? "medication"
+      : data.targetField;
+    const editAction = data.targetField === "pcsp_goal"
+      ? "edit_pcsp_goal"
+      : data.targetField === "client_medication"
+      ? "edit_client_medication"
+      : "edit_client_field";
+    const addAction = data.targetField === "pcsp_goal"
+      ? "add_pcsp_goal"
+      : data.targetField === "client_medication"
+      ? "add_client_medication"
+      : "add_client_field";
 
     if (data.fieldId) {
       const { data: existing } = await sb

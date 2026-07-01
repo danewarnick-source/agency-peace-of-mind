@@ -647,6 +647,46 @@ function SubjectHeader({ subject, onChanged, canMarkReady = true }: { subject: S
   );
 }
 
+// ---------------------------- Client field labels ----------------------------
+const CLIENT_FIELD_LABELS: Record<string, string> = {
+  first_name: "First name",
+  last_name: "Last name",
+  preferred_name: "Preferred name",
+  date_of_birth: "Date of birth",
+  gender: "Gender",
+  medicaid_id: "Medicaid ID",
+  ssn: "SSN",
+  phone: "Phone",
+  email: "Email",
+  mailing_address: "Mailing address",
+  physical_address: "Physical address",
+  address_line1: "Address line 1",
+  address_line2: "Address line 2",
+  city: "City",
+  state: "State",
+  postal_code: "ZIP code",
+  guardian_name: "Guardian name",
+  guardian_phone: "Guardian phone",
+  guardian_email: "Guardian email",
+  guardian_relationship: "Guardian relationship",
+  support_coordinator_name: "Support coordinator name",
+  support_coordinator_email: "Support coordinator email",
+  support_coordinator_phone: "Support coordinator phone",
+  support_coordinator_company: "Support coordinator company",
+  primary_care_physician: "Primary care physician",
+  plan_year: "Plan year",
+  pcsp_effective_date: "PCSP effective date",
+  pcsp_expiration_date: "PCSP expiration date",
+};
+function labelForField(key: string): string {
+  if (CLIENT_FIELD_LABELS[key]) return CLIENT_FIELD_LABELS[key];
+  return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+function fieldKeyFromIssue(key: string): string | null {
+  const m = key.match(/^client\.(?:missing|address)\.(.+)$/);
+  return m ? m[1] : null;
+}
+
 // ---------------------------- ValidationPanel ----------------------------
 type IssueHelp = {
   whatToDo: string;

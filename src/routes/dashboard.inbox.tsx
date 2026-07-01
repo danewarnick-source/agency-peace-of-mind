@@ -3,7 +3,9 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Mail, Paperclip, Inbox as InboxIcon, Download, ArrowLeft, AlertCircle, Info } from "lucide-react";
+import { Mail, Paperclip, Inbox as InboxIcon, Download, ArrowLeft, AlertCircle, Info, ShieldCheck, MessageSquare } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { RequireRole } from "@/components/rbac-guard";
 import {
@@ -12,6 +14,8 @@ import {
   type InboxMessageDetail,
   type InboxAttachment,
 } from "@/lib/inbox-messages.functions";
+import { listMyApprovalRequests, type ApprovalRequestRow } from "@/lib/billing-approvals.functions";
+import { ApprovalDialog } from "@/components/billing/ApprovalDialog";
 
 
 export const Route = createFileRoute("/dashboard/inbox")({

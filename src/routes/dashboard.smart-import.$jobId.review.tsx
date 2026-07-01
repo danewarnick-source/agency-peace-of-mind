@@ -32,6 +32,7 @@ import { type TenantIdentity, normalizeOrgName } from "@/lib/service-classificat
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Trash2, Plus, X, RotateCcw, Tag, UserPlus } from "lucide-react";
 
 import { providerSignoff } from "@/lib/hive-migration.functions";

@@ -46,9 +46,9 @@ export const Route = createFileRoute("/dashboard/smart-import/$jobId/review")({
 // Core target fields (matches what extraction emits)
 const CLIENT_FIELDS = [
   "first_name","last_name","full_name","date_of_birth","phone","address","physical_address","mailing_address","medicaid_id",
-  "admission_date","discharge_date","form_1056_number","form_1056_approved_date","job_code","team_name",
+  "admission_date","discharge_date","pcsp_expiration_date","form_1056_number","form_1056_approved_date","job_code","team_name",
   "is_own_guardian","guardian_name","guardian_phone","guardian_relationship","guardian_email","guardian_address",
-  "emergency_contact_name","emergency_contact_phone","emergency_contact_instructions","emergency_contact_2_name","emergency_contact_2_phone","emergency_contact_2_instructions",
+  "emergency_contact_name","emergency_contact_phone","emergency_contact_relationship","emergency_contact_instructions","emergency_contact_2_name","emergency_contact_2_phone","emergency_contact_2_relationship","emergency_contact_2_instructions",
   "support_coordinator_name","support_coordinator_email","support_coordinator_phone","support_coordinator_company",
   "billing_code_row","service_code","rate","max_units","monthly_max_units","unit_type",
   "pcp_name","pcp_phone","primary_care_name","primary_care_phone","specialist_name","specialist_phone","med_prescriber_name","med_prescriber_phone","neurologist_name","neurologist_phone","dentist_name","dentist_phone","prescriber_name","prescriber_phone",
@@ -412,9 +412,10 @@ function SubjectReview({
 const PERSON_FIELDS_SET = new Set([
   "first_name","last_name","full_name","date_of_birth","phone","address","mailing_address","medicaid_id",
   "is_own_guardian","guardian_name","guardian_phone","guardian_email","guardian_address","guardian_relationship",
-  "emergency_contact_name","emergency_contact_phone",
+  "emergency_contact_name","emergency_contact_phone","emergency_contact_relationship","emergency_contact_instructions",
+  "emergency_contact_2_name","emergency_contact_2_phone","emergency_contact_2_relationship","emergency_contact_2_instructions",
   "support_coordinator_name","support_coordinator_email","support_coordinator_phone","support_coordinator_company",
-  "admission_date","discharge_date","has_abi",
+  "admission_date","discharge_date","pcsp_expiration_date","has_abi",
 ]);
 const HEALTH_FIELDS_SET = new Set([
   "pcp_name","pcp_phone","primary_care_name","primary_care_phone","specialist_name","specialist_phone",

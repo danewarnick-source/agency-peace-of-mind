@@ -226,7 +226,7 @@ export const saveManualReviewRow = createServerFn({ method: "POST" })
       item: `Added ${label} manually during Smart Import review`,
       traces_to: "admin_override",
       actor: context.userId,
-      action: data.targetField === "pcsp_goal" ? "add_pcsp_goal" : "add_client_medication",
+      action: addAction,
     });
     return { ok: true, fieldId: inserted.id as string };
   });

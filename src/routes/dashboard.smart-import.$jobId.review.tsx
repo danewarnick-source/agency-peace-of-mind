@@ -1701,6 +1701,7 @@ type BillingRowShape = {
   monthly_max_units?: number | null;
   plan_start?: string | null;
   plan_end?: string | null;
+  ownership_ack?: "not_ours" | null;
 };
 const UNIT_TYPE_OPTIONS = ["15 min", "day", "month", "session", "hour", "unit"];
 
@@ -1717,6 +1718,7 @@ function parseBillingRow(f: FieldRow): BillingRowShape | null {
     return Number.isFinite(n) ? n : null;
   };
   const str = (x: unknown): string | null => (x === null || x === undefined ? null : String(x));
+  const ack = r.ownership_ack === "not_ours" ? "not_ours" as const : null;
   return {
     service_code: sc,
     provider_name: str(r.provider_name),
@@ -1726,6 +1728,7 @@ function parseBillingRow(f: FieldRow): BillingRowShape | null {
     monthly_max_units: num(r.monthly_max_units),
     plan_start: r.plan_start ? String(r.plan_start).slice(0, 10) : null,
     plan_end: r.plan_end ? String(r.plan_end).slice(0, 10) : null,
+    ownership_ack: ack,
   };
 }
 
@@ -1799,8 +1802,10 @@ function BillingCodesEditor({
 
   const orgLabel = tenant.names[0] ?? "your organization";
   const externalRows = parsed.filter((p) => providerOwnership(p.row.provider_name, tenant) === "external");
-  const pendingCount = externalRows.filter((p) => approvals[p.field.id]?.status === "pending").length;
-  const approvedCount = externalRows.filter((p) => approvals[p.field.id]?.status === "approved").length;
+  const notOursCount = externalRows.filter((p) => p.row.ownership_ack === "not_ours").length;
+  const unresolvedExternal = externalRows.filter((p) => p.row.ownership_ack !== "not_ours");
+  const pendingCount = unresolvedExternal.filter((p) => approvals[p.field.id]?.status === "pending").length;
+  const approvedCount = unresolvedExternal.filter((p) => approvals[p.field.id]?.status === "approved").length;
 
   return (
     <div id="billing-codes" className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
@@ -1809,7 +1814,7 @@ function BillingCodesEditor({
           <div className="text-sm font-semibold">Billing codes on the PCSP</div>
           <div className="text-xs text-muted-foreground">
             The <span className="font-medium">Ownership</span> column shows whether each code is billed by <span className="font-medium">{orgLabel}</span> or by an outside provider (support coordinator, another agency).
-            Only codes marked "Ours" flow into your 520s. For an external code you must <span className="font-medium">request HIVE Admin approval</span> — HIVE Admin will respond in your Inbox and you can go back and forth until it is resolved.
+            Only codes marked "Ours" flow into your 520s. For an external code, either click <span className="font-medium">Not my organization</span> to leave it on the record without billing responsibility, or click <span className="font-medium">Request HIVE approval</span> to have HIVE Admin review it in your Inbox.
           </div>
         </div>
         <Button size="sm" variant="outline" onClick={() => setAdding(true)} disabled={adding}>
@@ -1890,18 +1895,16 @@ function BillingCodesEditor({
         <div className="mt-3 rounded-md border border-amber-300/60 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
           <div className="mb-1 font-semibold">
             {externalRows.length} code{externalRows.length === 1 ? "" : "s"} belong to an outside provider on the PCSP
-            {(pendingCount + approvedCount) > 0 && (
-              <span className="ml-2 font-normal">
-                · {approvedCount} HIVE-approved, {pendingCount} awaiting HIVE review
-              </span>
-            )}
+            <span className="ml-2 font-normal">
+              · {approvedCount} HIVE-approved, {pendingCount} awaiting HIVE review, {notOursCount} marked "not my organization"
+            </span>
           </div>
           <div className="mb-1">
             The Provider on {externalRows.length === 1 ? "this line" : "these lines"} does not match <span className="font-medium">{orgLabel}</span>.
-            To bill any of them yourself, click <span className="font-medium">Request HIVE approval</span> on the line — HIVE Admin will review the justification and reply in your Inbox.
+            On each row, click <span className="font-medium">Not my organization</span> to leave it on the record without billing responsibility, or <span className="font-medium">Request HIVE approval</span> if you need to bill it yourself.
           </div>
           <div className="mt-1 font-mono">
-            {externalRows.map((p) => `${p.row.service_code} → ${p.row.provider_name ?? "unknown provider"}`).join("  •  ")}
+            {externalRows.map((p) => `${p.row.service_code} → ${p.row.provider_name ?? "unknown provider"}${p.row.ownership_ack === "not_ours" ? " (not ours)" : ""}`).join("  •  ")}
           </div>
         </div>
       )}
@@ -1973,6 +1976,7 @@ function BillingRowEditor({
             monthly_max_units: row.monthly_max_units ?? null,
             plan_start: row.plan_start ?? null,
             plan_end: row.plan_end ?? null,
+            ownership_ack: row.ownership_ack ?? null,
           },
         },
       }),
@@ -2019,9 +2023,54 @@ function BillingRowEditor({
           if (own === "unknown") {
             return <Badge variant="outline" className="whitespace-nowrap text-muted-foreground">Unspecified</Badge>;
           }
+          // Admin already acknowledged this external code is not ours.
+          // Row stays visible for the record; no HIVE approval required.
+          if (row.ownership_ack === "not_ours") {
+            const clearAck = () => {
+              const next: BillingRowShape = { ...row, ownership_ack: null };
+              setRow(next);
+              save({ data: { subjectId, fieldId: fieldId ?? null, row: {
+                service_code: next.service_code.toUpperCase(),
+                provider_name: next.provider_name ?? null,
+                unit_type: next.unit_type ?? null,
+                rate: next.rate ?? null,
+                max_units: next.max_units ?? null,
+                monthly_max_units: next.monthly_max_units ?? null,
+                plan_start: next.plan_start ?? null,
+                plan_end: next.plan_end ?? null,
+                ownership_ack: null,
+              } } }).then(() => { toast.success("Undone"); onChanged(); }).catch((e: Error) => toast.error(e.message));
+            };
+            return (
+              <div className="flex flex-col gap-1">
+                <Badge variant="outline" className="whitespace-nowrap border-slate-400/60 text-slate-600 dark:text-slate-300">
+                  Not our organization
+                </Badge>
+                <span className="text-[10px] text-muted-foreground">Kept for the record. Not billed by you.</span>
+                <button type="button" className="text-[10px] text-primary underline underline-offset-2 text-left" onClick={clearAck}>
+                  Undo
+                </button>
+              </div>
+            );
+          }
           // External provider: replace self-attest with a HIVE approval workflow.
           const ar = approvalRequest;
           const openDialog = () => onOpenApproval(row.service_code, row.provider_name ?? null, ar?.id ?? null);
+          const markNotOurs = () => {
+            const next: BillingRowShape = { ...row, ownership_ack: "not_ours" };
+            setRow(next);
+            save({ data: { subjectId, fieldId: fieldId ?? null, row: {
+              service_code: next.service_code.toUpperCase(),
+              provider_name: next.provider_name ?? null,
+              unit_type: next.unit_type ?? null,
+              rate: next.rate ?? null,
+              max_units: next.max_units ?? null,
+              monthly_max_units: next.monthly_max_units ?? null,
+              plan_start: next.plan_start ?? null,
+              plan_end: next.plan_end ?? null,
+              ownership_ack: "not_ours",
+            } } }).then(() => { toast.success("Marked as not your organization"); onChanged(); }).catch((e: Error) => toast.error(e.message));
+          };
           let statusEl: React.ReactNode;
           let btnLabel: string;
           if (!ar || ar.status === "withdrawn") {
@@ -2043,10 +2092,20 @@ function BillingRowEditor({
                 <AlertTriangle className="mr-1 h-3 w-3" /> External
               </Badge>
               {statusEl}
+              {fieldId && (!ar || ar.status === "withdrawn") && (
+                <button
+                  type="button"
+                  className="text-[10px] text-slate-600 dark:text-slate-300 underline underline-offset-2 text-left"
+                  onClick={markNotOurs}
+                  title="Keep this code on the record but confirm this org is not responsible for billing it"
+                >
+                  Not my organization
+                </button>
+              )}
               {fieldId && (
                 <button
                   type="button"
-                  className="text-[10px] text-primary underline underline-offset-2"
+                  className="text-[10px] text-primary underline underline-offset-2 text-left"
                   onClick={openDialog}
                   title="Send a justification to HIVE Admin for review"
                 >

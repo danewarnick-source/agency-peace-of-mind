@@ -72,13 +72,14 @@ export const Route = createFileRoute("/dashboard/clients/$clientId")({
 });
 
 // Map legacy deep-link tab values to the new five-tab model
-function resolveTab(raw: string | undefined): "profile" | "care" | "activity" | "funds" | "files" {
+function resolveTab(raw: string | undefined): "profile" | "care" | "activity" | "funds" | "files" | "pcsp" {
   if (!raw) return "profile";
   if (raw === "profile" || raw === "overview") return "profile";
   if (raw === "care" || raw === "plan" || raw === "caseload") return "care";
   if (raw === "activity" || raw === "shifts" || raw === "logs" || raw === "incidents" || raw === "summaries" || raw === "hhcert" || raw === "deadlines") return "activity";
   if (raw === "funds" || raw === "codes") return "funds";
   if (raw === "files" || raw === "documents") return "files";
+  if (raw === "pcsp") return "pcsp";
   return "profile";
 }
 

@@ -53,7 +53,7 @@ import {
 const search = z.object({
   tab: z
     .enum([
-      "profile", "care", "activity", "funds", "files",
+      "profile", "care", "activity", "funds", "files", "pcsp",
       // legacy deep-link values kept for backwards compat
       "overview", "plan", "codes", "caseload", "shifts", "logs", "incidents",
       "summaries", "hhcert", "deadlines", "documents",

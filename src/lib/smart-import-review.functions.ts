@@ -94,7 +94,7 @@ export const getReviewSubject = createServerFn({ method: "POST" })
         key: "org.codes_held_missing",
         severity: "warning",
         field: "billing_codes",
-        message: "Awarded service codes aren't set for this org — code routing falls back to provider-name matching. Configure codes_held to enable automatic billing/coordination split.",
+        message: "Your agency hasn't told HIVE which DSPD service codes it's contracted to bill. Without that list, NECTAR can't automatically tell which codes on this PCSP are yours to bill vs. another provider's — it has to guess from the provider name printed on the plan.",
       });
     }
     const overrides = ((subject as { validation_overrides?: Record<string, boolean> }).validation_overrides) ?? {};

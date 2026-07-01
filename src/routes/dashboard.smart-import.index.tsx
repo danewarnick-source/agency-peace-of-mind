@@ -441,20 +441,14 @@ function SmartImportPage() {
             </div>
           </div>
 
-          {/* File chips */}
+          {/* Grouped preview: what NECTAR will read, grouped by detected client */}
           {files.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {files.map((c) => (
-                <div key={c.id} className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs">
-                  <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="font-medium">{c.file.name}</span>
-                  <Badge variant="secondary" className="text-[10px]">{c.kind === "roster" ? "roster" : "document"}</Badge>
-                  <button onClick={() => removeFile(c.id)} className="text-muted-foreground hover:text-foreground">
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
+            <UploadedDocsPreview
+              files={files}
+              onRemove={removeFile}
+              onRenameGroup={renameGroup}
+              onMoveFile={moveFileToGroup}
+            />
           )}
 
           {/* Paste box */}

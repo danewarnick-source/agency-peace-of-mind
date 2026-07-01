@@ -26,7 +26,7 @@ import {
   getJobAssigner, upsertManualAssignment, removeAssignmentMapRow,
 } from "@/lib/smart-import-review.functions";
 import { resolveMergeFlag, overrideValidationIssue } from "@/lib/import-checklist.functions";
-import { type TenantIdentity } from "@/lib/service-classification";
+import { type TenantIdentity, normalizeOrgName } from "@/lib/service-classification";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -1599,13 +1599,27 @@ function parseBillingRow(f: FieldRow): BillingRowShape | null {
   };
 }
 
+function providerOwnership(providerName: string | null | undefined, tenant: TenantIdentity): "ours" | "external" | "unknown" {
+  const norm = normalizeOrgName(providerName);
+  if (!norm) return "unknown";
+  for (const n of tenant.names) {
+    const t = normalizeOrgName(n);
+    if (!t) continue;
+    if (norm === t || norm.includes(t) || t.includes(norm)) return "ours";
+  }
+  return "external";
+}
+
 function BillingCodesEditor({
-  subjectId, rows, tenant: _tenant, onChanged,
+  subjectId, rows, tenant, onChanged,
 }: {
   subjectId: string; rows: FieldRow[]; tenant: TenantIdentity; onChanged: () => void;
 }) {
   const [adding, setAdding] = useState(false);
   const [removedIds, setRemovedIds] = useState<Set<string>>(() => new Set());
+  // Local-only acknowledgements: admin clicked "Bill anyway — I have HIVE approval"
+  // for an external-provider row. Ephemeral to this review session.
+  const [approvedExternal, setApprovedExternal] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     setRemovedIds((prev) => {
@@ -1626,25 +1640,31 @@ function BillingCodesEditor({
       return next;
     });
   };
+  const toggleApproved = (fieldId: string) => {
+    setApprovedExternal((prev) => {
+      const next = new Set(prev);
+      if (next.has(fieldId)) next.delete(fieldId); else next.add(fieldId);
+      return next;
+    });
+  };
 
   type Parsed = { field: FieldRow; row: BillingRowShape };
-  // Prompt 24: show every extracted code as one editable row. The Provider
-  // column tells the admin whose code it is at a glance; deleting a row is
-  // how the admin opts out of billing it. No separate "confirm bucket" wall.
   const parsed: Parsed[] = rows
     .filter((f) => !f.dismissed_at && !removedIds.has(f.id))
     .map((f) => { const row = parseBillingRow(f); return row ? { field: f, row } : null; })
     .filter((x): x is Parsed => x !== null);
 
+  const orgLabel = tenant.names[0] ?? "your organization";
+  const externalRows = parsed.filter((p) => providerOwnership(p.row.provider_name, tenant) === "external");
+
   return (
     <div id="billing-codes" className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-sm font-semibold">Billing codes (your authorization)</div>
+          <div className="text-sm font-semibold">Billing codes on the PCSP</div>
           <div className="text-xs text-muted-foreground">
-            Pre-filled from the PCSP. The Provider column shows whose code it is — delete (×)
-            any row you don't bill. Blank rate or annual units commit with a "pending" flag
-            (advisory; never blocks billing setup).
+            The <span className="font-medium">Ownership</span> column shows whether each code is billed by <span className="font-medium">{orgLabel}</span> or by an outside provider (support coordinator, another agency).
+            Only codes marked "Ours" flow into your 520s. External codes stay visible for context and are excluded from billing unless HIVE admin grants an exception.
           </div>
         </div>
         <Button size="sm" variant="outline" onClick={() => setAdding(true)} disabled={adding}>
@@ -1663,19 +1683,21 @@ function BillingCodesEditor({
           <table className="w-full table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[64px]" />
-              <col className="w-[18%]" />
-              <col className="w-[80px]" />
+              <col className="w-[16%]" />
+              <col className="w-[140px]" />
               <col className="w-[72px]" />
-              <col className="w-[84px]" />
+              <col className="w-[72px]" />
               <col className="w-[76px]" />
-              <col className="w-[170px]" />
-              <col className="w-[96px]" />
-              <col className="w-[64px]" />
+              <col className="w-[68px]" />
+              <col className="w-[160px]" />
+              <col className="w-[80px]" />
+              <col className="w-[56px]" />
             </colgroup>
             <thead className="text-muted-foreground">
               <tr className="border-b border-border">
                 <th className="py-2 px-1.5 font-medium">Code</th>
                 <th className="py-2 px-1.5 font-medium">Provider</th>
+                <th className="py-2 px-1.5 font-medium">Ownership</th>
                 <th className="py-2 px-1.5 font-medium">Unit</th>
                 <th className="py-2 px-1.5 font-medium">Rate</th>
                 <th className="py-2 px-1.5 font-medium">Annual</th>
@@ -1687,13 +1709,26 @@ function BillingCodesEditor({
             </thead>
             <tbody>
               {parsed.map((p) => (
-                <BillingRowEditor key={p.field.id} fieldId={p.field.id} subjectId={subjectId} initial={p.row} onChanged={onChanged} onRemoved={markRemoved} />
+                <BillingRowEditor
+                  key={p.field.id}
+                  fieldId={p.field.id}
+                  subjectId={subjectId}
+                  initial={p.row}
+                  tenant={tenant}
+                  approvedExternal={approvedExternal.has(p.field.id)}
+                  onToggleApproved={() => toggleApproved(p.field.id)}
+                  onChanged={onChanged}
+                  onRemoved={markRemoved}
+                />
               ))}
               {adding && (
                 <BillingRowEditor
                   fieldId={null}
                   subjectId={subjectId}
                   initial={{ service_code: "" }}
+                  tenant={tenant}
+                  approvedExternal={false}
+                  onToggleApproved={() => {}}
                   isNew
                   onChanged={() => { setAdding(false); onChanged(); }}
                   onCancel={() => setAdding(false)}
@@ -1701,6 +1736,22 @@ function BillingCodesEditor({
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {externalRows.length > 0 && (
+        <div className="mt-3 rounded-md border border-amber-300/60 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+          <div className="mb-1 font-semibold">
+            {externalRows.length} code{externalRows.length === 1 ? "" : "s"} appear to belong to an outside provider
+          </div>
+          <div className="mb-1">
+            The Provider on {externalRows.length === 1 ? "this line" : "these lines"} does not match <span className="font-medium">{orgLabel}</span>.
+            These codes stay in the client's plan for reference but will not be included in your 520s or billing submissions.
+            To bill any of them yourself, you need a HIVE admin exception.
+          </div>
+          <div className="mt-1 font-mono">
+            {externalRows.map((p) => `${p.row.service_code} → ${p.row.provider_name ?? "unknown provider"}`).join("  •  ")}
+          </div>
         </div>
       )}
     </div>
@@ -1712,11 +1763,14 @@ function isPending(r: BillingRowShape): boolean {
 }
 
 function BillingRowEditor({
-  fieldId, subjectId, initial, isNew, onChanged, onCancel, onRemoved,
+  fieldId, subjectId, initial, tenant, approvedExternal, onToggleApproved, isNew, onChanged, onCancel, onRemoved,
 }: {
   fieldId: string | null;
   subjectId: string;
   initial: BillingRowShape;
+  tenant: TenantIdentity;
+  approvedExternal: boolean;
+  onToggleApproved: () => void;
   isNew?: boolean;
   onChanged: () => void;
   onCancel?: () => void;
@@ -1789,6 +1843,43 @@ function BillingRowEditor({
       </td>
       <td className="py-1.5 px-1.5">
         <Input className="h-8 w-full px-2" value={row.provider_name ?? ""} onChange={(e) => patch("provider_name", e.target.value || null)} />
+      </td>
+      <td className="py-1.5 px-1.5">
+        {(() => {
+          const own = providerOwnership(row.provider_name, tenant);
+          if (own === "ours") {
+            return <Badge variant="outline" className="whitespace-nowrap border-emerald-500/60 text-emerald-600">Ours</Badge>;
+          }
+          if (own === "unknown") {
+            return <Badge variant="outline" className="whitespace-nowrap text-muted-foreground">Unspecified</Badge>;
+          }
+          return (
+            <div className="flex flex-col gap-1">
+              <Badge variant="outline" className="whitespace-nowrap border-amber-500/60 text-amber-700 dark:text-amber-300">
+                <AlertTriangle className="mr-1 h-3 w-3" /> External
+              </Badge>
+              {approvedExternal ? (
+                <button
+                  type="button"
+                  className="text-[10px] text-emerald-600 underline underline-offset-2"
+                  onClick={onToggleApproved}
+                  title="Revoke HIVE-approved billing for this line"
+                >
+                  HIVE-approved · revoke
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="text-[10px] text-muted-foreground underline underline-offset-2"
+                  onClick={onToggleApproved}
+                  title="Mark that HIVE admin has granted an exception to bill this outside-provider code"
+                >
+                  I have HIVE approval
+                </button>
+              )}
+            </div>
+          );
+        })()}
       </td>
       <td className="py-1.5 px-1.5">
         <Select value={row.unit_type ?? ""} onValueChange={(v) => patch("unit_type", v)}>

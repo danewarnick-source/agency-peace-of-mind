@@ -1659,29 +1659,36 @@ function MissingBadge() {
 }
 
 
-function TextField({ label, value, onChange, placeholder, hint }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; hint?: string }) {
+function TextField({ label, value, onChange, placeholder, hint, isMissing }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; hint?: string; isMissing?: boolean }) {
   return (
     <div className="space-y-1">
-      <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</label>
+      <div className="flex items-center justify-between">
+        <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</label>
+        {isMissing && <MissingBadge />}
+      </div>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        className={`w-full rounded-md border bg-background px-2 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-2 ${isMissing ? "border-amber-400 focus:ring-amber-400" : "border-input focus:ring-ring"}`}
       />
       {hint && <p className="text-[10px] text-muted-foreground">{hint}</p>}
     </div>
   );
 }
 
-function AreaField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+function AreaField({ label, value, onChange, placeholder, isMissing }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; isMissing?: boolean }) {
   return (
     <div className="space-y-1">
-      <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</label>
-      <Textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="min-h-[64px] text-sm" />
+      <div className="flex items-center justify-between">
+        <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</label>
+        {isMissing && <MissingBadge />}
+      </div>
+      <Textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={`min-h-[64px] text-sm ${isMissing ? "border-amber-400 focus-visible:ring-amber-400" : ""}`} />
     </div>
   );
 }
+
 
 
 // ---------------------------- BillingCodesEditor (Prompt 18) ----------------------------

@@ -118,10 +118,11 @@ function ApprovalRow({ r, onOpen }: { r: ApprovalRequestRow; onOpen: () => void 
     <li className="flex flex-wrap items-start justify-between gap-3 px-1 py-3">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="font-mono text-[10px] text-muted-foreground">#{String(r.id).slice(0, 8)}</span>
           <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{r.code}</span>
           <span className="font-semibold">{r.organization_name}</span>
           <span className="text-xs text-muted-foreground">
-            requested by {r.requesting_user_name} · {new Date(r.created_at).toLocaleDateString()}
+            opened by {r.requesting_user_name} · {new Date(r.created_at).toLocaleDateString()}
           </span>
           {r.unread_for_me > 0 && (
             <Badge variant="destructive" className="text-[10px]">{r.unread_for_me} new</Badge>
@@ -131,14 +132,22 @@ function ApprovalRow({ r, onOpen }: { r: ApprovalRequestRow; onOpen: () => void 
           Provider on PCSP: <span className="font-medium text-foreground">{r.provider_name_on_pcsp || "unspecified"}</span>
         </div>
         <div className="mt-1 line-clamp-2 text-xs">{r.justification}</div>
+        {r.resolved_at && r.resolved_signature_name && (
+          <div className="mt-1 text-[11px] text-muted-foreground">
+            Signed by {r.resolved_signature_name} · {new Date(r.resolved_signature_at ?? r.resolved_at).toLocaleString()}
+          </div>
+        )}
       </div>
       <div className="flex flex-col items-end gap-1">
-        {status === "pending" && <Badge variant="outline" className="border-amber-500/60 text-amber-700">Pending</Badge>}
-        {status === "approved" && <Badge variant="outline" className="border-emerald-500/60 text-emerald-700">Approved</Badge>}
-        {status === "denied" && <Badge variant="outline" className="border-destructive/60 text-destructive">Denied</Badge>}
+        {status === "pending" && <Badge variant="outline" className="border-amber-500/60 text-amber-700">Open ticket</Badge>}
+        {status === "approved" && <Badge variant="outline" className="border-emerald-500/60 text-emerald-700">Resolved · Approved</Badge>}
+        {status === "denied" && <Badge variant="outline" className="border-destructive/60 text-destructive">Resolved · Denied</Badge>}
         {status === "withdrawn" && <Badge variant="outline" className="text-muted-foreground">Withdrawn</Badge>}
-        <Button size="sm" variant="outline" onClick={onOpen}>Open thread</Button>
+        <Button size="sm" variant="outline" onClick={onOpen}>
+          {status === "pending" ? "Open & respond" : "View thread"}
+        </Button>
       </div>
     </li>
   );
 }
+

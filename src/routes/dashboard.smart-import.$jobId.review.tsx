@@ -324,8 +324,9 @@ function SubjectReview({
   const askCount = (questions as Array<{ answer: string | null }>).filter((qq) => !qq.answer).length;
   const extraCount = (unfiled as Array<{ filed_to: string | null }>).filter((u) => !u.filed_to).length;
   // Drop per-code routing issues — they're replaced by the inline billing table editor.
+  const validationOverrides = validation?.overrides ?? {};
   const visibleIssues = (validation?.issues ?? []).filter(
-    (i) => !/^code\.(confirm_owner|coordination|coordination_info|bill_as_ours|ignore)\./.test(i.key),
+    (i) => !validationOverrides[i.key] && !/^code\.(confirm_owner|coordination|coordination_info|bill_as_ours|ignore)\./.test(i.key),
   );
   const issueCount = visibleIssues.length;
   const steps: Array<{ id: WizardStepId; label: string; badge?: number }> = [

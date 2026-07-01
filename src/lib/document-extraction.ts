@@ -45,8 +45,8 @@ export const CORE_CLIENT_FIELD_KEYS = new Set<string>([
   // Address
   "physical_address",
   // Emergency contact (split, never one blob) — primary + secondary
-  "emergency_contact_name", "emergency_contact_phone", "emergency_contact_instructions",
-  "emergency_contact_2_name", "emergency_contact_2_phone", "emergency_contact_2_instructions",
+  "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relationship", "emergency_contact_instructions",
+  "emergency_contact_2_name", "emergency_contact_2_phone", "emergency_contact_2_relationship", "emergency_contact_2_instructions",
   // Guardian
   "is_own_guardian", "guardian_name", "guardian_phone",
   "guardian_relationship", "guardian_email", "guardian_address",
@@ -135,10 +135,10 @@ Common field_key values to extract when present (use field_group to bucket relat
     separate PID/person_id field — there is no such column.
   Address (group "address"): physical_address  -- client's Residential Address (service/home street).
     mailing_address (value_text) -- the client's Mailing Address when listed separately on the PCSP.
-  Emergency contact (group "emergency_contact"): emergency_contact_name, emergency_contact_phone, emergency_contact_instructions.
+  Emergency contact (group "emergency_contact"): emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, emergency_contact_instructions.
     ALWAYS split name and phone into TWO separate fields. Never combine.
     If a SECOND emergency contact is listed, emit emergency_contact_2_name,
-    emergency_contact_2_phone, emergency_contact_2_instructions for that person.
+    emergency_contact_2_phone, emergency_contact_2_relationship, emergency_contact_2_instructions for that person.
   Guardian (group "guardian"): is_own_guardian (value_bool), guardian_name, guardian_phone,
     guardian_relationship, guardian_email, guardian_address.
     CRITICAL: a "Representative Payee" / "Rep Payee" is a FINANCIAL arrangement, NOT a legal

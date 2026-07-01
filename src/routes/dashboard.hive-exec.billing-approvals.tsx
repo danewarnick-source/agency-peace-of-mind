@@ -52,15 +52,15 @@ function BillingApprovalsPage() {
             <ShieldCheck className="h-4 w-4" />
           </span>
           <div>
-            <h2 className="font-display text-lg font-bold tracking-tight">Billing Code Approvals</h2>
+            <h2 className="font-display text-lg font-bold tracking-tight">Billing Approval Tickets</h2>
             <p className="text-xs text-muted-foreground">
-              Providers request permission to bill an outside-provider code from a PCSP. Review each
-              justification, converse with the provider, and approve or deny.
+              Incoming tickets from providers requesting permission to bill an outside-provider code from a PCSP.
+              Open a ticket to converse with the provider; a ticket resolves when you sign an Approve or Deny.
             </p>
           </div>
           {tab === "pending" && pendingTotal > 0 && (
             <Badge variant="outline" className="ml-auto border-amber-500/60 text-amber-700">
-              {pendingTotal} pending
+              {pendingTotal} open ticket{pendingTotal === 1 ? "" : "s"}
             </Badge>
           )}
         </div>

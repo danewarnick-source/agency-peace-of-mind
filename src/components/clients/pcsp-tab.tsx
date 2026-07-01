@@ -240,7 +240,7 @@ export function PcspTab({
 
   const latestSummary = summariesQ.data?.[0];
   const latestSummaryFresh = useMemo(() => {
-    const last = latestSummary?.published_at || latestSummary?.updated_at;
+    const last = latestSummary?.finalized_at || latestSummary?.updated_at;
     if (!last) return false;
     const d = daysUntil(last);
     return d !== null && d >= -120; // within 4 months

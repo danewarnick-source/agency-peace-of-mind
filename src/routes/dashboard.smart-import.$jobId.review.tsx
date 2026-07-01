@@ -348,6 +348,7 @@ function SubjectReview({
           subjectId={subjectId}
           validation={{ ...validation, issues: visibleIssues }}
           onChanged={refresh}
+          onNavigateStep={setStep}
         />
       )}
       {mergeFlags.length > 0 && (

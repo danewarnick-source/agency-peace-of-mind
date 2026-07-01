@@ -235,6 +235,23 @@ function SmartImportPage() {
 
   const removeFile = (id: string) => setFiles((p) => p.filter((c) => c.id !== id));
 
+  const renameGroup = (oldKey: string, newLabel: string) => {
+    const label = newLabel.trim();
+    if (!label) return;
+    const newKey = label.toLowerCase().replace(/[^a-z0-9]/g, "");
+    setFiles((p) => p.map((c) =>
+      c.clientKey === oldKey && c.kind === "ai_doc"
+        ? { ...c, detectedClient: label, clientKey: newKey }
+        : c,
+    ));
+  };
+
+  const moveFileToGroup = (fileId: string, targetKey: string, targetLabel: string | null) => {
+    setFiles((p) => p.map((c) =>
+      c.id === fileId ? { ...c, clientKey: targetKey, detectedClient: targetLabel } : c,
+    ));
+  };
+
   const canProcess = useMemo(
     () => (files.length > 0 || pasteText.trim().length > 0) && !!org?.organization_id,
     [files, pasteText, org],

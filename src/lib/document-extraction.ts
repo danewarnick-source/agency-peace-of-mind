@@ -148,12 +148,33 @@ Common field_key values to extract when present (use field_group to bucket relat
   Grievance acknowledgment (group "rights"): grievance_acknowledged (value_bool true) and
     grievance_signed_date (value_date) when the document is a SIGNED grievance-policy
     acknowledgment form (SOW §1.10(11)). Omit unless explicitly signed.
-  Goals (group "goals"): pcsp_goal -- emit ONE field per distinct goal/objective in value_text.
-    PCSP goals often appear in a table (Goal / Objective / Support Code). Emit one pcsp_goal
-    per ROW, not one combined entry. When the PCSP supplies per-goal context, ALSO emit any of
-    these as value_text fields (group "goals"): goal_domain (e.g. "Community Living",
-    "Healthy Living", "Safety"), goal_current_status, goal_strengths, goal_barriers,
-    goal_success_criteria. Omit those that aren't stated.
+  Goals (group "goals"): pcsp_goal -- emit ONE field per distinct goal/objective. Prefer
+    value_json with the structured shape below so provider reviewers see the full outline of
+    each goal, not just the sentence:
+      {
+        text,                  // the goal / objective statement as written
+        domain,                // e.g. "Community Living", "Healthy Living", "Safety", "Employment"
+        why,                   // rationale — why this goal exists for THIS person (from PCSP narrative,
+                               // assessment, or team discussion). Omit if not stated.
+        responsible_party,     // who owns delivering support (e.g. "Direct Support Staff",
+                               // "Support Coordinator", "Guardian", "Behaviorist", "Day Program").
+        service_codes,         // ARRAY of DSPD codes that fund / capture this goal (e.g. ["SLN","DSI"]).
+                               // Read from Support Code column on the PCSP goal table.
+        supports,              // HOW staff support the goal day-to-day (strategies, prompts, cues)
+        data_capture,          // WHAT staff document in daily logs / progress notes to show progress
+                               // (frequency, independence level, quantity, etc.)
+        behavior_plan_link,    // reference to related BSP objective or plan section, if any
+        intake_sources,        // related intake / independence-assessment references
+                               // (e.g. "Client Independence Assessment §3", "Intake Q12")
+        success_criteria,      // what "achieved" looks like
+        current_status,        // baseline / current level of independence
+        strengths,             // strengths the person brings toward this goal
+        barriers               // known barriers
+      }
+    Include ONLY keys supported by the document. NEVER invent responsible parties, service codes,
+    behavior-plan links, or intake references. If a PCSP only lists a bare sentence, emit just
+    { text }. Emit one pcsp_goal per ROW of the goal table, not one combined entry.
+
   Health (group "health"): allergies (value_array), dysphagia (value_bool),
     swallowing_alerts (value_array), self_admin_med_support (value_bool),
     clinical_alert (value_text — any high-priority safety/clinical notice, e.g. choking risk),

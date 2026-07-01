@@ -723,6 +723,16 @@ export async function applyExtractedFieldsToClient(
           support_explanation: supportExplanation,
           is_prn: boolFromAny(row.is_prn),
           prn_instructions: asString(row.prn_instructions),
+          purpose: asString(row.purpose),
+          adverse_effects: asString(row.adverse_effects),
+          choking_risk: boolFromAny(row.choking_risk) ?? false,
+          choking_risk_details: asString(row.choking_risk_details),
+          is_controlled: boolFromAny(row.is_controlled) ?? false,
+          pharmacy: asString(row.pharmacy),
+          rx_number: asString(row.rx_number),
+          packaging: asString(row.packaging),
+          side_effects: asString(row.side_effects),
+          contributes_to_swallowing_difficulty: boolFromAny(row.contributes_to_swallowing_difficulty) ?? false,
           is_active: true,
         });
         if (medErr) {

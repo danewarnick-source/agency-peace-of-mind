@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Loader2, ShieldCheck, ShieldAlert, Check, X, MessageSquare } from "lucide-react";
+import { Loader2, ShieldCheck, ShieldAlert, Check, X, MessageSquare, PenLine } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -25,7 +25,10 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+
 import {
   openApprovalRequest,
   postApprovalMessage,

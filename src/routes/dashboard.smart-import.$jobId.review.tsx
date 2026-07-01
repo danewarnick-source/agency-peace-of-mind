@@ -316,7 +316,7 @@ function SubjectReview({
 
   const { subject, fields, unfiled, certs, questions, matched } = q.data;
   const tenant = (q.data as { tenant?: { codesHeld: string[]; names: string[] } }).tenant ?? { codesHeld: [], names: [] };
-  const validation = (q.data as { validation?: { ok: boolean; issues: Array<{ key: string; severity: "error" | "warning"; field?: string; message: string }>; blocking: string[] } }).validation;
+  const validation = (q.data as { validation?: { ok: boolean; issues: Array<{ key: string; severity: "error" | "warning"; field?: string; message: string }>; blocking: string[]; overrides?: Record<string, boolean> } }).validation;
   const mergeFlags = (q.data as { mergeFlags?: Array<Record<string, string | number | boolean | null>> }).mergeFlags ?? [];
   const targetFields = jobMode === "client" ? CLIENT_FIELDS : EMPLOYEE_FIELDS;
   const canMarkReady = !validation || validation.ok;

@@ -481,7 +481,8 @@ export const setSubjectReady = createServerFn({ method: "POST" })
       const { data: rows } = await sb
         .from("extracted_fields")
         .select("target_field, value")
-        .eq("import_subject_id", data.subjectId);
+        .eq("import_subject_id", data.subjectId)
+        .is("dismissed_at", null);
       const draft = buildDraftFromExtractedFields(rows ?? []);
       const tenant = subj.org_id ? await fetchTenantIdentity(sb, subj.org_id) : { codesHeld: [], names: [] };
       const { issues } = validateClientDraft(draft, { tenant });

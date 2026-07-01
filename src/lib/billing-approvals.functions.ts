@@ -382,10 +382,14 @@ async function listRequestsInternal(
     resolved_by_name: r.resolved_by_user_id ? (profiles.get(r.resolved_by_user_id as string) ?? null) : null,
     resolved_at: (r.resolved_at as string | null) ?? null,
     resolution_note: (r.resolution_note as string | null) ?? null,
+    resolved_signature_name: (r.resolved_signature_name as string | null) ?? null,
+    resolved_signature_attested: (r.resolved_signature_attested as boolean | null) ?? null,
+    resolved_signature_at: (r.resolved_signature_at as string | null) ?? null,
     created_at: r.created_at as string,
     updated_at: r.updated_at as string,
     last_activity_at: lastByReq.get(r.id as string) ?? (r.updated_at as string) ?? (r.created_at as string),
     unread_for_me: unreadByReq.get(r.id as string) ?? 0,
+
   }));
 }
 

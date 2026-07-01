@@ -491,18 +491,31 @@ export function ClientsPage() {
                       <TableCell className="text-right py-2 w-[220px]" data-no-row-nav onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           {rosterTab === "archived" ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-xs"
-                              disabled={reactivateM.isPending}
-                              onClick={(e) => { e.stopPropagation(); reactivateM.mutate(c.id); }}
-                            >
-                              {reactivateM.isPending && reactivateM.variables === c.id
-                                ? <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                : null}
-                              Reactivate
-                            </Button>
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs"
+                                disabled={reactivateM.isPending}
+                                onClick={(e) => { e.stopPropagation(); reactivateM.mutate(c.id); }}
+                              >
+                                {reactivateM.isPending && reactivateM.variables === c.id
+                                  ? <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                  : null}
+                                Reactivate
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs text-destructive hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteTarget({ id: c.id, name: `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() });
+                                }}
+                              >
+                                <Trash2 className="mr-1 h-3 w-3" /> Delete
+                              </Button>
+                            </>
                           ) : (
                             <IntakeAction
                               organizationId={org?.organization_id}

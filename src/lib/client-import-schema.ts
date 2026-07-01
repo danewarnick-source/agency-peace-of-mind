@@ -919,7 +919,7 @@ export async function applyExtractedFieldsToClient(
   const KNOWN_CORE = new Set<string>([
     "first_name", "last_name", "full_name", "dob", "date_of_birth", "medicaid_id", "phone",
     "physical_address", "mailing_address",
-    "emergency_contact_name", "emergency_contact_phone", "emergency_contact_instructions",
+    "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relationship", "emergency_contact_instructions",
     "is_own_guardian", "guardian_name", "guardian_phone", "guardian_relationship",
     "guardian_email", "guardian_address",
     "clinical_alert", "special_directions", "dysphagia", "self_admin_med_support",
@@ -953,7 +953,7 @@ export async function applyExtractedFieldsToClient(
     "form_1056_number", "form_1056_approved_date",
     // SOW supplemental
     "level_of_need",
-    "emergency_contact_2_name", "emergency_contact_2_phone", "emergency_contact_2_instructions",
+    "emergency_contact_2_name", "emergency_contact_2_phone", "emergency_contact_2_relationship", "emergency_contact_2_instructions",
     "grievance_acknowledged", "grievance_signed_date",
     // End-of-life / advanced care
     "dnr_status", "dnr_location", "polst_status", "palliative_care_status", "hospice_status",

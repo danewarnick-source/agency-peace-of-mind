@@ -383,7 +383,10 @@ async function commitClient(
     if (f.is_custom_attribute) continue;
     const col = CLIENT_COL[f.target_field];
     if (!col) continue;
-    mapped[col] = f.value;
+    const coerced = coerceClientValue(col, f.value);
+    if (coerced !== null && coerced !== undefined && !(Array.isArray(coerced) && coerced.length === 0)) {
+      mapped[col] = coerced;
+    }
   }
 
   // Coerce/normalize guardianship via the shared helper so the trigger,

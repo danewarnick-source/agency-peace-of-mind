@@ -2023,9 +2023,54 @@ function BillingRowEditor({
           if (own === "unknown") {
             return <Badge variant="outline" className="whitespace-nowrap text-muted-foreground">Unspecified</Badge>;
           }
+          // Admin already acknowledged this external code is not ours.
+          // Row stays visible for the record; no HIVE approval required.
+          if (row.ownership_ack === "not_ours") {
+            const clearAck = () => {
+              const next: BillingRowShape = { ...row, ownership_ack: null };
+              setRow(next);
+              save({ data: { subjectId, fieldId: fieldId ?? null, row: {
+                service_code: next.service_code.toUpperCase(),
+                provider_name: next.provider_name ?? null,
+                unit_type: next.unit_type ?? null,
+                rate: next.rate ?? null,
+                max_units: next.max_units ?? null,
+                monthly_max_units: next.monthly_max_units ?? null,
+                plan_start: next.plan_start ?? null,
+                plan_end: next.plan_end ?? null,
+                ownership_ack: null,
+              } } }).then(() => { toast.success("Undone"); onChanged(); }).catch((e: Error) => toast.error(e.message));
+            };
+            return (
+              <div className="flex flex-col gap-1">
+                <Badge variant="outline" className="whitespace-nowrap border-slate-400/60 text-slate-600 dark:text-slate-300">
+                  Not our organization
+                </Badge>
+                <span className="text-[10px] text-muted-foreground">Kept for the record. Not billed by you.</span>
+                <button type="button" className="text-[10px] text-primary underline underline-offset-2 text-left" onClick={clearAck}>
+                  Undo
+                </button>
+              </div>
+            );
+          }
           // External provider: replace self-attest with a HIVE approval workflow.
           const ar = approvalRequest;
           const openDialog = () => onOpenApproval(row.service_code, row.provider_name ?? null, ar?.id ?? null);
+          const markNotOurs = () => {
+            const next: BillingRowShape = { ...row, ownership_ack: "not_ours" };
+            setRow(next);
+            save({ data: { subjectId, fieldId: fieldId ?? null, row: {
+              service_code: next.service_code.toUpperCase(),
+              provider_name: next.provider_name ?? null,
+              unit_type: next.unit_type ?? null,
+              rate: next.rate ?? null,
+              max_units: next.max_units ?? null,
+              monthly_max_units: next.monthly_max_units ?? null,
+              plan_start: next.plan_start ?? null,
+              plan_end: next.plan_end ?? null,
+              ownership_ack: "not_ours",
+            } } }).then(() => { toast.success("Marked as not your organization"); onChanged(); }).catch((e: Error) => toast.error(e.message));
+          };
           let statusEl: React.ReactNode;
           let btnLabel: string;
           if (!ar || ar.status === "withdrawn") {
@@ -2047,10 +2092,20 @@ function BillingRowEditor({
                 <AlertTriangle className="mr-1 h-3 w-3" /> External
               </Badge>
               {statusEl}
+              {fieldId && (!ar || ar.status === "withdrawn") && (
+                <button
+                  type="button"
+                  className="text-[10px] text-slate-600 dark:text-slate-300 underline underline-offset-2 text-left"
+                  onClick={markNotOurs}
+                  title="Keep this code on the record but confirm this org is not responsible for billing it"
+                >
+                  Not my organization
+                </button>
+              )}
               {fieldId && (
                 <button
                   type="button"
-                  className="text-[10px] text-primary underline underline-offset-2"
+                  className="text-[10px] text-primary underline underline-offset-2 text-left"
                   onClick={openDialog}
                   title="Send a justification to HIVE Admin for review"
                 >

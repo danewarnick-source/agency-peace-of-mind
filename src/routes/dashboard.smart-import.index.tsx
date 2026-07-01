@@ -33,7 +33,16 @@ export const Route = createFileRoute("/dashboard/smart-import/")({
 });
 
 type Mode = "employee" | "client";
-type FileChip = { id: string; file: File; kind: "roster" | "ai_doc" };
+type FileChip = {
+  id: string;
+  file: File;
+  kind: "roster" | "ai_doc";
+  detectedClient: string | null;   // display label (e.g. "BA" or "Blake Adam")
+  clientKey: string;               // normalized grouping key ("" = unassigned)
+  detectedDocType: string;         // "PCSP", "Behavior Plan", "Document", "Roster", ...
+  detectedDate: string | null;     // "6/1/26" or "2026-06-01"
+  rowCount?: number;               // for roster files
+};
 const ALLOWED_EXT = [".pdf", ".docx", ".csv", ".xlsx", ".xls"];
 const MAX_BYTES = 25 * 1024 * 1024;
 const ALLOWED_MIME = [

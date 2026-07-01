@@ -75,7 +75,14 @@ type SubjectRow = {
 function ReviewPage() {
   const { jobId } = Route.useParams();
   const getJob = useServerFn(getReviewJob);
+  const listPending = useServerFn(listPendingClientSubjects);
+  const { data: org } = useCurrentOrg();
   const job = useQuery({ queryKey: ["smart-import-review", jobId], queryFn: () => getJob({ data: { jobId } }) });
+  const orgPending = useQuery({
+    queryKey: ["pending-client-subjects", org?.organization_id],
+    queryFn: () => listPending({ data: { organizationId: org!.organization_id } }),
+    enabled: !!org?.organization_id && job.data?.job.mode === "client",
+  });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [discardOpen, setDiscardOpen] = useState(false);
   const navigate = useNavigate();
@@ -96,6 +103,47 @@ function ReviewPage() {
   const ready = subjects.filter((s) => s.review_status === "ready").length;
   const needReview = total - ready;
   const mode = job.data.job.mode as "employee" | "client";
+
+  // Build merged org-wide queue for client-mode jobs. Current job's subjects
+  // come first (so nothing about the current experience changes), then any
+  // pending clients from OTHER jobs — clicking those navigates the workbench.
+  type QueueRow = {
+    id: string; display_name: string; review_status: string;
+    match_status: string; source: "current" | "other";
+    import_job_id: string; job_label?: string;
+  };
+  const queue: QueueRow[] = mode === "client"
+    ? (() => {
+        const currentIds = new Set(subjects.map((s) => s.id));
+        const currentRows: QueueRow[] = subjects.map((s) => ({
+          id: s.id, display_name: s.display_name,
+          review_status: s.review_status, match_status: s.match_status,
+          source: "current" as const, import_job_id: jobId,
+        }));
+        const others: QueueRow[] = (orgPending.data?.items ?? [])
+          .filter((p) => p.jobId !== jobId && !currentIds.has(p.subjectId))
+          .map((p) => ({
+            id: p.subjectId, display_name: p.display_name,
+            review_status: p.review_status, match_status: p.match_status,
+            source: "other" as const, import_job_id: p.jobId,
+            job_label: p.import_date ? new Date(p.import_date).toLocaleDateString() : undefined,
+          }));
+        return [...currentRows, ...others];
+      })()
+    : subjects.map((s) => ({
+        id: s.id, display_name: s.display_name,
+        review_status: s.review_status, match_status: s.match_status,
+        source: "current" as const, import_job_id: jobId,
+      }));
+
+  const onQueueSelect = (row: QueueRow) => {
+    if (row.source === "other") {
+      navigate({ to: "/dashboard/smart-import/$jobId/review", params: { jobId: row.import_job_id } });
+      setSelectedId(row.id);
+    } else {
+      setSelectedId(row.id);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -132,7 +180,7 @@ function ReviewPage() {
       <RosterSummary mode={mode} total={total} ready={ready} needReview={needReview} jobId={jobId} whiteGlove={job.data.job.source === "white_glove"} signedOff={!!job.data.job.provider_signoff_at} />
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-        <SubjectQueue subjects={subjects} selectedId={selectedId} onSelect={setSelectedId} />
+        <SubjectQueue mode={mode} queue={queue} selectedId={selectedId} onSelect={onQueueSelect} />
         <div className="space-y-4">
           {selectedId ? (
             <SubjectReview
@@ -141,11 +189,13 @@ function ReviewPage() {
               jobId={jobId}
               subjects={subjects}
               assignments={job.data.assignments ?? []}
-              onChanged={() => job.refetch()}
+              onChanged={() => { job.refetch(); orgPending.refetch(); }}
             />
           ) : (
             <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground shadow-[var(--shadow-card)]">
-              Select a person from the queue to begin review.
+              {mode === "client" && queue.length === 0
+                ? "All caught up — no pending clients to review."
+                : "Select a person from the queue to begin review."}
             </div>
           )}
         </div>
@@ -153,6 +203,7 @@ function ReviewPage() {
     </div>
   );
 }
+
 
 // ---------------------------- AttributionBar ----------------------------
 function AttributionBar() {

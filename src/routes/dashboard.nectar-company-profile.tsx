@@ -95,6 +95,38 @@ function NectarCompanyProfilePage() {
         nectar_profile_saved_at: new Date().toISOString(),
         provider_approver_email: draft.providerEmail?.trim() || null,
       }).eq("id", orgId);
+
+      // Mirror the awarded codes into provider_interest_outline.codes_held,
+      // which is where NECTAR's code-routing classifier reads. Best-effort:
+      // if the row exists we update just codes_held; if not we insert a
+      // minimal Default outline. RLS errors are non-fatal — the fallback
+      // in fetchTenantIdentity reads services_offered directly.
+      try {
+        const codes = (draft.services ?? []).map((c) => String(c).toUpperCase());
+        const { data: existing } = await (supabase.from("provider_interest_outline") as any)
+          .select("id")
+          .eq("organization_id", orgId)
+          .eq("name", "Default")
+          .maybeSingle();
+        if (existing?.id) {
+          await (supabase.from("provider_interest_outline") as any)
+            .update({ codes_held: codes })
+            .eq("id", existing.id);
+        } else {
+          await (supabase.from("provider_interest_outline") as any).insert({
+            organization_id: orgId,
+            name: "Default",
+            location_mode: "anywhere",
+            location_values: [],
+            codes_held: codes,
+            need_levels_served: [],
+            disability_types_served: [],
+            disability_levels_served: [],
+          });
+        }
+      } catch (err) {
+        console.warn("[nectar-profile] provider_interest_outline sync skipped", err);
+      }
     } catch (err) {
       console.warn("[nectar-profile] DB write pending; localStorage fallback active", err);
     }

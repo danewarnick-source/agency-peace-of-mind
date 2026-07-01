@@ -2147,8 +2147,9 @@ function FieldRowEditor({
         <Select value={target} onValueChange={(v) => { setTarget(v); setDirty(true); }} disabled={dismissed}>
           <SelectTrigger className={`sm:max-w-[200px] ${dismissed ? "line-through text-muted-foreground" : ""}`}><SelectValue /></SelectTrigger>
           <SelectContent>
-            {targetFields.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-            {!targetFields.includes(target) && <SelectItem value={target}>{target}</SelectItem>}
+            {targetFields.map((t) => <SelectItem key={t} value={t}>{labelForField(t)}</SelectItem>)}
+            {!targetFields.includes(target) && <SelectItem value={target}>{labelForField(target)}</SelectItem>}
+
           </SelectContent>
         </Select>
       )}

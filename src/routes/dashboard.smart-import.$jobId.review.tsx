@@ -26,7 +26,7 @@ import {
   getJobAssigner, upsertManualAssignment, removeAssignmentMapRow,
 } from "@/lib/smart-import-review.functions";
 import { resolveMergeFlag, overrideValidationIssue } from "@/lib/import-checklist.functions";
-import { type TenantIdentity } from "@/lib/service-classification";
+import { type TenantIdentity, normalizeOrgName } from "@/lib/service-classification";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";

@@ -475,7 +475,7 @@ function SubjectWizard({
   const personFields = fields.filter((f) => PERSON_FIELDS_SET.has(f.target_field));
   const healthFields = fields.filter((f) => HEALTH_FIELDS_SET.has(f.target_field));
   const servicesFields = fields.filter((f) => SERVICES_FIELDS_SET.has(f.target_field));
-  const goalFields = fields.filter((f) => f.target_field === "pcsp_goal" || f.field_key === "pcsp_goal");
+  const goalFields = fields.filter((f) => f.target_field === "pcsp_goal" || f.field_key === "pcsp_goal" || f.target_field === "pcsp_goal_extraction_failed");
   const medicationFields = fields.filter((f) => f.target_field === "client_medication" || f.field_key === "client_medication" || f.target_field === "pcsp_has_medications");
   const hiddenProfileFields = new Set(["pcsp_goal", "client_medication", "pcsp_has_medications"]);
   const otherFields = fields.filter((f) => !PERSON_FIELDS_SET.has(f.target_field) && !HEALTH_FIELDS_SET.has(f.target_field) && !SERVICES_FIELDS_SET.has(f.target_field) && !hiddenProfileFields.has(f.target_field) && !f.is_custom_attribute);

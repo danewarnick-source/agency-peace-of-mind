@@ -24,7 +24,9 @@ import {
   computeProvisioningForecast, togglePlanItem, submitForSetup,
   saveBillingCodeRow, saveManualReviewRow, removeExtractedField, restoreExtractedField,
   getJobAssigner, upsertManualAssignment, removeAssignmentMapRow,
+  listPendingClientSubjects,
 } from "@/lib/smart-import-review.functions";
+
 import { resolveMergeFlag, overrideValidationIssue } from "@/lib/import-checklist.functions";
 import { type TenantIdentity, normalizeOrgName } from "@/lib/service-classification";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
@@ -73,7 +75,14 @@ type SubjectRow = {
 function ReviewPage() {
   const { jobId } = Route.useParams();
   const getJob = useServerFn(getReviewJob);
+  const listPending = useServerFn(listPendingClientSubjects);
+  const { data: org } = useCurrentOrg();
   const job = useQuery({ queryKey: ["smart-import-review", jobId], queryFn: () => getJob({ data: { jobId } }) });
+  const orgPending = useQuery({
+    queryKey: ["pending-client-subjects", org?.organization_id],
+    queryFn: () => listPending({ data: { organizationId: org!.organization_id } }),
+    enabled: !!org?.organization_id && job.data?.job.mode === "client",
+  });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [discardOpen, setDiscardOpen] = useState(false);
   const navigate = useNavigate();
@@ -94,6 +103,47 @@ function ReviewPage() {
   const ready = subjects.filter((s) => s.review_status === "ready").length;
   const needReview = total - ready;
   const mode = job.data.job.mode as "employee" | "client";
+
+  // Build merged org-wide queue for client-mode jobs. Current job's subjects
+  // come first (so nothing about the current experience changes), then any
+  // pending clients from OTHER jobs — clicking those navigates the workbench.
+  type QueueRow = {
+    id: string; display_name: string; review_status: string;
+    match_status: string; source: "current" | "other";
+    import_job_id: string; job_label?: string;
+  };
+  const queue: QueueRow[] = mode === "client"
+    ? (() => {
+        const currentIds = new Set(subjects.map((s) => s.id));
+        const currentRows: QueueRow[] = subjects.map((s) => ({
+          id: s.id, display_name: s.display_name,
+          review_status: s.review_status, match_status: s.match_status,
+          source: "current" as const, import_job_id: jobId,
+        }));
+        const others: QueueRow[] = (orgPending.data?.items ?? [])
+          .filter((p) => p.jobId !== jobId && !currentIds.has(p.subjectId))
+          .map((p) => ({
+            id: p.subjectId, display_name: p.display_name,
+            review_status: p.review_status, match_status: p.match_status,
+            source: "other" as const, import_job_id: p.jobId,
+            job_label: p.import_date ? new Date(p.import_date).toLocaleDateString() : undefined,
+          }));
+        return [...currentRows, ...others];
+      })()
+    : subjects.map((s) => ({
+        id: s.id, display_name: s.display_name,
+        review_status: s.review_status, match_status: s.match_status,
+        source: "current" as const, import_job_id: jobId,
+      }));
+
+  const onQueueSelect = (row: QueueRow) => {
+    if (row.source === "other") {
+      navigate({ to: "/dashboard/smart-import/$jobId/review", params: { jobId: row.import_job_id } });
+      setSelectedId(row.id);
+    } else {
+      setSelectedId(row.id);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -130,7 +180,7 @@ function ReviewPage() {
       <RosterSummary mode={mode} total={total} ready={ready} needReview={needReview} jobId={jobId} whiteGlove={job.data.job.source === "white_glove"} signedOff={!!job.data.job.provider_signoff_at} />
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-        <SubjectQueue subjects={subjects} selectedId={selectedId} onSelect={setSelectedId} />
+        <SubjectQueue mode={mode} queue={queue} selectedId={selectedId} onSelect={onQueueSelect} />
         <div className="space-y-4">
           {selectedId ? (
             <SubjectReview
@@ -139,11 +189,13 @@ function ReviewPage() {
               jobId={jobId}
               subjects={subjects}
               assignments={job.data.assignments ?? []}
-              onChanged={() => job.refetch()}
+              onChanged={() => { job.refetch(); orgPending.refetch(); }}
             />
           ) : (
             <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground shadow-[var(--shadow-card)]">
-              Select a person from the queue to begin review.
+              {mode === "client" && queue.length === 0
+                ? "All caught up — no pending clients to review."
+                : "Select a person from the queue to begin review."}
             </div>
           )}
         </div>
@@ -151,6 +203,7 @@ function ReviewPage() {
     </div>
   );
 }
+
 
 // ---------------------------- AttributionBar ----------------------------
 function AttributionBar() {
@@ -281,47 +334,76 @@ function WhiteGloveBanner({
 }
 
 // ---------------------------- SubjectQueue ----------------------------
+type QueueRow = {
+  id: string; display_name: string; review_status: string;
+  match_status: string; source: "current" | "other";
+  import_job_id: string; job_label?: string;
+};
 function SubjectQueue({
-  subjects, selectedId, onSelect,
-}: { subjects: SubjectRow[]; selectedId: string | null; onSelect: (id: string) => void }) {
+  mode, queue, selectedId, onSelect,
+}: { mode: "employee" | "client"; queue: QueueRow[]; selectedId: string | null; onSelect: (row: QueueRow) => void }) {
+  const currentCount = queue.filter((r) => r.source === "current").length;
+  const otherRows = queue.filter((r) => r.source === "other");
   return (
     <div className="rounded-2xl border border-border bg-card p-2 shadow-[var(--shadow-card)]">
-      <div className="px-2 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">People</div>
-      <div className="max-h-[60vh] space-y-1 overflow-auto">
-        {subjects.length === 0 && (
-          <div className="px-3 py-6 text-center text-sm text-muted-foreground">No people in this job.</div>
+      <div className="px-2 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {mode === "client" ? "Pending clients" : "People"}
+      </div>
+      <div className="max-h-[70vh] space-y-1 overflow-auto">
+        {queue.length === 0 && (
+          <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+            {mode === "client" ? "All caught up — no pending clients." : "No people in this job."}
+          </div>
         )}
-        {subjects.map((s) => {
-          const active = s.id === selectedId;
-          return (
-            <button
-              key={s.id}
-              onClick={() => onSelect(s.id)}
-              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                active ? "bg-primary/10 text-primary" : "hover:bg-muted"
-              }`}
-            >
-              <div className="min-w-0">
-                <div className="truncate font-medium">{s.display_name}</div>
-                <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-                  <StatusDot status={s.review_status} />
-                  <span className="capitalize">{s.review_status.replace("_", " ")}</span>
-                  {s.match_status === "matched_existing" && <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px]">match</Badge>}
-                  {s.match_status === "ambiguous" && <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px] text-amber-600">ambig</Badge>}
-                </div>
-              </div>
-              <ChevronRight className="h-4 w-4 opacity-50" />
-            </button>
-          );
-        })}
+        {queue.slice(0, currentCount).map((r) => (
+          <QueueButton key={r.id} row={r} active={r.id === selectedId} onSelect={onSelect} />
+        ))}
+        {otherRows.length > 0 && (
+          <div className="mt-3 border-t border-border pt-2">
+            <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              From other imports
+            </div>
+            {otherRows.map((r) => (
+              <QueueButton key={r.id} row={r} active={r.id === selectedId} onSelect={onSelect} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
 }
-function StatusDot({ status }: { status: SubjectRow["review_status"] }) {
+function QueueButton({ row, active, onSelect }: { row: QueueRow; active: boolean; onSelect: (row: QueueRow) => void }) {
+  return (
+    <button
+      onClick={() => onSelect(row)}
+      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+        active ? "bg-primary/10 text-primary" : "hover:bg-muted"
+      }`}
+    >
+      <div className="min-w-0">
+        <div className="truncate font-medium">{row.display_name}</div>
+        <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+          <StatusDot status={row.review_status} />
+          <span className="capitalize">{row.review_status.replace("_", " ")}</span>
+          {row.match_status === "matched_existing" && <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px]">match</Badge>}
+          {row.match_status === "ambiguous" && <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px] text-amber-600">ambig</Badge>}
+          {row.source === "other" && (
+            <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
+              <Link2 className="h-3 w-3" />
+              {row.job_label ?? "other import"}
+            </span>
+          )}
+        </div>
+      </div>
+      <ChevronRight className="h-4 w-4 opacity-50" />
+    </button>
+  );
+}
+function StatusDot({ status }: { status: string }) {
   const color = status === "ready" ? "bg-emerald-500" : status === "in_progress" ? "bg-amber-500" : "bg-muted-foreground/40";
   return <span className={`inline-block h-1.5 w-1.5 rounded-full ${color}`} />;
 }
+
 
 // ---------------------------- SubjectReview ----------------------------
 function SubjectReview({

@@ -10,7 +10,7 @@ import { Buffer } from "node:buffer";
 
 
 import { gatewayFetch } from "@/lib/ai-bedrock.server";
-import { parseDocumentWithAI, CORE_CLIENT_FIELD_KEYS } from "@/lib/document-extraction";
+import { parseDocumentWithAI, extractGoalsOnly, documentLikelyHasGoals, CORE_CLIENT_FIELD_KEYS } from "@/lib/document-extraction";
 
 // ----- Input schemas -----
 const ModeEnum = z.enum(["employee", "client"]);

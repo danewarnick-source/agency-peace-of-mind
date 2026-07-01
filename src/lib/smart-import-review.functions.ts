@@ -369,6 +369,10 @@ const BillingRowInput = z.object({
     monthly_max_units: z.number().nullable().optional(),
     plan_start: z.string().nullable().optional(),
     plan_end: z.string().nullable().optional(),
+    // Admin acknowledgment for an external code: "not_ours" means the code
+    // belongs to another provider (SC, other agency) and this org accepts no
+    // billing responsibility. Row stays visible; no HIVE approval needed.
+    ownership_ack: z.enum(["not_ours"]).nullable().optional(),
   }),
 });
 export const saveBillingCodeRow = createServerFn({ method: "POST" })

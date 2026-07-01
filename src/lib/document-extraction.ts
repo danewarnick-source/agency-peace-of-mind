@@ -41,12 +41,12 @@ export type ParseOutT = z.infer<typeof ParseOut>;
 export const CORE_CLIENT_FIELD_KEYS = new Set<string>([
   // Person
   "first_name", "last_name", "full_name", "dob", "medicaid_id", "phone", "plan_year",
-  "disability_category", "admission_date", "discharge_date",
+  "disability_category", "admission_date", "discharge_date", "pcsp_expiration_date",
   // Address
   "physical_address",
   // Emergency contact (split, never one blob) — primary + secondary
-  "emergency_contact_name", "emergency_contact_phone", "emergency_contact_instructions",
-  "emergency_contact_2_name", "emergency_contact_2_phone", "emergency_contact_2_instructions",
+  "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relationship", "emergency_contact_instructions",
+  "emergency_contact_2_name", "emergency_contact_2_phone", "emergency_contact_2_relationship", "emergency_contact_2_instructions",
   // Guardian
   "is_own_guardian", "guardian_name", "guardian_phone",
   "guardian_relationship", "guardian_email", "guardian_address",
@@ -128,16 +128,17 @@ Common field_key values to extract when present (use field_group to bucket relat
     Injury; omit this field entirely if the document does not state the population),
     admission_date (value_date — SOW §1.10 required; use the service/plan begin date if no explicit
     admission date is present; omit if not present in any form),
-    discharge_date (value_date — usually absent on intake; omit if not present).
+    discharge_date (value_date — usually absent on intake; omit if not present),
+    pcsp_expiration_date (value_date — PCSP/plan end date or review-by/expiration date; omit if absent).
     IMPORTANT: a PCSP labels the client's Medicaid number as "PID:" or "Person ID:". Treat these
     labels as Medicaid ID and extract the value into medicaid_id (digits only). Do NOT emit a
     separate PID/person_id field — there is no such column.
   Address (group "address"): physical_address  -- client's Residential Address (service/home street).
     mailing_address (value_text) -- the client's Mailing Address when listed separately on the PCSP.
-  Emergency contact (group "emergency_contact"): emergency_contact_name, emergency_contact_phone, emergency_contact_instructions.
+  Emergency contact (group "emergency_contact"): emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, emergency_contact_instructions.
     ALWAYS split name and phone into TWO separate fields. Never combine.
     If a SECOND emergency contact is listed, emit emergency_contact_2_name,
-    emergency_contact_2_phone, emergency_contact_2_instructions for that person.
+    emergency_contact_2_phone, emergency_contact_2_relationship, emergency_contact_2_instructions for that person.
   Guardian (group "guardian"): is_own_guardian (value_bool), guardian_name, guardian_phone,
     guardian_relationship, guardian_email, guardian_address.
     CRITICAL: a "Representative Payee" / "Rep Payee" is a FINANCIAL arrangement, NOT a legal
@@ -158,7 +159,14 @@ Common field_key values to extract when present (use field_group to bucket relat
     clinical_alert (value_text — any high-priority safety/clinical notice, e.g. choking risk),
     special_directions (value_text — care/access notes)
   Medications (group "medications"): emit ONE field per medication listed in the document with
-    field_key = "client_medication" and value_json = { name, dose, route, frequency, prn (bool), notes }.
+    field_key = "client_medication" and value_json = {
+      name, dose, route, frequency, scheduled_time, scheduled_times, prn (bool), prn_instructions,
+      instructions, prescriber, purpose, adverse_effects, choking_risk (bool), choking_risk_details,
+      is_controlled (bool), pharmacy, rx_number, packaging, side_effects,
+      contributes_to_swallowing_difficulty (bool), support_level, support_explanation, notes
+    }.
+    Include only keys supported by the document; do not invent clinical purpose, adverse effects,
+    controlled-substance status, choking risk, pharmacy, or Rx number when not stated.
     ALSO emit a single field "pcsp_has_medications" with value_bool. Set TRUE if the document
     lists ANY prescribed/administered medication (even one). Set FALSE only when the document
     explicitly states no medications (e.g. "None", "No current medications", an empty

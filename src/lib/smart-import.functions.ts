@@ -694,8 +694,8 @@ async function aiExtractFieldsFromText(
       is_custom: !isKnown,
     };
 
-    // Billing code row → JSON-encode value_json so the commit can read it back
-    if (key === "billing_code_row" && f.value_json && typeof f.value_json === "object") {
+    // Structured rows → JSON-encode value_json in `value` so review and commit can read it back.
+    if ((key === "billing_code_row" || key === "client_medication") && f.value_json && typeof f.value_json === "object") {
       out.push({ ...base, value: JSON.stringify(f.value_json) });
       continue;
     }

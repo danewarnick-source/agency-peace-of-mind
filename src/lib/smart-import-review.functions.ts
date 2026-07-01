@@ -18,6 +18,12 @@ import { fetchTenantIdentity } from "@/lib/service-classification";
 
 const JobId = z.object({ jobId: z.string().uuid() });
 const SubjectId = z.object({ subjectId: z.string().uuid() });
+const ManualReviewRowInput = z.object({
+  subjectId: z.string().uuid(),
+  fieldId: z.string().uuid().nullable().optional(),
+  targetField: z.enum(["pcsp_goal", "client_medication"]),
+  value: z.union([z.string(), z.record(z.string(), z.unknown())]),
+});
 
 // ---------- Job overview + subject queue ----------
 export const getReviewJob = createServerFn({ method: "POST" })
@@ -134,6 +140,81 @@ export const getReviewSubject = createServerFn({ method: "POST" })
       },
       mergeFlags,
     };
+  });
+
+export const saveManualReviewRow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => ManualReviewRowInput.parse(i))
+  .handler(async ({ data, context }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = context.supabase as any;
+    const valueText = typeof data.value === "string" ? data.value.trim() : JSON.stringify(data.value);
+    if (!valueText) throw new Error("Enter a value before saving.");
+    const label = data.targetField === "pcsp_goal" ? "PCSP goal" : "medication";
+
+    if (data.fieldId) {
+      const { data: existing } = await sb
+        .from("extracted_fields")
+        .select("id, value, original_value, import_job_id, org_id, import_subject_id")
+        .eq("id", data.fieldId)
+        .single();
+      if (!existing) throw new Error("Review row not found");
+      const { error } = await sb.from("extracted_fields").update({
+        target_field: data.targetField,
+        value: valueText,
+        original_value: existing.original_value ?? existing.value,
+        status: "edited",
+        confidence: 1,
+        provenance: "admin_override",
+        is_custom_attribute: false,
+        edited_by: context.userId,
+        edited_at: new Date().toISOString(),
+      }).eq("id", data.fieldId);
+      if (error) throw new Error(error.message);
+      await sb.from("import_audit").insert({
+        import_job_id: existing.import_job_id,
+        org_id: existing.org_id,
+        subject_id: existing.import_subject_id,
+        item: `Edited ${label}`,
+        traces_to: "admin_override",
+        actor: context.userId,
+        action: data.targetField === "pcsp_goal" ? "edit_pcsp_goal" : "edit_client_medication",
+      });
+      return { ok: true, fieldId: data.fieldId };
+    }
+
+    const { data: subj } = await sb
+      .from("import_subjects")
+      .select("import_job_id, org_id, subject_type")
+      .eq("id", data.subjectId)
+      .single();
+    if (!subj) throw new Error("Subject not found");
+    if (subj.subject_type !== "client") throw new Error("Only client subjects support this review row.");
+    const { data: inserted, error: insErr } = await sb.from("extracted_fields").insert({
+      import_job_id: subj.import_job_id,
+      import_subject_id: data.subjectId,
+      org_id: subj.org_id,
+      target_table: "clients",
+      target_field: data.targetField,
+      value: valueText,
+      status: "edited",
+      confidence: 1,
+      provenance: "admin_override",
+      is_custom_attribute: false,
+      edited_by: context.userId,
+      edited_at: new Date().toISOString(),
+    }).select("id").single();
+    if (insErr) throw new Error(insErr.message);
+    await sb.from("import_audit").insert({
+      import_job_id: subj.import_job_id,
+      org_id: subj.org_id,
+      subject_id: data.subjectId,
+      item: `Added ${label} manually during Smart Import review`,
+      traces_to: "admin_override",
+      actor: context.userId,
+      action: data.targetField === "pcsp_goal" ? "add_pcsp_goal" : "add_client_medication",
+    });
+    return { ok: true, fieldId: inserted.id as string };
   });
 
 // Build a minimal ClientDraft from extracted_fields rows so the same
@@ -259,8 +340,8 @@ export const editExtractedField = createServerFn({ method: "POST" })
 
 // ---------- Prompt 18: editable billing-code rows during review ----------
 // One server fn handles both insert (no fieldId) and update (fieldId).
-// Writes value_json (used at commit) AND value (kept as JSON string for the
-// existing text-based FieldRow shape). Status flips to "edited" so the row
+// Writes the structured row as JSON text in value so it works with the live
+// staging schema. Status flips to "edited" so the row
 // shows the same "admin edited" badge as other manual corrections.
 const BillingRowInput = z.object({
   subjectId: z.string().uuid(),
@@ -299,9 +380,7 @@ export const saveBillingCodeRow = createServerFn({ method: "POST" })
         .from("extracted_fields")
         .update({
           value: valueText,
-          value_json: row,
           target_field: "billing_code_row",
-          field_key: "billing_code_row",
           status: "edited",
           edited_by: context.userId,
           edited_at: new Date().toISOString(),
@@ -334,12 +413,10 @@ export const saveBillingCodeRow = createServerFn({ method: "POST" })
         org_id: subj.org_id,
         target_table: "clients",
         target_field: "billing_code_row",
-        field_key: "billing_code_row",
         value: valueText,
-        value_json: row,
         status: "edited",
         confidence: 1,
-        provenance: "admin_added",
+        provenance: "admin_override",
         is_custom_attribute: false,
         edited_by: context.userId,
         edited_at: new Date().toISOString(),
@@ -795,15 +872,15 @@ export const getJobAssigner = createServerFn({ method: "POST" })
     if (clientSubjectIds.length > 0) {
       const { data: rows } = await sb
         .from("extracted_fields")
-        .select("import_subject_id, value, value_json, dismissed_at")
+        .select("import_subject_id, value, dismissed_at")
         .in("import_subject_id", clientSubjectIds)
         .eq("target_field", "billing_code_row")
         .is("dismissed_at", null);
       const grouped = new Map<string, Array<{ service_code: string; provider_name: string | null }>>();
       for (const row of (rows ?? []) as Array<{
-        import_subject_id: string; value: string | null; value_json: unknown;
+        import_subject_id: string; value: string | null;
       }>) {
-        const raw = row.value_json ?? (() => { try { return row.value ? JSON.parse(row.value) : null; } catch { return null; } })();
+        const raw = (() => { try { return row.value ? JSON.parse(row.value) : null; } catch { return null; } })();
         const parsed = parseBillingRowLoose(raw);
         if (!parsed) continue;
         const list = grouped.get(row.import_subject_id) ?? [];

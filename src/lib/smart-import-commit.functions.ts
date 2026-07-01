@@ -20,21 +20,134 @@ const CLIENT_COL: Record<string, string> = {
   last_name: "last_name",
   phone: "phone_number",
   address: "physical_address",
+  physical_address: "physical_address",
+  mailing_address: "mailing_address",
   medicaid_id: "medicaid_id",
+  dob: "date_of_birth",
   date_of_birth: "date_of_birth",
   is_own_guardian: "is_own_guardian",
   guardian_name: "guardian_name",
   guardian_phone: "guardian_phone",
   guardian_relationship: "guardian_relationship",
   guardian_email: "guardian_email",
+  guardian_address: "guardian_address",
   emergency_contact_name: "emergency_contact_name",
   emergency_contact_phone: "emergency_contact_phone",
+  emergency_contact_instructions: "emergency_contact_instructions",
+  support_coordinator_name: "support_coordinator_name",
+  support_coordinator_email: "support_coordinator_email",
+  support_coordinator_phone: "support_coordinator_phone",
+  support_coordinator_company: "support_coordinator_company",
+  primary_care_name: "primary_care_name",
+  primary_care_phone: "primary_care_phone",
+  pcp_name: "primary_care_name",
+  pcp_phone: "primary_care_phone",
+  specialist_name: "specialist_name",
+  specialist_phone: "specialist_phone",
+  med_prescriber_name: "prescriber_name",
+  med_prescriber_phone: "prescriber_phone",
+  neurologist_name: "neurologist_name",
+  neurologist_phone: "neurologist_phone",
+  dentist_name: "dentist_name",
+  dentist_phone: "dentist_phone",
+  prescriber_name: "prescriber_name",
+  prescriber_phone: "prescriber_phone",
+  clinical_alert: "clinical_alert",
+  special_directions: "special_directions",
+  dysphagia: "dysphagia",
+  self_admin_med_support: "self_admin_med_support",
+  diagnoses: "diagnoses",
+  chronic_conditions: "chronic_conditions",
+  immunizations: "immunizations",
+  allergies: "allergies",
+  swallowing_alerts: "swallowing_alerts",
+  rights_restrictions: "rights_restrictions",
+  court_orders: "court_orders",
+  preferred_activities: "preferred_activities",
+  roommates: "roommates",
+  personal_belongings_inventory: "personal_belongings_inventory",
+  has_abi: "has_abi",
+  hr_applicable: "hr_applicable",
+  dnr_applicable: "dnr_applicable",
+  advanced_directives: "advanced_directives",
+  emergency_medical_treatment_authorization: "emergency_medical_treatment_authorization",
+  bsp_status: "bsp_status",
+  medical_insurance: "medical_insurance",
+  housing_voucher: "housing_voucher",
+  preferred_living: "preferred_living",
+  plan_year: "plan_year",
+  disability_category: "disability_category",
+  admission_date: "admission_date",
+  discharge_date: "discharge_date",
+  pcsp_expiration_date: "pcsp_expiration_date",
+  form_1056_number: "form_1056_number",
+  form_1056_approved_date: "form_1056_approved_date",
+  level_of_need: "level_of_need",
+  dnr_status: "dnr_status",
+  dnr_location: "dnr_location",
+  polst_status: "polst_status",
+  palliative_care_status: "palliative_care_status",
+  hospice_status: "hospice_status",
 };
 // On profiles we only update soft, non-auth fields
 const PROFILE_COL: Record<string, string> = {
   full_name: "full_name",
   phone: "phone",
 };
+
+const CLIENT_BOOL_COLS = new Set([
+  "is_own_guardian",
+  "dysphagia",
+  "self_admin_med_support",
+  "has_abi",
+  "hr_applicable",
+  "dnr_applicable",
+  "advanced_directives",
+  "emergency_medical_treatment_authorization",
+]);
+const CLIENT_ARRAY_COLS = new Set([
+  "diagnoses",
+  "chronic_conditions",
+  "immunizations",
+  "allergies",
+  "swallowing_alerts",
+  "rights_restrictions",
+  "court_orders",
+  "preferred_activities",
+  "roommates",
+  "personal_belongings_inventory",
+]);
+const CLIENT_DATE_COLS = new Set([
+  "date_of_birth",
+  "admission_date",
+  "discharge_date",
+  "pcsp_expiration_date",
+  "form_1056_approved_date",
+]);
+
+function coerceClientValue(column: string, raw: string | null): unknown {
+  const value = (raw ?? "").trim();
+  if (!value) return null;
+  if (CLIENT_BOOL_COLS.has(column)) {
+    try {
+      const parsed = JSON.parse(value) as { bool?: unknown } | boolean;
+      if (typeof parsed === "boolean") return parsed;
+      if (parsed && typeof parsed === "object" && typeof parsed.bool === "boolean") return parsed.bool;
+    } catch { /* plain string below */ }
+    if (/^(true|yes|y|1)$/i.test(value)) return true;
+    if (/^(false|no|n|0)$/i.test(value)) return false;
+    return null;
+  }
+  if (CLIENT_ARRAY_COLS.has(column)) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed.map(String).map((s) => s.trim()).filter(Boolean);
+    } catch { /* comma/newline list below */ }
+    return value.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
+  }
+  if (CLIENT_DATE_COLS.has(column)) return value.slice(0, 10);
+  return value;
+}
 
 type AuditTrace = "rule" | "source" | "inferred" | "admin_override";
 
@@ -271,7 +384,7 @@ async function commitClient(
   sb: any,
   orgId: string,
   subj: { id: string; matched_record_id: string | null; review_decision: string | null; display_name: string; validation_overrides?: Record<string, boolean> | null },
-  fields: Array<{ id: string; target_field: string; value: string | null; source_document_id: string | null; source_snippet: string | null; provenance: string; is_custom_attribute: boolean }>,
+  fields: Array<{ id: string; target_field: string; field_key?: string | null; value: string | null; source_document_id: string | null; source_snippet: string | null; provenance: string; is_custom_attribute: boolean }>,
   jobId: string,
   userId: string,
   gaps: string[],
@@ -282,7 +395,10 @@ async function commitClient(
     if (f.is_custom_attribute) continue;
     const col = CLIENT_COL[f.target_field];
     if (!col) continue;
-    mapped[col] = f.value;
+    const coerced = coerceClientValue(col, f.value);
+    if (coerced !== null && coerced !== undefined && !(Array.isArray(coerced) && coerced.length === 0)) {
+      mapped[col] = coerced;
+    }
   }
 
   // Coerce/normalize guardianship via the shared helper so the trigger,
@@ -378,11 +494,11 @@ async function commitClient(
     const norm: NormField[] = fields
       .filter((f) => !f.is_custom_attribute)
       .map((f) => {
-        const base: NormField = { field_key: f.target_field, confidence: 0.9 };
+        const base: NormField = { field_key: f.field_key || f.target_field, confidence: 0.9 };
         const v = f.value;
         if (v == null || String(v).trim() === "") return base;
         const s = String(v).trim();
-        if (f.target_field === "billing_code_row") {
+        if ((f.field_key || f.target_field) === "billing_code_row" || (f.field_key || f.target_field) === "client_medication") {
           try { base.value_json = JSON.parse(s); return base; } catch { /* fall through */ }
         }
         if (s.startsWith("[") || s.startsWith("{")) {
@@ -429,6 +545,16 @@ async function commitClient(
     await audit(sb, jobId, orgId, subj.id,
       `Autofill failed: ${(err as Error).message}`,
       "admin_override", userId, "autofill_error");
+  }
+
+  // The visible Profile > Contacts card reads client_emergency_contacts, not
+  // the legacy scalar emergency-contact columns on clients. Mirror reviewed
+  // PCSP emergency contacts there so finalization actually populates the UI.
+  try {
+    await seedEmergencyContacts(sb, orgId, recordId, fields);
+  } catch (err) {
+    gaps.push(`Contacts warning: ${(err as Error).message}`);
+    await audit(sb, jobId, orgId, subj.id, `Emergency contacts seed failed: ${(err as Error).message}`, "admin_override", userId, "contacts_seed_error");
   }
 
   // ─── PCSP single-source-of-truth ──────────────────────────────────────
@@ -497,6 +623,44 @@ async function commitClient(
   }
 
   return recordId;
+}
+
+async function seedEmergencyContacts(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  orgId: string,
+  clientId: string,
+  fields: Array<{ target_field: string; value: string | null; is_custom_attribute: boolean }>,
+) {
+  const active = fields.filter((f) => !f.is_custom_attribute);
+  const valueOf = (key: string) => active.find((f) => f.target_field === key)?.value?.trim() || null;
+  const rows = [
+    {
+      name: valueOf("emergency_contact_name"),
+      phone: valueOf("emergency_contact_phone"),
+      relationship: valueOf("emergency_contact_relationship"),
+    },
+    {
+      name: valueOf("emergency_contact_2_name"),
+      phone: valueOf("emergency_contact_2_phone"),
+      relationship: valueOf("emergency_contact_2_relationship"),
+    },
+  ].filter((r) => r.name);
+  if (!rows.length) return;
+
+  const { data: existing, error: existingErr } = await sb
+    .from("client_emergency_contacts")
+    .select("name, phone")
+    .eq("organization_id", orgId)
+    .eq("client_id", clientId);
+  if (existingErr) throw new Error(existingErr.message);
+  const seen = new Set((existing ?? []).map((r: { name: string; phone: string | null }) => `${r.name.trim().toLowerCase()}|${(r.phone ?? "").trim().toLowerCase()}`));
+  const inserts = rows
+    .filter((r) => !seen.has(`${r.name!.trim().toLowerCase()}|${(r.phone ?? "").trim().toLowerCase()}`))
+    .map((r) => ({ organization_id: orgId, client_id: clientId, name: r.name!, phone: r.phone, relationship: r.relationship }));
+  if (!inserts.length) return;
+  const { error } = await sb.from("client_emergency_contacts").insert(inserts);
+  if (error) throw new Error(error.message);
 }
 
 // Helper for the pre-commit validation gate. Builds a minimal ClientDraft

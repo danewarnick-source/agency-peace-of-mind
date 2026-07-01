@@ -79,6 +79,7 @@ const CLIENT_COL: Record<string, string> = {
   disability_category: "disability_category",
   admission_date: "admission_date",
   discharge_date: "discharge_date",
+  pcsp_expiration_date: "pcsp_expiration_date",
   form_1056_number: "form_1056_number",
   form_1056_approved_date: "form_1056_approved_date",
   level_of_need: "level_of_need",
@@ -120,6 +121,7 @@ const CLIENT_DATE_COLS = new Set([
   "date_of_birth",
   "admission_date",
   "discharge_date",
+  "pcsp_expiration_date",
   "form_1056_approved_date",
 ]);
 

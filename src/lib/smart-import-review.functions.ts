@@ -21,7 +21,7 @@ const SubjectId = z.object({ subjectId: z.string().uuid() });
 const ManualReviewRowInput = z.object({
   subjectId: z.string().uuid(),
   fieldId: z.string().uuid().nullable().optional(),
-  targetField: z.enum(["pcsp_goal", "client_medication"]),
+  targetField: z.string().trim().min(1),
   value: z.union([z.string(), z.record(z.string(), z.unknown())]),
 });
 

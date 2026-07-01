@@ -192,7 +192,7 @@ export const saveManualReviewRow = createServerFn({ method: "POST" })
         item: `Edited ${label}`,
         traces_to: "admin_override",
         actor: context.userId,
-        action: data.targetField === "pcsp_goal" ? "edit_pcsp_goal" : "edit_client_medication",
+        action: editAction,
       });
       return { ok: true, fieldId: data.fieldId };
     }

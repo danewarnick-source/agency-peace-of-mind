@@ -368,7 +368,7 @@ export function PcspTab({
                   ) : null}
                 </div>
                 <p className="text-xs text-muted-foreground">{String(c.phone ?? "")}</p>
-                {c.instructions ? <p className="mt-1 text-xs">{String(c.instructions)}</p> : null}
+                
               </div>
             ))}
           </div>

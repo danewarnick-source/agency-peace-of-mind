@@ -206,17 +206,31 @@ function ThreadView({ requestId, onClose }: { requestId: string; onClose: () => 
   }, [q.data, requestId, markRead, qc]);
 
   const [reply, setReply] = useState("");
+  const [signMode, setSignMode] = useState<null | "approve" | "deny">(null);
+  const [sigName, setSigName] = useState("");
+  const [sigAttested, setSigAttested] = useState(false);
 
   const postM = useMutation({
-    mutationFn: (action: "approve" | "deny" | null) =>
-      post({ data: { requestId, body: reply || (action === "approve" ? "Approved." : action === "deny" ? "Denied." : ""), action } }),
-    onSuccess: () => {
+    mutationFn: (vars: { action: "approve" | "deny" | null; signatureName?: string; signatureAttested?: boolean }) =>
+      post({
+        data: {
+          requestId,
+          body: reply || (vars.action === "approve" ? "Approved." : vars.action === "deny" ? "Denied." : ""),
+          action: vars.action,
+          signatureName: vars.signatureName,
+          signatureAttested: vars.signatureAttested,
+        },
+      }),
+    onSuccess: (_res, vars) => {
       setReply("");
+      setSignMode(null);
+      setSigName("");
+      setSigAttested(false);
       qc.invalidateQueries({ queryKey: ["approval-thread", requestId] });
       qc.invalidateQueries({ queryKey: ["approval-requests"] });
       qc.invalidateQueries({ queryKey: ["approval-lookup"] });
       qc.invalidateQueries({ queryKey: ["hive-approvals"] });
-      toast.success("Message sent");
+      toast.success(vars.action ? `Ticket resolved and signed.` : "Message sent");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -243,7 +257,7 @@ function ThreadView({ requestId, onClose }: { requestId: string; onClose: () => 
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
           <MessageSquare className="h-4 w-4" />
-          Billing approval — {request?.code ?? "…"}
+          Billing approval ticket — {request?.code ?? "…"}
         </DialogTitle>
         <DialogDescription>
           {request ? (
@@ -254,12 +268,18 @@ function ThreadView({ requestId, onClose }: { requestId: string; onClose: () => 
         </DialogDescription>
       </DialogHeader>
 
-      <div className="mb-2 flex items-center gap-2">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
         {request && statusBadge(request.status)}
         {request?.resolved_at && (
           <span className="text-xs text-muted-foreground">
             {request.status === "approved" ? "Approved" : request.status === "denied" ? "Denied" : "Resolved"} {fmt(request.resolved_at)}
             {request.resolved_by_name ? ` by ${request.resolved_by_name}` : ""}
+          </span>
+        )}
+        {request?.resolved_signature_name && (
+          <span className="inline-flex items-center gap-1 rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+            <PenLine className="h-3 w-3" /> Signed: {request.resolved_signature_name}
+            {request.resolved_signature_at ? ` · ${fmt(request.resolved_signature_at)}` : ""}
           </span>
         )}
       </div>
@@ -278,14 +298,14 @@ function ThreadView({ requestId, onClose }: { requestId: string; onClose: () => 
         )}
       </div>
 
-      {isPending && (
+      {isPending && signMode === null && (
         <div className="mt-3 space-y-2">
           <Textarea
             rows={3}
             value={reply}
             onChange={(e) => setReply(e.target.value)}
             placeholder={isHiveViewer
-              ? "Reply to the provider. Use Approve/Deny to resolve — your message becomes the resolution note."
+              ? "Reply to the provider, or click Approve / Deny to sign and resolve the ticket."
               : "Reply to HIVE Admin…"}
           />
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -297,10 +317,10 @@ function ThreadView({ requestId, onClose }: { requestId: string; onClose: () => 
             <Button
               size="sm"
               variant="outline"
-              onClick={() => postM.mutate(null)}
+              onClick={() => postM.mutate({ action: null })}
               disabled={postM.isPending || reply.trim().length === 0}
             >
-              {postM.isPending && postM.variables === null && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+              {postM.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
               Send reply
             </Button>
             {isHiveViewer && (
@@ -309,21 +329,71 @@ function ThreadView({ requestId, onClose }: { requestId: string; onClose: () => 
                   size="sm"
                   variant="outline"
                   className="border-destructive/50 text-destructive"
-                  onClick={() => postM.mutate("deny")}
+                  onClick={() => setSignMode("deny")}
                   disabled={postM.isPending}
                 >
-                  <X className="mr-1 h-3 w-3" /> Deny
+                  <X className="mr-1 h-3 w-3" /> Deny…
                 </Button>
                 <Button
                   size="sm"
                   className="bg-emerald-600 hover:bg-emerald-700"
-                  onClick={() => postM.mutate("approve")}
+                  onClick={() => setSignMode("approve")}
                   disabled={postM.isPending}
                 >
-                  <Check className="mr-1 h-3 w-3" /> Approve
+                  <Check className="mr-1 h-3 w-3" /> Approve…
                 </Button>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {isPending && signMode !== null && isHiveViewer && (
+        <div className="mt-3 space-y-3 rounded-md border border-primary/30 bg-primary/5 p-3">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <PenLine className="h-4 w-4" />
+            Sign to {signMode === "approve" ? "approve" : "deny"} this ticket
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Your signature resolves the ticket and is recorded in the audit trail. The reply above becomes the resolution note.
+          </p>
+          <div className="space-y-2">
+            <label className="block text-xs font-medium">Type your full name to sign</label>
+            <Input
+              value={sigName}
+              onChange={(e) => setSigName(e.target.value)}
+              placeholder="e.g. Jane Doe"
+              autoFocus
+            />
+          </div>
+          <label className="flex items-start gap-2 text-xs">
+            <Checkbox
+              checked={sigAttested}
+              onCheckedChange={(v) => setSigAttested(v === true)}
+              className="mt-0.5"
+            />
+            <span>
+              I attest that this {signMode === "approve" ? "approval" : "denial"} is final, made in my official capacity as HIVE Admin, and recorded in the audit trail.
+            </span>
+          </label>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => { setSignMode(null); setSigName(""); setSigAttested(false); }}
+              disabled={postM.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className={signMode === "approve" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-destructive hover:bg-destructive/90"}
+              onClick={() => postM.mutate({ action: signMode, signatureName: sigName.trim(), signatureAttested: sigAttested })}
+              disabled={postM.isPending || sigName.trim().length < 2 || !sigAttested}
+            >
+              {postM.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+              {signMode === "approve" ? <><Check className="mr-1 h-3 w-3" /> Sign &amp; approve</> : <><X className="mr-1 h-3 w-3" /> Sign &amp; deny</>}
+            </Button>
           </div>
         </div>
       )}
@@ -334,6 +404,7 @@ function ThreadView({ requestId, onClose }: { requestId: string; onClose: () => 
     </>
   );
 }
+
 
 function MessageBubble({ m, viewer }: { m: ApprovalMessageRow; viewer: SenderRole }) {
   const mine = m.sender_role === viewer;

@@ -404,6 +404,7 @@ export async function applyExtractedFieldsToClient(
   setScalarText("plan_year", "plan_year");
   setScalarText("disability_category", "disability_category");
   setScalarText("staff_ratio", "staff_ratio");
+  setScalarDate("pcsp_expiration_date", "pcsp_expiration_date");
 
 
   // End-of-life / advanced care — extractor maps real document wording onto
@@ -929,7 +930,7 @@ export async function applyExtractedFieldsToClient(
     "prescriber_name", "prescriber_phone",
     // Medical / compliance
     "bsp_status", "medical_insurance", "housing_voucher", "preferred_living",
-    "plan_year", "disability_category",
+    "plan_year", "disability_category", "pcsp_expiration_date",
     "advanced_directives", "emergency_medical_treatment_authorization",
     "has_abi", "hr_applicable", "dnr_applicable",
     // Array columns
@@ -937,7 +938,7 @@ export async function applyExtractedFieldsToClient(
     "court_orders", "rights_restrictions",
     "preferred_activities", "roommates", "personal_belongings_inventory",
     // SOW §1.10 dates
-    "admission_date", "discharge_date",
+    "admission_date", "discharge_date", "pcsp_expiration_date",
     // 1056 header fields
     "form_1056_number", "form_1056_approved_date",
     // SOW supplemental

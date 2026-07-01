@@ -73,6 +73,8 @@ function ReviewPage() {
   const getJob = useServerFn(getReviewJob);
   const job = useQuery({ queryKey: ["smart-import-review", jobId], queryFn: () => getJob({ data: { jobId } }) });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const navigate = useNavigate();
 
   // Auto-select first unfinished subject
   useEffect(() => {

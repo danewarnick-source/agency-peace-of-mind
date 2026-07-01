@@ -339,6 +339,90 @@ export async function parseDocumentWithAI(
   return tolerantParseExtraction(parsed, documentText.trim().length, content);
 }
 
+// -----------------------------------------------------------------
+// Goals-only focused extraction.
+//
+// The wide extraction pass occasionally drops the entire goals section on
+// PCSPs — the model returns person/health/billing rows and simply omits
+// pcsp_goal, leaving the review wizard with "No PCSP goals were found" on
+// a document that clearly contains goals. This is a second, focused pass
+// used as a safety net: same structured shape, ONLY goals. Callers should
+// invoke this when the primary pass returned zero pcsp_goal fields.
+// -----------------------------------------------------------------
+const GOALS_ONLY_SYSTEM_PROMPT = `You extract ONLY Person-Centered Support Plan (PCSP) goals from the document.
+
+Return a single JSON object with a top-level array named "fields". Every element MUST have field_key = "pcsp_goal" and field_group = "goals". Emit ONE element per distinct goal / objective / outcome row in the PCSP goal table. Do not emit any other field_key.
+
+For each goal, put the structured outline in value_json:
+  {
+    text,                  // the goal / objective statement as written
+    domain,                // e.g. "Community Living", "Healthy Living", "Safety", "Employment"
+    why,                   // rationale — why this goal exists for THIS person
+    responsible_party,     // who owns delivering support (e.g. "Direct Support Staff", "Support Coordinator")
+    service_codes,         // ARRAY of DSPD codes that fund/capture this goal (e.g. ["SLN","DSI"])
+    supports,              // HOW staff support the goal day-to-day (strategies, prompts, cues)
+    data_capture,          // WHAT staff document in daily logs / progress notes
+    behavior_plan_link,    // reference to related BSP objective, if any
+    intake_sources,        // related intake / independence-assessment references
+    success_criteria,      // what "achieved" looks like
+    current_status,        // baseline / current level of independence
+    strengths,             // strengths the person brings toward this goal
+    barriers               // known barriers
+  }
+Include ONLY keys the document supports. NEVER invent responsible parties, service codes, behavior-plan links, or intake references. If a goal is only a bare sentence, emit just { text }.
+
+Also include source_locator (e.g. "page 3", "Goal 2 row") and confidence 0..1.
+
+Return ONLY JSON, no commentary. If the document contains no goals at all, return {"fields": []}.`;
+
+export async function extractGoalsOnly(documentText: string): Promise<ParseOutT> {
+  const res = await gatewayFetch({
+    messages: [
+      { role: "system", content: GOALS_ONLY_SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: `DOCUMENT TEXT:\n\n${documentText.slice(0, 120_000)}`,
+      },
+    ],
+    response_format: { type: "json_object" },
+    max_tokens: 12000,
+  });
+  if (res.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(`AI gateway error ${res.status}: ${t.slice(0, 200)}`);
+  }
+  const body = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
+  };
+  const content: string = body?.choices?.[0]?.message?.content ?? "{}";
+  const clean = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(clean || "{}");
+  } catch {
+    const salvaged = tryCloseTruncatedJson(clean);
+    if (salvaged) {
+      try { parsed = JSON.parse(salvaged); } catch { /* ignore */ }
+    }
+    if (parsed === undefined) {
+      console.error("[document-extraction] goals-only pass returned unparseable JSON");
+      return { document_type: null, fiscal_year: null, effective_start: null, effective_end: null, medicaid_id: null, title: null, fields: [] };
+    }
+  }
+  const out = tolerantParseExtraction(parsed, documentText.trim().length, content);
+  // Defensive: only keep pcsp_goal rows in case the model drifted.
+  return { ...out, fields: (out.fields ?? []).filter((f) => f.field_key === "pcsp_goal") };
+}
+
+// Rough heuristic: does the source document appear to contain a goals section?
+// Used to decide whether an empty goals result is likely an extraction miss
+// (document HAS goals → retry) vs. the PCSP genuinely having none.
+export function documentLikelyHasGoals(text: string): boolean {
+  if (!text) return false;
+  return /\b(goals?|objectives?|outcomes?|action plan|support plan|desired outcomes?)\b/i.test(text);
+}
+
 // Close an unterminated JSON object/array string well enough for JSON.parse to
 // accept the prefix. Returns null if the input doesn't look like JSON.
 function tryCloseTruncatedJson(s: string): string | null {

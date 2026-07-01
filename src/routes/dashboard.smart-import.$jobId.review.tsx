@@ -1701,6 +1701,7 @@ type BillingRowShape = {
   monthly_max_units?: number | null;
   plan_start?: string | null;
   plan_end?: string | null;
+  ownership_ack?: "not_ours" | null;
 };
 const UNIT_TYPE_OPTIONS = ["15 min", "day", "month", "session", "hour", "unit"];
 
@@ -1717,6 +1718,7 @@ function parseBillingRow(f: FieldRow): BillingRowShape | null {
     return Number.isFinite(n) ? n : null;
   };
   const str = (x: unknown): string | null => (x === null || x === undefined ? null : String(x));
+  const ack = r.ownership_ack === "not_ours" ? "not_ours" as const : null;
   return {
     service_code: sc,
     provider_name: str(r.provider_name),
@@ -1726,6 +1728,7 @@ function parseBillingRow(f: FieldRow): BillingRowShape | null {
     monthly_max_units: num(r.monthly_max_units),
     plan_start: r.plan_start ? String(r.plan_start).slice(0, 10) : null,
     plan_end: r.plan_end ? String(r.plan_end).slice(0, 10) : null,
+    ownership_ack: ack,
   };
 }
 

@@ -36,6 +36,9 @@ export interface ApprovalRequestRow {
   resolved_by_name: string | null;
   resolved_at: string | null;
   resolution_note: string | null;
+  resolved_signature_name: string | null;
+  resolved_signature_attested: boolean | null;
+  resolved_signature_at: string | null;
   created_at: string;
   updated_at: string;
   last_activity_at: string;
@@ -53,7 +56,11 @@ export interface ApprovalMessageRow {
   created_at: string;
   read_by_provider_at: string | null;
   read_by_hive_at: string | null;
+  resolved_signature_name: string | null;
+  resolved_signature_attested: boolean | null;
+  resolved_signature_at: string | null;
 }
+
 
 export interface ApprovalThread {
   request: ApprovalRequestRow;
@@ -176,6 +183,8 @@ const PostInput = z.object({
   requestId: z.string().uuid(),
   body: z.string().min(1).max(4000),
   action: z.enum(["approve", "deny"]).nullable().optional(),
+  signatureName: z.string().max(200).optional(),
+  signatureAttested: z.boolean().optional(),
 });
 
 export const postApprovalMessage = createServerFn({ method: "POST" })
@@ -199,10 +208,13 @@ export const postApprovalMessage = createServerFn({ method: "POST" })
       side = "provider";
     }
 
-    // A resolution action is only valid from a HIVE Admin, on a pending request.
+    // A resolution action is only valid from a HIVE Admin, on a pending request, with a signature.
+    const sigName = (data.signatureName ?? "").trim();
+    const sigAttested = data.signatureAttested === true;
     if (data.action) {
       if (side !== "hive_admin") throw new Error("Only HIVE Admin can approve or deny");
       if (req.status !== "pending") throw new Error(`Request is already ${req.status}`);
+      if (!sigName || !sigAttested) throw new Error("Signature required to resolve. Type your full name and check the attestation.");
     }
 
     const now = new Date().toISOString();
@@ -216,6 +228,9 @@ export const postApprovalMessage = createServerFn({ method: "POST" })
       // Author's own side is read at insert time.
       read_by_provider_at: side === "provider" ? now : null,
       read_by_hive_at: side === "hive_admin" ? now : null,
+      resolved_signature_name: data.action ? sigName : null,
+      resolved_signature_attested: data.action ? sigAttested : null,
+      resolved_signature_at: data.action ? now : null,
     });
     if (mErr) throw new Error(mErr.message);
 
@@ -227,6 +242,9 @@ export const postApprovalMessage = createServerFn({ method: "POST" })
           resolved_by_user_id: userId,
           resolved_at: now,
           resolution_note: data.body.trim().slice(0, 2000),
+          resolved_signature_name: sigName,
+          resolved_signature_attested: sigAttested,
+          resolved_signature_at: now,
         })
         .eq("id", req.id);
       if (uErr) throw new Error(uErr.message);
@@ -234,6 +252,7 @@ export const postApprovalMessage = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
 
 // ---------- withdraw -------------------------------------------
 
@@ -363,10 +382,14 @@ async function listRequestsInternal(
     resolved_by_name: r.resolved_by_user_id ? (profiles.get(r.resolved_by_user_id as string) ?? null) : null,
     resolved_at: (r.resolved_at as string | null) ?? null,
     resolution_note: (r.resolution_note as string | null) ?? null,
+    resolved_signature_name: (r.resolved_signature_name as string | null) ?? null,
+    resolved_signature_attested: (r.resolved_signature_attested as boolean | null) ?? null,
+    resolved_signature_at: (r.resolved_signature_at as string | null) ?? null,
     created_at: r.created_at as string,
     updated_at: r.updated_at as string,
     last_activity_at: lastByReq.get(r.id as string) ?? (r.updated_at as string) ?? (r.created_at as string),
     unread_for_me: unreadByReq.get(r.id as string) ?? 0,
+
   }));
 }
 
@@ -431,6 +454,9 @@ export const getApprovalThread = createServerFn({ method: "POST" })
       resolved_by_name: req.resolved_by_user_id ? (profiles.get(req.resolved_by_user_id as string) ?? null) : null,
       resolved_at: (req.resolved_at as string | null) ?? null,
       resolution_note: (req.resolution_note as string | null) ?? null,
+      resolved_signature_name: (req.resolved_signature_name as string | null) ?? null,
+      resolved_signature_attested: (req.resolved_signature_attested as boolean | null) ?? null,
+      resolved_signature_at: (req.resolved_signature_at as string | null) ?? null,
       created_at: req.created_at as string,
       updated_at: req.updated_at as string,
       last_activity_at:
@@ -449,7 +475,11 @@ export const getApprovalThread = createServerFn({ method: "POST" })
       created_at: m.created_at as string,
       read_by_provider_at: (m.read_by_provider_at as string | null) ?? null,
       read_by_hive_at: (m.read_by_hive_at as string | null) ?? null,
+      resolved_signature_name: (m.resolved_signature_name as string | null) ?? null,
+      resolved_signature_attested: (m.resolved_signature_attested as boolean | null) ?? null,
+      resolved_signature_at: (m.resolved_signature_at as string | null) ?? null,
     }));
+
 
     return { request, messages, viewer_side: viewer };
   });

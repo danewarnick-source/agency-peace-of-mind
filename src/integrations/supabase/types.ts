@@ -980,6 +980,9 @@ export type Database = {
           read_by_hive_at: string | null
           read_by_provider_at: string | null
           request_id: string
+          resolved_signature_at: string | null
+          resolved_signature_attested: boolean | null
+          resolved_signature_name: string | null
           sender_role: string
           sender_user_id: string
         }
@@ -991,6 +994,9 @@ export type Database = {
           read_by_hive_at?: string | null
           read_by_provider_at?: string | null
           request_id: string
+          resolved_signature_at?: string | null
+          resolved_signature_attested?: boolean | null
+          resolved_signature_name?: string | null
           sender_role: string
           sender_user_id: string
         }
@@ -1002,6 +1008,9 @@ export type Database = {
           read_by_hive_at?: string | null
           read_by_provider_at?: string | null
           request_id?: string
+          resolved_signature_at?: string | null
+          resolved_signature_attested?: boolean | null
+          resolved_signature_name?: string | null
           sender_role?: string
           sender_user_id?: string
         }
@@ -1029,6 +1038,9 @@ export type Database = {
           resolution_note: string | null
           resolved_at: string | null
           resolved_by_user_id: string | null
+          resolved_signature_at: string | null
+          resolved_signature_attested: boolean | null
+          resolved_signature_name: string | null
           status: string
           subject_id: string | null
           updated_at: string
@@ -1046,6 +1058,9 @@ export type Database = {
           resolution_note?: string | null
           resolved_at?: string | null
           resolved_by_user_id?: string | null
+          resolved_signature_at?: string | null
+          resolved_signature_attested?: boolean | null
+          resolved_signature_name?: string | null
           status?: string
           subject_id?: string | null
           updated_at?: string
@@ -1063,6 +1078,9 @@ export type Database = {
           resolution_note?: string | null
           resolved_at?: string | null
           resolved_by_user_id?: string | null
+          resolved_signature_at?: string | null
+          resolved_signature_attested?: boolean | null
+          resolved_signature_name?: string | null
           status?: string
           subject_id?: string | null
           updated_at?: string

@@ -1128,6 +1128,98 @@ function MedicationReviewRowEditor({
   );
 }
 
+// ---------------------------- PCSP Goals (structured) ----------------------------
+type GoalShape = {
+  text: string;
+  domain?: string;
+  why?: string;
+  responsible_party?: string;
+  service_codes?: string[];
+  supports?: string;
+  data_capture?: string;
+  behavior_plan_link?: string;
+  intake_sources?: string;
+  success_criteria?: string;
+  current_status?: string;
+  strengths?: string;
+  barriers?: string;
+};
+
+function parseGoal(value: string | null): GoalShape {
+  if (!value) return { text: "" };
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("{")) return { text: trimmed };
+  try {
+    const j = JSON.parse(trimmed) as Record<string, unknown>;
+    const codes = Array.isArray(j.service_codes)
+      ? (j.service_codes as unknown[]).map((s) => String(s).trim()).filter(Boolean)
+      : typeof j.service_codes === "string"
+        ? String(j.service_codes).split(/[,\s]+/).map((s) => s.trim()).filter(Boolean)
+        : undefined;
+    return {
+      text: typeof j.text === "string" ? j.text : "",
+      domain: typeof j.domain === "string" ? j.domain : undefined,
+      why: typeof j.why === "string" ? j.why : undefined,
+      responsible_party: typeof j.responsible_party === "string" ? j.responsible_party : undefined,
+      service_codes: codes && codes.length ? codes : undefined,
+      supports: typeof j.supports === "string" ? j.supports : undefined,
+      data_capture: typeof j.data_capture === "string" ? j.data_capture : undefined,
+      behavior_plan_link: typeof j.behavior_plan_link === "string" ? j.behavior_plan_link : undefined,
+      intake_sources: typeof j.intake_sources === "string" ? j.intake_sources : undefined,
+      success_criteria: typeof j.success_criteria === "string" ? j.success_criteria : undefined,
+      current_status: typeof j.current_status === "string" ? j.current_status : undefined,
+      strengths: typeof j.strengths === "string" ? j.strengths : undefined,
+      barriers: typeof j.barriers === "string" ? j.barriers : undefined,
+    };
+  } catch {
+    return { text: trimmed };
+  }
+}
+
+function serializeGoal(g: GoalShape): GoalShape {
+  // Drop empty keys so the stored JSON stays compact and fieldText's { text } fallback keeps working.
+  const out: GoalShape = { text: g.text.trim() };
+  const put = <K extends keyof GoalShape>(k: K, v: GoalShape[K]) => {
+    if (v === undefined || v === null) return;
+    if (typeof v === "string" && !v.trim()) return;
+    if (Array.isArray(v) && v.length === 0) return;
+    (out[k] as unknown) = typeof v === "string" ? v.trim() : v;
+  };
+  put("domain", g.domain);
+  put("why", g.why);
+  put("responsible_party", g.responsible_party);
+  put("service_codes", g.service_codes);
+  put("supports", g.supports);
+  put("data_capture", g.data_capture);
+  put("behavior_plan_link", g.behavior_plan_link);
+  put("intake_sources", g.intake_sources);
+  put("success_criteria", g.success_criteria);
+  put("current_status", g.current_status);
+  put("strengths", g.strengths);
+  put("barriers", g.barriers);
+  return out;
+}
+
+function goalCompleteness(g: GoalShape): { filled: number; total: number; missing: string[] } {
+  const checks: Array<[string, unknown]> = [
+    ["Statement", g.text],
+    ["Domain", g.domain],
+    ["Why this goal", g.why],
+    ["Who's responsible", g.responsible_party],
+    ["Service codes", g.service_codes],
+    ["How staff support it", g.supports],
+    ["What to track in daily logs", g.data_capture],
+    ["Success criteria", g.success_criteria],
+  ];
+  const missing: string[] = [];
+  let filled = 0;
+  for (const [label, v] of checks) {
+    const has = Array.isArray(v) ? v.length > 0 : typeof v === "string" ? v.trim().length > 0 : !!v;
+    if (has) filled += 1; else missing.push(label);
+  }
+  return { filled, total: checks.length, missing };
+}
+
 function GoalsReviewPanel({ subjectId, fields, onChanged }: { subjectId: string; fields: FieldRow[]; onChanged: () => void }) {
   const [adding, setAdding] = useState(false);
   const goals = fields.filter((f) => !f.dismissed_at);
@@ -1135,9 +1227,12 @@ function GoalsReviewPanel({ subjectId, fields, onChanged }: { subjectId: string;
     <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="text-sm font-semibold">PCSP goals preview</div>
+          <div className="text-sm font-semibold">PCSP goals — full outline</div>
           <p className="mt-1 text-xs text-muted-foreground">
-            These goals populate the Care tab and ground support strategies, client-specific training, Person-Centered Profile content, and daily support expectations. Confirm each provider-responsible goal from the PCSP before finalizing.
+            NECTAR extracts more than the goal sentence. Confirm the rationale, who's responsible,
+            which service codes fund each goal, how staff support it day-to-day, and what to
+            capture in daily logs — this is what transitions into support strategies, client-specific
+            training, the Person-Centered Profile, and the daily documentation staff are held to.
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={() => setAdding(true)} disabled={adding}>
@@ -1149,7 +1244,7 @@ function GoalsReviewPanel({ subjectId, fields, onChanged }: { subjectId: string;
           No PCSP goals were found. If the PCSP includes goals, add them here so they are not missing from the live client profile.
         </div>
       )}
-      <div className="mt-3 space-y-2">
+      <div className="mt-3 space-y-3">
         {goals.map((f, idx) => (
           <GoalReviewRowEditor key={f.id} subjectId={subjectId} fieldId={f.id} initial={f.value ?? ""} label={`Goal ${idx + 1}`} onChanged={onChanged} />
         ))}
@@ -1166,12 +1261,26 @@ function GoalReviewRowEditor({
 }: {
   subjectId: string; fieldId: string | null; initial: string; label: string; isNew?: boolean; onChanged: () => void; onCancel?: () => void;
 }) {
-  const [value, setValue] = useState(initial);
+  const [goal, setGoal] = useState<GoalShape>(() => parseGoal(initial));
   const [dirty, setDirty] = useState(!!isNew);
+  const [expanded, setExpanded] = useState(!!isNew);
+  const [codesText, setCodesText] = useState(() => (goal.service_codes ?? []).join(", "));
   const save = useServerFn(saveManualReviewRow);
   const remove = useServerFn(removeExtractedField);
+
+  const update = <K extends keyof GoalShape>(k: K, v: GoalShape[K]) => {
+    setGoal((g) => ({ ...g, [k]: v }));
+    setDirty(true);
+  };
+  const updateCodes = (raw: string) => {
+    setCodesText(raw);
+    const parsed = raw.split(/[,\s]+/).map((s) => s.trim().toUpperCase()).filter(Boolean);
+    setGoal((g) => ({ ...g, service_codes: parsed.length ? parsed : undefined }));
+    setDirty(true);
+  };
+
   const saveMut = useMutation({
-    mutationFn: () => save({ data: { subjectId, fieldId, targetField: "pcsp_goal", value } }),
+    mutationFn: () => save({ data: { subjectId, fieldId, targetField: "pcsp_goal", value: serializeGoal(goal) } }),
     onSuccess: () => { toast.success("Saved goal"); setDirty(false); onChanged(); },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -1180,25 +1289,97 @@ function GoalReviewRowEditor({
     onSuccess: () => { toast.success("Removed from this import"); onChanged(); },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const completeness = goalCompleteness(goal);
+  const complete = completeness.missing.length === 0;
+
   return (
     <div className="rounded-lg border border-border/70 bg-background/60 p-3">
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${complete ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200" : "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"}`}>
+            {completeness.filled}/{completeness.total} outlined
+          </span>
+        </div>
         <div className="flex items-center gap-1">
-          {dirty && <Button size="sm" className="h-7" onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !value.trim()}>{saveMut.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Save</Button>}
+          <Button size="sm" variant="ghost" className="h-7" onClick={() => setExpanded((v) => !v)}>
+            {expanded ? "Hide details" : "Show details"}
+          </Button>
+          {dirty && <Button size="sm" className="h-7" onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !goal.text.trim()}>{saveMut.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Save</Button>}
           {isNew && onCancel && <Button size="sm" variant="ghost" className="h-7" onClick={onCancel}>Cancel</Button>}
           {!isNew && fieldId && <Button size="sm" variant="ghost" className="h-7 text-destructive" onClick={() => removeMut.mutate()} disabled={removeMut.isPending}><Trash2 className="h-3 w-3" /></Button>}
         </div>
       </div>
-      <Textarea
-        value={value}
-        onChange={(e) => { setValue(e.target.value); setDirty(true); }}
-        placeholder="Describe the PCSP goal, desired outcome, and any important support details from the plan."
-        className="min-h-[92px] text-sm"
-      />
+
+      <div className="space-y-1">
+        <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Goal statement</label>
+        <Textarea
+          value={goal.text}
+          onChange={(e) => update("text", e.target.value)}
+          placeholder="Exactly as written on the PCSP (e.g. 'Blake will independently prepare two meals per week.')"
+          className="min-h-[64px] text-sm"
+        />
+      </div>
+
+      {!complete && !expanded && (
+        <div className="mt-2 rounded-md border border-amber-300/60 bg-amber-50/40 p-2 text-[11px] text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
+          Missing for a full outline: {completeness.missing.join(" · ")}. Open <b>Show details</b> to fill these in so staff know why the goal exists, who owns it, and what to log daily.
+        </div>
+      )}
+
+      {expanded && (
+        <div className="mt-3 space-y-3 border-t border-border/60 pt-3">
+          <div className="grid gap-3 md:grid-cols-2">
+            <TextField label="Domain" placeholder="Community Living / Healthy Living / Safety / Employment" value={goal.domain ?? ""} onChange={(v) => update("domain", v)} />
+            <TextField label="Who's responsible" placeholder="Direct Support Staff, Support Coordinator, Guardian, Behaviorist…" value={goal.responsible_party ?? ""} onChange={(v) => update("responsible_party", v)} />
+          </div>
+          <TextField label="Service codes that fund / track this goal" placeholder="e.g. SLN, DSI, SEI" value={codesText} onChange={updateCodes} hint="Comma-separated DSPD codes. Drives which daily-log codes count toward this goal." />
+          <AreaField label="Why this goal exists (rationale)" placeholder="From the PCSP narrative or team discussion — the person-centered reason this goal matters." value={goal.why ?? ""} onChange={(v) => update("why", v)} />
+          <AreaField label="How staff support it (day-to-day)" placeholder="Prompts, cues, environmental supports, task analysis, staffing ratio…" value={goal.supports ?? ""} onChange={(v) => update("supports", v)} />
+          <AreaField label="What staff capture in daily logs" placeholder="Frequency, independence level, quantity, mood, incidents — exactly what a shift note must include to show progress." value={goal.data_capture ?? ""} onChange={(v) => update("data_capture", v)} />
+          <div className="grid gap-3 md:grid-cols-2">
+            <AreaField label="Related behavior plan section" placeholder="e.g. BSP Objective 2 (aggression replacement)" value={goal.behavior_plan_link ?? ""} onChange={(v) => update("behavior_plan_link", v)} />
+            <AreaField label="Related intake / independence sources" placeholder="e.g. Client Independence Assessment §3; Intake Q12" value={goal.intake_sources ?? ""} onChange={(v) => update("intake_sources", v)} />
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <AreaField label="Current status / baseline" placeholder="Where the person is today toward this goal." value={goal.current_status ?? ""} onChange={(v) => update("current_status", v)} />
+            <AreaField label="Success criteria" placeholder="What 'achieved' looks like, measurably." value={goal.success_criteria ?? ""} onChange={(v) => update("success_criteria", v)} />
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <AreaField label="Strengths" placeholder="Personal strengths that support this goal." value={goal.strengths ?? ""} onChange={(v) => update("strengths", v)} />
+            <AreaField label="Barriers" placeholder="Known barriers that staff need to plan around." value={goal.barriers ?? ""} onChange={(v) => update("barriers", v)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+function TextField({ label, value, onChange, placeholder, hint }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; hint?: string }) {
+  return (
+    <div className="space-y-1">
+      <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</label>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
+      />
+      {hint && <p className="text-[10px] text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+function AreaField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <div className="space-y-1">
+      <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</label>
+      <Textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="min-h-[64px] text-sm" />
+    </div>
+  );
+}
+
 
 // ---------------------------- BillingCodesEditor (Prompt 18) ----------------------------
 type BillingRowShape = {

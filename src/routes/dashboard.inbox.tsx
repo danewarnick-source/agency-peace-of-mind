@@ -234,6 +234,9 @@ function InboxPage() {
         </div>
       </header>
 
+      <BillingApprovalsInboxSection orgId={orgId} />
+
+
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         {listQ.isLoading ? (
           <div className="p-6 text-sm text-muted-foreground">Loading messages…</div>

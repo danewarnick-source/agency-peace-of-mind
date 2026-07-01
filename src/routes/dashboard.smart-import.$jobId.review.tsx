@@ -802,55 +802,93 @@ function ValidationPanel({
             m.mutate({ issueKey: i.key, overridden: true });
           };
           const help = getIssueHelp(i.key, onNavigateStep);
+          const missingField = fieldKeyFromIssue(i.key);
           return (
-            <li key={i.key} className="flex flex-wrap items-start justify-between gap-2 rounded-md border border-border/70 bg-background/60 px-3 py-2">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <Badge variant={isBlocking ? "destructive" : "outline"} className="capitalize text-[10px]">
-                    {isBlocking ? "blocking" : i.severity}
-                  </Badge>
-                  {i.field && <span className="text-xs text-muted-foreground">{i.field}</span>}
-                </div>
-                <div className="mt-1">{i.message}</div>
-                {!codeMatch && (
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground/80">What to do: </span>
-                    {help.whatToDo}
+            <li key={i.key} className="flex flex-col gap-2 rounded-md border border-border/70 bg-background/60 px-3 py-2">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={isBlocking ? "destructive" : "outline"} className="capitalize text-[10px]">
+                      {isBlocking ? "blocking" : i.severity}
+                    </Badge>
+                    {i.field && <span className="text-xs text-muted-foreground">{i.field}</span>}
                   </div>
-                )}
+                  <div className="mt-1">{i.message}</div>
+                  {!codeMatch && (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground/80">What to do: </span>
+                      {help.whatToDo}
+                    </div>
+                  )}
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  {codeMatch ? (
+                    <>
+                      <Button size="sm" variant="default" disabled={m.isPending} onClick={() => setCodeBucket(codeMatch[2], "bill_as_ours")}>
+                        Bill this (ours)
+                      </Button>
+                      <Button size="sm" variant="outline" disabled={m.isPending} onClick={() => setCodeBucket(codeMatch[2], "coordination")}>
+                        Coordination only (won't bill)
+                      </Button>
+                      <Button size="sm" variant="ghost" disabled={m.isPending} onClick={() => setCodeBucket(codeMatch[2], "ignore")}>
+                        File as info / ignore
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      {help.action && (
+                        <Button size="sm" variant="outline" disabled={m.isPending} onClick={help.action.onClick}>
+                          {help.action.label}
+                        </Button>
+                      )}
+                      {!missingField && (isBlocking ? (
+                        <Button size="sm" variant="default" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: true })}>
+                          Confirm — I've reviewed this
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="ghost" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: true })}>
+                          Dismiss
+                        </Button>
+                      ))}
+                      {missingField && (
+                        <Button size="sm" variant="ghost" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: true })}>
+                          Doesn't apply — dismiss
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="flex shrink-0 flex-wrap items-center gap-2">
-                {codeMatch ? (
-                  <>
-                    <Button size="sm" variant="default" disabled={m.isPending} onClick={() => setCodeBucket(codeMatch[2], "bill_as_ours")}>
-                      Bill this (ours)
-                    </Button>
-                    <Button size="sm" variant="outline" disabled={m.isPending} onClick={() => setCodeBucket(codeMatch[2], "coordination")}>
-                      Coordination only (won't bill)
-                    </Button>
-                    <Button size="sm" variant="ghost" disabled={m.isPending} onClick={() => setCodeBucket(codeMatch[2], "ignore")}>
-                      File as info / ignore
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    {help.action && (
-                      <Button size="sm" variant="outline" disabled={m.isPending} onClick={help.action.onClick}>
-                        {help.action.label}
-                      </Button>
-                    )}
-                    {isBlocking ? (
-                      <Button size="sm" variant="default" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: true })}>
-                        Confirm — I've reviewed this
-                      </Button>
-                    ) : (
-                      <Button size="sm" variant="ghost" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: true })}>
-                        Dismiss
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
+              {missingField && (
+                <div className="flex flex-wrap items-center gap-2 rounded border border-dashed border-border/70 bg-muted/30 px-2 py-2">
+                  <label className="text-xs font-medium text-foreground/80 min-w-[120px]">
+                    Add {labelForField(missingField).toLowerCase()}
+                  </label>
+                  <Input
+                    className="h-8 flex-1 min-w-[180px]"
+                    placeholder={`Type the ${labelForField(missingField).toLowerCase()}…`}
+                    value={inlineValue[i.key] ?? ""}
+                    onChange={(e) => setInlineValue((prev) => ({ ...prev, [i.key]: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        const v = (inlineValue[i.key] ?? "").trim();
+                        if (v) addFieldM.mutate({ targetField: missingField, value: v });
+                      }
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    disabled={addFieldM.isPending || !(inlineValue[i.key] ?? "").trim()}
+                    onClick={() => {
+                      const v = (inlineValue[i.key] ?? "").trim();
+                      if (v) addFieldM.mutate({ targetField: missingField, value: v });
+                    }}
+                  >
+                    {addFieldM.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                    Save {labelForField(missingField).toLowerCase()}
+                  </Button>
+                </div>
+              )}
             </li>
           );
         })}

@@ -11,7 +11,7 @@ import { RequirePermission } from "@/components/rbac-guard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Upload, FileText, Sparkles, X, ArrowLeft, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, Upload, FileText, Sparkles, X, ArrowLeft, CheckCircle2, AlertCircle, Pencil, Check, User } from "lucide-react";
 import { toast } from "sonner";
 import {
   createSmartImportJob,

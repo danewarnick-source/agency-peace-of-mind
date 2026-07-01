@@ -1895,18 +1895,16 @@ function BillingCodesEditor({
         <div className="mt-3 rounded-md border border-amber-300/60 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
           <div className="mb-1 font-semibold">
             {externalRows.length} code{externalRows.length === 1 ? "" : "s"} belong to an outside provider on the PCSP
-            {(pendingCount + approvedCount) > 0 && (
-              <span className="ml-2 font-normal">
-                · {approvedCount} HIVE-approved, {pendingCount} awaiting HIVE review
-              </span>
-            )}
+            <span className="ml-2 font-normal">
+              · {approvedCount} HIVE-approved, {pendingCount} awaiting HIVE review, {notOursCount} marked "not my organization"
+            </span>
           </div>
           <div className="mb-1">
             The Provider on {externalRows.length === 1 ? "this line" : "these lines"} does not match <span className="font-medium">{orgLabel}</span>.
-            To bill any of them yourself, click <span className="font-medium">Request HIVE approval</span> on the line — HIVE Admin will review the justification and reply in your Inbox.
+            On each row, click <span className="font-medium">Not my organization</span> to leave it on the record without billing responsibility, or <span className="font-medium">Request HIVE approval</span> if you need to bill it yourself.
           </div>
           <div className="mt-1 font-mono">
-            {externalRows.map((p) => `${p.row.service_code} → ${p.row.provider_name ?? "unknown provider"}`).join("  •  ")}
+            {externalRows.map((p) => `${p.row.service_code} → ${p.row.provider_name ?? "unknown provider"}${p.row.ownership_ack === "not_ours" ? " (not ours)" : ""}`).join("  •  ")}
           </div>
         </div>
       )}

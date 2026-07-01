@@ -183,6 +183,8 @@ const PostInput = z.object({
   requestId: z.string().uuid(),
   body: z.string().min(1).max(4000),
   action: z.enum(["approve", "deny"]).nullable().optional(),
+  signatureName: z.string().max(200).optional(),
+  signatureAttested: z.boolean().optional(),
 });
 
 export const postApprovalMessage = createServerFn({ method: "POST" })
@@ -206,10 +208,13 @@ export const postApprovalMessage = createServerFn({ method: "POST" })
       side = "provider";
     }
 
-    // A resolution action is only valid from a HIVE Admin, on a pending request.
+    // A resolution action is only valid from a HIVE Admin, on a pending request, with a signature.
+    const sigName = (data.signatureName ?? "").trim();
+    const sigAttested = data.signatureAttested === true;
     if (data.action) {
       if (side !== "hive_admin") throw new Error("Only HIVE Admin can approve or deny");
       if (req.status !== "pending") throw new Error(`Request is already ${req.status}`);
+      if (!sigName || !sigAttested) throw new Error("Signature required to resolve. Type your full name and check the attestation.");
     }
 
     const now = new Date().toISOString();
@@ -223,6 +228,9 @@ export const postApprovalMessage = createServerFn({ method: "POST" })
       // Author's own side is read at insert time.
       read_by_provider_at: side === "provider" ? now : null,
       read_by_hive_at: side === "hive_admin" ? now : null,
+      resolved_signature_name: data.action ? sigName : null,
+      resolved_signature_attested: data.action ? sigAttested : null,
+      resolved_signature_at: data.action ? now : null,
     });
     if (mErr) throw new Error(mErr.message);
 
@@ -234,6 +242,9 @@ export const postApprovalMessage = createServerFn({ method: "POST" })
           resolved_by_user_id: userId,
           resolved_at: now,
           resolution_note: data.body.trim().slice(0, 2000),
+          resolved_signature_name: sigName,
+          resolved_signature_attested: sigAttested,
+          resolved_signature_at: now,
         })
         .eq("id", req.id);
       if (uErr) throw new Error(uErr.message);
@@ -241,6 +252,7 @@ export const postApprovalMessage = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
 
 // ---------- withdraw -------------------------------------------
 

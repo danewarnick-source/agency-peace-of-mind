@@ -1464,25 +1464,30 @@ function serializeGoal(g: GoalShape): GoalShape {
   return out;
 }
 
-function goalCompleteness(g: GoalShape): { filled: number; total: number; missing: string[] } {
-  const checks: Array<[string, unknown]> = [
-    ["Statement", g.text],
-    ["Domain", g.domain],
-    ["Why this goal", g.why],
-    ["Who's responsible", g.responsible_party],
-    ["Service codes", g.service_codes],
-    ["How staff support it", g.supports],
-    ["What to track in daily logs", g.data_capture],
-    ["Success criteria", g.success_criteria],
-  ];
+const GOAL_COMPLETENESS_CHECKS: Array<{ key: keyof GoalShape; label: string }> = [
+  { key: "text", label: "Statement" },
+  { key: "domain", label: "Domain" },
+  { key: "why", label: "Why this goal" },
+  { key: "responsible_party", label: "Who's responsible" },
+  { key: "service_codes", label: "Service codes" },
+  { key: "supports", label: "How staff support it" },
+  { key: "data_capture", label: "What to track in daily logs" },
+  { key: "success_criteria", label: "Success criteria" },
+];
+
+function goalCompleteness(g: GoalShape): { filled: number; total: number; missing: string[]; missingKeys: Set<keyof GoalShape> } {
   const missing: string[] = [];
+  const missingKeys = new Set<keyof GoalShape>();
   let filled = 0;
-  for (const [label, v] of checks) {
+  for (const { key, label } of GOAL_COMPLETENESS_CHECKS) {
+    const v = g[key];
     const has = Array.isArray(v) ? v.length > 0 : typeof v === "string" ? v.trim().length > 0 : !!v;
-    if (has) filled += 1; else missing.push(label);
+    if (has) filled += 1;
+    else { missing.push(label); missingKeys.add(key); }
   }
-  return { filled, total: checks.length, missing };
+  return { filled, total: GOAL_COMPLETENESS_CHECKS.length, missing, missingKeys };
 }
+
 
 function GoalsReviewPanel({ subjectId, fields, onChanged }: { subjectId: string; fields: FieldRow[]; onChanged: () => void }) {
   const [adding, setAdding] = useState(false);
@@ -1593,38 +1598,47 @@ function GoalReviewRowEditor({
       </div>
 
       <div className="space-y-1">
-        <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Goal statement</label>
+        <div className="flex items-center justify-between">
+          <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Goal statement</label>
+          {completeness.missingKeys.has("text") && <MissingBadge />}
+        </div>
         <Textarea
           value={goal.text}
           onChange={(e) => update("text", e.target.value)}
           placeholder="Exactly as written on the PCSP (e.g. 'Blake will independently prepare two meals per week.')"
-          className="min-h-[64px] text-sm"
+          className={`min-h-[64px] text-sm ${completeness.missingKeys.has("text") ? "border-amber-400 focus-visible:ring-amber-400" : ""}`}
         />
       </div>
 
       {!complete && !expanded && (
         <div className="mt-2 rounded-md border border-amber-300/60 bg-amber-50/40 p-2 text-[11px] text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
-          Missing for a full outline: {completeness.missing.join(" · ")}. Open <b>Show details</b> to fill these in so staff know why the goal exists, who owns it, and what to log daily.
+          <b>Needs your input:</b> {completeness.missing.join(" · ")}. Click <b>Show details</b> — the empty fields are highlighted in amber.
+        </div>
+      )}
+
+      {expanded && !complete && (
+        <div className="mt-3 rounded-md border border-amber-300/60 bg-amber-50/40 p-2 text-[11px] text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
+          <b>Still needed:</b> {completeness.missing.join(" · ")}. The empty fields below are outlined in amber.
         </div>
       )}
 
       {expanded && (
         <div className="mt-3 space-y-3 border-t border-border/60 pt-3">
           <div className="grid gap-3 md:grid-cols-2">
-            <TextField label="Domain" placeholder="Community Living / Healthy Living / Safety / Employment" value={goal.domain ?? ""} onChange={(v) => update("domain", v)} />
-            <TextField label="Who's responsible" placeholder="Direct Support Staff, Support Coordinator, Guardian, Behaviorist…" value={goal.responsible_party ?? ""} onChange={(v) => update("responsible_party", v)} />
+            <TextField label="Domain" placeholder="Community Living / Healthy Living / Safety / Employment" value={goal.domain ?? ""} onChange={(v) => update("domain", v)} isMissing={completeness.missingKeys.has("domain")} />
+            <TextField label="Who's responsible" placeholder="Direct Support Staff, Support Coordinator, Guardian, Behaviorist…" value={goal.responsible_party ?? ""} onChange={(v) => update("responsible_party", v)} isMissing={completeness.missingKeys.has("responsible_party")} />
           </div>
-          <TextField label="Service codes that fund / track this goal" placeholder="e.g. SLN, DSI, SEI" value={codesText} onChange={updateCodes} hint="Comma-separated DSPD codes. Drives which daily-log codes count toward this goal." />
-          <AreaField label="Why this goal exists (rationale)" placeholder="From the PCSP narrative or team discussion — the person-centered reason this goal matters." value={goal.why ?? ""} onChange={(v) => update("why", v)} />
-          <AreaField label="How staff support it (day-to-day)" placeholder="Prompts, cues, environmental supports, task analysis, staffing ratio…" value={goal.supports ?? ""} onChange={(v) => update("supports", v)} />
-          <AreaField label="What staff capture in daily logs" placeholder="Frequency, independence level, quantity, mood, incidents — exactly what a shift note must include to show progress." value={goal.data_capture ?? ""} onChange={(v) => update("data_capture", v)} />
+          <TextField label="Service codes that fund / track this goal" placeholder="e.g. SLN, DSI, SEI" value={codesText} onChange={updateCodes} hint="Comma-separated DSPD codes. Drives which daily-log codes count toward this goal." isMissing={completeness.missingKeys.has("service_codes")} />
+          <AreaField label="Why this goal exists (rationale)" placeholder="From the PCSP narrative or team discussion — the person-centered reason this goal matters." value={goal.why ?? ""} onChange={(v) => update("why", v)} isMissing={completeness.missingKeys.has("why")} />
+          <AreaField label="How staff support it (day-to-day)" placeholder="Prompts, cues, environmental supports, task analysis, staffing ratio…" value={goal.supports ?? ""} onChange={(v) => update("supports", v)} isMissing={completeness.missingKeys.has("supports")} />
+          <AreaField label="What staff capture in daily logs" placeholder="Frequency, independence level, quantity, mood, incidents — exactly what a shift note must include to show progress." value={goal.data_capture ?? ""} onChange={(v) => update("data_capture", v)} isMissing={completeness.missingKeys.has("data_capture")} />
           <div className="grid gap-3 md:grid-cols-2">
             <AreaField label="Related behavior plan section" placeholder="e.g. BSP Objective 2 (aggression replacement)" value={goal.behavior_plan_link ?? ""} onChange={(v) => update("behavior_plan_link", v)} />
             <AreaField label="Related intake / independence sources" placeholder="e.g. Client Independence Assessment §3; Intake Q12" value={goal.intake_sources ?? ""} onChange={(v) => update("intake_sources", v)} />
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <AreaField label="Current status / baseline" placeholder="Where the person is today toward this goal." value={goal.current_status ?? ""} onChange={(v) => update("current_status", v)} />
-            <AreaField label="Success criteria" placeholder="What 'achieved' looks like, measurably." value={goal.success_criteria ?? ""} onChange={(v) => update("success_criteria", v)} />
+            <AreaField label="Success criteria" placeholder="What 'achieved' looks like, measurably." value={goal.success_criteria ?? ""} onChange={(v) => update("success_criteria", v)} isMissing={completeness.missingKeys.has("success_criteria")} />
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <AreaField label="Strengths" placeholder="Personal strengths that support this goal." value={goal.strengths ?? ""} onChange={(v) => update("strengths", v)} />
@@ -1636,29 +1650,45 @@ function GoalReviewRowEditor({
   );
 }
 
-function TextField({ label, value, onChange, placeholder, hint }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; hint?: string }) {
+function MissingBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+      <AlertTriangle className="h-2.5 w-2.5" /> Needs input
+    </span>
+  );
+}
+
+
+function TextField({ label, value, onChange, placeholder, hint, isMissing }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; hint?: string; isMissing?: boolean }) {
   return (
     <div className="space-y-1">
-      <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</label>
+      <div className="flex items-center justify-between">
+        <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</label>
+        {isMissing && <MissingBadge />}
+      </div>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        className={`w-full rounded-md border bg-background px-2 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-2 ${isMissing ? "border-amber-400 focus:ring-amber-400" : "border-input focus:ring-ring"}`}
       />
       {hint && <p className="text-[10px] text-muted-foreground">{hint}</p>}
     </div>
   );
 }
 
-function AreaField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+function AreaField({ label, value, onChange, placeholder, isMissing }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; isMissing?: boolean }) {
   return (
     <div className="space-y-1">
-      <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</label>
-      <Textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="min-h-[64px] text-sm" />
+      <div className="flex items-center justify-between">
+        <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</label>
+        {isMissing && <MissingBadge />}
+      </div>
+      <Textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={`min-h-[64px] text-sm ${isMissing ? "border-amber-400 focus-visible:ring-amber-400" : ""}`} />
     </div>
   );
 }
+
 
 
 // ---------------------------- BillingCodesEditor (Prompt 18) ----------------------------

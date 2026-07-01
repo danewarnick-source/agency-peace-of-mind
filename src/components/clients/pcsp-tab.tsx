@@ -405,7 +405,7 @@ export function PcspTab({
                   </thead>
                   <tbody>
                     {codesQ.data!.map((row) => {
-                      const units = Number(row.units_authorized ?? 0);
+                      const units = Number(row.annual_unit_authorization ?? 0);
                       const rate = Number(row.rate_per_unit ?? 0);
                       return (
                         <tr key={row.id as string} className="border-b last:border-none">
@@ -413,8 +413,8 @@ export function PcspTab({
                           <td className="py-1.5 pr-3">{units || "—"}</td>
                           <td className="py-1.5 pr-3">{String(row.unit_type ?? "—")}</td>
                           <td className="py-1.5 pr-3">
-                            {fmtDate(row.effective_start)}
-                            {row.effective_end ? ` – ${fmtDate(row.effective_end)}` : ""}
+                            {fmtDate(row.service_start_date)}
+                            {row.service_end_date ? ` – ${fmtDate(row.service_end_date)}` : ""}
                           </td>
                           {canSeeFinancial ? (
                             <td className="py-1.5 pr-3">{rate ? `$${rate.toFixed(2)}` : "—"}</td>

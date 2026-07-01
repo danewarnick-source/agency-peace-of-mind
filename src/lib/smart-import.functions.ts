@@ -695,7 +695,9 @@ async function aiExtractFieldsFromText(
     };
 
     // Structured rows → JSON-encode value_json in `value` so review and commit can read it back.
-    if ((key === "billing_code_row" || key === "client_medication") && f.value_json && typeof f.value_json === "object") {
+    // pcsp_goal carries the full outline (why / responsible_party / service_codes / supports /
+    // data_capture / …); without JSON-encoding it here, only the plain goal sentence would survive.
+    if ((key === "billing_code_row" || key === "client_medication" || key === "pcsp_goal") && f.value_json && typeof f.value_json === "object") {
       out.push({ ...base, value: JSON.stringify(f.value_json) });
       continue;
     }

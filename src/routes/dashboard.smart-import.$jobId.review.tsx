@@ -666,7 +666,9 @@ function ValidationPanel({
     <div className={panelClass}>
       <div className={headerClass}>
         <AlertTriangle className="h-4 w-4" />
-        {sortedIssues.length} thing{sortedIssues.length === 1 ? "" : "s"} to review before saving
+        {anyBlocking
+          ? `${sortedIssues.length} thing${sortedIssues.length === 1 ? "" : "s"} to review before saving`
+          : `${sortedIssues.length} optional item${sortedIssues.length === 1 ? "" : "s"} — nothing is blocking this client`}
         <span className="text-xs font-normal opacity-80">
           ({blockingCount} blocking, {advisoryCount} advisory)
         </span>

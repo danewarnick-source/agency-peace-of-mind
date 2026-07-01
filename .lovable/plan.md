@@ -1,19 +1,16 @@
 ## Problem
-Adding a manual field in Smart Import review fails with:
-`new row for relation "extracted_fields" violates check constraint "extracted_fields_provenance_check"`
+Deleting an archived client fails with `function public.is_org_admin_or_manager(uuid) does not exist`. The dialog also can't load record counts ("Unable to load record counts").
 
-The live `extracted_fields` table's check constraint only allows `provenance IN ('rule','source','inferred')`, but our code (in `smart-import-review.functions.ts`, in ~8 places incl. the manual-add path) writes `provenance: 'admin_override'`. A later migration added `'admin_override'` but was never applied to live.
+## Root cause
+`client_deletion_impact(_client_id)` and `delete_client_hard(_client_id)` call `public.is_org_admin_or_manager(c.organization_id)` with one argument, but the live helper's signature is `is_org_admin_or_manager(_org uuid, _user uuid)` — two args. Postgres reports the missing overload and the RPC aborts.
 
-## Fix (one migration, no code changes)
-Update the live check constraint to match what the app already writes:
+## Fix
+One migration that recreates both functions (and `discard_import_job_hard` if it has the same call) so the authorization check passes both args:
 
 ```sql
-ALTER TABLE public.extracted_fields
-  DROP CONSTRAINT extracted_fields_provenance_check;
-
-ALTER TABLE public.extracted_fields
-  ADD CONSTRAINT extracted_fields_provenance_check
-  CHECK (provenance IN ('rule','source','inferred','admin_override'));
+IF NOT public.is_org_admin_or_manager(c.organization_id, auth.uid()) THEN
+  RAISE EXCEPTION 'Not authorized';
+END IF;
 ```
 
-That's it — this unblocks "Add a field", plus every other admin edit/override in the review wizard that's silently been hitting this constraint.
+No client-side changes. After this, the impact counts render and Delete permanently succeeds.

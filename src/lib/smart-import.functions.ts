@@ -10,7 +10,7 @@ import { Buffer } from "node:buffer";
 
 
 import { gatewayFetch } from "@/lib/ai-bedrock.server";
-import { parseDocumentWithAI, CORE_CLIENT_FIELD_KEYS } from "@/lib/document-extraction";
+import { parseDocumentWithAI, extractGoalsOnly, documentLikelyHasGoals, CORE_CLIENT_FIELD_KEYS } from "@/lib/document-extraction";
 
 // ----- Input schemas -----
 const ModeEnum = z.enum(["employee", "client"]);
@@ -695,7 +695,9 @@ async function aiExtractFieldsFromText(
     };
 
     // Structured rows → JSON-encode value_json in `value` so review and commit can read it back.
-    if ((key === "billing_code_row" || key === "client_medication") && f.value_json && typeof f.value_json === "object") {
+    // pcsp_goal carries the full outline (why / responsible_party / service_codes / supports /
+    // data_capture / …); without JSON-encoding it here, only the plain goal sentence would survive.
+    if ((key === "billing_code_row" || key === "client_medication" || key === "pcsp_goal") && f.value_json && typeof f.value_json === "object") {
       out.push({ ...base, value: JSON.stringify(f.value_json) });
       continue;
     }
@@ -720,6 +722,52 @@ async function aiExtractFieldsFromText(
     const v = f.value_date || (typeof f.value_number === "number" ? String(f.value_number) : f.value_text || "");
     if (!v || !String(v).trim()) continue;
     out.push({ ...base, value: String(v).trim() });
+  }
+
+  // ---- Zero-goals safety net ----
+  // The wide extraction pass sometimes silently drops the goals section on
+  // PCSPs. If we ended up with zero pcsp_goal rows AND the source text looks
+  // like it contains goals, run a focused second pass just for goals and merge
+  // its results in. If both passes still return nothing, emit a synthetic
+  // pcsp_goal_extraction_failed flag so the review UI can surface a loud
+  // "add manually" banner instead of the neutral "no goals found" copy.
+  const goalCount = out.filter((r) => r.target_field === "pcsp_goal").length;
+  if (goalCount === 0 && documentLikelyHasGoals(text)) {
+    try {
+      const retry = await extractGoalsOnly(text);
+      for (const f of retry.fields ?? []) {
+        if (f.field_key !== "pcsp_goal") continue;
+        const conf = typeof f.confidence === "number" ? Math.max(0, Math.min(1, f.confidence)) : 0.7;
+        const snippet = String(f.source_locator || f.value_text || "").slice(0, 200);
+        const base = {
+          target_field: "pcsp_goal",
+          status: "placed" as const,
+          confidence: conf,
+          snippet,
+          provenance: "source" as const,
+          is_custom: false,
+        };
+        if (f.value_json && typeof f.value_json === "object") {
+          out.push({ ...base, value: JSON.stringify(f.value_json) });
+        } else if (f.value_text && f.value_text.trim()) {
+          out.push({ ...base, value: f.value_text.trim() });
+        }
+      }
+    } catch (err) {
+      console.warn("[smart-import] goals-only retry failed:", (err as Error)?.message);
+    }
+  }
+  const finalGoalCount = out.filter((r) => r.target_field === "pcsp_goal").length;
+  if (finalGoalCount === 0 && documentLikelyHasGoals(text)) {
+    out.push({
+      target_field: "pcsp_goal_extraction_failed",
+      value: JSON.stringify({ bool: true }),
+      status: "flag",
+      confidence: 0.5,
+      snippet: "NECTAR extracted no goals from a PCSP that appears to contain a goals section.",
+      provenance: "inferred",
+      is_custom: true,
+    });
   }
 
   // Derive a display name from extracted person fields.

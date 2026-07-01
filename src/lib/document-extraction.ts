@@ -159,7 +159,14 @@ Common field_key values to extract when present (use field_group to bucket relat
     clinical_alert (value_text — any high-priority safety/clinical notice, e.g. choking risk),
     special_directions (value_text — care/access notes)
   Medications (group "medications"): emit ONE field per medication listed in the document with
-    field_key = "client_medication" and value_json = { name, dose, route, frequency, prn (bool), notes }.
+    field_key = "client_medication" and value_json = {
+      name, dose, route, frequency, scheduled_time, scheduled_times, prn (bool), prn_instructions,
+      instructions, prescriber, purpose, adverse_effects, choking_risk (bool), choking_risk_details,
+      is_controlled (bool), pharmacy, rx_number, packaging, side_effects,
+      contributes_to_swallowing_difficulty (bool), support_level, support_explanation, notes
+    }.
+    Include only keys supported by the document; do not invent clinical purpose, adverse effects,
+    controlled-substance status, choking risk, pharmacy, or Rx number when not stated.
     ALSO emit a single field "pcsp_has_medications" with value_bool. Set TRUE if the document
     lists ANY prescribed/administered medication (even one). Set FALSE only when the document
     explicitly states no medications (e.g. "None", "No current medications", an empty

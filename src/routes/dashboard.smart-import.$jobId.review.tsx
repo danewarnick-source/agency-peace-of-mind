@@ -348,6 +348,7 @@ function SubjectReview({
           subjectId={subjectId}
           validation={{ ...validation, issues: visibleIssues }}
           onChanged={refresh}
+          onNavigateStep={setStep}
         />
       )}
       {mergeFlags.length > 0 && (
@@ -578,34 +579,100 @@ function SubjectHeader({ subject, onChanged, canMarkReady = true }: { subject: S
 }
 
 // ---------------------------- ValidationPanel ----------------------------
+type IssueHelp = {
+  whatToDo: string;
+  action?: { label: string; onClick: () => void };
+};
+
+function getIssueHelp(
+  key: string,
+  onNavigateStep?: (id: WizardStepId) => void,
+): IssueHelp {
+  if (key === "org.codes_held_missing") {
+    return {
+      whatToDo:
+        "Set this org's awarded service codes so NECTAR can tell 'ours' from 'other provider' automatically. You can also just delete any code rows below that aren't yours.",
+      action: {
+        label: "Set awarded codes",
+        onClick: () => {
+          window.open("/dashboard/nectar-company-profile#codes-held", "_blank");
+        },
+      },
+    };
+  }
+  if (/^client\.(missing|address)/.test(key)) {
+    return {
+      whatToDo:
+        "Open the Person & contacts step and fill in this field, or dismiss the extracted row if it doesn't apply.",
+      action: onNavigateStep
+        ? { label: "Go to Person step", onClick: () => onNavigateStep("person") }
+        : undefined,
+    };
+  }
+  if (/^code\./.test(key)) {
+    return {
+      whatToDo: "Fix the row in the Billing codes table below — edit values or delete the row.",
+      action: onNavigateStep
+        ? {
+            label: "Jump to billing table",
+            onClick: () => {
+              onNavigateStep("services");
+              setTimeout(() => {
+                document.getElementById("billing-codes")?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }, 100);
+            },
+          }
+        : undefined,
+    };
+  }
+  return {
+    whatToDo: "Review this item and either fix it above/below or click Confirm to acknowledge.",
+  };
+}
+
 function ValidationPanel({
-  subjectId, validation, onChanged,
+  subjectId, validation, onChanged, onNavigateStep,
 }: {
   subjectId: string;
   validation: { ok: boolean; issues: Array<{ key: string; severity: "error" | "warning"; field?: string; message: string }>; blocking: string[] };
   onChanged: () => void;
+  onNavigateStep?: (id: WizardStepId) => void;
 }) {
   const overrideFn = useServerFn(overrideValidationIssue);
   const m = useMutation({
     mutationFn: (vars: { issueKey: string; overridden: boolean }) =>
       overrideFn({ data: { subjectId, issueKey: vars.issueKey, overridden: vars.overridden } }),
-    onSuccess: () => { toast.success("Override saved"); onChanged(); },
+    onSuccess: () => { toast.success("Saved"); onChanged(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const blockingSet = new Set(validation.blocking);
+  // Sort: blocking errors first, then warnings.
+  const sortedIssues = [...validation.issues].sort((a, b) => {
+    const aBlock = blockingSet.has(a.key) ? 0 : a.severity === "error" ? 1 : 2;
+    const bBlock = blockingSet.has(b.key) ? 0 : b.severity === "error" ? 1 : 2;
+    return aBlock - bBlock;
+  });
+  const blockingCount = sortedIssues.filter((i) => blockingSet.has(i.key)).length;
+  const advisoryCount = sortedIssues.length - blockingCount;
+  const anyBlocking = blockingCount > 0;
+  const panelClass = anyBlocking
+    ? "rounded-2xl border border-destructive/40 bg-destructive/5 p-4"
+    : "rounded-2xl border border-amber-300/60 bg-amber-50/40 p-4 dark:bg-amber-950/20";
+  const headerClass = anyBlocking
+    ? "flex items-center gap-2 text-sm font-semibold text-destructive"
+    : "flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400";
   return (
-    <div className="rounded-2xl border border-destructive/40 bg-destructive/5 p-4">
-      <div className="flex items-center gap-2 text-sm font-semibold text-destructive">
+    <div className={panelClass}>
+      <div className={headerClass}>
         <AlertTriangle className="h-4 w-4" />
-        NECTAR needs you to confirm these before saving
+        {sortedIssues.length} thing{sortedIssues.length === 1 ? "" : "s"} to review before saving
+        <span className="text-xs font-normal opacity-80">
+          ({blockingCount} blocking, {advisoryCount} advisory)
+        </span>
       </div>
       <ul className="mt-2 space-y-2 text-sm">
-        {validation.issues.map((i) => {
+        {sortedIssues.map((i) => {
           const isBlocking = blockingSet.has(i.key);
-          // Per-code routing buttons (Prompt 15): "code.confirm_owner.<CODE>",
-          // "code.coordination.<CODE>", "code.coordination_info.<CODE>".
-          // Each picks one of three explicit outcomes; only one override key
-          // is kept active per code, the others are cleared.
           const codeMatch = i.key.match(/^code\.(confirm_owner|coordination|coordination_info)\.(.+)$/);
           const setCodeBucket = (code: string, bucket: "bill_as_ours" | "coordination" | "ignore") => {
             const all = ["bill_as_ours", "coordination", "ignore"] as const;
@@ -614,20 +681,25 @@ function ValidationPanel({
               if (b === bucket) m.mutate({ issueKey: key, overridden: true });
               else m.mutate({ issueKey: key, overridden: false });
             });
-            // Also clear the original blocking confirm_owner / coordination issue
-            // so it disappears from the panel after the admin picks an outcome.
             m.mutate({ issueKey: i.key, overridden: true });
           };
+          const help = getIssueHelp(i.key, onNavigateStep);
           return (
             <li key={i.key} className="flex flex-wrap items-start justify-between gap-2 rounded-md border border-border/70 bg-background/60 px-3 py-2">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <Badge variant={i.severity === "error" ? "destructive" : "outline"} className="capitalize text-[10px]">
-                    {i.severity}
+                  <Badge variant={isBlocking ? "destructive" : "outline"} className="capitalize text-[10px]">
+                    {isBlocking ? "blocking" : i.severity}
                   </Badge>
                   {i.field && <span className="text-xs text-muted-foreground">{i.field}</span>}
                 </div>
                 <div className="mt-1">{i.message}</div>
+                {!codeMatch && (
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground/80">What to do: </span>
+                    {help.whatToDo}
+                  </div>
+                )}
               </div>
               <div className="flex shrink-0 flex-wrap items-center gap-2">
                 {codeMatch ? (
@@ -642,15 +714,24 @@ function ValidationPanel({
                       File as info / ignore
                     </Button>
                   </>
-                ) : isBlocking ? (
-                  <Button size="sm" variant="outline" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: true })}>
-                    Confirm — I've reviewed this
-                  </Button>
-                ) : i.severity === "error" ? (
-                  <Button size="sm" variant="ghost" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: false })}>
-                    Un-confirm
-                  </Button>
-                ) : null}
+                ) : (
+                  <>
+                    {help.action && (
+                      <Button size="sm" variant="outline" disabled={m.isPending} onClick={help.action.onClick}>
+                        {help.action.label}
+                      </Button>
+                    )}
+                    {isBlocking ? (
+                      <Button size="sm" variant="default" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: true })}>
+                        Confirm — I've reviewed this
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="ghost" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: true })}>
+                        Dismiss
+                      </Button>
+                    )}
+                  </>
+                )}
               </div>
             </li>
           );
@@ -780,7 +861,7 @@ function PlacementLineup({
   // Prompt 18: peel billing-code rows out of the generic field list so we can
   // show them as a proper editable table. The remaining placement lineup keeps
   // its existing value→field shape for every other field.
-  const billing = fields.filter((f) => f.target_field === "billing_code_row");
+  const billing = fields.filter((f) => f.target_field === "billing_code_row" && !f.dismissed_at);
   const rest = fields.filter((f) => f.target_field !== "billing_code_row");
   // Prompt 24: limit lineup to SOW-required record fields. Incidental
   // mappings (extras NECTAR pulled but aren't required by §1.10) are
@@ -874,7 +955,7 @@ function BillingCodesEditor({
   const [adding, setAdding] = useState(false);
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+    <div id="billing-codes" className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="text-sm font-semibold">Billing codes (your authorization)</div>

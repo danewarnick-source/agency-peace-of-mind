@@ -971,6 +971,112 @@ export type Database = {
           },
         ]
       }
+      billing_code_approval_messages: {
+        Row: {
+          action: string | null
+          body: string
+          created_at: string
+          id: string
+          read_by_hive_at: string | null
+          read_by_provider_at: string | null
+          request_id: string
+          sender_role: string
+          sender_user_id: string
+        }
+        Insert: {
+          action?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          read_by_hive_at?: string | null
+          read_by_provider_at?: string | null
+          request_id: string
+          sender_role: string
+          sender_user_id: string
+        }
+        Update: {
+          action?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          read_by_hive_at?: string | null
+          read_by_provider_at?: string | null
+          request_id?: string
+          sender_role?: string
+          sender_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_code_approval_messages_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "billing_code_approval_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_code_approval_requests: {
+        Row: {
+          code: string
+          created_at: string
+          extracted_field_id: string | null
+          id: string
+          import_job_id: string | null
+          justification: string
+          organization_id: string
+          provider_name_on_pcsp: string | null
+          requesting_user_id: string
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by_user_id: string | null
+          status: string
+          subject_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          extracted_field_id?: string | null
+          id?: string
+          import_job_id?: string | null
+          justification: string
+          organization_id: string
+          provider_name_on_pcsp?: string | null
+          requesting_user_id: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by_user_id?: string | null
+          status?: string
+          subject_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          extracted_field_id?: string | null
+          id?: string
+          import_job_id?: string | null
+          justification?: string
+          organization_id?: string
+          provider_name_on_pcsp?: string | null
+          requesting_user_id?: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by_user_id?: string | null
+          status?: string
+          subject_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_code_approval_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_submission_audit_log: {
         Row: {
           action: string

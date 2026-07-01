@@ -24,6 +24,7 @@ export const EXEC_NAV: ExecNavItem[] = [
   { to: "/dashboard/hive-exec/new-company", label: "Add Company", icon: Plus },
   { to: "/dashboard/hive-exec/states", label: "States", icon: MapPin },
   { to: "/dashboard/hive-exec/approvals", label: "Extraction Approvals", icon: ShieldCheck },
+  { to: "/dashboard/hive-exec/billing-approvals", label: "Billing Approvals", icon: ShieldCheck },
   { to: "/dashboard/hive-exec/permissions", label: "Permissions & Roles", icon: UserCog },
   { to: "/dashboard/hive-exec/plans", label: "Plans & Billing", icon: CreditCard },
   { to: "/dashboard/hive-exec/health", label: "Account Health", icon: Activity },

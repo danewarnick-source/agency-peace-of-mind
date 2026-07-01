@@ -34,6 +34,8 @@ import { Trash2, Plus, X, RotateCcw, Tag, UserPlus } from "lucide-react";
 
 import { providerSignoff } from "@/lib/hive-migration.functions";
 import { DiscardImportDialog } from "@/components/smart-import/discard-import-dialog";
+import { ApprovalDialog } from "@/components/billing/ApprovalDialog";
+import { lookupApprovalRequestsForFields, type ApprovalRequestRow } from "@/lib/billing-approvals.functions";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/review")({
   head: () => ({ meta: [{ title: "Smart Import Review — NECTAR" }] }),
@@ -1633,9 +1635,29 @@ function BillingCodesEditor({
 }) {
   const [adding, setAdding] = useState(false);
   const [removedIds, setRemovedIds] = useState<Set<string>>(() => new Set());
-  // Local-only acknowledgements: admin clicked "Bill anyway — I have HIVE approval"
-  // for an external-provider row. Ephemeral to this review session.
-  const [approvedExternal, setApprovedExternal] = useState<Set<string>>(() => new Set());
+
+  // Load persistent HIVE-approval status for every extracted-field row in
+  // this billing table. Provider self-attestation is gone — status is
+  // driven by billing_code_approval_requests / _messages.
+  const { data: org } = useCurrentOrg();
+  const orgId = org?.organization_id ?? null;
+  const { jobId } = Route.useParams();
+  const lookupFn = useServerFn(lookupApprovalRequestsForFields);
+  const fieldIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const approvalsQ = useQuery({
+    enabled: !!orgId && fieldIds.length > 0,
+    queryKey: ["approval-lookup", orgId, fieldIds],
+    queryFn: () => lookupFn({ data: { organizationId: orgId!, extractedFieldIds: fieldIds } }),
+  });
+  const approvals: Record<string, ApprovalRequestRow | null> = approvalsQ.data ?? {};
+
+  // Dialog target: which row are we asking / viewing right now.
+  const [dialog, setDialog] = useState<null | {
+    fieldId: string;
+    code: string;
+    providerName: string | null;
+    requestId: string | null;
+  }>(null);
 
   useEffect(() => {
     setRemovedIds((prev) => {
@@ -1656,13 +1678,6 @@ function BillingCodesEditor({
       return next;
     });
   };
-  const toggleApproved = (fieldId: string) => {
-    setApprovedExternal((prev) => {
-      const next = new Set(prev);
-      if (next.has(fieldId)) next.delete(fieldId); else next.add(fieldId);
-      return next;
-    });
-  };
 
   type Parsed = { field: FieldRow; row: BillingRowShape };
   const parsed: Parsed[] = rows
@@ -1672,6 +1687,8 @@ function BillingCodesEditor({
 
   const orgLabel = tenant.names[0] ?? "your organization";
   const externalRows = parsed.filter((p) => providerOwnership(p.row.provider_name, tenant) === "external");
+  const pendingCount = externalRows.filter((p) => approvals[p.field.id]?.status === "pending").length;
+  const approvedCount = externalRows.filter((p) => approvals[p.field.id]?.status === "approved").length;
 
   return (
     <div id="billing-codes" className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
@@ -1680,7 +1697,7 @@ function BillingCodesEditor({
           <div className="text-sm font-semibold">Billing codes on the PCSP</div>
           <div className="text-xs text-muted-foreground">
             The <span className="font-medium">Ownership</span> column shows whether each code is billed by <span className="font-medium">{orgLabel}</span> or by an outside provider (support coordinator, another agency).
-            Only codes marked "Ours" flow into your 520s. External codes stay visible for context and are excluded from billing unless HIVE admin grants an exception.
+            Only codes marked "Ours" flow into your 520s. For an external code you must <span className="font-medium">request HIVE Admin approval</span> — HIVE Admin will respond in your Inbox and you can go back and forth until it is resolved.
           </div>
         </div>
         <Button size="sm" variant="outline" onClick={() => setAdding(true)} disabled={adding}>
@@ -1700,7 +1717,7 @@ function BillingCodesEditor({
             <colgroup>
               <col className="w-[64px]" />
               <col className="w-[16%]" />
-              <col className="w-[140px]" />
+              <col className="w-[170px]" />
               <col className="w-[72px]" />
               <col className="w-[72px]" />
               <col className="w-[76px]" />
@@ -1713,7 +1730,7 @@ function BillingCodesEditor({
               <tr className="border-b border-border">
                 <th className="py-2 px-1.5 font-medium">Code</th>
                 <th className="py-2 px-1.5 font-medium">Provider</th>
-                <th className="py-2 px-1.5 font-medium">Ownership</th>
+                <th className="py-2 px-1.5 font-medium">Ownership / Approval</th>
                 <th className="py-2 px-1.5 font-medium">Unit</th>
                 <th className="py-2 px-1.5 font-medium">Rate</th>
                 <th className="py-2 px-1.5 font-medium">Annual</th>
@@ -1731,8 +1748,10 @@ function BillingCodesEditor({
                   subjectId={subjectId}
                   initial={p.row}
                   tenant={tenant}
-                  approvedExternal={approvedExternal.has(p.field.id)}
-                  onToggleApproved={() => toggleApproved(p.field.id)}
+                  approvalRequest={approvals[p.field.id] ?? null}
+                  onOpenApproval={(codeValue, providerName, requestId) => setDialog({
+                    fieldId: p.field.id, code: codeValue, providerName, requestId,
+                  })}
                   onChanged={onChanged}
                   onRemoved={markRemoved}
                 />
@@ -1743,8 +1762,8 @@ function BillingCodesEditor({
                   subjectId={subjectId}
                   initial={{ service_code: "" }}
                   tenant={tenant}
-                  approvedExternal={false}
-                  onToggleApproved={() => {}}
+                  approvalRequest={null}
+                  onOpenApproval={() => {}}
                   isNew
                   onChanged={() => { setAdding(false); onChanged(); }}
                   onCancel={() => setAdding(false)}
@@ -1758,17 +1777,36 @@ function BillingCodesEditor({
       {externalRows.length > 0 && (
         <div className="mt-3 rounded-md border border-amber-300/60 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
           <div className="mb-1 font-semibold">
-            {externalRows.length} code{externalRows.length === 1 ? "" : "s"} appear to belong to an outside provider
+            {externalRows.length} code{externalRows.length === 1 ? "" : "s"} belong to an outside provider on the PCSP
+            {(pendingCount + approvedCount) > 0 && (
+              <span className="ml-2 font-normal">
+                · {approvedCount} HIVE-approved, {pendingCount} awaiting HIVE review
+              </span>
+            )}
           </div>
           <div className="mb-1">
             The Provider on {externalRows.length === 1 ? "this line" : "these lines"} does not match <span className="font-medium">{orgLabel}</span>.
-            These codes stay in the client's plan for reference but will not be included in your 520s or billing submissions.
-            To bill any of them yourself, you need a HIVE admin exception.
+            To bill any of them yourself, click <span className="font-medium">Request HIVE approval</span> on the line — HIVE Admin will review the justification and reply in your Inbox.
           </div>
           <div className="mt-1 font-mono">
             {externalRows.map((p) => `${p.row.service_code} → ${p.row.provider_name ?? "unknown provider"}`).join("  •  ")}
           </div>
         </div>
+      )}
+
+      {dialog && orgId && (
+        <ApprovalDialog
+          open={!!dialog}
+          onOpenChange={(o) => { if (!o) setDialog(null); }}
+          organizationId={orgId}
+          requestId={dialog.requestId}
+          code={dialog.code}
+          providerNameOnPcsp={dialog.providerName}
+          importJobId={jobId}
+          subjectId={subjectId}
+          extractedFieldId={dialog.fieldId}
+          onCreated={() => { approvalsQ.refetch(); }}
+        />
       )}
     </div>
   );
@@ -1779,14 +1817,14 @@ function isPending(r: BillingRowShape): boolean {
 }
 
 function BillingRowEditor({
-  fieldId, subjectId, initial, tenant, approvedExternal, onToggleApproved, isNew, onChanged, onCancel, onRemoved,
+  fieldId, subjectId, initial, tenant, approvalRequest, onOpenApproval, isNew, onChanged, onCancel, onRemoved,
 }: {
   fieldId: string | null;
   subjectId: string;
   initial: BillingRowShape;
   tenant: TenantIdentity;
-  approvedExternal: boolean;
-  onToggleApproved: () => void;
+  approvalRequest: ApprovalRequestRow | null;
+  onOpenApproval: (code: string, providerName: string | null, requestId: string | null) => void;
   isNew?: boolean;
   onChanged: () => void;
   onCancel?: () => void;
@@ -1869,28 +1907,43 @@ function BillingRowEditor({
           if (own === "unknown") {
             return <Badge variant="outline" className="whitespace-nowrap text-muted-foreground">Unspecified</Badge>;
           }
+          // External provider: replace self-attest with a HIVE approval workflow.
+          const ar = approvalRequest;
+          const openDialog = () => onOpenApproval(row.service_code, row.provider_name ?? null, ar?.id ?? null);
+          let statusEl: React.ReactNode;
+          let btnLabel: string;
+          if (!ar || ar.status === "withdrawn") {
+            statusEl = null;
+            btnLabel = "Request HIVE approval";
+          } else if (ar.status === "pending") {
+            statusEl = <Badge variant="outline" className="whitespace-nowrap border-amber-500/60 text-amber-700 dark:text-amber-300">Awaiting HIVE</Badge>;
+            btnLabel = "View thread";
+          } else if (ar.status === "approved") {
+            statusEl = <Badge variant="outline" className="whitespace-nowrap border-emerald-500/60 text-emerald-700 dark:text-emerald-300"><ShieldCheck className="mr-1 h-3 w-3" />HIVE approved</Badge>;
+            btnLabel = "View thread";
+          } else {
+            statusEl = <Badge variant="outline" className="whitespace-nowrap border-destructive/60 text-destructive">Denied</Badge>;
+            btnLabel = "View thread";
+          }
           return (
             <div className="flex flex-col gap-1">
               <Badge variant="outline" className="whitespace-nowrap border-amber-500/60 text-amber-700 dark:text-amber-300">
                 <AlertTriangle className="mr-1 h-3 w-3" /> External
               </Badge>
-              {approvedExternal ? (
+              {statusEl}
+              {fieldId && (
                 <button
                   type="button"
-                  className="text-[10px] text-emerald-600 underline underline-offset-2"
-                  onClick={onToggleApproved}
-                  title="Revoke HIVE-approved billing for this line"
+                  className="text-[10px] text-primary underline underline-offset-2"
+                  onClick={openDialog}
+                  title="Send a justification to HIVE Admin for review"
                 >
-                  HIVE-approved · revoke
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="text-[10px] text-muted-foreground underline underline-offset-2"
-                  onClick={onToggleApproved}
-                  title="Mark that HIVE admin has granted an exception to bill this outside-provider code"
-                >
-                  I have HIVE approval
+                  {btnLabel}
+                  {ar && ar.unread_for_me > 0 && (
+                    <span className="ml-1 inline-flex items-center rounded-full bg-destructive px-1.5 py-0 text-[9px] font-semibold text-white">
+                      {ar.unread_for_me}
+                    </span>
+                  )}
                 </button>
               )}
             </div>

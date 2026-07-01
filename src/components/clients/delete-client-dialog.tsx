@@ -84,7 +84,7 @@ export function DeleteClientDialog({ open, onOpenChange, clientId, clientName, o
                 {IMPACT_ROWS.map((r) => (
                   <li key={r.key} className="flex justify-between gap-2">
                     <span className="text-muted-foreground">{r.label}</span>
-                    <span className="font-mono">{(impactQ.data as Record<string, number>)[r.key] ?? 0}</span>
+                    <span className="font-mono">{(impactQ.data[r.key] as number) ?? 0}</span>
                   </li>
                 ))}
               </ul>

@@ -1763,11 +1763,14 @@ function isPending(r: BillingRowShape): boolean {
 }
 
 function BillingRowEditor({
-  fieldId, subjectId, initial, isNew, onChanged, onCancel, onRemoved,
+  fieldId, subjectId, initial, tenant, approvedExternal, onToggleApproved, isNew, onChanged, onCancel, onRemoved,
 }: {
   fieldId: string | null;
   subjectId: string;
   initial: BillingRowShape;
+  tenant: TenantIdentity;
+  approvedExternal: boolean;
+  onToggleApproved: () => void;
   isNew?: boolean;
   onChanged: () => void;
   onCancel?: () => void;

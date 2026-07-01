@@ -139,7 +139,7 @@ export function classifyExtractedService(args: {
 export async function fetchTenantIdentity(sb: any, orgId: string): Promise<TenantIdentity> {
   const { data: org } = await sb
     .from("organizations")
-    .select("name, legal_name, aliases")
+    .select("name, legal_name, aliases, services_offered")
     .eq("id", orgId)
     .maybeSingle();
   const { data: outline } = await sb
@@ -152,10 +152,16 @@ export async function fetchTenantIdentity(sb: any, orgId: string): Promise<Tenan
   if (org?.name) names.push(org.name);
   if (org?.legal_name) names.push(org.legal_name);
   if (Array.isArray(org?.aliases)) for (const a of org.aliases) if (a) names.push(String(a));
-  return {
-    names,
-    codesHeld: Array.isArray(outline?.codes_held) ? outline.codes_held.map((c: string) => String(c).toUpperCase()) : [],
-  };
+  const outlineCodes = Array.isArray(outline?.codes_held)
+    ? outline.codes_held.map((c: string) => String(c).toUpperCase())
+    : [];
+  // Fallback to organizations.services_offered when the referral-matching
+  // outline hasn't been populated (Company Profile writes services_offered).
+  const servicesCodes = Array.isArray(org?.services_offered)
+    ? org.services_offered.map((c: string) => String(c).toUpperCase())
+    : [];
+  const codesHeld = Array.from(new Set([...outlineCodes, ...servicesCodes]));
+  return { names, codesHeld };
 }
 
 /**

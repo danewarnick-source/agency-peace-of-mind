@@ -41,7 +41,7 @@ export type ParseOutT = z.infer<typeof ParseOut>;
 export const CORE_CLIENT_FIELD_KEYS = new Set<string>([
   // Person
   "first_name", "last_name", "full_name", "dob", "medicaid_id", "phone", "plan_year",
-  "disability_category", "admission_date", "discharge_date",
+  "disability_category", "admission_date", "discharge_date", "pcsp_expiration_date",
   // Address
   "physical_address",
   // Emergency contact (split, never one blob) — primary + secondary
@@ -128,7 +128,8 @@ Common field_key values to extract when present (use field_group to bucket relat
     Injury; omit this field entirely if the document does not state the population),
     admission_date (value_date — SOW §1.10 required; use the service/plan begin date if no explicit
     admission date is present; omit if not present in any form),
-    discharge_date (value_date — usually absent on intake; omit if not present).
+    discharge_date (value_date — usually absent on intake; omit if not present),
+    pcsp_expiration_date (value_date — PCSP/plan end date or review-by/expiration date; omit if absent).
     IMPORTANT: a PCSP labels the client's Medicaid number as "PID:" or "Person ID:". Treat these
     labels as Medicaid ID and extract the value into medicaid_id (digits only). Do NOT emit a
     separate PID/person_id field — there is no such column.

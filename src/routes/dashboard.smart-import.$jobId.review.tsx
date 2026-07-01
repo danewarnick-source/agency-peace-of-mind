@@ -1845,6 +1845,43 @@ function BillingRowEditor({
         <Input className="h-8 w-full px-2" value={row.provider_name ?? ""} onChange={(e) => patch("provider_name", e.target.value || null)} />
       </td>
       <td className="py-1.5 px-1.5">
+        {(() => {
+          const own = providerOwnership(row.provider_name, tenant);
+          if (own === "ours") {
+            return <Badge variant="outline" className="whitespace-nowrap border-emerald-500/60 text-emerald-600">Ours</Badge>;
+          }
+          if (own === "unknown") {
+            return <Badge variant="outline" className="whitespace-nowrap text-muted-foreground">Unspecified</Badge>;
+          }
+          return (
+            <div className="flex flex-col gap-1">
+              <Badge variant="outline" className="whitespace-nowrap border-amber-500/60 text-amber-700 dark:text-amber-300">
+                <AlertTriangle className="mr-1 h-3 w-3" /> External
+              </Badge>
+              {approvedExternal ? (
+                <button
+                  type="button"
+                  className="text-[10px] text-emerald-600 underline underline-offset-2"
+                  onClick={onToggleApproved}
+                  title="Revoke HIVE-approved billing for this line"
+                >
+                  HIVE-approved · revoke
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="text-[10px] text-muted-foreground underline underline-offset-2"
+                  onClick={onToggleApproved}
+                  title="Mark that HIVE admin has granted an exception to bill this outside-provider code"
+                >
+                  I have HIVE approval
+                </button>
+              )}
+            </div>
+          );
+        })()}
+      </td>
+      <td className="py-1.5 px-1.5">
         <Select value={row.unit_type ?? ""} onValueChange={(v) => patch("unit_type", v)}>
           <SelectTrigger className="h-8 w-full px-1.5"><SelectValue placeholder="—" /></SelectTrigger>
           <SelectContent>

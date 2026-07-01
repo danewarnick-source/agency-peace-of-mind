@@ -1029,12 +1029,22 @@ function PlacementLineup({
     <div className="space-y-4">
       {showBilling && <BillingCodesEditor subjectId={subjectId} rows={billing} tenant={tenant} onChanged={onChanged} />}
       <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="text-sm font-semibold">Placement lineup</div>
-          <div className="text-xs text-muted-foreground">SOW-required fields only. Edit or × to remove.</div>
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <div className="text-sm font-semibold">Information NECTAR pulled from the file</div>
+            <div className="text-xs text-muted-foreground">
+              These are the required fields for a client record. Edit any value, remove a row with ×, or add anything NECTAR missed.
+            </div>
+          </div>
+          <AddMissingFieldPopover
+            subjectId={subjectId}
+            targetFields={targetFields}
+            presentFields={core.map((f) => f.target_field)}
+            onChanged={onChanged}
+          />
         </div>
         <div className="space-y-2">
-          {core.length === 0 && <div className="text-sm text-muted-foreground">No required fields extracted.</div>}
+          {core.length === 0 && <div className="text-sm text-muted-foreground">No required fields extracted yet — use "+ Add a field" to enter them manually.</div>}
           {core.map((f) => (
             <FieldRowEditor key={f.id} field={f} targetFields={targetFields} matchedValue={matched ? (matched[f.target_field] as string | null) ?? null : null} showDiff={decision === "update"} onChanged={onChanged} />
           ))}

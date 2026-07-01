@@ -105,6 +105,83 @@ async function readDocText(file: File): Promise<string> {
   return `Imported document: ${file.name}`;
 }
 
+// ─── Client-side heuristic detection for the pre-flight preview ──────────────
+// Order matters: check more-specific keywords before generic ones.
+const DOC_TYPE_PATTERNS: Array<{ label: string; re: RegExp }> = [
+  { label: "PCSP", re: /\bpcsp\b/i },
+  { label: "Person-Centered Profile", re: /person[\s_-]*centered|\bpcp\b/i },
+  { label: "ISP", re: /\bisp\b/i },
+  { label: "IEP", re: /\biep\b/i },
+  { label: "Behavior Plan", re: /\bbsp\b|behavior[\s_-]*(support|plan)/i },
+  { label: "Medication (MAR)", re: /\bmar\b|medication/i },
+  { label: "Authorization (1056)", re: /\b1056\b|authorization|auth[\s_-]*form/i },
+  { label: "Assessment", re: /assessment|\bica\b|\bsis\b/i },
+  { label: "Consent", re: /consent|release/i },
+  { label: "Progress Note", re: /progress[\s_-]*note/i },
+  { label: "Incident Report", re: /incident/i },
+  { label: "Emergency Plan", re: /emergency/i },
+  { label: "Diet / Nutrition", re: /diet|nutrition|meal[\s_-]*plan/i },
+  { label: "Seizure Protocol", re: /seizure/i },
+  { label: "DNR", re: /\bdnr\b|do[\s_-]*not[\s_-]*resuscitate/i },
+  { label: "Guardianship", re: /guardian/i },
+  { label: "Human Rights", re: /human[\s_-]*rights|\bhrc\b/i },
+];
+
+const DATE_RE = /\b(\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|\d{4}-\d{1,2}-\d{1,2})\b/;
+const NOISE_TOKENS = /\b(draft|final|copy|updated|revised|signed|scan|scanned|v\d+)\b/gi;
+
+function detectFromFilename(file: File): {
+  detectedClient: string | null;
+  clientKey: string;
+  detectedDocType: string;
+  detectedDate: string | null;
+} {
+  const base = file.name.replace(/\.[^.]+$/, "");
+  // doc type
+  let docType = "Document";
+  let matchedRe: RegExp | null = null;
+  for (const p of DOC_TYPE_PATTERNS) {
+    if (p.re.test(base)) { docType = p.label; matchedRe = p.re; break; }
+  }
+  // date
+  const dateMatch = base.match(DATE_RE);
+  const detectedDate = dateMatch ? dateMatch[1] : null;
+
+  // strip doc-type keyword, date, and noise; the leftover is (hopefully) the person
+  let rest = base;
+  if (matchedRe) rest = rest.replace(matchedRe, " ");
+  if (dateMatch) rest = rest.replace(dateMatch[0], " ");
+  rest = rest.replace(NOISE_TOKENS, " ");
+  rest = rest.replace(/[_\-.]+/g, " ").replace(/\s+/g, " ").trim();
+  // trim trailing punctuation and parentheticals
+  rest = rest.replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim();
+
+  let detectedClient: string | null = null;
+  if (rest.length > 0 && rest.length <= 60) {
+    const parts = rest.split(" ").filter(Boolean);
+    // If it looks like initials (2-3 caps) keep as-is uppercased
+    if (parts.length === 1 && /^[A-Za-z]{2,3}$/.test(parts[0])) {
+      detectedClient = parts[0].toUpperCase();
+    } else if (parts.length >= 1 && parts.length <= 4) {
+      detectedClient = parts
+        .map((w) => (w.length > 1 ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w.toUpperCase()))
+        .join(" ");
+    }
+  }
+  const clientKey = detectedClient ? detectedClient.toLowerCase().replace(/[^a-z0-9]/g, "") : "";
+  return { detectedClient, clientKey, detectedDocType: docType, detectedDate };
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+function fileExt(f: File): string {
+  const m = f.name.match(/\.([^.]+)$/);
+  return m ? m[1].toUpperCase() : "FILE";
+}
+
 function SmartImportPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();

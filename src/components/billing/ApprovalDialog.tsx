@@ -432,6 +432,14 @@ function MessageBubble({ m, viewer }: { m: ApprovalMessageRow; viewer: SenderRol
           )}
         </div>
         <div className="whitespace-pre-wrap text-sm">{m.body}</div>
+        {m.resolved_signature_name && (
+          <div className="mt-1.5 flex items-center gap-1 rounded border border-border/60 bg-background/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+            <PenLine className="h-3 w-3" />
+            Signed: {m.resolved_signature_name}
+            {m.resolved_signature_at ? ` · ${fmt(m.resolved_signature_at)}` : ""}
+            {m.resolved_signature_attested ? " · attested" : ""}
+          </div>
+        )}
       </div>
     </li>
   );

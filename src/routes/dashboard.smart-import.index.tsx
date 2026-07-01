@@ -207,9 +207,24 @@ function SmartImportPage() {
       const err = validateFile(f);
       if (err) { toast.error(err); continue; }
       const kind: FileChip["kind"] = isAiDoc(f) ? "ai_doc" : "roster";
-      next.push({ id: crypto.randomUUID(), file: f, kind });
+      const detected = kind === "roster"
+        ? { detectedClient: null, clientKey: "__roster__", detectedDocType: "Roster / table", detectedDate: null }
+        : detectFromFilename(f);
+      next.push({ id: crypto.randomUUID(), file: f, kind, ...detected });
     }
-    if (next.length) setFiles((p) => [...p, ...next]);
+    if (next.length) {
+      setFiles((p) => [...p, ...next]);
+      // Fill in row counts for rosters in the background so the preview shows "12 rows"
+      for (const chip of next) {
+        if (chip.kind === "roster") {
+          parseRoster(chip.file)
+            .then((parsed) => {
+              setFiles((p) => p.map((c) => (c.id === chip.id ? { ...c, rowCount: parsed.rows.length } : c)));
+            })
+            .catch(() => { /* leave rowCount undefined */ });
+        }
+      }
+    }
   }, []);
 
   const onDrop = useCallback((e: React.DragEvent) => {

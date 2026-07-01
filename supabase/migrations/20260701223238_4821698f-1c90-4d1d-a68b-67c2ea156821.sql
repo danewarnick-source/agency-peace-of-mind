@@ -1,0 +1,2 @@
+ALTER TABLE public.extracted_fields DROP CONSTRAINT IF EXISTS extracted_fields_provenance_check;
+ALTER TABLE public.extracted_fields ADD CONSTRAINT extracted_fields_provenance_check CHECK (provenance IN ('rule','source','inferred','admin_override'));

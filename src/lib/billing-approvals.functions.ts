@@ -36,6 +36,9 @@ export interface ApprovalRequestRow {
   resolved_by_name: string | null;
   resolved_at: string | null;
   resolution_note: string | null;
+  resolved_signature_name: string | null;
+  resolved_signature_attested: boolean | null;
+  resolved_signature_at: string | null;
   created_at: string;
   updated_at: string;
   last_activity_at: string;
@@ -53,7 +56,11 @@ export interface ApprovalMessageRow {
   created_at: string;
   read_by_provider_at: string | null;
   read_by_hive_at: string | null;
+  resolved_signature_name: string | null;
+  resolved_signature_attested: boolean | null;
+  resolved_signature_at: string | null;
 }
+
 
 export interface ApprovalThread {
   request: ApprovalRequestRow;

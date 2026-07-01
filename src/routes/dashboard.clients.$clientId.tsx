@@ -30,6 +30,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
+import { PcspTab } from "@/components/clients/pcsp-tab";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
 import { SectionsView, ClientSpecificTrainingCard, GoalsEditor, PublishConfirmDialog } from "@/components/clients/client-specific-training-card";
@@ -53,7 +54,7 @@ import {
 const search = z.object({
   tab: z
     .enum([
-      "profile", "care", "activity", "funds", "files",
+      "profile", "care", "activity", "funds", "files", "pcsp",
       // legacy deep-link values kept for backwards compat
       "overview", "plan", "codes", "caseload", "shifts", "logs", "incidents",
       "summaries", "hhcert", "deadlines", "documents",
@@ -72,13 +73,14 @@ export const Route = createFileRoute("/dashboard/clients/$clientId")({
 });
 
 // Map legacy deep-link tab values to the new five-tab model
-function resolveTab(raw: string | undefined): "profile" | "care" | "activity" | "funds" | "files" {
+function resolveTab(raw: string | undefined): "profile" | "care" | "activity" | "funds" | "files" | "pcsp" {
   if (!raw) return "profile";
   if (raw === "profile" || raw === "overview") return "profile";
   if (raw === "care" || raw === "plan" || raw === "caseload") return "care";
   if (raw === "activity" || raw === "shifts" || raw === "logs" || raw === "incidents" || raw === "summaries" || raw === "hhcert" || raw === "deadlines") return "activity";
   if (raw === "funds" || raw === "codes") return "funds";
   if (raw === "files" || raw === "documents") return "files";
+  if (raw === "pcsp") return "pcsp";
   return "profile";
 }
 
@@ -179,6 +181,7 @@ function ClientProfileHub() {
           <TabsTrigger value="activity">Activity</TabsTrigger>
           <TabsTrigger value="funds">Funds</TabsTrigger>
           <TabsTrigger value="files">Files</TabsTrigger>
+          <TabsTrigger value="pcsp">PCSP</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="space-y-4">
@@ -212,6 +215,10 @@ function ClientProfileHub() {
 
         <TabsContent value="files" className="space-y-4">
           <ClientDocumentsCard clientId={clientId} clientName={fullName} />
+        </TabsContent>
+
+        <TabsContent value="pcsp" className="space-y-4">
+          <PcspTab client={client} clientId={clientId} orgId={orgId} />
         </TabsContent>
       </Tabs>
     </div>

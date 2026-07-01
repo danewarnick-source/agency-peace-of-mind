@@ -1976,6 +1976,7 @@ function BillingRowEditor({
             monthly_max_units: row.monthly_max_units ?? null,
             plan_start: row.plan_start ?? null,
             plan_end: row.plan_end ?? null,
+            ownership_ack: row.ownership_ack ?? null,
           },
         },
       }),

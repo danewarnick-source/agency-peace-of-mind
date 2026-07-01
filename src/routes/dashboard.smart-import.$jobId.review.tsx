@@ -33,6 +33,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Trash2, Plus, X, RotateCcw, Tag, UserPlus } from "lucide-react";
 
 import { providerSignoff } from "@/lib/hive-migration.functions";
+import { DiscardImportDialog } from "@/components/smart-import/discard-import-dialog";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/review")({
   head: () => ({ meta: [{ title: "Smart Import Review — NECTAR" }] }),

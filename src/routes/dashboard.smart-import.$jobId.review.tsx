@@ -334,47 +334,76 @@ function WhiteGloveBanner({
 }
 
 // ---------------------------- SubjectQueue ----------------------------
+type QueueRow = {
+  id: string; display_name: string; review_status: string;
+  match_status: string; source: "current" | "other";
+  import_job_id: string; job_label?: string;
+};
 function SubjectQueue({
-  subjects, selectedId, onSelect,
-}: { subjects: SubjectRow[]; selectedId: string | null; onSelect: (id: string) => void }) {
+  mode, queue, selectedId, onSelect,
+}: { mode: "employee" | "client"; queue: QueueRow[]; selectedId: string | null; onSelect: (row: QueueRow) => void }) {
+  const currentCount = queue.filter((r) => r.source === "current").length;
+  const otherRows = queue.filter((r) => r.source === "other");
   return (
     <div className="rounded-2xl border border-border bg-card p-2 shadow-[var(--shadow-card)]">
-      <div className="px-2 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">People</div>
-      <div className="max-h-[60vh] space-y-1 overflow-auto">
-        {subjects.length === 0 && (
-          <div className="px-3 py-6 text-center text-sm text-muted-foreground">No people in this job.</div>
+      <div className="px-2 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {mode === "client" ? "Pending clients" : "People"}
+      </div>
+      <div className="max-h-[70vh] space-y-1 overflow-auto">
+        {queue.length === 0 && (
+          <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+            {mode === "client" ? "All caught up — no pending clients." : "No people in this job."}
+          </div>
         )}
-        {subjects.map((s) => {
-          const active = s.id === selectedId;
-          return (
-            <button
-              key={s.id}
-              onClick={() => onSelect(s.id)}
-              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                active ? "bg-primary/10 text-primary" : "hover:bg-muted"
-              }`}
-            >
-              <div className="min-w-0">
-                <div className="truncate font-medium">{s.display_name}</div>
-                <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-                  <StatusDot status={s.review_status} />
-                  <span className="capitalize">{s.review_status.replace("_", " ")}</span>
-                  {s.match_status === "matched_existing" && <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px]">match</Badge>}
-                  {s.match_status === "ambiguous" && <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px] text-amber-600">ambig</Badge>}
-                </div>
-              </div>
-              <ChevronRight className="h-4 w-4 opacity-50" />
-            </button>
-          );
-        })}
+        {queue.slice(0, currentCount).map((r) => (
+          <QueueButton key={r.id} row={r} active={r.id === selectedId} onSelect={onSelect} />
+        ))}
+        {otherRows.length > 0 && (
+          <div className="mt-3 border-t border-border pt-2">
+            <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              From other imports
+            </div>
+            {otherRows.map((r) => (
+              <QueueButton key={r.id} row={r} active={r.id === selectedId} onSelect={onSelect} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
 }
-function StatusDot({ status }: { status: SubjectRow["review_status"] }) {
+function QueueButton({ row, active, onSelect }: { row: QueueRow; active: boolean; onSelect: (row: QueueRow) => void }) {
+  return (
+    <button
+      onClick={() => onSelect(row)}
+      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+        active ? "bg-primary/10 text-primary" : "hover:bg-muted"
+      }`}
+    >
+      <div className="min-w-0">
+        <div className="truncate font-medium">{row.display_name}</div>
+        <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+          <StatusDot status={row.review_status} />
+          <span className="capitalize">{row.review_status.replace("_", " ")}</span>
+          {row.match_status === "matched_existing" && <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px]">match</Badge>}
+          {row.match_status === "ambiguous" && <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px] text-amber-600">ambig</Badge>}
+          {row.source === "other" && (
+            <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
+              <Link2 className="h-3 w-3" />
+              {row.job_label ?? "other import"}
+            </span>
+          )}
+        </div>
+      </div>
+      <ChevronRight className="h-4 w-4 opacity-50" />
+    </button>
+  );
+}
+function StatusDot({ status }: { status: string }) {
   const color = status === "ready" ? "bg-emerald-500" : status === "in_progress" ? "bg-amber-500" : "bg-muted-foreground/40";
   return <span className={`inline-block h-1.5 w-1.5 rounded-full ${color}`} />;
 }
+
 
 // ---------------------------- SubjectReview ----------------------------
 function SubjectReview({

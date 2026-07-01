@@ -21,7 +21,7 @@ const SubjectId = z.object({ subjectId: z.string().uuid() });
 const ManualReviewRowInput = z.object({
   subjectId: z.string().uuid(),
   fieldId: z.string().uuid().nullable().optional(),
-  targetField: z.enum(["pcsp_goal", "client_medication"]),
+  targetField: z.string().trim().min(1),
   value: z.union([z.string(), z.record(z.string(), z.unknown())]),
 });
 
@@ -150,7 +150,21 @@ export const saveManualReviewRow = createServerFn({ method: "POST" })
     const sb = context.supabase as any;
     const valueText = typeof data.value === "string" ? data.value.trim() : JSON.stringify(data.value);
     if (!valueText) throw new Error("Enter a value before saving.");
-    const label = data.targetField === "pcsp_goal" ? "PCSP goal" : "medication";
+    const label = data.targetField === "pcsp_goal"
+      ? "PCSP goal"
+      : data.targetField === "client_medication"
+      ? "medication"
+      : data.targetField;
+    const editAction = data.targetField === "pcsp_goal"
+      ? "edit_pcsp_goal"
+      : data.targetField === "client_medication"
+      ? "edit_client_medication"
+      : "edit_client_field";
+    const addAction = data.targetField === "pcsp_goal"
+      ? "add_pcsp_goal"
+      : data.targetField === "client_medication"
+      ? "add_client_medication"
+      : "add_client_field";
 
     if (data.fieldId) {
       const { data: existing } = await sb
@@ -178,7 +192,7 @@ export const saveManualReviewRow = createServerFn({ method: "POST" })
         item: `Edited ${label}`,
         traces_to: "admin_override",
         actor: context.userId,
-        action: data.targetField === "pcsp_goal" ? "edit_pcsp_goal" : "edit_client_medication",
+        action: editAction,
       });
       return { ok: true, fieldId: data.fieldId };
     }
@@ -212,7 +226,7 @@ export const saveManualReviewRow = createServerFn({ method: "POST" })
       item: `Added ${label} manually during Smart Import review`,
       traces_to: "admin_override",
       actor: context.userId,
-      action: data.targetField === "pcsp_goal" ? "add_pcsp_goal" : "add_client_medication",
+      action: addAction,
     });
     return { ok: true, fieldId: inserted.id as string };
   });

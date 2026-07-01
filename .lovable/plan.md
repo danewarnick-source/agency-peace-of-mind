@@ -1,60 +1,74 @@
-## Add ability to delete Smart Imports and archived Clients
 
-Two related destructive actions, both admin-only, both behind explicit confirm dialogs.
+## Problem
 
-### 1. Delete a Smart Import mid-flow
+When the Smart Import review shows a blocking warning like **"Last name is required"**, the only action is *"Confirm — I've reviewed this"*, which just dismisses the warning. There is nowhere in the UI to actually **type in** the missing value. Providers also find the heading **"Placement lineup"** confusing — it's internal jargon for "the fields NECTAR pulled out of the document and where they'll land on the client."
 
-**Where the button lives**
-- On the Pending Clients list (`dashboard.clients.pending.tsx`) — a trash icon on each pending row.
-- On the Smart Import review page (`dashboard.smart-import.$jobId.review.tsx`) — a "Discard import" button in the header, available at any wizard step before finalization.
+## Goal
 
-**Confirm dialog copy**
-> "Discard this smart import? This permanently removes the uploaded PCSP, all extracted fields, the draft profile, and any staff assignment mapping. This does NOT affect any finalized clients. This cannot be undone."
+1. Every "missing required field" warning gets a real **"Add [field]"** action that opens an inline input and creates the field on the record (no more dead-end "Confirm" for missing data).
+2. Rename **"Placement lineup"** and give it a one-line plain-English explanation so providers understand what they're looking at.
+3. Add a small **"Add a field NECTAR missed"** button at the top of that section so any required field (not just ones the validator flagged) can be added manually.
 
-**What actually gets deleted (new server fn `discardImportJob`)**
-Scoped to the caller's org, only if the job is not yet committed:
-- `import_subjects` (+ cascade: `extracted_fields`, `import_field_provenance`, `import_merge_flags`, `import_nectar_questions`)
-- `assignment_map` rows for the job
-- `import_documents` + `import_cert_documents` + storage objects
-- `import_audit` entry recording the discard (who, when, reason=user_discarded)
-- `import_jobs` row last
+All UI + a small backend extension. No new pages.
 
-Refuses (returns typed error) if the job is already `status = 'committed'` — at that point the client exists and must be deleted through the client-delete flow instead.
+## Scope of change
 
-### 2. Delete an archived Client
+### 1. Inline "Add missing field" from the validation panel
+`src/routes/dashboard.smart-import.$jobId.review.tsx` — `ValidationPanel` / `getIssueHelp`
 
-**Where the button lives**
-- Roster "Archived" tab only (never Active). Row-level "Delete permanently" action + confirm dialog.
-- Also surfaced on the client profile when the client is archived.
+- Detect issues whose key matches `client.missing.<field>` (already the convention — see `getIssueHelp`, line 672).
+- For those rows, replace the current *"Confirm — I've reviewed this"* button with a primary **"Add [field name]"** button that opens a small inline editor (Input + Save / Cancel) directly under the warning row.
+- On Save: call the extended `saveManualReviewRow` server fn (see §4) with `targetField` = the missing field key and the typed value. On success: invalidate the subject query so both the validation panel and the field list update — the warning clears automatically once the field exists and validation re-runs.
+- Keep the existing "Confirm — I've reviewed this" as a secondary/ghost button for cases where the admin legitimately wants to acknowledge without adding data (e.g. field truly doesn't apply).
 
-**Confirm dialog — two-step**
-Step 1 shows a full plain-English list of what gets erased, sourced from the actual row counts for that client (goals, medications, MAR logs, daily logs, incident reports, shifts, documents, PCSP file, emergency contacts, billing codes, staff assignments, progress summaries, client-specific trainings + completions, etc.).
+### 2. Rename "Placement lineup" → provider-friendly
+`src/routes/dashboard.smart-import.$jobId.review.tsx` — `PlacementLineup`, line 948
 
-> "Deleting **{client name}** permanently erases every record tied to this person's supports across your organization. This includes their PCSP, goals, medications and MAR history, daily logs, incidents, shifts, billing authorizations, staff assignments, trainings, and uploaded documents. Audit-trail entries and completed training certificates already earned by staff are retained (compliance requirement) but will show the client as 'deleted'. This cannot be undone."
+- Change the visible heading from **"Placement lineup"** to **"Information NECTAR pulled from the file"**.
+- Change the subtext from *"SOW-required fields only. Edit or × to remove."* to *"These are the required fields for a client record. Edit any value, remove a row with ×, or add anything NECTAR missed."*
+- No internal renames — the component name and prop names stay as-is to keep the diff tight.
 
-Step 2: user types the client's full name to enable the red "Delete permanently" button.
+### 3. "Add a field NECTAR missed" affordance
+Same section, in the header row next to the subtext:
 
-**What actually gets deleted (new server fn `deleteClientPermanently`)**
-- Requires: caller is org admin AND `clients.archived_at IS NOT NULL` for that client in the caller's org.
-- Deletes from ~30 client-scoped tables in FK-safe order (client_medications, emar_logs, client_progress_summaries, client_billing_codes, client_billing_code_rate_history, client_emergency_contacts, client_documents + storage, client_specific_trainings, client_intake_completion, client_approved_locations, client_ratios, client_weekly_targets, client_belongings, client_loans + entries, client_spending_log, client_discharges, client_external_services, daily_logs, incident_reports, scheduled_shifts, evv_timesheets, shift_mar_entries, shift_completeness_flags, staff_assignments for this client, assignment_map rows, referrals, etc.).
-- Retains for audit/compliance (nulls `client_id` or keeps client name as a text snapshot):
-  - `training_completions` (staff kept their certs; already has `content_snapshot` with client name)
-  - `billing_submissions` history
-  - `import_audit`
-- Writes an `import_audit`-style deletion record: who deleted, when, client name/DOB snapshot, table row counts erased.
-- Deletes the `clients` row last.
+- Add a small `+ Add a field` button.
+- Opens a lightweight popover with:
+  - A **Select** of required target fields that aren't already present on this subject (computed from `targetFields` minus fields already in `core`), e.g. `last_name`, `date_of_birth`, `medicaid_id`, etc., with human labels.
+  - A single **Input** for the value.
+  - A **Save** button that calls the same extended `saveManualReviewRow`.
+- On success: invalidate → the new field appears as a row in the list and any related "missing" warning clears.
 
-### Technical notes
+### 4. Backend: broaden `saveManualReviewRow` to accept any client field
+`src/lib/smart-import-review.functions.ts`, line 145 + its `ManualReviewRowInput` schema.
 
-- New file: `src/lib/client-lifecycle.functions.ts` — `discardImportJob`, `deleteClientPermanently`, `getClientDeletionImpact` (row counts for the confirm dialog).
-- All three use `requireSupabaseAuth` + `has_role('admin')` check. No service-role client needed — RLS + org-scoped queries.
-- UI additions:
-  - `DiscardImportDialog` in `src/components/smart-import/`
-  - `DeleteClientDialog` in `src/components/clients/`
-- No schema migration required; all deletes go through existing RLS.
-- Toasts on success; navigate back to the respective list on success.
+Currently the validator restricts `targetField` to `pcsp_goal` / `client_medication`. That's the only reason we need a backend touch — the insert path below it (lines 186–207) already writes to `extracted_fields` with `target_table: "clients"` in exactly the shape we need.
 
-### Out of scope
-- Bulk delete.
-- Undo / soft-delete recovery window (explicit "cannot be undone" per your ask).
-- Deleting Active (non-archived) clients — still requires archive first.
+- Extend the schema to accept any string `targetField` (still non-empty, still trimmed, still trims + validates the value).
+- Keep the existing `label` and `action` audit-log branch for the two special cases; for any other client field write a generic audit entry: `item: "Added <field> manually"`, `action: "edit_client_field"`.
+- No new server function. RLS and audit trail already covered by the existing handler.
+
+### 5. Auto-clear the validation issue when the field is filled
+The validator already re-runs on subject change (existing `onChanged` invalidates the subject query and `getReviewSubject` recomputes validation). So once the new `extracted_fields` row exists with a non-empty value, `client.missing.<field>` disappears from `validation.issues` on its own. **No manual override call needed** — this is more honest than the current "Confirm — I've reviewed this" click, which only hides the warning without fixing it.
+
+## Non-goals
+
+- No change to how validation is computed server-side.
+- No redesign of the wizard steps or the wider review page.
+- No change to the billing-code table, PCSP goals editor, or medications table.
+- Custom attributes section is untouched.
+
+## Technical details
+
+**Files touched**
+- `src/routes/dashboard.smart-import.$jobId.review.tsx`
+  - `ValidationPanel` (line 702) — inline add editor for `client.missing.*` rows.
+  - `getIssueHelp` (line 656) — update copy for `client.missing.*` to reflect the new "Add" action.
+  - `PlacementLineup` (line 926) — new heading/subtext + "+ Add a field" popover.
+- `src/lib/smart-import-review.functions.ts`
+  - `ManualReviewRowInput` schema (near top of file) — allow any non-empty `targetField` string, not just the two enum values.
+  - `saveManualReviewRow` handler — generic audit-log fallback for non-goal / non-medication fields.
+
+**Human labels for target fields**
+Add a small `CLIENT_FIELD_LABELS` map (`first_name → "First name"`, `last_name → "Last name"`, `date_of_birth → "Date of birth"`, `medicaid_id → "Medicaid ID"`, etc.) co-located in the review route file, used by both the validation-panel button ("Add last name") and the popover's Select. Fall back to a title-cased version of the key for anything not in the map.
+
+**No migration required** — `extracted_fields` already stores the shape we need and RLS/grants are already in place for authenticated org admins.

@@ -647,6 +647,46 @@ function SubjectHeader({ subject, onChanged, canMarkReady = true }: { subject: S
   );
 }
 
+// ---------------------------- Client field labels ----------------------------
+const CLIENT_FIELD_LABELS: Record<string, string> = {
+  first_name: "First name",
+  last_name: "Last name",
+  preferred_name: "Preferred name",
+  date_of_birth: "Date of birth",
+  gender: "Gender",
+  medicaid_id: "Medicaid ID",
+  ssn: "SSN",
+  phone: "Phone",
+  email: "Email",
+  mailing_address: "Mailing address",
+  physical_address: "Physical address",
+  address_line1: "Address line 1",
+  address_line2: "Address line 2",
+  city: "City",
+  state: "State",
+  postal_code: "ZIP code",
+  guardian_name: "Guardian name",
+  guardian_phone: "Guardian phone",
+  guardian_email: "Guardian email",
+  guardian_relationship: "Guardian relationship",
+  support_coordinator_name: "Support coordinator name",
+  support_coordinator_email: "Support coordinator email",
+  support_coordinator_phone: "Support coordinator phone",
+  support_coordinator_company: "Support coordinator company",
+  primary_care_physician: "Primary care physician",
+  plan_year: "Plan year",
+  pcsp_effective_date: "PCSP effective date",
+  pcsp_expiration_date: "PCSP expiration date",
+};
+function labelForField(key: string): string {
+  if (CLIENT_FIELD_LABELS[key]) return CLIENT_FIELD_LABELS[key];
+  return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+function fieldKeyFromIssue(key: string): string | null {
+  const m = key.match(/^client\.(?:missing|address)\.(.+)$/);
+  return m ? m[1] : null;
+}
+
 // ---------------------------- ValidationPanel ----------------------------
 type IssueHelp = {
   whatToDo: string;
@@ -670,12 +710,11 @@ function getIssueHelp(
     };
   }
   if (/^client\.(missing|address)/.test(key)) {
+    const field = fieldKeyFromIssue(key);
     return {
-      whatToDo:
-        "Open the Person & contacts step and fill in this field, or dismiss the extracted row if it doesn't apply.",
-      action: onNavigateStep
-        ? { label: "Go to Person step", onClick: () => onNavigateStep("person") }
-        : undefined,
+      whatToDo: field
+        ? `Type the ${labelForField(field).toLowerCase()} in the box that opened below — it's saved straight onto this client and the warning clears automatically. Only click Dismiss if the field genuinely doesn't apply.`
+        : "Fill in this field in the box that opened below, or click Dismiss if it doesn't apply.",
     };
   }
   if (/^code\./.test(key)) {
@@ -708,12 +747,20 @@ function ValidationPanel({
   onNavigateStep?: (id: WizardStepId) => void;
 }) {
   const overrideFn = useServerFn(overrideValidationIssue);
+  const saveManualFn = useServerFn(saveManualReviewRow);
   const m = useMutation({
     mutationFn: (vars: { issueKey: string; overridden: boolean }) =>
       overrideFn({ data: { subjectId, issueKey: vars.issueKey, overridden: vars.overridden } }),
     onSuccess: () => { toast.success("Saved"); onChanged(); },
     onError: (e: Error) => toast.error(e.message),
   });
+  const addFieldM = useMutation({
+    mutationFn: (vars: { targetField: string; value: string }) =>
+      saveManualFn({ data: { subjectId, targetField: vars.targetField, value: vars.value } }),
+    onSuccess: () => { toast.success("Added"); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const [inlineValue, setInlineValue] = useState<Record<string, string>>({});
   const blockingSet = new Set(validation.blocking);
   // Sort: blocking errors first, then warnings.
   const sortedIssues = [...validation.issues].sort((a, b) => {
@@ -755,55 +802,93 @@ function ValidationPanel({
             m.mutate({ issueKey: i.key, overridden: true });
           };
           const help = getIssueHelp(i.key, onNavigateStep);
+          const missingField = fieldKeyFromIssue(i.key);
           return (
-            <li key={i.key} className="flex flex-wrap items-start justify-between gap-2 rounded-md border border-border/70 bg-background/60 px-3 py-2">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <Badge variant={isBlocking ? "destructive" : "outline"} className="capitalize text-[10px]">
-                    {isBlocking ? "blocking" : i.severity}
-                  </Badge>
-                  {i.field && <span className="text-xs text-muted-foreground">{i.field}</span>}
-                </div>
-                <div className="mt-1">{i.message}</div>
-                {!codeMatch && (
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground/80">What to do: </span>
-                    {help.whatToDo}
+            <li key={i.key} className="flex flex-col gap-2 rounded-md border border-border/70 bg-background/60 px-3 py-2">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={isBlocking ? "destructive" : "outline"} className="capitalize text-[10px]">
+                      {isBlocking ? "blocking" : i.severity}
+                    </Badge>
+                    {i.field && <span className="text-xs text-muted-foreground">{i.field}</span>}
                   </div>
-                )}
+                  <div className="mt-1">{i.message}</div>
+                  {!codeMatch && (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground/80">What to do: </span>
+                      {help.whatToDo}
+                    </div>
+                  )}
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  {codeMatch ? (
+                    <>
+                      <Button size="sm" variant="default" disabled={m.isPending} onClick={() => setCodeBucket(codeMatch[2], "bill_as_ours")}>
+                        Bill this (ours)
+                      </Button>
+                      <Button size="sm" variant="outline" disabled={m.isPending} onClick={() => setCodeBucket(codeMatch[2], "coordination")}>
+                        Coordination only (won't bill)
+                      </Button>
+                      <Button size="sm" variant="ghost" disabled={m.isPending} onClick={() => setCodeBucket(codeMatch[2], "ignore")}>
+                        File as info / ignore
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      {help.action && (
+                        <Button size="sm" variant="outline" disabled={m.isPending} onClick={help.action.onClick}>
+                          {help.action.label}
+                        </Button>
+                      )}
+                      {!missingField && (isBlocking ? (
+                        <Button size="sm" variant="default" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: true })}>
+                          Confirm — I've reviewed this
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="ghost" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: true })}>
+                          Dismiss
+                        </Button>
+                      ))}
+                      {missingField && (
+                        <Button size="sm" variant="ghost" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: true })}>
+                          Doesn't apply — dismiss
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="flex shrink-0 flex-wrap items-center gap-2">
-                {codeMatch ? (
-                  <>
-                    <Button size="sm" variant="default" disabled={m.isPending} onClick={() => setCodeBucket(codeMatch[2], "bill_as_ours")}>
-                      Bill this (ours)
-                    </Button>
-                    <Button size="sm" variant="outline" disabled={m.isPending} onClick={() => setCodeBucket(codeMatch[2], "coordination")}>
-                      Coordination only (won't bill)
-                    </Button>
-                    <Button size="sm" variant="ghost" disabled={m.isPending} onClick={() => setCodeBucket(codeMatch[2], "ignore")}>
-                      File as info / ignore
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    {help.action && (
-                      <Button size="sm" variant="outline" disabled={m.isPending} onClick={help.action.onClick}>
-                        {help.action.label}
-                      </Button>
-                    )}
-                    {isBlocking ? (
-                      <Button size="sm" variant="default" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: true })}>
-                        Confirm — I've reviewed this
-                      </Button>
-                    ) : (
-                      <Button size="sm" variant="ghost" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: true })}>
-                        Dismiss
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
+              {missingField && (
+                <div className="flex flex-wrap items-center gap-2 rounded border border-dashed border-border/70 bg-muted/30 px-2 py-2">
+                  <label className="text-xs font-medium text-foreground/80 min-w-[120px]">
+                    Add {labelForField(missingField).toLowerCase()}
+                  </label>
+                  <Input
+                    className="h-8 flex-1 min-w-[180px]"
+                    placeholder={`Type the ${labelForField(missingField).toLowerCase()}…`}
+                    value={inlineValue[i.key] ?? ""}
+                    onChange={(e) => setInlineValue((prev) => ({ ...prev, [i.key]: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        const v = (inlineValue[i.key] ?? "").trim();
+                        if (v) addFieldM.mutate({ targetField: missingField, value: v });
+                      }
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    disabled={addFieldM.isPending || !(inlineValue[i.key] ?? "").trim()}
+                    onClick={() => {
+                      const v = (inlineValue[i.key] ?? "").trim();
+                      if (v) addFieldM.mutate({ targetField: missingField, value: v });
+                    }}
+                  >
+                    {addFieldM.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                    Save {labelForField(missingField).toLowerCase()}
+                  </Button>
+                </div>
+              )}
             </li>
           );
         })}
@@ -944,12 +1029,22 @@ function PlacementLineup({
     <div className="space-y-4">
       {showBilling && <BillingCodesEditor subjectId={subjectId} rows={billing} tenant={tenant} onChanged={onChanged} />}
       <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="text-sm font-semibold">Placement lineup</div>
-          <div className="text-xs text-muted-foreground">SOW-required fields only. Edit or × to remove.</div>
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <div className="text-sm font-semibold">Information NECTAR pulled from the file</div>
+            <div className="text-xs text-muted-foreground">
+              These are the required fields for a client record. Edit any value, remove a row with ×, or add anything NECTAR missed.
+            </div>
+          </div>
+          <AddMissingFieldPopover
+            subjectId={subjectId}
+            targetFields={targetFields}
+            presentFields={core.map((f) => f.target_field)}
+            onChanged={onChanged}
+          />
         </div>
         <div className="space-y-2">
-          {core.length === 0 && <div className="text-sm text-muted-foreground">No required fields extracted.</div>}
+          {core.length === 0 && <div className="text-sm text-muted-foreground">No required fields extracted yet — use "+ Add a field" to enter them manually.</div>}
           {core.map((f) => (
             <FieldRowEditor key={f.id} field={f} targetFields={targetFields} matchedValue={matched ? (matched[f.target_field] as string | null) ?? null : null} showDiff={decision === "update"} onChanged={onChanged} />
           ))}
@@ -969,6 +1064,71 @@ function PlacementLineup({
         </div>
       )}
     </div>
+  );
+}
+
+function AddMissingFieldPopover({
+  subjectId, targetFields, presentFields, onChanged,
+}: {
+  subjectId: string;
+  targetFields: string[];
+  presentFields: string[];
+  onChanged: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [field, setField] = useState<string>("");
+  const [value, setValue] = useState<string>("");
+  const saveFn = useServerFn(saveManualReviewRow);
+  const m = useMutation({
+    mutationFn: () => saveFn({ data: { subjectId, targetField: field, value: value.trim() } }),
+    onSuccess: () => {
+      toast.success(`Added ${labelForField(field).toLowerCase()}`);
+      setField(""); setValue(""); setOpen(false);
+      onChanged();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const present = new Set(presentFields);
+  const options = targetFields.filter((f) => !present.has(f)).sort((a, b) => labelForField(a).localeCompare(labelForField(b)));
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button size="sm" variant="outline" className="h-8">
+          <Plus className="mr-1 h-3.5 w-3.5" /> Add a field
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 space-y-3">
+        <div className="text-sm font-semibold">Add a field NECTAR missed</div>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">Field</label>
+          <Select value={field} onValueChange={setField}>
+            <SelectTrigger className="h-9"><SelectValue placeholder="Pick a field…" /></SelectTrigger>
+            <SelectContent className="max-h-72">
+              {options.length === 0 && <div className="px-2 py-1 text-xs text-muted-foreground">All required fields are already present.</div>}
+              {options.map((f) => (
+                <SelectItem key={f} value={f}>{labelForField(f)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">Value</label>
+          <Input
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={field ? `Type the ${labelForField(field).toLowerCase()}…` : "Pick a field first"}
+            disabled={!field}
+          />
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button size="sm" disabled={!field || !value.trim() || m.isPending} onClick={() => m.mutate()}>
+            {m.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+            Save
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 

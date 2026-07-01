@@ -142,10 +142,10 @@ export function PcspTab({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("client_emergency_contacts")
-        .select("id, name, phone, relationship, instructions")
+        .select("id, name, phone, relationship")
         .eq("client_id", clientId);
       if (error) throw error;
-      return (data ?? []) as Array<Record<string, unknown>>;
+      return (data ?? []) as unknown as Array<Record<string, unknown>>;
     },
   });
 
@@ -162,7 +162,7 @@ export function PcspTab({
         .eq("is_active", true)
         .order("medication_name", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as Array<Record<string, unknown>>;
+      return (data ?? []) as unknown as Array<Record<string, unknown>>;
     },
   });
 
@@ -173,11 +173,11 @@ export function PcspTab({
       const { data, error } = await supabase
         .from("client_billing_codes")
         .select(
-          "id, service_code, units_authorized, unit_type, rate_per_unit, effective_start, effective_end, authorization_pending",
+          "id, service_code, annual_unit_authorization, unit_type, rate_per_unit, service_start_date, service_end_date, authorization_pending",
         )
         .eq("client_id", clientId);
       if (error) throw error;
-      return (data ?? []) as Array<Record<string, unknown>>;
+      return (data ?? []) as unknown as Array<Record<string, unknown>>;
     },
   });
 
@@ -187,12 +187,12 @@ export function PcspTab({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("client_progress_summaries")
-        .select("id, period_start, period_end, status, published_at, updated_at")
+        .select("id, period_start, period_end, status, finalized_at, updated_at")
         .eq("client_id", clientId)
         .order("period_end", { ascending: false })
         .limit(4);
       if (error) throw error;
-      return (data ?? []) as Array<Record<string, unknown>>;
+      return (data ?? []) as unknown as Array<Record<string, unknown>>;
     },
   });
 

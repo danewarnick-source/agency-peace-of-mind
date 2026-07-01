@@ -454,6 +454,9 @@ export const getApprovalThread = createServerFn({ method: "POST" })
       resolved_by_name: req.resolved_by_user_id ? (profiles.get(req.resolved_by_user_id as string) ?? null) : null,
       resolved_at: (req.resolved_at as string | null) ?? null,
       resolution_note: (req.resolution_note as string | null) ?? null,
+      resolved_signature_name: (req.resolved_signature_name as string | null) ?? null,
+      resolved_signature_attested: (req.resolved_signature_attested as boolean | null) ?? null,
+      resolved_signature_at: (req.resolved_signature_at as string | null) ?? null,
       created_at: req.created_at as string,
       updated_at: req.updated_at as string,
       last_activity_at:
@@ -472,7 +475,11 @@ export const getApprovalThread = createServerFn({ method: "POST" })
       created_at: m.created_at as string,
       read_by_provider_at: (m.read_by_provider_at as string | null) ?? null,
       read_by_hive_at: (m.read_by_hive_at as string | null) ?? null,
+      resolved_signature_name: (m.resolved_signature_name as string | null) ?? null,
+      resolved_signature_attested: (m.resolved_signature_attested as boolean | null) ?? null,
+      resolved_signature_at: (m.resolved_signature_at as string | null) ?? null,
     }));
+
 
     return { request, messages, viewer_side: viewer };
   });

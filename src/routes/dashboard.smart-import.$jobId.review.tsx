@@ -592,9 +592,9 @@ function getIssueHelp(
   if (key === "org.codes_held_missing") {
     return {
       whatToDo:
-        "Set this org's awarded service codes so NECTAR can tell 'ours' from 'other provider' automatically. You can also just delete any code rows below that aren't yours.",
+        "Two ways to clear this: (a) Open Company Profile and check off the DSPD codes your agency is awarded — this is a one-time setup and every future import benefits, or (b) if you've already reviewed the billing codes on this client and they're correct as shown, click Dismiss. This warning never blocks saving the client.",
       action: {
-        label: "Set awarded codes",
+        label: "Set awarded codes in Company Profile",
         onClick: () => {
           window.open("/dashboard/nectar-company-profile#codes-held", "_blank");
         },
@@ -666,7 +666,9 @@ function ValidationPanel({
     <div className={panelClass}>
       <div className={headerClass}>
         <AlertTriangle className="h-4 w-4" />
-        {sortedIssues.length} thing{sortedIssues.length === 1 ? "" : "s"} to review before saving
+        {anyBlocking
+          ? `${sortedIssues.length} thing${sortedIssues.length === 1 ? "" : "s"} to review before saving`
+          : `${sortedIssues.length} optional item${sortedIssues.length === 1 ? "" : "s"} — nothing is blocking this client`}
         <span className="text-xs font-normal opacity-80">
           ({blockingCount} blocking, {advisoryCount} advisory)
         </span>

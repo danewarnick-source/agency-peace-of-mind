@@ -1802,8 +1802,10 @@ function BillingCodesEditor({
 
   const orgLabel = tenant.names[0] ?? "your organization";
   const externalRows = parsed.filter((p) => providerOwnership(p.row.provider_name, tenant) === "external");
-  const pendingCount = externalRows.filter((p) => approvals[p.field.id]?.status === "pending").length;
-  const approvedCount = externalRows.filter((p) => approvals[p.field.id]?.status === "approved").length;
+  const notOursCount = externalRows.filter((p) => p.row.ownership_ack === "not_ours").length;
+  const unresolvedExternal = externalRows.filter((p) => p.row.ownership_ack !== "not_ours");
+  const pendingCount = unresolvedExternal.filter((p) => approvals[p.field.id]?.status === "pending").length;
+  const approvedCount = unresolvedExternal.filter((p) => approvals[p.field.id]?.status === "approved").length;
 
   return (
     <div id="billing-codes" className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
@@ -1812,7 +1814,7 @@ function BillingCodesEditor({
           <div className="text-sm font-semibold">Billing codes on the PCSP</div>
           <div className="text-xs text-muted-foreground">
             The <span className="font-medium">Ownership</span> column shows whether each code is billed by <span className="font-medium">{orgLabel}</span> or by an outside provider (support coordinator, another agency).
-            Only codes marked "Ours" flow into your 520s. For an external code you must <span className="font-medium">request HIVE Admin approval</span> — HIVE Admin will respond in your Inbox and you can go back and forth until it is resolved.
+            Only codes marked "Ours" flow into your 520s. For an external code, either click <span className="font-medium">Not my organization</span> to leave it on the record without billing responsibility, or click <span className="font-medium">Request HIVE approval</span> to have HIVE Admin review it in your Inbox.
           </div>
         </div>
         <Button size="sm" variant="outline" onClick={() => setAdding(true)} disabled={adding}>

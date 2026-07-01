@@ -22,7 +22,7 @@ import {
   getReviewJob, getReviewSubject, editExtractedField, setSubjectDecision,
   setSubjectReady, upsertCertDocument, answerNectarQuestion, fileUnfiledItem,
   computeProvisioningForecast, togglePlanItem, submitForSetup,
-  saveBillingCodeRow, removeExtractedField, restoreExtractedField,
+  saveBillingCodeRow, saveManualReviewRow, removeExtractedField, restoreExtractedField,
   getJobAssigner, upsertManualAssignment, removeAssignmentMapRow,
 } from "@/lib/smart-import-review.functions";
 import { resolveMergeFlag, overrideValidationIssue } from "@/lib/import-checklist.functions";
@@ -44,7 +44,19 @@ export const Route = createFileRoute("/dashboard/smart-import/$jobId/review")({
 });
 
 // Core target fields (matches what extraction emits)
-const CLIENT_FIELDS = ["first_name","last_name","full_name","date_of_birth","phone","address","medicaid_id","job_code","team_name","is_own_guardian","guardian_name","guardian_phone","guardian_relationship","guardian_email","emergency_contact_name","emergency_contact_phone"];
+const CLIENT_FIELDS = [
+  "first_name","last_name","full_name","date_of_birth","phone","address","physical_address","mailing_address","medicaid_id",
+  "admission_date","discharge_date","form_1056_number","form_1056_approved_date","job_code","team_name",
+  "is_own_guardian","guardian_name","guardian_phone","guardian_relationship","guardian_email","guardian_address",
+  "emergency_contact_name","emergency_contact_phone","emergency_contact_instructions","emergency_contact_2_name","emergency_contact_2_phone","emergency_contact_2_instructions",
+  "support_coordinator_name","support_coordinator_email","support_coordinator_phone","support_coordinator_company",
+  "billing_code_row","service_code","rate","max_units","monthly_max_units","unit_type",
+  "pcp_name","pcp_phone","primary_care_name","primary_care_phone","specialist_name","specialist_phone","med_prescriber_name","med_prescriber_phone","neurologist_name","neurologist_phone","dentist_name","dentist_phone","prescriber_name","prescriber_phone",
+  "medical_insurance","diagnoses","chronic_conditions","immunizations","allergies","dysphagia","swallowing_alerts","self_admin_med_support","clinical_alert","special_directions",
+  "has_abi","hr_applicable","dnr_applicable","advanced_directives","emergency_medical_treatment_authorization","rights_restrictions","court_orders","dnr_status","dnr_location","polst_status","palliative_care_status","hospice_status",
+  "bsp_status","plan_year","disability_category","staff_ratio","housing_voucher","preferred_living","preferred_activities","roommates","personal_belongings_inventory",
+  "pcsp_goal","client_medication","pcsp_has_medications",
+];
 const EMPLOYEE_FIELDS = ["full_name","first_name","last_name","email","phone","position","hire_date","team_name"];
 
 type SubjectRow = {
@@ -329,13 +341,23 @@ function SubjectReview({
     (i) => !validationOverrides[i.key] && !/^code\.(confirm_owner|coordination|coordination_info|bill_as_ours|ignore)\./.test(i.key),
   );
   const issueCount = visibleIssues.length;
-  const steps: Array<{ id: WizardStepId; label: string; badge?: number }> = [
-    { id: "person", label: "Person & contacts" },
-    { id: "services", label: "Services & health" },
-    { id: "plan", label: "Plan & documents", badge: extraCount || undefined },
-    { id: "staff", label: jobMode === "employee" ? "Certs & training" : "Staff & training" },
-    { id: "review", label: "Review", badge: (askCount + issueCount) || undefined },
-  ];
+  const steps: Array<{ id: WizardStepId; label: string; badge?: number }> = jobMode === "client"
+    ? [
+        { id: "person", label: "Person & contacts" },
+        { id: "health", label: "Health & medical" },
+        { id: "medications", label: "Medications / MAR" },
+        { id: "goals", label: "PCSP goals" },
+        { id: "services", label: "Services" },
+        { id: "plan", label: "Plan & documents", badge: extraCount || undefined },
+        { id: "staff", label: "Staff & training" },
+        { id: "review", label: "Review", badge: (askCount + issueCount) || undefined },
+      ]
+    : [
+        { id: "person", label: "Person & contacts" },
+        { id: "services", label: "Role & team" },
+        { id: "staff", label: "Certs & training" },
+        { id: "review", label: "Review", badge: (askCount + issueCount) || undefined },
+      ];
   const activeIdx = steps.findIndex((s) => s.id === step);
 
   return (
@@ -394,14 +416,18 @@ const PERSON_FIELDS_SET = new Set([
   "support_coordinator_name","support_coordinator_email","support_coordinator_phone","support_coordinator_company",
   "admission_date","discharge_date","has_abi",
 ]);
+const HEALTH_FIELDS_SET = new Set([
+  "pcp_name","pcp_phone","primary_care_name","primary_care_phone","specialist_name","specialist_phone",
+  "med_prescriber_name","med_prescriber_phone","neurologist_name","neurologist_phone","dentist_name","dentist_phone","prescriber_name","prescriber_phone",
+  "medical_insurance","diagnoses","chronic_conditions","immunizations","allergies","dysphagia","swallowing_alerts","self_admin_med_support",
+  "clinical_alert","special_directions","bsp_status","has_abi","hr_applicable","dnr_applicable","advanced_directives","emergency_medical_treatment_authorization",
+  "rights_restrictions","court_orders","dnr_status","dnr_location","polst_status","palliative_care_status","hospice_status",
+]);
 const SERVICES_FIELDS_SET = new Set([
-  "billing_code_row","job_code","team_name",
-  "pcp_name","pcp_phone","specialist_name","specialist_phone",
-  "med_prescriber_name","med_prescriber_phone","medical_insurance",
-  "hr_applicable","dnr_applicable",
+  "billing_code_row","service_code","rate","max_units","monthly_max_units","unit_type","job_code","team_name",
 ]);
 
-type WizardStepId = "person" | "services" | "plan" | "staff" | "review";
+type WizardStepId = "person" | "health" | "medications" | "goals" | "services" | "plan" | "staff" | "review";
 
 function SubjectWizard({
   subjectId, jobMode, fields, targetFields, matched, decision, tenant,
@@ -426,8 +452,12 @@ function SubjectWizard({
   onChanged: () => void;
 }) {
   const personFields = fields.filter((f) => PERSON_FIELDS_SET.has(f.target_field));
+  const healthFields = fields.filter((f) => HEALTH_FIELDS_SET.has(f.target_field));
   const servicesFields = fields.filter((f) => SERVICES_FIELDS_SET.has(f.target_field));
-  const otherFields = fields.filter((f) => !PERSON_FIELDS_SET.has(f.target_field) && !SERVICES_FIELDS_SET.has(f.target_field) && !f.is_custom_attribute);
+  const goalFields = fields.filter((f) => f.target_field === "pcsp_goal" || f.field_key === "pcsp_goal");
+  const medicationFields = fields.filter((f) => f.target_field === "client_medication" || f.field_key === "client_medication" || f.target_field === "pcsp_has_medications");
+  const hiddenProfileFields = new Set(["pcsp_goal", "client_medication", "pcsp_has_medications"]);
+  const otherFields = fields.filter((f) => !PERSON_FIELDS_SET.has(f.target_field) && !HEALTH_FIELDS_SET.has(f.target_field) && !SERVICES_FIELDS_SET.has(f.target_field) && !hiddenProfileFields.has(f.target_field) && !f.is_custom_attribute);
   // Anything we couldn't bucket falls into Person so nothing disappears.
   const personFieldsAll = [...personFields, ...otherFields, ...fields.filter((f) => f.is_custom_attribute)];
 
@@ -445,8 +475,25 @@ function SubjectWizard({
       {step === "services" && (
         <PlacementLineup
           fields={servicesFields} targetFields={targetFields} matched={matched}
-          decision={decision} subjectId={subjectId} tenant={tenant} onChanged={onChanged}
+          decision={decision} subjectId={subjectId} tenant={tenant} onChanged={onChanged} showBilling
         />
+      )}
+      {step === "health" && (
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground shadow-[var(--shadow-card)]">
+            This is the health/medical portion of the client profile preview. Confirm providers, diagnoses, allergies, swallowing risks, clinical alerts, human-rights/DNR flags, and other PCSP-pulled care details before creating the profile.
+          </div>
+          <PlacementLineup
+            fields={healthFields} targetFields={targetFields} matched={matched}
+            decision={decision} subjectId={subjectId} tenant={tenant} onChanged={onChanged}
+          />
+        </div>
+      )}
+      {step === "medications" && jobMode === "client" && (
+        <MedicationsReviewPanel subjectId={subjectId} fields={medicationFields} onChanged={onChanged} />
+      )}
+      {step === "goals" && jobMode === "client" && (
+        <GoalsReviewPanel subjectId={subjectId} fields={goalFields} onChanged={onChanged} />
       )}
       {step === "plan" && (
         <div className="space-y-3">
@@ -856,10 +903,10 @@ type FieldRow = {
   dismissed_at?: string | null;
 };
 function PlacementLineup({
-  fields, targetFields, matched, decision, subjectId, tenant, onChanged,
+  fields, targetFields, matched, decision, subjectId, tenant, onChanged, showBilling = false,
 }: {
   fields: FieldRow[]; targetFields: string[]; matched: Record<string, string | null> | null;
-  decision: SubjectRow["review_decision"]; subjectId: string; tenant: TenantIdentity; onChanged: () => void;
+  decision: SubjectRow["review_decision"]; subjectId: string; tenant: TenantIdentity; onChanged: () => void; showBilling?: boolean;
 }) {
   // Prompt 18: peel billing-code rows out of the generic field list so we can
   // show them as a proper editable table. The remaining placement lineup keeps
@@ -874,7 +921,7 @@ function PlacementLineup({
   const custom = rest.filter((f) => f.is_custom_attribute);
   return (
     <div className="space-y-4">
-      <BillingCodesEditor subjectId={subjectId} rows={billing} tenant={tenant} onChanged={onChanged} />
+      {showBilling && <BillingCodesEditor subjectId={subjectId} rows={billing} tenant={tenant} onChanged={onChanged} />}
       <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
         <div className="mb-3 flex items-center justify-between">
           <div className="text-sm font-semibold">Placement lineup</div>
@@ -904,6 +951,254 @@ function PlacementLineup({
   );
 }
 
+// ---------------------------- Profile-shaped clinical review panels ----------------------------
+function parseJsonValue(f: FieldRow): Record<string, unknown> | null {
+  if (!f.value) return null;
+  try {
+    const raw = JSON.parse(f.value);
+    return raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
+
+function valueString(v: unknown): string {
+  return v == null ? "" : String(v);
+}
+
+type MedicationReviewRow = {
+  name: string;
+  dose: string;
+  route: string;
+  frequency: string;
+  schedule: string;
+  scheduled_time: string;
+  prescriber: string;
+  support_level: string;
+  support_explanation: string;
+};
+
+const emptyMedicationRow: MedicationReviewRow = {
+  name: "",
+  dose: "",
+  route: "",
+  frequency: "",
+  schedule: "",
+  scheduled_time: "",
+  prescriber: "",
+  support_level: "",
+  support_explanation: "",
+};
+
+function parseMedicationReviewRow(f: FieldRow): MedicationReviewRow {
+  const raw = parseJsonValue(f);
+  if (!raw) return { ...emptyMedicationRow, name: f.value ?? "" };
+  return {
+    name: valueString(raw.name ?? raw.medication_name),
+    dose: valueString(raw.dose ?? raw.dosage),
+    route: valueString(raw.route),
+    frequency: valueString(raw.frequency),
+    schedule: valueString(raw.schedule),
+    scheduled_time: valueString(raw.scheduled_time),
+    prescriber: valueString(raw.prescriber),
+    support_level: valueString(raw.support_level),
+    support_explanation: valueString(raw.support_explanation),
+  };
+}
+
+function MedicationsReviewPanel({ subjectId, fields, onChanged }: { subjectId: string; fields: FieldRow[]; onChanged: () => void }) {
+  const [adding, setAdding] = useState(false);
+  const meds = fields.filter((f) => (f.target_field === "client_medication" || f.field_key === "client_medication") && !f.dismissed_at);
+  const hasNoMedsSignal = fields.some((f) => f.target_field === "pcsp_has_medications" && String(f.value ?? "").toLowerCase() === "false" && !f.dismissed_at);
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="text-sm font-semibold">Medications / MAR preview</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              These rows create the client's active medication list used by MAR/eMAR, medication attestations, client-specific training, and daily care documentation. Review the PCSP/MAR-extracted details before finalizing.
+            </p>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setAdding(true)} disabled={adding}>
+            <Plus className="mr-1 h-3.5 w-3.5" /> Add medication
+          </Button>
+        </div>
+        {hasNoMedsSignal && meds.length === 0 && (
+          <div className="mt-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-700 dark:text-emerald-300">
+            NECTAR found the PCSP says this person has no medications. If that is wrong, add the medication rows here before finalizing.
+          </div>
+        )}
+        {meds.length === 0 && !adding && !hasNoMedsSignal && (
+          <div className="mt-3 rounded-lg border border-amber-300/60 bg-amber-50/40 p-3 text-xs text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
+            No medication rows were found. If the PCSP/MAR includes medications, add them manually here so MAR/eMAR and training start from the reviewed record.
+          </div>
+        )}
+        {(meds.length > 0 || adding) && (
+          <div className="mt-3 overflow-x-auto rounded-md border border-border/60">
+            <table className="w-full min-w-[980px] text-left text-xs">
+              <thead className="text-muted-foreground">
+                <tr className="border-b border-border">
+                  <th className="px-2 py-2 font-medium">Medication</th>
+                  <th className="px-2 py-2 font-medium">Dose</th>
+                  <th className="px-2 py-2 font-medium">Route</th>
+                  <th className="px-2 py-2 font-medium">Frequency / schedule</th>
+                  <th className="px-2 py-2 font-medium">Time</th>
+                  <th className="px-2 py-2 font-medium">Prescriber</th>
+                  <th className="px-2 py-2 font-medium">Support needed</th>
+                  <th className="px-2 py-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {meds.map((f) => (
+                  <MedicationReviewRowEditor key={f.id} subjectId={subjectId} fieldId={f.id} initial={parseMedicationReviewRow(f)} onChanged={onChanged} />
+                ))}
+                {adding && (
+                  <MedicationReviewRowEditor subjectId={subjectId} fieldId={null} initial={emptyMedicationRow} isNew onChanged={() => { setAdding(false); onChanged(); }} onCancel={() => setAdding(false)} />
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MedicationReviewRowEditor({
+  subjectId, fieldId, initial, isNew, onChanged, onCancel,
+}: {
+  subjectId: string; fieldId: string | null; initial: MedicationReviewRow; isNew?: boolean; onChanged: () => void; onCancel?: () => void;
+}) {
+  const [row, setRow] = useState<MedicationReviewRow>(initial);
+  const [dirty, setDirty] = useState(!!isNew);
+  const save = useServerFn(saveManualReviewRow);
+  const remove = useServerFn(removeExtractedField);
+  const patch = <K extends keyof MedicationReviewRow>(key: K, value: MedicationReviewRow[K]) => {
+    setRow((prev) => ({ ...prev, [key]: value }));
+    setDirty(true);
+  };
+  const saveMut = useMutation({
+    mutationFn: () => save({ data: { subjectId, fieldId, targetField: "client_medication", value: row } }),
+    onSuccess: () => { toast.success("Saved medication"); setDirty(false); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const removeMut = useMutation({
+    mutationFn: () => remove({ data: { fieldId: fieldId as string } }),
+    onSuccess: () => { toast.success("Removed from this import"); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <tr className="border-b border-border/60 align-top">
+      <td className="px-2 py-2"><Input className="h-8 min-w-[150px]" value={row.name} onChange={(e) => patch("name", e.target.value)} placeholder="Name" /></td>
+      <td className="px-2 py-2"><Input className="h-8 min-w-[100px]" value={row.dose} onChange={(e) => patch("dose", e.target.value)} placeholder="Dose" /></td>
+      <td className="px-2 py-2"><Input className="h-8 min-w-[90px]" value={row.route} onChange={(e) => patch("route", e.target.value)} placeholder="Route" /></td>
+      <td className="px-2 py-2">
+        <div className="space-y-1">
+          <Input className="h-8 min-w-[150px]" value={row.frequency} onChange={(e) => patch("frequency", e.target.value)} placeholder="Frequency" />
+          <Input className="h-8 min-w-[150px]" value={row.schedule} onChange={(e) => patch("schedule", e.target.value)} placeholder="Schedule notes" />
+        </div>
+      </td>
+      <td className="px-2 py-2"><Input className="h-8 min-w-[90px]" value={row.scheduled_time} onChange={(e) => patch("scheduled_time", e.target.value)} placeholder="08:00" /></td>
+      <td className="px-2 py-2"><Input className="h-8 min-w-[130px]" value={row.prescriber} onChange={(e) => patch("prescriber", e.target.value)} placeholder="Prescriber" /></td>
+      <td className="px-2 py-2">
+        <div className="space-y-1">
+          <Select value={row.support_level || "__blank"} onValueChange={(v) => patch("support_level", v === "__blank" ? "" : v)}>
+            <SelectTrigger className="h-8 min-w-[140px]"><SelectValue placeholder="Level" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__blank">Not specified</SelectItem>
+              <SelectItem value="independent">Independent</SelectItem>
+              <SelectItem value="reminder">Reminder</SelectItem>
+              <SelectItem value="set_up">Set up</SelectItem>
+              <SelectItem value="full_assist">Full assist</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input className="h-8 min-w-[180px]" value={row.support_explanation} onChange={(e) => patch("support_explanation", e.target.value)} placeholder="Support instructions" />
+        </div>
+      </td>
+      <td className="px-2 py-2">
+        <div className="flex items-center justify-end gap-1">
+          {dirty && <Button size="sm" className="h-7" onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !row.name.trim()}>{saveMut.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Save</Button>}
+          {isNew && onCancel && <Button size="sm" variant="ghost" className="h-7" onClick={onCancel}>Cancel</Button>}
+          {!isNew && fieldId && <Button size="sm" variant="ghost" className="h-7 text-destructive" onClick={() => removeMut.mutate()} disabled={removeMut.isPending}><Trash2 className="h-3 w-3" /></Button>}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function GoalsReviewPanel({ subjectId, fields, onChanged }: { subjectId: string; fields: FieldRow[]; onChanged: () => void }) {
+  const [adding, setAdding] = useState(false);
+  const goals = fields.filter((f) => !f.dismissed_at);
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="text-sm font-semibold">PCSP goals preview</div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            These goals populate the Care tab and ground support strategies, client-specific training, Person-Centered Profile content, and daily support expectations. Confirm each provider-responsible goal from the PCSP before finalizing.
+          </p>
+        </div>
+        <Button size="sm" variant="outline" onClick={() => setAdding(true)} disabled={adding}>
+          <Plus className="mr-1 h-3.5 w-3.5" /> Add goal
+        </Button>
+      </div>
+      {goals.length === 0 && !adding && (
+        <div className="mt-3 rounded-lg border border-amber-300/60 bg-amber-50/40 p-3 text-xs text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
+          No PCSP goals were found. If the PCSP includes goals, add them here so they are not missing from the live client profile.
+        </div>
+      )}
+      <div className="mt-3 space-y-2">
+        {goals.map((f, idx) => (
+          <GoalReviewRowEditor key={f.id} subjectId={subjectId} fieldId={f.id} initial={f.value ?? ""} label={`Goal ${idx + 1}`} onChanged={onChanged} />
+        ))}
+        {adding && (
+          <GoalReviewRowEditor subjectId={subjectId} fieldId={null} initial="" label="New goal" isNew onChanged={() => { setAdding(false); onChanged(); }} onCancel={() => setAdding(false)} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function GoalReviewRowEditor({
+  subjectId, fieldId, initial, label, isNew, onChanged, onCancel,
+}: {
+  subjectId: string; fieldId: string | null; initial: string; label: string; isNew?: boolean; onChanged: () => void; onCancel?: () => void;
+}) {
+  const [value, setValue] = useState(initial);
+  const [dirty, setDirty] = useState(!!isNew);
+  const save = useServerFn(saveManualReviewRow);
+  const remove = useServerFn(removeExtractedField);
+  const saveMut = useMutation({
+    mutationFn: () => save({ data: { subjectId, fieldId, targetField: "pcsp_goal", value } }),
+    onSuccess: () => { toast.success("Saved goal"); setDirty(false); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const removeMut = useMutation({
+    mutationFn: () => remove({ data: { fieldId: fieldId as string } }),
+    onSuccess: () => { toast.success("Removed from this import"); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <div className="rounded-lg border border-border/70 bg-background/60 p-3">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div className="flex items-center gap-1">
+          {dirty && <Button size="sm" className="h-7" onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !value.trim()}>{saveMut.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Save</Button>}
+          {isNew && onCancel && <Button size="sm" variant="ghost" className="h-7" onClick={onCancel}>Cancel</Button>}
+          {!isNew && fieldId && <Button size="sm" variant="ghost" className="h-7 text-destructive" onClick={() => removeMut.mutate()} disabled={removeMut.isPending}><Trash2 className="h-3 w-3" /></Button>}
+        </div>
+      </div>
+      <Textarea
+        value={value}
+        onChange={(e) => { setValue(e.target.value); setDirty(true); }}
+        placeholder="Describe the PCSP goal, desired outcome, and any important support details from the plan."
+        className="min-h-[92px] text-sm"
+      />
+    </div>
+  );
+}
+
 // ---------------------------- BillingCodesEditor (Prompt 18) ----------------------------
 type BillingRowShape = {
   service_code: string;
@@ -918,8 +1213,8 @@ type BillingRowShape = {
 const UNIT_TYPE_OPTIONS = ["15 min", "day", "month", "session", "hour", "unit"];
 
 function parseBillingRow(f: FieldRow): BillingRowShape | null {
-  // Prefer value_json (jsonb on the row), fall back to parsing the text value.
-  const raw = f.value_json ?? (() => { try { return f.value ? JSON.parse(f.value) : null; } catch { return null; } })();
+  // Structured rows are stored as JSON text in staging for live-schema compatibility.
+  const raw = (() => { try { return f.value ? JSON.parse(f.value) : null; } catch { return null; } })();
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
   const sc = r.service_code ? String(r.service_code).toUpperCase() : "";

@@ -122,6 +122,26 @@ function toNum(v: unknown): number | null {
   return null;
 }
 
+function asString(v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  return s ? s : null;
+}
+
+function timeFromAny(v: unknown): string | null {
+  const s = asString(v);
+  if (!s) return null;
+  const m = s.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+  if (!m) return null;
+  return `${m[1].padStart(2, "0")}:${m[2]}`;
+}
+
+function boolFromAny(v: unknown): boolean {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "string") return ["true", "yes", "y", "1", "prn"].includes(v.trim().toLowerCase());
+  return false;
+}
+
 export async function applyExtractedFieldsToClient(
   ctx: ApplyExtractedCtx,
 ): Promise<{ autofilled: string[]; suggested: string[]; customCreated: string[] }> {
@@ -306,6 +326,7 @@ export async function applyExtractedFieldsToClient(
   setScalarText("first_name", "first_name");
   setScalarText("last_name", "last_name");
   setScalarDate("date_of_birth", "dob");
+  setScalarDate("date_of_birth", "date_of_birth");
   setScalarText("medicaid_id", "medicaid_id");
   setScalarText("phone_number", "phone");
   setScalarText("physical_address", "physical_address");
@@ -395,6 +416,9 @@ export async function applyExtractedFieldsToClient(
   setScalarText("hospice_status", "hospice_status");
 
   // Booleans
+  setScalarBool("has_abi", "has_abi");
+  setScalarBool("hr_applicable", "hr_applicable");
+  setScalarBool("dnr_applicable", "dnr_applicable");
   setScalarBool("advanced_directives", "advanced_directives");
   setScalarBool("emergency_medical_treatment_authorization", "emergency_medical_treatment_authorization");
   setScalarBool("grievance_acknowledged", "grievance_acknowledged");
@@ -658,6 +682,59 @@ export async function applyExtractedFieldsToClient(
       .eq("is_active", true);
     const hasExistingMeds = (existingMedCount ?? 0) > 0;
 
+    if (medRows.length > 0) {
+      const { data: existingMeds } = await supabase
+        .from("client_medications")
+        .select("medication_name,dosage,is_active")
+        .eq("organization_id", organizationId)
+        .eq("client_id", clientId);
+      const seen = new Set(
+        (existingMeds ?? []).map((m: { medication_name: string; dosage: string | null }) =>
+          `${(m.medication_name || "").trim().toLowerCase()}|${(m.dosage || "").trim().toLowerCase()}`,
+        ),
+      );
+      let insertedMeds = 0;
+      for (const f of medRows) {
+        const row = (f.value_json && typeof f.value_json === "object" ? f.value_json : {}) as Record<string, unknown>;
+        const name = asString(row.medication_name ?? row.name ?? fieldText(f));
+        if (!name) continue;
+        const dosage = asString(row.dosage ?? row.dose);
+        const key = `${name.toLowerCase()}|${(dosage || "").toLowerCase()}`;
+        if (seen.has(key)) continue;
+        const scheduledTime = timeFromAny(row.scheduled_time ?? row.schedule);
+        const scheduledTimes = Array.isArray(row.scheduled_times)
+          ? row.scheduled_times.map(timeFromAny).filter((t): t is string => !!t)
+          : (scheduledTime ? [scheduledTime] : []);
+        const instructions = asString(row.instructions) ?? asString(row.support_explanation) ?? asString(row.schedule);
+        const supportExplanation = asString(row.support_explanation) ?? instructions ?? "Review medication support instructions from the source document.";
+        const { error: medErr } = await supabase.from("client_medications").insert({
+          organization_id: organizationId,
+          client_id: clientId,
+          medication_name: name,
+          dosage,
+          route: asString(row.route),
+          frequency: asString(row.frequency ?? row.schedule),
+          scheduled_time: scheduledTime,
+          scheduled_times: scheduledTimes,
+          prescriber: asString(row.prescriber),
+          instructions,
+          support_level: asString(row.support_level),
+          support_explanation: supportExplanation,
+          is_prn: boolFromAny(row.is_prn),
+          prn_instructions: asString(row.prn_instructions),
+          is_active: true,
+        });
+        if (medErr) {
+          await onError("client_medication_insert_error", medErr.message);
+          suggested.push(`medication ${name} (could not create row)`);
+        } else {
+          insertedMeds += 1;
+          seen.add(key);
+        }
+      }
+      if (insertedMeds) autofilled.push(`client_medications(${insertedMeds})`);
+    }
+
     if (medRows.length === 0 && hasMedsFlag === false && !hasExistingMeds) {
       const { data: cRow } = await supabase
         .from("clients")
@@ -845,6 +922,8 @@ export async function applyExtractedFieldsToClient(
     "support_coordinator_company",
     // Medical providers
     "primary_care_name", "primary_care_phone",
+    "pcp_name", "pcp_phone", "specialist_name", "specialist_phone",
+    "med_prescriber_name", "med_prescriber_phone",
     "neurologist_name", "neurologist_phone",
     "dentist_name", "dentist_phone",
     "prescriber_name", "prescriber_phone",
@@ -852,6 +931,7 @@ export async function applyExtractedFieldsToClient(
     "bsp_status", "medical_insurance", "housing_voucher", "preferred_living",
     "plan_year", "disability_category",
     "advanced_directives", "emergency_medical_treatment_authorization",
+    "has_abi", "hr_applicable", "dnr_applicable",
     // Array columns
     "diagnoses", "chronic_conditions", "immunizations",
     "court_orders", "rights_restrictions",

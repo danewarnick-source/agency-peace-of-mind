@@ -906,7 +906,7 @@ export async function applyExtractedFieldsToClient(
   // Anything else without a clients column → generic custom field so nothing
   // extracted is lost. Unknown keys are logged once so we can detect future drops.
   const KNOWN_CORE = new Set<string>([
-    "first_name", "last_name", "full_name", "dob", "medicaid_id", "phone",
+    "first_name", "last_name", "full_name", "dob", "date_of_birth", "medicaid_id", "phone",
     "physical_address", "mailing_address",
     "emergency_contact_name", "emergency_contact_phone", "emergency_contact_instructions",
     "is_own_guardian", "guardian_name", "guardian_phone", "guardian_relationship",

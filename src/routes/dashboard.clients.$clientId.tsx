@@ -181,6 +181,7 @@ function ClientProfileHub() {
           <TabsTrigger value="activity">Activity</TabsTrigger>
           <TabsTrigger value="funds">Funds</TabsTrigger>
           <TabsTrigger value="files">Files</TabsTrigger>
+          <TabsTrigger value="pcsp">PCSP</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="space-y-4">

@@ -955,7 +955,7 @@ function BillingCodesEditor({
   const [adding, setAdding] = useState(false);
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+    <div id="billing-codes" className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="text-sm font-semibold">Billing codes (your authorization)</div>

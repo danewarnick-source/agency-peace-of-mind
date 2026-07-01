@@ -710,12 +710,11 @@ function getIssueHelp(
     };
   }
   if (/^client\.(missing|address)/.test(key)) {
+    const field = fieldKeyFromIssue(key);
     return {
-      whatToDo:
-        "Open the Person & contacts step and fill in this field, or dismiss the extracted row if it doesn't apply.",
-      action: onNavigateStep
-        ? { label: "Go to Person step", onClick: () => onNavigateStep("person") }
-        : undefined,
+      whatToDo: field
+        ? `Type the ${labelForField(field).toLowerCase()} in the box that opened below — it's saved straight onto this client and the warning clears automatically. Only click Dismiss if the field genuinely doesn't apply.`
+        : "Fill in this field in the box that opened below, or click Dismiss if it doesn't apply.",
     };
   }
   if (/^code\./.test(key)) {

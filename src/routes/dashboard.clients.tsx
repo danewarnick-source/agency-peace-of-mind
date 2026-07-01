@@ -534,6 +534,17 @@ export function ClientsPage() {
 
         )}
       </div>
+
+      <DeleteClientDialog
+        open={!!deleteTarget}
+        onOpenChange={(v) => !v && setDeleteTarget(null)}
+        clientId={deleteTarget?.id ?? null}
+        clientName={deleteTarget?.name ?? ""}
+        onDeleted={() => {
+          setDeleteTarget(null);
+          qc.invalidateQueries({ queryKey: ["clients"] });
+        }}
+      />
     </div>
   );
 }

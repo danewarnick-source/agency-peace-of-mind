@@ -1,48 +1,51 @@
-## What to build
+# Org-wide pending-client workbench on the Review page
 
-On the Smart Import upload page (client mode), replace the flat row of file chips with a **grouped, running list** that appears the moment a file is added and grows as more are added. Each group is headed by a client name and lists every document uploaded for that person with type + a couple of details. Nothing runs until the admin clicks "Process with NECTAR" — this is purely a pre-flight preview.
+## The problem
 
-## Group shape
+The Smart Import Review page (`/dashboard/smart-import/$jobId/review`) is **job-scoped**. Its left "People" column lists only the subjects inside the currently-opened job. When the provider has two pending clients across two different import jobs (or the second client was created outside this job), only one appears — even though both need review.
 
-```text
-Blake Adam                                          2 documents
-  ─ PCSP · PDF · dated 6/1/26 · 1.4 MB · "BA PCSP - 6.1.26.pdf"     [remove]
-  ─ Behavior Plan · DOCX · 220 KB · "BA - BSP draft.docx"           [remove]
+The provider then has to bounce between the Pending Clients dashboard, Smart Import, and the Review page for each client. Painful.
 
-Unassigned (tap a chip to tag a client)              1 document
-  ─ Roster · CSV · 12 rows · "intake_may.csv"                       [remove]
-```
+## The change
 
-Rosters stay in their own "Roster / table" group (they fan out into many people server-side, so grouping by name is meaningless up front).
+Turn the left column into an **org-wide "Pending clients" queue**, so a provider can sit down once and finalize every pending client in a row. When they finish one (Complete client setup → committed / finalized), it drops off the list and the next pending client auto-loads.
 
-## Detection (client-side only, no server calls)
+Data already exists: `listPendingClientSubjects` in `src/lib/smart-import-review.functions.ts` returns every non-committed, non-discarded client subject across all jobs in the org (the Pending Clients dashboard uses it). We just haven't wired it into the review workbench.
 
-Parse each `File.name` locally the moment it's added:
+## Scope (UI only, no schema changes)
 
-1. **Document type** — regex match against a keyword table:
-   - PCSP, Person-Centered / ISP, IEP, BSP / Behavior, MAR / Medication, Consent, Assessment, 1056 / Authorization, Progress Note, Incident, Emergency, Diet, Seizure, DNR, Guardianship. Falls back to "Document" when nothing matches.
-2. **Client identifier** — strip the doc-type token, extension, and any trailing date; take what remains as the label. Handle two common shapes:
-   - `"BA PCSP - 6.1.26.pdf"` → initials `BA`
-   - `"Blake Adam - PCSP.pdf"` / `"Blake_Adam_PCSP.pdf"` → full name `Blake Adam`
-   Two-letter tokens are treated as initials and displayed as `BA` until the admin edits it.
-3. **Date** — first `M/D/YY(YY)` or `YYYY-MM-DD` in the name.
-4. **File details** — mime/extension + human-readable size (already in `File.size`).
+### 1. `src/routes/dashboard.smart-import.$jobId.review.tsx`
 
-Grouping key = normalized name/initials (case-insensitive, punctuation stripped). Two files that both parse to `BA` land under the same header even before the admin renames it.
+- Add a second query alongside `getReviewJob`: `listPendingClientSubjects` → `orgPendingClients` (org-scoped, excludes finalized/discarded, includes `import_job_id`).
+- Merge results into a single left-column list. Each row shows: display name, review status dot, and a small chip with the source (e.g. "This import" vs the other job's short id / created date) so the provider knows why a subject from another job is showing up.
+- Rows from other jobs, when clicked, `navigate({ to: '/dashboard/smart-import/$jobId/review', params: { jobId: row.import_job_id } })` and then select that subject. Rows from the current job just call `setSelectedId` as today.
+- Group ordering: current-job subjects first (preserves existing flow), then other-job pending clients, then a divider + "Recently finalized (this session)" collapsed section for reassurance.
+- After a subject is marked ready + committed (existing `submitForSetup` / "Complete client setup" success path), invalidate both `["smart-import-review", jobId]` and `["pending-client-subjects", orgId]`, then auto-advance: pick the next non-ready subject from the merged list; if it belongs to another job, navigate there.
+- Empty state when the merged list is empty: "All caught up — no pending clients to review." with a link back to `/dashboard/clients`.
+- Keep employee-mode jobs unchanged (the org-wide queue is client-only; if `job.mode === 'employee'`, render the current job-only queue as today).
 
-## Admin editing before processing
+### 2. `SubjectQueue` component (same file)
 
-- Each group header is click-to-edit inline: rename "BA" → "Blake Adam" and every file in that group moves with the label. This only affects the preview; server extraction is unchanged.
-- Each file row keeps its existing remove (×) affordance.
-- A file with no detected identifier lands in "Unassigned"; the admin can drag/select it into an existing group via a small "Move to…" menu, or leave it — NECTAR still processes it, it just wasn't pre-labeled.
+- Accept the new merged list shape `{ id, display_name, review_status, match_status, source: 'current' | 'other', import_job_id, job_label? }`.
+- Rename header from "People" → "Pending clients" (client mode only).
+- Add a subtle "opens other import" indicator (small `Link2` icon + short job label) on other-job rows.
+- Keep the existing status dot + match badges.
 
-Roster/CSV/XLSX files skip name detection entirely and appear in a single "Roster / table" group with row count (parsed via the existing `parseRoster` helper, which already runs before submit — we hoist that parse to happen on add so we can show the row count immediately).
+### 3. No backend / schema changes
 
-## Files touched
+- `listPendingClientSubjects` is already the right shape and already RLS-scoped to the org.
+- No new server function, no migration, no RLS change.
+- Employee imports, discard flow, and the wizard itself are untouched.
 
-- `src/routes/dashboard.smart-import.index.tsx` — replace the current `{files.length > 0 && ...}` chip strip (≈ lines 327-340) with a new `<UploadedDocsPreview>` block; extend `FileChip` with client-parsed metadata (`detectedClient`, `detectedDocType`, `detectedDate`, `rowCount?`); update `onAddFiles` to run the local parser and (for rosters) `parseRoster` at add-time. No changes to `process.mutationFn` — the server pipeline still receives the same `files` array.
+## Out of scope
 
-## Non-goals
+- Reorganizing the wizard steps or per-step content.
+- Any change to how subjects are created during extraction (that's the "second client not showing up because the import didn't produce a subject" case — separate issue, not this fix).
+- Changing the standalone Pending Clients dashboard route.
 
-- No new server function, no schema changes, no changes to review/commit flow.
-- Detection is a heuristic label for the admin's benefit, not authoritative — server extraction remains the source of truth for who each document belongs to.
+## Acceptance
+
+- Opening the review page for any job shows every pending client the org has, not just this job's.
+- Clicking a pending client from another job navigates the workbench to that job and opens that client.
+- Completing a client's setup removes it from the left column and auto-selects the next pending client (across jobs) without leaving the page.
+- When nothing is left, the column shows a clean "all caught up" state.

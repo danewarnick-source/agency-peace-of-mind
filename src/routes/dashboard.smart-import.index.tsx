@@ -541,3 +541,201 @@ function SummaryView({
     </div>
   );
 }
+
+// ─── Grouped uploaded-docs preview ─────────────────────────────────────────
+function UploadedDocsPreview({
+  files,
+  onRemove,
+  onRenameGroup,
+  onMoveFile,
+}: {
+  files: FileChip[];
+  onRemove: (id: string) => void;
+  onRenameGroup: (oldKey: string, newLabel: string) => void;
+  onMoveFile: (fileId: string, targetKey: string, targetLabel: string | null) => void;
+}) {
+  // Bucket by clientKey. Special keys: "" = Unassigned, "__roster__" = rosters
+  const groups = useMemo(() => {
+    const map = new Map<string, { key: string; label: string | null; kind: "client" | "roster" | "unassigned"; items: FileChip[] }>();
+    for (const c of files) {
+      const k = c.clientKey;
+      if (!map.has(k)) {
+        const kind: "client" | "roster" | "unassigned" =
+          k === "__roster__" ? "roster" : k === "" ? "unassigned" : "client";
+        map.set(k, { key: k, label: c.detectedClient, kind, items: [] });
+      }
+      map.get(k)!.items.push(c);
+    }
+    // Stable order: named clients (alpha) → unassigned → rosters
+    return Array.from(map.values()).sort((a, b) => {
+      const order = (g: typeof a) => (g.kind === "client" ? 0 : g.kind === "unassigned" ? 1 : 2);
+      const oa = order(a), ob = order(b);
+      if (oa !== ob) return oa - ob;
+      return (a.label ?? "").localeCompare(b.label ?? "");
+    });
+  }, [files]);
+
+  const clientGroups = groups.filter((g) => g.kind === "client");
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <div className="mb-3 flex items-baseline justify-between">
+        <div>
+          <div className="text-sm font-semibold">Uploaded so far</div>
+          <div className="text-xs text-muted-foreground">
+            NECTAR will read these when you press Process. Group headers are our best guess from the filenames — tap to rename.
+          </div>
+        </div>
+        <div className="text-xs text-muted-foreground">
+          {files.length} file{files.length === 1 ? "" : "s"} · {clientGroups.length} {clientGroups.length === 1 ? "person" : "people"} detected
+        </div>
+      </div>
+
+      <ul className="space-y-4">
+        {groups.map((g) => (
+          <GroupBlock
+            key={g.key || (g.kind === "roster" ? "__roster__" : "__unassigned__")}
+            group={g}
+            allGroups={clientGroups}
+            onRemove={onRemove}
+            onRenameGroup={onRenameGroup}
+            onMoveFile={onMoveFile}
+          />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function GroupBlock({
+  group,
+  allGroups,
+  onRemove,
+  onRenameGroup,
+  onMoveFile,
+}: {
+  group: { key: string; label: string | null; kind: "client" | "roster" | "unassigned"; items: FileChip[] };
+  allGroups: Array<{ key: string; label: string | null }>;
+  onRemove: (id: string) => void;
+  onRenameGroup: (oldKey: string, newLabel: string) => void;
+  onMoveFile: (fileId: string, targetKey: string, targetLabel: string | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(group.label ?? "");
+
+  const headerLabel =
+    group.kind === "roster" ? "Roster / table" :
+    group.kind === "unassigned" ? "Unassigned" :
+    group.label ?? "Unknown";
+
+  const commit = () => {
+    if (draft.trim() && draft.trim() !== group.label) onRenameGroup(group.key, draft.trim());
+    setEditing(false);
+  };
+
+  return (
+    <li>
+      <div className="mb-1.5 flex items-center gap-2 border-b border-border/60 pb-1">
+        {group.kind === "client" ? (
+          <User className="h-3.5 w-3.5 text-primary" />
+        ) : (
+          <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+        )}
+        {group.kind === "client" && editing ? (
+          <>
+            <input
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={commit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commit();
+                if (e.key === "Escape") { setDraft(group.label ?? ""); setEditing(false); }
+              }}
+              className="h-6 rounded border border-border bg-background px-1.5 text-sm font-semibold"
+            />
+            <button type="button" onClick={commit} className="text-primary hover:opacity-80">
+              <Check className="h-3.5 w-3.5" />
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="text-sm font-semibold">{headerLabel}</span>
+            {group.kind === "client" && (
+              <button
+                type="button"
+                onClick={() => { setDraft(group.label ?? ""); setEditing(true); }}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Rename group"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            )}
+          </>
+        )}
+        <span className="ml-auto text-[11px] uppercase tracking-wider text-muted-foreground">
+          {group.items.length} {group.items.length === 1 ? "document" : "documents"}
+        </span>
+      </div>
+
+      <ul className="divide-y divide-border/50">
+        {group.items.map((c) => (
+          <li key={c.id} className="flex items-center gap-3 py-1.5 text-xs">
+            <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge variant="secondary" className="text-[10px]">{c.detectedDocType}</Badge>
+                <span className="text-muted-foreground">·</span>
+                <span className="font-mono text-[10px] uppercase text-muted-foreground">{fileExt(c.file)}</span>
+                {c.detectedDate && (
+                  <>
+                    <span className="text-muted-foreground">·</span>
+                    <span className="text-muted-foreground">dated {c.detectedDate}</span>
+                  </>
+                )}
+                {typeof c.rowCount === "number" && (
+                  <>
+                    <span className="text-muted-foreground">·</span>
+                    <span className="text-muted-foreground">{c.rowCount} row{c.rowCount === 1 ? "" : "s"}</span>
+                  </>
+                )}
+                <span className="text-muted-foreground">·</span>
+                <span className="text-muted-foreground">{formatBytes(c.file.size)}</span>
+              </div>
+              <div className="truncate text-[11px] text-muted-foreground/80">{c.file.name}</div>
+            </div>
+
+            {c.kind === "ai_doc" && (
+              <select
+                value={c.clientKey}
+                onChange={(e) => {
+                  const target = allGroups.find((g) => g.key === e.target.value);
+                  if (e.target.value === "") onMoveFile(c.id, "", null);
+                  else if (target) onMoveFile(c.id, target.key, target.label);
+                }}
+                className="h-6 max-w-[10rem] rounded border border-border bg-background px-1 text-[11px]"
+                title="Move to client"
+              >
+                {group.kind === "unassigned" && <option value="">Unassigned</option>}
+                {allGroups.map((g) => (
+                  <option key={g.key} value={g.key}>{g.label ?? "Unknown"}</option>
+                ))}
+                {group.kind !== "unassigned" && <option value="">Unassigned</option>}
+              </select>
+            )}
+
+            <button
+              type="button"
+              onClick={() => onRemove(c.id)}
+              className="text-muted-foreground hover:text-destructive"
+              aria-label="Remove file"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </li>
+  );
+}
+

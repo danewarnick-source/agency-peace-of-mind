@@ -24,7 +24,7 @@ import {
 import {
   UserPlus, Contact2, MapPin, Loader2,
   ChevronRight, AlertTriangle, Search,
-  ArrowLeft, Sparkles,
+  ArrowLeft, Sparkles, Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { OnboardingReturnBar } from "@/components/onboarding/onboarding-return-bar";
@@ -33,6 +33,7 @@ import { jobCodeLabel } from "@/lib/job-codes";
 import { DspdCodesMultiSelect } from "@/components/clients/dspd-codes-multiselect";
 import { isDailyServiceCode } from "@/lib/service-billing";
 import { useClientIntakeProgress } from "@/hooks/use-client-intake-progress";
+import { DeleteClientDialog } from "@/components/clients/delete-client-dialog";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -161,6 +162,7 @@ export function ClientsPage() {
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [rosterTab, setRosterTab] = useState<"active" | "archived">("active");
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const { data: allClients = [], isLoading } = useQuery({
     enabled: !!org,
@@ -489,18 +491,31 @@ export function ClientsPage() {
                       <TableCell className="text-right py-2 w-[220px]" data-no-row-nav onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           {rosterTab === "archived" ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-xs"
-                              disabled={reactivateM.isPending}
-                              onClick={(e) => { e.stopPropagation(); reactivateM.mutate(c.id); }}
-                            >
-                              {reactivateM.isPending && reactivateM.variables === c.id
-                                ? <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                : null}
-                              Reactivate
-                            </Button>
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs"
+                                disabled={reactivateM.isPending}
+                                onClick={(e) => { e.stopPropagation(); reactivateM.mutate(c.id); }}
+                              >
+                                {reactivateM.isPending && reactivateM.variables === c.id
+                                  ? <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                  : null}
+                                Reactivate
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs text-destructive hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteTarget({ id: c.id, name: `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() });
+                                }}
+                              >
+                                <Trash2 className="mr-1 h-3 w-3" /> Delete
+                              </Button>
+                            </>
                           ) : (
                             <IntakeAction
                               organizationId={org?.organization_id}
@@ -519,6 +534,17 @@ export function ClientsPage() {
 
         )}
       </div>
+
+      <DeleteClientDialog
+        open={!!deleteTarget}
+        onOpenChange={(v) => !v && setDeleteTarget(null)}
+        clientId={deleteTarget?.id ?? null}
+        clientName={deleteTarget?.name ?? ""}
+        onDeleted={() => {
+          setDeleteTarget(null);
+          qc.invalidateQueries({ queryKey: ["clients"] });
+        }}
+      />
     </div>
   );
 }

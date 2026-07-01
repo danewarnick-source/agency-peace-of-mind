@@ -33,6 +33,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Trash2, Plus, X, RotateCcw, Tag, UserPlus } from "lucide-react";
 
 import { providerSignoff } from "@/lib/hive-migration.functions";
+import { DiscardImportDialog } from "@/components/smart-import/discard-import-dialog";
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/review")({
   head: () => ({ meta: [{ title: "Smart Import Review — NECTAR" }] }),
@@ -72,6 +73,8 @@ function ReviewPage() {
   const getJob = useServerFn(getReviewJob);
   const job = useQuery({ queryKey: ["smart-import-review", jobId], queryFn: () => getJob({ data: { jobId } }) });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const navigate = useNavigate();
 
   // Auto-select first unfinished subject
   useEffect(() => {
@@ -96,8 +99,25 @@ function ReviewPage() {
         <Link to="/dashboard/smart-import" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> Back to Smart Import
         </Link>
-        <Badge variant="outline" className="gap-1"><Sparkles className="h-3 w-3" /> NECTAR review</Badge>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-destructive hover:text-destructive"
+            onClick={() => setDiscardOpen(true)}
+          >
+            <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Discard import
+          </Button>
+          <Badge variant="outline" className="gap-1"><Sparkles className="h-3 w-3" /> NECTAR review</Badge>
+        </div>
       </div>
+
+      <DiscardImportDialog
+        open={discardOpen}
+        onOpenChange={setDiscardOpen}
+        jobId={jobId}
+        onDiscarded={() => navigate({ to: "/dashboard/smart-import" })}
+      />
 
       <AttributionBar />
 

@@ -13586,6 +13586,7 @@ export type Database = {
         Args: { _org: string; _staff: string; _viewer: string }
         Returns: boolean
       }
+      client_deletion_impact: { Args: { _client_id: string }; Returns: Json }
       clients_for_staff: {
         Args: { _org: string; _staff: string }
         Returns: {
@@ -13690,6 +13691,8 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      delete_client_hard: { Args: { _client_id: string }; Returns: Json }
+      discard_import_job_hard: { Args: { _job_id: string }; Returns: Json }
       find_possible_duplicate_referral: {
         Args: {
           _age: number

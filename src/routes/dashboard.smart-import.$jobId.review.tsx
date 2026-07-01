@@ -96,7 +96,6 @@ function ReviewPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-      <div className="flex items-center justify-between">
         <Link to="/dashboard/smart-import" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> Back to Smart Import
         </Link>

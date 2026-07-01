@@ -592,9 +592,9 @@ function getIssueHelp(
   if (key === "org.codes_held_missing") {
     return {
       whatToDo:
-        "Set this org's awarded service codes so NECTAR can tell 'ours' from 'other provider' automatically. You can also just delete any code rows below that aren't yours.",
+        "Two ways to clear this: (a) Open Company Profile and check off the DSPD codes your agency is awarded — this is a one-time setup and every future import benefits, or (b) if you've already reviewed the billing codes on this client and they're correct as shown, click Dismiss. This warning never blocks saving the client.",
       action: {
-        label: "Set awarded codes",
+        label: "Set awarded codes in Company Profile",
         onClick: () => {
           window.open("/dashboard/nectar-company-profile#codes-held", "_blank");
         },

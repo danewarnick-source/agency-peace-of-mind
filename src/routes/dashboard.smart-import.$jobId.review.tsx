@@ -781,7 +781,7 @@ function PlacementLineup({
   // Prompt 18: peel billing-code rows out of the generic field list so we can
   // show them as a proper editable table. The remaining placement lineup keeps
   // its existing value→field shape for every other field.
-  const billing = fields.filter((f) => f.target_field === "billing_code_row");
+  const billing = fields.filter((f) => f.target_field === "billing_code_row" && !f.dismissed_at);
   const rest = fields.filter((f) => f.target_field !== "billing_code_row");
   // Prompt 24: limit lineup to SOW-required record fields. Incidental
   // mappings (extras NECTAR pulled but aren't required by §1.10) are

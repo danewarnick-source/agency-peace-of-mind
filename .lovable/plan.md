@@ -1,51 +1,108 @@
-# Org-wide pending-client workbench on the Review page
+# HIVE Executive-only billing approval tickets, with signature-to-resolve
 
-## The problem
+## Clarifying what changes (and what doesn't)
 
-The Smart Import Review page (`/dashboard/smart-import/$jobId/review`) is **job-scoped**. Its left "People" column lists only the subjects inside the currently-opened job. When the provider has two pending clients across two different import jobs (or the second client was created outside this job), only one appears — even though both need review.
+**Doesn't change.** HIVE Executive already has its own surface at
+`/dashboard/hive-exec/billing-approvals` (in the exec sidebar as "Billing Approvals").
+That page — not the provider inbox — is where HIVE Admin lives. HIVE Admin
+never sees anything inside a provider org's inbox: the
+`BillingApprovalsInboxSection` in `src/routes/dashboard.inbox.tsx` uses
+`listMyApprovalRequests`, which is scoped to the caller's own org, so it only
+shows the *provider's* side of the thread to that provider. That's correct and
+stays.
 
-The provider then has to bounce between the Pending Clients dashboard, Smart Import, and the Review page for each client. Painful.
+**Does change.** Two gaps to close:
 
-## The change
+1. The exec page reads like a list, not a **ticket inbox**. Rebrand + treat each
+   pending request as a ticket ("New billing approval request — DSI — TNS")
+   with an unread badge, "Open ticket" affordance, and a clear "Resolved" state
+   after action.
+2. Approve / Deny currently resolves on a single click with no signature. Add a
+   required **signature step**: typed full name + attestation checkbox +
+   timestamp, captured on the resolving click. Signature is stored and shown in
+   the thread history so the resolution is defensible.
 
-Turn the left column into an **org-wide "Pending clients" queue**, so a provider can sit down once and finalize every pending client in a row. When they finish one (Complete client setup → committed / finalized), it drops off the list and the next pending client auto-loads.
+## Scope
 
-Data already exists: `listPendingClientSubjects` in `src/lib/smart-import-review.functions.ts` returns every non-committed, non-discarded client subject across all jobs in the org (the Pending Clients dashboard uses it). We just haven't wired it into the review workbench.
+### 1. Database (one migration)
 
-## Scope (UI only, no schema changes)
+Add signature capture columns to `billing_code_approval_requests`:
 
-### 1. `src/routes/dashboard.smart-import.$jobId.review.tsx`
+- `resolved_signature_name TEXT` — typed full name of the HIVE Admin.
+- `resolved_signature_attested BOOLEAN` — attestation checkbox state.
+- `resolved_signature_at TIMESTAMPTZ` — when the signature was captured.
 
-- Add a second query alongside `getReviewJob`: `listPendingClientSubjects` → `orgPendingClients` (org-scoped, excludes finalized/discarded, includes `import_job_id`).
-- Merge results into a single left-column list. Each row shows: display name, review status dot, and a small chip with the source (e.g. "This import" vs the other job's short id / created date) so the provider knows why a subject from another job is showing up.
-- Rows from other jobs, when clicked, `navigate({ to: '/dashboard/smart-import/$jobId/review', params: { jobId: row.import_job_id } })` and then select that subject. Rows from the current job just call `setSelectedId` as today.
-- Group ordering: current-job subjects first (preserves existing flow), then other-job pending clients, then a divider + "Recently finalized (this session)" collapsed section for reassurance.
-- After a subject is marked ready + committed (existing `submitForSetup` / "Complete client setup" success path), invalidate both `["smart-import-review", jobId]` and `["pending-client-subjects", orgId]`, then auto-advance: pick the next non-ready subject from the merged list; if it belongs to another job, navigate there.
-- Empty state when the merged list is empty: "All caught up — no pending clients to review." with a link back to `/dashboard/clients`.
-- Keep employee-mode jobs unchanged (the org-wide queue is client-only; if `job.mode === 'employee'`, render the current job-only queue as today).
+Also add the same columns to `billing_code_approval_messages` for the
+resolving message row (so the audit line in the thread carries the signature).
 
-### 2. `SubjectQueue` component (same file)
+No RLS changes — existing policies already scope by role/org.
 
-- Accept the new merged list shape `{ id, display_name, review_status, match_status, source: 'current' | 'other', import_job_id, job_label? }`.
-- Rename header from "People" → "Pending clients" (client mode only).
-- Add a subtle "opens other import" indicator (small `Link2` icon + short job label) on other-job rows.
-- Keep the existing status dot + match badges.
+### 2. Server function (`src/lib/billing-approvals.functions.ts`)
 
-### 3. No backend / schema changes
+- Extend `PostApprovalMessage` input with optional `signatureName`,
+  `signatureAttested`.
+- In the handler, when `action` is `approve` or `deny`:
+  - Require both `signatureName` (non-empty) and `signatureAttested === true`;
+    reject with a clear error otherwise (`"Signature required to resolve."`).
+  - Write `resolved_signature_name`, `resolved_signature_attested`,
+    `resolved_signature_at = now()` on the request row (alongside the existing
+    `resolved_by_user_id` / `resolved_at`).
+  - Copy the same three signature fields onto the newly inserted message row.
+- Include the new fields in `ApprovalRequestRow` and message payloads returned
+  by `listPendingHiveApprovals` and `getApprovalThread`.
 
-- `listPendingClientSubjects` is already the right shape and already RLS-scoped to the org.
-- No new server function, no migration, no RLS change.
-- Employee imports, discard flow, and the wizard itself are untouched.
+### 3. Signature UX in `ApprovalDialog` (`src/components/billing/ApprovalDialog.tsx`)
 
-## Out of scope
+Only when the current side is `hive_admin` and status is still `pending`:
 
-- Reorganizing the wizard steps or per-step content.
-- Any change to how subjects are created during extraction (that's the "second client not showing up because the import didn't produce a subject" case — separate issue, not this fix).
-- Changing the standalone Pending Clients dashboard route.
+- Replace the current one-click Approve / Deny buttons with a "Sign to
+  resolve" mini-panel that appears when the admin clicks Approve or Deny:
+  - Radio (already-picked action, disabled) or two clearly-labeled buttons that
+    open the panel with the chosen action pre-selected.
+  - Input: "Type your full name to sign" (must match the signed-in exec
+    profile name — case-insensitive trim compare; mismatch shows an inline
+    error).
+  - Checkbox: "I attest this decision is final and recorded in the audit
+    trail." (label copy is legal-safe, no medical claims.)
+  - Confirm button: `Sign & approve` / `Sign & deny` — disabled until name +
+    attestation are filled.
+  - Cancel button: returns to reply mode without resolving.
+- On confirm, mutation posts `{ action, signatureName, signatureAttested }`.
+  On success, dialog reflects the resolved state and shows the signature line
+  ("Signed by Jane Doe · Jul 1, 2026 4:57 PM").
+- In the message history render, resolution messages carry a small
+  "Signed by … at …" line under the message body.
+
+### 4. Reframe the exec queue as a ticket inbox (`src/routes/dashboard.hive-exec.billing-approvals.tsx`)
+
+Contained polish only — no route change, no rename in the sidebar:
+
+- Header copy: "Billing Approval Tickets — incoming from providers."
+- Each row shows a ticket-style label: `#<short id> · <code> · <org>` with a
+  status pill (New / Awaiting your reply / Resolved) driven by
+  `status` and `unread_for_me`.
+- Primary action button says "Open ticket" (already does).
+- After a ticket is resolved, the row automatically moves to the Resolved tab
+  on next refetch (the page already refetches every 30s and after dialog
+  close — keep as-is).
+
+### 5. Out of scope
+
+- No changes to how providers submit requests (SubjectReview billing editor
+  stays as-is).
+- No changes to the provider inbox surface — it correctly shows only the
+  provider's own conversations.
+- No new notification channel (email/SMS). The existing unread badge on the
+  exec nav item (if wired) is enough; adding email is a separate ask.
 
 ## Acceptance
 
-- Opening the review page for any job shows every pending client the org has, not just this job's.
-- Clicking a pending client from another job navigates the workbench to that job and opens that client.
-- Completing a client's setup removes it from the left column and auto-selects the next pending client (across jobs) without leaving the page.
-- When nothing is left, the column shows a clean "all caught up" state.
+- HIVE Admin only ever sees billing approval conversations under
+  `/dashboard/hive-exec/billing-approvals`; the provider inbox remains
+  provider-only.
+- Clicking Approve or Deny requires typing the signer's name and checking the
+  attestation before the ticket resolves.
+- Resolved tickets display the signer's name and signature timestamp both on
+  the request summary and on the resolving message in the thread.
+- Attempting to resolve without a signature returns a clear error and does not
+  mutate the request.

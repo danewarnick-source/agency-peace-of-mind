@@ -944,15 +944,37 @@ function BillingCodesEditor({
 }: {
   subjectId: string; rows: FieldRow[]; tenant: TenantIdentity; onChanged: () => void;
 }) {
+  const [adding, setAdding] = useState(false);
+  const [removedIds, setRemovedIds] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    setRemovedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const currentIds = new Set(rows.map((r) => r.id));
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (currentIds.has(id)) next.add(id);
+      });
+      return next.size === prev.size ? prev : next;
+    });
+  }, [rows]);
+
+  const markRemoved = (fieldId: string) => {
+    setRemovedIds((prev) => {
+      const next = new Set(prev);
+      next.add(fieldId);
+      return next;
+    });
+  };
+
   type Parsed = { field: FieldRow; row: BillingRowShape };
   // Prompt 24: show every extracted code as one editable row. The Provider
   // column tells the admin whose code it is at a glance; deleting a row is
   // how the admin opts out of billing it. No separate "confirm bucket" wall.
   const parsed: Parsed[] = rows
+    .filter((f) => !f.dismissed_at && !removedIds.has(f.id))
     .map((f) => { const row = parseBillingRow(f); return row ? { field: f, row } : null; })
     .filter((x): x is Parsed => x !== null);
-
-  const [adding, setAdding] = useState(false);
 
   return (
     <div id="billing-codes" className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
@@ -1005,7 +1027,7 @@ function BillingCodesEditor({
             </thead>
             <tbody>
               {parsed.map((p) => (
-                <BillingRowEditor key={p.field.id} fieldId={p.field.id} subjectId={subjectId} initial={p.row} onChanged={onChanged} />
+                <BillingRowEditor key={p.field.id} fieldId={p.field.id} subjectId={subjectId} initial={p.row} onChanged={onChanged} onRemoved={markRemoved} />
               ))}
               {adding && (
                 <BillingRowEditor
@@ -1030,7 +1052,7 @@ function isPending(r: BillingRowShape): boolean {
 }
 
 function BillingRowEditor({
-  fieldId, subjectId, initial, isNew, onChanged, onCancel,
+  fieldId, subjectId, initial, isNew, onChanged, onCancel, onRemoved,
 }: {
   fieldId: string | null;
   subjectId: string;
@@ -1038,6 +1060,7 @@ function BillingRowEditor({
   isNew?: boolean;
   onChanged: () => void;
   onCancel?: () => void;
+  onRemoved?: (fieldId: string) => void;
 }) {
   const [row, setRow] = useState<BillingRowShape>(initial);
   const [dirty, setDirty] = useState(!!isNew);
@@ -1079,7 +1102,11 @@ function BillingRowEditor({
 
   const removeMut = useMutation({
     mutationFn: () => remove({ data: { fieldId: fieldId as string } }),
-    onSuccess: () => { toast.success("Removed"); onChanged(); },
+    onSuccess: () => {
+      if (fieldId) onRemoved?.(fieldId);
+      toast.success("Removed from this import — it will not be created or billed.");
+      onChanged();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 

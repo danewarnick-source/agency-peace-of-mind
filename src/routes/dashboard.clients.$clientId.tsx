@@ -216,6 +216,10 @@ function ClientProfileHub() {
         <TabsContent value="files" className="space-y-4">
           <ClientDocumentsCard clientId={clientId} clientName={fullName} />
         </TabsContent>
+
+        <TabsContent value="pcsp" className="space-y-4">
+          <PcspTab client={client} clientId={clientId} orgId={orgId} />
+        </TabsContent>
       </Tabs>
     </div>
   );

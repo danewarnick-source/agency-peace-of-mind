@@ -1402,7 +1402,15 @@ function goalCompleteness(g: GoalShape): { filled: number; total: number; missin
 
 function GoalsReviewPanel({ subjectId, fields, onChanged }: { subjectId: string; fields: FieldRow[]; onChanged: () => void }) {
   const [adding, setAdding] = useState(false);
-  const goals = fields.filter((f) => !f.dismissed_at);
+  const extractionFailed = fields.some(
+    (f) => (f.target_field === "pcsp_goal_extraction_failed" || f.field_key === "pcsp_goal_extraction_failed") && !f.dismissed_at,
+  );
+  const goals = fields.filter(
+    (f) =>
+      !f.dismissed_at &&
+      f.target_field !== "pcsp_goal_extraction_failed" &&
+      f.field_key !== "pcsp_goal_extraction_failed",
+  );
   return (
     <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -1419,7 +1427,15 @@ function GoalsReviewPanel({ subjectId, fields, onChanged }: { subjectId: string;
           <Plus className="mr-1 h-3.5 w-3.5" /> Add goal
         </Button>
       </div>
-      {goals.length === 0 && !adding && (
+      {extractionFailed && goals.length === 0 && (
+        <div className="mt-3 rounded-lg border-2 border-amber-500 bg-amber-100/70 p-3 text-xs font-medium text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+          <div className="mb-1 text-sm font-semibold">NECTAR could not extract goals from this PCSP.</div>
+          The uploaded document appears to contain a goals section, but NECTAR's extraction returned nothing after a
+          focused retry. This is an extraction miss — do NOT publish this client until goals are entered. Add them
+          manually below, or re-upload the PCSP to re-run extraction.
+        </div>
+      )}
+      {!extractionFailed && goals.length === 0 && !adding && (
         <div className="mt-3 rounded-lg border border-amber-300/60 bg-amber-50/40 p-3 text-xs text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
           No PCSP goals were found. If the PCSP includes goals, add them here so they are not missing from the live client profile.
         </div>

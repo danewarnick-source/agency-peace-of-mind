@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UnauthorizedRouteImport } from './routes/unauthorized'
+import { Route as TrainingRouteImport } from './routes/training'
 import { Route as SuperAdminRouteImport } from './routes/super-admin'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
@@ -184,6 +185,11 @@ import { Route as ApiPublicOauthGmailCallbackRouteImport } from './routes/api/pu
 const UnauthorizedRoute = UnauthorizedRouteImport.update({
   id: '/unauthorized',
   path: '/unauthorized',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrainingRoute = TrainingRouteImport.update({
+  id: '/training',
+  path: '/training',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SuperAdminRoute = SuperAdminRouteImport.update({
@@ -1120,6 +1126,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/super-admin': typeof SuperAdminRoute
+  '/training': typeof TrainingRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/ask-nectar': typeof DashboardAskNectarRoute
@@ -1292,6 +1299,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/super-admin': typeof SuperAdminRoute
+  '/training': typeof TrainingRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/ask-nectar': typeof DashboardAskNectarRoute
@@ -1460,6 +1468,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/super-admin': typeof SuperAdminRoute
+  '/training': typeof TrainingRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/ask-nectar': typeof DashboardAskNectarRoute
@@ -1635,6 +1644,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/super-admin'
+    | '/training'
     | '/unauthorized'
     | '/certificate/$code'
     | '/dashboard/ask-nectar'
@@ -1807,6 +1817,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/super-admin'
+    | '/training'
     | '/unauthorized'
     | '/certificate/$code'
     | '/dashboard/ask-nectar'
@@ -1974,6 +1985,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/super-admin'
+    | '/training'
     | '/unauthorized'
     | '/certificate/$code'
     | '/dashboard/ask-nectar'
@@ -2148,6 +2160,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   SuperAdminRoute: typeof SuperAdminRoute
+  TrainingRoute: typeof TrainingRoute
   UnauthorizedRoute: typeof UnauthorizedRoute
   CertificateCodeRoute: typeof CertificateCodeRoute
   VerifyCodeRoute: typeof VerifyCodeRoute
@@ -2167,6 +2180,13 @@ declare module '@tanstack/react-router' {
       path: '/unauthorized'
       fullPath: '/unauthorized'
       preLoaderRoute: typeof UnauthorizedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/training': {
+      id: '/training'
+      path: '/training'
+      fullPath: '/training'
+      preLoaderRoute: typeof TrainingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/super-admin': {
@@ -3823,6 +3843,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   SuperAdminRoute: SuperAdminRoute,
+  TrainingRoute: TrainingRoute,
   UnauthorizedRoute: UnauthorizedRoute,
   CertificateCodeRoute: CertificateCodeRoute,
   VerifyCodeRoute: VerifyCodeRoute,
@@ -3838,13 +3859,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

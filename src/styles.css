@@ -175,6 +175,13 @@
   --gradient-amber:  linear-gradient(135deg, #f4a93a 0%, #f59324 100%);
   --gradient-navy:   linear-gradient(140deg, #141a3d 0%, #0d112b 100%);
 
+  /* HIVE Training storefront tokens (spec: navy #1A2B47, honey-gold #C8881E). */
+  --training-navy:      #1A2B47;
+  --training-gold:      #C8881E;
+  --training-gold-soft: #E9C27A;
+  --training-bg:        #FAFAF7;
+  --training-glow:      0 0 0 1px rgba(200,136,30,0.35), 0 20px 60px -20px rgba(200,136,30,0.35);
+
   --btn-primary:        #1C2A5E;  --btn-primary-hover: #333F6E;  --btn-primary-active: #18234F;
   --btn-gold:           #F5A623;  --btn-gold-hover:    #DC9520;  --btn-gold-active:    #C4851C;
   --btn-violet:         #6C2BB3;  --btn-violet-hover:  #6127A1;  --btn-violet-active:  #56228F;

@@ -1993,29 +1993,29 @@ function BillingRowEditor({
 
   return (
     <tr className="border-b border-border/60 align-middle">
-      <td className="py-1.5 px-1.5">
+      <td className="py-1 px-1.5">
         {isNew ? (
           <Select value={row.service_code} onValueChange={(v) => patch("service_code", v)}>
-            <SelectTrigger className="h-8 w-full px-1.5"><SelectValue placeholder="—" /></SelectTrigger>
+            <SelectTrigger className="h-7 w-full px-1.5 text-[11px]"><SelectValue placeholder="—" /></SelectTrigger>
             <SelectContent>
               {allCodes.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
         ) : (
-          <Badge variant="outline" className="font-mono">{row.service_code}</Badge>
+          <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0">{row.service_code}</Badge>
         )}
       </td>
-      <td className="py-1.5 px-1.5">
-        <Input className="h-8 w-full px-2" value={row.provider_name ?? ""} onChange={(e) => patch("provider_name", e.target.value || null)} />
+      <td className="py-1 px-1.5">
+        <Input className="h-7 w-full px-1.5 text-[11px]" value={row.provider_name ?? ""} onChange={(e) => patch("provider_name", e.target.value || null)} />
       </td>
-      <td className="py-1.5 px-1.5">
+      <td className="py-1 px-1.5">
         {(() => {
           const own = providerOwnership(row.provider_name, tenant);
           if (own === "ours") {
-            return <Badge variant="outline" className="whitespace-nowrap border-emerald-500/60 text-emerald-600">Ours</Badge>;
+            return <Badge variant="outline" className="whitespace-nowrap border-emerald-500/60 text-emerald-600 text-[10px] px-1.5 py-0">Ours</Badge>;
           }
           if (own === "unknown") {
-            return <Badge variant="outline" className="whitespace-nowrap text-muted-foreground">Unspecified</Badge>;
+            return <Badge variant="outline" className="whitespace-nowrap text-muted-foreground text-[10px] px-1.5 py-0">Unspecified</Badge>;
           }
           // Admin already acknowledged this external code is not ours.
           // Row stays visible for the record; no HIVE approval required.
@@ -2036,11 +2036,11 @@ function BillingRowEditor({
               } } }).then(() => { toast.success("Undone"); onChanged(); }).catch((e: Error) => toast.error(e.message));
             };
             return (
-              <div className="flex flex-col gap-1">
-                <Badge variant="outline" className="whitespace-nowrap border-slate-400/60 text-slate-600 dark:text-slate-300">
+              <div className="flex flex-col gap-0.5">
+                <Badge variant="outline" className="whitespace-nowrap border-slate-400/60 text-slate-600 dark:text-slate-300 text-[10px] px-1.5 py-0">
                   Not our organization
                 </Badge>
-                <span className="text-[10px] text-muted-foreground">Kept for the record. Not billed by you.</span>
+                <span className="text-[9px] text-muted-foreground leading-tight">Kept for record.</span>
                 <button type="button" className="text-[10px] text-primary underline underline-offset-2 text-left" onClick={clearAck}>
                   Undo
                 </button>
@@ -2071,19 +2071,19 @@ function BillingRowEditor({
             statusEl = null;
             btnLabel = "Request HIVE approval";
           } else if (ar.status === "pending") {
-            statusEl = <Badge variant="outline" className="whitespace-nowrap border-amber-500/60 text-amber-700 dark:text-amber-300">Awaiting HIVE</Badge>;
+            statusEl = <Badge variant="outline" className="whitespace-nowrap border-amber-500/60 text-amber-700 dark:text-amber-300 text-[10px] px-1.5 py-0">Awaiting HIVE</Badge>;
             btnLabel = "View thread";
           } else if (ar.status === "approved") {
-            statusEl = <Badge variant="outline" className="whitespace-nowrap border-emerald-500/60 text-emerald-700 dark:text-emerald-300"><ShieldCheck className="mr-1 h-3 w-3" />HIVE approved</Badge>;
+            statusEl = <Badge variant="outline" className="whitespace-nowrap border-emerald-500/60 text-emerald-700 dark:text-emerald-300 text-[10px] px-1.5 py-0"><ShieldCheck className="mr-1 h-2.5 w-2.5" />HIVE approved</Badge>;
             btnLabel = "View thread";
           } else {
-            statusEl = <Badge variant="outline" className="whitespace-nowrap border-destructive/60 text-destructive">Denied</Badge>;
+            statusEl = <Badge variant="outline" className="whitespace-nowrap border-destructive/60 text-destructive text-[10px] px-1.5 py-0">Denied</Badge>;
             btnLabel = "View thread";
           }
           return (
-            <div className="flex flex-col gap-1">
-              <Badge variant="outline" className="whitespace-nowrap border-amber-500/60 text-amber-700 dark:text-amber-300">
-                <AlertTriangle className="mr-1 h-3 w-3" /> External
+            <div className="flex flex-col gap-0.5">
+              <Badge variant="outline" className="whitespace-nowrap border-amber-500/60 text-amber-700 dark:text-amber-300 text-[10px] px-1.5 py-0">
+                <AlertTriangle className="mr-1 h-2.5 w-2.5" /> External
               </Badge>
               {statusEl}
               {fieldId && (!ar || ar.status === "withdrawn") && (
@@ -2093,7 +2093,7 @@ function BillingRowEditor({
                   onClick={markNotOurs}
                   title="Keep this code on the record but confirm this org is not responsible for billing it"
                 >
-                  Not my organization
+                  Not my org
                 </button>
               )}
               {fieldId && (
@@ -2115,51 +2115,51 @@ function BillingRowEditor({
           );
         })()}
       </td>
-      <td className="py-1.5 px-1.5">
+      <td className="py-1 px-1.5">
         <Select value={row.unit_type ?? ""} onValueChange={(v) => patch("unit_type", v)}>
-          <SelectTrigger className="h-8 w-full px-1.5"><SelectValue placeholder="—" /></SelectTrigger>
+          <SelectTrigger className="h-7 w-full px-1.5 text-[11px]"><SelectValue placeholder="—" /></SelectTrigger>
           <SelectContent>
             {UNIT_TYPE_OPTIONS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
           </SelectContent>
         </Select>
       </td>
-      <td className="py-1.5 px-1.5">
-        <Input className="h-8 w-full px-1.5" inputMode="decimal" value={row.rate ?? ""} onChange={(e) => patch("rate", numOrNull(e.target.value))} />
+      <td className="py-1 px-1.5">
+        <Input className="h-7 w-full px-1.5 text-[11px] text-right" inputMode="decimal" value={row.rate ?? ""} onChange={(e) => patch("rate", numOrNull(e.target.value))} />
       </td>
-      <td className="py-1.5 px-1.5">
-        <Input className="h-8 w-full px-1.5" inputMode="numeric" value={row.max_units ?? ""} onChange={(e) => patch("max_units", numOrNull(e.target.value))} />
+      <td className="py-1 px-1.5">
+        <Input className="h-7 w-full px-1.5 text-[11px] text-right" inputMode="numeric" value={row.max_units ?? ""} onChange={(e) => patch("max_units", numOrNull(e.target.value))} />
       </td>
-      <td className="py-1.5 px-1.5">
-        <Input className="h-8 w-full px-1.5" inputMode="numeric" value={row.monthly_max_units ?? ""} onChange={(e) => patch("monthly_max_units", numOrNull(e.target.value))} />
+      <td className="py-1 px-1.5">
+        <Input className="h-7 w-full px-1.5 text-[11px] text-right" inputMode="numeric" value={row.monthly_max_units ?? ""} onChange={(e) => patch("monthly_max_units", numOrNull(e.target.value))} />
       </td>
-      <td className="py-1.5 px-1.5">
-        <div className="flex items-center gap-1">
-          <Input className="h-8 w-full px-1.5" type="date" value={row.plan_start ?? ""} onChange={(e) => patch("plan_start", e.target.value || null)} title="Start" />
-          <span className="text-muted-foreground">–</span>
-          <Input className="h-8 w-full px-1.5" type="date" value={row.plan_end ?? ""} onChange={(e) => patch("plan_end", e.target.value || null)} title="End" />
+      <td className="py-1 px-1.5">
+        <div className="flex items-center gap-0.5">
+          <Input className="h-7 w-full px-1 text-[10px]" type="date" value={row.plan_start ?? ""} onChange={(e) => patch("plan_start", e.target.value || null)} title="Start" />
+          <span className="text-muted-foreground text-[10px]">–</span>
+          <Input className="h-7 w-full px-1 text-[10px]" type="date" value={row.plan_end ?? ""} onChange={(e) => patch("plan_end", e.target.value || null)} title="End" />
         </div>
       </td>
-      <td className="py-1.5 px-1.5">
+      <td className="py-1 px-1.5">
         {pending ? (
-          <Badge variant="outline" className="whitespace-nowrap text-amber-600">
-            <AlertTriangle className="mr-1 h-3 w-3" /> pending
+          <Badge variant="outline" className="whitespace-nowrap text-amber-600 text-[10px] px-1.5 py-0">
+            <AlertTriangle className="mr-1 h-2.5 w-2.5" /> pending
           </Badge>
         ) : (
-          <Badge variant="outline" className="text-emerald-600">ready</Badge>
+          <Badge variant="outline" className="text-emerald-600 text-[10px] px-1.5 py-0">ready</Badge>
         )}
       </td>
-      <td className="py-1.5 pr-0">
-        <div className="flex items-center justify-end gap-1">
+      <td className="py-1 pr-0">
+        <div className="flex items-center justify-end gap-0.5">
           {dirty && (
-            <Button size="sm" className="h-7" onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !row.service_code}>
+            <Button size="sm" className="h-6 px-2 text-[10px]" onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !row.service_code}>
               {saveMut.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Save
             </Button>
           )}
           {isNew && onCancel && (
-            <Button size="sm" variant="ghost" className="h-7" onClick={onCancel}>Cancel</Button>
+            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" onClick={onCancel}>Cancel</Button>
           )}
           {!isNew && fieldId && (
-            <Button size="sm" variant="ghost" className="h-7 text-destructive" onClick={() => removeMut.mutate()} disabled={removeMut.isPending}>
+            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive" onClick={() => removeMut.mutate()} disabled={removeMut.isPending}>
               <Trash2 className="h-3 w-3" />
             </Button>
           )}
@@ -2168,6 +2168,7 @@ function BillingRowEditor({
     </tr>
   );
 }
+
 
 function FieldRowEditor({
   field, targetFields, matchedValue, showDiff, onChanged,

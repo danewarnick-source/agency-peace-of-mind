@@ -7291,6 +7291,8 @@ export type Database = {
       import_documents: {
         Row: {
           checksum: string | null
+          client_key: string | null
+          client_label: string | null
           file_name: string
           file_size: number | null
           file_type: string | null
@@ -7304,6 +7306,8 @@ export type Database = {
         }
         Insert: {
           checksum?: string | null
+          client_key?: string | null
+          client_label?: string | null
           file_name: string
           file_size?: number | null
           file_type?: string | null
@@ -7317,6 +7321,8 @@ export type Database = {
         }
         Update: {
           checksum?: string | null
+          client_key?: string | null
+          client_label?: string | null
           file_name?: string
           file_size?: number | null
           file_type?: string | null

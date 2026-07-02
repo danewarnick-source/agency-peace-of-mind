@@ -9246,28 +9246,31 @@ export type Database = {
       }
       org_email_settings: {
         Row: {
-          from_address: string
+          from_address: string | null
           from_name: string
           organization_id: string
           reply_to: string | null
+          send_mode: string
           updated_at: string
           updated_by: string | null
           verified: boolean
         }
         Insert: {
-          from_address?: string
+          from_address?: string | null
           from_name?: string
           organization_id: string
           reply_to?: string | null
+          send_mode?: string
           updated_at?: string
           updated_by?: string | null
           verified?: boolean
         }
         Update: {
-          from_address?: string
+          from_address?: string | null
           from_name?: string
           organization_id?: string
           reply_to?: string | null
+          send_mode?: string
           updated_at?: string
           updated_by?: string | null
           verified?: boolean

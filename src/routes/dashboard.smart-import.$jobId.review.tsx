@@ -1807,8 +1807,8 @@ function BillingCodesEditor({
 
   const orgLabel = tenant.names[0] ?? "your organization";
   const externalRows = parsed.filter((p) => providerOwnership(p.row.provider_name, tenant) === "external");
-  const notOursCount = externalRows.filter((p) => p.row.ownership_ack === "not_ours").length;
-  const unresolvedExternal = externalRows.filter((p) => p.row.ownership_ack !== "not_ours");
+  const activeExternal = externalRows.filter((p) => p.row.ownership_ack !== "not_ours");
+  const unresolvedExternal = activeExternal;
   const pendingCount = unresolvedExternal.filter((p) => approvals[p.field.id]?.status === "pending").length;
   const approvedCount = unresolvedExternal.filter((p) => approvals[p.field.id]?.status === "approved").length;
 
@@ -1889,17 +1889,17 @@ function BillingCodesEditor({
         </div>
       )}
 
-      {externalRows.length > 0 && (
+      {activeExternal.length > 0 && (
         <details className="mt-2 rounded-md border border-amber-300/60 bg-amber-50 p-2 text-[11px] text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
           <summary className="cursor-pointer font-semibold">
-            {externalRows.length} outside-provider code{externalRows.length === 1 ? "" : "s"} on this PCSP
-            <span className="ml-1 font-normal">· {approvedCount} approved · {pendingCount} awaiting HIVE · {notOursCount} not ours</span>
+            {activeExternal.length} outside-provider code{activeExternal.length === 1 ? "" : "s"} on this PCSP
+            <span className="ml-1 font-normal">· {approvedCount} approved · {pendingCount} awaiting HIVE</span>
           </summary>
           <div className="mt-1.5">
-            Provider on {externalRows.length === 1 ? "this line" : "these lines"} does not match <span className="font-medium">{orgLabel}</span>. Use <span className="font-medium">Not my organization</span> or <span className="font-medium">Request HIVE approval</span>.
+            Provider on {activeExternal.length === 1 ? "this line" : "these lines"} does not match <span className="font-medium">{orgLabel}</span>. Use <span className="font-medium">Not my organization</span> to keep it purely informational, or <span className="font-medium">Request HIVE approval</span> to have HIVE Admin review it.
           </div>
           <div className="mt-1 font-mono text-[10px]">
-            {externalRows.map((p) => `${p.row.service_code} → ${p.row.provider_name ?? "unknown"}${p.row.ownership_ack === "not_ours" ? " (not ours)" : ""}`).join("  •  ")}
+            {activeExternal.map((p) => `${p.row.service_code} → ${p.row.provider_name ?? "unknown"}`).join("  •  ")}
           </div>
         </details>
       )}
@@ -1992,9 +1992,12 @@ function BillingRowEditor({
 
   const pending = isPending(row);
   const allCodes = EVV_SERVICE_CODES.map((c) => c.code);
+  const notOurs = row.ownership_ack === "not_ours";
+  const ro = (v: string | number | null | undefined) =>
+    v == null || v === "" ? <span className="text-muted-foreground/60">—</span> : <span>{v}</span>;
 
   return (
-    <tr className="border-b border-border/60 align-middle">
+    <tr className={`border-b border-border/60 align-middle ${notOurs ? "bg-muted/30 text-muted-foreground" : ""}`}>
       <td className="py-1 px-1.5">
         {isNew ? (
           <Select value={row.service_code} onValueChange={(v) => patch("service_code", v)}>
@@ -2008,7 +2011,11 @@ function BillingRowEditor({
         )}
       </td>
       <td className="py-1 px-1.5">
-        <Input className="h-7 w-full px-1.5 text-[11px]" value={row.provider_name ?? ""} onChange={(e) => patch("provider_name", e.target.value || null)} />
+        {notOurs ? (
+          <span className="text-[11px]">{row.provider_name ?? <span className="text-muted-foreground/60">—</span>}</span>
+        ) : (
+          <Input className="h-7 w-full px-1.5 text-[11px]" value={row.provider_name ?? ""} onChange={(e) => patch("provider_name", e.target.value || null)} />
+        )}
       </td>
       <td className="py-1 px-1.5">
         {(() => {
@@ -2042,7 +2049,7 @@ function BillingRowEditor({
                 <Badge variant="outline" className="whitespace-nowrap border-slate-400/60 text-slate-600 dark:text-slate-300 text-[10px] px-1.5 py-0">
                   Not our organization
                 </Badge>
-                <span className="text-[9px] text-muted-foreground leading-tight">Kept for record.</span>
+                <span className="text-[9px] text-muted-foreground leading-tight">Informational only — not billed or tracked.</span>
                 <button type="button" className="text-[10px] text-primary underline underline-offset-2 text-left" onClick={clearAck}>
                   Undo
                 </button>
@@ -2118,31 +2125,53 @@ function BillingRowEditor({
         })()}
       </td>
       <td className="py-1 px-1.5">
-        <Select value={row.unit_type ?? ""} onValueChange={(v) => patch("unit_type", v)}>
-          <SelectTrigger className="h-7 w-full px-1.5 text-[11px]"><SelectValue placeholder="—" /></SelectTrigger>
-          <SelectContent>
-            {UNIT_TYPE_OPTIONS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {notOurs ? (
+          <span className="text-[11px]">{ro(row.unit_type)}</span>
+        ) : (
+          <Select value={row.unit_type ?? ""} onValueChange={(v) => patch("unit_type", v)}>
+            <SelectTrigger className="h-7 w-full px-1.5 text-[11px]"><SelectValue placeholder="—" /></SelectTrigger>
+            <SelectContent>
+              {UNIT_TYPE_OPTIONS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
+      </td>
+      <td className="py-1 px-1.5 text-right">
+        {notOurs ? (
+          <span className="text-[11px]">{ro(row.rate)}</span>
+        ) : (
+          <Input className="h-7 w-full px-1.5 text-[11px] text-right" inputMode="decimal" value={row.rate ?? ""} onChange={(e) => patch("rate", numOrNull(e.target.value))} />
+        )}
+      </td>
+      <td className="py-1 px-1.5 text-right">
+        {notOurs ? (
+          <span className="text-[11px]">{ro(row.max_units)}</span>
+        ) : (
+          <Input className="h-7 w-full px-1.5 text-[11px] text-right" inputMode="numeric" value={row.max_units ?? ""} onChange={(e) => patch("max_units", numOrNull(e.target.value))} />
+        )}
+      </td>
+      <td className="py-1 px-1.5 text-right">
+        {notOurs ? (
+          <span className="text-[11px]">{ro(row.monthly_max_units)}</span>
+        ) : (
+          <Input className="h-7 w-full px-1.5 text-[11px] text-right" inputMode="numeric" value={row.monthly_max_units ?? ""} onChange={(e) => patch("monthly_max_units", numOrNull(e.target.value))} />
+        )}
       </td>
       <td className="py-1 px-1.5">
-        <Input className="h-7 w-full px-1.5 text-[11px] text-right" inputMode="decimal" value={row.rate ?? ""} onChange={(e) => patch("rate", numOrNull(e.target.value))} />
+        {notOurs ? (
+          <span className="text-[10px]">
+            {row.plan_start ?? "—"} – {row.plan_end ?? "—"}
+          </span>
+        ) : (
+          <div className="flex items-center gap-0.5">
+            <Input className="h-7 w-full px-1 text-[10px]" type="date" value={row.plan_start ?? ""} onChange={(e) => patch("plan_start", e.target.value || null)} title="Start" />
+            <span className="text-muted-foreground text-[10px]">–</span>
+            <Input className="h-7 w-full px-1 text-[10px]" type="date" value={row.plan_end ?? ""} onChange={(e) => patch("plan_end", e.target.value || null)} title="End" />
+          </div>
+        )}
       </td>
       <td className="py-1 px-1.5">
-        <Input className="h-7 w-full px-1.5 text-[11px] text-right" inputMode="numeric" value={row.max_units ?? ""} onChange={(e) => patch("max_units", numOrNull(e.target.value))} />
-      </td>
-      <td className="py-1 px-1.5">
-        <Input className="h-7 w-full px-1.5 text-[11px] text-right" inputMode="numeric" value={row.monthly_max_units ?? ""} onChange={(e) => patch("monthly_max_units", numOrNull(e.target.value))} />
-      </td>
-      <td className="py-1 px-1.5">
-        <div className="flex items-center gap-0.5">
-          <Input className="h-7 w-full px-1 text-[10px]" type="date" value={row.plan_start ?? ""} onChange={(e) => patch("plan_start", e.target.value || null)} title="Start" />
-          <span className="text-muted-foreground text-[10px]">–</span>
-          <Input className="h-7 w-full px-1 text-[10px]" type="date" value={row.plan_end ?? ""} onChange={(e) => patch("plan_end", e.target.value || null)} title="End" />
-        </div>
-      </td>
-      <td className="py-1 px-1.5">
-        {pending ? (
+        {notOurs ? null : pending ? (
           <Badge variant="outline" className="whitespace-nowrap text-amber-600 text-[10px] px-1.5 py-0">
             <AlertTriangle className="mr-1 h-2.5 w-2.5" /> pending
           </Badge>
@@ -2152,7 +2181,7 @@ function BillingRowEditor({
       </td>
       <td className="py-1 pr-0">
         <div className="flex items-center justify-end gap-0.5">
-          {dirty && (
+          {dirty && !notOurs && (
             <Button size="sm" className="h-6 px-2 text-[10px]" onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !row.service_code}>
               {saveMut.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Save
             </Button>

@@ -469,6 +469,10 @@ export async function applyExtractedFieldsToClient(
   for (const f of ok) {
     if (f.field_key === "billing_code_row" && f.value_json && typeof f.value_json === "object") {
       const row = f.value_json as Record<string, unknown>;
+      // Rows the admin explicitly marked "not our organization" are
+      // informational-only on the record and MUST NOT flow into billing
+      // codes OR into client_external_services. Skip entirely.
+      if (row.ownership_ack === "not_ours") continue;
       if (row.service_code) {
         codeRows.push({
           service_code: String(row.service_code).toUpperCase(),

@@ -1,50 +1,40 @@
-## Goal
+## What actually happened to Blake's billing codes
 
-Support the "same person is both a Host and a DSP" case (Harvey), without collapsing the two data models. Hosts stay in `hhp_cue_cards` (never clock, never scheduled). Staff stay in `organization_members` + `profiles` (invited, roster, EVV, caseload). A new nullable link column ties the two rows together when they refer to the same real person.
-
-## Data model
-
-Add one nullable column to `hhp_cue_cards`:
+I looked at the live data for Blake Adams. The PCSP extracted **DSI** and **HHS** correctly — but instead of landing on his profile as authorized codes, they were filed as "someone else's services":
 
 ```
-linked_staff_user_id  uuid  references auth.users(id) on delete set null
+client_billing_codes:      0 rows for Blake
+client_external_services:  DSI, HHS — note: "Provider 'TRUE NORTH SUPPORTS LLC' is a different organization."
+clients.authorized_dspd_codes: {}  (empty — matches the "None." you saw)
 ```
 
-Plus a partial unique index so a given staff user can't be linked to two host cards inside the same org:
+The classifier saw provider name **"TRUE NORTH SUPPORTS LLC"** on the PCSP, compared it to this tenant's display name (**"TNS FAKE"**), decided they didn't match, and — because the org has no aliases and no `codes_held` configured — silently routed both codes to the external/coordination bucket. There was no unconfirmed code holding things back; the pipeline confidently sent them the wrong way.
 
-```
-unique (organization_id, linked_staff_user_id) where linked_staff_user_id is not null
-```
+This is the same failure mode any provider will hit when the PCSP spells their legal name differently than their app display name (very common: "True North Supports LLC" on the state form vs. "TNS" or a nickname in-app).
 
-RLS is unchanged — the existing `hhp_write` policy already gates edits.
+## Fix — three parts
 
-## Server function
+### 1. Recover Blake now (data-only)
+- Move his two external rows into `client_billing_codes` as pending stubs (rate 0, `authorization_pending = true`) so Care-tab actions unblock and staff can be scheduled while units/rate get filled in.
+- Set `clients.authorized_dspd_codes` and `job_code` to `{DSI, HHS}`.
+- Delete the two `client_external_services` rows so the mis-file doesn't linger.
 
-Extend `updateHhpCueCard` in `src/lib/hhp-cue-cards.functions.ts` to accept `linked_staff_user_id: string | null`. When set, verify the target user is an active member of the same organization before writing (guards against cross-org linkage). Include the column in `CARD_COLS` and the `HhpCueCard` type.
+### 2. Stop the silent misclassification in Smart Import
+- **Classifier change** (`src/lib/service-classification.ts`): when `provider_name` is present but the tenant has no `aliases` AND no `codes_held` configured, return `confident: false` instead of confidently marking the row as "other provider." That forces the review UI to show the "Owner?" prompt (which already has an **"Ours"** button) instead of quietly routing the code to external services.
+- **Review UI** (`dashboard.smart-import.$jobId.review.tsx` billing panel): when every extracted billing row is being sent to `external_services`, show a prominent yellow banner: *"All N codes on this PCSP are being filed as another provider's. Confirm ownership or add 'TRUE NORTH SUPPORTS LLC' as an alias for TNS FAKE."* with a one-click **"Add as alias for this org"** button that appends to `organizations.aliases`. From that point forward all future imports match automatically.
+- **Finalize gate** (`smart-import-review.functions.ts` → `setSubjectReady`): treat `code.confirm_owner.*` issues as blocking (they already are), and *also* refuse to mark ready when 100% of billing rows are going to external services without an explicit `code.coordination.*` override — same reasoning: don't let a provider "finalize" a client with zero of their own billing codes attached unless they meant to.
 
-## UI — Hosts tab
+### 3. On-profile safety net for clients already finalized
+On the client profile's **Authorized DSPD codes** card:
+- When `client_external_services` has rows whose `provider_name` matches this org (by fuzzy match against name/legal_name/aliases) OR when the client has PCSP goals scoped to codes that aren't in `authorized_dspd_codes`, show an amber row: *"2 codes from PCSP aren't authorized: DSI, HHS — [Reclaim as ours]"*. Clicking reclaims them (same data patch as step 1).
+- Wire the existing manual "Add code" input to also insert a matching `client_billing_codes` stub (`authorization_pending = true`) instead of only mutating the array — otherwise scheduling still can't use it.
 
-In `src/components/hosts/hosts-page.tsx`, on the host edit dialog add a **"Also a staff member"** section:
+### Technical notes
+- Recovery in step 1 is a one-shot SQL migration scoped to Blake's client id.
+- Alias write in step 2 uses `array_append(organizations.aliases, ?)` and requires `manage_users`.
+- The reclaim action in step 3 is a small server fn `reclaimExternalCodesAsOurs({ clientId, codes[] })` that mirrors the commit-time pipeline: insert stubs, update `authorized_dspd_codes`/`job_code`, delete the external rows.
+- No changes to the extractor, PCSP goals, or the finalize wizard's other steps.
 
-- Combobox listing active `organization_members` in the org (reuses existing `useOrgMembers` / equivalent hook — will pick whichever the Caseload picker already uses).
-- Two helper buttons beside it:
-  - **Invite as staff** → opens the existing staff-invite dialog prefilled with the host's name + email; on success, auto-links the new user to this card.
-  - **Unlink** → clears the field.
-- Below the combobox, a small info line: *"Harvey will appear on the staff Roster and in client Caseload pickers. Their Host record stays separate — hosts still never appear on the schedule."*
-
-On the host card in the list view, add a subtle **"Also DSP"** badge when `linked_staff_user_id` is set, so it's obvious at a glance which hosts are also employees.
-
-## UI — Caseload picker (client Care tab)
-
-No structural change. Once Harvey exists as a staff row (via the invite above), he shows up in Blake's Caseload picker automatically. Add a one-line footnote to the Caseload help text: *"Hosts only appear here if they're also invited as staff."* — so the earlier surprise doesn't repeat.
-
-## What this does NOT do
-
-- Does not merge hosts and staff into one table.
-- Does not auto-create a staff account when you create a host — the provider has to click **Invite as staff** (staff invites require email, role, employment terms; silently minting them would break HR/compliance).
-- Does not change scheduling, EVV, or billing logic. The staff-side Harvey clocks shifts; the host-side Harvey still produces daily notes + overnight confirmations. They just share a real-world identity via `linked_staff_user_id`.
-
-## Migration summary
-
-- Adds `linked_staff_user_id` (nullable) to Host Home Provider cue cards, so a host can be marked as also being an employee.
-- Adds a uniqueness rule so one staff member can only be linked to one host card per organization.
+### Out of scope (say so if you want them in)
+- Auto-learning aliases from every PCSP the classifier sees.
+- Bulk retroactive rescue across all finalized clients (I'll do Blake only; if you want, I can add an admin tool that scans every client and offers the same "reclaim" fix in bulk).

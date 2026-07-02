@@ -110,6 +110,7 @@ const STAFF_NAV: NavItem[] = [
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/ask-nectar", label: "Ask NECTAR", icon: Sparkles },
   { to: "/dashboard/courses", label: "My Trainings", icon: GraduationCap },
+  { to: "/dashboard/hive-training", label: "HIVE Training", icon: GraduationCap },
 ];
 
 const ADMIN_NAV: NavItem[] = [
@@ -121,6 +122,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/deadlines", label: "Deadlines", icon: AlarmClock },
   { to: "/dashboard/summaries", label: "Summaries", icon: FileText },
   { to: "/dashboard/hub/finances", label: "Finances", icon: Receipt, perm: "view_billing" },
+  { to: "/dashboard/hive-training", label: "HIVE Training", icon: GraduationCap },
   { to: "/dashboard/reports", label: "Reports", icon: FileText, perm: "export_reports" },
   { to: "/dashboard/inbox", label: "Inbox", icon: Inbox },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },

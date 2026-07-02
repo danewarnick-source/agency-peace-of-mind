@@ -63,7 +63,9 @@ function HiveTrainingHub() {
   useEffect(() => {
     if (search.checkout === "success") toast.success("Payment received. Seats/assignments will appear shortly.");
     else if (search.checkout === "cancelled") toast.info("Checkout cancelled.");
-  }, [search.checkout]);
+    if (search.card === "saved") toast.success("Card saved. Auto-renew is ready to go.");
+    else if (search.card === "cancelled") toast.info("Card setup cancelled.");
+  }, [search.checkout, search.card]);
 
   if (!org) {
     return (

@@ -296,8 +296,11 @@ function SmartImportPage() {
             file_type: chip.file.type || null as unknown as string,
             file_size: chip.file.size,
             storage_path: path,
+            client_key: chip.clientKey || null,
+            client_label: chip.detectedClient || null,
           },
         });
+
 
         if (chip.kind === "roster") {
           const parsed = await parseRoster(chip.file);

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { usePortalView } from "@/hooks/use-portal-view";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -59,6 +60,7 @@ type Member = { id: string; label: string };
 function HiveTrainingHub() {
   const { data: org } = useCurrentOrg();
   const search = useSearch({ from: Route.id });
+  const { view, hydrated } = usePortalView();
 
   useEffect(() => {
     if (search.checkout === "success") toast.success("Payment received. Seats/assignments will appear shortly.");
@@ -67,13 +69,14 @@ function HiveTrainingHub() {
     else if (search.card === "cancelled") toast.info("Card setup cancelled.");
   }, [search.checkout, search.card]);
 
-  if (!org) {
+  if (!org || !hydrated) {
     return (
       <div className="p-6 flex justify-center"><Loader2 className="h-5 w-5 animate-spin" /></div>
     );
   }
 
-  const isAdmin = ["admin", "manager", "super_admin"].includes(org.role);
+  const realIsAdmin = ["admin", "manager", "super_admin"].includes(org.role);
+  const isAdmin = realIsAdmin && view !== "staff" && view !== "staff_mobile";
 
   return (
     <div className="mx-auto max-w-6xl p-4 md:p-6 space-y-6">
@@ -81,8 +84,15 @@ function HiveTrainingHub() {
         <div className="rounded-lg p-2 bg-[#1A2B47] text-white">
           <GraduationCap className="h-6 w-6" />
         </div>
-        <div>
-          <h1 className="text-xl md:text-2xl font-semibold text-[#1A2B47]">HIVE Training</h1>
+        <div className="flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl md:text-2xl font-semibold text-[#1A2B47]">HIVE Training</h1>
+            {realIsAdmin && !isAdmin && (
+              <span className="inline-flex items-center rounded-full bg-muted text-muted-foreground text-xs px-2 py-0.5">
+                Previewing as staff
+              </span>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">
             {isAdmin
               ? "DSPD-aligned courses, competency sign-off, and verifiable certificates for your team."
@@ -97,6 +107,7 @@ function HiveTrainingHub() {
     </div>
   );
 }
+
 
 // ============================================================
 // STAFF VIEW — mobile-first, no buying surface

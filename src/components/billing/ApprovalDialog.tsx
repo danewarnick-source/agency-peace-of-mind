@@ -54,6 +54,10 @@ export interface ApprovalDialogProps {
   subjectId?: string | null;
   extractedFieldId?: string | null;
   onCreated?: (requestId: string) => void;
+  // Only true from the HIVE Executive route. Gates Approve/Deny + signature UI
+  // so provider-side surfaces (Inbox, Smart Import) never show them, even for
+  // users who also hold the HIVE Executive role.
+  allowResolution?: boolean;
 }
 
 function statusBadge(status: ApprovalRequestRow["status"]) {

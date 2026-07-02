@@ -1,66 +1,70 @@
+# Fix: two PDFs assigned to the same client create two subjects
 
-# Goal
-Make the PCSP the "source of truth" for the client profile. If a fact is anywhere in the PCSP (DOB, physical address, primary care phone, guardian email, etc.), it should end up on the client profile without an admin re-typing it — and any remaining gap should be an obvious, one-click fix, not a silent empty field.
+## Why it's happening
 
-# What's actually causing the gaps today
-Three separate layers each drop a different subset of PCSP data:
+In `src/routes/dashboard.smart-import.index.tsx` the UI already tracks a `clientKey` per file (from the "test / test" dropdowns), but that key is **never sent to the server**. The upload path only sends `rosterBatches` + `textBlobs` to `runSmartExtraction`.
 
-1. **Extractor prompt** (`src/lib/document-extraction.ts`)
-   Enumerates ~70 keys but leaves out several PCSP-visible facts (e.g. gender/sex, preferred pronouns, communication preferences, mobility/adaptive equipment, primary language, ethnicity/race if collected, funding source, day program name, transportation notes, additional phone numbers, alternate address, secondary Medicaid/insurance IDs, county, PCSP author, plan review dates, PCSP signature dates). If the model isn't told to look, it doesn't return them.
+In `src/lib/smart-import.functions.ts` (`runSmartExtraction`, ~L392–411), the server loop is:
 
-2. **Finalizer** (`applyExtractedFieldsToClient` in `src/lib/client-import-schema.ts`)
-   Only writes columns it explicitly lists. Any extra `field_key` the model DOES return today is discarded (not even parked as a `custom_field_value`). This is why users see fields on the review screen that never appear on the profile.
+```
+for each uploaded PDF/DOCX text blob:
+  aiExtractFieldsFromText(...)
+  INSERT INTO import_subjects (...)   ← one row per document
+  INSERT extracted_fields for that new subject
+```
 
-3. **Profile registry** (`src/lib/client-profile-fields.ts`)
-   The profile only renders keys registered here. New PCSP facts have nowhere to land in the UI even after we widen extraction + finalizer.
+So two PDFs = two `import_subjects` rows, regardless of what the admin picked in the "Move to client" dropdown. The grouping the user sees on the upload screen is purely cosmetic today.
 
-# Plan
+## Fix
 
-## 1. Widen the extraction schema (PCSP-first pass)
-Extend `SYSTEM_PROMPT` and `CORE_CLIENT_FIELD_KEYS` in `src/lib/document-extraction.ts` to cover every field the standard Utah DSPD PCSP template exposes but we currently ignore:
+Carry the client grouping end-to-end and collapse same-group docs into one subject.
 
-- Identity: `gender`, `pronouns`, `preferred_name`, `primary_language`, `communication_notes`, `race`, `ethnicity`, `marital_status`
-- Contact: `secondary_phone`, `email`, `county`, `city`, `state`, `zip`, `mailing_city`, `mailing_state`, `mailing_zip`
-- Health context: `mobility_notes`, `adaptive_equipment`, `dietary_restrictions`, `weight`, `height`, `blood_type`, `menstrual_supports`, `vision_status`, `hearing_status`
-- Insurance / IDs: `secondary_insurance`, `ssn_last4`, `medicare_id`
-- Program: `day_program_name`, `day_program_phone`, `transportation_notes`, `funding_source`
-- Plan metadata: `pcsp_author_name`, `pcsp_meeting_date`, `pcsp_effective_start`, `pcsp_review_date`, `pcsp_signed_by_client`, `pcsp_signed_by_guardian`
+### Client changes — `src/routes/dashboard.smart-import.index.tsx`
 
-Add an explicit instruction to the prompt: **"If a fact appears anywhere in the document — narrative text, tables, headers, or signature blocks — you MUST emit it. Missing a fact that is visible in the document is worse than a low-confidence guess (mark low confidence instead)."**
+1. When calling `recordDoc`, also pass `client_key` and `client_label` from the chip so the server persists the admin's grouping choice on `import_documents`.
+2. Nothing else changes in the UI — the existing "Move to client" dropdown already writes `clientKey` onto every chip.
 
-Also add a second **profile-completeness safety pass**: after the main extraction, if any of a defined "must-have" set (DOB, address, primary phone, guardian, emergency contact) is missing from the fields array, run a small targeted follow-up call (same pattern as the existing `extractGoalsOnly` retry) asking only for those keys.
+### Server changes — `src/lib/smart-import.functions.ts`
 
-## 2. Make the finalizer field-driven, not hand-coded
-In `applyExtractedFieldsToClient`:
+1. `recordImportDocument`:
+   - Extend the Zod input with optional `client_key` and `client_label`.
+   - Persist them on `import_documents` (see migration below).
 
-- Replace the long list of hand-written `setScalarText("column", "key")` lines with a loop over `CLIENT_PROFILE_FIELDS` from `client-profile-fields.ts`. Each registry entry declares its storage (column vs custom) and its extraction aliases, so adding a new field in one place populates it end-to-end.
-- Add a `setCustomText / setCustomBool / setCustomArray` path that mirrors `setScalarText` but writes through `writeProfileFieldValue`, so any registry field with `storage.kind === "custom"` auto-fills too.
-- Fallback bucket: for any high-confidence extracted field whose key is not in `CORE_CLIENT_FIELD_KEYS` and not a registry alias, park it as a `custom_field_value` with `source: "pcsp"` so it's visible under "Additional PCSP details" instead of vanishing.
+2. `runSmartExtraction` — text-blob / uploaded-doc branch (currently L343–428):
+   - When downloading `import_documents`, also select `client_key`, `client_label`.
+   - Build `realTextBlobs` with `client_key` / `client_label` attached (pasted text stays keyless).
+   - **Bucket blobs by `client_key`** (empty key = its own bucket, one subject per doc so today's behavior is preserved for unassigned docs).
+   - For each bucket with a non-empty key:
+     - Create **one** `import_subjects` row. Prefer `client_label` for `display_name`; fall back to the first extracted `display_name`.
+     - Run `aiExtractFieldsFromText` for every blob in the bucket and insert **all** their `extracted_fields` + `unfiled_items` under that single `subject_id`, keeping each row's own `source_document_id` for provenance.
+     - If two blobs disagree on the same `target_field`, keep both rows: mark the second as `status: "flag"` with a `"conflict with <file>"` snippet so the reviewer can pick a winner (no silent overwrite).
+   - Roster batches keep today's "one subject per row" behavior — they aren't affected.
 
-## 3. Grow the profile registry
-Add registry entries in `client-profile-fields.ts` for the new keys from step 1 that deserve first-class UI (pronouns, preferred name, primary language, communication notes, mobility, adaptive equipment, dietary restrictions, secondary phone, email, county, day program, transportation notes, PCSP author, PCSP signature dates). Column-backed where a `clients` column already exists; custom-backed otherwise. No new DB columns in this pass — we lean on `custom_field_values` for anything new, so this stays a code-only change.
+3. `import_field_provenance` / summary counts don't need changes; they roll up by subject.
 
-## 4. "PCSP coverage" panel on the client profile
-On the profile Care/Overview tab, add a compact **"Pulled from PCSP"** card:
+### Migration (SQL handoff)
 
-- Green rows: fields the current PCSP filled.
-- Amber rows: fields the current PCSP contained but that were overridden by a prior value (i.e. entries in the `suggested` list from the finalizer) — one-click "Accept PCSP value".
-- Grey rows: fields the PCSP did NOT contain — inline "Add manually" input, same pattern as `AddMissingFieldPopover` from Smart Import review.
+`import_documents` needs two nullable columns:
 
-This is the "no missing fields when the PCSP has that information" guarantee, made visible.
+```sql
+ALTER TABLE public.import_documents
+  ADD COLUMN IF NOT EXISTS client_key   text,
+  ADD COLUMN IF NOT EXISTS client_label text;
+CREATE INDEX IF NOT EXISTS import_documents_job_client_key_idx
+  ON public.import_documents (import_job_id, client_key);
+```
 
-## 5. Backfill for clients whose PCSP is already filed
-Add a small `reapplyPcspToClient` server function that re-runs steps 2–3 against the client's most recent stored PCSP extraction (already in `client_documents` / `extracted_fields`) without re-calling the AI. Expose it as a "Re-sync from PCSP" button on the coverage card so existing clients benefit immediately.
+No RLS/grant changes — inherits existing policies.
 
-## Explicitly out of scope
-- No new `clients` table columns (all new PCSP facts land in `custom_field_values`).
-- No changes to Smart Import wizard step order — the finalizer widening is what flows through.
-- No changes to billing-code, medication, or goal extraction (those already have dedicated passes).
+## Out of scope
 
-# Technical notes (for the implementer)
-- Keep the finalizer's existing conflict/duplicate detection (`writeScalarConflict`, `writeDuplicateFlag`) — the registry loop should call into it unchanged.
-- The "safety pass" second AI call should reuse `gatewayFetch` with `max_tokens: 4000` and only fire when ≥1 must-have is missing, to keep cost bounded.
-- `CORE_CLIENT_FIELD_KEYS` must stay in lockstep with the new extraction keys or Smart Import will mis-classify them as custom attributes.
-- Coverage card reads from `extracted_fields` for provenance ("Filled from PCSP · page 3") so admins trust it.
+- The pending-clients review page (`dashboard.clients.pending.tsx`) and Smart Import review already render one card per `import_subjects` row, so no changes needed there — collapsing at the subject level fixes the visible symptom.
+- Roster CSV/XLSX rows keep their current one-subject-per-row semantics.
+- No change to `aiExtractFieldsFromText` prompts.
 
-Ready to switch to build mode and implement?
+## Verification
+
+1. Upload two PDFs, use the dropdowns to assign both to "test".
+2. Run extraction → summary shows **1 person**, not 2.
+3. Open the review page → single "test" card with fields sourced from both documents; conflicting values appear as review flags rather than silent overwrites.
+4. Leave a doc as "Unassigned" and confirm it still creates its own subject.

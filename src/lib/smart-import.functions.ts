@@ -32,7 +32,10 @@ const RecordDocInput = z.object({
   file_size: z.number().int().nonnegative().optional(),
   storage_path: z.string().min(1).max(500),
   checksum: z.string().max(128).optional(),
+  client_key: z.string().max(120).optional().nullable(),
+  client_label: z.string().max(200).optional().nullable(),
 });
+
 
 const RosterRow = z.record(z.string(), z.string());
 const ExtractInput = z.object({
@@ -239,6 +242,8 @@ export const recordImportDocument = createServerFn({ method: "POST" })
         storage_path: data.storage_path,
         checksum: data.checksum ?? null,
         uploaded_by: context.userId,
+        client_key: data.client_key ?? null,
+        client_label: data.client_label ?? null,
       })
       .select("id")
       .single();
@@ -342,26 +347,36 @@ export const runSmartExtraction = createServerFn({ method: "POST" })
 
       // ---- Text blobs + uploaded PDF/DOCX docs: AI extraction ----
       // Server-side: pull every recorded document for this job, download from
-      // the private bucket, convert to text, then AI-extract. Client-supplied
-      // text blobs that are obvious placeholders ("Imported document: …") are
-      // dropped — the server is the source of truth for file text.
-      const realTextBlobs: Array<{
+      // the private bucket, convert to text, then AI-extract. Documents that
+      // share the same admin-assigned client_key collapse into ONE subject so
+      // multi-doc uploads for the same person don't split into duplicates.
+      type TextBlob = {
         source_document_id: string | null;
         file_name: string;
         text: string;
-      }> = [];
+        client_key: string | null;
+        client_label: string | null;
+      };
+      const realTextBlobs: TextBlob[] = [];
 
-      // Real pasted text from the client (not the placeholder).
+      // Real pasted text from the client (not the placeholder). Pasted text
+      // has no client_key so each blob becomes its own subject (today's behavior).
       for (const blob of data.textBlobs) {
         if (blob.text && !/^Imported document:/i.test(blob.text.trim())) {
-          realTextBlobs.push(blob);
+          realTextBlobs.push({
+            source_document_id: blob.source_document_id,
+            file_name: blob.file_name,
+            text: blob.text,
+            client_key: null,
+            client_label: null,
+          });
         }
       }
 
       // Download + extract text for every uploaded doc that's not a roster.
       const { data: docs } = await sb
         .from("import_documents")
-        .select("id, file_name, file_type, storage_path")
+        .select("id, file_name, file_type, storage_path, client_key, client_label")
         .eq("import_job_id", data.jobId);
       for (const doc of docs ?? []) {
         const fname = String(doc.file_name || "").toLowerCase();
@@ -383,59 +398,108 @@ export const runSmartExtraction = createServerFn({ method: "POST" })
             source_document_id: doc.id as string,
             file_name: doc.file_name as string,
             text: text.slice(0, 200_000),
+            client_key: (doc.client_key as string | null) || null,
+            client_label: (doc.client_label as string | null) || null,
           });
         } catch (e) {
           throw new Error(`Failed to extract text from ${doc.file_name}: ${(e as Error).message}`);
         }
       }
 
+      // Bucket by client_key. Blobs without a key each become their own bucket
+      // (preserves current behavior for unassigned docs / pasted text).
+      const buckets = new Map<string, TextBlob[]>();
+      let anon = 0;
       for (const blob of realTextBlobs) {
-        const extracted = await aiExtractFieldsFromText(blob.text, mode);
-        if (extracted.fields.length === 0) {
+        const key = blob.client_key && blob.client_key.length > 0
+          ? `k:${blob.client_key}`
+          : `anon:${anon++}`;
+        const list = buckets.get(key) ?? [];
+        list.push(blob);
+        buckets.set(key, list);
+      }
+
+      for (const [, blobs] of buckets) {
+        // Extract each blob's fields first so we can pick a fallback display name.
+        const extractions: Array<{
+          blob: TextBlob;
+          extracted: Awaited<ReturnType<typeof aiExtractFieldsFromText>>;
+        }> = [];
+        for (const blob of blobs) {
+          const extracted = await aiExtractFieldsFromText(blob.text, mode);
+          extractions.push({ blob, extracted });
+        }
+        const hasAnyFields = extractions.some((e) => e.extracted.fields.length > 0);
+        if (!hasAnyFields) {
           throw new Error(
-            `Extraction returned no usable fields from ${blob.file_name}. The document text was read, but no client fields could be saved.`,
+            `Extraction returned no usable fields from ${blobs.map((b) => b.file_name).join(", ")}. The document text was read, but no client fields could be saved.`,
           );
         }
+
+        // Prefer the admin's chosen label for the group; otherwise fall back
+        // to the first non-empty extracted display name.
+        const groupLabel = blobs.find((b) => b.client_label)?.client_label ?? null;
+        const displayName =
+          groupLabel ||
+          extractions.find((e) => e.extracted.display_name && e.extracted.display_name !== "Unnamed")?.extracted.display_name ||
+          extractions[0].extracted.display_name ||
+          "Unnamed";
+
         const { data: subj, error: serr } = await sb
           .from("import_subjects")
           .insert({
             import_job_id: data.jobId,
             org_id: data.organizationId,
             subject_type: mode,
-            display_name: extracted.display_name,
+            display_name: displayName,
             match_status: "new",
           })
           .select("id")
           .single();
         if (serr) throw new Error(serr.message);
-        allSubjects.push({ id: subj.id, display_name: extracted.display_name });
+        allSubjects.push({ id: subj.id, display_name: displayName });
 
-        for (const f of extracted.fields) {
-          await sb.from("extracted_fields").insert({
-            import_job_id: data.jobId,
-            import_subject_id: subj.id,
-            org_id: data.organizationId,
-            target_table: mode === "client" ? "clients" : "profiles",
-            target_field: f.target_field,
-            value: f.value,
-            status: f.status,
-            confidence: f.confidence,
-            source_document_id: blob.source_document_id,
-            source_snippet: f.snippet,
-            provenance: f.provenance,
-            is_custom_attribute: f.is_custom,
-          });
-        }
-        for (const leftover of extracted.unfiled) {
-          await sb.from("unfiled_items").insert({
-            import_job_id: data.jobId,
-            import_subject_id: subj.id,
-            org_id: data.organizationId,
-            text: leftover,
-            source_document_id: blob.source_document_id,
-          });
+        // Track which target_fields we've seen so conflicts across documents in
+        // the same bucket surface as review flags instead of silent overwrites.
+        const seen = new Map<string, string>(); // target_field -> file_name of first placer
+
+        for (const { blob, extracted } of extractions) {
+          for (const f of extracted.fields) {
+            const first = seen.get(f.target_field);
+            const isConflict = !!first && !f.is_custom;
+            const status = isConflict ? "flag" : f.status;
+            const snippet = isConflict
+              ? `${f.snippet} — conflicts with value from ${first}`
+              : f.snippet;
+            await sb.from("extracted_fields").insert({
+              import_job_id: data.jobId,
+              import_subject_id: subj.id,
+              org_id: data.organizationId,
+              target_table: mode === "client" ? "clients" : "profiles",
+              target_field: f.target_field,
+              value: f.value,
+              status,
+              confidence: f.confidence,
+              source_document_id: blob.source_document_id,
+              source_snippet: snippet,
+              provenance: f.provenance,
+              is_custom_attribute: f.is_custom,
+            });
+            if (!first && !f.is_custom) seen.set(f.target_field, blob.file_name);
+          }
+          for (const leftover of extracted.unfiled) {
+            await sb.from("unfiled_items").insert({
+              import_job_id: data.jobId,
+              import_subject_id: subj.id,
+              org_id: data.organizationId,
+              text: leftover,
+              source_document_id: blob.source_document_id,
+            });
+          }
         }
       }
+
+
 
       // ---- Fail loudly: if no subject made it through, the upload was
       // unreadable or the model returned nothing. Never report "complete" on 0.

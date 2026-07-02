@@ -6669,6 +6669,112 @@ export type Database = {
           },
         ]
       }
+      hive_training_auto_renew_runs: {
+        Row: {
+          created_at: string
+          details: Json
+          error_message: string | null
+          id: string
+          organization_id: string
+          run_at: string
+          seats_purchased: number
+          staff_count: number
+          status: Database["public"]["Enums"]["hive_training_auto_renew_status"]
+          stripe_payment_intent_id: string | null
+          total_amount_cents: number
+        }
+        Insert: {
+          created_at?: string
+          details?: Json
+          error_message?: string | null
+          id?: string
+          organization_id: string
+          run_at?: string
+          seats_purchased?: number
+          staff_count?: number
+          status: Database["public"]["Enums"]["hive_training_auto_renew_status"]
+          stripe_payment_intent_id?: string | null
+          total_amount_cents?: number
+        }
+        Update: {
+          created_at?: string
+          details?: Json
+          error_message?: string | null
+          id?: string
+          organization_id?: string
+          run_at?: string
+          seats_purchased?: number
+          staff_count?: number
+          status?: Database["public"]["Enums"]["hive_training_auto_renew_status"]
+          stripe_payment_intent_id?: string | null
+          total_amount_cents?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hive_training_auto_renew_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hive_training_auto_renew_settings: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          last_run_at: string | null
+          lead_days: number
+          organization_id: string
+          paused_reason: string | null
+          payment_method_brand: string | null
+          payment_method_last4: string | null
+          scope: Database["public"]["Enums"]["hive_training_auto_renew_scope"]
+          selected_catalog_ids: string[]
+          stripe_customer_id: string | null
+          stripe_payment_method_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          last_run_at?: string | null
+          lead_days?: number
+          organization_id: string
+          paused_reason?: string | null
+          payment_method_brand?: string | null
+          payment_method_last4?: string | null
+          scope?: Database["public"]["Enums"]["hive_training_auto_renew_scope"]
+          selected_catalog_ids?: string[]
+          stripe_customer_id?: string | null
+          stripe_payment_method_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          last_run_at?: string | null
+          lead_days?: number
+          organization_id?: string
+          paused_reason?: string | null
+          payment_method_brand?: string | null
+          payment_method_last4?: string | null
+          scope?: Database["public"]["Enums"]["hive_training_auto_renew_scope"]
+          selected_catalog_ids?: string[]
+          stripe_customer_id?: string | null
+          stripe_payment_method_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hive_training_auto_renew_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hive_training_catalog: {
         Row: {
           active: boolean
@@ -14978,6 +15084,13 @@ export type Database = {
         | "in_progress"
         | "completed"
         | "expired"
+      hive_training_auto_renew_scope: "all" | "full_program" | "selected"
+      hive_training_auto_renew_status:
+        | "succeeded"
+        | "card_failed"
+        | "no_eligible"
+        | "partial"
+        | "error"
       hive_training_catalog_kind: "full_program" | "ala_carte"
       hive_training_order_model: "bulk_seats" | "individual"
       hive_training_order_status: "pending" | "paid" | "refunded" | "failed"
@@ -15176,6 +15289,14 @@ export const Constants = {
         "in_progress",
         "completed",
         "expired",
+      ],
+      hive_training_auto_renew_scope: ["all", "full_program", "selected"],
+      hive_training_auto_renew_status: [
+        "succeeded",
+        "card_failed",
+        "no_eligible",
+        "partial",
+        "error",
       ],
       hive_training_catalog_kind: ["full_program", "ala_carte"],
       hive_training_order_model: ["bulk_seats", "individual"],

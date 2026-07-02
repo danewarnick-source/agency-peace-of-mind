@@ -1889,17 +1889,17 @@ function BillingCodesEditor({
         </div>
       )}
 
-      {externalRows.length > 0 && (
+      {activeExternal.length > 0 && (
         <details className="mt-2 rounded-md border border-amber-300/60 bg-amber-50 p-2 text-[11px] text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
           <summary className="cursor-pointer font-semibold">
-            {externalRows.length} outside-provider code{externalRows.length === 1 ? "" : "s"} on this PCSP
-            <span className="ml-1 font-normal">· {approvedCount} approved · {pendingCount} awaiting HIVE · {notOursCount} not ours</span>
+            {activeExternal.length} outside-provider code{activeExternal.length === 1 ? "" : "s"} on this PCSP
+            <span className="ml-1 font-normal">· {approvedCount} approved · {pendingCount} awaiting HIVE</span>
           </summary>
           <div className="mt-1.5">
-            Provider on {externalRows.length === 1 ? "this line" : "these lines"} does not match <span className="font-medium">{orgLabel}</span>. Use <span className="font-medium">Not my organization</span> or <span className="font-medium">Request HIVE approval</span>.
+            Provider on {activeExternal.length === 1 ? "this line" : "these lines"} does not match <span className="font-medium">{orgLabel}</span>. Use <span className="font-medium">Not my organization</span> to keep it purely informational, or <span className="font-medium">Request HIVE approval</span> to have HIVE Admin review it.
           </div>
           <div className="mt-1 font-mono text-[10px]">
-            {externalRows.map((p) => `${p.row.service_code} → ${p.row.provider_name ?? "unknown"}${p.row.ownership_ack === "not_ours" ? " (not ours)" : ""}`).join("  •  ")}
+            {activeExternal.map((p) => `${p.row.service_code} → ${p.row.provider_name ?? "unknown"}`).join("  •  ")}
           </div>
         </details>
       )}

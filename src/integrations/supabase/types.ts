@@ -6589,6 +6589,459 @@ export type Database = {
           },
         ]
       }
+      hive_training_assignments: {
+        Row: {
+          completed_at: string | null
+          course_id: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          order_id: string | null
+          organization_id: string
+          payment_model: Database["public"]["Enums"]["hive_training_order_model"]
+          progress_pct: number
+          seat_id: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["hive_training_assignment_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          course_id: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          order_id?: string | null
+          organization_id: string
+          payment_model: Database["public"]["Enums"]["hive_training_order_model"]
+          progress_pct?: number
+          seat_id?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["hive_training_assignment_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          course_id?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          order_id?: string | null
+          organization_id?: string
+          payment_model?: Database["public"]["Enums"]["hive_training_order_model"]
+          progress_pct?: number
+          seat_id?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["hive_training_assignment_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hive_training_assignments_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "hive_training_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hive_training_assignments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "hive_training_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hive_training_assignments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hive_training_assignments_seat_id_fkey"
+            columns: ["seat_id"]
+            isOneToOne: false
+            referencedRelation: "hive_training_seats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hive_training_catalog: {
+        Row: {
+          active: boolean
+          created_at: string
+          currency: string
+          id: string
+          includes: string[]
+          kind: Database["public"]["Enums"]["hive_training_catalog_kind"]
+          name: string
+          price_cents: number
+          sku: string
+          sort: number
+          stripe_price_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          currency?: string
+          id?: string
+          includes?: string[]
+          kind: Database["public"]["Enums"]["hive_training_catalog_kind"]
+          name: string
+          price_cents: number
+          sku: string
+          sort?: number
+          stripe_price_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          currency?: string
+          id?: string
+          includes?: string[]
+          kind?: Database["public"]["Enums"]["hive_training_catalog_kind"]
+          name?: string
+          price_cents?: number
+          sku?: string
+          sort?: number
+          stripe_price_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hive_training_certificates: {
+        Row: {
+          assignment_id: string
+          code: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          issued_at: string
+          pdf_url: string | null
+        }
+        Insert: {
+          assignment_id: string
+          code: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          issued_at?: string
+          pdf_url?: string | null
+        }
+        Update: {
+          assignment_id?: string
+          code?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          issued_at?: string
+          pdf_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hive_training_certificates_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "hive_training_assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hive_training_course_modules: {
+        Row: {
+          body_md: string | null
+          course_id: string
+          created_at: string
+          id: string
+          quiz_json: Json | null
+          sort: number
+          title: string
+          updated_at: string
+          video_url: string | null
+        }
+        Insert: {
+          body_md?: string | null
+          course_id: string
+          created_at?: string
+          id?: string
+          quiz_json?: Json | null
+          sort?: number
+          title: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Update: {
+          body_md?: string | null
+          course_id?: string
+          created_at?: string
+          id?: string
+          quiz_json?: Json | null
+          sort?: number
+          title?: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hive_training_course_modules_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "hive_training_courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hive_training_courses: {
+        Row: {
+          cert_validity_months: number
+          cover_url: string | null
+          created_at: string
+          description: string | null
+          estimated_minutes: number
+          id: string
+          published: boolean
+          slug: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          cert_validity_months?: number
+          cover_url?: string | null
+          created_at?: string
+          description?: string | null
+          estimated_minutes?: number
+          id?: string
+          published?: boolean
+          slug: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          cert_validity_months?: number
+          cover_url?: string | null
+          created_at?: string
+          description?: string | null
+          estimated_minutes?: number
+          id?: string
+          published?: boolean
+          slug?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hive_training_module_progress: {
+        Row: {
+          assignment_id: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          module_id: string
+          quiz_score: number | null
+          updated_at: string
+        }
+        Insert: {
+          assignment_id: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          module_id: string
+          quiz_score?: number | null
+          updated_at?: string
+        }
+        Update: {
+          assignment_id?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          module_id?: string
+          quiz_score?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hive_training_module_progress_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "hive_training_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hive_training_module_progress_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "hive_training_course_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hive_training_order_items: {
+        Row: {
+          catalog_id: string
+          created_at: string
+          id: string
+          order_id: string
+          quantity: number
+          unit_price_cents: number
+        }
+        Insert: {
+          catalog_id: string
+          created_at?: string
+          id?: string
+          order_id: string
+          quantity: number
+          unit_price_cents: number
+        }
+        Update: {
+          catalog_id?: string
+          created_at?: string
+          id?: string
+          order_id?: string
+          quantity?: number
+          unit_price_cents?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hive_training_order_items_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "hive_training_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hive_training_order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "hive_training_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hive_training_orders: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          currency: string
+          id: string
+          model: Database["public"]["Enums"]["hive_training_order_model"]
+          organization_id: string
+          paid_at: string | null
+          purchaser_user_id: string
+          refunded_at: string | null
+          status: Database["public"]["Enums"]["hive_training_order_status"]
+          stripe_checkout_session_id: string | null
+          stripe_customer_id: string | null
+          stripe_payment_intent_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount_cents?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          model: Database["public"]["Enums"]["hive_training_order_model"]
+          organization_id: string
+          paid_at?: string | null
+          purchaser_user_id: string
+          refunded_at?: string | null
+          status?: Database["public"]["Enums"]["hive_training_order_status"]
+          stripe_checkout_session_id?: string | null
+          stripe_customer_id?: string | null
+          stripe_payment_intent_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          model?: Database["public"]["Enums"]["hive_training_order_model"]
+          organization_id?: string
+          paid_at?: string | null
+          purchaser_user_id?: string
+          refunded_at?: string | null
+          status?: Database["public"]["Enums"]["hive_training_order_status"]
+          stripe_checkout_session_id?: string | null
+          stripe_customer_id?: string | null
+          stripe_payment_intent_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hive_training_orders_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hive_training_seats: {
+        Row: {
+          assigned_at: string | null
+          assigned_to_user_id: string | null
+          catalog_id: string
+          consumed_at: string | null
+          created_at: string
+          id: string
+          order_id: string | null
+          organization_id: string
+          status: Database["public"]["Enums"]["hive_training_seat_status"]
+          updated_at: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_to_user_id?: string | null
+          catalog_id: string
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+          order_id?: string | null
+          organization_id: string
+          status?: Database["public"]["Enums"]["hive_training_seat_status"]
+          updated_at?: string
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_to_user_id?: string | null
+          catalog_id?: string
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+          order_id?: string | null
+          organization_id?: string
+          status?: Database["public"]["Enums"]["hive_training_seat_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hive_training_seats_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "hive_training_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hive_training_seats_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "hive_training_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hive_training_seats_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       home_designations: {
         Row: {
           active: boolean
@@ -9792,6 +10245,7 @@ export type Database = {
           slug: string
           specializations: string | null
           state_code: string | null
+          training_only: boolean
           updated_at: string
         }
         Insert: {
@@ -9818,6 +10272,7 @@ export type Database = {
           slug: string
           specializations?: string | null
           state_code?: string | null
+          training_only?: boolean
           updated_at?: string
         }
         Update: {
@@ -9844,6 +10299,7 @@ export type Database = {
           slug?: string
           specializations?: string | null
           state_code?: string | null
+          training_only?: boolean
           updated_at?: string
         }
         Relationships: [
@@ -14465,6 +14921,16 @@ export type Database = {
       hive_ticket_severity: "low" | "medium" | "high" | "critical"
       hive_ticket_source: "auto" | "manual"
       hive_ticket_status: "new" | "in_progress" | "resolved"
+      hive_training_assignment_status:
+        | "pending_payment"
+        | "not_started"
+        | "in_progress"
+        | "completed"
+        | "expired"
+      hive_training_catalog_kind: "full_program" | "ala_carte"
+      hive_training_order_model: "bulk_seats" | "individual"
+      hive_training_order_status: "pending" | "paid" | "refunded" | "failed"
+      hive_training_seat_status: "available" | "assigned" | "consumed"
       home_position: "manager" | "supervisor" | "staff"
       invitation_status: "pending" | "accepted" | "revoked"
       other_assignment_proposer: "admin" | "manager" | "nectar"
@@ -14653,6 +15119,17 @@ export const Constants = {
       hive_ticket_severity: ["low", "medium", "high", "critical"],
       hive_ticket_source: ["auto", "manual"],
       hive_ticket_status: ["new", "in_progress", "resolved"],
+      hive_training_assignment_status: [
+        "pending_payment",
+        "not_started",
+        "in_progress",
+        "completed",
+        "expired",
+      ],
+      hive_training_catalog_kind: ["full_program", "ala_carte"],
+      hive_training_order_model: ["bulk_seats", "individual"],
+      hive_training_order_status: ["pending", "paid", "refunded", "failed"],
+      hive_training_seat_status: ["available", "assigned", "consumed"],
       home_position: ["manager", "supervisor", "staff"],
       invitation_status: ["pending", "accepted", "revoked"],
       other_assignment_proposer: ["admin", "manager", "nectar"],

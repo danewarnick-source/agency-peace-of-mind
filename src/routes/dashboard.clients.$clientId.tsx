@@ -25,6 +25,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { previewClientUpdateFromDocument, applySelectedClientFields } from "@/lib/import-checklist.functions";
+import { reclaimExternalCodesAsOurs } from "@/lib/client-billing-fix.functions";
 
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,

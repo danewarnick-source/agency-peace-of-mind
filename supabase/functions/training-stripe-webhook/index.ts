@@ -100,13 +100,64 @@ async function handleCheckoutCompleted(
 
   if (modeContext === "bulk_seats") {
     if (!orgId) return;
-    const rows = Array.from({ length: quantity }).map(() => ({
+
+    // Check for renewal intents attached to this session — if present,
+    // auto-consume seats into assignments for the exact staff × course pairs.
+    const { data: intents } = await admin
+      .from("hive_training_renewal_intents")
+      .select("id, user_id, course_id")
+      .eq("stripe_session_id", session.id)
+      .is("consumed_at", null);
+
+    const intentList = (intents ?? []) as Array<{ id: string; user_id: string; course_id: string }>;
+    const nowIso = new Date().toISOString();
+
+    // 1. Create the raw seats first (one row per purchased seat).
+    const seatRows = Array.from({ length: quantity }).map(() => ({
       organization_id: orgId,
       order_id: orderId,
       catalog_id: catalogId,
-      status: "available",
+      status: intentList.length > 0 ? "consumed" : "available",
+      consumed_at: intentList.length > 0 ? nowIso : null,
     }));
-    await admin.from("hive_training_seats").insert(rows);
+    const { data: insertedSeats } = await admin
+      .from("hive_training_seats")
+      .insert(seatRows)
+      .select("id");
+
+    // 2. If we have intents, pair each seat with an intent and materialize
+    //    the assignment automatically.
+    if (intentList.length > 0 && insertedSeats && insertedSeats.length > 0) {
+      const pairs = intentList.slice(0, insertedSeats.length).map((intent, idx) => ({
+        seatId: insertedSeats[idx].id as string,
+        intent,
+      }));
+
+      // Assign each seat to its intended user.
+      for (const p of pairs) {
+        await admin
+          .from("hive_training_seats")
+          .update({ assigned_to_user_id: p.intent.user_id })
+          .eq("id", p.seatId);
+      }
+
+      const assignmentRows = pairs.map((p) => ({
+        organization_id: orgId,
+        user_id: p.intent.user_id,
+        course_id: p.intent.course_id,
+        payment_model: "bulk_seats",
+        order_id: orderId,
+        seat_id: p.seatId,
+        status: "not_started",
+      }));
+      await admin.from("hive_training_assignments").insert(assignmentRows);
+
+      // Mark the intents consumed.
+      await admin
+        .from("hive_training_renewal_intents")
+        .update({ consumed_at: nowIso })
+        .in("id", pairs.map((p) => p.intent.id));
+    }
   } else if (modeContext === "individual" && assigneeUserId) {
     const targetCourseIds = courseIds.length ? courseIds : [];
     if (targetCourseIds.length === 0) return;

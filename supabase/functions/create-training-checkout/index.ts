@@ -14,8 +14,9 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+type RenewalIntent = { user_id: string; course_id: string };
 type Body =
-  | { mode_context: "bulk_seats"; catalog_id: string; quantity: number; success_path?: string; cancel_path?: string }
+  | { mode_context: "bulk_seats"; catalog_id: string; quantity: number; success_path?: string; cancel_path?: string; renewal_intents?: RenewalIntent[] }
   | { mode_context: "individual"; catalog_id: string; assignee_user_id: string; success_path?: string; cancel_path?: string };
 
 Deno.serve(async (req) => {
@@ -147,6 +148,29 @@ Deno.serve(async (req) => {
     .from("hive_training_orders")
     .update({ stripe_checkout_session_id: session.id })
     .eq("id", order.id);
+
+  // Persist renewal intents so the webhook can auto-assign seats to the
+  // specific staff × course pairs the admin selected before checkout.
+  if (
+    body.mode_context === "bulk_seats" &&
+    Array.isArray(body.renewal_intents) &&
+    body.renewal_intents.length > 0 &&
+    orgRow?.organization_id
+  ) {
+    const intentRows = body.renewal_intents
+      .filter((i) => i && i.user_id && i.course_id)
+      .slice(0, quantity)
+      .map((i) => ({
+        organization_id: orgRow.organization_id,
+        stripe_session_id: session.id,
+        catalog_id: sku.id,
+        user_id: i.user_id,
+        course_id: i.course_id,
+      }));
+    if (intentRows.length > 0) {
+      await admin.from("hive_training_renewal_intents").insert(intentRows);
+    }
+  }
 
   return json({ url: session.url, order_id: order.id, session_id: session.id }, 200);
 });

@@ -35,7 +35,7 @@ export const HHP_STATUS_LABEL: Record<HhpStatus, string> = {
 };
 
 const CARD_COLS =
-  "id, organization_id, name, phone, email, address, location_city, location_county, household_members, pets, wheelchair_accessible, sign_language, criminal_history_flag, experience_summary, behavioral_comfort, communication_abilities, medical_comfort, independence_levels_accepted, schedule_availability, commitment_length, provider_notes, status, source, form_submission_id, created_at, updated_at";
+  "id, organization_id, name, phone, email, address, location_city, location_county, household_members, pets, wheelchair_accessible, sign_language, criminal_history_flag, experience_summary, behavioral_comfort, communication_abilities, medical_comfort, independence_levels_accepted, schedule_availability, commitment_length, provider_notes, status, source, form_submission_id, linked_staff_user_id, created_at, updated_at";
 
 export type HhpCueCard = {
   id: string;

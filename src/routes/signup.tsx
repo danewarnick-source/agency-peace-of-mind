@@ -622,6 +622,10 @@ function Step3Business({
         return;
       }
 
+      const isTrainingOnly =
+        typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("flow") === "training";
+
       const { error: orgErr } = await supabase
         .from("organizations")
         .update({
@@ -630,6 +634,7 @@ function Step3Business({
           dhhs_provider_id: form.providerNumber || null,
           account_contact_name: form.contactName || null,
           account_contact_email: userResp.user?.email ?? null,
+          training_only: isTrainingOnly,
         })
         .eq("id", orgId);
       if (orgErr) {

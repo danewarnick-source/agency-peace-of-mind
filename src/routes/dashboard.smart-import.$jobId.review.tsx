@@ -623,6 +623,26 @@ function SubjectWizard({
       )}
       {step === "review" && (
         <div className="space-y-3">
+          <ImportSummaryPanel
+            subject={{
+              id: subjectId,
+              display_name: (fields.find((f) => f.target_field === "full_name")?.value)
+                ?? [fields.find((f) => f.target_field === "first_name")?.value, fields.find((f) => f.target_field === "last_name")?.value].filter(Boolean).join(" ")
+                ?? "This person",
+              subject_type: jobMode,
+              match_status: "new",
+              matched_record_id: null,
+              review_decision: decision,
+              review_status: "in_progress",
+            }}
+            fields={fields}
+            unfiled={unfiled}
+            assignments={assignments}
+            subjects={subjects}
+            tenant={tenant}
+            jobMode={jobMode}
+            onJumpToStep={setStep}
+          />
           {questions.length > 0 && (
             <div>
               <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">NECTAR asks</div>
@@ -636,7 +656,7 @@ function SubjectWizard({
           <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
             <div className="font-semibold text-emerald-700 dark:text-emerald-400">Ready to create</div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Use <strong>Complete {jobMode === "client" ? "client" : "staff"} setup</strong> at the top of this page to commit. Open flags become "Needed" items on the person's file — only the last name blocks creation.
+              Everything in the outline above will be created for this {jobMode === "client" ? "client" : "staff member"} when you click <strong>Complete {jobMode === "client" ? "client" : "staff"} setup</strong> at the top of this page. Open flags become "Needed" items on the person's file — only the last name blocks creation.
             </p>
           </div>
         </div>
@@ -2499,6 +2519,352 @@ function UnfiledItem({ item, onChanged }: { item: { id: string; text: string; fi
     </div>
   );
 }
+
+// ---------------------------- ImportSummaryPanel ----------------------------
+// Final read-only outline shown at Step 8. Recaps every previous step so the
+// admin sees the complete "this is what will be created" record in one place
+// before clicking Complete client setup. All editing still happens in Steps 1-7.
+function ImportSummaryPanel({
+  subject, fields, unfiled, assignments, subjects, tenant, jobMode, onJumpToStep,
+}: {
+  subject: SubjectRow;
+  fields: FieldRow[];
+  unfiled: Array<{ id: string; text: string; filed_to: string | null }>;
+  assignments: Array<{ id: string; relation_type: string; staff_subject_id: string | null; client_subject_id: string | null; status: string; inference_reason: string | null }>;
+  subjects: SubjectRow[];
+  tenant: TenantIdentity;
+  jobMode: "employee" | "client";
+  onJumpToStep: (s: WizardStepId) => void;
+}) {
+  const byField = (key: string): string | null => {
+    const f = fields.find((x) => x.target_field === key && !x.dismissed_at);
+    return f?.value?.trim() || null;
+  };
+  const many = (key: string): string[] => {
+    return fields
+      .filter((x) => x.target_field === key && !x.dismissed_at && x.value?.trim())
+      .map((x) => x.value!.trim());
+  };
+  const missing = (v: string | null | undefined) =>
+    v ? <span>{v}</span> : <span className="text-muted-foreground/60 italic">— none captured —</span>;
+
+  // Person
+  const firstName = byField("first_name") ?? subject.display_name.split(/\s+/)[0] ?? null;
+  const lastName = byField("last_name");
+  const dob = byField("date_of_birth");
+  const medicaid = byField("medicaid_id");
+  const address = byField("mailing_address") ?? byField("address");
+  const phone = byField("phone");
+  const scName = byField("support_coordinator_name");
+  const scCompany = byField("support_coordinator_company");
+  const guardianName = byField("guardian_name");
+  const guardianRel = byField("guardian_relationship");
+  const guardianPhone = byField("guardian_phone");
+  const isOwnGuardian = (byField("is_own_guardian") ?? "").toLowerCase() === "true";
+
+  // Health
+  const diagnoses = many("diagnoses").concat(many("chronic_conditions"));
+  const allergies = many("allergies");
+  const abi = (byField("has_abi") ?? "").toLowerCase() === "true";
+  const dnr = (byField("dnr_applicable") ?? byField("dnr_status") ?? "").toLowerCase();
+  const hasDnr = dnr && !["false", "no", "none", ""].includes(dnr);
+  const hr = (byField("hr_applicable") ?? "").toLowerCase() === "true";
+  const pcpName = byField("pcp_name") ?? byField("primary_care_name");
+  const pcpPhone = byField("pcp_phone") ?? byField("primary_care_phone");
+
+  // Medications
+  const medRows = fields.filter(
+    (f) => (f.target_field === "client_medication" || f.field_key === "client_medication") && !f.dismissed_at,
+  );
+  const hasNoMedsSignal = fields.some(
+    (f) => f.target_field === "pcsp_has_medications" && String(f.value ?? "").toLowerCase() === "false" && !f.dismissed_at,
+  );
+  const parsedMeds = medRows.map(parseMedicationReviewRow);
+
+  // Goals
+  const goalRows = fields.filter(
+    (f) => (f.target_field === "pcsp_goal" || f.field_key === "pcsp_goal") && !f.dismissed_at,
+  );
+  const goalExtractionFailed = fields.some(
+    (f) => (f.target_field === "pcsp_goal_extraction_failed" || f.field_key === "pcsp_goal_extraction_failed") && !f.dismissed_at,
+  );
+  const parsedGoals = goalRows.map((f) => parseGoal(f.value));
+  const incompleteGoals = parsedGoals.filter((g) => goalCompleteness(g).missing.length > 0).length;
+
+  // Services / billing rows
+  const billingFields = fields.filter((f) => f.target_field === "billing_code_row" && !f.dismissed_at);
+  const parsedBilling = billingFields
+    .map((f) => parseBillingRow(f))
+    .filter((b): b is BillingRowShape => b !== null);
+  const oursCount = parsedBilling.filter((r) => providerOwnership(r.provider_name, tenant) === "ours").length;
+  const externalActive = parsedBilling.filter(
+    (r) => providerOwnership(r.provider_name, tenant) === "external" && r.ownership_ack !== "not_ours",
+  );
+  const notOursCount = parsedBilling.filter((r) => r.ownership_ack === "not_ours").length;
+  const unknownProviderCount = parsedBilling.filter((r) => providerOwnership(r.provider_name, tenant) === "unknown").length;
+
+  // Documents (unfiled = supporting docs bucket)
+  const docs = unfiled;
+
+  // Staff / assignments
+  const clientId = subject.id;
+  const staffAssignments = assignments.filter(
+    (a) => (jobMode === "client" ? a.client_subject_id === clientId : a.staff_subject_id === clientId),
+  );
+  const staffNames = staffAssignments.map((a) => {
+    const other = jobMode === "client" ? a.staff_subject_id : a.client_subject_id;
+    return subjects.find((s) => s.id === other)?.display_name ?? "Unknown";
+  });
+
+  // Missing blockers (only last_name is a hard blocker; surface others as advisory)
+  const missingBlockers: string[] = [];
+  if (!lastName) missingBlockers.push("Last name");
+
+  const SectionHeader = ({
+    title, count, tone = "neutral", step,
+  }: { title: string; count?: string; tone?: "neutral" | "amber" | "emerald"; step: WizardStepId }) => {
+    const toneCls =
+      tone === "amber" ? "text-amber-700 dark:text-amber-300 border-amber-300/60"
+      : tone === "emerald" ? "text-emerald-700 dark:text-emerald-300 border-emerald-300/60"
+      : "text-muted-foreground border-border";
+    return (
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5">
+          <div className="text-[11px] font-semibold uppercase tracking-wide">{title}</div>
+          {count && (
+            <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-medium ${toneCls}`}>{count}</span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => onJumpToStep(step)}
+          className="text-[10px] text-primary underline underline-offset-2 hover:no-underline"
+        >
+          Edit
+        </button>
+      </div>
+    );
+  };
+
+  const Row = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <div className="grid grid-cols-[140px_1fr] gap-2 py-0.5 text-[11px]">
+      <div className="text-muted-foreground">{label}</div>
+      <div className="min-w-0 break-words">{value}</div>
+    </div>
+  );
+
+  const cardCls = "rounded-lg border border-border bg-card/60 p-2.5 shadow-[var(--shadow-card)]";
+
+  return (
+    <div className="space-y-2">
+      {/* Header strip */}
+      <div className="rounded-lg border border-primary/30 bg-primary/5 p-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Final review — everything below will be created on Complete client setup</div>
+            <div className="mt-0.5 text-sm font-semibold">
+              {[firstName, lastName].filter(Boolean).join(" ") || subject.display_name}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-1">
+            {missingBlockers.length > 0 ? (
+              <span className="rounded-full border border-destructive/50 bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
+                Blocked · missing {missingBlockers.join(", ")}
+              </span>
+            ) : (
+              <span className="rounded-full border border-emerald-500/50 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+                Required fields present
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Two-column outline on wide screens */}
+      <div className="grid gap-2 md:grid-cols-2">
+        {/* Person & contacts */}
+        <div className={cardCls}>
+          <SectionHeader title="Person & contacts" step="person" />
+          <Row label="First name" value={missing(firstName)} />
+          <Row label="Last name" value={lastName ? <span>{lastName}</span> : <span className="text-destructive">— required —</span>} />
+          <Row label="Date of birth" value={missing(dob)} />
+          <Row label="Medicaid ID" value={missing(medicaid)} />
+          <Row label="Address" value={missing(address)} />
+          <Row label="Phone" value={missing(phone)} />
+          <Row label="Support coordinator" value={missing([scName, scCompany].filter(Boolean).join(" · ") || null)} />
+          <Row
+            label="Guardian"
+            value={
+              isOwnGuardian ? <span>Self / own guardian</span>
+              : guardianName ? <span>{[guardianName, guardianRel, guardianPhone].filter(Boolean).join(" · ")}</span>
+              : missing(null)
+            }
+          />
+        </div>
+
+        {/* Health & medical */}
+        <div className={cardCls}>
+          <SectionHeader title="Health & medical" step="health" count={`${diagnoses.length} dx · ${allergies.length} allergy`} />
+          <Row label="Diagnoses" value={diagnoses.length ? diagnoses.join(", ") : missing(null)} />
+          <Row label="Allergies" value={allergies.length ? allergies.join(", ") : missing(null)} />
+          <Row
+            label="Clinical flags"
+            value={
+              [abi && "ABI", hasDnr && "DNR", hr && "Human Rights"].filter(Boolean).length
+                ? [abi && "ABI", hasDnr && "DNR", hr && "Human Rights"].filter(Boolean).join(" · ")
+                : missing(null)
+            }
+          />
+          <Row label="PCP" value={pcpName ? <span>{pcpName}{pcpPhone ? ` · ${pcpPhone}` : ""}</span> : missing(null)} />
+        </div>
+
+        {/* Medications */}
+        <div className={cardCls}>
+          <SectionHeader
+            title="Medications"
+            step="medications"
+            tone={parsedMeds.length === 0 && !hasNoMedsSignal ? "amber" : "neutral"}
+            count={parsedMeds.length ? `${parsedMeds.length} med${parsedMeds.length === 1 ? "" : "s"}` : hasNoMedsSignal ? "none per PCSP" : "0 · needs review"}
+          />
+          {parsedMeds.length === 0 ? (
+            <div className="text-[11px] text-muted-foreground italic">
+              {hasNoMedsSignal ? "PCSP indicates no medications." : "— none captured — add manually in Step 3 if the PCSP lists any."}
+            </div>
+          ) : (
+            <ul className="space-y-0.5 text-[11px]">
+              {parsedMeds.map((m, i) => (
+                <li key={i}>
+                  <span className="font-medium">{m.name || "(unnamed)"}</span>
+                  {(m.dose || m.frequency) && <span className="text-muted-foreground"> · {[m.dose, m.frequency].filter(Boolean).join(" · ")}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* PCSP goals */}
+        <div className={cardCls}>
+          <SectionHeader
+            title="PCSP goals"
+            step="goals"
+            tone={goalExtractionFailed || incompleteGoals > 0 ? "amber" : parsedGoals.length ? "emerald" : "neutral"}
+            count={
+              goalExtractionFailed && parsedGoals.length === 0
+                ? "extraction failed"
+                : `${parsedGoals.length} goal${parsedGoals.length === 1 ? "" : "s"}${incompleteGoals ? ` · ${incompleteGoals} incomplete` : ""}`
+            }
+          />
+          {parsedGoals.length === 0 ? (
+            <div className="text-[11px] text-muted-foreground italic">— none captured — add manually in Step 4.</div>
+          ) : (
+            <ul className="space-y-0.5 text-[11px]">
+              {parsedGoals.map((g, i) => {
+                const c = goalCompleteness(g);
+                return (
+                  <li key={i} className="flex items-start justify-between gap-2">
+                    <span className="min-w-0 truncate">{g.text || "(no statement)"}</span>
+                    <span className={`shrink-0 rounded-full px-1.5 py-0 text-[9px] ${c.missing.length === 0 ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200" : "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"}`}>
+                      {c.filled}/{c.total}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        {/* Services / billing */}
+        <div className={`${cardCls} md:col-span-2`}>
+          <SectionHeader
+            title="Services & billing codes"
+            step="services"
+            tone={externalActive.length > 0 ? "amber" : oursCount > 0 ? "emerald" : "neutral"}
+            count={`${oursCount} ours · ${externalActive.length} external · ${notOursCount} not-my-org${unknownProviderCount ? ` · ${unknownProviderCount} unspecified` : ""}`}
+          />
+          {parsedBilling.length === 0 ? (
+            <div className="text-[11px] text-muted-foreground italic">— no billing codes captured —</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px] text-left text-[11px]">
+                <thead className="text-muted-foreground">
+                  <tr className="border-b border-border/60">
+                    <th className="px-1.5 py-1 font-medium">Code</th>
+                    <th className="px-1.5 py-1 font-medium">Provider</th>
+                    <th className="px-1.5 py-1 font-medium">Status</th>
+                    <th className="px-1.5 py-1 font-medium">Unit</th>
+                    <th className="px-1.5 py-1 text-right font-medium">Rate</th>
+                    <th className="px-1.5 py-1 text-right font-medium">Cap</th>
+                    <th className="px-1.5 py-1 font-medium">Plan dates</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {parsedBilling.map((r, i) => {
+                    const own = providerOwnership(r.provider_name, tenant);
+                    const notOurs = r.ownership_ack === "not_ours";
+                    let statusLabel = "Ours · will create";
+                    let statusCls = "text-emerald-700 dark:text-emerald-300";
+                    if (notOurs) { statusLabel = "Not my org · informational"; statusCls = "text-muted-foreground"; }
+                    else if (own === "external") { statusLabel = "External · coordination / HIVE"; statusCls = "text-amber-700 dark:text-amber-300"; }
+                    else if (own === "unknown") { statusLabel = "Provider unspecified"; statusCls = "text-muted-foreground"; }
+                    return (
+                      <tr key={i} className={`border-b border-border/40 ${notOurs ? "bg-muted/20 text-muted-foreground" : ""}`}>
+                        <td className="px-1.5 py-1 font-mono">{r.service_code}</td>
+                        <td className="px-1.5 py-1">{r.provider_name ?? <span className="text-muted-foreground/60">—</span>}</td>
+                        <td className={`px-1.5 py-1 ${statusCls}`}>{statusLabel}</td>
+                        <td className="px-1.5 py-1">{r.unit_type ?? "—"}</td>
+                        <td className="px-1.5 py-1 text-right">{r.rate ?? "—"}</td>
+                        <td className="px-1.5 py-1 text-right">{r.max_units ?? r.monthly_max_units ?? "—"}</td>
+                        <td className="px-1.5 py-1">{r.plan_start ?? "—"} – {r.plan_end ?? "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Plan & documents */}
+        <div className={cardCls}>
+          <SectionHeader title="Plan & documents" step="plan" count={`${docs.length} supporting doc${docs.length === 1 ? "" : "s"}`} />
+          {docs.length === 0 ? (
+            <div className="text-[11px] text-muted-foreground italic">— no additional supporting documents —</div>
+          ) : (
+            <ul className="space-y-0.5 text-[11px]">
+              {docs.slice(0, 8).map((d) => (
+                <li key={d.id} className="truncate">
+                  <span>{d.text}</span>
+                  {d.filed_to && <span className="text-muted-foreground"> · filed to {d.filed_to}</span>}
+                </li>
+              ))}
+              {docs.length > 8 && (
+                <li className="text-muted-foreground">+ {docs.length - 8} more</li>
+              )}
+            </ul>
+          )}
+        </div>
+
+        {/* Staff & training */}
+        <div className={cardCls}>
+          <SectionHeader
+            title="Staff & training"
+            step="staff"
+            count={`${staffNames.length} staff assigned`}
+          />
+          {staffNames.length === 0 ? (
+            <div className="text-[11px] text-muted-foreground italic">— no staff assigned yet —</div>
+          ) : (
+            <div className="text-[11px]">{staffNames.join(" · ")}</div>
+          )}
+          <div className="mt-1 text-[10px] text-muted-foreground">
+            Per-client training (Support strategies, Client-specific training, Person-Centered Thinking) is created automatically once PCSP + goals are finalized.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 // ---------------------------- ProvisioningPanel ----------------------------
 function ProvisioningPanel({ subjectId, onChanged }: { subjectId: string; onChanged: () => void }) {

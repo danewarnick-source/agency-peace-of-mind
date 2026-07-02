@@ -6674,6 +6674,7 @@ export type Database = {
           active: boolean
           created_at: string
           currency: string
+          fulfills_course_ids: string[]
           id: string
           includes: string[]
           kind: Database["public"]["Enums"]["hive_training_catalog_kind"]
@@ -6688,6 +6689,7 @@ export type Database = {
           active?: boolean
           created_at?: string
           currency?: string
+          fulfills_course_ids?: string[]
           id?: string
           includes?: string[]
           kind: Database["public"]["Enums"]["hive_training_catalog_kind"]
@@ -6702,6 +6704,7 @@ export type Database = {
           active?: boolean
           created_at?: string
           currency?: string
+          fulfills_course_ids?: string[]
           id?: string
           includes?: string[]
           kind?: Database["public"]["Enums"]["hive_training_catalog_kind"]
@@ -6798,6 +6801,7 @@ export type Database = {
       }
       hive_training_courses: {
         Row: {
+          catalog_id: string | null
           cert_validity_months: number
           cover_url: string | null
           created_at: string
@@ -6810,6 +6814,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          catalog_id?: string | null
           cert_validity_months?: number
           cover_url?: string | null
           created_at?: string
@@ -6822,6 +6827,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          catalog_id?: string | null
           cert_validity_months?: number
           cover_url?: string | null
           created_at?: string
@@ -6833,7 +6839,15 @@ export type Database = {
           title?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "hive_training_courses_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "hive_training_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       hive_training_module_progress: {
         Row: {
@@ -14771,6 +14785,10 @@ export type Database = {
       }
       has_permission: {
         Args: { _org_id: string; _perm: string; _user_id: string }
+        Returns: boolean
+      }
+      hive_training_seat_available: {
+        Args: { _seat_id: string }
         Returns: boolean
       }
       hybrid_search_timesheets: {

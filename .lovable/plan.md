@@ -1,65 +1,53 @@
 
-## What the Review step does today
+## Employee Loan Ledger (HR Admin tab) + built-in e-sign
 
-The Smart Import wizard walks an admin through 8 steps for each pending person:
+Mirror the existing Client Loan feature for staff, add it as a tab inside HR Admin, and add a built-in ESIGN-Act-compliant e-signature flow (no DocuSign needed). Admin sends → staff gets an email with a secure magic link → staff reviews the full agreement, types/draws signature, clicks Sign → signed record locks with timestamp + IP + user-agent.
 
-1. **Person & contacts** — name, DOB, Medicaid ID, address, guardians
-2. **Health & medical** — diagnoses, allergies, ABI/DNR/Human Rights flags, providers
-3. **Medications / MAR** — the medication list that feeds MAR/eMAR
-4. **PCSP goals** — goals + rationale, responsibilities, data-capture
-5. **Services** — billing codes (Ours vs External, HIVE approvals, "Not my org")
-6. **Plan & documents** — PCSP + supporting documents
-7. **Staff & training** — caseload assignment + code-scoped training rows
-8. **Review** — *this is the final step*
+### Data model (new migration)
 
-Right now Step 8 shows only three things:
+- `employee_loans` — same shape as `client_loans` but keyed to `staff_id (uuid, FK profiles.id)` instead of `client_id`. Fields: borrower_name, lender_name, agreement_date, purpose, advance_amount/cadence, direct_payment_amount/cadence/due_day/start_date/description, interest_rate/notes, repayment_conditions (jsonb), maturity_date, repayment_method, voluntary_ack, signature_parties (jsonb), notes, status (draft | sent_for_signature | signed | active | closed | void), organization_id, created_by, timestamps.
+- `employee_loan_entries` — ledger entries (advance / direct_payment / repayment / adjustment), identical to `client_loan_entries`.
+- `employee_loan_signatures` — one row per signing event: loan_id, signer_type ('employee' | 'org_rep'), signer_name, signer_email, signature_image (base64 PNG of drawn sig or rendered typed sig), signature_method ('typed' | 'drawn'), signed_at, signer_ip, signer_user_agent, agreement_snapshot (jsonb — frozen copy of the agreement text at signing time), token_id.
+- `employee_loan_signature_tokens` — magic-link tokens: id, loan_id, signer_email, token_hash (sha256), expires_at (72h), used_at, created_by.
+- RLS: admins/managers of the org can read/write loans, entries, and issue tokens. Staff can NEVER list or query these tables. Signature tokens are validated via a server function that bypasses RLS through `supabaseAdmin` after verifying the token hash — the staff signer is anonymous to RLS.
+- GRANTs to `authenticated` and `service_role` on every new table.
+- No org-wide attestation gate (per your answer).
 
-- **NECTAR asks** — any outstanding clarification questions Nectar generated
-- **Provisioning forecast** — a preview of which app features will be turned on for this person (e.g. "time clock will create — matched DSI", "daily logs will create — matched HHS"), with per-item override dropdowns
-- **"Ready to create"** confirmation card pointing back up at the **Complete client setup** button in the header
+### Server functions (`src/lib/employee-loans.functions.ts`)
 
-It does **not** recap what was actually captured in Steps 1–7. That's the gap your screenshot is pointing at — the final page should be the single scannable "here's everything about this person that's about to be committed" view.
+Admin-only, guarded by `requireSupabaseAuth` + org admin/manager check:
+- `listEmployeeLoans`, `getEmployeeLoan`, `upsertEmployeeLoan`, `deleteEmployeeLoan`
+- `addEmployeeLoanEntry`, `deleteEmployeeLoanEntry`
+- `sendEmployeeLoanForSignature({ loan_id, signer_email, signer_name })` — creates a token row (random 32-byte token, stores sha256), snapshots agreement into token payload, emails signer via existing `send-email` edge function with link `https://<host>/sign/employee-loan/{token}`. Marks loan `status='sent_for_signature'`.
+- `getEmployeeLoanForSigning({ token })` — public server fn (no auth). Validates token hash, not expired, not used. Returns the agreement snapshot only (no other org data).
+- `submitEmployeeLoanSignature({ token, signer_name, signature_image, signature_method })` — public server fn. Re-validates token, captures IP + UA via `getRequest()`, inserts `employee_loan_signatures` with frozen snapshot, marks token used, advances loan status to `signed`, then `active` once the org rep also signs (or immediately if the loan carries an org-side attestation already).
+- `voidEmployeeLoanSignatureToken` — admin cancel of a pending link.
 
-## What I'll add to the Review step
+### Routes
 
-Rebuild Step 8 as a **full read-only outline** of the import, grouped by wizard step, with counts, values, and a "Jump back to edit" link on each section. Keep NECTAR asks + Provisioning forecast + Ready-to-create where they are; the summary sits above them.
+- `src/routes/dashboard.hr-admin.tsx` — add new "Employee Loans" tab (existing HR Admin route already exists in the file list). Tab content = `EmployeeLoansPanel` component.
+- `src/routes/sign.employee-loan.$token.tsx` — public route (NOT under `_authenticated`), full-screen signing page. Renders agreement snapshot verbatim, ESIGN consent checkbox ("I agree to sign electronically…"), signature pad (`react-signature-canvas`) with typed-name fallback, submit button. On success shows a confirmation with option to download PDF of signed agreement.
 
-### Sections (in order)
+### Components (`src/components/employee-loans/`)
 
-1. **Header strip** — Person name, org, source (upload / white-glove), # source documents, extraction confidence, and a "Missing to finalize" chip (last name / required blockers only).
-2. **Person & contacts** — first/last, DOB, Medicaid ID, mailing address, phone, support coordinator (name + company), guardians (name/relationship/phone). Amber inline "missing" badges for empty required fields.
-3. **Health & medical** — diagnoses list, allergies list, ABI / DNR / Human Rights flags, PCP + specialists.
-4. **Medications** — count + a compact table (name, dose, route, frequency, PRN reason). "0 medications — none extracted" when empty.
-5. **PCSP goals** — count + per-goal one-line summary (title · completeness "X of 8 fields") with amber "needs input" if any goal is incomplete.
-6. **Services / billing codes** — table of committed rows:
-   - **Ours** codes → will create billing authorizations (rate, unit, cap, plan dates)
-   - **External** codes → will file to client_external_services OR are pending HIVE approval (status shown)
-   - **Not my organization** codes → shown greyed, labeled *Informational only — not billed or tracked*
-7. **Plan & documents** — PCSP file + any supporting documents (name, type, page count).
-8. **Staff & training** — caseload roster (staff scoped by service code) and per-code training requirements that will be assigned.
-9. **Provisioning forecast** — kept as-is (features that will be enabled).
-10. **NECTAR asks** — kept as-is (open clarification questions).
-11. **Ready to create** — kept, but reworded to reference the summary above ("Everything above will be created for {name} when you click Complete client setup").
+- `EmployeeLoansPanel.tsx` — mirrors the Client Loan Ledger screen you shared: staff picker + "New loan" button, "Agreements on file" table (staff, borrower name, date, status, signature status, updated). No feature-toggle banner (per your answer).
+- `EmployeeLoanEditor.tsx` — same fields as `LoanEditor` for clients, borrower defaults to the selected staff member's full name and email.
+- `SendForSignatureDialog.tsx` — confirm signer email (pre-fills staff email), preview of email body, "Send" action. Shows pending token status + "Resend" / "Void link" once sent.
+- `SignedRecordCard.tsx` — displays signature image, method, IP, timestamp, downloads a locked PDF (rendered client-side with existing PDF utilities).
+- `sign-employee-loan-page.tsx` — used by the public signing route.
 
-Each section header has:
+### Email
 
-- A count / status chip (e.g. `4 diagnoses`, `2 goals · 1 incomplete`, `3 billing rows · 1 external pending HIVE`)
-- A small **"Edit in Step N"** link that switches the wizard back to the source step
+Uses the existing `supabase/functions/send-email` Resend rail via a new helper in `src/lib/email.functions.ts` (`sendEmployeeLoanSignatureEmail`). Subject: "Loan agreement ready for your signature — {org name}". Body: plain HTML with agreement summary, "Review and sign" button, expiration note, and a plain-English ESIGN disclosure.
 
-Empty sections render a muted `— none captured —` line rather than being hidden, so nothing silently disappears from the review.
+### Legal / audit posture
 
-### Behavior rules
+- ESIGN Act elements captured on every signature: intent (explicit consent checkbox), association (token → agreement snapshot), attribution (name + email + IP + UA), integrity (immutable snapshot + sha256 of rendered agreement stored alongside).
+- Signed agreements are immutable — editor becomes read-only once `status='signed'` or `'active'`; changes require voiding and creating a new agreement.
+- Admin audit log entry on every send/sign/void via existing audit patterns.
 
-- Read-only. All editing still happens in Steps 1–7; Review never mutates.
-- Uses data already loaded by `getReviewSubject` — no new server functions, no extra round trips.
-- Rows marked `ownership_ack === "not_ours"` are shown in the Services section as informational only and excluded from the "will create" counts (matches the finalize pipeline we already have).
-- Amber "needs input" chips reuse the same completeness logic as the individual step panels so counts match.
+### Out of scope (call out to user before build)
 
-## Technical section
-
-- File touched: `src/routes/dashboard.smart-import.$jobId.review.tsx` only.
-- New component `ImportSummaryPanel({ subjectId, fields, subject, onJumpToStep })` rendered at the top of the `step === "review"` branch (around line 624).
-- Field grouping helpers reuse existing `parseMedicationReviewRow`, `parseBillingRow`, `parseGoalReviewRow`, and `labelForField` — no new parsers.
-- Section rows are plain `<dl>` / compact table markup using existing Tailwind utility classes and shadcn `Badge` / `Button` variants; density matches the rest of the wizard (`text-[11px]`, `h-7` controls) so it stays on one screen on a MacBook.
-- "Jump back" buttons call the existing `setStep(id)` used by the StepRail — no router navigation.
-- No schema, no server-function, no migration changes.
+- DocuSign integration — skipped since you chose built-in e-sign. Can be added later as an alternative sender.
+- Payroll deduction automation — the ledger records repayments manually; wiring into payroll is a separate feature.
+- Staff-facing "my loans" view — admins-only for now; add later if you want staff to see their signed copies in-app.

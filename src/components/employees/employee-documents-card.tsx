@@ -312,7 +312,3 @@ function DocRow({
   );
 }
 
-// Reserved for future use; imported for side-effect-free tree-shaking hint.
-export const _EMPLOYEE_DOCS_KINDS = KINDS;
-export function _unusedHook() { useEffect(() => {}, []); }
-useMemo; // eslint no-unused

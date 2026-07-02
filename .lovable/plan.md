@@ -1,129 +1,90 @@
-# HIVE Training — Build Plan
+## Goal
 
-Training module inside the existing HIVE project. Shared auth + DB, walled off from PHI. Stripe Checkout wired against `STRIPE_SECRET_KEY` (test now, live later, zero code change).
+Give the admin a single, calm surface that names **which staff member** needs **which training** renewed, with one-click / checkbox-driven "set up renewal" flow. Price stays present but recedes — the headline is compliance and ease, not cost.
 
----
+## New section on the admin view: "Renewals coming up"
 
-## 1. Access model & compliance boundary
+Sits between the readiness banner and the storefront. Replaces today's aggregate "4 staff have CPR expiring…" one-liner with an itemized, staff-level list.
 
-- Reuse `auth.users` + `profiles` + `organizations` + `organization_members`. No parallel user table.
-- Add `organizations.training_only boolean not null default false`. A training-only org sees only the Training surface; flipping to `false` upgrades to full HIVE — same login, no migration.
-- Role mapping onto existing `app_role`:
-  - `platform_admin` → existing `super_admin`
-  - `company_admin` → existing `admin`
-  - `staff` → existing `employee`
-  - `state_auditor` → add enum value `auditor`
-- **Compliance wall**: every new table prefixed `hive_training_*`. No FKs to `clients`, `client_medications`, `emar_logs`, `incident_reports`, `daily_logs`, PCSP or any PHI table. Enforced by convention + header comment on every migration + code review.
-
-## 2. Database (new tables — all RLS org-scoped via existing `is_org_member` / `is_org_admin_or_manager` helpers)
+Layout:
 
 ```text
-hive_training_catalog        SKUs sold publicly
-  sku, name, kind (full_program|ala_carte), price_cents,
-  stripe_price_id, includes text[], sort, active
+Renewals coming up                                    [ Set up renewals ▸ ]
+Keep your team current. We'll handle the rest.
 
-hive_training_courses        course content
-  slug, title, description, cover_url, estimated_minutes,
-  cert_validity_months, published
+☐  Sarah M.       CPR / First Aid       expires Aug 14  (43 days)   [Due soon]
+☐  Devon R.       CPR / First Aid       expires Sep 02  (62 days)
+☐  Priya K.       Mandt                 expires Sep 20  (80 days)
+☐  James O.       DSPD Orientation      expires — never assigned    [Missing]
+☐  Full team (12) Full Program refresh                              [Bundle]
 
-hive_training_course_modules ordered modules per course
-  course_id, sort, title, body_md, video_url, quiz_json
-
-hive_training_orders         Stripe Checkout sessions
-  organization_id, purchaser_user_id, model (bulk_seats|individual),
-  stripe_checkout_session_id, stripe_payment_intent_id,
-  amount_cents, currency,
-  status (pending|paid|refunded|failed), paid_at
-
-hive_training_order_items    line items
-  order_id, catalog_id, quantity, unit_price_cents
-
-hive_training_seats          purchased-but-unassigned entitlement pool
-  organization_id, order_id, catalog_id,
-  status (available|assigned|consumed),
-  assigned_to_user_id, assigned_at
-
-hive_training_assignments    staff <-> course, with payment provenance
-  organization_id, user_id, course_id, seat_id nullable,
-  payment_model (bulk_seats|individual), order_id nullable,
-  status (pending_payment|not_started|in_progress|completed|expired),
-  progress_pct, started_at, completed_at, expires_at
-
-hive_training_module_progress
-  assignment_id, module_id, completed_at, quiz_score
-
-hive_training_certificates
-  assignment_id, code (public verify), issued_at, expires_at, pdf_url
+    2 selected · Renewal covered end-to-end          [ Set up renewals ]
 ```
 
-RLS: all `organization_id`-scoped. `hive_training_catalog` + `hive_training_courses` get narrow public `TO anon` SELECT (storefront + verify page). `GRANT`s follow the four-step migration rule.
+Rules for what shows up:
+- Assignments with `expires_at` within the next 120 days (sorted soonest-first).
+- Staff on the roster who have **no assignment at all** for a required course → shown as "never assigned" rows so nothing is missed.
+- Grouped by staff, but each row is one staff × one course so the checkbox maps cleanly to a seat.
+- A "Select all expiring within 60 days" quick-action at the top.
 
-## 3. Payments — Stripe Checkout (test-mode now, live-swappable)
+Copy tone: benefit-first, no dollar signs in the row. Small muted price footnote only ("Covered by 1 seat each") appears under the sticky action bar, not on every row.
 
-- Server functions read `process.env.STRIPE_SECRET_KEY` inside `.handler()` — no code paths hardcoded to test vs live. Adding the live key later is the only switch.
-- Two Checkout flows:
-  1. **Bulk seats** (company_admin): line items = N × SKU → on `checkout.session.completed` webhook, insert N `hive_training_seats` rows `status='available'`.
-  2. **Individual** (staff): admin creates assignment `status='pending_payment'` → staff hits "Pay & start" → Checkout session with `client_reference_id = assignment_id` → webhook marks assignment paid + `not_started`.
-- Webhook: new server route `src/routes/api/public/webhooks/stripe-training.ts` (kept separate from the existing subscription webhook). Verifies signature, idempotent on `stripe_checkout_session_id`, sole writer of `status='paid'`. `STRIPE_WEBHOOK_SECRET_TRAINING` env.
-- Hosted Checkout only — never a custom card form. Store only Stripe IDs.
+## The "Set up renewals" flow
 
-## 4. Public storefront (Surface 1)
+Clicking the primary button opens a single confirmation sheet:
 
-- `src/routes/training.tsx` — pricing page mirroring the reference design.
-  - Eyebrow "STAFF TRAINING", headline, Full Program card ($300, featured, amber glow) + À la carte card ($75 / $200 / $100 + save-$75 footnote).
-  - Navy `#1A2B47`, honey-gold `#C8881E`, generous whitespace, rounded cards. Tokens added to `src/styles.css`; no hardcoded color utilities in components.
-  - Real `head()` SEO + og tags.
-- `src/routes/training.signup.tsx` — public org + admin signup. Server fn creates org (`training_only=true`), admin membership, sends verify email. No PHI fields.
+1. **Summary** — "Renew 4 trainings for 3 staff. Certificates auto-issued on completion, expirations tracked."
+2. **Bundle suggestion** — if the selection maps to a Full Program cheaper than à-la-carte, we quietly swap and show a single line: "Bundled as Full Program — saves $75 and covers everything." No hard sell.
+3. **Price line** — one line, small, at the bottom: `Total: $X · one-time`.
+4. Primary button: **Set up renewals** → existing bulk-seats Stripe checkout with the correct catalog SKU(s) preloaded. On webhook success, seats auto-assign back to the exact staff+course pairs that were checked (this is the ease-of-use payoff).
 
-## 5. Company admin surface (Surface 2)
+Auto-assign on success is the important half: today the admin buys seats then has to hand-assign each one. The renewal flow records the intent (which staff × which course each seat is for) before checkout, and the webhook handler consumes those intents into `hive_training_assignments` automatically.
 
-`src/routes/_authenticated/dashboard.training.tsx` layout + children:
-- `.index.tsx` — roster, assignments, completion %, cert expirations, seat balance by SKU.
-- `.buy.tsx` — pick SKU + quantity → Checkout (bulk_seats).
-- `.assign.tsx` — pick staff + course; if seat available assign from pool, else offer "let staff pay individually".
-- `.staff.tsx` — CRUD staff under this org (reuse existing profile pattern, no PHI fields exposed).
-- `.orders.tsx` — invoice history from `hive_training_orders`.
+## Readiness banner — trimmed
 
-Visible when current user is org `admin`. For `training_only` orgs this is the only nav.
+The existing yellow banner keeps its evergreen fallback, but the aggregate "4 staff have CPR expiring… Cover them — $75/staff" line moves out. That aggregate CTA now scrolls the admin to the new **Renewals coming up** table instead of scrolling to the storefront. Rationale: the storefront is for adding programs; renewals are their own quieter surface.
 
-## 6. Staff learner surface (Surface 3, mobile-first)
+## Storefront — softened
 
-- `dashboard.training.my.tsx` — assigned courses + progress.
-- `dashboard.training.course.$assignmentId.tsx` — module player, quiz, completion, certificate.
-- `flex-col` → `md:flex-row`, 44px+ tap targets, tables in `overflow-x-auto` (per Core memory).
-- `pending_payment` assignments show "Pay $X & start" → individual Checkout.
+Small copy adjustments to match the ease/compliance framing:
+- Featured card keeps the "Best value · save $75" ribbon (it's factual, not a hard sell).
+- À-la-carte prices stay in the corner badge but the card body leads with what it satisfies, not the number.
+- No dollar figures in row-level renewal UI.
 
-## 7. Nav integration
+## Technical section
 
-- Full-HIVE orgs: add "Training" item to sidebar → same routes.
-- Training-only orgs: sidebar collapses to Training + Settings + Billing. Driven by `training_only` + role.
+Files:
+- `src/routes/dashboard.hive-training.index.tsx` — add `RenewalsSection` between `ReadinessBanner` and `Storefront`. Move current expiring-cert logic out of the banner and into the new section.
+- `src/routes/dashboard.hive-training.index.tsx` — new `SetupRenewalsDialog` component (selection summary + bundle suggestion + checkout trigger).
+- `supabase/functions/create-training-checkout/index.ts` — accept an optional `renewal_intents: [{ user_id, course_id, catalog_id }]` array; persist to a new `hive_training_renewal_intents` row keyed by the Stripe session id.
+- `supabase/functions/training-stripe-webhook/index.ts` — on `checkout.session.completed`, if renewal intents exist, consume each freshly-created seat by inserting the matching `hive_training_assignments` row and marking the seat `consumed` — bypassing manual assignment.
 
-## 8. Certificate verification
+Database (single new table, PHI-free, stays within the `hive_training_*` boundary):
 
-Extend existing `certificate.$code.tsx` to resolve training certs too. Public page shows staff first name + course + issue/expiration only — no PII beyond that.
+```sql
+CREATE TABLE public.hive_training_renewal_intents (
+  id uuid PK,
+  organization_id uuid,
+  stripe_session_id text,
+  catalog_id uuid,
+  user_id uuid,          -- staff to auto-assign to
+  course_id uuid,        -- specific course this seat should fulfill
+  consumed_at timestamptz,
+  created_at timestamptz
+);
+-- GRANTs to authenticated (admin RLS: is_org_admin_or_manager) + service_role.
+-- No FKs into PHI tables. Same compliance wall as the rest of hive_training_*.
+```
 
-## 9. Build order
+Data queries the admin view needs (all against existing tables, no new schema for reads):
+- `hive_training_assignments` where `organization_id = org` and `expires_at <= now + 120 days`, joined to `hive_training_courses`.
+- `organization_members` × `org_member_directory` for the roster.
+- Cross-reference to surface "never assigned" rows: staff with no assignment for each required course.
+- `hive_training_catalog` (already loaded) to resolve which SKU covers each course, and to detect Full-Program bundling.
 
-1. Migration: enum extension, `training_only` column, all `hive_training_*` tables + RLS + GRANTs.
-2. Storefront `/training` + `/training/signup`.
-3. Stripe test-mode Checkout server fns + `/api/public/webhooks/stripe-training` handler + secret wiring.
-4. Company admin surface (buy → assign → track).
-5. Mobile staff learner surface.
-6. Nav wiring + `training_only` sidebar mode.
-7. Certificate issuance + verify page extension.
+Selection state lives in local React state (a `Map<userId+courseId, catalogId>`), passed into the dialog and then into `create-training-checkout`.
 
-## 10. Guardrails / non-goals
-
-- No custom card form ever — hosted Checkout only.
-- No FK from any `hive_training_*` table to a PHI table.
-- Webhook is the only writer of `status='paid'`.
-- No separate auth system, no separate Supabase project.
-- v1 course content seeded via migration (I write CPR/Mandt/DSPD copy from what you provide). Full admin authoring UI is a follow-up.
-- Refund flow: `charge.refunded` webhook marks order refunded + revokes unconsumed seats. No self-serve refund UI in v1.
-- `state_auditor` role gets no training-surface visibility in v1.
-
-## Confirm before I build
-
-1. **Course content for v1**: seed CPR/First Aid, Mandt, and DSPD 30-day + 12-hr ongoing courses from copy you provide, or stub with placeholder modules so the plumbing ships and you fill content in later?
-2. **Stripe secrets**: I'll wire against `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET_TRAINING`. Confirm you want me to request those via the secret form now (test values are fine) so the webhook route builds without runtime errors.
-3. **Training-only signup**: any minimum required fields beyond org name + admin name/email/password/phone? (e.g. state, agency type)
+Out of scope for this pass:
+- No email reminders yet (surface only).
+- No changes to the staff view.
+- No new roles/enum changes.

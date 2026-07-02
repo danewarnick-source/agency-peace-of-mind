@@ -1,51 +1,66 @@
-# Fix: Smart Import → Medications / MAR panel is cramped
 
-## Problem observed
-In `src/routes/dashboard.smart-import.$jobId.review.tsx` the `MedicationsReviewPanel` (line ~1299) renders a rigid 7-column table with `min-w-[980px]`. On the wizard's narrow content column that forces:
-- horizontal scrolling to reach Prescriber / Support needed,
-- fields like Dose, Route, Frequency and Prescriber squeezed to unreadable widths,
-- the panel's height + tall stacked inputs push the Back / Step 3 of 8 / Next controls off-screen (no visible Next in the screenshot).
+# Goal
+Make the PCSP the "source of truth" for the client profile. If a fact is anywhere in the PCSP (DOB, physical address, primary care phone, guardian email, etc.), it should end up on the client profile without an admin re-typing it — and any remaining gap should be an obvious, one-click fix, not a silent empty field.
 
-The intro paragraph and the amber "no medication rows" callout also waste vertical space at the top before the first med row appears.
+# What's actually causing the gaps today
+Three separate layers each drop a different subset of PCSP data:
 
-## Fix (frontend only, MAR panel only)
+1. **Extractor prompt** (`src/lib/document-extraction.ts`)
+   Enumerates ~70 keys but leaves out several PCSP-visible facts (e.g. gender/sex, preferred pronouns, communication preferences, mobility/adaptive equipment, primary language, ethnicity/race if collected, funding source, day program name, transportation notes, additional phone numbers, alternate address, secondary Medicaid/insurance IDs, county, PCSP author, plan review dates, PCSP signature dates). If the model isn't told to look, it doesn't return them.
 
-Rebuild `MedicationsReviewPanel` and `MedicationReviewRowEditor` as a **compact card-per-medication list** instead of a horizontally-scrolling table. Same data, same server calls, same fields — just laid out to fit the wizard column.
+2. **Finalizer** (`applyExtractedFieldsToClient` in `src/lib/client-import-schema.ts`)
+   Only writes columns it explicitly lists. Any extra `field_key` the model DOES return today is discarded (not even parked as a `custom_field_value`). This is why users see fields on the review screen that never appear on the profile.
 
-### 1. Panel header (tighten)
-- Collapse the long descriptive paragraph into a single one-line hint plus a small "Why this matters" `<details>` disclosure (default closed).
-- Keep "Add medication" button aligned right on the same row as the title.
-- Show the emerald "no meds per PCSP" / amber "none found" callouts as slim single-line banners (py-2, text-xs) only when relevant.
+3. **Profile registry** (`src/lib/client-profile-fields.ts`)
+   The profile only renders keys registered here. New PCSP facts have nowhere to land in the UI even after we widen extraction + finalizer.
 
-### 2. Row layout (new, no table)
-Each medication becomes a bordered rounded card. Fields flow in a responsive grid that never overflows:
+# Plan
 
-```text
-┌─ Medication name (full width, prominent)  ──────── [Save] [⋯] ┐
-│ Dose | Route | Time | Prescriber      (grid-cols-2 md:grid-cols-4)
-│ Frequency  |  Schedule notes           (grid-cols-1 md:grid-cols-2)
-│ Support level ▾  |  Support instructions  (grid-cols-1 md:grid-cols-[160px_1fr])
-└──────────────────────────────────────────────────────────────┘
-```
+## 1. Widen the extraction schema (PCSP-first pass)
+Extend `SYSTEM_PROMPT` and `CORE_CLIENT_FIELD_KEYS` in `src/lib/document-extraction.ts` to cover every field the standard Utah DSPD PCSP template exposes but we currently ignore:
 
-- Inputs drop to `h-8 text-xs`, remove `min-w-[…]` values so they shrink cleanly.
-- Support level + instructions sit on ONE row (currently stacked), matching the row height of the other fields.
-- Trash / Save / Cancel move to the card header on the right, always visible without scrolling within a row.
-- Field labels appear as tiny `text-[10px] uppercase text-muted-foreground` above each input (better than table headers that scroll away).
+- Identity: `gender`, `pronouns`, `preferred_name`, `primary_language`, `communication_notes`, `race`, `ethnicity`, `marital_status`
+- Contact: `secondary_phone`, `email`, `county`, `city`, `state`, `zip`, `mailing_city`, `mailing_state`, `mailing_zip`
+- Health context: `mobility_notes`, `adaptive_equipment`, `dietary_restrictions`, `weight`, `height`, `blood_type`, `menstrual_supports`, `vision_status`, `hearing_status`
+- Insurance / IDs: `secondary_insurance`, `ssn_last4`, `medicare_id`
+- Program: `day_program_name`, `day_program_phone`, `transportation_notes`, `funding_source`
+- Plan metadata: `pcsp_author_name`, `pcsp_meeting_date`, `pcsp_effective_start`, `pcsp_review_date`, `pcsp_signed_by_client`, `pcsp_signed_by_guardian`
 
-### 3. List density
-- Cards separated by `space-y-2` (not `space-y-4`), so 2–3 meds are visible without scrolling.
-- Remove the outer `overflow-x-auto` wrapper entirely — nothing needs horizontal scroll now.
-- Panel outer padding drops from `p-4` to `p-3`.
+Add an explicit instruction to the prompt: **"If a fact appears anywhere in the document — narrative text, tables, headers, or signature blocks — you MUST emit it. Missing a fact that is visible in the document is worse than a low-confidence guess (mark low confidence instead)."**
 
-### 4. Footer visibility
-No changes to the wizard step footer itself; freeing vertical space in the MAR body is what brings Back / Next back on-screen at 1165×696.
+Also add a second **profile-completeness safety pass**: after the main extraction, if any of a defined "must-have" set (DOB, address, primary phone, guardian, emergency contact) is missing from the fields array, run a small targeted follow-up call (same pattern as the existing `extractGoalsOnly` retry) asking only for those keys.
 
-## Out of scope
-- No backend / server-fn changes.
-- No changes to other wizard steps (Person, Health, Goals, etc.).
-- No changes to the finalized client profile Medications card.
-- No new fields — same 8 attributes per row as today.
+## 2. Make the finalizer field-driven, not hand-coded
+In `applyExtractedFieldsToClient`:
 
-## Files touched
-- `src/routes/dashboard.smart-import.$jobId.review.tsx` — replace `MedicationsReviewPanel` (≈1299–1356) and `MedicationReviewRowEditor` (≈1358–1418) with the compact card layout described above.
+- Replace the long list of hand-written `setScalarText("column", "key")` lines with a loop over `CLIENT_PROFILE_FIELDS` from `client-profile-fields.ts`. Each registry entry declares its storage (column vs custom) and its extraction aliases, so adding a new field in one place populates it end-to-end.
+- Add a `setCustomText / setCustomBool / setCustomArray` path that mirrors `setScalarText` but writes through `writeProfileFieldValue`, so any registry field with `storage.kind === "custom"` auto-fills too.
+- Fallback bucket: for any high-confidence extracted field whose key is not in `CORE_CLIENT_FIELD_KEYS` and not a registry alias, park it as a `custom_field_value` with `source: "pcsp"` so it's visible under "Additional PCSP details" instead of vanishing.
+
+## 3. Grow the profile registry
+Add registry entries in `client-profile-fields.ts` for the new keys from step 1 that deserve first-class UI (pronouns, preferred name, primary language, communication notes, mobility, adaptive equipment, dietary restrictions, secondary phone, email, county, day program, transportation notes, PCSP author, PCSP signature dates). Column-backed where a `clients` column already exists; custom-backed otherwise. No new DB columns in this pass — we lean on `custom_field_values` for anything new, so this stays a code-only change.
+
+## 4. "PCSP coverage" panel on the client profile
+On the profile Care/Overview tab, add a compact **"Pulled from PCSP"** card:
+
+- Green rows: fields the current PCSP filled.
+- Amber rows: fields the current PCSP contained but that were overridden by a prior value (i.e. entries in the `suggested` list from the finalizer) — one-click "Accept PCSP value".
+- Grey rows: fields the PCSP did NOT contain — inline "Add manually" input, same pattern as `AddMissingFieldPopover` from Smart Import review.
+
+This is the "no missing fields when the PCSP has that information" guarantee, made visible.
+
+## 5. Backfill for clients whose PCSP is already filed
+Add a small `reapplyPcspToClient` server function that re-runs steps 2–3 against the client's most recent stored PCSP extraction (already in `client_documents` / `extracted_fields`) without re-calling the AI. Expose it as a "Re-sync from PCSP" button on the coverage card so existing clients benefit immediately.
+
+## Explicitly out of scope
+- No new `clients` table columns (all new PCSP facts land in `custom_field_values`).
+- No changes to Smart Import wizard step order — the finalizer widening is what flows through.
+- No changes to billing-code, medication, or goal extraction (those already have dedicated passes).
+
+# Technical notes (for the implementer)
+- Keep the finalizer's existing conflict/duplicate detection (`writeScalarConflict`, `writeDuplicateFlag`) — the registry loop should call into it unchanged.
+- The "safety pass" second AI call should reuse `gatewayFetch` with `max_tokens: 4000` and only fire when ≥1 must-have is missing, to keep cost bounded.
+- `CORE_CLIENT_FIELD_KEYS` must stay in lockstep with the new extraction keys or Smart Import will mis-classify them as custom attributes.
+- Coverage card reads from `extracted_fields` for provenance ("Filled from PCSP · page 3") so admins trust it.
+
+Ready to switch to build mode and implement?

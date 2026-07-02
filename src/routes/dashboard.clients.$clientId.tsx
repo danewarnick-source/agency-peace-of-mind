@@ -25,6 +25,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { previewClientUpdateFromDocument, applySelectedClientFields } from "@/lib/import-checklist.functions";
+import { reclaimExternalCodesAsOurs } from "@/lib/client-billing-fix.functions";
 
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -295,6 +296,37 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
       return (count ?? 0) > 0;
     },
     staleTime: 30_000,
+  });
+
+  // Safety net: surface external-service rows whose codes should probably be
+  // ours (e.g. Smart Import misclassified the provider name). One-click
+  // "Reclaim" moves them back to authorized codes + pending billing stubs.
+  const { data: reclaimableCodes } = useQuery({
+    queryKey: ["client-reclaimable-codes", clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_external_services")
+        .select("service_code")
+        .eq("client_id", clientId);
+      if (error) throw error;
+      const known = new Set((codes ?? []).map((c) => c.toUpperCase()));
+      const missing = Array.from(
+        new Set((data ?? []).map((r) => String(r.service_code ?? "").toUpperCase()).filter(Boolean)),
+      ).filter((c) => !known.has(c));
+      return missing;
+    },
+    staleTime: 30_000,
+  });
+  const reclaimFn = useServerFn(reclaimExternalCodesAsOurs);
+  const reclaimMut = useMutation({
+    mutationFn: async (list: string[]) => reclaimFn({ data: { clientId, codes: list } }),
+    onSuccess: (res) => {
+      toast.success(`Reclaimed ${res.moved} code${res.moved === 1 ? "" : "s"} as yours`);
+      qc.invalidateQueries({ queryKey: ["client-reclaimable-codes", clientId] });
+      qc.invalidateQueries({ queryKey: ["client-profile", orgId, clientId] });
+      qc.invalidateQueries({ queryKey: ["client", clientId] });
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to reclaim"),
   });
   const extractedGoals = ((cstData?.training as { goals?: CSTGoal[] } | null)?.goals ?? []) as CSTGoal[];
   const goalIsIncomplete = (g: CSTGoal) => !g.supports?.trim() || !g.details?.trim();
@@ -673,10 +705,30 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
             </div>
           </CardContent>
         ) : (
-          <CardContent className="flex flex-wrap gap-1.5 text-sm">
-            {codes.length === 0 ? (
-              <span className="text-muted-foreground">None.</span>
-            ) : codes.map((c) => <Badge key={c} variant="outline">{c}</Badge>)}
+          <CardContent className="space-y-2 text-sm">
+            {reclaimableCodes && reclaimableCodes.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-300/60 bg-amber-50/60 dark:bg-amber-950/20 px-2.5 py-2 text-xs text-amber-900 dark:text-amber-200">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                <span className="min-w-0">
+                  {reclaimableCodes.length} code{reclaimableCodes.length === 1 ? "" : "s"} from this client's PCSP {reclaimableCodes.length === 1 ? "isn't" : "aren't"} authorized here:{" "}
+                  <span className="font-medium">{reclaimableCodes.join(", ")}</span>. Smart Import may have filed {reclaimableCodes.length === 1 ? "it" : "them"} as another provider's.
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-7 ml-auto"
+                  disabled={reclaimMut.isPending}
+                  onClick={() => reclaimMut.mutate(reclaimableCodes)}
+                >
+                  {reclaimMut.isPending ? "Reclaiming…" : "Reclaim as ours"}
+                </Button>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-1.5">
+              {codes.length === 0 ? (
+                <span className="text-muted-foreground">None.</span>
+              ) : codes.map((c) => <Badge key={c} variant="outline">{c}</Badge>)}
+            </div>
           </CardContent>
         )}
       </Card>

@@ -37,6 +37,10 @@ export interface TenantIdentity {
   codesHeld: string[];
   /** Names by which the tenant might appear in a PCSP Provider column. */
   names: string[];
+  /** True if the org has configured aliases (extra provider-column spellings). */
+  hasAliases?: boolean;
+  /** True if the org has configured awarded codes (codes_held or services_offered). */
+  hasCodesHeld?: boolean;
 }
 
 const MASTER_CODES: Set<string> = new Set(EVV_SERVICE_CODES.map((c) => c.code));
@@ -100,8 +104,21 @@ export function classifyExtractedService(args: {
     return { bucket: "ours", confident: true, reason: "Provider on PCSP matches this org." };
   }
 
-  // Provider is named AND is not us → another provider.
+  // Provider is named AND is not us.
   if (provider) {
+    // If the tenant hasn't configured any aliases or awarded codes, we can't
+    // reliably tell whether the provider on the PCSP is the tenant spelled
+    // differently (e.g. "TRUE NORTH SUPPORTS LLC" vs display name "TNS").
+    // Refuse to route to another provider silently — mark unconfident so the
+    // review UI forces the admin to confirm.
+    const tenantConfigured = !!args.tenant.hasAliases || !!args.tenant.hasCodesHeld;
+    if (!tenantConfigured) {
+      return {
+        bucket: "other_provider",
+        confident: false,
+        reason: `Provider "${provider}" doesn't match this org's name. Add it as an alias or confirm ownership before billing.`,
+      };
+    }
     return {
       bucket: "other_provider",
       confident: true,
@@ -152,6 +169,7 @@ export async function fetchTenantIdentity(sb: any, orgId: string): Promise<Tenan
   if (org?.name) names.push(org.name);
   if (org?.legal_name) names.push(org.legal_name);
   if (Array.isArray(org?.aliases)) for (const a of org.aliases) if (a) names.push(String(a));
+  const aliasCount = Array.isArray(org?.aliases) ? org.aliases.filter(Boolean).length : 0;
   const outlineCodes = Array.isArray(outline?.codes_held)
     ? outline.codes_held.map((c: string) => String(c).toUpperCase())
     : [];
@@ -161,7 +179,12 @@ export async function fetchTenantIdentity(sb: any, orgId: string): Promise<Tenan
     ? org.services_offered.map((c: string) => String(c).toUpperCase())
     : [];
   const codesHeld = Array.from(new Set([...outlineCodes, ...servicesCodes]));
-  return { names, codesHeld };
+  return {
+    names,
+    codesHeld,
+    hasAliases: aliasCount > 0,
+    hasCodesHeld: codesHeld.length > 0,
+  };
 }
 
 /**

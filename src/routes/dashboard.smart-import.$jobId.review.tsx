@@ -1301,57 +1301,56 @@ function MedicationsReviewPanel({ subjectId, fields, onChanged }: { subjectId: s
   const meds = fields.filter((f) => (f.target_field === "client_medication" || f.field_key === "client_medication") && !f.dismissed_at);
   const hasNoMedsSignal = fields.some((f) => f.target_field === "pcsp_has_medications" && String(f.value ?? "").toLowerCase() === "false" && !f.dismissed_at);
   return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="text-sm font-semibold">Medications / MAR preview</div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              These rows create the client's active medication list used by MAR/eMAR, medication attestations, client-specific training, and daily care documentation. Review the PCSP/MAR-extracted details before finalizing.
-            </p>
+    <div className="rounded-2xl border border-border bg-card p-3 shadow-[var(--shadow-card)]">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold">Medications / MAR</div>
+          <div className="text-[11px] text-muted-foreground">
+            Review PCSP/MAR-extracted meds before finalizing.{" "}
+            <details className="inline">
+              <summary className="inline cursor-pointer underline decoration-dotted">Why this matters</summary>
+              <span className="block mt-1 text-[11px]">
+                These rows create the client's active medication list used by MAR/eMAR, medication attestations, client-specific training, and daily care documentation.
+              </span>
+            </details>
           </div>
-          <Button size="sm" variant="outline" onClick={() => setAdding(true)} disabled={adding}>
-            <Plus className="mr-1 h-3.5 w-3.5" /> Add medication
-          </Button>
         </div>
-        {hasNoMedsSignal && meds.length === 0 && (
-          <div className="mt-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-700 dark:text-emerald-300">
-            NECTAR found the PCSP says this person has no medications. If that is wrong, add the medication rows here before finalizing.
-          </div>
-        )}
-        {meds.length === 0 && !adding && !hasNoMedsSignal && (
-          <div className="mt-3 rounded-lg border border-amber-300/60 bg-amber-50/40 p-3 text-xs text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
-            No medication rows were found. If the PCSP/MAR includes medications, add them manually here so MAR/eMAR and training start from the reviewed record.
-          </div>
-        )}
-        {(meds.length > 0 || adding) && (
-          <div className="mt-3 overflow-x-auto rounded-md border border-border/60">
-            <table className="w-full min-w-[980px] text-left text-xs">
-              <thead className="text-muted-foreground">
-                <tr className="border-b border-border">
-                  <th className="px-2 py-2 font-medium">Medication</th>
-                  <th className="px-2 py-2 font-medium">Dose</th>
-                  <th className="px-2 py-2 font-medium">Route</th>
-                  <th className="px-2 py-2 font-medium">Frequency / schedule</th>
-                  <th className="px-2 py-2 font-medium">Time</th>
-                  <th className="px-2 py-2 font-medium">Prescriber</th>
-                  <th className="px-2 py-2 font-medium">Support needed</th>
-                  <th className="px-2 py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {meds.map((f) => (
-                  <MedicationReviewRowEditor key={f.id} subjectId={subjectId} fieldId={f.id} initial={parseMedicationReviewRow(f)} onChanged={onChanged} />
-                ))}
-                {adding && (
-                  <MedicationReviewRowEditor subjectId={subjectId} fieldId={null} initial={emptyMedicationRow} isNew onChanged={() => { setAdding(false); onChanged(); }} onCancel={() => setAdding(false)} />
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <Button size="sm" variant="outline" className="h-8 shrink-0" onClick={() => setAdding(true)} disabled={adding}>
+          <Plus className="mr-1 h-3.5 w-3.5" /> Add
+        </Button>
       </div>
+
+      {hasNoMedsSignal && meds.length === 0 && (
+        <div className="mt-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2 py-1.5 text-[11px] text-emerald-700 dark:text-emerald-300">
+          NECTAR: PCSP says no medications. Add rows here if that's wrong.
+        </div>
+      )}
+      {meds.length === 0 && !adding && !hasNoMedsSignal && (
+        <div className="mt-2 rounded-md border border-amber-300/60 bg-amber-50/40 px-2 py-1.5 text-[11px] text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
+          No medications extracted. Add manually if the PCSP/MAR lists any.
+        </div>
+      )}
+
+      {(meds.length > 0 || adding) && (
+        <div className="mt-2 space-y-2">
+          {meds.map((f) => (
+            <MedicationReviewRowEditor key={f.id} subjectId={subjectId} fieldId={f.id} initial={parseMedicationReviewRow(f)} onChanged={onChanged} />
+          ))}
+          {adding && (
+            <MedicationReviewRowEditor subjectId={subjectId} fieldId={null} initial={emptyMedicationRow} isNew onChanged={() => { setAdding(false); onChanged(); }} onCancel={() => setAdding(false)} />
+          )}
+        </div>
+      )}
     </div>
+  );
+}
+
+function MedField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="flex min-w-0 flex-col gap-0.5">
+      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+      {children}
+    </label>
   );
 }
 
@@ -1379,22 +1378,47 @@ function MedicationReviewRowEditor({
     onError: (e: Error) => toast.error(e.message),
   });
   return (
-    <tr className="border-b border-border/60 align-top">
-      <td className="px-2 py-2"><Input className="h-8 min-w-[150px]" value={row.name} onChange={(e) => patch("name", e.target.value)} placeholder="Name" /></td>
-      <td className="px-2 py-2"><Input className="h-8 min-w-[100px]" value={row.dose} onChange={(e) => patch("dose", e.target.value)} placeholder="Dose" /></td>
-      <td className="px-2 py-2"><Input className="h-8 min-w-[90px]" value={row.route} onChange={(e) => patch("route", e.target.value)} placeholder="Route" /></td>
-      <td className="px-2 py-2">
-        <div className="space-y-1">
-          <Input className="h-8 min-w-[150px]" value={row.frequency} onChange={(e) => patch("frequency", e.target.value)} placeholder="Frequency" />
-          <Input className="h-8 min-w-[150px]" value={row.schedule} onChange={(e) => patch("schedule", e.target.value)} placeholder="Schedule notes" />
+    <div className="rounded-md border border-border/60 bg-background p-2 space-y-1.5">
+      <div className="flex items-center gap-2">
+        <Input
+          className="h-8 flex-1 min-w-0 text-sm font-medium"
+          value={row.name}
+          onChange={(e) => patch("name", e.target.value)}
+          placeholder="Medication name"
+        />
+        <div className="flex shrink-0 items-center gap-1">
+          {dirty && (
+            <Button size="sm" className="h-7 px-2" onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !row.name.trim()}>
+              {saveMut.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Save
+            </Button>
+          )}
+          {isNew && onCancel && (
+            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={onCancel}>Cancel</Button>
+          )}
+          {!isNew && fieldId && (
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-destructive" onClick={() => removeMut.mutate()} disabled={removeMut.isPending}>
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          )}
         </div>
-      </td>
-      <td className="px-2 py-2"><Input className="h-8 min-w-[90px]" value={row.scheduled_time} onChange={(e) => patch("scheduled_time", e.target.value)} placeholder="08:00" /></td>
-      <td className="px-2 py-2"><Input className="h-8 min-w-[130px]" value={row.prescriber} onChange={(e) => patch("prescriber", e.target.value)} placeholder="Prescriber" /></td>
-      <td className="px-2 py-2">
-        <div className="space-y-1">
+      </div>
+
+      <div className="grid grid-cols-2 gap-1.5 md:grid-cols-4">
+        <MedField label="Dose"><Input className="h-8 text-xs" value={row.dose} onChange={(e) => patch("dose", e.target.value)} placeholder="e.g. 10 mg" /></MedField>
+        <MedField label="Route"><Input className="h-8 text-xs" value={row.route} onChange={(e) => patch("route", e.target.value)} placeholder="PO, IM…" /></MedField>
+        <MedField label="Time"><Input className="h-8 text-xs" value={row.scheduled_time} onChange={(e) => patch("scheduled_time", e.target.value)} placeholder="08:00" /></MedField>
+        <MedField label="Prescriber"><Input className="h-8 text-xs" value={row.prescriber} onChange={(e) => patch("prescriber", e.target.value)} placeholder="Prescriber" /></MedField>
+      </div>
+
+      <div className="grid grid-cols-1 gap-1.5 md:grid-cols-2">
+        <MedField label="Frequency"><Input className="h-8 text-xs" value={row.frequency} onChange={(e) => patch("frequency", e.target.value)} placeholder="e.g. Daily" /></MedField>
+        <MedField label="Schedule notes"><Input className="h-8 text-xs" value={row.schedule} onChange={(e) => patch("schedule", e.target.value)} placeholder="e.g. With food" /></MedField>
+      </div>
+
+      <div className="grid grid-cols-1 gap-1.5 md:grid-cols-[160px_1fr]">
+        <MedField label="Support level">
           <Select value={row.support_level || "__blank"} onValueChange={(v) => patch("support_level", v === "__blank" ? "" : v)}>
-            <SelectTrigger className="h-8 min-w-[140px]"><SelectValue placeholder="Level" /></SelectTrigger>
+            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Level" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="__blank">Not specified</SelectItem>
               <SelectItem value="independent">Independent</SelectItem>
@@ -1403,17 +1427,10 @@ function MedicationReviewRowEditor({
               <SelectItem value="full_assist">Full assist</SelectItem>
             </SelectContent>
           </Select>
-          <Input className="h-8 min-w-[180px]" value={row.support_explanation} onChange={(e) => patch("support_explanation", e.target.value)} placeholder="Support instructions" />
-        </div>
-      </td>
-      <td className="px-2 py-2">
-        <div className="flex items-center justify-end gap-1">
-          {dirty && <Button size="sm" className="h-7" onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !row.name.trim()}>{saveMut.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Save</Button>}
-          {isNew && onCancel && <Button size="sm" variant="ghost" className="h-7" onClick={onCancel}>Cancel</Button>}
-          {!isNew && fieldId && <Button size="sm" variant="ghost" className="h-7 text-destructive" onClick={() => removeMut.mutate()} disabled={removeMut.isPending}><Trash2 className="h-3 w-3" /></Button>}
-        </div>
-      </td>
-    </tr>
+        </MedField>
+        <MedField label="Support instructions"><Input className="h-8 text-xs" value={row.support_explanation} onChange={(e) => patch("support_explanation", e.target.value)} placeholder="How staff supports this med" /></MedField>
+      </div>
+    </div>
   );
 }
 

@@ -185,6 +185,7 @@ const updateInput = orgOnly.extend({
   id: z.string().uuid(),
   provider_notes: z.string().trim().max(8000).nullable().optional(),
   status: z.enum(HHP_STATUSES).optional(),
+  linked_staff_user_id: z.string().uuid().nullable().optional(),
   ...cardBase,
 }).partial({
   ...Object.fromEntries(Object.keys(cardBase).map((k) => [k, true])),

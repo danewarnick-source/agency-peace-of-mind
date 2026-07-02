@@ -37,6 +37,10 @@ export interface TenantIdentity {
   codesHeld: string[];
   /** Names by which the tenant might appear in a PCSP Provider column. */
   names: string[];
+  /** True if the org has configured aliases (extra provider-column spellings). */
+  hasAliases?: boolean;
+  /** True if the org has configured awarded codes (codes_held or services_offered). */
+  hasCodesHeld?: boolean;
 }
 
 const MASTER_CODES: Set<string> = new Set(EVV_SERVICE_CODES.map((c) => c.code));

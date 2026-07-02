@@ -315,6 +315,13 @@ function ThreadView({ requestId, onClose, allowResolution }: { requestId: string
               : "Reply to HIVE Admin…"}
           />
           <div className="flex flex-wrap items-center justify-end gap-2">
+            placeholder={canResolve
+              ? "Reply to the provider, or click Approve / Deny to sign and resolve the ticket."
+              : isHiveViewer
+                ? "Reply to the provider…"
+                : "Reply to HIVE Admin…"}
+          />
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {!isHiveViewer && viewer === "provider" && (
               <Button variant="ghost" size="sm" onClick={() => withdrawM.mutate()} disabled={withdrawM.isPending}>
                 Withdraw request
@@ -329,7 +336,7 @@ function ThreadView({ requestId, onClose, allowResolution }: { requestId: string
               {postM.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
               Send reply
             </Button>
-            {isHiveViewer && (
+            {canResolve && (
               <>
                 <Button
                   size="sm"
@@ -354,7 +361,7 @@ function ThreadView({ requestId, onClose, allowResolution }: { requestId: string
         </div>
       )}
 
-      {isPending && signMode !== null && isHiveViewer && (
+      {isPending && signMode !== null && canResolve && (
         <div className="mt-3 space-y-3 rounded-md border border-primary/30 bg-primary/5 p-3">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <PenLine className="h-4 w-4" />

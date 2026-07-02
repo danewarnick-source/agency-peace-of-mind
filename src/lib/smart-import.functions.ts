@@ -845,9 +845,12 @@ async function aiExtractFieldsFromText(
 }
 
 // Employee path keeps the lighter flat-field prompt (no PCSP-specific structure).
-async function aiExtractEmployeeFieldsFromText(
+// Exported so per-employee upload flows (employee profile → NECTAR extract)
+// can reuse the same prompt/parse logic instead of duplicating it.
+export async function aiExtractEmployeeFieldsFromText(
   text: string,
 ): Promise<{ display_name: string; fields: ExtractedFieldOut[]; unfiled: string[] }> {
+
   const targetFields = [
     "full_name", "first_name", "last_name", "email", "phone",
     "position", "hire_date", "team_name",

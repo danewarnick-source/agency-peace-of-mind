@@ -187,6 +187,11 @@ export function HostsPage() {
                             {canManage && orgId && (
                               <HostCertBadge orgId={orgId} hostCardId={c.id} />
                             )}
+                            {c.linked_staff_user_id && (
+                              <Badge className="gap-1 bg-primary/15 text-primary text-[10px] hover:bg-primary/20">
+                                <UserCheck className="h-3 w-3" /> Also DSP
+                              </Badge>
+                            )}
                             {c.wheelchair_accessible && (
                               <Badge variant="outline" className="text-[10px]">
                                 Wheelchair

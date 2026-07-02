@@ -4,11 +4,11 @@ import { HubShell, type HubTab } from "@/components/admin-hubs/hub-shell";
 import { RequirePermission } from "@/components/rbac-guard";
 import { usePermissions } from "@/hooks/use-permissions";
 import { EmployeesPage } from "./dashboard.employees.index";
-import { HrAdminPage } from "./dashboard.hr-admin";
+import { HrAdminPage, EmployeeLoansPage } from "./dashboard.hr-admin";
 import { HostsPage } from "@/components/hosts/hosts-page";
 
 const search = z.object({
-  tab: z.enum(["roster", "hosts", "hr-admin"]).optional(),
+  tab: z.enum(["roster", "hosts", "hr-admin", "loans"]).optional(),
 });
 
 function EmployeesHub() {
@@ -29,6 +29,15 @@ function EmployeesHub() {
     render: () => (
       <RequirePermission perm="manage_users">
         <HrAdminPage />
+      </RequirePermission>
+    ),
+  });
+  tabs.push({
+    key: "loans",
+    label: "Employee Loans",
+    render: () => (
+      <RequirePermission perm="manage_users">
+        <EmployeeLoansPage />
       </RequirePermission>
     ),
   });

@@ -90,6 +90,7 @@ export function ApprovalDialog(props: ApprovalDialogProps) {
           <ThreadView
             requestId={activeRequestId}
             onClose={() => onOpenChange(false)}
+            allowResolution={props.allowResolution ?? false}
           />
         ) : (
           <NewRequestForm

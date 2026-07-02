@@ -1,40 +1,51 @@
-## What actually happened to Blake's billing codes
+# Fix: Smart Import → Medications / MAR panel is cramped
 
-I looked at the live data for Blake Adams. The PCSP extracted **DSI** and **HHS** correctly — but instead of landing on his profile as authorized codes, they were filed as "someone else's services":
+## Problem observed
+In `src/routes/dashboard.smart-import.$jobId.review.tsx` the `MedicationsReviewPanel` (line ~1299) renders a rigid 7-column table with `min-w-[980px]`. On the wizard's narrow content column that forces:
+- horizontal scrolling to reach Prescriber / Support needed,
+- fields like Dose, Route, Frequency and Prescriber squeezed to unreadable widths,
+- the panel's height + tall stacked inputs push the Back / Step 3 of 8 / Next controls off-screen (no visible Next in the screenshot).
 
+The intro paragraph and the amber "no medication rows" callout also waste vertical space at the top before the first med row appears.
+
+## Fix (frontend only, MAR panel only)
+
+Rebuild `MedicationsReviewPanel` and `MedicationReviewRowEditor` as a **compact card-per-medication list** instead of a horizontally-scrolling table. Same data, same server calls, same fields — just laid out to fit the wizard column.
+
+### 1. Panel header (tighten)
+- Collapse the long descriptive paragraph into a single one-line hint plus a small "Why this matters" `<details>` disclosure (default closed).
+- Keep "Add medication" button aligned right on the same row as the title.
+- Show the emerald "no meds per PCSP" / amber "none found" callouts as slim single-line banners (py-2, text-xs) only when relevant.
+
+### 2. Row layout (new, no table)
+Each medication becomes a bordered rounded card. Fields flow in a responsive grid that never overflows:
+
+```text
+┌─ Medication name (full width, prominent)  ──────── [Save] [⋯] ┐
+│ Dose | Route | Time | Prescriber      (grid-cols-2 md:grid-cols-4)
+│ Frequency  |  Schedule notes           (grid-cols-1 md:grid-cols-2)
+│ Support level ▾  |  Support instructions  (grid-cols-1 md:grid-cols-[160px_1fr])
+└──────────────────────────────────────────────────────────────┘
 ```
-client_billing_codes:      0 rows for Blake
-client_external_services:  DSI, HHS — note: "Provider 'TRUE NORTH SUPPORTS LLC' is a different organization."
-clients.authorized_dspd_codes: {}  (empty — matches the "None." you saw)
-```
 
-The classifier saw provider name **"TRUE NORTH SUPPORTS LLC"** on the PCSP, compared it to this tenant's display name (**"TNS FAKE"**), decided they didn't match, and — because the org has no aliases and no `codes_held` configured — silently routed both codes to the external/coordination bucket. There was no unconfirmed code holding things back; the pipeline confidently sent them the wrong way.
+- Inputs drop to `h-8 text-xs`, remove `min-w-[…]` values so they shrink cleanly.
+- Support level + instructions sit on ONE row (currently stacked), matching the row height of the other fields.
+- Trash / Save / Cancel move to the card header on the right, always visible without scrolling within a row.
+- Field labels appear as tiny `text-[10px] uppercase text-muted-foreground` above each input (better than table headers that scroll away).
 
-This is the same failure mode any provider will hit when the PCSP spells their legal name differently than their app display name (very common: "True North Supports LLC" on the state form vs. "TNS" or a nickname in-app).
+### 3. List density
+- Cards separated by `space-y-2` (not `space-y-4`), so 2–3 meds are visible without scrolling.
+- Remove the outer `overflow-x-auto` wrapper entirely — nothing needs horizontal scroll now.
+- Panel outer padding drops from `p-4` to `p-3`.
 
-## Fix — three parts
+### 4. Footer visibility
+No changes to the wizard step footer itself; freeing vertical space in the MAR body is what brings Back / Next back on-screen at 1165×696.
 
-### 1. Recover Blake now (data-only)
-- Move his two external rows into `client_billing_codes` as pending stubs (rate 0, `authorization_pending = true`) so Care-tab actions unblock and staff can be scheduled while units/rate get filled in.
-- Set `clients.authorized_dspd_codes` and `job_code` to `{DSI, HHS}`.
-- Delete the two `client_external_services` rows so the mis-file doesn't linger.
+## Out of scope
+- No backend / server-fn changes.
+- No changes to other wizard steps (Person, Health, Goals, etc.).
+- No changes to the finalized client profile Medications card.
+- No new fields — same 8 attributes per row as today.
 
-### 2. Stop the silent misclassification in Smart Import
-- **Classifier change** (`src/lib/service-classification.ts`): when `provider_name` is present but the tenant has no `aliases` AND no `codes_held` configured, return `confident: false` instead of confidently marking the row as "other provider." That forces the review UI to show the "Owner?" prompt (which already has an **"Ours"** button) instead of quietly routing the code to external services.
-- **Review UI** (`dashboard.smart-import.$jobId.review.tsx` billing panel): when every extracted billing row is being sent to `external_services`, show a prominent yellow banner: *"All N codes on this PCSP are being filed as another provider's. Confirm ownership or add 'TRUE NORTH SUPPORTS LLC' as an alias for TNS FAKE."* with a one-click **"Add as alias for this org"** button that appends to `organizations.aliases`. From that point forward all future imports match automatically.
-- **Finalize gate** (`smart-import-review.functions.ts` → `setSubjectReady`): treat `code.confirm_owner.*` issues as blocking (they already are), and *also* refuse to mark ready when 100% of billing rows are going to external services without an explicit `code.coordination.*` override — same reasoning: don't let a provider "finalize" a client with zero of their own billing codes attached unless they meant to.
-
-### 3. On-profile safety net for clients already finalized
-On the client profile's **Authorized DSPD codes** card:
-- When `client_external_services` has rows whose `provider_name` matches this org (by fuzzy match against name/legal_name/aliases) OR when the client has PCSP goals scoped to codes that aren't in `authorized_dspd_codes`, show an amber row: *"2 codes from PCSP aren't authorized: DSI, HHS — [Reclaim as ours]"*. Clicking reclaims them (same data patch as step 1).
-- Wire the existing manual "Add code" input to also insert a matching `client_billing_codes` stub (`authorization_pending = true`) instead of only mutating the array — otherwise scheduling still can't use it.
-
-### Technical notes
-- Recovery in step 1 is a one-shot SQL migration scoped to Blake's client id.
-- Alias write in step 2 uses `array_append(organizations.aliases, ?)` and requires `manage_users`.
-- The reclaim action in step 3 is a small server fn `reclaimExternalCodesAsOurs({ clientId, codes[] })` that mirrors the commit-time pipeline: insert stubs, update `authorized_dspd_codes`/`job_code`, delete the external rows.
-- No changes to the extractor, PCSP goals, or the finalize wizard's other steps.
-
-### Out of scope (say so if you want them in)
-- Auto-learning aliases from every PCSP the classifier sees.
-- Bulk retroactive rescue across all finalized clients (I'll do Blake only; if you want, I can add an admin tool that scans every client and offers the same "reclaim" fix in bulk).
+## Files touched
+- `src/routes/dashboard.smart-import.$jobId.review.tsx` — replace `MedicationsReviewPanel` (≈1299–1356) and `MedicationReviewRowEditor` (≈1358–1418) with the compact card layout described above.

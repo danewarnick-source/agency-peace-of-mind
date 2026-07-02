@@ -711,28 +711,30 @@ function SubjectHeader({ subject, onChanged, canMarkReady = true }: { subject: S
   const isReady = subject.review_status === "ready";
   const blocked = !isReady && !canMarkReady;
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-      <div>
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">{subject.subject_type}</div>
-        <div className="mt-0.5 text-lg font-semibold">{subject.display_name}</div>
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <Badge variant="outline" className="capitalize">{subject.match_status.replace("_", " ")}</Badge>
-          {subject.review_decision && <Badge variant="outline" className="capitalize">{subject.review_decision.replace("_", " ")}</Badge>}
-          <Badge variant="outline" className="capitalize">{subject.review_status.replace("_", " ")}</Badge>
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2 shadow-[var(--shadow-card)]">
+      <div className="min-w-0">
+        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{subject.subject_type}</div>
+        <div className="truncate text-base font-semibold">{subject.display_name}</div>
+        <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
+          <Badge variant="outline" className="capitalize text-[10px] px-1.5 py-0">{subject.match_status.replace("_", " ")}</Badge>
+          {subject.review_decision && <Badge variant="outline" className="capitalize text-[10px] px-1.5 py-0">{subject.review_decision.replace("_", " ")}</Badge>}
+          <Badge variant="outline" className="capitalize text-[10px] px-1.5 py-0">{subject.review_status.replace("_", " ")}</Badge>
         </div>
       </div>
       <Button
+        size="sm"
         variant={isReady ? "outline" : "default"}
         onClick={() => m.mutate(!isReady)}
         disabled={m.isPending || blocked}
         title={blocked ? "Resolve NECTAR validation issues below first" : undefined}
       >
         {m.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {isReady ? "Reopen" : <><CheckCircle2 className="mr-2 h-4 w-4" /> Mark ready</>}
+        {isReady ? "Reopen" : <><CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Mark ready</>}
       </Button>
     </div>
   );
 }
+
 
 // ---------------------------- Client field labels ----------------------------
 const CLIENT_FIELD_LABELS: Record<string, string> = {

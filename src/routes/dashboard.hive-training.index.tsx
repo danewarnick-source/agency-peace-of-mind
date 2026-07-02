@@ -327,6 +327,12 @@ function AdminView({ orgId }: { orgId: string }) {
       <ReadinessBanner
         members={members ?? []}
         assignments={assignments ?? []}
+      />
+
+      <RenewalsSection
+        orgId={orgId}
+        assignments={assignments ?? []}
+        members={members ?? []}
         catalog={catalog ?? []}
       />
 

@@ -1811,53 +1811,46 @@ function BillingCodesEditor({
   const approvedCount = unresolvedExternal.filter((p) => approvals[p.field.id]?.status === "approved").length;
 
   return (
-    <div id="billing-codes" className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
+    <div id="billing-codes" className="rounded-2xl border border-border bg-card p-3 md:p-4 shadow-[var(--shadow-card)]">
+      <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <div className="text-sm font-semibold">Billing codes on the PCSP</div>
-          <div className="text-xs text-muted-foreground">
-            The <span className="font-medium">Ownership</span> column shows whether each code is billed by <span className="font-medium">{orgLabel}</span> or by an outside provider (support coordinator, another agency).
-            Only codes marked "Ours" flow into your 520s. For an external code, either click <span className="font-medium">Not my organization</span> to leave it on the record without billing responsibility, or click <span className="font-medium">Request HIVE approval</span> to have HIVE Admin review it in your Inbox.
+          <div className="text-[11px] leading-snug text-muted-foreground">
+            Ownership shows who bills each code. Only <span className="font-medium">Ours</span> flows to your 520s.{" "}
+            <details className="inline">
+              <summary className="inline cursor-pointer text-primary underline underline-offset-2">Details</summary>
+              <span className="ml-1">
+                For an external code, click <span className="font-medium">Not my organization</span> to keep it on the record without billing responsibility, or <span className="font-medium">Request HIVE approval</span> to have HIVE Admin review it in your Inbox.
+              </span>
+            </details>
           </div>
         </div>
-        <Button size="sm" variant="outline" onClick={() => setAdding(true)} disabled={adding}>
+        <Button size="sm" variant="outline" className="h-7 shrink-0 px-2 text-xs" onClick={() => setAdding(true)} disabled={adding}>
           <Plus className="mr-1 h-3 w-3" /> Add code
         </Button>
       </div>
 
       {parsed.length === 0 && !adding && (
-        <div className="rounded-md border border-dashed border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+        <div className="rounded-md border border-dashed border-border bg-muted/30 p-2.5 text-xs text-muted-foreground">
           No billable codes were found in this document. Use "Add code" to enter them manually.
         </div>
       )}
 
       {(parsed.length > 0 || adding) && (
         <div className="overflow-x-auto rounded-md border border-border/60">
-          <table className="w-full table-fixed text-left text-xs">
-            <colgroup>
-              <col className="w-[64px]" />
-              <col className="w-[16%]" />
-              <col className="w-[170px]" />
-              <col className="w-[72px]" />
-              <col className="w-[72px]" />
-              <col className="w-[76px]" />
-              <col className="w-[68px]" />
-              <col className="w-[160px]" />
-              <col className="w-[80px]" />
-              <col className="w-[56px]" />
-            </colgroup>
+          <table className="w-full text-left text-[11px]">
             <thead className="text-muted-foreground">
               <tr className="border-b border-border">
-                <th className="py-2 px-1.5 font-medium">Code</th>
-                <th className="py-2 px-1.5 font-medium">Provider</th>
-                <th className="py-2 px-1.5 font-medium">Ownership / Approval</th>
-                <th className="py-2 px-1.5 font-medium">Unit</th>
-                <th className="py-2 px-1.5 font-medium">Rate</th>
-                <th className="py-2 px-1.5 font-medium">Annual</th>
-                <th className="py-2 px-1.5 font-medium">Mo. cap</th>
-                <th className="py-2 px-1.5 font-medium">Term</th>
-                <th className="py-2 px-1.5 font-medium">Status</th>
-                <th className="py-2 px-1.5" />
+                <th className="py-1.5 px-1.5 font-medium w-[56px]">Code</th>
+                <th className="py-1.5 px-1.5 font-medium">Provider</th>
+                <th className="py-1.5 px-1.5 font-medium w-[150px]">Ownership</th>
+                <th className="py-1.5 px-1.5 font-medium w-[70px]">Unit</th>
+                <th className="py-1.5 px-1.5 font-medium w-[64px]">Rate</th>
+                <th className="py-1.5 px-1.5 font-medium w-[68px]">Annual</th>
+                <th className="py-1.5 px-1.5 font-medium w-[56px]">Mo</th>
+                <th className="py-1.5 px-1.5 font-medium w-[150px]">Term</th>
+                <th className="py-1.5 px-1.5 font-medium w-[70px]">Status</th>
+                <th className="py-1.5 px-1.5 w-[36px]" />
               </tr>
             </thead>
             <tbody>
@@ -1895,22 +1888,20 @@ function BillingCodesEditor({
       )}
 
       {externalRows.length > 0 && (
-        <div className="mt-3 rounded-md border border-amber-300/60 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
-          <div className="mb-1 font-semibold">
-            {externalRows.length} code{externalRows.length === 1 ? "" : "s"} belong to an outside provider on the PCSP
-            <span className="ml-2 font-normal">
-              · {approvedCount} HIVE-approved, {pendingCount} awaiting HIVE review, {notOursCount} marked "not my organization"
-            </span>
+        <details className="mt-2 rounded-md border border-amber-300/60 bg-amber-50 p-2 text-[11px] text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+          <summary className="cursor-pointer font-semibold">
+            {externalRows.length} outside-provider code{externalRows.length === 1 ? "" : "s"} on this PCSP
+            <span className="ml-1 font-normal">· {approvedCount} approved · {pendingCount} awaiting HIVE · {notOursCount} not ours</span>
+          </summary>
+          <div className="mt-1.5">
+            Provider on {externalRows.length === 1 ? "this line" : "these lines"} does not match <span className="font-medium">{orgLabel}</span>. Use <span className="font-medium">Not my organization</span> or <span className="font-medium">Request HIVE approval</span>.
           </div>
-          <div className="mb-1">
-            The Provider on {externalRows.length === 1 ? "this line" : "these lines"} does not match <span className="font-medium">{orgLabel}</span>.
-            On each row, click <span className="font-medium">Not my organization</span> to leave it on the record without billing responsibility, or <span className="font-medium">Request HIVE approval</span> if you need to bill it yourself.
+          <div className="mt-1 font-mono text-[10px]">
+            {externalRows.map((p) => `${p.row.service_code} → ${p.row.provider_name ?? "unknown"}${p.row.ownership_ack === "not_ours" ? " (not ours)" : ""}`).join("  •  ")}
           </div>
-          <div className="mt-1 font-mono">
-            {externalRows.map((p) => `${p.row.service_code} → ${p.row.provider_name ?? "unknown provider"}${p.row.ownership_ack === "not_ours" ? " (not ours)" : ""}`).join("  •  ")}
-          </div>
-        </div>
+        </details>
       )}
+
 
       {dialog && orgId && (
         <ApprovalDialog

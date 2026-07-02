@@ -31,7 +31,7 @@ type Doc = {
   uploaded_at: string;
   nectar_status: string;
   nectar_last_run_at: string | null;
-  nectar_applied_fields: unknown;
+  nectar_applied_fields: Record<string, unknown> | null;
   nectar_error: string | null;
 };
 

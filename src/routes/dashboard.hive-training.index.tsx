@@ -408,9 +408,9 @@ function AdminAssignmentsTab({ orgId }: { orgId: string }) {
         organization_id: orgId,
         user_id: userId,
         course_id: courseId,
-        payment_model: "bulk_seats",
+        payment_model: "bulk_seats" as const,
         seat_id: seatId,
-        status: "not_started",
+        status: "not_started" as const,
       }));
       const { error: aErr } = await supabase.from("hive_training_assignments").insert(rows);
       if (aErr) throw aErr;

@@ -96,9 +96,11 @@ function CoursePlayer() {
       if (error) throw error;
       // Recompute progress + optionally start.
       const newPct = total > 0 ? Math.round(((done + 1) / total) * 100) : 0;
-      const patch: Record<string, unknown> = { progress_pct: newPct };
-      if (assignment?.status === "not_started") patch.status = "in_progress";
-      if (assignment && !assignment.started_at) patch.started_at = new Date().toISOString();
+      const patch: { progress_pct: number; status?: "in_progress"; started_at?: string } = { progress_pct: newPct };
+      if (assignment?.status === "not_started") {
+        patch.status = "in_progress";
+        patch.started_at = new Date().toISOString();
+      }
       await supabase.from("hive_training_assignments").update(patch).eq("id", assignmentId);
     },
     onSuccess: () => {

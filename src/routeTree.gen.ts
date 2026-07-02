@@ -85,6 +85,7 @@ import { Route as DashboardAskNectarRouteImport } from './routes/dashboard.ask-n
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
 import { Route as DashboardTrainingIndexRouteImport } from './routes/dashboard.training.index'
 import { Route as DashboardSmartImportIndexRouteImport } from './routes/dashboard.smart-import.index'
+import { Route as DashboardHiveTrainingIndexRouteImport } from './routes/dashboard.hive-training.index'
 import { Route as DashboardHiveExecIndexRouteImport } from './routes/dashboard.hive-exec.index'
 import { Route as DashboardFormsIndexRouteImport } from './routes/dashboard.forms.index'
 import { Route as DashboardFinancialIndexRouteImport } from './routes/dashboard.financial.index'
@@ -167,6 +168,7 @@ import { Route as DashboardAdminEmarAuditRouteImport } from './routes/dashboard.
 import { Route as DashboardAdminCeHoursRouteImport } from './routes/dashboard.admin.ce-hours'
 import { Route as DashboardSmartImportJobIdReviewRouteImport } from './routes/dashboard.smart-import.$jobId.review'
 import { Route as DashboardSmartImportJobIdDoneRouteImport } from './routes/dashboard.smart-import.$jobId.done'
+import { Route as DashboardHiveTrainingCourseAssignmentIdRouteImport } from './routes/dashboard.hive-training.course.$assignmentId'
 import { Route as DashboardHiveExecStatesStateCodeRouteImport } from './routes/dashboard.hive-exec.states.$stateCode'
 import { Route as DashboardFormsFormIdSubmissionsRouteImport } from './routes/dashboard.forms.$formId.submissions'
 import { Route as DashboardFormsFormIdFillRouteImport } from './routes/dashboard.forms.$formId.fill'
@@ -570,6 +572,12 @@ const DashboardSmartImportIndexRoute =
     id: '/',
     path: '/',
     getParentRoute: () => DashboardSmartImportRoute,
+  } as any)
+const DashboardHiveTrainingIndexRoute =
+  DashboardHiveTrainingIndexRouteImport.update({
+    id: '/hive-training/',
+    path: '/hive-training/',
+    getParentRoute: () => DashboardRoute,
   } as any)
 const DashboardHiveExecIndexRoute = DashboardHiveExecIndexRouteImport.update({
   id: '/',
@@ -1026,6 +1034,12 @@ const DashboardSmartImportJobIdDoneRoute =
     path: '/$jobId/done',
     getParentRoute: () => DashboardSmartImportRoute,
   } as any)
+const DashboardHiveTrainingCourseAssignmentIdRoute =
+  DashboardHiveTrainingCourseAssignmentIdRouteImport.update({
+    id: '/hive-training/course/$assignmentId',
+    path: '/hive-training/course/$assignmentId',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardHiveExecStatesStateCodeRoute =
   DashboardHiveExecStatesStateCodeRouteImport.update({
     id: '/$stateCode',
@@ -1265,6 +1279,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/financial/': typeof DashboardFinancialIndexRoute
   '/dashboard/forms/': typeof DashboardFormsIndexRoute
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
+  '/dashboard/hive-training/': typeof DashboardHiveTrainingIndexRoute
   '/dashboard/smart-import/': typeof DashboardSmartImportIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/billing-daily-check': typeof ApiPublicHooksBillingDailyCheckRoute
@@ -1279,6 +1294,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/forms/$formId/fill': typeof DashboardFormsFormIdFillRoute
   '/dashboard/forms/$formId/submissions': typeof DashboardFormsFormIdSubmissionsRoute
   '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
+  '/dashboard/hive-training/course/$assignmentId': typeof DashboardHiveTrainingCourseAssignmentIdRoute
   '/dashboard/smart-import/$jobId/done': typeof DashboardSmartImportJobIdDoneRoute
   '/dashboard/smart-import/$jobId/review': typeof DashboardSmartImportJobIdReviewRoute
   '/api/public/oauth/gmail/callback': typeof ApiPublicOauthGmailCallbackRoute
@@ -1432,6 +1448,7 @@ export interface FileRoutesByTo {
   '/dashboard/financial': typeof DashboardFinancialIndexRoute
   '/dashboard/forms': typeof DashboardFormsIndexRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecIndexRoute
+  '/dashboard/hive-training': typeof DashboardHiveTrainingIndexRoute
   '/dashboard/smart-import': typeof DashboardSmartImportIndexRoute
   '/dashboard/training': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/billing-daily-check': typeof ApiPublicHooksBillingDailyCheckRoute
@@ -1446,6 +1463,7 @@ export interface FileRoutesByTo {
   '/dashboard/forms/$formId/fill': typeof DashboardFormsFormIdFillRoute
   '/dashboard/forms/$formId/submissions': typeof DashboardFormsFormIdSubmissionsRoute
   '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
+  '/dashboard/hive-training/course/$assignmentId': typeof DashboardHiveTrainingCourseAssignmentIdRoute
   '/dashboard/smart-import/$jobId/done': typeof DashboardSmartImportJobIdDoneRoute
   '/dashboard/smart-import/$jobId/review': typeof DashboardSmartImportJobIdReviewRoute
   '/api/public/oauth/gmail/callback': typeof ApiPublicOauthGmailCallbackRoute
@@ -1607,6 +1625,7 @@ export interface FileRoutesById {
   '/dashboard/financial/': typeof DashboardFinancialIndexRoute
   '/dashboard/forms/': typeof DashboardFormsIndexRoute
   '/dashboard/hive-exec/': typeof DashboardHiveExecIndexRoute
+  '/dashboard/hive-training/': typeof DashboardHiveTrainingIndexRoute
   '/dashboard/smart-import/': typeof DashboardSmartImportIndexRoute
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/billing-daily-check': typeof ApiPublicHooksBillingDailyCheckRoute
@@ -1621,6 +1640,7 @@ export interface FileRoutesById {
   '/dashboard/forms/$formId/fill': typeof DashboardFormsFormIdFillRoute
   '/dashboard/forms/$formId/submissions': typeof DashboardFormsFormIdSubmissionsRoute
   '/dashboard/hive-exec/states/$stateCode': typeof DashboardHiveExecStatesStateCodeRouteWithChildren
+  '/dashboard/hive-training/course/$assignmentId': typeof DashboardHiveTrainingCourseAssignmentIdRoute
   '/dashboard/smart-import/$jobId/done': typeof DashboardSmartImportJobIdDoneRoute
   '/dashboard/smart-import/$jobId/review': typeof DashboardSmartImportJobIdReviewRoute
   '/api/public/oauth/gmail/callback': typeof ApiPublicOauthGmailCallbackRoute
@@ -1783,6 +1803,7 @@ export interface FileRouteTypes {
     | '/dashboard/financial/'
     | '/dashboard/forms/'
     | '/dashboard/hive-exec/'
+    | '/dashboard/hive-training/'
     | '/dashboard/smart-import/'
     | '/dashboard/training/'
     | '/api/public/hooks/billing-daily-check'
@@ -1797,6 +1818,7 @@ export interface FileRouteTypes {
     | '/dashboard/forms/$formId/fill'
     | '/dashboard/forms/$formId/submissions'
     | '/dashboard/hive-exec/states/$stateCode'
+    | '/dashboard/hive-training/course/$assignmentId'
     | '/dashboard/smart-import/$jobId/done'
     | '/dashboard/smart-import/$jobId/review'
     | '/api/public/oauth/gmail/callback'
@@ -1950,6 +1972,7 @@ export interface FileRouteTypes {
     | '/dashboard/financial'
     | '/dashboard/forms'
     | '/dashboard/hive-exec'
+    | '/dashboard/hive-training'
     | '/dashboard/smart-import'
     | '/dashboard/training'
     | '/api/public/hooks/billing-daily-check'
@@ -1964,6 +1987,7 @@ export interface FileRouteTypes {
     | '/dashboard/forms/$formId/fill'
     | '/dashboard/forms/$formId/submissions'
     | '/dashboard/hive-exec/states/$stateCode'
+    | '/dashboard/hive-training/course/$assignmentId'
     | '/dashboard/smart-import/$jobId/done'
     | '/dashboard/smart-import/$jobId/review'
     | '/api/public/oauth/gmail/callback'
@@ -2124,6 +2148,7 @@ export interface FileRouteTypes {
     | '/dashboard/financial/'
     | '/dashboard/forms/'
     | '/dashboard/hive-exec/'
+    | '/dashboard/hive-training/'
     | '/dashboard/smart-import/'
     | '/dashboard/training/'
     | '/api/public/hooks/billing-daily-check'
@@ -2138,6 +2163,7 @@ export interface FileRouteTypes {
     | '/dashboard/forms/$formId/fill'
     | '/dashboard/forms/$formId/submissions'
     | '/dashboard/hive-exec/states/$stateCode'
+    | '/dashboard/hive-training/course/$assignmentId'
     | '/dashboard/smart-import/$jobId/done'
     | '/dashboard/smart-import/$jobId/review'
     | '/api/public/oauth/gmail/callback'
@@ -2706,6 +2732,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/smart-import/'
       preLoaderRoute: typeof DashboardSmartImportIndexRouteImport
       parentRoute: typeof DashboardSmartImportRoute
+    }
+    '/dashboard/hive-training/': {
+      id: '/dashboard/hive-training/'
+      path: '/hive-training'
+      fullPath: '/dashboard/hive-training/'
+      preLoaderRoute: typeof DashboardHiveTrainingIndexRouteImport
+      parentRoute: typeof DashboardRoute
     }
     '/dashboard/hive-exec/': {
       id: '/dashboard/hive-exec/'
@@ -3281,6 +3314,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSmartImportJobIdDoneRouteImport
       parentRoute: typeof DashboardSmartImportRoute
     }
+    '/dashboard/hive-training/course/$assignmentId': {
+      id: '/dashboard/hive-training/course/$assignmentId'
+      path: '/hive-training/course/$assignmentId'
+      fullPath: '/dashboard/hive-training/course/$assignmentId'
+      preLoaderRoute: typeof DashboardHiveTrainingCourseAssignmentIdRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/hive-exec/states/$stateCode': {
       id: '/dashboard/hive-exec/states/$stateCode'
       path: '/$stateCode'
@@ -3733,9 +3773,11 @@ interface DashboardRouteChildren {
   DashboardWorkspaceClientIdRoute: typeof DashboardWorkspaceClientIdRoute
   DashboardCoursesIndexRoute: typeof DashboardCoursesIndexRoute
   DashboardEmployeesIndexRoute: typeof DashboardEmployeesIndexRoute
+  DashboardHiveTrainingIndexRoute: typeof DashboardHiveTrainingIndexRoute
   DashboardTrainingIndexRoute: typeof DashboardTrainingIndexRoute
   DashboardCoursesPersonModuleAssignmentIdRoute: typeof DashboardCoursesPersonModuleAssignmentIdRoute
   DashboardCoursesTopicTopicIdRoute: typeof DashboardCoursesTopicTopicIdRoute
+  DashboardHiveTrainingCourseAssignmentIdRoute: typeof DashboardHiveTrainingCourseAssignmentIdRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
@@ -3817,10 +3859,13 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardWorkspaceClientIdRoute: DashboardWorkspaceClientIdRoute,
   DashboardCoursesIndexRoute: DashboardCoursesIndexRoute,
   DashboardEmployeesIndexRoute: DashboardEmployeesIndexRoute,
+  DashboardHiveTrainingIndexRoute: DashboardHiveTrainingIndexRoute,
   DashboardTrainingIndexRoute: DashboardTrainingIndexRoute,
   DashboardCoursesPersonModuleAssignmentIdRoute:
     DashboardCoursesPersonModuleAssignmentIdRoute,
   DashboardCoursesTopicTopicIdRoute: DashboardCoursesTopicTopicIdRoute,
+  DashboardHiveTrainingCourseAssignmentIdRoute:
+    DashboardHiveTrainingCourseAssignmentIdRoute,
 }
 
 const DashboardRouteWithChildren = DashboardRoute._addFileChildren(

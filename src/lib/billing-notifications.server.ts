@@ -67,17 +67,17 @@ async function getAgencyName(orgId: string): Promise<string | undefined> {
   return data?.name ?? undefined;
 }
 
-async function getSenderFor(orgId: string): Promise<{ from: string } | null> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data } = await (supabaseAdmin as any)
-    .from("org_email_settings")
-    .select("from_name, from_address, verified")
-    .eq("organization_id", orgId)
-    .maybeSingle();
-  if (!data || !data.verified || !data.from_address) return null;
-  const name = String(data.from_name || "").trim();
-  return { from: name ? `${name} <${data.from_address}>` : String(data.from_address) };
+async function getSenderFor(orgId: string): Promise<{ from: string; reply_to: string } | null> {
+  try {
+    const { resolveOrgSender } = await import("./email.functions");
+    return await resolveOrgSender(supabaseAdmin, orgId);
+  } catch {
+    // No reply-to configured yet (or other lookup failure). Billing state
+    // changes must never break on email — caller logs and moves on.
+    return null;
+  }
 }
+
 
 export async function sendBillingEmail(ctx: BillingEmailContext): Promise<{
   sent: boolean;

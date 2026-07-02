@@ -499,7 +499,7 @@ export const runSmartExtraction = createServerFn({ method: "POST" })
         }
       }
 
-      }
+
 
       // ---- Fail loudly: if no subject made it through, the upload was
       // unreadable or the model returned nothing. Never report "complete" on 0.

@@ -84,6 +84,17 @@ export const CORE_CLIENT_FIELD_KEYS = new Set<string>([
   "mailing_address", "support_coordinator_company", "representative_payee",
   // Per-goal context
   "goal_domain", "goal_current_status", "goal_strengths", "goal_barriers", "goal_success_criteria",
+  // Expanded profile capture (PCSP-first) — populated via profile-field registry
+  // and/or auto-parked as custom_field_values so nothing visible in the PCSP is lost.
+  "gender", "pronouns", "preferred_name", "primary_language", "communication_notes",
+  "race", "ethnicity", "marital_status",
+  "secondary_phone", "email", "county",
+  "mobility_notes", "adaptive_equipment", "dietary_restrictions",
+  "vision_status", "hearing_status", "weight", "height", "blood_type",
+  "day_program_name", "day_program_phone", "transportation_notes", "funding_source",
+  "secondary_insurance", "medicare_id",
+  "pcsp_author_name", "pcsp_meeting_date", "pcsp_effective_start", "pcsp_review_date",
+  "pcsp_signed_by_client", "pcsp_signed_by_guardian",
 ]);
 
 export const SYSTEM_PROMPT = `You are NECTAR, an extraction engine for a Utah DSPD provider compliance platform (HIVE).

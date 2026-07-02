@@ -189,7 +189,7 @@ function NewRequestForm({
   );
 }
 
-function ThreadView({ requestId, onClose }: { requestId: string; onClose: () => void }) {
+function ThreadView({ requestId, onClose, allowResolution }: { requestId: string; onClose: () => void; allowResolution: boolean }) {
   const getThread = useServerFn(getApprovalThread);
   const post = useServerFn(postApprovalMessage);
   const markRead = useServerFn(markApprovalThreadRead);

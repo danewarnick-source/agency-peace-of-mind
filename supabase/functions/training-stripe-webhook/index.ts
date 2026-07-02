@@ -43,7 +43,11 @@ Deno.serve(async (req) => {
   try {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
-      await handleCheckoutCompleted(admin, session);
+      if (session.mode === "setup" && session.metadata?.hive_flow === "auto_renew_setup") {
+        await handleAutoRenewSetup(admin, stripe, session);
+      } else {
+        await handleCheckoutCompleted(admin, session);
+      }
     } else if (event.type === "charge.refunded") {
       const charge = event.data.object as Stripe.Charge;
       await handleChargeRefunded(admin, charge);

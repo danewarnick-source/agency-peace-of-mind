@@ -8,7 +8,7 @@ import { HrAdminPage } from "./dashboard.hr-admin";
 import { HostsPage } from "@/components/hosts/hosts-page";
 
 const search = z.object({
-  tab: z.enum(["roster", "hosts", "compliance"]).optional(),
+  tab: z.enum(["roster", "hosts", "hr-admin"]).optional(),
 });
 
 function EmployeesHub() {
@@ -16,20 +16,16 @@ function EmployeesHub() {
   const tabs: HubTab[] = [
     { key: "roster", label: "Roster", render: () => <EmployeesPage /> },
   ];
-  if (can("view_referrals") || can("manage_referrals")) {
+  if (can("view_referrals") || can("manage_referrals") || can("manage_clients")) {
     tabs.push({
       key: "hosts",
       label: "Hosts",
-      render: () => (
-        <RequirePermission perm="view_referrals">
-          <HostsPage />
-        </RequirePermission>
-      ),
+      render: () => <HostsPage />,
     });
   }
   tabs.push({
-    key: "compliance",
-    label: "Compliance",
+    key: "hr-admin",
+    label: "HR Admin",
     render: () => (
       <RequirePermission perm="manage_users">
         <HrAdminPage />

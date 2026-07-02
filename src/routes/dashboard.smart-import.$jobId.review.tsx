@@ -586,7 +586,7 @@ function SubjectWizard({
       )}
       {step === "health" && (
         <div className="space-y-3">
-          <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground shadow-[var(--shadow-card)]">
+          <div className="rounded-xl border border-border bg-card p-2.5 text-[11px] leading-snug text-muted-foreground shadow-[var(--shadow-card)]">
             This is the health/medical portion of the client profile preview. Confirm providers, diagnoses, allergies, swallowing risks, clinical alerts, human-rights/DNR flags, and other PCSP-pulled care details before creating the profile.
           </div>
           <PlacementLineup
@@ -603,7 +603,7 @@ function SubjectWizard({
       )}
       {step === "plan" && (
         <div className="space-y-3">
-          <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground shadow-[var(--shadow-card)]">
+          <div className="rounded-xl border border-border bg-card p-2.5 text-[11px] leading-snug text-muted-foreground shadow-[var(--shadow-card)]">
             PCSP and supporting documents (Human Rights, grievance policy, individualized plans, DNR) — additional uploads land here.
           </div>
           <UnfiledPanel items={unfiled} onChanged={onChanged} />
@@ -614,7 +614,7 @@ function SubjectWizard({
           <CertsPanel subjectId={subjectId} certs={certs} onChanged={onChanged} />
         ) : (
           <div className="space-y-3">
-            <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground shadow-[var(--shadow-card)]">
+            <div className="rounded-xl border border-border bg-card p-2.5 text-[11px] leading-snug text-muted-foreground shadow-[var(--shadow-card)]">
               Assign staff and scope each one to the codes they're authorized for. Per-client training (Support strategies, Client-specific training, Person-Centered Thinking) unlocks after PCSP upload.
             </div>
             <AssignmentMapPanel jobId={jobId} subjects={subjects} assignments={assignments} onChanged={onChanged} />

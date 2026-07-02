@@ -290,18 +290,16 @@ export const sendEmployeeLoanForSignature = createServerFn({ method: "POST" })
     // Build sign URL
     const signUrl = `${data.base_url.replace(/\/$/, "")}/sign/employee-loan/${rawToken}`;
 
-    // Send email via existing send-email edge function (uses org email settings)
-    const { data: settings } = await (supabase as any)
-      .from("org_email_settings")
-      .select("from_name, from_address, reply_to, verified")
-      .eq("organization_id", data.organization_id)
-      .maybeSingle();
-
-    let emailStatus: { ok: boolean; error?: string } = { ok: false, error: "Email sender not configured. The signing link is still valid — send it manually below." };
-    if (settings?.verified && settings?.from_address) {
-      const fromName = String(settings.from_name || "").trim();
-      const fromAddress = String(settings.from_address).trim();
-      const from = fromName ? `${fromName} <${fromAddress}>` : fromAddress;
+    // Send email via the shared HIVE-managed sender (see email.functions.ts).
+    // Reply-to = the address the provider configured in Settings → Email,
+    // so signer replies land in the provider's inbox, not the HIVE domain.
+    let emailStatus: { ok: boolean; error?: string } = {
+      ok: false,
+      error: "Email send failed. The signing link is still valid — send it manually below.",
+    };
+    try {
+      const { resolveOrgSender } = await import("@/lib/email.functions");
+      const sender = await resolveOrgSender(supabase, data.organization_id);
       const html = `
         <div style="font-family:Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">
           <h2 style="margin:0 0 12px">Loan agreement ready for your signature</h2>
@@ -321,17 +319,20 @@ export const sendEmployeeLoanForSignature = createServerFn({ method: "POST" })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: invokeData, error: invokeErr } = await (supabase as any).functions.invoke("send-email", {
         body: {
-          from,
+          from: sender.from,
           to: data.signer_email,
           subject: `Loan agreement ready for your signature — ${loan.lender_name}`,
           html,
-          reply_to: settings.reply_to ?? undefined,
+          reply_to: sender.reply_to,
         },
       });
       if (invokeErr) emailStatus = { ok: false, error: invokeErr.message };
       else if (!invokeData || invokeData.ok !== true) emailStatus = { ok: false, error: invokeData?.error || "Email send failed" };
       else emailStatus = { ok: true };
+    } catch (e) {
+      emailStatus = { ok: false, error: e instanceof Error ? e.message : "Email send failed" };
     }
+
 
     return { token_id: token.id, sign_url: signUrl, expires_at, email: emailStatus };
   });

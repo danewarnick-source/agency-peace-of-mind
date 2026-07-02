@@ -347,12 +347,14 @@ function AdminView({ orgId }: { orgId: string }) {
 
       <AutoRenewCard orgId={orgId} catalog={catalog ?? []} />
 
-      <RenewalsSection
-        orgId={orgId}
-        assignments={assignments ?? []}
-        members={members ?? []}
-        catalog={catalog ?? []}
-      />
+      <div id="ht-renewals" tabIndex={-1} className="scroll-mt-6 rounded-xl outline-none">
+        <RenewalsSection
+          orgId={orgId}
+          assignments={assignments ?? []}
+          members={members ?? []}
+          catalog={catalog ?? []}
+        />
+      </div>
 
       <Storefront
         catalog={catalog ?? []}
@@ -456,17 +458,38 @@ function BannerLine({
 }
 
 function scrollToRenewals() {
-  const el = document.getElementById("ht-renewals")
-    ?? document.getElementById("ht-storefront")
-    ?? document.getElementById("ht-roster");
-  el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  scrollToTrainingTarget(["ht-renewals", "ht-storefront", "ht-roster"]);
 }
 function scrollToRoster() {
-  document.getElementById("ht-roster")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  scrollToTrainingTarget(["ht-roster"]);
 }
 function scrollToStorefront() {
-  const el = document.getElementById("ht-storefront") ?? document.getElementById("ht-roster");
-  el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  scrollToTrainingTarget(["ht-storefront", "ht-roster"]);
+}
+
+function scrollToTrainingTarget(ids: string[]) {
+  const el = ids
+    .map((id) => document.getElementById(id))
+    .find((node): node is HTMLElement => {
+      if (!node) return false;
+      const rect = node.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 1;
+    });
+
+  if (!el) return;
+
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+  window.setTimeout(() => {
+    el.focus({ preventScroll: true });
+    el.animate(
+      [
+        { boxShadow: "0 0 0 0 rgba(200, 136, 30, 0)" },
+        { boxShadow: "0 0 0 4px rgba(200, 136, 30, 0.35)" },
+        { boxShadow: "0 0 0 0 rgba(200, 136, 30, 0)" },
+      ],
+      { duration: 900, easing: "ease-out" },
+    );
+  }, 250);
 }
 
 
@@ -593,7 +616,7 @@ function RenewalsSection({
   if (rows.length === 0) return null;
 
   return (
-    <section id="ht-renewals" className="rounded-xl border border-border bg-white p-4 md:p-5 space-y-3">
+    <section className="rounded-xl border border-border bg-white p-4 md:p-5 space-y-3">
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
         <div>
           <h2 className="text-lg font-semibold text-[#1A2B47]">Renewals coming up</h2>

@@ -1,14 +1,25 @@
-## Plan
+## Restore "Review renewals" button (and make it scroll)
 
-1. **Fix the button target**
-   - Update the renewal/banner CTA so it scrolls to the visible buying/training area when there are no renewal rows.
-   - Make the scroll helper fall back in this order: renewals section → storefront/programs section → roster.
+**Change (single edit in `src/routes/dashboard.hive-training.index.tsx`, ~line 394):**
 
-2. **Remove duplicate scroll anchors**
-   - The page currently has two `ht-storefront` IDs: one wrapper and one section. Keep a single stable ID so browser scrolling is reliable.
+Revert the unassigned-staff banner line back to its original label and handler:
 
-3. **Make the renewal section discoverable**
-   - If there are no renewal rows, don’t leave the button with nowhere useful to go; route the action to the storefront/program purchase section instead.
+```tsx
+cta="Review renewals"
+onClick={() => scrollToRenewals()}
+```
 
-4. **Verify**
-   - Confirm the relevant button exists on the training dashboard and clicking it moves the page to the expected section instead of doing nothing.
+**Why this now works:** `scrollToRenewals()` was already hardened in the previous fix to fall back through targets that actually exist on the page:
+
+```
+ht-renewals  →  ht-storefront  →  ht-roster
+```
+
+So even when there are no renewal rows (renewals section not rendered), the click will smooth-scroll to the storefront (or the roster as a last resort) instead of silently doing nothing.
+
+**No other changes:**
+- Keep `scrollToRenewals()`, `scrollToStorefront()`, `scrollToRoster()` as they are.
+- Keep the `id="ht-storefront"` on the Storefront section.
+- No copy or behavior changes elsewhere.
+
+**Verify:** on the training dashboard, click "Review renewals" in the readiness banner and confirm the page scrolls (to renewals if present, otherwise storefront).

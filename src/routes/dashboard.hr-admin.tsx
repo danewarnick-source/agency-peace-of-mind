@@ -101,6 +101,14 @@ export function HrAdminPage() {
         </Button>
       </div>
 
+      <Tabs defaultValue="compliance">
+        <TabsList>
+          <TabsTrigger value="compliance">Compliance & training</TabsTrigger>
+          <TabsTrigger value="loans"><Banknote className="mr-1 h-3.5 w-3.5" /> Employee Loans</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="compliance" className="space-y-6 pt-4">
+
       {/* NECTAR gaps / renewals bar */}
       <Card className="border-amber-200/60 bg-amber-50/40 dark:bg-amber-900/10">
         <CardHeader className="flex flex-row items-center justify-between pb-3">

@@ -17,6 +17,16 @@ import { aiExtractEmployeeFieldsFromText } from "@/lib/smart-import.functions";
 
 const BUCKET = "employee-docs";
 
+type NectarAppliedField = { field: string; value: string; confidence: number };
+type NectarSuggestedField = NectarAppliedField & { existing: string | null };
+type NectarSummary = {
+  applied: NectarAppliedField[];
+  suggested: NectarSuggestedField[];
+  display_name: string;
+  unfiled: string[];
+  extracted_at: string;
+};
+
 type Doc = {
   id: string;
   organization_id: string;
@@ -31,9 +41,10 @@ type Doc = {
   uploaded_at: string;
   nectar_status: string;
   nectar_last_run_at: string | null;
-  nectar_applied_fields: Record<string, unknown> | null;
+  nectar_applied_fields: NectarSummary | null;
   nectar_error: string | null;
 };
+
 
 // ---------------------------------------------------------------------------
 // LIST

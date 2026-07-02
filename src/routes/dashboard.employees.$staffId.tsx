@@ -322,7 +322,6 @@ function StaffProfilePage() {
               </CardContent>
             </Card>
 
-            </Card>
 
             {/* Card 6 — Employee documents (NECTAR autofill) */}
             <div className="lg:col-span-2">

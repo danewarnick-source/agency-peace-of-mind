@@ -659,43 +659,45 @@ function StepRail({
   steps, activeIdx, onJump,
 }: { steps: Array<{ id: string; label: string; badge?: number }>; activeIdx: number; onJump: (i: number) => void }) {
   return (
-    <ol className="flex flex-wrap items-center gap-1 rounded-2xl border border-border bg-card p-2 shadow-[var(--shadow-card)]">
+    <ol className="flex flex-nowrap items-center gap-0.5 overflow-x-auto rounded-xl border border-border bg-card px-1.5 py-1 shadow-[var(--shadow-card)] lg:flex-wrap lg:overflow-visible">
       {steps.map((s, i) => {
         const done = i < activeIdx;
         const active = i === activeIdx;
         const allowJump = i <= activeIdx + 1;
         return (
-          <li key={s.id} className="flex items-center">
+          <li key={s.id} className="flex shrink-0 items-center">
             <button
               type="button"
               onClick={() => allowJump && onJump(i)}
               disabled={!allowJump}
               className={[
-                "inline-flex min-h-[36px] items-center gap-2 rounded-full px-3 text-xs font-medium transition",
+                "inline-flex h-7 items-center gap-1.5 rounded-full px-2 text-[11px] font-medium transition",
                 active ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 ring-1 ring-amber-500/40" :
-                done ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15" :
+                done ? "text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10" :
                 "text-muted-foreground hover:bg-muted",
                 allowJump ? "cursor-pointer" : "cursor-not-allowed opacity-60",
               ].join(" ")}
+              title={s.label}
             >
               <span className={[
-                "inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold",
+                "inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-semibold",
                 done ? "bg-emerald-500 text-white" : active ? "bg-amber-500 text-white" : "bg-muted text-muted-foreground",
               ].join(" ")}>
-                {done ? <CheckCircle2 className="h-3 w-3" /> : i + 1}
+                {done ? <CheckCircle2 className="h-2.5 w-2.5" /> : i + 1}
               </span>
-              <span>{s.label}</span>
+              <span className="whitespace-nowrap">{s.label}</span>
               {s.badge ? (
-                <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-500/20 px-1 text-[10px] text-amber-700 dark:text-amber-400">{s.badge}</span>
+                <span className="inline-flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-amber-500/20 px-1 text-[9px] text-amber-700 dark:text-amber-400">{s.badge}</span>
               ) : null}
             </button>
-            {i < steps.length - 1 && <ChevronRight className="mx-0.5 h-3 w-3 text-muted-foreground/50" />}
+            {i < steps.length - 1 && <ChevronRight className="mx-0 h-3 w-3 shrink-0 text-muted-foreground/40" />}
           </li>
         );
       })}
     </ol>
   );
 }
+
 
 
 // ---------------------------- SubjectHeader ----------------------------

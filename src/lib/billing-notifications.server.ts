@@ -114,8 +114,10 @@ export async function sendBillingEmail(ctx: BillingEmailContext): Promise<{
         subject: rendered.subject,
         html: rendered.html,
         text: rendered.text,
+        reply_to: sender.reply_to,
       },
     });
+
     if (error || !invoke?.ok) {
       // eslint-disable-next-line no-console
       console.error("[billing-email:send-failed]", ctx.kind, ctx.orgId, error?.message || invoke?.error);

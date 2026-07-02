@@ -391,8 +391,8 @@ function ReadinessBanner({
         key="unassigned"
         icon={<AlertTriangle className="h-4 w-4 text-[#C8881E]" />}
         text={<><b>{unassignedCount} staff</b> have no training assigned yet.</>}
-        cta="Buy training"
-        onClick={() => scrollToStorefront()}
+        cta="Review renewals"
+        onClick={() => scrollToRenewals()}
       />
     );
   }

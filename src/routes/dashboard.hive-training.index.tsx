@@ -11,9 +11,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
 import {
   GraduationCap, ShoppingCart, Users, Loader2, PlayCircle,
   AlertTriangle, Sparkles, Award, ShieldCheck, TrendingUp, Clock,
+  Repeat, CreditCard, CheckCircle2,
 } from "lucide-react";
 import { z } from "zod";
 

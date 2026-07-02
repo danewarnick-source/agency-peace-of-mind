@@ -1,16 +1,52 @@
-## Promote Employee Loans to a top-level Employees tab
+## Root cause
 
-Employee Loans is currently a sub-tab nested inside HR Admin. Move it up one level so it sits as its own tab in the Employees hub, next to Compliance/HR Admin.
+The RLS policies on `public.hhp_cue_cards` call `is_org_member(auth.uid(), organization_id)`, but the function signature is `is_org_member(_org uuid, _user uuid)` — the arguments are **swapped**. Every membership check evaluates as "is this user_id an organization, and is this organization_id a user?" — always false.
 
-### Changes
-1. **`src/routes/dashboard.hub.employees.tsx`**
-   - Extend the `tab` search-param enum to include `"loans"`.
-   - Add a fourth `HubTab`: `{ key: "loans", label: "Employee Loans" }`, rendering `<EmployeeLoansPanel />` wrapped in `<RequirePermission perm="manage_users">`.
+Result:
+- INSERT → `new row violates row-level security policy for table "hhp_cue_cards"` (the exact error in your screenshot).
+- SELECT → silently returns zero rows (which is why every status column shows 0 hosts).
 
-2. **`HrAdminPage`** (the component behind the HR Admin tab)
-   - Remove the inner "Employee Loans" sub-tab so the panel isn't shown twice. HR Admin keeps only "Compliance & training".
+## Fix
 
-### Final Employees hub tab order
-Roster · Hosts · HR Admin · Employee Loans
+Single migration that drops and recreates both policies with the correct argument order.
 
-Pure UI reorganization — no schema, RLS, or business-logic changes.
+```sql
+DROP POLICY IF EXISTS hhp_read  ON public.hhp_cue_cards;
+DROP POLICY IF EXISTS hhp_write ON public.hhp_cue_cards;
+
+CREATE POLICY hhp_read ON public.hhp_cue_cards
+FOR SELECT TO authenticated
+USING (
+  public.is_org_member(organization_id, auth.uid())
+  AND (
+    public.has_permission(auth.uid(), organization_id, 'view_referrals')
+    OR public.has_permission(auth.uid(), organization_id, 'manage_referrals')
+    OR public.has_permission(auth.uid(), organization_id, 'manage_users')
+  )
+);
+
+CREATE POLICY hhp_write ON public.hhp_cue_cards
+FOR ALL TO authenticated
+USING (
+  public.is_org_member(organization_id, auth.uid())
+  AND (
+    public.has_permission(auth.uid(), organization_id, 'manage_referrals')
+    OR public.has_permission(auth.uid(), organization_id, 'manage_users')
+  )
+)
+WITH CHECK (
+  public.is_org_member(organization_id, auth.uid())
+  AND (
+    public.has_permission(auth.uid(), organization_id, 'manage_referrals')
+    OR public.has_permission(auth.uid(), organization_id, 'manage_users')
+  )
+);
+```
+
+## Verification
+
+After the migration runs:
+1. Reload the Hosts tab — any existing hosts in your org (previously hidden by the broken read policy) should now appear.
+2. Click **New host** → fill in required fields → **Create host**. The RLS error should be gone and the host appears in the "Onboarding" column.
+
+No code changes required — this is a database-only fix.

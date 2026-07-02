@@ -228,6 +228,25 @@ export const updateHhpCueCard = createServerFn({ method: "POST" })
     setIf("provider_notes", data.provider_notes ?? null);
     setIf("status", data.status);
 
+    // Link/unlink to a staff member. When linking, verify the target user is
+    // an active member of the SAME organization to prevent cross-tenant links.
+    if (data.linked_staff_user_id !== undefined) {
+      if (data.linked_staff_user_id === null) {
+        patch.linked_staff_user_id = null;
+      } else {
+        const { data: mem, error: memErr } = await supabase
+          .from("organization_members")
+          .select("user_id")
+          .eq("organization_id", data.organization_id)
+          .eq("user_id", data.linked_staff_user_id)
+          .eq("active", true)
+          .maybeSingle();
+        if (memErr) throw new Error(memErr.message);
+        if (!mem) throw new Error("Selected staff is not an active member of this organization");
+        patch.linked_staff_user_id = data.linked_staff_user_id;
+      }
+    }
+
     const { error } = await supabase
       .from("hhp_cue_cards")
       .update(patch as never)

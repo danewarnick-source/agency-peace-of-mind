@@ -369,13 +369,17 @@ function HostDetailDialog({
 
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState<HhpStatus>("onboarding");
+  const [linkedStaffId, setLinkedStaffId] = useState<string | null>(null);
 
   useEffect(() => {
     if (q.data) {
       setNotes(q.data.provider_notes ?? "");
       setStatus(q.data.status);
+      setLinkedStaffId(q.data.linked_staff_user_id ?? null);
     }
   }, [q.data]);
+
+  const staffQ = useOrgStaffOptions(organizationId);
 
   const save = useMutation({
     mutationFn: () =>
@@ -385,6 +389,7 @@ function HostDetailDialog({
           id: cardId!,
           provider_notes: notes,
           status,
+          linked_staff_user_id: linkedStaffId,
         },
       }),
     onSuccess: () => {

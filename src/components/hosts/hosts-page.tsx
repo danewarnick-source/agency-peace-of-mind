@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Home, Plus } from "lucide-react";
+import { Home, Plus, UserCheck } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { usePermissions } from "@/hooks/use-permissions";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +39,45 @@ import {
   type HhpStatus,
 } from "@/lib/hhp-cue-cards.functions";
 import { HostCertificationPanel, HostCertBadge } from "./host-home-certification-dialog";
+
+type StaffOpt = { id: string; name: string };
+
+function useOrgStaffOptions(orgId: string | undefined) {
+  return useQuery({
+    enabled: !!orgId,
+    queryKey: ["hosts-staff-options", orgId],
+    queryFn: async (): Promise<StaffOpt[]> => {
+      const { data: members, error: mErr } = await supabase
+        .from("organization_members")
+        .select("user_id")
+        .eq("organization_id", orgId!)
+        .eq("active", true);
+      if (mErr) throw mErr;
+      const ids = (members ?? [])
+        .map((m) => (m as { user_id: string | null }).user_id)
+        .filter((x): x is string => !!x);
+      if (ids.length === 0) return [];
+      const { data: profs, error: pErr } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, full_name, is_active")
+        .in("id", ids);
+      if (pErr) throw pErr;
+      return ((profs ?? []) as Array<{
+        id: string; first_name: string | null; last_name: string | null;
+        full_name: string | null; is_active: boolean | null;
+      }>)
+        .filter((p) => p.is_active !== false)
+        .map((p) => ({
+          id: p.id,
+          name:
+            (p.full_name?.trim()) ||
+            [p.first_name, p.last_name].filter(Boolean).join(" ").trim() ||
+            "Staff",
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    },
+  });
+}
 
 function splitList(s: string): string[] {
   return s
@@ -145,6 +186,11 @@ export function HostsPage() {
                           <div className="mt-2 flex flex-wrap gap-1">
                             {canManage && orgId && (
                               <HostCertBadge orgId={orgId} hostCardId={c.id} />
+                            )}
+                            {c.linked_staff_user_id && (
+                              <Badge className="gap-1 bg-primary/15 text-primary text-[10px] hover:bg-primary/20">
+                                <UserCheck className="h-3 w-3" /> Also DSP
+                              </Badge>
                             )}
                             {c.wheelchair_accessible && (
                               <Badge variant="outline" className="text-[10px]">
@@ -323,13 +369,17 @@ function HostDetailDialog({
 
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState<HhpStatus>("onboarding");
+  const [linkedStaffId, setLinkedStaffId] = useState<string | null>(null);
 
   useEffect(() => {
     if (q.data) {
       setNotes(q.data.provider_notes ?? "");
       setStatus(q.data.status);
+      setLinkedStaffId(q.data.linked_staff_user_id ?? null);
     }
   }, [q.data]);
+
+  const staffQ = useOrgStaffOptions(organizationId);
 
   const save = useMutation({
     mutationFn: () =>
@@ -339,6 +389,7 @@ function HostDetailDialog({
           id: cardId!,
           provider_notes: notes,
           status,
+          linked_staff_user_id: linkedStaffId,
         },
       }),
     onSuccess: () => {
@@ -439,6 +490,44 @@ function HostDetailDialog({
                   placeholder="Onboarding notes, training status, observations — fills out as the card solidifies."
                 />
               </div>
+
+              <div className="rounded-md border border-border bg-muted/30 p-3">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <UserCheck className="h-3.5 w-3.5" /> Also a staff member?
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Link this host to a DSP on your roster so they can be assigned
+                  shifts, appear in caseload pickers, and complete client trainings.
+                </p>
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <Select
+                    value={linkedStaffId ?? "none"}
+                    onValueChange={(v) => setLinkedStaffId(v === "none" ? null : v)}
+                    disabled={!canManage || staffQ.isLoading}
+                  >
+                    <SelectTrigger className="sm:max-w-xs">
+                      <SelectValue placeholder="Not linked to staff" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Not a staff member</SelectItem>
+                      {(staffQ.data ?? []).map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button asChild size="sm" variant="outline">
+                    <Link to="/dashboard/invitations">
+                      <Plus className="mr-1 h-3.5 w-3.5" /> Invite as staff
+                    </Link>
+                  </Button>
+                </div>
+                {linkedStaffId && (
+                  <p className="mt-2 text-xs text-primary">
+                    This host will appear in staff pickers and can be scheduled as a DSP.
+                  </p>
+                )}
+              </div>
+
               {canManage && (
                 <div className="flex justify-end">
                   <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>

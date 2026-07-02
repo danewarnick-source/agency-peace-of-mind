@@ -35,7 +35,7 @@ export const HHP_STATUS_LABEL: Record<HhpStatus, string> = {
 };
 
 const CARD_COLS =
-  "id, organization_id, name, phone, email, address, location_city, location_county, household_members, pets, wheelchair_accessible, sign_language, criminal_history_flag, experience_summary, behavioral_comfort, communication_abilities, medical_comfort, independence_levels_accepted, schedule_availability, commitment_length, provider_notes, status, source, form_submission_id, created_at, updated_at";
+  "id, organization_id, name, phone, email, address, location_city, location_county, household_members, pets, wheelchair_accessible, sign_language, criminal_history_flag, experience_summary, behavioral_comfort, communication_abilities, medical_comfort, independence_levels_accepted, schedule_availability, commitment_length, provider_notes, status, source, form_submission_id, linked_staff_user_id, created_at, updated_at";
 
 export type HhpCueCard = {
   id: string;
@@ -62,6 +62,7 @@ export type HhpCueCard = {
   status: HhpStatus;
   source: "questionnaire" | "manual";
   form_submission_id: string | null;
+  linked_staff_user_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -184,6 +185,7 @@ const updateInput = orgOnly.extend({
   id: z.string().uuid(),
   provider_notes: z.string().trim().max(8000).nullable().optional(),
   status: z.enum(HHP_STATUSES).optional(),
+  linked_staff_user_id: z.string().uuid().nullable().optional(),
   ...cardBase,
 }).partial({
   ...Object.fromEntries(Object.keys(cardBase).map((k) => [k, true])),
@@ -225,6 +227,25 @@ export const updateHhpCueCard = createServerFn({ method: "POST" })
     setIf("commitment_length", data.commitment_length ?? null);
     setIf("provider_notes", data.provider_notes ?? null);
     setIf("status", data.status);
+
+    // Link/unlink to a staff member. When linking, verify the target user is
+    // an active member of the SAME organization to prevent cross-tenant links.
+    if (data.linked_staff_user_id !== undefined) {
+      if (data.linked_staff_user_id === null) {
+        patch.linked_staff_user_id = null;
+      } else {
+        const { data: mem, error: memErr } = await supabase
+          .from("organization_members")
+          .select("user_id")
+          .eq("organization_id", data.organization_id)
+          .eq("user_id", data.linked_staff_user_id)
+          .eq("active", true)
+          .maybeSingle();
+        if (memErr) throw new Error(memErr.message);
+        if (!mem) throw new Error("Selected staff is not an active member of this organization");
+        patch.linked_staff_user_id = data.linked_staff_user_id;
+      }
+    }
 
     const { error } = await supabase
       .from("hhp_cue_cards")

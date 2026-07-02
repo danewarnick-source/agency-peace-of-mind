@@ -43,6 +43,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { RequirePermission } from "@/components/rbac-guard";
 import { StaffTypeEditor } from "@/components/hr/staff-type-editor";
+import { EmployeeDocumentsCard } from "@/components/employees/employee-documents-card";
 import {
   getStaffChecklist,
   getStaffPii,

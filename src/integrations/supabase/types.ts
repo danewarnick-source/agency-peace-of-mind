@@ -5649,6 +5649,7 @@ export type Database = {
           household_members: Json
           id: string
           independence_levels_accepted: string[]
+          linked_staff_user_id: string | null
           location_city: string | null
           location_county: string | null
           medical_comfort: string[]
@@ -5679,6 +5680,7 @@ export type Database = {
           household_members?: Json
           id?: string
           independence_levels_accepted?: string[]
+          linked_staff_user_id?: string | null
           location_city?: string | null
           location_county?: string | null
           medical_comfort?: string[]
@@ -5709,6 +5711,7 @@ export type Database = {
           household_members?: Json
           id?: string
           independence_levels_accepted?: string[]
+          linked_staff_user_id?: string | null
           location_city?: string | null
           location_county?: string | null
           medical_comfort?: string[]

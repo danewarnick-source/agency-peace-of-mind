@@ -1,52 +1,50 @@
-## Root cause
+## Goal
 
-The RLS policies on `public.hhp_cue_cards` call `is_org_member(auth.uid(), organization_id)`, but the function signature is `is_org_member(_org uuid, _user uuid)` — the arguments are **swapped**. Every membership check evaluates as "is this user_id an organization, and is this organization_id a user?" — always false.
+Support the "same person is both a Host and a DSP" case (Harvey), without collapsing the two data models. Hosts stay in `hhp_cue_cards` (never clock, never scheduled). Staff stay in `organization_members` + `profiles` (invited, roster, EVV, caseload). A new nullable link column ties the two rows together when they refer to the same real person.
 
-Result:
-- INSERT → `new row violates row-level security policy for table "hhp_cue_cards"` (the exact error in your screenshot).
-- SELECT → silently returns zero rows (which is why every status column shows 0 hosts).
+## Data model
 
-## Fix
+Add one nullable column to `hhp_cue_cards`:
 
-Single migration that drops and recreates both policies with the correct argument order.
-
-```sql
-DROP POLICY IF EXISTS hhp_read  ON public.hhp_cue_cards;
-DROP POLICY IF EXISTS hhp_write ON public.hhp_cue_cards;
-
-CREATE POLICY hhp_read ON public.hhp_cue_cards
-FOR SELECT TO authenticated
-USING (
-  public.is_org_member(organization_id, auth.uid())
-  AND (
-    public.has_permission(auth.uid(), organization_id, 'view_referrals')
-    OR public.has_permission(auth.uid(), organization_id, 'manage_referrals')
-    OR public.has_permission(auth.uid(), organization_id, 'manage_users')
-  )
-);
-
-CREATE POLICY hhp_write ON public.hhp_cue_cards
-FOR ALL TO authenticated
-USING (
-  public.is_org_member(organization_id, auth.uid())
-  AND (
-    public.has_permission(auth.uid(), organization_id, 'manage_referrals')
-    OR public.has_permission(auth.uid(), organization_id, 'manage_users')
-  )
-)
-WITH CHECK (
-  public.is_org_member(organization_id, auth.uid())
-  AND (
-    public.has_permission(auth.uid(), organization_id, 'manage_referrals')
-    OR public.has_permission(auth.uid(), organization_id, 'manage_users')
-  )
-);
+```
+linked_staff_user_id  uuid  references auth.users(id) on delete set null
 ```
 
-## Verification
+Plus a partial unique index so a given staff user can't be linked to two host cards inside the same org:
 
-After the migration runs:
-1. Reload the Hosts tab — any existing hosts in your org (previously hidden by the broken read policy) should now appear.
-2. Click **New host** → fill in required fields → **Create host**. The RLS error should be gone and the host appears in the "Onboarding" column.
+```
+unique (organization_id, linked_staff_user_id) where linked_staff_user_id is not null
+```
 
-No code changes required — this is a database-only fix.
+RLS is unchanged — the existing `hhp_write` policy already gates edits.
+
+## Server function
+
+Extend `updateHhpCueCard` in `src/lib/hhp-cue-cards.functions.ts` to accept `linked_staff_user_id: string | null`. When set, verify the target user is an active member of the same organization before writing (guards against cross-org linkage). Include the column in `CARD_COLS` and the `HhpCueCard` type.
+
+## UI — Hosts tab
+
+In `src/components/hosts/hosts-page.tsx`, on the host edit dialog add a **"Also a staff member"** section:
+
+- Combobox listing active `organization_members` in the org (reuses existing `useOrgMembers` / equivalent hook — will pick whichever the Caseload picker already uses).
+- Two helper buttons beside it:
+  - **Invite as staff** → opens the existing staff-invite dialog prefilled with the host's name + email; on success, auto-links the new user to this card.
+  - **Unlink** → clears the field.
+- Below the combobox, a small info line: *"Harvey will appear on the staff Roster and in client Caseload pickers. Their Host record stays separate — hosts still never appear on the schedule."*
+
+On the host card in the list view, add a subtle **"Also DSP"** badge when `linked_staff_user_id` is set, so it's obvious at a glance which hosts are also employees.
+
+## UI — Caseload picker (client Care tab)
+
+No structural change. Once Harvey exists as a staff row (via the invite above), he shows up in Blake's Caseload picker automatically. Add a one-line footnote to the Caseload help text: *"Hosts only appear here if they're also invited as staff."* — so the earlier surprise doesn't repeat.
+
+## What this does NOT do
+
+- Does not merge hosts and staff into one table.
+- Does not auto-create a staff account when you create a host — the provider has to click **Invite as staff** (staff invites require email, role, employment terms; silently minting them would break HR/compliance).
+- Does not change scheduling, EVV, or billing logic. The staff-side Harvey clocks shifts; the host-side Harvey still produces daily notes + overnight confirmations. They just share a real-world identity via `linked_staff_user_id`.
+
+## Migration summary
+
+- Adds `linked_staff_user_id` (nullable) to Host Home Provider cue cards, so a host can be marked as also being an employee.
+- Adds a uniqueness rule so one staff member can only be linked to one host card per organization.

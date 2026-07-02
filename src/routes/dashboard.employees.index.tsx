@@ -245,10 +245,16 @@ export function EmployeesPage() {
           ce_suggested_topics: input.ceSuggestedTopics ?? [],
         } as any)
         .eq("id", input.userId)
-        .select("id");
+        // Return the exact columns we wrote so a silent partial-write
+        // (RLS column restriction, wrong id) is visible instead of a false "Saved" toast.
+        .select("id, full_name, email, employee_id, position, positions, worker_type, start_date, end_date, hire_date");
       if (pErr) throw pErr;
       if (!pRows || pRows.length === 0) {
         throw new Error("Profile not updated — record not found or you don't have permission to edit it.");
+      }
+      const saved = pRows[0] as { full_name: string | null; email: string | null };
+      if ((input.fullName ?? "") && saved.full_name !== input.fullName) {
+        throw new Error("Name did not persist. Your role may not allow editing this profile column.");
       }
 
       // Rates are PII-gated: route through the server fn so the
@@ -271,15 +277,23 @@ export function EmployeesPage() {
       if (!mRows || mRows.length === 0) {
         throw new Error("Membership not updated — record not found or you don't have permission to change role/status.");
       }
+      return { staffId: input.userId };
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       toast.success("Employee updated");
+      // Refresh both list and the profile-page query so navigating to the
+      // staff profile shows the newly-saved values without a hard reload.
       qc.invalidateQueries({ queryKey: ["members"] });
       qc.invalidateQueries({ queryKey: ["staff-pii"] });
+      qc.invalidateQueries({ queryKey: ["staff-profile"] });
+      if (res?.staffId) {
+        qc.invalidateQueries({ queryKey: ["staff-profile", org?.organization_id, res.staffId] });
+      }
       setEditingMember(null);
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   return (
     <div className="space-y-6">

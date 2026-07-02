@@ -43,6 +43,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { RequirePermission } from "@/components/rbac-guard";
 import { StaffTypeEditor } from "@/components/hr/staff-type-editor";
+import { EmployeeDocumentsCard } from "@/components/employees/employee-documents-card";
 import {
   getStaffChecklist,
   getStaffPii,
@@ -322,8 +323,19 @@ function StaffProfilePage() {
               </CardContent>
             </Card>
 
+
+            {/* Card 6 — Employee documents (NECTAR autofill) */}
+            <div className="lg:col-span-2">
+              <EmployeeDocumentsCard
+                organizationId={orgId}
+                staffId={staffId}
+                onProfileMaybeChanged={invalidateProfile}
+              />
+            </div>
+
           </div>
         </TabsContent>
+
 
         {/* ----- CERTS & TRAININGS ----- */}
         <TabsContent value="requirements" className="mt-4">

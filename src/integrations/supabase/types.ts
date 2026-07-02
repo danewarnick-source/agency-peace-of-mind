@@ -4275,6 +4275,74 @@ export type Database = {
           },
         ]
       }
+      employee_documents: {
+        Row: {
+          created_at: string
+          file_name: string | null
+          file_path: string
+          id: string
+          kind: string
+          mime_type: string | null
+          nectar_applied_fields: Json
+          nectar_error: string | null
+          nectar_last_run_at: string | null
+          nectar_status: string
+          organization_id: string
+          size_bytes: number | null
+          staff_id: string
+          title: string | null
+          updated_at: string
+          uploaded_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name?: string | null
+          file_path: string
+          id?: string
+          kind?: string
+          mime_type?: string | null
+          nectar_applied_fields?: Json
+          nectar_error?: string | null
+          nectar_last_run_at?: string | null
+          nectar_status?: string
+          organization_id: string
+          size_bytes?: number | null
+          staff_id: string
+          title?: string | null
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_name?: string | null
+          file_path?: string
+          id?: string
+          kind?: string
+          mime_type?: string | null
+          nectar_applied_fields?: Json
+          nectar_error?: string | null
+          nectar_last_run_at?: string | null
+          nectar_status?: string
+          organization_id?: string
+          size_bytes?: number | null
+          staff_id?: string
+          title?: string | null
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_documents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_loan_entries: {
         Row: {
           amount: number

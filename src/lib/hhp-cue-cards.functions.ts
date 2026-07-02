@@ -62,6 +62,7 @@ export type HhpCueCard = {
   status: HhpStatus;
   source: "questionnaire" | "manual";
   form_submission_id: string | null;
+  linked_staff_user_id: string | null;
   created_at: string;
   updated_at: string;
 };

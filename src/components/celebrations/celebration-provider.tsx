@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Hexagon, Sparkles } from "lucide-react";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { useAuth } from "@/hooks/use-auth";
 import {
   listActiveCelebrations,
   acknowledgeCelebration,

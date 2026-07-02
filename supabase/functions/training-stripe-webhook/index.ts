@@ -43,7 +43,11 @@ Deno.serve(async (req) => {
   try {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
-      await handleCheckoutCompleted(admin, session);
+      if (session.mode === "setup" && session.metadata?.hive_flow === "auto_renew_setup") {
+        await handleAutoRenewSetup(admin, stripe, session);
+      } else {
+        await handleCheckoutCompleted(admin, session);
+      }
     } else if (event.type === "charge.refunded") {
       const charge = event.data.object as Stripe.Charge;
       await handleChargeRefunded(admin, charge);
@@ -199,3 +203,35 @@ async function handleChargeRefunded(
     .eq("order_id", order.id)
     .eq("status", "available");
 }
+
+async function handleAutoRenewSetup(
+  admin: ReturnType<typeof createClient>,
+  stripe: Stripe,
+  session: Stripe.Checkout.Session,
+) {
+  const orgId = session.metadata?.organization_id;
+  if (!orgId) return;
+  const setupIntentId = session.setup_intent as string | null;
+  if (!setupIntentId) return;
+
+  const si = await stripe.setupIntents.retrieve(setupIntentId);
+  const pmId = typeof si.payment_method === "string" ? si.payment_method : si.payment_method?.id;
+  if (!pmId) return;
+  const pm = await stripe.paymentMethods.retrieve(pmId);
+  const customerId = (session.customer as string) || (si.customer as string) || null;
+
+  await admin
+    .from("hive_training_auto_renew_settings")
+    .upsert(
+      {
+        organization_id: orgId,
+        stripe_customer_id: customerId,
+        stripe_payment_method_id: pmId,
+        payment_method_brand: pm.card?.brand ?? null,
+        payment_method_last4: pm.card?.last4 ?? null,
+        paused_reason: null,
+      },
+      { onConflict: "organization_id" },
+    );
+}
+

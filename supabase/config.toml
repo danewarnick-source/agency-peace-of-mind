@@ -14,3 +14,9 @@ verify_jwt = true
 
 [functions.training-stripe-webhook]
 verify_jwt = false
+
+[functions.create-training-setup-intent]
+verify_jwt = true
+
+[functions.auto-renew-trainings]
+verify_jwt = false

@@ -903,6 +903,7 @@ export async function applyExtractedFieldsToClient(
     let value: string | boolean | string[] | null = null;
     if (field.type === "bool") value = fieldBool(chosen);
     else if (field.type === "array") value = fieldArray(chosen);
+    else if (field.type === "date") value = fieldDate(chosen);
     else value = fieldText(chosen);
     if (value == null || (Array.isArray(value) && value.length === 0) ||
         (typeof value === "string" && value.trim().length === 0)) {
@@ -961,6 +962,19 @@ export async function applyExtractedFieldsToClient(
     "grievance_acknowledged", "grievance_signed_date",
     // End-of-life / advanced care
     "dnr_status", "dnr_location", "polst_status", "palliative_care_status", "hospice_status",
+    // Expanded profile capture (routed via registry custom fields; adding here so
+    // the "unmapped" fallback log doesn't warn on them, and so they're recognized
+    // as core PCSP fields rather than free-form custom attributes).
+    "gender", "pronouns", "preferred_name", "primary_language", "communication_notes",
+    "race", "ethnicity", "marital_status",
+    "secondary_phone", "email", "county",
+    "mobility_notes", "adaptive_equipment", "dietary_restrictions",
+    "vision_status", "hearing_status", "weight", "height", "blood_type",
+    "day_program_name", "day_program_phone", "transportation_notes", "funding_source",
+    "secondary_insurance", "medicare_id",
+    "pcsp_author_name", "pcsp_meeting_date", "pcsp_effective_start", "pcsp_review_date",
+    "pcsp_signed_by_client", "pcsp_signed_by_guardian",
+    "representative_payee",
   ]);
   const seenCustom = new Set<string>();
   for (const f of ok) {

@@ -256,6 +256,7 @@ function ThreadView({ requestId, onClose, allowResolution }: { requestId: string
   const messages = q.data?.messages ?? [];
   const isPending = request?.status === "pending";
   const isHiveViewer = viewer === "hive_admin";
+  const canResolve = isHiveViewer && allowResolution;
 
   return (
     <>

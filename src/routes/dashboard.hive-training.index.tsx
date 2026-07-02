@@ -329,6 +329,8 @@ function AdminView({ orgId }: { orgId: string }) {
         assignments={assignments ?? []}
       />
 
+      <AutoRenewCard orgId={orgId} catalog={catalog ?? []} />
+
       <RenewalsSection
         orgId={orgId}
         assignments={assignments ?? []}

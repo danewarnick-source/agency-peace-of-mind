@@ -903,6 +903,7 @@ export async function applyExtractedFieldsToClient(
     let value: string | boolean | string[] | null = null;
     if (field.type === "bool") value = fieldBool(chosen);
     else if (field.type === "array") value = fieldArray(chosen);
+    else if (field.type === "date") value = fieldDate(chosen);
     else value = fieldText(chosen);
     if (value == null || (Array.isArray(value) && value.length === 0) ||
         (typeof value === "string" && value.trim().length === 0)) {

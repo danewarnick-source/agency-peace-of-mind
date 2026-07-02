@@ -9,3 +9,8 @@ verify_jwt = true
 [functions.parse-referral-doc]
 verify_jwt = true
 
+[functions.create-training-checkout]
+verify_jwt = true
+
+[functions.training-stripe-webhook]
+verify_jwt = false

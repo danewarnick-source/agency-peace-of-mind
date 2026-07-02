@@ -310,11 +310,6 @@ function ThreadView({ requestId, onClose, allowResolution }: { requestId: string
             rows={3}
             value={reply}
             onChange={(e) => setReply(e.target.value)}
-            placeholder={isHiveViewer
-              ? "Reply to the provider, or click Approve / Deny to sign and resolve the ticket."
-              : "Reply to HIVE Admin…"}
-          />
-          <div className="flex flex-wrap items-center justify-end gap-2">
             placeholder={canResolve
               ? "Reply to the provider, or click Approve / Deny to sign and resolve the ticket."
               : isHiveViewer
@@ -322,6 +317,7 @@ function ThreadView({ requestId, onClose, allowResolution }: { requestId: string
                 : "Reply to HIVE Admin…"}
           />
           <div className="flex flex-wrap items-center justify-end gap-2">
+
             {!isHiveViewer && viewer === "provider" && (
               <Button variant="ghost" size="sm" onClick={() => withdrawM.mutate()} disabled={withdrawM.isPending}>
                 Withdraw request

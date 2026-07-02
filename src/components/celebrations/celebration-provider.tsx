@@ -30,7 +30,8 @@ function saveShown(ids: Set<string>) {
 
 export function CelebrationProvider({ children }: { children: ReactNode }) {
   const { data: org } = useCurrentOrg();
-  const orgId = org?.organization_id;
+  const { session } = useAuth();
+  const orgId = session ? org?.organization_id : undefined;
   const fetchList = useServerFn(listActiveCelebrations);
   const ackFn = useServerFn(acknowledgeCelebration);
   const evalFn = useServerFn(evaluateCelebrationTriggers);

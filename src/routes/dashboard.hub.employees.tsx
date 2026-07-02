@@ -8,7 +8,10 @@ import { HrAdminPage, EmployeeLoansPage } from "./dashboard.hr-admin";
 import { HostsPage } from "@/components/hosts/hosts-page";
 
 const search = z.object({
-  tab: z.enum(["roster", "hosts", "hr-admin", "loans"]).optional(),
+  tab: z
+    .enum(["roster", "hosts", "hr-admin", "loans", "compliance"])
+    .transform((v) => (v === "compliance" ? "hr-admin" : v))
+    .optional(),
 });
 
 function EmployeesHub() {

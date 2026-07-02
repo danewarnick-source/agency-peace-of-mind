@@ -623,6 +623,26 @@ function SubjectWizard({
       )}
       {step === "review" && (
         <div className="space-y-3">
+          <ImportSummaryPanel
+            subject={{
+              id: subjectId,
+              display_name: (fields.find((f) => f.target_field === "full_name")?.value)
+                ?? [fields.find((f) => f.target_field === "first_name")?.value, fields.find((f) => f.target_field === "last_name")?.value].filter(Boolean).join(" ")
+                ?? "This person",
+              subject_type: jobMode,
+              match_status: "new",
+              matched_record_id: null,
+              review_decision: decision,
+              review_status: "in_progress",
+            }}
+            fields={fields}
+            unfiled={unfiled}
+            assignments={assignments}
+            subjects={subjects}
+            tenant={tenant}
+            jobMode={jobMode}
+            onJumpToStep={setStep}
+          />
           {questions.length > 0 && (
             <div>
               <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">NECTAR asks</div>
@@ -636,7 +656,7 @@ function SubjectWizard({
           <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
             <div className="font-semibold text-emerald-700 dark:text-emerald-400">Ready to create</div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Use <strong>Complete {jobMode === "client" ? "client" : "staff"} setup</strong> at the top of this page to commit. Open flags become "Needed" items on the person's file — only the last name blocks creation.
+              Everything in the outline above will be created for this {jobMode === "client" ? "client" : "staff member"} when you click <strong>Complete {jobMode === "client" ? "client" : "staff"} setup</strong> at the top of this page. Open flags become "Needed" items on the person's file — only the last name blocks creation.
             </p>
           </div>
         </div>

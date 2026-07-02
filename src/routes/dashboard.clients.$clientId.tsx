@@ -297,6 +297,37 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
     },
     staleTime: 30_000,
   });
+
+  // Safety net: surface external-service rows whose codes should probably be
+  // ours (e.g. Smart Import misclassified the provider name). One-click
+  // "Reclaim" moves them back to authorized codes + pending billing stubs.
+  const { data: reclaimableCodes } = useQuery({
+    queryKey: ["client-reclaimable-codes", clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_external_services")
+        .select("service_code")
+        .eq("client_id", clientId);
+      if (error) throw error;
+      const known = new Set((codes ?? []).map((c) => c.toUpperCase()));
+      const missing = Array.from(
+        new Set((data ?? []).map((r) => String(r.service_code ?? "").toUpperCase()).filter(Boolean)),
+      ).filter((c) => !known.has(c));
+      return missing;
+    },
+    staleTime: 30_000,
+  });
+  const reclaimFn = useServerFn(reclaimExternalCodesAsOurs);
+  const reclaimMut = useMutation({
+    mutationFn: async (list: string[]) => reclaimFn({ data: { clientId, codes: list } }),
+    onSuccess: (res) => {
+      toast.success(`Reclaimed ${res.moved} code${res.moved === 1 ? "" : "s"} as yours`);
+      qc.invalidateQueries({ queryKey: ["client-reclaimable-codes", clientId] });
+      qc.invalidateQueries({ queryKey: ["client-profile", orgId, clientId] });
+      qc.invalidateQueries({ queryKey: ["client", clientId] });
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to reclaim"),
+  });
   const extractedGoals = ((cstData?.training as { goals?: CSTGoal[] } | null)?.goals ?? []) as CSTGoal[];
   const goalIsIncomplete = (g: CSTGoal) => !g.supports?.trim() || !g.details?.trim();
   const missingLabel = (g: CSTGoal) => {

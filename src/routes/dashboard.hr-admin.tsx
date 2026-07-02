@@ -339,6 +339,12 @@ export function HrAdminPage() {
         complete is always a one-click human attestation — NECTAR pre-fills but
         never auto-confirms.
       </p>
+        </TabsContent>
+
+        <TabsContent value="loans" className="pt-4">
+          {orgId && <EmployeeLoansPanel organizationId={orgId} lenderName={org?.organization_name ?? "Employer"} />}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

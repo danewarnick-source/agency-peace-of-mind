@@ -268,6 +268,43 @@ Common field_key values to extract when present (use field_group to bucket relat
     court_orders (value_array — one entry per court order), personal_belongings_inventory (value_array),
     team_name (value_text)
 
+  Expanded profile (group "profile") — extract WHENEVER these appear anywhere in the PCSP
+  (identity blocks, header tables, contact tables, narrative, signature blocks). Emit each as its
+  own field_key so they auto-populate the client profile. Do NOT combine.
+    gender (value_text), pronouns (value_text), preferred_name (value_text — nickname / how the
+      person prefers to be addressed), primary_language (value_text — e.g. "English", "Spanish"),
+      communication_notes (value_text — communication style, AAC device, sign, prompts needed),
+      race (value_text), ethnicity (value_text), marital_status (value_text),
+      secondary_phone (value_text — any second phone number listed for the client),
+      email (value_text — client's email if listed),
+      county (value_text — county of residence),
+      mobility_notes (value_text — ambulation, wheelchair, transfer needs),
+      adaptive_equipment (value_text — wheelchair, walker, hearing aid, etc.),
+      dietary_restrictions (value_text — pureed, thickened liquids, diabetic, kosher, allergies-to-avoid),
+      vision_status (value_text), hearing_status (value_text),
+      weight (value_text — as written, e.g. "165 lbs"), height (value_text — e.g. "5'8""),
+      blood_type (value_text),
+      day_program_name (value_text — name of day program / SEI provider if listed),
+      day_program_phone (value_text),
+      transportation_notes (value_text — how the person gets to services),
+      funding_source (value_text — Medicaid waiver / other),
+      secondary_insurance (value_text), medicare_id (value_text).
+
+  PCSP plan metadata (group "pcsp_meta") — from the PCSP header, footer, or signature page:
+    pcsp_author_name (value_text — plan facilitator / support coordinator who authored the PCSP),
+    pcsp_meeting_date (value_date — planning meeting date),
+    pcsp_effective_start (value_date — plan begin date; may equal admission_date),
+    pcsp_review_date (value_date — next scheduled review; usually same as pcsp_expiration_date but
+      emit separately when the doc labels one "review" and another "expiration"),
+    pcsp_signed_by_client (value_bool — TRUE when the client's signature is present on the plan),
+    pcsp_signed_by_guardian (value_bool — TRUE when the guardian's signature is present).
+
+EXHAUSTIVENESS RULE (critical): If a fact appears anywhere in the document — narrative text,
+tables, headers, footers, sidebars, or signature blocks — you MUST emit it as a field. It is
+worse to silently drop a visible PCSP fact than to emit it at a lower confidence. When the fact
+appears but the wording is ambiguous, emit it with confidence around 0.5–0.7 rather than
+omitting. Only omit when the fact is genuinely absent from the document.
+
 For each field include source_locator (e.g. "page 3", "§4.2", "row 12 of budget table") and a confidence 0..1.
 Never invent data — omit fields not present. Return ONLY JSON, no commentary.
 

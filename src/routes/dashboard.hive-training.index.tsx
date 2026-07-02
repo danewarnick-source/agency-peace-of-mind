@@ -354,13 +354,11 @@ function AdminView({ orgId }: { orgId: string }) {
         catalog={catalog ?? []}
       />
 
-      <div id="ht-storefront">
-        <Storefront
-          catalog={catalog ?? []}
-          members={members ?? []}
-          onPurchased={() => qc.invalidateQueries({ queryKey: ["ht-org-seats", orgId] })}
-        />
-      </div>
+      <Storefront
+        catalog={catalog ?? []}
+        members={members ?? []}
+        onPurchased={() => qc.invalidateQueries({ queryKey: ["ht-org-seats", orgId] })}
+      />
 
 
       <RosterSection
@@ -458,14 +456,17 @@ function BannerLine({
 }
 
 function scrollToRenewals() {
-  const el = document.getElementById("ht-renewals") ?? document.getElementById("ht-roster");
+  const el = document.getElementById("ht-renewals")
+    ?? document.getElementById("ht-storefront")
+    ?? document.getElementById("ht-roster");
   el?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 function scrollToRoster() {
   document.getElementById("ht-roster")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 function scrollToStorefront() {
-  document.getElementById("ht-storefront")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const el = document.getElementById("ht-storefront") ?? document.getElementById("ht-roster");
+  el?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 

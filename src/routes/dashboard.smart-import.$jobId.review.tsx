@@ -1807,8 +1807,8 @@ function BillingCodesEditor({
 
   const orgLabel = tenant.names[0] ?? "your organization";
   const externalRows = parsed.filter((p) => providerOwnership(p.row.provider_name, tenant) === "external");
-  const notOursCount = externalRows.filter((p) => p.row.ownership_ack === "not_ours").length;
-  const unresolvedExternal = externalRows.filter((p) => p.row.ownership_ack !== "not_ours");
+  const activeExternal = externalRows.filter((p) => p.row.ownership_ack !== "not_ours");
+  const unresolvedExternal = activeExternal;
   const pendingCount = unresolvedExternal.filter((p) => approvals[p.field.id]?.status === "pending").length;
   const approvedCount = unresolvedExternal.filter((p) => approvals[p.field.id]?.status === "approved").length;
 

@@ -16,7 +16,7 @@ function EmployeesHub() {
   const tabs: HubTab[] = [
     { key: "roster", label: "Roster", render: () => <EmployeesPage /> },
   ];
-  if (can("view_referrals") || can("manage_referrals") || can("manage_clients")) {
+  if (can("view_referrals") || can("manage_referrals") || can("manage_users")) {
     tabs.push({
       key: "hosts",
       label: "Hosts",

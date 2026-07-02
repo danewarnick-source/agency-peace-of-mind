@@ -354,11 +354,14 @@ function AdminView({ orgId }: { orgId: string }) {
         catalog={catalog ?? []}
       />
 
-      <Storefront
-        catalog={catalog ?? []}
-        members={members ?? []}
-        onPurchased={() => qc.invalidateQueries({ queryKey: ["ht-org-seats", orgId] })}
-      />
+      <div id="ht-storefront">
+        <Storefront
+          catalog={catalog ?? []}
+          members={members ?? []}
+          onPurchased={() => qc.invalidateQueries({ queryKey: ["ht-org-seats", orgId] })}
+        />
+      </div>
+
 
       <RosterSection
         orgId={orgId}
@@ -390,11 +393,12 @@ function ReadinessBanner({
         key="unassigned"
         icon={<AlertTriangle className="h-4 w-4 text-[#C8881E]" />}
         text={<><b>{unassignedCount} staff</b> have no training assigned yet.</>}
-        cta="Review renewals"
-        onClick={() => scrollToRenewals()}
+        cta="Buy training"
+        onClick={() => scrollToStorefront()}
       />
     );
   }
+
 
   if (inProgressCount > 0) {
     items.push(
@@ -454,11 +458,16 @@ function BannerLine({
 }
 
 function scrollToRenewals() {
-  document.getElementById("ht-renewals")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const el = document.getElementById("ht-renewals") ?? document.getElementById("ht-roster");
+  el?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 function scrollToRoster() {
   document.getElementById("ht-roster")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
+function scrollToStorefront() {
+  document.getElementById("ht-storefront")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 
 // ---- Renewals section (staff-level, checkbox-driven) ----
 

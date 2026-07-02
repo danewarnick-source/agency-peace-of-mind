@@ -1161,3 +1161,216 @@ function SeatRow({
     </div>
   );
 }
+
+// ---- Auto-renew settings card ----
+
+type AutoRenewSettings = {
+  organization_id: string;
+  enabled: boolean;
+  lead_days: number;
+  scope: "all" | "full_program" | "selected";
+  selected_catalog_ids: string[];
+  stripe_customer_id: string | null;
+  stripe_payment_method_id: string | null;
+  payment_method_brand: string | null;
+  payment_method_last4: string | null;
+  last_run_at: string | null;
+  paused_reason: string | null;
+};
+
+function AutoRenewCard({ orgId, catalog }: { orgId: string; catalog: CatalogRow[] }) {
+  const qc = useQueryClient();
+  const { data: settings, isLoading } = useQuery({
+    queryKey: ["ht-auto-renew", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("hive_training_auto_renew_settings")
+        .select("*")
+        .eq("organization_id", orgId)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as AutoRenewSettings | null;
+    },
+  });
+
+  const [saving, setSaving] = useState(false);
+
+  const upsert = async (patch: Partial<AutoRenewSettings>) => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("hive_training_auto_renew_settings")
+        .upsert(
+          {
+            organization_id: orgId,
+            enabled: settings?.enabled ?? false,
+            lead_days: settings?.lead_days ?? 45,
+            scope: settings?.scope ?? "all",
+            selected_catalog_ids: settings?.selected_catalog_ids ?? [],
+            ...patch,
+          },
+          { onConflict: "organization_id" },
+        );
+      if (error) throw error;
+      await qc.invalidateQueries({ queryKey: ["ht-auto-renew", orgId] });
+    } catch (e) {
+      toast.error("Couldn't save auto-renew settings.");
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveCard = async () => {
+    setSaving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-training-setup-intent", { body: {} });
+      if (error) throw error;
+      const url = (data as { url?: string })?.url;
+      if (!url) throw new Error("No checkout URL returned.");
+      window.location.href = url;
+    } catch (e) {
+      toast.error("Couldn't start card setup. Ensure payments are configured.");
+      console.error(e);
+      setSaving(false);
+    }
+  };
+
+  const runNow = async () => {
+    setSaving(true);
+    try {
+      const { error } = await supabase.functions.invoke("auto-renew-trainings", {
+        body: { organization_id: orgId },
+      });
+      if (error) throw error;
+      toast.success("Auto-renew check triggered.");
+      await qc.invalidateQueries({ queryKey: ["ht-auto-renew", orgId] });
+    } catch (e) {
+      toast.error("Couldn't run auto-renew.");
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (isLoading) return null;
+
+  const enabled = settings?.enabled ?? false;
+  const leadDays = settings?.lead_days ?? 45;
+  const scope = settings?.scope ?? "all";
+  const hasCard = !!settings?.stripe_payment_method_id;
+
+  return (
+    <section className="rounded-xl border border-border bg-gradient-to-br from-[#FFF9EE] to-white p-4 md:p-5">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+        <div className="flex gap-3">
+          <div className="rounded-lg p-2 bg-[#C8881E]/15 text-[#C8881E] h-fit">
+            <Repeat className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-[#1A2B47]">Auto-renew expiring trainings</h2>
+            <p className="text-sm text-muted-foreground max-w-xl">
+              Set it once. HIVE re-purchases and re-assigns seats before certificates expire — no gap, no chase, no scramble.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={enabled}
+            disabled={saving}
+            onCheckedChange={(v) => upsert({ enabled: v })}
+          />
+          <span className="text-sm font-medium text-[#1A2B47]">{enabled ? "On" : "Off"}</span>
+        </div>
+      </div>
+
+      {enabled && (
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Renew how early?</Label>
+            <Select value={String(leadDays)} onValueChange={(v) => upsert({ lead_days: Number(v) })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="30">30 days before expiration</SelectItem>
+                <SelectItem value="45">45 days before expiration</SelectItem>
+                <SelectItem value="60">60 days before expiration</SelectItem>
+                <SelectItem value="90">90 days before expiration</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Scope</Label>
+            <Select value={scope} onValueChange={(v) => upsert({ scope: v as AutoRenewSettings["scope"] })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All required courses</SelectItem>
+                <SelectItem value="full_program">Full Program courses only</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Payment method</Label>
+            {hasCard ? (
+              <div className="flex items-center justify-between rounded-md border bg-white px-3 py-2 h-10">
+                <span className="text-sm text-[#1A2B47] inline-flex items-center gap-2">
+                  <CreditCard className="h-4 w-4" />
+                  {(settings?.payment_method_brand ?? "Card").toUpperCase()} •••• {settings?.payment_method_last4 ?? "----"}
+                </span>
+                <button
+                  onClick={saveCard}
+                  disabled={saving}
+                  className="text-xs text-[#C8881E] hover:underline"
+                >
+                  Change
+                </button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={saveCard}
+                disabled={saving}
+                className="w-full h-10 border-[#C8881E] text-[#C8881E] hover:bg-[#C8881E]/10"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CreditCard className="h-4 w-4 mr-2" />Save a card</>}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {enabled && (
+        <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2 pt-3 border-t text-sm">
+          <div className="text-muted-foreground">
+            {settings?.paused_reason ? (
+              <span className="inline-flex items-center gap-1 text-red-700">
+                <AlertTriangle className="h-4 w-4" />
+                Paused: {settings.paused_reason}. Update your card and re-enable.
+              </span>
+            ) : hasCard ? (
+              <span className="inline-flex items-center gap-1 text-[#1A2B47]">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                Ready. We check daily and email a receipt for every renewal.
+                {settings?.last_run_at && (
+                  <span className="text-muted-foreground"> · Last check {new Date(settings.last_run_at).toLocaleDateString()}</span>
+                )}
+              </span>
+            ) : (
+              <span className="text-muted-foreground">Save a card to activate auto-renew.</span>
+            )}
+          </div>
+          {hasCard && (
+            <Button size="sm" variant="ghost" onClick={runNow} disabled={saving}>
+              Run check now
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Reference catalog is available for future 'selected' scope UI. */}
+      {catalog.length === 0 && enabled && (
+        <p className="mt-2 text-xs text-muted-foreground">No active courses in the catalog yet.</p>
+      )}
+    </section>
+  );
+}
+

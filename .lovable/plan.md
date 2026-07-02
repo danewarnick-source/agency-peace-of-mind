@@ -1,32 +1,29 @@
-# Respect Portal View on /dashboard/hive-training
+## Fix: "Review renewals" button does nothing
 
-The training page currently branches on the real DB role (`org.role`), so a Company Admin who flips the sidebar's **Portal View** to "Staff View" still sees the admin storefront. Fix: also consult `usePortalView()` and force `StaffView` when the admin has explicitly switched to staff.
+### Root cause
+The banner CTA calls `scrollToRenewals()`, which scrolls to `#ht-renewals`. But `RenewalsSection` returns `null` when `rows.length === 0` — and `rows` is built from `requiredCourses`, which comes from catalog items' `fulfills_course_ids`. When that mapping is empty (current state), there are zero renewal rows even though 4 staff have no training assigned, so the target element doesn't exist and the click is a no-op.
 
-## Change
+The banner line is also semantically wrong for that case: "4 staff have no training assigned yet" isn't a renewal — it's an initial purchase/assign.
 
-In `src/routes/dashboard.hive-training.index.tsx`, `HiveTrainingHub()`:
+### Changes (all in `src/routes/dashboard.hive-training.index.tsx`)
 
-1. Import `usePortalView` from `@/hooks/use-portal-view`.
-2. Replace:
-   ```ts
-   const isAdmin = ["admin","manager","super_admin"].includes(org.role);
-   ```
-   with:
-   ```ts
-   const { view, hydrated } = usePortalView();
-   const realIsAdmin = ["admin","manager","super_admin"].includes(org.role);
-   const isAdmin = realIsAdmin && view !== "staff" && view !== "staff_mobile";
-   ```
-3. While `!hydrated`, show the existing spinner so we don't flash the wrong view.
-4. Header subtitle: when `realIsAdmin && !isAdmin`, append a small muted "Previewing as staff" pill so admins know the toggle is what changed the page.
+1. **Add a scroll target on the Storefront**
+   - Wrap the `<Storefront ... />` render in a `<div id="ht-storefront">` (or pass an `id` prop it forwards to its outer section).
+   - Add `function scrollToStorefront()` mirroring the other helpers.
 
-That's the whole fix — StaffView already exists and handles the learner surface correctly (assignments only, no storefront, no roster).
+2. **Fix the "unassigned" banner line**
+   - Change its CTA label from `"Review renewals"` to `"Buy training"`.
+   - Change its `onClick` from `scrollToRenewals()` to `scrollToStorefront()`.
+   - Rationale: unassigned staff need seats bought + assigned; the Renewals section is for expiring/expired certs, not first-time assignment.
 
-## Note on AutoRenewCard
+3. **Make `scrollToRenewals()` resilient (keeps the in-progress path safe)**
+   - If `#ht-renewals` isn't in the DOM, fall back to scrolling to `#ht-roster`. Prevents the same silent no-op if renewals ever hide again.
 
-The AutoRenewCard added in the previous turn is already wired inside `AdminView`. The screenshots predate that build. Once the preview rebuilds, admins on the admin surface will see it above "Renewals coming up." No additional work needed.
+### Out of scope
+- No changes to `RenewalsSection` logic, `AutoRenewCard`, storefront checkout, edge functions, or DB.
+- No change to the in-progress banner ("See team" → roster) — that one works.
+- No change to Staff view.
 
-## Out of scope
-
-- No changes to StaffView, storefront, renewals, roster, or edge functions.
-- No new hooks or DB.
+### Verification
+- Reload `/dashboard/hive-training` as admin → click **Buy training** in the yellow banner → page smooth-scrolls to the "Programs built for DSPD compliance" storefront.
+- When expiring assignments exist later, `#ht-renewals` renders and the fallback is inert.

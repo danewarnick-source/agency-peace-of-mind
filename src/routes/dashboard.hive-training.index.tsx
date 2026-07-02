@@ -455,11 +455,16 @@ function BannerLine({
 }
 
 function scrollToRenewals() {
-  document.getElementById("ht-renewals")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const el = document.getElementById("ht-renewals") ?? document.getElementById("ht-roster");
+  el?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 function scrollToRoster() {
   document.getElementById("ht-roster")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
+function scrollToStorefront() {
+  document.getElementById("ht-storefront")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 
 // ---- Renewals section (staff-level, checkbox-driven) ----
 

@@ -490,6 +490,44 @@ function HostDetailDialog({
                   placeholder="Onboarding notes, training status, observations — fills out as the card solidifies."
                 />
               </div>
+
+              <div className="rounded-md border border-border bg-muted/30 p-3">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <UserCheck className="h-3.5 w-3.5" /> Also a staff member?
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Link this host to a DSP on your roster so they can be assigned
+                  shifts, appear in caseload pickers, and complete client trainings.
+                </p>
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <Select
+                    value={linkedStaffId ?? "none"}
+                    onValueChange={(v) => setLinkedStaffId(v === "none" ? null : v)}
+                    disabled={!canManage || staffQ.isLoading}
+                  >
+                    <SelectTrigger className="sm:max-w-xs">
+                      <SelectValue placeholder="Not linked to staff" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Not a staff member</SelectItem>
+                      {(staffQ.data ?? []).map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button asChild size="sm" variant="outline">
+                    <Link to="/dashboard/invitations">
+                      <Plus className="mr-1 h-3.5 w-3.5" /> Invite as staff
+                    </Link>
+                  </Button>
+                </div>
+                {linkedStaffId && (
+                  <p className="mt-2 text-xs text-primary">
+                    This host will appear in staff pickers and can be scheduled as a DSP.
+                  </p>
+                )}
+              </div>
+
               {canManage && (
                 <div className="flex justify-end">
                   <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>

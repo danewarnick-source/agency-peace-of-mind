@@ -13,6 +13,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useRouterState } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Loader2, ShieldCheck, ShieldAlert, Check, X, MessageSquare, PenLine } from "lucide-react";
 import {
@@ -190,6 +191,7 @@ function NewRequestForm({
 }
 
 function ThreadView({ requestId, onClose, allowResolution }: { requestId: string; onClose: () => void; allowResolution: boolean }) {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
   const getThread = useServerFn(getApprovalThread);
   const post = useServerFn(postApprovalMessage);
   const markRead = useServerFn(markApprovalThreadRead);
@@ -256,7 +258,8 @@ function ThreadView({ requestId, onClose, allowResolution }: { requestId: string
   const messages = q.data?.messages ?? [];
   const isPending = request?.status === "pending";
   const isHiveViewer = viewer === "hive_admin";
-  const canResolve = isHiveViewer && allowResolution;
+  const isHiveExecutiveApprovalRoute = pathname === "/dashboard/hive-exec/billing-approvals";
+  const canResolve = isHiveViewer && allowResolution === true && isHiveExecutiveApprovalRoute;
 
   return (
     <>

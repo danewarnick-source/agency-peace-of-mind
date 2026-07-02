@@ -1,50 +1,32 @@
-# Auto-Renew Expiring Trainings
+# Respect Portal View on /dashboard/hive-training
 
-Give admins a "set it and forget it" toggle so HIVE automatically re-purchases and re-assigns training seats before staff certificates expire. Stays inside the PHI-free `hive_training_*` boundary.
+The training page currently branches on the real DB role (`org.role`), so a Company Admin who flips the sidebar's **Portal View** to "Staff View" still sees the admin storefront. Fix: also consult `usePortalView()` and force `StaffView` when the admin has explicitly switched to staff.
 
-## UX
+## Change
 
-**Where it lives:** top of the Renewals section on `/dashboard/hive-training` (admin view), as a single card above the checkbox list.
+In `src/routes/dashboard.hive-training.index.tsx`, `HiveTrainingHub()`:
 
-- Toggle: **"Auto-renew expiring trainings"** (org-level, default off)
-- When on, reveal three compact controls:
-  - **Renew how early?** 30 / 45 / 60 / 90 days before expiration (default 45)
-  - **Scope:** All courses · Full Program only · Selected courses (multiselect from catalog)
-  - **Payment method:** dropdown of the org's saved Stripe payment methods (Stripe customer portal link if none saved)
-- Small muted footnote: "We'll email you a receipt each time. You can pause anytime."
-- Status line under the toggle when active: "Next auto-renewal check: {date} — {N} staff eligible"
+1. Import `usePortalView` from `@/hooks/use-portal-view`.
+2. Replace:
+   ```ts
+   const isAdmin = ["admin","manager","super_admin"].includes(org.role);
+   ```
+   with:
+   ```ts
+   const { view, hydrated } = usePortalView();
+   const realIsAdmin = ["admin","manager","super_admin"].includes(org.role);
+   const isAdmin = realIsAdmin && view !== "staff" && view !== "staff_mobile";
+   ```
+3. While `!hydrated`, show the existing spinner so we don't flash the wrong view.
+4. Header subtitle: when `realIsAdmin && !isAdmin`, append a small muted "Previewing as staff" pill so admins know the toggle is what changed the page.
 
-Rows in the checkbox list below get a small "Auto" pill when covered by the active auto-renew rule, so admins see what's already handled vs. what still needs a one-off "Set up renewals."
+That's the whole fix — StaffView already exists and handles the learner surface correctly (assignments only, no storefront, no roster).
 
-## Data
+## Note on AutoRenewCard
 
-New table `hive_training_auto_renew_settings` (PHI-free, no FKs into client tables):
-- `organization_id` (pk), `enabled`, `lead_days`, `scope` enum (`all` | `full_program` | `selected`), `selected_catalog_ids uuid[]`, `stripe_payment_method_id`, `stripe_customer_id`, `last_run_at`, `paused_reason`, timestamps
-- RLS: `is_org_admin_or_manager` read/write + service_role
-
-New table `hive_training_auto_renew_runs` for audit trail:
-- `organization_id`, `run_at`, `staff_count`, `seats_purchased`, `total_amount_cents`, `stripe_payment_intent_id`, `status` (`succeeded` | `card_failed` | `no_eligible` | `partial`), `error_message`
-- Admin-read + service_role
-
-## Backend
-
-- **Edge fn `auto-renew-trainings`** (scheduled daily via pg_cron → pg_net):
-  1. For each org with `enabled = true`, find `hive_training_assignments` where `expires_at BETWEEN now() AND now() + lead_days` and no active future assignment exists.
-  2. Filter by `scope` (bundle into Full Program when it's cheaper than à-la-carte, same logic as manual flow).
-  3. Charge saved payment method off-session via Stripe PaymentIntent (`off_session: true`, `confirm: true`).
-  4. On success: insert seats, create `hive_training_assignments`, insert `hive_training_renewal_intents` rows already marked consumed, email receipt.
-  5. On card decline / `authentication_required`: set `paused_reason`, email admin with "update payment method" link, log run as `card_failed`.
-- **Reuses existing** `create-training-checkout` catalog-resolution helpers; no new pricing logic.
-- **pg_cron:** daily 08:00 UTC calling `/api/public/hooks/auto-renew-trainings` (auth via `apikey` anon key per project pattern).
+The AutoRenewCard added in the previous turn is already wired inside `AdminView`. The screenshots predate that build. Once the preview rebuilds, admins on the admin surface will see it above "Renewals coming up." No additional work needed.
 
 ## Out of scope
-- Staff view changes
-- Reminder emails beyond the auto-renew receipt / failure notice
-- Auto-renew for anything outside `hive_training_*` (no PHI, no cert types in the main compliance module)
-- Retry logic beyond the one-shot daily attempt (failure pauses the rule until admin acts)
 
-## Build order
-1. Migration (settings + runs tables, RLS, grants)
-2. Edge fn + pg_cron schedule
-3. Admin UI card + wiring
-4. Stripe payment-method save flow (uses existing customer if present, else SetupIntent on first enable)
+- No changes to StaffView, storefront, renewals, roster, or edge functions.
+- No new hooks or DB.

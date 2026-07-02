@@ -1,70 +1,114 @@
-# Fix: two PDFs assigned to the same client create two subjects
+# Build: HIVE-managed email (Mode 1 only)
 
-## Why it's happening
+Migration already applied: `org_email_settings.send_mode` (default
+`hive_managed`), `from_address` now nullable, one hive_managed row seeded
+for every org.
 
-In `src/routes/dashboard.smart-import.index.tsx` the UI already tracks a `clientKey` per file (from the "test / test" dropdowns), but that key is **never sent to the server**. The upload path only sends `rosterBatches` + `textBlobs` to `runSmartExtraction`.
+## Files to change
 
-In `src/lib/smart-import.functions.ts` (`runSmartExtraction`, ~L392–411), the server loop is:
+### 1. `src/lib/email.functions.ts` — full rewrite
 
+- Add exported constant
+  `HIVE_MANAGED_FROM_ADDRESS = "onboarding@resend.dev"` with a "SWAP-POINT"
+  comment: change to `notifications@mail.hivehcbs.com` once that domain is
+  verified in Resend. No other file will hardcode a From address.
+- Add exported server-only helper
+  `resolveOrgSender(supabase, orgId) → { from, reply_to, send_mode }`:
+  - reads `org_email_settings` + `organizations.name`
+  - `from = "${settings.from_name || org.name || 'HIVE Notifications'} <${HIVE_MANAGED_FROM_ADDRESS}>"`
+  - `reply_to = settings.reply_to` (throws a UI-friendly error if missing)
+  - `send_mode: "hive_managed"` always for now; `own_domain` falls through
+    to hive_managed rather than blocking sends.
+- `getOrgEmailSettings`: return `{ settings, hive_managed_from_address }`
+  so the UI can preview what recipients will see without hardcoding.
+- `updateOrgEmailSettings`: input becomes
+  `{ organization_id, send_mode?, from_name?, reply_to }`; `reply_to`
+  required + validated as email; `own_domain` mode explicitly rejected
+  with "not available yet" message; upsert forces `send_mode='hive_managed'`,
+  `from_address=null`, `verified=true`.
+- `sendEmail`: drop old settings/verified check; call `resolveOrgSender`,
+  then invoke `send-email` edge fn with `from = sender.from` and
+  `reply_to = data.reply_to ?? sender.reply_to` (per-call override wins,
+  org-level is always present).
+
+### 2. `src/lib/employee-loans.functions.ts` — loan-signature email
+
+Replace the inline `org_email_settings` lookup + verified-gate + from
+composition (lines ~293–334) with:
+
+```ts
+import { resolveOrgSender } from "@/lib/email.functions";
+...
+let emailStatus = { ok: false, error: "..." };
+try {
+  const sender = await resolveOrgSender(supabase, data.organization_id);
+  const html = `...` // unchanged
+  const { data: invokeData, error: invokeErr } =
+    await (supabase as any).functions.invoke("send-email", {
+      body: {
+        from: sender.from,
+        to: data.signer_email,
+        subject: `Loan agreement ready for your signature — ${loan.lender_name}`,
+        html,
+        reply_to: sender.reply_to,   // provider's inbox
+      },
+    });
+  if (invokeErr) emailStatus = { ok: false, error: invokeErr.message };
+  else if (!invokeData || invokeData.ok !== true)
+    emailStatus = { ok: false, error: invokeData?.error || "Email send failed" };
+  else emailStatus = { ok: true };
+} catch (e) {
+  emailStatus = { ok: false, error: e instanceof Error ? e.message : "Email send failed" };
+}
 ```
-for each uploaded PDF/DOCX text blob:
-  aiExtractFieldsFromText(...)
-  INSERT INTO import_subjects (...)   ← one row per document
-  INSERT extracted_fields for that new subject
+
+Result: TNS loan-signature email actually sends. Reply-to = the address
+the provider entered in Settings → Email. If reply-to isn't set yet, the
+signing link still generates and shows a fixable error in the UI.
+
+### 3. `src/lib/billing-notifications.server.ts` — replace `getSenderFor`
+
+Currently gates on `verified && from_address`, both no-ops in Mode 1.
+Replace with a supabaseAdmin-scoped version of the same helper:
+
+```ts
+async function getSenderFor(orgId: string): Promise<{ from: string; reply_to: string } | null> {
+  try {
+    return await resolveOrgSender(supabaseAdmin, orgId);
+  } catch { return null; }   // Silent: billing state changes must never break on email
+}
 ```
 
-So two PDFs = two `import_subjects` rows, regardless of what the admin picked in the "Move to client" dropdown. The grouping the user sees on the upload screen is purely cosmetic today.
+Then include `reply_to: sender.reply_to` in the `functions.invoke` body.
 
-## Fix
+### 4. `src/routes/dashboard.settings.email.tsx` — Mode 1 UI
 
-Carry the client grouping end-to-end and collapse same-group docs into one subject.
+Rewrite to remove From-address, Verified toggle, and Resend-DNS copy.
+New fields:
 
-### Client changes — `src/routes/dashboard.smart-import.index.tsx`
+- **Reply-to address** (required, email) — "Recipients replying to HIVE
+  emails will land here." Save-blocked until valid.
+- **From display name** (optional, defaults to org name) — "Inbox shows
+  `{name} <notifications@mail.hivehcbs.com>`." Preview uses the constant
+  returned by `getOrgEmailSettings`.
+- Banner: "HIVE-managed sending is on. Zero DNS setup required. Custom
+  domain sending is coming."
+- Existing "Send a test" panel stays; test emails now go through the
+  HIVE-managed sender with the org's reply-to.
 
-1. When calling `recordDoc`, also pass `client_key` and `client_label` from the chip so the server persists the admin's grouping choice on `import_documents`.
-2. Nothing else changes in the UI — the existing "Move to client" dropdown already writes `clientKey` onto every chip.
+## Out of scope (deferred)
 
-### Server changes — `src/lib/smart-import.functions.ts`
+- Mode 2 own_domain flow, Resend Domains API integration, DNS records UI,
+  verification polling. Server fn hooks reserve the mode but reject it.
+- Migrating the current `onboarding@resend.dev` bootstrap to a verified
+  HIVE subdomain — that's a one-line change to `HIVE_MANAGED_FROM_ADDRESS`
+  the moment DNS is done.
 
-1. `recordImportDocument`:
-   - Extend the Zod input with optional `client_key` and `client_label`.
-   - Persist them on `import_documents` (see migration below).
+## Verification (after build)
 
-2. `runSmartExtraction` — text-blob / uploaded-doc branch (currently L343–428):
-   - When downloading `import_documents`, also select `client_key`, `client_label`.
-   - Build `realTextBlobs` with `client_key` / `client_label` attached (pasted text stays keyless).
-   - **Bucket blobs by `client_key`** (empty key = its own bucket, one subject per doc so today's behavior is preserved for unassigned docs).
-   - For each bucket with a non-empty key:
-     - Create **one** `import_subjects` row. Prefer `client_label` for `display_name`; fall back to the first extracted `display_name`.
-     - Run `aiExtractFieldsFromText` for every blob in the bucket and insert **all** their `extracted_fields` + `unfiled_items` under that single `subject_id`, keeping each row's own `source_document_id` for provenance.
-     - If two blobs disagree on the same `target_field`, keep both rows: mark the second as `status: "flag"` with a `"conflict with <file>"` snippet so the reviewer can pick a winner (no silent overwrite).
-   - Roster batches keep today's "one subject per row" behavior — they aren't affected.
-
-3. `import_field_provenance` / summary counts don't need changes; they roll up by subject.
-
-### Migration (SQL handoff)
-
-`import_documents` needs two nullable columns:
-
-```sql
-ALTER TABLE public.import_documents
-  ADD COLUMN IF NOT EXISTS client_key   text,
-  ADD COLUMN IF NOT EXISTS client_label text;
-CREATE INDEX IF NOT EXISTS import_documents_job_client_key_idx
-  ON public.import_documents (import_job_id, client_key);
-```
-
-No RLS/grant changes — inherits existing policies.
-
-## Out of scope
-
-- The pending-clients review page (`dashboard.clients.pending.tsx`) and Smart Import review already render one card per `import_subjects` row, so no changes needed there — collapsing at the subject level fixes the visible symptom.
-- Roster CSV/XLSX rows keep their current one-subject-per-row semantics.
-- No change to `aiExtractFieldsFromText` prompts.
-
-## Verification
-
-1. Upload two PDFs, use the dropdowns to assign both to "test".
-2. Run extraction → summary shows **1 person**, not 2.
-3. Open the review page → single "test" card with fields sourced from both documents; conflicting values appear as review flags rather than silent overwrites.
-4. Leave a doc as "Unassigned" and confirm it still creates its own subject.
+1. Open Settings → Email as TNS admin, enter reply-to, save.
+2. Send loan for signature → email arrives at signer with From =
+   `True North Supports <onboarding@resend.dev>`, reply-to = TNS address.
+3. Recipient hits Reply in Gmail → address auto-fills with TNS reply-to,
+   not the Resend domain.
+4. "Send a test" from Settings → Email works with the same envelope.

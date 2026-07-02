@@ -169,6 +169,7 @@ export async function fetchTenantIdentity(sb: any, orgId: string): Promise<Tenan
   if (org?.name) names.push(org.name);
   if (org?.legal_name) names.push(org.legal_name);
   if (Array.isArray(org?.aliases)) for (const a of org.aliases) if (a) names.push(String(a));
+  const aliasCount = Array.isArray(org?.aliases) ? org.aliases.filter(Boolean).length : 0;
   const outlineCodes = Array.isArray(outline?.codes_held)
     ? outline.codes_held.map((c: string) => String(c).toUpperCase())
     : [];
@@ -178,7 +179,12 @@ export async function fetchTenantIdentity(sb: any, orgId: string): Promise<Tenan
     ? org.services_offered.map((c: string) => String(c).toUpperCase())
     : [];
   const codesHeld = Array.from(new Set([...outlineCodes, ...servicesCodes]));
-  return { names, codesHeld };
+  return {
+    names,
+    codesHeld,
+    hasAliases: aliasCount > 0,
+    hasCodesHeld: codesHeld.length > 0,
+  };
 }
 
 /**

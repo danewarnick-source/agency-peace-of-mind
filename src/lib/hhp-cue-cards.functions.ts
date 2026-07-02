@@ -195,12 +195,10 @@ export const updateHhpCueCard = createServerFn({ method: "POST" })
   .inputValidator((d) => updateInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    await requirePermission(
-      supabase,
-      userId,
-      data.organization_id,
+    await requireAnyPermission(supabase, userId, data.organization_id, [
       "manage_referrals",
-    );
+      "manage_users",
+    ]);
 
     // Build partial patch — never null-out unset keys
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

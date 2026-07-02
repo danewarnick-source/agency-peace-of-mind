@@ -14,8 +14,9 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+type RenewalIntent = { user_id: string; course_id: string };
 type Body =
-  | { mode_context: "bulk_seats"; catalog_id: string; quantity: number; success_path?: string; cancel_path?: string }
+  | { mode_context: "bulk_seats"; catalog_id: string; quantity: number; success_path?: string; cancel_path?: string; renewal_intents?: RenewalIntent[] }
   | { mode_context: "individual"; catalog_id: string; assignee_user_id: string; success_path?: string; cancel_path?: string };
 
 Deno.serve(async (req) => {

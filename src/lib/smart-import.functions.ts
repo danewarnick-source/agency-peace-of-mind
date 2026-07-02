@@ -242,6 +242,8 @@ export const recordImportDocument = createServerFn({ method: "POST" })
         storage_path: data.storage_path,
         checksum: data.checksum ?? null,
         uploaded_by: context.userId,
+        client_key: data.client_key ?? null,
+        client_label: data.client_label ?? null,
       })
       .select("id")
       .single();

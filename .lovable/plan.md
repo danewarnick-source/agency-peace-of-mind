@@ -1,98 +1,129 @@
+# HIVE Training — Build Plan
 
-# Employee profile — parity with client profile + fix quick-edit save
-
-Two problems, one plan:
-
-1. **Bug**: values entered in the list "quick edit" dialog don't show on the employee profile page (screenshot shows Name not set / email/phone/employee_id/position all "—", only worker_type persisted).
-2. **Feature**: employee profile should look and behave like the client profile — onboarding forms, applications, and uploaded authoritative documents that NECTAR reads and auto-distributes into profile fields.
+Training module inside the existing HIVE project. Shared auth + DB, walled off from PHI. Stripe Checkout wired against `STRIPE_SECRET_KEY` (test now, live later, zero code change).
 
 ---
 
-## Part 1 — Fix quick-edit → profile
+## 1. Access model & compliance boundary
 
-**Diagnose first, then fix.** The quick-edit mutation in `dashboard.employees.index.tsx` writes `full_name`, `email`, `employee_id`, `position`, `positions`, `worker_type`, `start_date`, `end_date`, `hire_date`, `ce_suggested_topics` to `profiles` in one call and throws if 0 rows come back. Screenshot shows `worker_type` saved but nothing else — that shape is only possible if:
+- Reuse `auth.users` + `profiles` + `organizations` + `organization_members`. No parallel user table.
+- Add `organizations.training_only boolean not null default false`. A training-only org sees only the Training surface; flipping to `false` upgrades to full HIVE — same login, no migration.
+- Role mapping onto existing `app_role`:
+  - `platform_admin` → existing `super_admin`
+  - `company_admin` → existing `admin`
+  - `staff` → existing `employee`
+  - `state_auditor` → add enum value `auditor`
+- **Compliance wall**: every new table prefixed `hive_training_*`. No FKs to `clients`, `client_medications`, `emar_logs`, `incident_reports`, `daily_logs`, PCSP or any PHI table. Enforced by convention + header comment on every migration + code review.
 
-- the update targeted a **different** `profiles.id` than the one the profile page reads (mismatched `userId` vs membership row), **or**
-- the RLS policy silently drops non-`worker_type` columns via a column-level restriction, **or**
-- the profile page is reading a cached/stale snapshot from a different query key.
+## 2. Database (new tables — all RLS org-scoped via existing `is_org_member` / `is_org_admin_or_manager` helpers)
 
-Steps:
+```text
+hive_training_catalog        SKUs sold publicly
+  sku, name, kind (full_program|ala_carte), price_cents,
+  stripe_price_id, includes text[], sort, active
 
-1. Add explicit `.select("id, full_name, email, employee_id, position, worker_type")` on the quick-edit update and log/toast the returned row so we can confirm what actually persisted.
-2. Verify the `userId` passed into the dialog is the `profiles.id` (auth user id) of the row the profile route loads by `staffId`. Currently `EditableMember.userId` is set from `organization_members.user_id`; make sure the profile route's `staffId` is the same id (audit both call sites; align if needed).
-3. Invalidate the profile-page query keys (`["staff-profile", staffId]`, `["members"]`, `["staff-pii"]`) on save so the profile page refetches without a hard reload.
-4. If the returned row shows the writes succeeded but the profile page still shows "—", the profile fetch is stale — fix the query key / add a `router.invalidate()` after save.
-5. Re-read `profiles` RLS via `supabase--read_query` and confirm no column-level `UPDATE` restriction is silently narrowing writes.
+hive_training_courses        course content
+  slug, title, description, cover_url, estimated_minutes,
+  cert_validity_months, published
 
-Same treatment for the pencil-edit "Contact & position" card on the profile page (`dashboard.employees.$staffId.tsx` line ~407): it already updates `phone`, `employee_id`, `department`, `worker_type`, `hire_date`; extend `onSaved` to invalidate the profile query and confirm rows returned.
+hive_training_course_modules ordered modules per course
+  course_id, sort, title, body_md, video_url, quiz_json
 
-**No behavior change to the quick-edit UI** — just make sure what the user types lands on the row the profile displays, and the profile shows it immediately.
+hive_training_orders         Stripe Checkout sessions
+  organization_id, purchaser_user_id, model (bulk_seats|individual),
+  stripe_checkout_session_id, stripe_payment_intent_id,
+  amount_cents, currency,
+  status (pending|paid|refunded|failed), paid_at
 
-## Part 2 — Employee profile becomes a first-class intake surface (client parity)
+hive_training_order_items    line items
+  order_id, catalog_id, quantity, unit_price_cents
 
-Mirror the client profile pattern (`src/components/clients/*` + `dashboard.clients.$clientId.tsx`) on the employee side. The building blocks already exist for clients — reuse the same shape.
+hive_training_seats          purchased-but-unassigned entitlement pool
+  organization_id, order_id, catalog_id,
+  status (available|assigned|consumed),
+  assigned_to_user_id, assigned_at
 
-### New employee profile sections (on `dashboard.employees.$staffId.tsx`, Overview tab)
+hive_training_assignments    staff <-> course, with payment provenance
+  organization_id, user_id, course_id, seat_id nullable,
+  payment_model (bulk_seats|individual), order_id nullable,
+  status (pending_payment|not_started|in_progress|completed|expired),
+  progress_pct, started_at, completed_at, expires_at
 
-1. **Employee documents card** (mirrors `client-documents-card.tsx`)
-   - Upload area for onboarding forms, applications, I-9/W-4, resume, certifications, background check, driver's license, direct-deposit form, offer letter, etc.
-   - Stored in a new `employee_documents` table (org-scoped, RLS, GRANTs) with `staff_id`, `kind`, `file_path`, `uploaded_by`, `nectar_status`.
-   - Files land in a Supabase Storage bucket `employee-docs` (private, signed URLs).
+hive_training_module_progress
+  assignment_id, module_id, completed_at, quiz_score
 
-2. **Intake checklist card** (mirrors `client-intake-checklist-card.tsx`)
-   - Progress bar for the HR onboarding packet: Application, I-9, W-4, direct deposit, emergency contact, signed handbook, background check, TB/CPR, driver's license copy, etc.
-   - Items check off automatically when the matching document is uploaded or the matching profile field is populated.
-
-3. **Tracked fields card** (mirrors `tracked-fields-card.tsx`)
-   - Read-only surface of profile fields with provenance chips (Source doc / Manual / Nectar-suggested), same UX as the client version.
-
-4. **Finish onboarding / Setup checklist** (mirrors `finish-onboarding-card.tsx` + `setup-checklist.tsx`)
-   - Gate "Employee ready to work" state on the checklist reaching 100%.
-
-### NECTAR extraction → autofill
-
-Reuse `src/lib/smart-import.functions.ts` (already has `mode: "employee"` and `aiExtractEmployeeFieldsFromText`). Extend it so that when a document is uploaded from the profile page (not just from the bulk Smart Import wizard), the extracted fields are:
-
-1. Written to `extracted_fields` with `subject_type = "employee"` and `subject_id = staff_id`.
-2. Routed through a new `applyEmployeeExtractedFieldsToProfile` helper that maps extraction keys → `profiles` columns:
-   - `full_name`, `email`, `phone`, `employee_id`, `position`/`positions`, `worker_type`, `hire_date`/`start_date`, `department`, `date_of_birth`, `address`, `emergency contact`, `driver license #/expiry`, `direct deposit` (routed to a separate secured table), etc.
-3. Only writes fields when the profile column is empty or the user approves an override (same "review" pattern the client flow already uses via `dashboard.smart-import.$jobId.review.tsx`).
-4. Adds provenance rows to `import_field_provenance` so the tracked-fields card can show "from `application.pdf` (Nectar, 0.92)".
-
-Reduced-liability notice already exists (`REDUCED_LIABILITY_NOTICE` in `authoritative-sources.functions.ts`) — surface it on the upload dialog exactly like the client side.
-
-### Onboarding forms surface
-
-Under a new "Onboarding" sub-tab on the employee profile:
-- List of required forms pulled from `forms` (filter by `applies_to = "employee"`), same renderer used at `/dashboard/forms/$formId/fill`.
-- Status per form: not started / draft / submitted / attested. Submissions flow through the existing `form_submissions` + `document_attestations` tables.
-
-### New/changed tables (SQL handoff via `docs/SQL_HANDOFF.md`)
-
+hive_training_certificates
+  assignment_id, code (public verify), issued_at, expires_at, pdf_url
 ```
-employee_documents(id, organization_id, staff_id, kind, file_path,
-                   uploaded_by, uploaded_at, nectar_status, nectar_job_id)
-+ RLS org-scoped, GRANTs for authenticated/service_role
-+ storage bucket "employee-docs" (private)
-```
-Reuse existing `extracted_fields`, `import_field_provenance`, `unfiled_items`, `forms`, `form_submissions`.
 
-### Files to touch
+RLS: all `organization_id`-scoped. `hive_training_catalog` + `hive_training_courses` get narrow public `TO anon` SELECT (storefront + verify page). `GRANT`s follow the four-step migration rule.
 
-- `src/routes/dashboard.employees.$staffId.tsx` — add Documents, Intake checklist, Tracked fields, Onboarding tab sections.
-- `src/routes/dashboard.employees.index.tsx` — quick-edit fix + invalidation.
-- `src/components/employees/` (new folder) — `employee-documents-card.tsx`, `employee-intake-checklist-card.tsx`, `employee-tracked-fields-card.tsx`, `employee-onboarding-tab.tsx`.
-- `src/lib/employee-documents.functions.ts` (new) — upload, list, delete, trigger extraction.
-- `src/lib/smart-import.functions.ts` — expose a single-document ingest entrypoint for the profile page (bypass wizard), reusing `aiExtractEmployeeFieldsFromText`.
-- `src/lib/employee-profile-autofill.ts` (new) — extraction-key → `profiles` column mapping + provenance writes.
-- `supabase/migrations/*.sql` + `docs/SQL_HANDOFF.md` — `employee_documents` table + storage bucket policies.
+## 3. Payments — Stripe Checkout (test-mode now, live-swappable)
 
-### Out of scope for this plan
-- No new NECTAR model, no auto-approve of writes: extraction always lands as "suggested" until the admin accepts, matching the client flow.
-- Direct-deposit account numbers and SSN are extracted only into PII-gated storage (never into `profiles`), gated by `can_view_staff_pii()`.
-- No change to bulk Smart Import wizard UX — the per-employee upload is an additional entry point, not a replacement.
+- Server functions read `process.env.STRIPE_SECRET_KEY` inside `.handler()` — no code paths hardcoded to test vs live. Adding the live key later is the only switch.
+- Two Checkout flows:
+  1. **Bulk seats** (company_admin): line items = N × SKU → on `checkout.session.completed` webhook, insert N `hive_training_seats` rows `status='available'`.
+  2. **Individual** (staff): admin creates assignment `status='pending_payment'` → staff hits "Pay & start" → Checkout session with `client_reference_id = assignment_id` → webhook marks assignment paid + `not_started`.
+- Webhook: new server route `src/routes/api/public/webhooks/stripe-training.ts` (kept separate from the existing subscription webhook). Verifies signature, idempotent on `stripe_checkout_session_id`, sole writer of `status='paid'`. `STRIPE_WEBHOOK_SECRET_TRAINING` env.
+- Hosted Checkout only — never a custom card form. Store only Stripe IDs.
 
-## Verification before "done"
-- Reproduce the original bug by editing an employee in the list and confirm the profile updates without a hard refresh.
-- Upload an application PDF on a test employee, confirm extracted fields appear as suggestions on the tracked-fields card, approve, confirm they land in `profiles` and show on the Overview.
-- Run `npm run build` (regenerates `src/routeTree.gen.ts`), stage together.
+## 4. Public storefront (Surface 1)
+
+- `src/routes/training.tsx` — pricing page mirroring the reference design.
+  - Eyebrow "STAFF TRAINING", headline, Full Program card ($300, featured, amber glow) + À la carte card ($75 / $200 / $100 + save-$75 footnote).
+  - Navy `#1A2B47`, honey-gold `#C8881E`, generous whitespace, rounded cards. Tokens added to `src/styles.css`; no hardcoded color utilities in components.
+  - Real `head()` SEO + og tags.
+- `src/routes/training.signup.tsx` — public org + admin signup. Server fn creates org (`training_only=true`), admin membership, sends verify email. No PHI fields.
+
+## 5. Company admin surface (Surface 2)
+
+`src/routes/_authenticated/dashboard.training.tsx` layout + children:
+- `.index.tsx` — roster, assignments, completion %, cert expirations, seat balance by SKU.
+- `.buy.tsx` — pick SKU + quantity → Checkout (bulk_seats).
+- `.assign.tsx` — pick staff + course; if seat available assign from pool, else offer "let staff pay individually".
+- `.staff.tsx` — CRUD staff under this org (reuse existing profile pattern, no PHI fields exposed).
+- `.orders.tsx` — invoice history from `hive_training_orders`.
+
+Visible when current user is org `admin`. For `training_only` orgs this is the only nav.
+
+## 6. Staff learner surface (Surface 3, mobile-first)
+
+- `dashboard.training.my.tsx` — assigned courses + progress.
+- `dashboard.training.course.$assignmentId.tsx` — module player, quiz, completion, certificate.
+- `flex-col` → `md:flex-row`, 44px+ tap targets, tables in `overflow-x-auto` (per Core memory).
+- `pending_payment` assignments show "Pay $X & start" → individual Checkout.
+
+## 7. Nav integration
+
+- Full-HIVE orgs: add "Training" item to sidebar → same routes.
+- Training-only orgs: sidebar collapses to Training + Settings + Billing. Driven by `training_only` + role.
+
+## 8. Certificate verification
+
+Extend existing `certificate.$code.tsx` to resolve training certs too. Public page shows staff first name + course + issue/expiration only — no PII beyond that.
+
+## 9. Build order
+
+1. Migration: enum extension, `training_only` column, all `hive_training_*` tables + RLS + GRANTs.
+2. Storefront `/training` + `/training/signup`.
+3. Stripe test-mode Checkout server fns + `/api/public/webhooks/stripe-training` handler + secret wiring.
+4. Company admin surface (buy → assign → track).
+5. Mobile staff learner surface.
+6. Nav wiring + `training_only` sidebar mode.
+7. Certificate issuance + verify page extension.
+
+## 10. Guardrails / non-goals
+
+- No custom card form ever — hosted Checkout only.
+- No FK from any `hive_training_*` table to a PHI table.
+- Webhook is the only writer of `status='paid'`.
+- No separate auth system, no separate Supabase project.
+- v1 course content seeded via migration (I write CPR/Mandt/DSPD copy from what you provide). Full admin authoring UI is a follow-up.
+- Refund flow: `charge.refunded` webhook marks order refunded + revokes unconsumed seats. No self-serve refund UI in v1.
+- `state_auditor` role gets no training-surface visibility in v1.
+
+## Confirm before I build
+
+1. **Course content for v1**: seed CPR/First Aid, Mandt, and DSPD 30-day + 12-hr ongoing courses from copy you provide, or stub with placeholder modules so the plumbing ships and you fill content in later?
+2. **Stripe secrets**: I'll wire against `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET_TRAINING`. Confirm you want me to request those via the secret form now (test values are fine) so the webhook route builds without runtime errors.
+3. **Training-only signup**: any minimum required fields beyond org name + admin name/email/password/phone? (e.g. state, agency type)

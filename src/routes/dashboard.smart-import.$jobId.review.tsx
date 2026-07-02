@@ -586,7 +586,7 @@ function SubjectWizard({
       )}
       {step === "health" && (
         <div className="space-y-3">
-          <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground shadow-[var(--shadow-card)]">
+          <div className="rounded-xl border border-border bg-card p-2.5 text-[11px] leading-snug text-muted-foreground shadow-[var(--shadow-card)]">
             This is the health/medical portion of the client profile preview. Confirm providers, diagnoses, allergies, swallowing risks, clinical alerts, human-rights/DNR flags, and other PCSP-pulled care details before creating the profile.
           </div>
           <PlacementLineup
@@ -603,7 +603,7 @@ function SubjectWizard({
       )}
       {step === "plan" && (
         <div className="space-y-3">
-          <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground shadow-[var(--shadow-card)]">
+          <div className="rounded-xl border border-border bg-card p-2.5 text-[11px] leading-snug text-muted-foreground shadow-[var(--shadow-card)]">
             PCSP and supporting documents (Human Rights, grievance policy, individualized plans, DNR) — additional uploads land here.
           </div>
           <UnfiledPanel items={unfiled} onChanged={onChanged} />
@@ -614,7 +614,7 @@ function SubjectWizard({
           <CertsPanel subjectId={subjectId} certs={certs} onChanged={onChanged} />
         ) : (
           <div className="space-y-3">
-            <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground shadow-[var(--shadow-card)]">
+            <div className="rounded-xl border border-border bg-card p-2.5 text-[11px] leading-snug text-muted-foreground shadow-[var(--shadow-card)]">
               Assign staff and scope each one to the codes they're authorized for. Per-client training (Support strategies, Client-specific training, Person-Centered Thinking) unlocks after PCSP upload.
             </div>
             <AssignmentMapPanel jobId={jobId} subjects={subjects} assignments={assignments} onChanged={onChanged} />
@@ -659,43 +659,45 @@ function StepRail({
   steps, activeIdx, onJump,
 }: { steps: Array<{ id: string; label: string; badge?: number }>; activeIdx: number; onJump: (i: number) => void }) {
   return (
-    <ol className="flex flex-wrap items-center gap-1 rounded-2xl border border-border bg-card p-2 shadow-[var(--shadow-card)]">
+    <ol className="flex flex-nowrap items-center gap-0.5 overflow-x-auto rounded-xl border border-border bg-card px-1.5 py-1 shadow-[var(--shadow-card)] lg:flex-wrap lg:overflow-visible">
       {steps.map((s, i) => {
         const done = i < activeIdx;
         const active = i === activeIdx;
         const allowJump = i <= activeIdx + 1;
         return (
-          <li key={s.id} className="flex items-center">
+          <li key={s.id} className="flex shrink-0 items-center">
             <button
               type="button"
               onClick={() => allowJump && onJump(i)}
               disabled={!allowJump}
               className={[
-                "inline-flex min-h-[36px] items-center gap-2 rounded-full px-3 text-xs font-medium transition",
+                "inline-flex h-7 items-center gap-1.5 rounded-full px-2 text-[11px] font-medium transition",
                 active ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 ring-1 ring-amber-500/40" :
-                done ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15" :
+                done ? "text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10" :
                 "text-muted-foreground hover:bg-muted",
                 allowJump ? "cursor-pointer" : "cursor-not-allowed opacity-60",
               ].join(" ")}
+              title={s.label}
             >
               <span className={[
-                "inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold",
+                "inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-semibold",
                 done ? "bg-emerald-500 text-white" : active ? "bg-amber-500 text-white" : "bg-muted text-muted-foreground",
               ].join(" ")}>
-                {done ? <CheckCircle2 className="h-3 w-3" /> : i + 1}
+                {done ? <CheckCircle2 className="h-2.5 w-2.5" /> : i + 1}
               </span>
-              <span>{s.label}</span>
+              <span className="whitespace-nowrap">{s.label}</span>
               {s.badge ? (
-                <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-500/20 px-1 text-[10px] text-amber-700 dark:text-amber-400">{s.badge}</span>
+                <span className="inline-flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-amber-500/20 px-1 text-[9px] text-amber-700 dark:text-amber-400">{s.badge}</span>
               ) : null}
             </button>
-            {i < steps.length - 1 && <ChevronRight className="mx-0.5 h-3 w-3 text-muted-foreground/50" />}
+            {i < steps.length - 1 && <ChevronRight className="mx-0 h-3 w-3 shrink-0 text-muted-foreground/40" />}
           </li>
         );
       })}
     </ol>
   );
 }
+
 
 
 // ---------------------------- SubjectHeader ----------------------------
@@ -709,28 +711,30 @@ function SubjectHeader({ subject, onChanged, canMarkReady = true }: { subject: S
   const isReady = subject.review_status === "ready";
   const blocked = !isReady && !canMarkReady;
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-      <div>
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">{subject.subject_type}</div>
-        <div className="mt-0.5 text-lg font-semibold">{subject.display_name}</div>
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <Badge variant="outline" className="capitalize">{subject.match_status.replace("_", " ")}</Badge>
-          {subject.review_decision && <Badge variant="outline" className="capitalize">{subject.review_decision.replace("_", " ")}</Badge>}
-          <Badge variant="outline" className="capitalize">{subject.review_status.replace("_", " ")}</Badge>
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2 shadow-[var(--shadow-card)]">
+      <div className="min-w-0">
+        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{subject.subject_type}</div>
+        <div className="truncate text-base font-semibold">{subject.display_name}</div>
+        <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
+          <Badge variant="outline" className="capitalize text-[10px] px-1.5 py-0">{subject.match_status.replace("_", " ")}</Badge>
+          {subject.review_decision && <Badge variant="outline" className="capitalize text-[10px] px-1.5 py-0">{subject.review_decision.replace("_", " ")}</Badge>}
+          <Badge variant="outline" className="capitalize text-[10px] px-1.5 py-0">{subject.review_status.replace("_", " ")}</Badge>
         </div>
       </div>
       <Button
+        size="sm"
         variant={isReady ? "outline" : "default"}
         onClick={() => m.mutate(!isReady)}
         disabled={m.isPending || blocked}
         title={blocked ? "Resolve NECTAR validation issues below first" : undefined}
       >
         {m.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {isReady ? "Reopen" : <><CheckCircle2 className="mr-2 h-4 w-4" /> Mark ready</>}
+        {isReady ? "Reopen" : <><CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Mark ready</>}
       </Button>
     </div>
   );
 }
+
 
 // ---------------------------- Client field labels ----------------------------
 const CLIENT_FIELD_LABELS: Record<string, string> = {
@@ -1809,53 +1813,46 @@ function BillingCodesEditor({
   const approvedCount = unresolvedExternal.filter((p) => approvals[p.field.id]?.status === "approved").length;
 
   return (
-    <div id="billing-codes" className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
+    <div id="billing-codes" className="rounded-2xl border border-border bg-card p-3 md:p-4 shadow-[var(--shadow-card)]">
+      <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <div className="text-sm font-semibold">Billing codes on the PCSP</div>
-          <div className="text-xs text-muted-foreground">
-            The <span className="font-medium">Ownership</span> column shows whether each code is billed by <span className="font-medium">{orgLabel}</span> or by an outside provider (support coordinator, another agency).
-            Only codes marked "Ours" flow into your 520s. For an external code, either click <span className="font-medium">Not my organization</span> to leave it on the record without billing responsibility, or click <span className="font-medium">Request HIVE approval</span> to have HIVE Admin review it in your Inbox.
+          <div className="text-[11px] leading-snug text-muted-foreground">
+            Ownership shows who bills each code. Only <span className="font-medium">Ours</span> flows to your 520s.{" "}
+            <details className="inline">
+              <summary className="inline cursor-pointer text-primary underline underline-offset-2">Details</summary>
+              <span className="ml-1">
+                For an external code, click <span className="font-medium">Not my organization</span> to keep it on the record without billing responsibility, or <span className="font-medium">Request HIVE approval</span> to have HIVE Admin review it in your Inbox.
+              </span>
+            </details>
           </div>
         </div>
-        <Button size="sm" variant="outline" onClick={() => setAdding(true)} disabled={adding}>
+        <Button size="sm" variant="outline" className="h-7 shrink-0 px-2 text-xs" onClick={() => setAdding(true)} disabled={adding}>
           <Plus className="mr-1 h-3 w-3" /> Add code
         </Button>
       </div>
 
       {parsed.length === 0 && !adding && (
-        <div className="rounded-md border border-dashed border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+        <div className="rounded-md border border-dashed border-border bg-muted/30 p-2.5 text-xs text-muted-foreground">
           No billable codes were found in this document. Use "Add code" to enter them manually.
         </div>
       )}
 
       {(parsed.length > 0 || adding) && (
         <div className="overflow-x-auto rounded-md border border-border/60">
-          <table className="w-full table-fixed text-left text-xs">
-            <colgroup>
-              <col className="w-[64px]" />
-              <col className="w-[16%]" />
-              <col className="w-[170px]" />
-              <col className="w-[72px]" />
-              <col className="w-[72px]" />
-              <col className="w-[76px]" />
-              <col className="w-[68px]" />
-              <col className="w-[160px]" />
-              <col className="w-[80px]" />
-              <col className="w-[56px]" />
-            </colgroup>
+          <table className="w-full text-left text-[11px]">
             <thead className="text-muted-foreground">
               <tr className="border-b border-border">
-                <th className="py-2 px-1.5 font-medium">Code</th>
-                <th className="py-2 px-1.5 font-medium">Provider</th>
-                <th className="py-2 px-1.5 font-medium">Ownership / Approval</th>
-                <th className="py-2 px-1.5 font-medium">Unit</th>
-                <th className="py-2 px-1.5 font-medium">Rate</th>
-                <th className="py-2 px-1.5 font-medium">Annual</th>
-                <th className="py-2 px-1.5 font-medium">Mo. cap</th>
-                <th className="py-2 px-1.5 font-medium">Term</th>
-                <th className="py-2 px-1.5 font-medium">Status</th>
-                <th className="py-2 px-1.5" />
+                <th className="py-1.5 px-1.5 font-medium w-[56px]">Code</th>
+                <th className="py-1.5 px-1.5 font-medium">Provider</th>
+                <th className="py-1.5 px-1.5 font-medium w-[150px]">Ownership</th>
+                <th className="py-1.5 px-1.5 font-medium w-[70px]">Unit</th>
+                <th className="py-1.5 px-1.5 font-medium w-[64px]">Rate</th>
+                <th className="py-1.5 px-1.5 font-medium w-[68px]">Annual</th>
+                <th className="py-1.5 px-1.5 font-medium w-[56px]">Mo</th>
+                <th className="py-1.5 px-1.5 font-medium w-[150px]">Term</th>
+                <th className="py-1.5 px-1.5 font-medium w-[70px]">Status</th>
+                <th className="py-1.5 px-1.5 w-[36px]" />
               </tr>
             </thead>
             <tbody>
@@ -1893,22 +1890,20 @@ function BillingCodesEditor({
       )}
 
       {externalRows.length > 0 && (
-        <div className="mt-3 rounded-md border border-amber-300/60 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
-          <div className="mb-1 font-semibold">
-            {externalRows.length} code{externalRows.length === 1 ? "" : "s"} belong to an outside provider on the PCSP
-            <span className="ml-2 font-normal">
-              · {approvedCount} HIVE-approved, {pendingCount} awaiting HIVE review, {notOursCount} marked "not my organization"
-            </span>
+        <details className="mt-2 rounded-md border border-amber-300/60 bg-amber-50 p-2 text-[11px] text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+          <summary className="cursor-pointer font-semibold">
+            {externalRows.length} outside-provider code{externalRows.length === 1 ? "" : "s"} on this PCSP
+            <span className="ml-1 font-normal">· {approvedCount} approved · {pendingCount} awaiting HIVE · {notOursCount} not ours</span>
+          </summary>
+          <div className="mt-1.5">
+            Provider on {externalRows.length === 1 ? "this line" : "these lines"} does not match <span className="font-medium">{orgLabel}</span>. Use <span className="font-medium">Not my organization</span> or <span className="font-medium">Request HIVE approval</span>.
           </div>
-          <div className="mb-1">
-            The Provider on {externalRows.length === 1 ? "this line" : "these lines"} does not match <span className="font-medium">{orgLabel}</span>.
-            On each row, click <span className="font-medium">Not my organization</span> to leave it on the record without billing responsibility, or <span className="font-medium">Request HIVE approval</span> if you need to bill it yourself.
+          <div className="mt-1 font-mono text-[10px]">
+            {externalRows.map((p) => `${p.row.service_code} → ${p.row.provider_name ?? "unknown"}${p.row.ownership_ack === "not_ours" ? " (not ours)" : ""}`).join("  •  ")}
           </div>
-          <div className="mt-1 font-mono">
-            {externalRows.map((p) => `${p.row.service_code} → ${p.row.provider_name ?? "unknown provider"}${p.row.ownership_ack === "not_ours" ? " (not ours)" : ""}`).join("  •  ")}
-          </div>
-        </div>
+        </details>
       )}
+
 
       {dialog && orgId && (
         <ApprovalDialog
@@ -2000,29 +1995,29 @@ function BillingRowEditor({
 
   return (
     <tr className="border-b border-border/60 align-middle">
-      <td className="py-1.5 px-1.5">
+      <td className="py-1 px-1.5">
         {isNew ? (
           <Select value={row.service_code} onValueChange={(v) => patch("service_code", v)}>
-            <SelectTrigger className="h-8 w-full px-1.5"><SelectValue placeholder="—" /></SelectTrigger>
+            <SelectTrigger className="h-7 w-full px-1.5 text-[11px]"><SelectValue placeholder="—" /></SelectTrigger>
             <SelectContent>
               {allCodes.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
         ) : (
-          <Badge variant="outline" className="font-mono">{row.service_code}</Badge>
+          <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0">{row.service_code}</Badge>
         )}
       </td>
-      <td className="py-1.5 px-1.5">
-        <Input className="h-8 w-full px-2" value={row.provider_name ?? ""} onChange={(e) => patch("provider_name", e.target.value || null)} />
+      <td className="py-1 px-1.5">
+        <Input className="h-7 w-full px-1.5 text-[11px]" value={row.provider_name ?? ""} onChange={(e) => patch("provider_name", e.target.value || null)} />
       </td>
-      <td className="py-1.5 px-1.5">
+      <td className="py-1 px-1.5">
         {(() => {
           const own = providerOwnership(row.provider_name, tenant);
           if (own === "ours") {
-            return <Badge variant="outline" className="whitespace-nowrap border-emerald-500/60 text-emerald-600">Ours</Badge>;
+            return <Badge variant="outline" className="whitespace-nowrap border-emerald-500/60 text-emerald-600 text-[10px] px-1.5 py-0">Ours</Badge>;
           }
           if (own === "unknown") {
-            return <Badge variant="outline" className="whitespace-nowrap text-muted-foreground">Unspecified</Badge>;
+            return <Badge variant="outline" className="whitespace-nowrap text-muted-foreground text-[10px] px-1.5 py-0">Unspecified</Badge>;
           }
           // Admin already acknowledged this external code is not ours.
           // Row stays visible for the record; no HIVE approval required.
@@ -2043,11 +2038,11 @@ function BillingRowEditor({
               } } }).then(() => { toast.success("Undone"); onChanged(); }).catch((e: Error) => toast.error(e.message));
             };
             return (
-              <div className="flex flex-col gap-1">
-                <Badge variant="outline" className="whitespace-nowrap border-slate-400/60 text-slate-600 dark:text-slate-300">
+              <div className="flex flex-col gap-0.5">
+                <Badge variant="outline" className="whitespace-nowrap border-slate-400/60 text-slate-600 dark:text-slate-300 text-[10px] px-1.5 py-0">
                   Not our organization
                 </Badge>
-                <span className="text-[10px] text-muted-foreground">Kept for the record. Not billed by you.</span>
+                <span className="text-[9px] text-muted-foreground leading-tight">Kept for record.</span>
                 <button type="button" className="text-[10px] text-primary underline underline-offset-2 text-left" onClick={clearAck}>
                   Undo
                 </button>
@@ -2078,19 +2073,19 @@ function BillingRowEditor({
             statusEl = null;
             btnLabel = "Request HIVE approval";
           } else if (ar.status === "pending") {
-            statusEl = <Badge variant="outline" className="whitespace-nowrap border-amber-500/60 text-amber-700 dark:text-amber-300">Awaiting HIVE</Badge>;
+            statusEl = <Badge variant="outline" className="whitespace-nowrap border-amber-500/60 text-amber-700 dark:text-amber-300 text-[10px] px-1.5 py-0">Awaiting HIVE</Badge>;
             btnLabel = "View thread";
           } else if (ar.status === "approved") {
-            statusEl = <Badge variant="outline" className="whitespace-nowrap border-emerald-500/60 text-emerald-700 dark:text-emerald-300"><ShieldCheck className="mr-1 h-3 w-3" />HIVE approved</Badge>;
+            statusEl = <Badge variant="outline" className="whitespace-nowrap border-emerald-500/60 text-emerald-700 dark:text-emerald-300 text-[10px] px-1.5 py-0"><ShieldCheck className="mr-1 h-2.5 w-2.5" />HIVE approved</Badge>;
             btnLabel = "View thread";
           } else {
-            statusEl = <Badge variant="outline" className="whitespace-nowrap border-destructive/60 text-destructive">Denied</Badge>;
+            statusEl = <Badge variant="outline" className="whitespace-nowrap border-destructive/60 text-destructive text-[10px] px-1.5 py-0">Denied</Badge>;
             btnLabel = "View thread";
           }
           return (
-            <div className="flex flex-col gap-1">
-              <Badge variant="outline" className="whitespace-nowrap border-amber-500/60 text-amber-700 dark:text-amber-300">
-                <AlertTriangle className="mr-1 h-3 w-3" /> External
+            <div className="flex flex-col gap-0.5">
+              <Badge variant="outline" className="whitespace-nowrap border-amber-500/60 text-amber-700 dark:text-amber-300 text-[10px] px-1.5 py-0">
+                <AlertTriangle className="mr-1 h-2.5 w-2.5" /> External
               </Badge>
               {statusEl}
               {fieldId && (!ar || ar.status === "withdrawn") && (
@@ -2100,7 +2095,7 @@ function BillingRowEditor({
                   onClick={markNotOurs}
                   title="Keep this code on the record but confirm this org is not responsible for billing it"
                 >
-                  Not my organization
+                  Not my org
                 </button>
               )}
               {fieldId && (
@@ -2122,51 +2117,51 @@ function BillingRowEditor({
           );
         })()}
       </td>
-      <td className="py-1.5 px-1.5">
+      <td className="py-1 px-1.5">
         <Select value={row.unit_type ?? ""} onValueChange={(v) => patch("unit_type", v)}>
-          <SelectTrigger className="h-8 w-full px-1.5"><SelectValue placeholder="—" /></SelectTrigger>
+          <SelectTrigger className="h-7 w-full px-1.5 text-[11px]"><SelectValue placeholder="—" /></SelectTrigger>
           <SelectContent>
             {UNIT_TYPE_OPTIONS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
           </SelectContent>
         </Select>
       </td>
-      <td className="py-1.5 px-1.5">
-        <Input className="h-8 w-full px-1.5" inputMode="decimal" value={row.rate ?? ""} onChange={(e) => patch("rate", numOrNull(e.target.value))} />
+      <td className="py-1 px-1.5">
+        <Input className="h-7 w-full px-1.5 text-[11px] text-right" inputMode="decimal" value={row.rate ?? ""} onChange={(e) => patch("rate", numOrNull(e.target.value))} />
       </td>
-      <td className="py-1.5 px-1.5">
-        <Input className="h-8 w-full px-1.5" inputMode="numeric" value={row.max_units ?? ""} onChange={(e) => patch("max_units", numOrNull(e.target.value))} />
+      <td className="py-1 px-1.5">
+        <Input className="h-7 w-full px-1.5 text-[11px] text-right" inputMode="numeric" value={row.max_units ?? ""} onChange={(e) => patch("max_units", numOrNull(e.target.value))} />
       </td>
-      <td className="py-1.5 px-1.5">
-        <Input className="h-8 w-full px-1.5" inputMode="numeric" value={row.monthly_max_units ?? ""} onChange={(e) => patch("monthly_max_units", numOrNull(e.target.value))} />
+      <td className="py-1 px-1.5">
+        <Input className="h-7 w-full px-1.5 text-[11px] text-right" inputMode="numeric" value={row.monthly_max_units ?? ""} onChange={(e) => patch("monthly_max_units", numOrNull(e.target.value))} />
       </td>
-      <td className="py-1.5 px-1.5">
-        <div className="flex items-center gap-1">
-          <Input className="h-8 w-full px-1.5" type="date" value={row.plan_start ?? ""} onChange={(e) => patch("plan_start", e.target.value || null)} title="Start" />
-          <span className="text-muted-foreground">–</span>
-          <Input className="h-8 w-full px-1.5" type="date" value={row.plan_end ?? ""} onChange={(e) => patch("plan_end", e.target.value || null)} title="End" />
+      <td className="py-1 px-1.5">
+        <div className="flex items-center gap-0.5">
+          <Input className="h-7 w-full px-1 text-[10px]" type="date" value={row.plan_start ?? ""} onChange={(e) => patch("plan_start", e.target.value || null)} title="Start" />
+          <span className="text-muted-foreground text-[10px]">–</span>
+          <Input className="h-7 w-full px-1 text-[10px]" type="date" value={row.plan_end ?? ""} onChange={(e) => patch("plan_end", e.target.value || null)} title="End" />
         </div>
       </td>
-      <td className="py-1.5 px-1.5">
+      <td className="py-1 px-1.5">
         {pending ? (
-          <Badge variant="outline" className="whitespace-nowrap text-amber-600">
-            <AlertTriangle className="mr-1 h-3 w-3" /> pending
+          <Badge variant="outline" className="whitespace-nowrap text-amber-600 text-[10px] px-1.5 py-0">
+            <AlertTriangle className="mr-1 h-2.5 w-2.5" /> pending
           </Badge>
         ) : (
-          <Badge variant="outline" className="text-emerald-600">ready</Badge>
+          <Badge variant="outline" className="text-emerald-600 text-[10px] px-1.5 py-0">ready</Badge>
         )}
       </td>
-      <td className="py-1.5 pr-0">
-        <div className="flex items-center justify-end gap-1">
+      <td className="py-1 pr-0">
+        <div className="flex items-center justify-end gap-0.5">
           {dirty && (
-            <Button size="sm" className="h-7" onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !row.service_code}>
+            <Button size="sm" className="h-6 px-2 text-[10px]" onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !row.service_code}>
               {saveMut.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Save
             </Button>
           )}
           {isNew && onCancel && (
-            <Button size="sm" variant="ghost" className="h-7" onClick={onCancel}>Cancel</Button>
+            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" onClick={onCancel}>Cancel</Button>
           )}
           {!isNew && fieldId && (
-            <Button size="sm" variant="ghost" className="h-7 text-destructive" onClick={() => removeMut.mutate()} disabled={removeMut.isPending}>
+            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive" onClick={() => removeMut.mutate()} disabled={removeMut.isPending}>
               <Trash2 className="h-3 w-3" />
             </Button>
           )}
@@ -2175,6 +2170,7 @@ function BillingRowEditor({
     </tr>
   );
 }
+
 
 function FieldRowEditor({
   field, targetFields, matchedValue, showDiff, onChanged,

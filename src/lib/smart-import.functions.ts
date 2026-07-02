@@ -32,7 +32,10 @@ const RecordDocInput = z.object({
   file_size: z.number().int().nonnegative().optional(),
   storage_path: z.string().min(1).max(500),
   checksum: z.string().max(128).optional(),
+  client_key: z.string().max(120).optional().nullable(),
+  client_label: z.string().max(200).optional().nullable(),
 });
+
 
 const RosterRow = z.record(z.string(), z.string());
 const ExtractInput = z.object({

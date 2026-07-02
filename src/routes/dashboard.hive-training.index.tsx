@@ -22,6 +22,7 @@ import { z } from "zod";
 const searchSchema = z.object({
   checkout: z.enum(["success", "cancelled"]).optional(),
   session_id: z.string().optional(),
+  card: z.enum(["saved", "cancelled"]).optional(),
 }).partial();
 
 export const Route = createFileRoute("/dashboard/hive-training/")({

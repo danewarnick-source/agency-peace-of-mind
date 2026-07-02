@@ -144,12 +144,10 @@ export const createHhpCueCard = createServerFn({ method: "POST" })
   .inputValidator((d) => createInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    await requirePermission(
-      supabase,
-      userId,
-      data.organization_id,
+    await requireAnyPermission(supabase, userId, data.organization_id, [
       "manage_referrals",
-    );
+      "manage_users",
+    ]);
     const { data: row, error } = await supabase
       .from("hhp_cue_cards")
       .insert({

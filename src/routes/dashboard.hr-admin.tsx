@@ -25,7 +25,9 @@ import {
 import { RequirePermission } from "@/components/rbac-guard";
 import { HrComplianceMatrix } from "@/components/hr/hr-compliance-matrix";
 import { OtherAssignmentsRollup } from "@/components/training/other-assignments-rollup";
-import { Settings as SettingsIcon } from "lucide-react";
+import { Settings as SettingsIcon, Banknote } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EmployeeLoansPanel } from "@/components/employee-loans/EmployeeLoansPanel";
 
 export const Route = createFileRoute("/dashboard/hr-admin")({
   head: () => ({ meta: [{ title: "HR Admin — HIVE" }] }),
@@ -98,6 +100,14 @@ export function HrAdminPage() {
           </Link>
         </Button>
       </div>
+
+      <Tabs defaultValue="compliance">
+        <TabsList>
+          <TabsTrigger value="compliance">Compliance & training</TabsTrigger>
+          <TabsTrigger value="loans"><Banknote className="mr-1 h-3.5 w-3.5" /> Employee Loans</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="compliance" className="space-y-6 pt-4">
 
       {/* NECTAR gaps / renewals bar */}
       <Card className="border-amber-200/60 bg-amber-50/40 dark:bg-amber-900/10">
@@ -329,6 +339,12 @@ export function HrAdminPage() {
         complete is always a one-click human attestation — NECTAR pre-fills but
         never auto-confirms.
       </p>
+        </TabsContent>
+
+        <TabsContent value="loans" className="pt-4">
+          {orgId && <EmployeeLoansPanel organizationId={orgId} lenderName={org?.organization_name ?? "Employer"} />}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

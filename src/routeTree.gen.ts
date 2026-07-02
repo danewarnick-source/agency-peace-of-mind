@@ -91,6 +91,7 @@ import { Route as DashboardEmployeesIndexRouteImport } from './routes/dashboard.
 import { Route as DashboardCoursesIndexRouteImport } from './routes/dashboard.courses.index'
 import { Route as DashboardClientsIndexRouteImport } from './routes/dashboard.clients.index'
 import { Route as DashboardBillingIndexRouteImport } from './routes/dashboard.billing.index'
+import { Route as SignEmployeeLoanTokenRouteImport } from './routes/sign.employee-loan.$token'
 import { Route as DashboardWorkspaceClientIdRouteImport } from './routes/dashboard.workspace.$clientId'
 import { Route as DashboardTrainingIdRouteImport } from './routes/dashboard.training.$id'
 import { Route as DashboardTracksTrackSlugRouteImport } from './routes/dashboard.tracks.$trackSlug'
@@ -598,6 +599,11 @@ const DashboardBillingIndexRoute = DashboardBillingIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => DashboardBillingRoute,
+} as any)
+const SignEmployeeLoanTokenRoute = SignEmployeeLoanTokenRouteImport.update({
+  id: '/sign/employee-loan/$token',
+  path: '/sign/employee-loan/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardWorkspaceClientIdRoute =
   DashboardWorkspaceClientIdRouteImport.update({
@@ -1244,6 +1250,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
+  '/sign/employee-loan/$token': typeof SignEmployeeLoanTokenRoute
   '/dashboard/billing/': typeof DashboardBillingIndexRoute
   '/dashboard/clients/': typeof DashboardClientsIndexRoute
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
@@ -1409,6 +1416,7 @@ export interface FileRoutesByTo {
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
+  '/sign/employee-loan/$token': typeof SignEmployeeLoanTokenRoute
   '/dashboard/billing': typeof DashboardBillingIndexRoute
   '/dashboard/clients': typeof DashboardClientsIndexRoute
   '/dashboard/courses': typeof DashboardCoursesIndexRoute
@@ -1582,6 +1590,7 @@ export interface FileRoutesById {
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
+  '/sign/employee-loan/$token': typeof SignEmployeeLoanTokenRoute
   '/dashboard/billing/': typeof DashboardBillingIndexRoute
   '/dashboard/clients/': typeof DashboardClientsIndexRoute
   '/dashboard/courses/': typeof DashboardCoursesIndexRoute
@@ -1756,6 +1765,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/workspace/$clientId'
+    | '/sign/employee-loan/$token'
     | '/dashboard/billing/'
     | '/dashboard/clients/'
     | '/dashboard/courses/'
@@ -1921,6 +1931,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/workspace/$clientId'
+    | '/sign/employee-loan/$token'
     | '/dashboard/billing'
     | '/dashboard/clients'
     | '/dashboard/courses'
@@ -2093,6 +2104,7 @@ export interface FileRouteTypes {
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
     | '/dashboard/workspace/$clientId'
+    | '/sign/employee-loan/$token'
     | '/dashboard/billing/'
     | '/dashboard/clients/'
     | '/dashboard/courses/'
@@ -2139,6 +2151,7 @@ export interface RootRouteChildren {
   UnauthorizedRoute: typeof UnauthorizedRoute
   CertificateCodeRoute: typeof CertificateCodeRoute
   VerifyCodeRoute: typeof VerifyCodeRoute
+  SignEmployeeLoanTokenRoute: typeof SignEmployeeLoanTokenRoute
   ApiPublicHooksBillingDailyCheckRoute: typeof ApiPublicHooksBillingDailyCheckRoute
   ApiPublicHooksGmailIngestRoute: typeof ApiPublicHooksGmailIngestRoute
   ApiPublicHooksNectarSchedulesRoute: typeof ApiPublicHooksNectarSchedulesRoute
@@ -2722,6 +2735,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/billing/'
       preLoaderRoute: typeof DashboardBillingIndexRouteImport
       parentRoute: typeof DashboardBillingRoute
+    }
+    '/sign/employee-loan/$token': {
+      id: '/sign/employee-loan/$token'
+      path: '/sign/employee-loan/$token'
+      fullPath: '/sign/employee-loan/$token'
+      preLoaderRoute: typeof SignEmployeeLoanTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/dashboard/workspace/$clientId': {
       id: '/dashboard/workspace/$clientId'
@@ -3806,6 +3826,7 @@ const rootRouteChildren: RootRouteChildren = {
   UnauthorizedRoute: UnauthorizedRoute,
   CertificateCodeRoute: CertificateCodeRoute,
   VerifyCodeRoute: VerifyCodeRoute,
+  SignEmployeeLoanTokenRoute: SignEmployeeLoanTokenRoute,
   ApiPublicHooksBillingDailyCheckRoute: ApiPublicHooksBillingDailyCheckRoute,
   ApiPublicHooksGmailIngestRoute: ApiPublicHooksGmailIngestRoute,
   ApiPublicHooksNectarSchedulesRoute: ApiPublicHooksNectarSchedulesRoute,
@@ -3817,13 +3838,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

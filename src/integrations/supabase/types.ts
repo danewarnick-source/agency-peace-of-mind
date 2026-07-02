@@ -4275,6 +4275,299 @@ export type Database = {
           },
         ]
       }
+      employee_loan_entries: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          entry_date: string
+          id: string
+          kind: string
+          loan_id: string
+          note: string | null
+          organization_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          entry_date: string
+          id?: string
+          kind: string
+          loan_id: string
+          note?: string | null
+          organization_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          id?: string
+          kind?: string
+          loan_id?: string
+          note?: string | null
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_loan_entries_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "employee_loans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_loan_entries_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_loan_signature_tokens: {
+        Row: {
+          agreement_snapshot: Json
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          loan_id: string
+          organization_id: string
+          signer_email: string
+          signer_name: string
+          token_hash: string
+          used_at: string | null
+        }
+        Insert: {
+          agreement_snapshot: Json
+          created_at?: string
+          created_by?: string | null
+          expires_at: string
+          id?: string
+          loan_id: string
+          organization_id: string
+          signer_email: string
+          signer_name: string
+          token_hash: string
+          used_at?: string | null
+        }
+        Update: {
+          agreement_snapshot?: Json
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          loan_id?: string
+          organization_id?: string
+          signer_email?: string
+          signer_name?: string
+          token_hash?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_loan_signature_tokens_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "employee_loans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_loan_signature_tokens_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_loan_signatures: {
+        Row: {
+          agreement_sha256: string
+          agreement_snapshot: Json
+          id: string
+          loan_id: string
+          organization_id: string
+          signature_image: string
+          signature_method: string
+          signed_at: string
+          signer_email: string | null
+          signer_ip: string | null
+          signer_name: string
+          signer_type: string
+          signer_user_agent: string | null
+          token_id: string | null
+        }
+        Insert: {
+          agreement_sha256: string
+          agreement_snapshot: Json
+          id?: string
+          loan_id: string
+          organization_id: string
+          signature_image: string
+          signature_method: string
+          signed_at?: string
+          signer_email?: string | null
+          signer_ip?: string | null
+          signer_name: string
+          signer_type: string
+          signer_user_agent?: string | null
+          token_id?: string | null
+        }
+        Update: {
+          agreement_sha256?: string
+          agreement_snapshot?: Json
+          id?: string
+          loan_id?: string
+          organization_id?: string
+          signature_image?: string
+          signature_method?: string
+          signed_at?: string
+          signer_email?: string | null
+          signer_ip?: string | null
+          signer_name?: string
+          signer_type?: string
+          signer_user_agent?: string | null
+          token_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_loan_signatures_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "employee_loans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_loan_signatures_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_loan_signatures_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "employee_loan_signature_tokens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_loans: {
+        Row: {
+          advance_amount: number | null
+          advance_cadence: string | null
+          agreement_date: string
+          borrower_email: string | null
+          borrower_name: string
+          created_at: string
+          created_by: string | null
+          direct_payment_amount: number | null
+          direct_payment_cadence: string | null
+          direct_payment_description: string | null
+          direct_payment_due_day: string | null
+          direct_payment_start_date: string | null
+          id: string
+          interest_notes: string | null
+          interest_rate: number
+          lender_name: string
+          maturity_date: string | null
+          notes: string | null
+          organization_id: string
+          purpose: string | null
+          repayment_conditions: Json
+          repayment_method: string | null
+          signature_parties: Json
+          staff_id: string
+          status: string
+          updated_at: string
+          voluntary_ack: boolean
+        }
+        Insert: {
+          advance_amount?: number | null
+          advance_cadence?: string | null
+          agreement_date: string
+          borrower_email?: string | null
+          borrower_name: string
+          created_at?: string
+          created_by?: string | null
+          direct_payment_amount?: number | null
+          direct_payment_cadence?: string | null
+          direct_payment_description?: string | null
+          direct_payment_due_day?: string | null
+          direct_payment_start_date?: string | null
+          id?: string
+          interest_notes?: string | null
+          interest_rate?: number
+          lender_name: string
+          maturity_date?: string | null
+          notes?: string | null
+          organization_id: string
+          purpose?: string | null
+          repayment_conditions?: Json
+          repayment_method?: string | null
+          signature_parties?: Json
+          staff_id: string
+          status?: string
+          updated_at?: string
+          voluntary_ack?: boolean
+        }
+        Update: {
+          advance_amount?: number | null
+          advance_cadence?: string | null
+          agreement_date?: string
+          borrower_email?: string | null
+          borrower_name?: string
+          created_at?: string
+          created_by?: string | null
+          direct_payment_amount?: number | null
+          direct_payment_cadence?: string | null
+          direct_payment_description?: string | null
+          direct_payment_due_day?: string | null
+          direct_payment_start_date?: string | null
+          id?: string
+          interest_notes?: string | null
+          interest_rate?: number
+          lender_name?: string
+          maturity_date?: string | null
+          notes?: string | null
+          organization_id?: string
+          purpose?: string | null
+          repayment_conditions?: Json
+          repayment_method?: string | null
+          signature_parties?: Json
+          staff_id?: string
+          status?: string
+          updated_at?: string
+          voluntary_ack?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_loans_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_loans_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_loans_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       evv_export_batches: {
         Row: {
           archived_at: string | null

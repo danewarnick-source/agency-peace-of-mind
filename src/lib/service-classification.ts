@@ -104,8 +104,21 @@ export function classifyExtractedService(args: {
     return { bucket: "ours", confident: true, reason: "Provider on PCSP matches this org." };
   }
 
-  // Provider is named AND is not us → another provider.
+  // Provider is named AND is not us.
   if (provider) {
+    // If the tenant hasn't configured any aliases or awarded codes, we can't
+    // reliably tell whether the provider on the PCSP is the tenant spelled
+    // differently (e.g. "TRUE NORTH SUPPORTS LLC" vs display name "TNS").
+    // Refuse to route to another provider silently — mark unconfident so the
+    // review UI forces the admin to confirm.
+    const tenantConfigured = !!args.tenant.hasAliases || !!args.tenant.hasCodesHeld;
+    if (!tenantConfigured) {
+      return {
+        bucket: "other_provider",
+        confident: false,
+        reason: `Provider "${provider}" doesn't match this org's name. Add it as an alias or confirm ownership before billing.`,
+      };
+    }
     return {
       bucket: "other_provider",
       confident: true,

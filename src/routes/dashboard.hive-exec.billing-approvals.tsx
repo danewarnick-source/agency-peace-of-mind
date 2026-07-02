@@ -106,6 +106,7 @@ function BillingApprovalsPage() {
           onOpenChange={(o) => { if (!o) { setOpenId(null); setOpenOrgId(null); } }}
           organizationId={openOrgId}
           requestId={openId}
+          allowResolution
         />
       )}
     </div>

@@ -54,6 +54,10 @@ export interface ApprovalDialogProps {
   subjectId?: string | null;
   extractedFieldId?: string | null;
   onCreated?: (requestId: string) => void;
+  // Only true from the HIVE Executive route. Gates Approve/Deny + signature UI
+  // so provider-side surfaces (Inbox, Smart Import) never show them, even for
+  // users who also hold the HIVE Executive role.
+  allowResolution?: boolean;
 }
 
 function statusBadge(status: ApprovalRequestRow["status"]) {
@@ -86,6 +90,7 @@ export function ApprovalDialog(props: ApprovalDialogProps) {
           <ThreadView
             requestId={activeRequestId}
             onClose={() => onOpenChange(false)}
+            allowResolution={props.allowResolution ?? false}
           />
         ) : (
           <NewRequestForm
@@ -184,7 +189,7 @@ function NewRequestForm({
   );
 }
 
-function ThreadView({ requestId, onClose }: { requestId: string; onClose: () => void }) {
+function ThreadView({ requestId, onClose, allowResolution }: { requestId: string; onClose: () => void; allowResolution: boolean }) {
   const getThread = useServerFn(getApprovalThread);
   const post = useServerFn(postApprovalMessage);
   const markRead = useServerFn(markApprovalThreadRead);
@@ -251,6 +256,7 @@ function ThreadView({ requestId, onClose }: { requestId: string; onClose: () => 
   const messages = q.data?.messages ?? [];
   const isPending = request?.status === "pending";
   const isHiveViewer = viewer === "hive_admin";
+  const canResolve = isHiveViewer && allowResolution;
 
   return (
     <>
@@ -304,11 +310,14 @@ function ThreadView({ requestId, onClose }: { requestId: string; onClose: () => 
             rows={3}
             value={reply}
             onChange={(e) => setReply(e.target.value)}
-            placeholder={isHiveViewer
+            placeholder={canResolve
               ? "Reply to the provider, or click Approve / Deny to sign and resolve the ticket."
-              : "Reply to HIVE Admin…"}
+              : isHiveViewer
+                ? "Reply to the provider…"
+                : "Reply to HIVE Admin…"}
           />
           <div className="flex flex-wrap items-center justify-end gap-2">
+
             {!isHiveViewer && viewer === "provider" && (
               <Button variant="ghost" size="sm" onClick={() => withdrawM.mutate()} disabled={withdrawM.isPending}>
                 Withdraw request
@@ -323,7 +332,7 @@ function ThreadView({ requestId, onClose }: { requestId: string; onClose: () => 
               {postM.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
               Send reply
             </Button>
-            {isHiveViewer && (
+            {canResolve && (
               <>
                 <Button
                   size="sm"
@@ -348,7 +357,7 @@ function ThreadView({ requestId, onClose }: { requestId: string; onClose: () => 
         </div>
       )}
 
-      {isPending && signMode !== null && isHiveViewer && (
+      {isPending && signMode !== null && canResolve && (
         <div className="mt-3 space-y-3 rounded-md border border-primary/30 bg-primary/5 p-3">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <PenLine className="h-4 w-4" />

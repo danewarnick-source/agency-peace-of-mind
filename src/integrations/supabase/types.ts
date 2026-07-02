@@ -6995,6 +6995,39 @@ export type Database = {
           },
         ]
       }
+      hive_training_renewal_intents: {
+        Row: {
+          catalog_id: string
+          consumed_at: string | null
+          course_id: string
+          created_at: string
+          id: string
+          organization_id: string
+          stripe_session_id: string
+          user_id: string
+        }
+        Insert: {
+          catalog_id: string
+          consumed_at?: string | null
+          course_id: string
+          created_at?: string
+          id?: string
+          organization_id: string
+          stripe_session_id: string
+          user_id: string
+        }
+        Update: {
+          catalog_id?: string
+          consumed_at?: string | null
+          course_id?: string
+          created_at?: string
+          id?: string
+          organization_id?: string
+          stripe_session_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       hive_training_seats: {
         Row: {
           assigned_at: string | null

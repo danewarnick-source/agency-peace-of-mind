@@ -354,11 +354,14 @@ function AdminView({ orgId }: { orgId: string }) {
         catalog={catalog ?? []}
       />
 
-      <Storefront
-        catalog={catalog ?? []}
-        members={members ?? []}
-        onPurchased={() => qc.invalidateQueries({ queryKey: ["ht-org-seats", orgId] })}
-      />
+      <div id="ht-storefront">
+        <Storefront
+          catalog={catalog ?? []}
+          members={members ?? []}
+          onPurchased={() => qc.invalidateQueries({ queryKey: ["ht-org-seats", orgId] })}
+        />
+      </div>
+
 
       <RosterSection
         orgId={orgId}

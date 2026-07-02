@@ -234,9 +234,8 @@ function CTA({ variant = "primary" }: { variant?: "primary" | "outline" }) {
   const primary = "text-white shadow-lg hover:brightness-110";
   const outline = "border border-[color:var(--training-navy)]/20 hover:bg-[color:var(--surface-2)]";
   return (
-    <Link
-      to="/signup"
-      search={{ flow: "training" } as unknown as never}
+    <a
+      href="/signup?flow=training"
       className={`${base} ${variant === "primary" ? primary : outline}`}
       style={
         variant === "primary"
@@ -245,6 +244,6 @@ function CTA({ variant = "primary" }: { variant?: "primary" | "outline" }) {
       }
     >
       Sign up <ArrowRight className="h-4 w-4" />
-    </Link>
+    </a>
   );
 }

@@ -7,7 +7,6 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { getOrgEmailSettings, updateOrgEmailSettings, sendEmail } from "@/lib/email.functions";
 
 export const Route = createFileRoute("/dashboard/settings/email")({
@@ -21,9 +20,8 @@ function EmailSettingsPage() {
   const sendFn = useServerFn(sendEmail);
 
   const [fromName, setFromName] = useState("");
-  const [fromAddress, setFromAddress] = useState("");
   const [replyTo, setReplyTo] = useState("");
-  const [verified, setVerified] = useState(false);
+  const [hiveFromAddress, setHiveFromAddress] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [testTo, setTestTo] = useState("");
@@ -36,12 +34,12 @@ function EmailSettingsPage() {
     if (!org) return;
     (async () => {
       try {
-        const row = await getFn({ data: { organization_id: org.organization_id } });
+        const res = await getFn({ data: { organization_id: org.organization_id } });
+        setHiveFromAddress(res.hive_managed_from_address);
+        const row = res.settings;
         if (row) {
           setFromName(row.from_name ?? "");
-          setFromAddress(row.from_address ?? "");
           setReplyTo(row.reply_to ?? "");
-          setVerified(!!row.verified);
         }
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Failed to load settings");
@@ -51,23 +49,29 @@ function EmailSettingsPage() {
     })();
   }, [org, getFn]);
 
+  const previewDisplayName =
+    fromName.trim() || org?.organization_name || "HIVE Notifications";
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!org) return;
+    if (!replyTo.trim()) {
+      toast.error("Enter a reply-to address so recipients can reply to your organization.");
+      return;
+    }
     setBusy(true);
     try {
       await saveFn({
         data: {
           organization_id: org.organization_id,
-          from_name: fromName.trim(),
-          from_address: fromAddress.trim(),
-          reply_to: replyTo.trim() || null,
-          verified,
+          send_mode: "hive_managed",
+          from_name: fromName.trim() || null,
+          reply_to: replyTo.trim(),
         },
       });
       toast.success("Email settings saved");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Save failed");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Save failed");
     } finally {
       setBusy(false);
     }
@@ -109,11 +113,30 @@ function EmailSettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <Link to="/dashboard/settings" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+      <Link
+        to="/dashboard/settings"
+        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+      >
         <ArrowLeft className="h-4 w-4" /> Back to Settings
       </Link>
 
-      <form onSubmit={save} className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+      <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 text-sm">
+        <div className="flex items-start gap-3">
+          <ShieldCheck className="mt-0.5 h-5 w-5 text-primary" />
+          <div>
+            <div className="font-semibold">HIVE-managed sending is on</div>
+            <div className="text-muted-foreground">
+              Emails send immediately from HIVE's shared sender — no DNS setup needed.
+              Sending from your own domain is coming later.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <form
+        onSubmit={save}
+        className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
+      >
         <div className="flex items-start gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary">
             <Mail className="h-5 w-5" />
@@ -121,40 +144,61 @@ function EmailSettingsPage() {
           <div>
             <h1 className="text-lg font-semibold">Organization email sender</h1>
             <p className="text-sm text-muted-foreground">
-              Every email HIVE sends (referral follow-ups, notifications) uses this sender.
-              Verify a sending domain in Resend (DNS records), then mark verified below.
+              Every email HIVE sends for {org.organization_name} (loan signatures,
+              notifications, referral follow-ups) uses these settings.
             </p>
           </div>
         </div>
 
         <div className="mt-6 grid gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="from_name">From name</Label>
-            <Input id="from_name" value={fromName} onChange={(e) => setFromName(e.target.value)} placeholder="True North Supports" disabled={!loaded} required />
+            <Label htmlFor="reply_to">
+              Reply-to address <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="reply_to"
+              type="email"
+              value={replyTo}
+              onChange={(e) => setReplyTo(e.target.value)}
+              placeholder="admin@yourdomain.com"
+              disabled={!loaded}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              When recipients hit "Reply", their email will go to this address.
+              Use a mailbox someone actually reads.
+            </p>
           </div>
+
           <div className="grid gap-2">
-            <Label htmlFor="from_address">From address</Label>
-            <Input id="from_address" type="email" value={fromAddress} onChange={(e) => setFromAddress(e.target.value)} placeholder="no-reply@tnsutah.com" disabled={!loaded} required />
-            <p className="text-xs text-muted-foreground">Must live on a domain you've verified in Resend.</p>
+            <Label htmlFor="from_name">From display name (optional)</Label>
+            <Input
+              id="from_name"
+              value={fromName}
+              onChange={(e) => setFromName(e.target.value)}
+              placeholder={org.organization_name}
+              disabled={!loaded}
+            />
+            <p className="text-xs text-muted-foreground">
+              Defaults to your organization name.
+            </p>
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="reply_to">Reply-to (optional)</Label>
-            <Input id="reply_to" type="email" value={replyTo} onChange={(e) => setReplyTo(e.target.value)} placeholder="admin@tnsutah.com" disabled={!loaded} />
-          </div>
-          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-4">
-            <div className="flex items-start gap-3">
-              <ShieldCheck className="mt-0.5 h-5 w-5 text-primary" />
-              <div>
-                <div className="text-sm font-semibold">Sender verified in Resend</div>
-                <div className="text-xs text-muted-foreground">
-                  Turn this on AFTER your DNS records are confirmed in the Resend dashboard.
-                  Sends are refused until this is on.
-                </div>
-              </div>
+
+          <div className="rounded-lg border border-border bg-muted/30 p-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Inbox preview
             </div>
-            <Switch checked={verified} onCheckedChange={setVerified} disabled={!loaded} />
+            <div className="mt-1 font-mono text-sm">
+              {previewDisplayName} &lt;{hiveFromAddress || "onboarding@resend.dev"}&gt;
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Reply-to: <span className="font-mono">{replyTo.trim() || "(none set)"}</span>
+            </div>
           </div>
-          <Button type="submit" disabled={!loaded || busy}>{busy ? "Saving…" : "Save settings"}</Button>
+
+          <Button type="submit" disabled={!loaded || busy}>
+            {busy ? "Saving…" : "Save settings"}
+          </Button>
         </div>
       </form>
 
@@ -166,11 +210,21 @@ function EmailSettingsPage() {
         <div className="mt-4 grid gap-3 sm:flex sm:items-end">
           <div className="grid flex-1 gap-2">
             <Label htmlFor="test_to">Recipient</Label>
-            <Input id="test_to" type="email" value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="you@yourdomain.com" />
+            <Input
+              id="test_to"
+              type="email"
+              value={testTo}
+              onChange={(e) => setTestTo(e.target.value)}
+              placeholder="you@yourdomain.com"
+            />
           </div>
           <div className="flex gap-2">
-            <Button onClick={() => sendTest(false)} disabled={sending}>{sending ? "Sending…" : "Send test"}</Button>
-            <Button variant="outline" onClick={() => sendTest(true)} disabled={sending}>Force failure</Button>
+            <Button onClick={() => sendTest(false)} disabled={sending}>
+              {sending ? "Sending…" : "Send test"}
+            </Button>
+            <Button variant="outline" onClick={() => sendTest(true)} disabled={sending}>
+              Force failure
+            </Button>
           </div>
         </div>
       </div>

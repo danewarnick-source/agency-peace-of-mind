@@ -112,6 +112,12 @@ export const runInternalAudit = createServerFn({ method: "POST" })
     const wantArea = data.area ?? null;
 
     const findings: AuditFinding[] = [];
+    let reqScopeCounts = {
+      inScopeCount: 0,
+      dormantCount: 0,
+      autoSatisfiedCount: 0,
+      needsEvidenceCount: 0,
+    };
     const include = (area: FindingArea) => !wantArea || wantArea === area;
 
     // ------- Lookups --------

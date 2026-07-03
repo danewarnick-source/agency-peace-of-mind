@@ -4530,7 +4530,7 @@ function RebuildDemoRequirementsButton({ orgId }: { orgId: string }) {
                 disabled={typed !== "REBUILD"}
                 onClick={() => void run()}
               >
-                Delete and re-extract
+                Re-extract and swap
               </Button>
             </>
           )}

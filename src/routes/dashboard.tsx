@@ -713,6 +713,25 @@ function SidebarBody({
           const Icon = item.icon;
           const slug = item.to.replace(/^\/dashboard\/?/, "") || "home";
           const isNectar = item.label === "NECTAR";
+          const locked = !!item.isLocked;
+
+          if (locked) {
+            return (
+              <button
+                key={item.to}
+                type="button"
+                data-tour={`nav.${slug}`}
+                onClick={() => item.feature && setUpgradeFeatureKey(item.feature)}
+                aria-label={`${item.label} — locked. Click to request upgrade.`}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/40 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground/60 transition-colors cursor-pointer"
+              >
+                <Icon className="h-4 w-4 opacity-60" />
+                <span className="flex-1 text-left">{item.label}</span>
+                <LockIcon />
+              </button>
+            );
+          }
+
           return (
             <Link
               key={item.to}

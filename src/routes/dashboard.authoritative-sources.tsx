@@ -101,10 +101,6 @@ import {
   signMasterAttestation,
   listMasterAttestationReview,
 } from "@/lib/master-attestation.functions";
-// re-declared below via original block; keeping single import location.
-import _msaShim from "@/lib/master-attestation.functions";
-  signMasterAttestation,
-} from "@/lib/master-attestation.functions";
 import {
   listBindings,
   setBinding,

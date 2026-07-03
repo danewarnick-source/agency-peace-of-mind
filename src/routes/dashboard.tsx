@@ -181,6 +181,7 @@ function DashboardLayout() {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [upgradeFeatureKey, setUpgradeFeatureKey] = useState<string | null>(null);
   const [taskCenterOpen, setTaskCenterOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 

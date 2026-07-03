@@ -1689,7 +1689,7 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
           chunkCount,
           chunkFailures,
           reason: "extractor_incomplete" as const,
-          message: `NECTAR couldn't finish reading this document — ${chunkFailures.length} of ${chunkCount} sections failed to parse. Click Draft again to retry.`,
+          message: `NECTAR couldn't finish reading this document — ${chunkFailures.length} of ${chunkCount} sections failed to parse. First failure: ${chunkFailures[0]?.slice(0, 200) ?? "(unknown)"}. Click Draft again to retry.`,
         };
       }
       await reportPlatformEvent({

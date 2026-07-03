@@ -486,3 +486,350 @@ export const getAuditorPackageView = createServerFn({ method: "GET" })
       payload,
     };
   });
+
+// ============================================================
+// Folders + Files (org admin writes; auditor + org read)
+// PHI SEAM — files today are seed/sample only.
+// Repoint storage bucket 'audit-files' to compliant-host bucket
+// before accepting live client files.
+// ============================================================
+
+export interface AuditPackageFolderRow {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface AuditPackageFileRow {
+  id: string;
+  folder_id: string | null;
+  file_name: string;
+  content_type: string | null;
+  size_bytes: number | null;
+  uploaded_by: string;
+  created_at: string;
+}
+
+export const listPackageFolders = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ auditPackageId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }): Promise<AuditPackageFolderRow[]> => {
+    const { data: rows, error } = await context.supabase
+      .from("audit_package_folders")
+      .select("id, name, created_at")
+      .eq("audit_package_id", data.auditPackageId)
+      .order("name", { ascending: true });
+    if (error) throw error;
+    return (rows ?? []) as AuditPackageFolderRow[];
+  });
+
+export const createPackageFolder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      auditPackageId: z.string().uuid(),
+      name: z.string().trim().min(1).max(120),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }): Promise<{ id: string }> => {
+    const { supabase, userId } = context;
+    const { data: row, error } = await (supabase as unknown as {
+      from: (t: string) => {
+        insert: (v: Record<string, unknown>) => {
+          select: (c: string) => { single: () => Promise<{ data: { id: string } | null; error: unknown }> };
+        };
+      };
+    })
+      .from("audit_package_folders")
+      .insert({
+        audit_package_id: data.auditPackageId,
+        name: data.name,
+        created_by: userId,
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    return { id: row!.id };
+  });
+
+export const deletePackageFolder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ folderId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
+    const { error } = await context.supabase
+      .from("audit_package_folders")
+      .delete()
+      .eq("id", data.folderId);
+    if (error) throw error;
+    return { ok: true };
+  });
+
+export const listPackageFiles = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ auditPackageId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }): Promise<AuditPackageFileRow[]> => {
+    const { data: rows, error } = await context.supabase
+      .from("audit_package_files")
+      .select("id, folder_id, file_name, content_type, size_bytes, uploaded_by, created_at")
+      .eq("audit_package_id", data.auditPackageId)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (rows ?? []) as AuditPackageFileRow[];
+  });
+
+/**
+ * Org admin only. Mints a signed upload URL to the private `audit-files`
+ * bucket and inserts an audit_package_files row. Client uploads the actual
+ * bytes to Supabase Storage via that signed URL.
+ *
+ * PHI SEAM — seed/sample files only; repoint bucket before cutover.
+ */
+export const createPackageFileUpload = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      auditPackageId: z.string().uuid(),
+      folderId: z.string().uuid().nullable(),
+      fileName: z.string().trim().min(1).max(255),
+      contentType: z.string().max(255).optional(),
+      sizeBytes: z.number().int().nonnegative().optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }): Promise<{ fileId: string; path: string; token: string; bucket: string }> => {
+    const { supabase, userId } = context;
+
+    // Verify the caller can insert into audit_package_files for this package
+    // (RLS covers this — the insert will fail if they're not org admin/manager).
+    const { data: pkg, error: pkgErr } = await supabase
+      .from("audit_packages")
+      .select("id, organization_id")
+      .eq("id", data.auditPackageId)
+      .single();
+    if (pkgErr || !pkg) throw new Error("Package not found or forbidden");
+    const p = pkg as { id: string; organization_id: string };
+
+    const bucket = "audit-files";
+    const fileId = (globalThis.crypto?.randomUUID?.() ??
+      // fallback shouldn't happen in a modern worker
+      `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    const safeName = data.fileName.replace(/[^\w.\- ]/g, "_");
+    const path = `${p.organization_id}/${data.auditPackageId}/${fileId}/${safeName}`;
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: signed, error: signedErr } = await supabaseAdmin.storage
+      .from(bucket)
+      .createSignedUploadUrl(path);
+    if (signedErr || !signed) throw new Error(signedErr?.message ?? "Failed to sign upload");
+
+    const { data: row, error: insErr } = await (supabase as unknown as {
+      from: (t: string) => {
+        insert: (v: Record<string, unknown>) => {
+          select: (c: string) => { single: () => Promise<{ data: { id: string } | null; error: unknown }> };
+        };
+      };
+    })
+      .from("audit_package_files")
+      .insert({
+        audit_package_id: data.auditPackageId,
+        folder_id: data.folderId,
+        file_name: data.fileName,
+        storage_bucket: bucket,
+        storage_path: path,
+        content_type: data.contentType ?? null,
+        size_bytes: data.sizeBytes ?? null,
+        uploaded_by: userId,
+      })
+      .select("id")
+      .single();
+    if (insErr) throw insErr;
+
+    return { fileId: row!.id, path, token: signed.token, bucket };
+  });
+
+/**
+ * Get a signed download URL for a file. RLS on audit_package_files SELECT
+ * enforces: org admin/manager OR an active auditor with granted access.
+ * Failing the select = forbidden.
+ */
+export const getPackageFileDownloadUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ fileId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }): Promise<{ url: string; fileName: string }> => {
+    const { supabase } = context;
+    const { data: row, error } = await supabase
+      .from("audit_package_files")
+      .select("id, storage_bucket, storage_path, file_name")
+      .eq("id", data.fileId)
+      .maybeSingle();
+    if (error || !row) throw new Error("File not found or forbidden");
+    const f = row as { storage_bucket: string; storage_path: string; file_name: string };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: signed, error: sErr } = await supabaseAdmin.storage
+      .from(f.storage_bucket)
+      .createSignedUrl(f.storage_path, 60 * 10);
+    if (sErr || !signed) throw new Error(sErr?.message ?? "Failed to sign download");
+    return { url: signed.signedUrl, fileName: f.file_name };
+  });
+
+export const deletePackageFile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ fileId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
+    const { supabase } = context;
+    const { data: row, error } = await supabase
+      .from("audit_package_files")
+      .select("id, storage_bucket, storage_path")
+      .eq("id", data.fileId)
+      .maybeSingle();
+    if (error || !row) throw new Error("File not found or forbidden");
+    const f = row as { storage_bucket: string; storage_path: string };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Best-effort storage delete first; row delete is RLS-checked
+    await supabaseAdmin.storage.from(f.storage_bucket).remove([f.storage_path]);
+
+    const { error: delErr } = await supabase.from("audit_package_files").delete().eq("id", data.fileId);
+    if (delErr) throw delErr;
+    return { ok: true };
+  });
+
+// ============================================================
+// Auditor provisioning (org admin-only)
+// ============================================================
+
+export interface OrgAuditorRow {
+  id: string;
+  email: string;
+  full_name: string;
+  agency_name: string;
+  status: "active" | "revoked";
+  created_at: string;
+  package_access_count: number;
+}
+
+export const listOrgAuditors = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ organizationId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }): Promise<OrgAuditorRow[]> => {
+    const { supabase, userId } = context;
+    await assertOrgAdmin(supabase, data.organizationId, userId);
+
+    const { data: aud } = await supabase
+      .from("auditor_accounts")
+      .select("id, email, full_name, agency_name, status, created_at")
+      .eq("organization_id", data.organizationId)
+      .order("created_at", { ascending: false });
+    const list = (aud ?? []) as Array<Omit<OrgAuditorRow, "package_access_count">>;
+    if (list.length === 0) return [];
+
+    const audIds = list.map((a) => a.id);
+    const { data: access } = await supabase
+      .from("audit_package_access")
+      .select("auditor_account_id, revoked_at")
+      .in("auditor_account_id", audIds);
+    const counts = new Map<string, number>();
+    for (const a of ((access ?? []) as Array<{ auditor_account_id: string; revoked_at: string | null }>)) {
+      if (a.revoked_at) continue;
+      counts.set(a.auditor_account_id, (counts.get(a.auditor_account_id) ?? 0) + 1);
+    }
+    return list.map((a) => ({ ...a, package_access_count: counts.get(a.id) ?? 0 }));
+  });
+
+/**
+ * Org admin creates an auditor account. Uses admin.inviteUserByEmail so
+ * Supabase sends the invite email — the auditor sets their own password.
+ * Org never enters or stores the auditor's password.
+ */
+export const provisionOrgAuditor = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      organizationId: z.string().uuid(),
+      email: z.string().email().max(255),
+      fullName: z.string().trim().min(1).max(200),
+      agencyName: z.string().trim().min(1).max(200),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }): Promise<{ auditorAccountId: string }> => {
+    const { supabase, userId } = context;
+    await assertOrgAdmin(supabase, data.organizationId, userId);
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Look up or invite the auth user
+    let authUserId: string | null = null;
+    const { data: existing } = await (supabaseAdmin.auth.admin as unknown as {
+      listUsers: (opts?: { page?: number; perPage?: number }) => Promise<{
+        data: { users: Array<{ id: string; email?: string | null }> } | null;
+      }>;
+    }).listUsers({ page: 1, perPage: 200 });
+    const found = existing?.users.find((u) => (u.email ?? "").toLowerCase() === data.email.toLowerCase());
+    if (found) {
+      authUserId = found.id;
+    } else {
+      const { data: invited, error: invErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
+        data: {
+          role: "auditor",
+          full_name: data.fullName,
+          agency_name: data.agencyName,
+          organization_id: data.organizationId,
+        },
+        redirectTo: `${process.env.PUBLIC_SITE_URL ?? ""}/audit-portal`,
+      });
+      if (invErr || !invited?.user) throw new Error(invErr?.message ?? "Failed to invite auditor");
+      authUserId = invited.user.id;
+    }
+
+    // Upsert auditor_accounts row (org-scoped)
+    const { data: row, error: upErr } = await (supabase as unknown as {
+      from: (t: string) => {
+        upsert: (v: Record<string, unknown>, o: { onConflict: string }) => {
+          select: (c: string) => { single: () => Promise<{ data: { id: string } | null; error: unknown }> };
+        };
+      };
+    })
+      .from("auditor_accounts")
+      .upsert(
+        {
+          user_id: authUserId,
+          email: data.email,
+          full_name: data.fullName,
+          agency_name: data.agencyName,
+          organization_id: data.organizationId,
+          provisioned_by: userId,
+          status: "active",
+        },
+        { onConflict: "email" },
+      )
+      .select("id")
+      .single();
+    if (upErr) throw upErr;
+
+    return { auditorAccountId: row!.id };
+  });
+
+export const revokeOrgAuditor = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ organizationId: z.string().uuid(), auditorAccountId: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
+    const { supabase, userId } = context;
+    await assertOrgAdmin(supabase, data.organizationId, userId);
+
+    const { error } = await supabase
+      .from("auditor_accounts")
+      .update({ status: "revoked" })
+      .eq("id", data.auditorAccountId)
+      .eq("organization_id", data.organizationId);
+    if (error) throw error;
+
+    // Also revoke all package access rows for this auditor
+    await supabase
+      .from("audit_package_access")
+      .update({ revoked_at: new Date().toISOString() })
+      .eq("auditor_account_id", data.auditorAccountId)
+      .is("revoked_at", null);
+    return { ok: true };
+  });

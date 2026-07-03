@@ -384,6 +384,92 @@ export type Database = {
           },
         ]
       }
+      audit_package_files: {
+        Row: {
+          audit_package_id: string
+          content_type: string | null
+          created_at: string
+          file_name: string
+          folder_id: string | null
+          id: string
+          size_bytes: number | null
+          storage_bucket: string
+          storage_path: string
+          uploaded_by: string
+        }
+        Insert: {
+          audit_package_id: string
+          content_type?: string | null
+          created_at?: string
+          file_name: string
+          folder_id?: string | null
+          id?: string
+          size_bytes?: number | null
+          storage_bucket?: string
+          storage_path: string
+          uploaded_by: string
+        }
+        Update: {
+          audit_package_id?: string
+          content_type?: string | null
+          created_at?: string
+          file_name?: string
+          folder_id?: string | null
+          id?: string
+          size_bytes?: number | null
+          storage_bucket?: string
+          storage_path?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_package_files_audit_package_id_fkey"
+            columns: ["audit_package_id"]
+            isOneToOne: false
+            referencedRelation: "audit_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_package_files_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "audit_package_folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_package_folders: {
+        Row: {
+          audit_package_id: string
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+        }
+        Insert: {
+          audit_package_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
+        }
+        Update: {
+          audit_package_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_package_folders_audit_package_id_fkey"
+            columns: ["audit_package_id"]
+            isOneToOne: false
+            referencedRelation: "audit_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_package_subjects: {
         Row: {
           added_at: string
@@ -598,6 +684,8 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          organization_id: string | null
+          provisioned_by: string | null
           status: string
           updated_at: string
           user_id: string | null
@@ -608,6 +696,8 @@ export type Database = {
           email: string
           full_name: string
           id?: string
+          organization_id?: string | null
+          provisioned_by?: string | null
           status?: string
           updated_at?: string
           user_id?: string | null
@@ -618,11 +708,21 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          organization_id?: string | null
+          provisioned_by?: string | null
           status?: string
           updated_at?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "auditor_accounts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       auditor_share_access_log: {
         Row: {

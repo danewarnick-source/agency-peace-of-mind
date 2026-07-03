@@ -990,6 +990,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
           category: item.category ?? "obligation",
           source_citation: citation,
           applies_to: item.applies_to ?? "company",
+          service_code: normalizeCode(item.service_code),
           approval_state: assisted ? "nectar_drafted" : null,
         })
         .select("id")

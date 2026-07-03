@@ -1280,6 +1280,32 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     }
 
     if (inserted === 0) {
+      // If any chunks failed to parse, this is an "extractor incomplete"
+      // situation, not a "no obligations" one — say so clearly and file a
+      // distinct HIVE ticket. Re-clicking Draft retries.
+      if (chunkFailures.length > 0) {
+        await reportPlatformEvent({
+          eventKind: "extractor_incomplete",
+          organizationId: doc.organization_id as string,
+          organizationName: orgName,
+          title: `Extractor couldn't finish "${(doc.title as string) ?? doc.file_name}"`,
+          detail: `Document ${doc.id} (${rawText.length} chars) was split into ${chunkCount} sections; ${chunkFailures.length} failed to parse and yielded 0 requirements. First failure: ${chunkFailures[0]?.slice(0, 300)}`,
+          category: "parsing_failure",
+          severity: "medium",
+          dedupeKey: `extractor_incomplete:${doc.id}`,
+          eventRef: {
+            documentId: doc.id,
+            chunkCount,
+            failedChunks: chunkFailures.length,
+            firstFailure: chunkFailures[0]?.slice(0, 400),
+          },
+        });
+        return {
+          inserted: 0,
+          reason: "extractor_incomplete" as const,
+          message: `NECTAR couldn't finish reading this document — ${chunkFailures.length} of ${chunkCount} sections failed to parse. Click Draft again to retry. If it keeps failing, the parsed text may be malformed.`,
+        };
+      }
 
       // Document parsed cleanly but yielded zero requirements. Worth a HIVE
       // ticket for the platform team to investigate — either the extractor
@@ -1307,6 +1333,29 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       };
     }
 
+    if (chunkFailures.length > 0) {
+      await reportPlatformEvent({
+        eventKind: "extractor_incomplete",
+        organizationId: doc.organization_id as string,
+        organizationName: orgName,
+        title: `Partial extract on "${(doc.title as string) ?? doc.file_name}"`,
+        detail: `Document ${doc.id}: ${inserted} requirements drafted; ${chunkFailures.length} of ${chunkCount} sections failed to parse. First failure: ${chunkFailures[0]?.slice(0, 300)}`,
+        category: "parsing_failure",
+        severity: "low",
+        dedupeKey: `extractor_incomplete:${doc.id}`,
+        eventRef: {
+          documentId: doc.id,
+          chunkCount,
+          failedChunks: chunkFailures.length,
+          inserted,
+        },
+      });
+      return {
+        inserted,
+        reason: "partial" as const,
+        message: `Drafted ${inserted} requirements. ${chunkFailures.length} of ${chunkCount} sections of the document couldn't be read on this pass — click Draft again to retry those sections.`,
+      };
+    }
 
     return { inserted, reason: "ok" as const };
   });

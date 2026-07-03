@@ -28,6 +28,7 @@ import { OrgSwitcher, DemoBadge, DemoOrgBanner } from "@/components/org-switcher
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getInboxUnreadCount } from "@/lib/inbox-messages.functions";
+import { useEntitlements } from "@/hooks/use-entitlements";
 import { BillingBanner } from "@/components/billing/billing-banner";
 import { DraftJobsProvider } from "@/components/nectar/draft-jobs-driver";
 import { DraftJobsHeaderPill } from "@/components/nectar/draft-jobs-header-pill";

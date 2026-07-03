@@ -1,25 +1,32 @@
-# Keep full document text on upload
+# Read entire document when NECTAR extracts requirements
 
 ## Problem
-When a document is uploaded and parsed (Scope of Work, PCSP, etc.), the extracted plain text is saved to `nectar_documents.raw_text` but capped at 50,000 characters. Anything past that cap is silently dropped, so long documents like the State SOW lose their tail end.
+`extractRequirementsFromText()` in `src/lib/authoritative-sources.functions.ts` (line 750) sends only the first 60,000 characters of a document to the AI:
 
-Source of the cut: `src/lib/nectar-documents.functions.ts`, line 243:
 ```ts
-raw_text: text.slice(0, 50000),
+{ role: "user", content: `DOCUMENT TEXT:\n\n${text.slice(0, 60000)}` }
 ```
 
-That is the only place upload text is truncated. State onboarding / template uploads don't add their own cap.
+A full State Scope of Work is much longer than that, so any requirement past the ~60k mark is never seen by NECTAR. Everything else (raw_text storage, review flow, requirement shape, DB writes, de-dupe by `requirement_key`) already works — only this one call cuts the input short.
 
 ## Fix
-One-line change in `src/lib/nectar-documents.functions.ts`:
+Change `extractRequirementsFromText` to walk the full document in sequential windows and merge the results, keeping the same return shape so the caller (`generateRequirementsFromSource`) is untouched.
 
-- Replace `raw_text: text.slice(0, 50000),` with `raw_text: text,` so the full extracted text is stored regardless of length.
+Details:
+- Chunk `text` into ~55,000-character windows with a ~2,000-character overlap at chunk boundaries. Overlap prevents a clause that straddles the cut from being missed on both sides.
+- Break on paragraph boundaries when possible (last `\n\n` before the window end) so we don't split mid-sentence; fall back to a hard cut if no boundary is found.
+- For each chunk, run the existing `gatewayFetch` call with the existing `REQ_SYSTEM_PROMPT` and `ReqExtraction` schema. Prepend a small "PART k of N" line to the user message so the model knows it's seeing part of a larger document.
+- Merge results in order. De-dupe within the extractor by a lowercased `title|citation` key so overlap regions don't produce doubled rows going into the DB layer (which then does its own key-based de-dupe).
+- Safety cap: process at most 40 chunks (~2.2M chars, well beyond a full SOW). If the document exceeds that, extract from the first 40 chunks and log a `platform_event` from the caller only if we ever hit it — but plain SOWs are far under that ceiling, so nothing changes for real inputs.
+- Preserve existing error handling: on 429/402/non-OK, throw the same errors so the caller's `try/catch` reports the same messages. If one chunk fails after some chunks have already succeeded, throw — the caller already surfaces AI errors clearly and the admin can retry cleanly.
 
-The `raw_text` column is Postgres `text` (unbounded), so no schema change is needed.
-
-## Out of scope (unchanged, per your ask)
-- Upload UI, file size limits, parsing pipeline, extraction prompts, autofill logic — all untouched.
-- The 120,000-char slice we send to the AI extractor stays as-is; that's a model-input guardrail, not storage. It only affects what the extractor sees, not what we keep. If you later want the AI to also read the full document, that's a separate change.
+Nothing else changes:
+- `raw_text` storage — untouched.
+- Requirement shape, categories, `applies_to`, citation formatting, `requirement_key` — untouched.
+- De-dupe against existing requirements in the DB (`existingKeys`) — untouched.
+- Assisted-setup / `markDraftedByNectar` path — untouched.
+- Legacy `sow_clause` fallback — untouched.
+- `raw_text: text.slice(0, 50000)` in `ingestWebSource` (web-page snapshots) — out of scope; this task is specifically about long file uploads like the SOW, and web-page truncation is a separate rule.
 
 ## Verification
-Upload the full State Scope of Work, then check `nectar_documents.raw_text` length for that row — it should match the real extracted length of the PDF instead of stopping at 50,000.
+Upload the full State Scope of Work as an authoritative source, click "Draft requirements". Confirm the drafted list includes requirements from late sections of the document (e.g., billing/EVV sections past §10, appendices, attachments) — not only early sections. Cross-check by opening one late-section requirement and confirming its citation points to the correct high-numbered section.

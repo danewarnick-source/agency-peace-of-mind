@@ -794,6 +794,10 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     z
       .object({
         documentId: z.string().uuid(),
+        // When true, newly inserted requirements are tagged with
+        // metadata.rebuild_pending = true so a subsequent commitRebuild
+        // can atomically swap the old set for the new set.
+        rebuildBatch: z.boolean().optional(),
       })
       .parse(input),
   )
@@ -899,15 +903,22 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     }
 
 
-    // Existing requirements (so we can de-dupe across re-runs)
+    // Existing requirements (so we can de-dupe across re-runs).
+    // In rebuildBatch mode we intentionally skip dedupe: new rows land tagged
+    // rebuild_pending alongside the old rows so commitRebuild can swap them.
     const { data: existing } = await supabase
       .from("nectar_requirements")
       .select("requirement_key")
       .eq("organization_id", doc.organization_id)
       .eq("source_document_id", doc.id);
-    const existingKeys = new Set(
-      (existing ?? []).map((r) => (r.requirement_key as string) ?? ""),
-    );
+    const existingKeys = data.rebuildBatch
+      ? new Set<string>()
+      : new Set(
+          (existing ?? []).map((r) => (r.requirement_key as string) ?? ""),
+        );
+    const rebuildMeta = data.rebuildBatch
+      ? ({ rebuild_pending: true } as Json)
+      : null;
 
     // 1. Prose-clause extraction (the real path for SOW / contracts)
     let aiItems: Array<{
@@ -993,6 +1004,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
           applies_to: item.applies_to ?? "company",
           service_code: normalizeCode(item.service_code),
           approval_state: assisted ? "nectar_drafted" : null,
+          ...(rebuildMeta ? { metadata: rebuildMeta } : {}),
         })
         .select("id")
         .single();
@@ -1033,6 +1045,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
             : `${baseLabel}${webSuffix}`,
           applies_to: "company",
           approval_state: assisted ? "nectar_drafted" : null,
+          ...(rebuildMeta ? { metadata: rebuildMeta } : {}),
         })
         .select("id")
         .single();
@@ -1360,6 +1373,30 @@ REQUIREMENT TEXT: ${req.description ?? "(no extended text — restate the title 
 // misclick can never wipe another workspace. Admin/super_admin only.
 const TNS_FAKE_ORG_ID = "7fabcf5d-f826-487f-8730-8b0c3f1969bb";
 
+// NON-DESTRUCTIVE START. Verifies admin, returns the eligible source
+// documents. NO delete happens here — new requirements are extracted with
+// metadata.rebuild_pending = true alongside the originals, then swapped
+// atomically by commitRebuildForOrg (or discarded by rollbackRebuildForOrg).
+async function assertTnsFakeRebuildAdmin(
+  supabase: any,
+  userId: string,
+  organizationId: string,
+) {
+  if (organizationId !== TNS_FAKE_ORG_ID) {
+    throw new Error("Rebuild is only available for the TNS FAKE demo workspace.");
+  }
+  const { data: member } = await supabase
+    .from("organization_members")
+    .select("role, active")
+    .eq("organization_id", organizationId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  const role = (member?.role as string | null) ?? null;
+  if (!member?.active || (role !== "admin" && role !== "super_admin")) {
+    throw new Error("Admin or super-admin only.");
+  }
+}
+
 export const wipeRequirementsForOrgRebuild = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
@@ -1372,25 +1409,15 @@ export const wipeRequirementsForOrgRebuild = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    if (data.organizationId !== TNS_FAKE_ORG_ID) {
-      throw new Error("Rebuild is only available for the TNS FAKE demo workspace.");
-    }
-    const { data: member } = await supabase
-      .from("organization_members")
-      .select("role, active")
-      .eq("organization_id", data.organizationId)
-      .eq("user_id", userId)
-      .maybeSingle();
-    const role = (member?.role as string | null) ?? null;
-    if (!member?.active || (role !== "admin" && role !== "super_admin")) {
-      throw new Error("Admin or super-admin only.");
-    }
+    await assertTnsFakeRebuildAdmin(supabase, userId, data.organizationId);
 
-    // Fast wipe (append-only trigger handled inside the SECURITY DEFINER RPC).
-    const { error: delErr } = await supabase.rpc(
-      "rebuild_wipe_requirements_tns_fake",
-    );
-    if (delErr) throw new Error(`Delete failed: ${delErr.message}`);
+    // Safety: clear any stray rebuild_pending rows from a previously
+    // aborted rebuild so this run starts clean.
+    await supabase
+      .from("nectar_requirements")
+      .delete()
+      .eq("organization_id", data.organizationId)
+      .contains("metadata", { rebuild_pending: true });
 
     const { data: sources, error: sErr } = await supabase
       .from("nectar_documents")
@@ -1416,4 +1443,75 @@ export const wipeRequirementsForOrgRebuild = createServerFn({ method: "POST" })
 
     return { ok: true as const, documents };
   });
+
+// Commit: delete OLD (non-pending) requirements for the org, then clear
+// the rebuild_pending flag on the new ones. Wrapped inside the append-only
+// trigger workaround (SECURITY DEFINER RPC) for the delete.
+export const commitRebuildForOrg = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        confirm: z.literal("REBUILD"),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await assertTnsFakeRebuildAdmin(supabase, userId, data.organizationId);
+
+    // Delete only OLD requirements (those without rebuild_pending) via the
+    // SECURITY DEFINER RPC that disables the append-only approval trigger.
+    const { error: delErr } = await supabase.rpc(
+      "rebuild_wipe_requirements_tns_fake",
+      { p_keep_pending: true } as never,
+    );
+    if (delErr) throw new Error(`Commit delete failed: ${delErr.message}`);
+
+    // Clear the rebuild_pending flag on the new rows.
+    const { data: pending } = await supabase
+      .from("nectar_requirements")
+      .select("id, metadata")
+      .eq("organization_id", data.organizationId)
+      .contains("metadata", { rebuild_pending: true });
+
+    let cleared = 0;
+    for (const r of pending ?? []) {
+      const meta = { ...((r.metadata ?? {}) as Record<string, unknown>) };
+      delete meta.rebuild_pending;
+      const { error } = await supabase
+        .from("nectar_requirements")
+        .update({ metadata: meta as Json })
+        .eq("id", r.id as string);
+      if (!error) cleared += 1;
+    }
+
+    return { ok: true as const, cleared };
+  });
+
+// Rollback: throw away the new pending rows, leave the originals intact.
+export const rollbackRebuildForOrg = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        confirm: z.literal("REBUILD"),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await assertTnsFakeRebuildAdmin(supabase, userId, data.organizationId);
+
+    const { error } = await supabase
+      .from("nectar_requirements")
+      .delete()
+      .eq("organization_id", data.organizationId)
+      .contains("metadata", { rebuild_pending: true });
+    if (error) throw new Error(`Rollback failed: ${error.message}`);
+    return { ok: true as const };
+  });
+
 

@@ -1304,7 +1304,26 @@ export const processDraftChunk = createServerFn({ method: "POST" })
       .from("nectar_documents")
       .select("raw_text")
       .eq("id", job.document_id as string)
-      .single();
+      .maybeSingle();
+    if (!doc) {
+      // Source document was deleted out from under this job — mark failed so
+      // the driver stops retrying instead of looping forever.
+      await supabase
+        .from("nectar_draft_jobs")
+        .update({
+          status: "failed",
+          error_message: "Source document was deleted; draft job cancelled.",
+        })
+        .eq("id", data.jobId);
+      return {
+        processed: (job.processed_chunks as number) ?? priorIndices.length,
+        total: ranges.length,
+        itemsAdded: 0,
+        failuresAdded: [] as string[],
+        skipped: true as const,
+        aborted: true as const,
+      };
+    }
     const rawText = ((doc?.raw_text as string | null) ?? "").trim();
     const window = rawText.slice(start, end);
 
@@ -1417,14 +1436,39 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
     const chunkFailures = (job.chunk_failures as unknown as string[]) ?? [];
     const chunkCount = job.total_chunks as number;
 
-    const { data: doc } = await supabase
+    const { data: doc, error: docErr } = await supabase
       .from("nectar_documents")
       .select(
         "id, organization_id, title, authoritative_kind, file_name, source, external_ids, assisted_setup_requested, raw_text",
       )
       .eq("id", job.document_id as string)
-      .single();
-    if (!doc) throw new Error("Draft job's document is missing");
+      .maybeSingle();
+    if (docErr) {
+      console.error("[finalizeRequirementsDraft] doc fetch error", {
+        jobId: data.jobId,
+        documentId: job.document_id,
+        code: docErr.code,
+        message: docErr.message,
+        details: docErr.details,
+      });
+      throw new Error(`Draft job's document could not be loaded: ${docErr.message}`);
+    }
+    if (!doc) {
+      await supabase
+        .from("nectar_draft_jobs")
+        .update({
+          status: "failed",
+          error_message: "Source document was deleted; draft job cancelled.",
+        })
+        .eq("id", data.jobId);
+      console.error("[finalizeRequirementsDraft] doc missing", {
+        jobId: data.jobId,
+        documentId: job.document_id,
+        orgId: job.organization_id,
+        userId,
+      });
+      throw new Error("Draft job's source document was deleted; the job has been cancelled.");
+    }
     const rawText = ((doc.raw_text as string | null) ?? "").trim();
 
     const { data: orgRow } = await supabase

@@ -753,23 +753,11 @@ export const listOrgAuditors = createServerFn({ method: "GET" })
   });
 
 /**
- * Org admin creates an auditor account. Uses admin.inviteUserByEmail so
- * Supabase sends the invite email — the auditor sets their own password.
- * Org never enters or stores the auditor's password.
+ * Org admin creates an auditor account, grants access to a specific package,
+ * and sends a branded, package-specific invite email (not Supabase's generic
+ * app invite). The auditor's set-password link lands them directly on
+ * /audit-portal/{packageId} — never the HIVE homepage.
  */
-export const provisionOrgAuditor = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
-    z.object({
-      organizationId: z.string().uuid(),
-      email: z.string().email().max(255),
-      fullName: z.string().trim().min(1).max(200),
-      agencyName: z.string().trim().min(1).max(200),
-    }).parse(d),
-  )
-  .handler(async ({ data, context }): Promise<{ auditorAccountId: string }> => {
-    const { supabase, userId } = context;
-    await assertOrgAdmin(supabase, data.organizationId, userId);
 
 export const provisionOrgAuditor = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

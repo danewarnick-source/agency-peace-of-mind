@@ -97,6 +97,10 @@ import {
   providerRejectRequirement,
 } from "@/lib/nectar-approvals.functions";
 import {
+  getCurrentMasterAttestation,
+  signMasterAttestation,
+} from "@/lib/master-attestation.functions";
+import {
   listBindings,
   setBinding,
   listFormsForRequirement,
@@ -2350,13 +2354,15 @@ function AttestationsPanel({ orgId }: { orgId: string }) {
   });
 
   return (
-    <div className="rounded-2xl border border-border/60 bg-background/60 p-4 backdrop-blur">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Immutable attestation log</h2>
-        <Badge variant="outline" className="text-[10px]">
-          {data?.attestations?.length ?? 0} entries
-        </Badge>
-      </div>
+    <div className="space-y-4">
+      <MasterAttestationPanel orgId={orgId} />
+      <div className="rounded-2xl border border-border/60 bg-background/60 p-4 backdrop-blur">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Immutable attestation log</h2>
+          <Badge variant="outline" className="text-[10px]">
+            {data?.attestations?.length ?? 0} entries
+          </Badge>
+        </div>
       <p className="mb-3 text-xs text-muted-foreground">
         Every "Confirm" you click in HIVE is logged here with user, timestamp,
         and the exact statement you attested to. This log is append-only.
@@ -2389,9 +2395,152 @@ function AttestationsPanel({ orgId }: { orgId: string }) {
           ))}
         </ul>
       )}
+      </div>
     </div>
   );
 }
+
+function MasterAttestationPanel({ orgId }: { orgId: string }) {
+  const qc = useQueryClient();
+  const getFn = useServerFn(getCurrentMasterAttestation);
+  const signFn = useServerFn(signMasterAttestation);
+  const [open, setOpen] = useState(false);
+
+  const q = useQuery({
+    queryKey: ["master-attestation", orgId],
+    queryFn: () => getFn({ data: { orgId } }),
+  });
+
+  const sign = useMutation({
+    mutationFn: () => signFn({ data: { orgId } }),
+    onSuccess: () => {
+      toast.success("Master attestation signed.");
+      qc.invalidateQueries({ queryKey: ["master-attestation", orgId] });
+      qc.invalidateQueries({ queryKey: ["attestations", orgId] });
+      setOpen(false);
+    },
+    onError: (e: unknown) => {
+      toast.error(e instanceof Error ? e.message : "Failed to sign attestation");
+    },
+  });
+
+  const status = q.data;
+  const current = status?.current;
+  const isDue = !!status?.isDue;
+
+  return (
+    <div className="rounded-2xl border border-border/60 bg-background/60 p-4 backdrop-blur">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold">Master attestation</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            One signed attestation covering every requirement in scope for your held
+            service codes. Re-sign only when your scope changes or annually.
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          {current && (
+            <Badge variant="outline" className="text-[10px]">
+              Version {current.version}
+            </Badge>
+          )}
+          {isDue && (
+            <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100 text-[10px]">
+              {current ? "Re-attest needed" : "Signature needed"}
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      {q.isLoading ? (
+        <p className="text-sm text-muted-foreground">
+          <Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" /> Loading…
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {current ? (
+            <div className="rounded-xl border border-border/60 bg-background/40 p-3 text-xs">
+              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                <span>
+                  <span className="text-muted-foreground">Signed by:</span>{" "}
+                  {current.signed_by_name ?? "—"}
+                </span>
+                <span>
+                  <span className="text-muted-foreground">Signed at:</span>{" "}
+                  {new Date(current.signed_at).toLocaleString()}
+                </span>
+                <span>
+                  <span className="text-muted-foreground">Requirements covered:</span>{" "}
+                  {current.requirement_count}
+                </span>
+              </div>
+              <div className="mt-2">
+                <span className="text-muted-foreground">Scope codes:</span>{" "}
+                {(current.scope_codes ?? []).length
+                  ? (current.scope_codes ?? []).join(", ")
+                  : "(none)"}
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-border/60 p-3 text-xs text-muted-foreground">
+              No master attestation on file yet.
+            </div>
+          )}
+
+          {isDue && (status?.dueReasons?.length ?? 0) > 0 && (
+            <ul className="list-disc space-y-0.5 pl-5 text-xs text-amber-800">
+              {status!.dueReasons.map((r, i) => (
+                <li key={i}>{r}</li>
+              ))}
+            </ul>
+          )}
+
+          <div>
+            <Button
+              size="sm"
+              onClick={() => setOpen(true)}
+              variant={isDue ? "default" : "outline"}
+            >
+              {current ? "Re-attest" : "Sign master attestation"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {current ? `Re-attest — version ${(current.version ?? 0) + 1}` : "Sign master attestation"}
+            </DialogTitle>
+            <DialogDescription>
+              Review the statement below carefully before signing. Your signature
+              will be logged in the immutable attestation trail.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[50vh] overflow-y-auto whitespace-pre-wrap rounded-xl border border-border/60 bg-background/40 p-3 text-sm leading-relaxed">
+            {status?.attestationTextTemplate ?? ""}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={sign.isPending}>
+              Cancel
+            </Button>
+            <Button onClick={() => sign.mutate()} disabled={sign.isPending}>
+              {sign.isPending ? (
+                <>
+                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> Signing…
+                </>
+              ) : (
+                "I attest and sign"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 
 // ---------- NECTAR Requirements Engine — applicability mapping ----------
 // Per-requirement scope panel: NECTAR proposes which parts of the operation

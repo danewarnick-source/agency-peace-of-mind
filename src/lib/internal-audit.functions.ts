@@ -523,6 +523,37 @@ export const runInternalAudit = createServerFn({ method: "POST" })
         .eq("organization_id", orgId);
       const heldCodes = new Set<string>((heldCodesRows ?? []).map((r) => r.code));
 
+      // Prompt 32 — load the current master attestation once per run. An
+      // attestation-type requirement is satisfied when a current (non-due)
+      // master attestation covers its service_code.
+      const { data: masterRows } = await supabase
+        .from("master_attestations")
+        .select("scope_codes, requirement_count, signed_at")
+        .eq("organization_id", orgId)
+        .is("superseded_at", null)
+        .order("version", { ascending: false })
+        .limit(1);
+      const masterCurrent = ((masterRows ?? [])[0] ?? null) as {
+        scope_codes: string[] | null;
+        requirement_count: number | null;
+        signed_at: string;
+      } | null;
+      let masterIsDue = !masterCurrent;
+      if (masterCurrent) {
+        const ageMs = Date.now() - new Date(masterCurrent.signed_at).getTime();
+        if (ageMs > 365 * 24 * 60 * 60 * 1000) masterIsDue = true;
+        const snap = [...(masterCurrent.scope_codes ?? [])].sort();
+        const now = [...heldCodes].sort();
+        if (snap.length !== now.length || snap.some((c, i) => c !== now[i]))
+          masterIsDue = true;
+      }
+      const masterScopeCodes = new Set<string>(masterCurrent?.scope_codes ?? []);
+      const isCoveredByMaster = (code: string | null): boolean => {
+        if (!masterCurrent || masterIsDue) return false;
+        if (!code) return true;
+        return masterScopeCodes.has(code);
+      };
+
       // ---------- Lazy resolver (Prompt 29) ----------
       // Instead of firing on missing nectar_requirement_mappings rows, resolve
       // each in-scope requirement against its requirement_bindings row + live
@@ -761,10 +792,13 @@ export const runInternalAudit = createServerFn({ method: "POST" })
             missTitle = `Document not on file — ${r.title}`;
             break;
           case "attestation":
-            // Master-attestation coverage lands in Prompt 32. Until then,
-            // fall back to any active attestation-style document on file.
-            satisfied = activeDocByReq.has(r.id);
-            missTitle = `Attestation needed — ${r.title}`;
+            // Prompt 32 — an attestation-type requirement is satisfied when
+            // a current (non-due) master attestation covers its service_code.
+            // Falls back to any per-requirement document attestation on file.
+            satisfied = isCoveredByMaster(r.service_code) || activeDocByReq.has(r.id);
+            missTitle = masterCurrent && masterIsDue
+              ? `Re-attestation needed — ${r.title}`
+              : `Attestation needed — ${r.title}`;
             break;
           default:
             satisfied = false;

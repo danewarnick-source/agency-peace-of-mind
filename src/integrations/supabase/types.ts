@@ -9060,6 +9060,53 @@ export type Database = {
           },
         ]
       }
+      master_attestations: {
+        Row: {
+          attestation_text: string
+          id: string
+          organization_id: string
+          requirement_count: number
+          scope_codes: string[]
+          signed_at: string
+          signed_by: string
+          signed_by_name: string | null
+          superseded_at: string | null
+          version: number
+        }
+        Insert: {
+          attestation_text: string
+          id?: string
+          organization_id: string
+          requirement_count?: number
+          scope_codes?: string[]
+          signed_at?: string
+          signed_by: string
+          signed_by_name?: string | null
+          superseded_at?: string | null
+          version: number
+        }
+        Update: {
+          attestation_text?: string
+          id?: string
+          organization_id?: string
+          requirement_count?: number
+          scope_codes?: string[]
+          signed_at?: string
+          signed_by?: string
+          signed_by_name?: string | null
+          superseded_at?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "master_attestations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       medication_transfers: {
         Row: {
           client_id: string

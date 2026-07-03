@@ -61,6 +61,7 @@ function HiveTrainingHub() {
   const { data: org } = useCurrentOrg();
   const search = useSearch({ from: Route.id });
   const { view, hydrated } = usePortalView();
+  const { hasAddon, loading: entLoading } = useEntitlements();
 
   useEffect(() => {
     if (search.checkout === "success") toast.success("Payment received. Seats/assignments will appear shortly.");
@@ -69,11 +70,16 @@ function HiveTrainingHub() {
     else if (search.card === "cancelled") toast.info("Card setup cancelled.");
   }, [search.checkout, search.card]);
 
-  if (!org || !hydrated) {
+  if (!org || !hydrated || entLoading) {
     return (
       <div className="p-6 flex justify-center"><Loader2 className="h-5 w-5 animate-spin" /></div>
     );
   }
+
+  if (!hasAddon("hive_training")) {
+    return <FeatureLocked featureName="HIVE Training" />;
+  }
+
 
   const realIsAdmin = ["admin", "manager", "super_admin"].includes(org.role);
   const isAdmin = realIsAdmin && view !== "staff" && view !== "staff_mobile";

@@ -40,6 +40,24 @@ export interface MasterAttestationStatus {
   attestationTextTemplate: string;
 }
 
+export interface ReviewRequirement {
+  id: string;
+  title: string;
+  source_citation: string | null;
+  satisfied_by: string;
+  evidence_note: string | null;
+}
+export interface ReviewGroup {
+  code: string; // held service code, or "__provider__" for provider-wide
+  label: string;
+  requirements: ReviewRequirement[];
+}
+export interface MasterAttestationReview {
+  groups: ReviewGroup[];
+  totalRequirements: number;
+  heldCodes: string[];
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function loadScopeSnapshot(sb: any, orgId: string) {
   const [codesRes, reqsRes] = await Promise.all([

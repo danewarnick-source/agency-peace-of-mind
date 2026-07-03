@@ -4308,6 +4308,8 @@ function RebuildDemoRequirementsButton({ orgId }: { orgId: string }) {
 
   const wipeFn = useServerFn(wipeRequirementsForOrgRebuild);
   const extractFn = useServerFn(generateRequirementsFromSource);
+  const commitFn = useServerFn(commitRebuildForOrg);
+  const rollbackFn = useServerFn(rollbackRebuildForOrg);
 
   if (orgId !== TNS_FAKE_ORG_ID) return null;
   if (role !== "admin" && role !== "super_admin") return null;
@@ -4325,6 +4327,24 @@ function RebuildDemoRequirementsButton({ orgId }: { orgId: string }) {
     cancelRef.current = false;
   }
 
+  // Extract one document, retrying once on HTTP 429 (rate-limit) after 3s.
+  async function extractOnce(docId: string): Promise<{ inserted?: number }> {
+    try {
+      return (await extractFn({
+        data: { documentId: docId, rebuildBatch: true },
+      })) as { inserted?: number };
+    } catch (e) {
+      const msg = (e as Error).message ?? "";
+      if (/\b429\b|rate.?limit/i.test(msg)) {
+        await new Promise((r) => setTimeout(r, 3000));
+        return (await extractFn({
+          data: { documentId: docId, rebuildBatch: true },
+        })) as { inserted?: number };
+      }
+      throw e;
+    }
+  }
+
   async function run() {
     cancelRef.current = false;
     setPhase("wiping");
@@ -4332,13 +4352,17 @@ function RebuildDemoRequirementsButton({ orgId }: { orgId: string }) {
     setFailures([]);
     setCurrentIdx(0);
     try {
+      // Phase 1 — get the doc list. NO delete happens here; any stray
+      // rebuild_pending rows from a prior aborted run are cleared server-side.
       const wipeRes = await wipeFn({
         data: { organizationId: orgId, confirm: "REBUILD" as const },
       });
       const list = wipeRes.documents ?? [];
       setDocs(list);
-      qc.invalidateQueries({ queryKey: ["requirements", orgId] });
       setPhase("extracting");
+
+      // Phase 2 — extract into rebuild_pending rows alongside originals.
+      // Do NOT invalidate queries during the loop (would unmount this panel).
       let insCount = 0;
       const fails: Array<{ title: string; error: string }> = [];
       for (let i = 0; i < list.length; i++) {
@@ -4346,9 +4370,7 @@ function RebuildDemoRequirementsButton({ orgId }: { orgId: string }) {
         setCurrentIdx(i);
         const doc = list[i];
         try {
-          const r = (await extractFn({ data: { documentId: doc.id } })) as {
-            inserted?: number;
-          };
+          const r = await extractOnce(doc.id);
           insCount += typeof r?.inserted === "number" ? r.inserted : 0;
           setInserted(insCount);
         } catch (e) {
@@ -4357,17 +4379,49 @@ function RebuildDemoRequirementsButton({ orgId }: { orgId: string }) {
         }
       }
       setCurrentIdx(list.length);
-      setPhase("done");
+
+      // Phase 3 — commit or rollback. If cancelled OR everything failed,
+      // roll back the pending rows and keep the originals.
+      if (cancelRef.current) {
+        await rollbackFn({
+          data: { organizationId: orgId, confirm: "REBUILD" as const },
+        });
+        toast.message("Rebuild cancelled — original requirements are intact.");
+        setPhase("done");
+      } else if (insCount === 0) {
+        await rollbackFn({
+          data: { organizationId: orgId, confirm: "REBUILD" as const },
+        });
+        toast.error(
+          `Rebuild rolled back — no requirements were extracted (${fails.length} failed). Originals kept.`,
+        );
+        setPhase("done");
+      } else {
+        await commitFn({
+          data: { organizationId: orgId, confirm: "REBUILD" as const },
+        });
+        setPhase("done");
+        toast.success(
+          `Rebuilt from ${list.length - fails.length}/${list.length} sources · ${insCount} requirements inserted${
+            fails.length ? ` · ${fails.length} failed` : ""
+          }`,
+        );
+      }
+
+      // Single end-of-run invalidation (safe now — loop is done).
       qc.invalidateQueries({ queryKey: ["requirements", orgId] });
       qc.invalidateQueries({ queryKey: ["req-mappings-all", orgId] });
-      toast.success(
-        `Rebuilt from ${list.length - fails.length}/${list.length} sources · ${insCount} requirements inserted${
-          fails.length ? ` · ${fails.length} failed` : ""
-        }`,
-      );
     } catch (e) {
-      toast.error((e as Error).message);
+      // Hard failure before or during commit — try best-effort rollback so
+      // we never leave the org with a mixed set.
+      try {
+        await rollbackFn({
+          data: { organizationId: orgId, confirm: "REBUILD" as const },
+        });
+      } catch {}
+      toast.error(`${(e as Error).message} — originals kept.`);
       setPhase("idle");
+      qc.invalidateQueries({ queryKey: ["requirements", orgId] });
     }
   }
 

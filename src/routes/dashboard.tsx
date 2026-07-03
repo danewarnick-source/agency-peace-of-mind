@@ -353,8 +353,10 @@ function DashboardLayout() {
 
 
   return (
+    <DraftJobsProvider>
     <div className="flex h-screen h-[100dvh] flex-col overflow-hidden">
       <ImpersonationBanner />
+
 
       {/* Mobile shell — staff view only (below md) */}
       {isStaffView && !isMobilePreview && (

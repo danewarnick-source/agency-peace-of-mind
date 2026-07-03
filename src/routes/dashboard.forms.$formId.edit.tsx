@@ -283,7 +283,9 @@ function EditForm() {
                   </div>
                 )}
               </div>
-              <FrequencyControl frequency={frequency} schedule={schedule} setFrequency={setFrequency} setSchedule={setSchedule} />
+              <div className={managedByReq ? "pointer-events-none opacity-60" : ""} title={managedByReq ? "Managed by requirement" : undefined}>
+                <FrequencyControl frequency={frequency} schedule={schedule} setFrequency={setFrequency} setSchedule={setSchedule} />
+              </div>
             </div>
           </Card>
 

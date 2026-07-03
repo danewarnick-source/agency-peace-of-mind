@@ -1288,6 +1288,8 @@ function RequirementsPanel({
             </Button>
           )}
           <ManualRequirementDialog orgId={orgId} />
+          <RebuildDemoRequirementsButton orgId={orgId} />
+
         </div>
       </div>
 

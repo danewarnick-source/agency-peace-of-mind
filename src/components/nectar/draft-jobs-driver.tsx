@@ -95,6 +95,7 @@ export function DraftJobsProvider({ children }: { children: React.ReactNode }) {
   const getActive = useServerFn(getActiveDraftJobs);
   const processFn = useServerFn(processDraftChunk);
   const finalizeFn = useServerFn(finalizeRequirementsDraft);
+  const nudgeFn = useServerFn(nudgeDraftJob);
 
   const [progress, setProgress] = useState<Record<string, DraftJobProgress>>({});
   // Track which jobIds have an in-flight driver loop so polling doesn't

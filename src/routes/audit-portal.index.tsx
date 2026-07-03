@@ -21,12 +21,24 @@ function AuditPortalIndex() {
   return (
     <AuditPortalShell>
       {(auditor) => {
+        const navigate = useNavigate();
         const listFn = useServerFn(listMyAuditPackages);
         const listQ = useQuery({
           queryKey: ["my-audit-packages", auditor.auditor_account_id],
           queryFn: () => listFn(),
         });
         const rows = listQ.data ?? [];
+
+        // Single-grant convenience: land the auditor directly on their one
+        // package instead of a 1-row list. Multi-grant stays on the list.
+        useEffect(() => {
+          if (!listQ.isSuccess) return;
+          if (rows.length === 1) {
+            navigate({ to: "/audit-portal/$packageId", params: { packageId: rows[0].id }, replace: true });
+          }
+        }, [listQ.isSuccess, rows, navigate]);
+
+
 
         return (
           <div className="space-y-4">

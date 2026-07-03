@@ -1417,14 +1417,32 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
     const chunkFailures = (job.chunk_failures as unknown as string[]) ?? [];
     const chunkCount = job.total_chunks as number;
 
-    const { data: doc } = await supabase
+    const { data: doc, error: docErr } = await supabase
       .from("nectar_documents")
       .select(
         "id, organization_id, title, authoritative_kind, file_name, source, external_ids, assisted_setup_requested, raw_text",
       )
       .eq("id", job.document_id as string)
-      .single();
-    if (!doc) throw new Error("Draft job's document is missing");
+      .maybeSingle();
+    if (docErr) {
+      console.error("[finalizeRequirementsDraft] doc fetch error", {
+        jobId: data.jobId,
+        documentId: job.document_id,
+        code: docErr.code,
+        message: docErr.message,
+        details: docErr.details,
+      });
+      throw new Error(`Draft job's document could not be loaded: ${docErr.message}`);
+    }
+    if (!doc) {
+      console.error("[finalizeRequirementsDraft] doc missing", {
+        jobId: data.jobId,
+        documentId: job.document_id,
+        orgId: job.organization_id,
+        userId,
+      });
+      throw new Error("Draft job's document is missing (id=" + String(job.document_id) + ")");
+    }
     const rawText = ((doc.raw_text as string | null) ?? "").trim();
 
     const { data: orgRow } = await supabase

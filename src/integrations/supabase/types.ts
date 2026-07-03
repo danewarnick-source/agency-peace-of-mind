@@ -11036,8 +11036,11 @@ export type Database = {
       provider_authorized_codes: {
         Row: {
           added_by: string | null
+          archived_at: string | null
           carve_out: boolean
           code: string
+          confirmed_at: string | null
+          confirmed_by: string | null
           created_at: string
           id: string
           kind: string
@@ -11053,8 +11056,11 @@ export type Database = {
         }
         Insert: {
           added_by?: string | null
+          archived_at?: string | null
           carve_out?: boolean
           code: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
           created_at?: string
           id?: string
           kind?: string
@@ -11070,8 +11076,11 @@ export type Database = {
         }
         Update: {
           added_by?: string | null
+          archived_at?: string | null
           carve_out?: boolean
           code?: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
           created_at?: string
           id?: string
           kind?: string

@@ -11,15 +11,23 @@ import {
   Moon,
   CheckCircle2,
   Info,
+  Archive,
+  ArchiveRestore,
+  AlertTriangle,
+  HelpCircle,
 } from "lucide-react";
 import {
   listAuthorizedCodes,
   upsertAuthorizedCode,
   removeAuthorizedCode,
+  archiveAuthorizedCode,
+  unarchiveAuthorizedCode,
+  confirmAuthorizedCode,
 } from "@/lib/nectar-engine.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -29,26 +37,50 @@ import {
 } from "@/components/ui/select";
 
 /**
- * Prompt 34 — Authorized codes panel.
+ * Prompt 35 — Authorized codes panel.
  *
- * Source of truth for which service codes the provider is CONTRACTED to
- * deliver. NECTAR's coverage follows this set (active OR dormant), so a
- * dormant code doesn't lose audit protection when it's later activated.
- *
- * Addendum uploads expand this set: an addendum marked as authoritative can
- * authorize additional codes that NECTAR drafts requirements for under the
- * same propose/confirm flow as the original contract/SOW.
+ * A code stays in provider_authorized_codes forever once added (coverage
+ * follows the contract, not current activity). This panel FLAGS which
+ * authorized codes currently have no active client, so the display is honest
+ * — but never auto-removes anything. Admins may soft-archive (archived_at)
+ * unverified codes they don't recognize; archiving hides the row from the
+ * default list but the row is preserved for 7-year retention.
  */
+type CodeRowT = {
+  id: string | null;
+  code: string;
+  label: string | null;
+  status: string;
+  source: string;
+  notes: string | null;
+  inUse: boolean;
+  hasActiveClient: boolean;
+  displayStatus: "active" | "standby" | "standby-unverified" | "archived";
+  confirmedRequirements: number;
+  proposedRequirements: number;
+  archived_at: string | null;
+  confirmed_at: string | null;
+};
+
 export function AuthorizedCodesPanel({ orgId }: { orgId: string }) {
   const list = useServerFn(listAuthorizedCodes);
   const upsert = useServerFn(upsertAuthorizedCode);
   const remove = useServerFn(removeAuthorizedCode);
+  const archive = useServerFn(archiveAuthorizedCode);
+  const unarchive = useServerFn(unarchiveAuthorizedCode);
+  const confirmFn = useServerFn(confirmAuthorizedCode);
   const qc = useQueryClient();
 
+  const [showArchived, setShowArchived] = useState(false);
+
   const { data, isLoading } = useQuery({
-    queryKey: ["authorized-codes", orgId],
-    queryFn: () => list({ data: { organizationId: orgId } }),
+    queryKey: ["authorized-codes", orgId, showArchived],
+    queryFn: () =>
+      list({ data: { organizationId: orgId, includeArchived: showArchived } }),
   });
+
+  const invalidate = () =>
+    qc.invalidateQueries({ queryKey: ["authorized-codes", orgId] });
 
   const upsertM = useMutation({
     mutationFn: (vars: {
@@ -67,7 +99,7 @@ export function AuthorizedCodesPanel({ orgId }: { orgId: string }) {
         },
       }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["authorized-codes", orgId] });
+      invalidate();
       toast.success("Authorized code saved — NECTAR will keep its requirements live.");
     },
     onError: (e) => toast.error((e as Error).message),
@@ -76,8 +108,35 @@ export function AuthorizedCodesPanel({ orgId }: { orgId: string }) {
   const removeM = useMutation({
     mutationFn: (id: string) => remove({ data: { id } }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["authorized-codes", orgId] });
+      invalidate();
       toast.success("Removed from authorized set.");
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  const archiveM = useMutation({
+    mutationFn: (id: string) => archive({ data: { id } }),
+    onSuccess: () => {
+      invalidate();
+      toast.success("Archived. Row is preserved (7-year retention).");
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  const unarchiveM = useMutation({
+    mutationFn: (id: string) => unarchive({ data: { id } }),
+    onSuccess: () => {
+      invalidate();
+      toast.success("Restored to your authorized set.");
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  const confirmM = useMutation({
+    mutationFn: (id: string) => confirmFn({ data: { id } }),
+    onSuccess: () => {
+      invalidate();
+      toast.success("Confirmed — this code is verified as part of your contract.");
     },
     onError: (e) => toast.error((e as Error).message),
   });
@@ -86,6 +145,8 @@ export function AuthorizedCodesPanel({ orgId }: { orgId: string }) {
   const [newSource, setNewSource] = useState<
     "manual" | "contract" | "sow" | "addendum"
   >("contract");
+
+  const summary = data?.summary;
 
   return (
     <div className="space-y-4">
@@ -99,12 +160,47 @@ export function AuthorizedCodesPanel({ orgId }: { orgId: string }) {
             <p className="mt-1 text-muted-foreground">
               Every code your contract/SOW authorizes stays covered by NECTAR's
               rules and requirements, even if no client is currently using it.
-              When a dormant code activates (e.g. a client gets SLH), the
+              When a standby code activates (e.g. a client gets SLH), the
               requirements are already in place — no scramble.
             </p>
           </div>
         </div>
       </div>
+
+      {/* Prompt 35 — honest summary line */}
+      {summary && (
+        <div className="rounded-xl border border-border/60 bg-background/40 px-4 py-2.5 text-sm text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="font-medium text-foreground">
+            {summary.authorized}
+          </span>{" "}
+          authorized
+          <span className="opacity-60">·</span>
+          <span className="text-emerald-700 dark:text-emerald-300 font-medium">
+            {summary.withActiveClients}
+          </span>{" "}
+          with active clients
+          <span className="opacity-60">·</span>
+          <span className="text-amber-700 dark:text-amber-300 font-medium">
+            {summary.standby}
+          </span>{" "}
+          on standby
+          {summary.archivedCount > 0 && (
+            <>
+              <span className="opacity-60">·</span>
+              <span>{summary.archivedCount} archived</span>
+            </>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            <label className="text-xs flex items-center gap-2">
+              <Switch
+                checked={showArchived}
+                onCheckedChange={setShowArchived}
+              />
+              Show archived
+            </label>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-2xl border border-border/60 bg-background/60 p-4 backdrop-blur">
         <div className="text-sm font-medium mb-2 flex items-center gap-2">
@@ -124,9 +220,7 @@ export function AuthorizedCodesPanel({ orgId }: { orgId: string }) {
             <label className="text-xs text-muted-foreground">Source</label>
             <Select
               value={newSource}
-              onValueChange={(v) =>
-                setNewSource(v as typeof newSource)
-              }
+              onValueChange={(v) => setNewSource(v as typeof newSource)}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -146,11 +240,7 @@ export function AuthorizedCodesPanel({ orgId }: { orgId: string }) {
                 return;
               }
               upsertM.mutate(
-                {
-                  code: newCode.trim(),
-                  status: "dormant",
-                  source: newSource,
-                },
+                { code: newCode.trim(), status: "dormant", source: newSource },
                 { onSuccess: () => setNewCode("") },
               );
             }}
@@ -182,19 +272,19 @@ export function AuthorizedCodesPanel({ orgId }: { orgId: string }) {
           <div className="px-4 py-3 border-b border-border/60 flex flex-wrap items-center gap-2 text-xs">
             <Badge variant="secondary" className="gap-1">
               <ShieldCheck className="h-3 w-3" />
-              {data?.summary.total ?? 0} total covered
+              {summary?.total ?? 0} total covered
             </Badge>
             <Badge className="gap-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">
               <CheckCircle2 className="h-3 w-3" />
-              {data?.summary.active ?? 0} active
+              {summary?.withActiveClients ?? 0} with active clients
             </Badge>
-            <Badge variant="outline" className="gap-1 text-muted-foreground">
+            <Badge variant="outline" className="gap-1 text-amber-700 dark:text-amber-300 border-amber-400/40">
               <Moon className="h-3 w-3" />
-              {data?.summary.dormant ?? 0} dormant / standby
+              {summary?.standby ?? 0} standby
             </Badge>
-            {(data?.summary.inferredOnly ?? 0) > 0 && (
+            {(summary?.inferredOnly ?? 0) > 0 && (
               <Badge variant="outline" className="gap-1 text-amber-600 border-amber-400/40">
-                {data!.summary.inferredOnly} inferred from data — promote to lock
+                {summary!.inferredOnly} inferred from data — promote to lock
               </Badge>
             )}
           </div>
@@ -202,7 +292,7 @@ export function AuthorizedCodesPanel({ orgId }: { orgId: string }) {
             {(data?.codes ?? []).map((row) => (
               <CodeRow
                 key={row.id ?? `inferred-${row.code}`}
-                row={row}
+                row={row as CodeRowT}
                 onPromote={() =>
                   upsertM.mutate({
                     code: row.code,
@@ -210,8 +300,16 @@ export function AuthorizedCodesPanel({ orgId }: { orgId: string }) {
                     source: "manual",
                   })
                 }
+                onConfirm={() => row.id && confirmM.mutate(row.id)}
+                onArchive={() => row.id && archiveM.mutate(row.id)}
+                onUnarchive={() => row.id && unarchiveM.mutate(row.id)}
                 onRemove={() => row.id && removeM.mutate(row.id)}
-                removing={removeM.isPending}
+                busy={
+                  archiveM.isPending ||
+                  unarchiveM.isPending ||
+                  confirmM.isPending ||
+                  removeM.isPending
+                }
               />
             ))}
             {(data?.codes ?? []).length === 0 && (
@@ -231,46 +329,41 @@ export function AuthorizedCodesPanel({ orgId }: { orgId: string }) {
 function CodeRow({
   row,
   onPromote,
+  onConfirm,
+  onArchive,
+  onUnarchive,
   onRemove,
-  removing,
+  busy,
 }: {
-  row: {
-    id: string | null;
-    code: string;
-    label: string | null;
-    status: string;
-    source: string;
-    notes: string | null;
-    inUse: boolean;
-    confirmedRequirements: number;
-    proposedRequirements: number;
-  };
+  row: CodeRowT;
   onPromote: () => void;
+  onConfirm: () => void;
+  onArchive: () => void;
+  onUnarchive: () => void;
   onRemove: () => void;
-  removing: boolean;
+  busy: boolean;
 }) {
   const isInferred = !row.id;
+  const isArchived = row.displayStatus === "archived";
+
   return (
     <div className="p-4 flex flex-wrap items-center gap-3">
       <div className="font-mono text-base font-semibold tracking-tight min-w-[60px]">
         {row.code}
       </div>
-      <div className="flex flex-wrap gap-1.5 grow">
-        {row.inUse ? (
-          <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 gap-1">
-            <CheckCircle2 className="h-3 w-3" /> Active
-          </Badge>
-        ) : (
-          <Badge
-            variant="outline"
-            className="gap-1 text-muted-foreground border-border/80"
-          >
-            <Moon className="h-3 w-3" /> Standby (authorized, not in use)
-          </Badge>
-        )}
+      <div className="flex flex-wrap gap-1.5 grow items-center">
+        <StatusChip status={row.displayStatus} />
         <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
           {row.source}
         </Badge>
+        {row.confirmed_at && (
+          <Badge
+            variant="outline"
+            className="text-[10px] gap-1 border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+          >
+            <CheckCircle2 className="h-3 w-3" /> verified
+          </Badge>
+        )}
         {row.confirmedRequirements > 0 && (
           <Badge variant="secondary" className="text-[11px]">
             {row.confirmedRequirements} confirmed req
@@ -289,10 +382,35 @@ function CodeRow({
         {row.label && (
           <span className="text-xs text-muted-foreground">{row.label}</span>
         )}
-        {row.notes && (
+        {row.notes && !isArchived && (
           <span className="text-[11px] text-muted-foreground italic">
             {row.notes}
           </span>
+        )}
+
+        {/* Prompt 35 — confirm-or-archive prompt for unverified codes with no active client */}
+        {row.displayStatus === "standby-unverified" && row.id && (
+          <div className="w-full text-[11px] mt-1 flex flex-wrap items-center gap-2 text-amber-700 dark:text-amber-300">
+            <HelpCircle className="h-3 w-3" />
+            <span>Confirm this code belongs on your contract:</span>
+            <button
+              type="button"
+              className="underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-100 disabled:opacity-50"
+              onClick={onConfirm}
+              disabled={busy}
+            >
+              Yes, keep it
+            </button>
+            <span className="opacity-40">·</span>
+            <button
+              type="button"
+              className="underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-100 disabled:opacity-50"
+              onClick={onArchive}
+              disabled={busy}
+            >
+              Archive (soft — never deleted)
+            </button>
+          </div>
         )}
       </div>
       <div className="flex items-center gap-1">
@@ -300,18 +418,71 @@ function CodeRow({
           <Button size="sm" variant="outline" onClick={onPromote}>
             Lock as authorized
           </Button>
-        ) : (
+        ) : isArchived ? (
           <Button
             size="sm"
-            variant="ghost"
-            onClick={onRemove}
-            disabled={removing}
-            title="Remove from authorized set"
+            variant="outline"
+            onClick={onUnarchive}
+            disabled={busy}
+            title="Restore to authorized set"
           >
-            <Trash2 className="h-4 w-4" />
+            <ArchiveRestore className="h-4 w-4" />
           </Button>
+        ) : (
+          <>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onArchive}
+              disabled={busy}
+              title="Archive (soft — kept for 7-year retention)"
+            >
+              <Archive className="h-4 w-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onRemove}
+              disabled={busy}
+              title="Remove entirely (rare — prefer archive)"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </>
         )}
       </div>
     </div>
+  );
+}
+
+function StatusChip({ status }: { status: CodeRowT["displayStatus"] }) {
+  if (status === "active") {
+    return (
+      <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 gap-1">
+        <CheckCircle2 className="h-3 w-3" /> Active
+      </Badge>
+    );
+  }
+  if (status === "standby") {
+    return (
+      <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 gap-1">
+        <Moon className="h-3 w-3" /> Standby — no active client
+      </Badge>
+    );
+  }
+  if (status === "standby-unverified") {
+    return (
+      <Badge
+        variant="outline"
+        className="gap-1 border-amber-400/40 text-amber-700 dark:text-amber-300"
+      >
+        <AlertTriangle className="h-3 w-3" /> Standby — unverified source
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="gap-1 text-muted-foreground">
+      <Archive className="h-3 w-3" /> Archived
+    </Badge>
   );
 }

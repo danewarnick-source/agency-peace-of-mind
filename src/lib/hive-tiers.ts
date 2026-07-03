@@ -51,6 +51,11 @@ export const ADDON_CATALOG: Record<AddonId, AddonDef> = {
     name: "Priority Support",
     blurb: "Faster SLAs in the HIVE Support Queue.",
   },
+  hive_training: {
+    id: "hive_training",
+    name: "HIVE Training",
+    blurb: "DSPD-aligned course library with competency sign-off and verifiable certificates.",
+  },
 };
 
 export const TIER_CATALOG: TierDef[] = [

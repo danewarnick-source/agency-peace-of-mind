@@ -1084,7 +1084,20 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     // groups. Per-row inserts against a 260k-char SOW easily exceed the
     // server-function wall-clock; a handful of batches finishes in seconds.
     const aiRows: Array<{
-      row: Record<string, unknown>;
+      row: Parameters<typeof supabase.from<"nectar_requirements">>[""] extends never
+        ? never
+        : {
+            organization_id: string;
+            source_document_id: string;
+            origin: "document";
+            requirement_key: string;
+            title: string;
+            description: string | null;
+            category: "audit_doc" | "obligation" | "rule" | "billing";
+            source_citation: string;
+            applies_to: "company" | "staff" | "client";
+            approval_state: string | null;
+          };
       key: string;
     }> = [];
     for (const item of aiItems) {

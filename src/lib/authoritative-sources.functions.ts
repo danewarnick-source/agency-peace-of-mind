@@ -745,15 +745,16 @@ const ReqItem = z.object({
   citation: z.string().max(200).optional().nullable(),
   applies_to: z.enum(["company", "staff", "client"]).optional().nullable(),
 });
-const ReqExtraction = z.object({ requirements: z.array(ReqItem).max(200).default([]) });
+const ReqExtraction = z.object({ requirements: z.array(ReqItem).max(500).default([]) });
 
 // Split a long document into overlapping windows so NECTAR reads the entire
-// text, not just the first ~60k characters. Overlap prevents a clause that
-// straddles a window boundary from being missed on both sides.
+// text. Smaller windows keep model output well under its token ceiling so
+// JSON doesn't come back truncated. Overlap prevents a clause that straddles
+// a window boundary from being missed on both sides.
 function chunkDocumentText(
   text: string,
-  windowSize = 55_000,
-  overlap = 2_000,
+  windowSize = 30_000,
+  overlap = 1_500,
   maxChunks = 40,
 ): string[] {
   if (text.length <= windowSize) return [text];
@@ -775,50 +776,122 @@ function chunkDocumentText(
   return chunks;
 }
 
-async function extractRequirementsFromText(text: string) {
+// Single AI call for one text window. Returns the parsed items or throws a
+// classified error (429/402 bubble up; parse errors are typed so the caller
+// can retry with a smaller window).
+class ChunkParseError extends Error {}
+
+async function extractOnce(
+  windowText: string,
+  partLabel: string,
+): Promise<Array<z.infer<typeof ReqItem>>> {
+  const res = await gatewayFetch({
+    model: "google/gemini-2.5-flash",
+    messages: [
+      { role: "system", content: REQ_SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: `${partLabel}\n\nDOCUMENT TEXT:\n\n${windowText}`,
+      },
+    ],
+    response_format: { type: "json_object" },
+  });
+  if (res.status === 429) throw new Error("AI rate limit reached. Try again in a moment.");
+  if (res.status === 402)
+    throw new Error("AI credits exhausted. Add funds in Settings → Workspace → Usage.");
+  if (!res.ok) throw new ChunkParseError(`AI gateway error ${res.status}`);
+  const json = await res.json();
+  const content: string = json.choices?.[0]?.message?.content ?? "{}";
+  let raw: unknown;
+  try {
+    raw = JSON.parse(content);
+  } catch {
+    throw new ChunkParseError("model returned invalid/truncated JSON");
+  }
+  const parsed = ReqExtraction.safeParse(raw);
+  if (!parsed.success)
+    throw new ChunkParseError("model output failed schema validation");
+  return parsed.data.requirements;
+}
+
+// Extract with a single retry: if a window fails to parse, split it in half
+// and try each half once. Failed halves are reported (not silently dropped).
+async function extractChunkWithRetry(
+  windowText: string,
+  partLabel: string,
+): Promise<{ items: Array<z.infer<typeof ReqItem>>; failures: string[] }> {
+  try {
+    const items = await extractOnce(windowText, partLabel);
+    return { items, failures: [] };
+  } catch (err) {
+    if (!(err instanceof ChunkParseError)) throw err; // 429/402/etc → bubble
+    // Retry by splitting in half at a paragraph boundary where possible.
+    const mid = Math.floor(windowText.length / 2);
+    const boundary = windowText.lastIndexOf("\n\n", mid + 2_000);
+    const split = boundary > windowText.length * 0.2 ? boundary : mid;
+    const halves = [windowText.slice(0, split), windowText.slice(split)];
+    const items: Array<z.infer<typeof ReqItem>> = [];
+    const failures: string[] = [];
+    for (let h = 0; h < halves.length; h += 1) {
+      try {
+        const got = await extractOnce(halves[h], `${partLabel} (retry ${h + 1}/2)`);
+        items.push(...got);
+      } catch (retryErr) {
+        if (!(retryErr instanceof ChunkParseError)) throw retryErr;
+        failures.push(
+          `${partLabel} half ${h + 1}: ${(retryErr as Error).message}`,
+        );
+      }
+    }
+    return { items, failures };
+  }
+}
+
+// Concurrency-limited map: runs up to `limit` promises at a time.
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+  const workers = new Array(Math.min(limit, items.length)).fill(0).map(async () => {
+    while (true) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      results[i] = await fn(items[i], i);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+async function extractRequirementsFromText(text: string): Promise<{
+  items: Array<z.infer<typeof ReqItem>>;
+  chunkCount: number;
+  chunkFailures: string[];
+}> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
 
   const chunks = chunkDocumentText(text);
+  const perChunk = await mapWithConcurrency(chunks, 3, (chunk, i) =>
+    extractChunkWithRetry(chunk, `PART ${i + 1} OF ${chunks.length}`),
+  );
+
   const merged: Array<z.infer<typeof ReqItem>> = [];
   const seen = new Set<string>();
-
-  for (let i = 0; i < chunks.length; i += 1) {
-    const partHeader =
-      chunks.length > 1 ? `PART ${i + 1} OF ${chunks.length}\n\n` : "";
-    const res = await gatewayFetch({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        { role: "system", content: REQ_SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: `${partHeader}DOCUMENT TEXT:\n\n${chunks[i]}`,
-        },
-      ],
-      response_format: { type: "json_object" },
-    });
-    if (res.status === 429) throw new Error("AI rate limit reached. Try again in a moment.");
-    if (res.status === 402)
-      throw new Error("AI credits exhausted. Add funds in Settings → Workspace → Usage.");
-    if (!res.ok) throw new Error(`AI gateway error ${res.status}`);
-    const json = await res.json();
-    const content: string = json.choices?.[0]?.message?.content ?? "{}";
-    let raw: unknown;
-    try {
-      raw = JSON.parse(content);
-    } catch {
-      raw = {};
-    }
-    const parsed = ReqExtraction.safeParse(raw);
-    if (!parsed.success) continue;
-    for (const item of parsed.data.requirements) {
+  const chunkFailures: string[] = [];
+  for (const r of perChunk) {
+    chunkFailures.push(...r.failures);
+    for (const item of r.items) {
       const dedupeKey = `${item.title.trim().toLowerCase()}|${(item.citation ?? "").trim().toLowerCase()}`;
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
       merged.push(item);
     }
   }
-  return merged;
+  return { items: merged, chunkCount: chunks.length, chunkFailures };
 }
 
 

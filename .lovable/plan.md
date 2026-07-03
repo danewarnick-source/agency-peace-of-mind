@@ -1,32 +1,53 @@
-# Read entire document when NECTAR extracts requirements
+## What's happening
 
-## Problem
-`extractRequirementsFromText()` in `src/lib/authoritative-sources.functions.ts` (line 750) sends only the first 60,000 characters of a document to the AI:
+When you click Draft on the full Scope of Work (~260,000 chars), the server splits the document into ~5 windows and asks NECTAR to extract requirements from each one. But the current extractor has three silent failure modes that all end in "0 inserted, no message":
 
-```ts
-{ role: "user", content: `DOCUMENT TEXT:\n\n${text.slice(0, 60000)}` }
-```
+1. **Per-chunk cap of 200 items** — a dense SOW window can return more than 200 requirements. The Zod schema rejects the whole chunk, and the code does `continue` — that chunk contributes zero, silently.
+2. **Model output truncation** — with 55k-char input windows, the model's JSON output can hit its own output-token ceiling and come back truncated. `JSON.parse` throws, `continue` runs, silently zero.
+3. **Sequential chunks + one-row-at-a-time inserts** — 5 chunks × one large model call each, then hundreds of individual inserts, can exceed the server-function wall-clock and time out with a generic error instead of a diagnostic.
 
-A full State Scope of Work is much longer than that, so any requirement past the ~60k mark is never seen by NECTAR. Everything else (raw_text storage, review flow, requirement shape, DB writes, de-dupe by `requirement_key`) already works — only this one call cuts the input short.
+The UI only reports the final `inserted` and optional `message`, so all three modes look identical: "nothing happened."
 
-## Fix
-Change `extractRequirementsFromText` to walk the full document in sequential windows and merge the results, keeping the same return shape so the caller (`generateRequirementsFromSource`) is untouched.
+## Fix (scope: `src/lib/authoritative-sources.functions.ts` only)
 
-Details:
-- Chunk `text` into ~55,000-character windows with a ~2,000-character overlap at chunk boundaries. Overlap prevents a clause that straddles the cut from being missed on both sides.
-- Break on paragraph boundaries when possible (last `\n\n` before the window end) so we don't split mid-sentence; fall back to a hard cut if no boundary is found.
-- For each chunk, run the existing `gatewayFetch` call with the existing `REQ_SYSTEM_PROMPT` and `ReqExtraction` schema. Prepend a small "PART k of N" line to the user message so the model knows it's seeing part of a larger document.
-- Merge results in order. De-dupe within the extractor by a lowercased `title|citation` key so overlap regions don't produce doubled rows going into the DB layer (which then does its own key-based de-dupe).
-- Safety cap: process at most 40 chunks (~2.2M chars, well beyond a full SOW). If the document exceeds that, extract from the first 40 chunks and log a `platform_event` from the caller only if we ever hit it — but plain SOWs are far under that ceiling, so nothing changes for real inputs.
-- Preserve existing error handling: on 429/402/non-OK, throw the same errors so the caller's `try/catch` reports the same messages. If one chunk fails after some chunks have already succeeded, throw — the caller already surfaces AI errors clearly and the admin can retry cleanly.
+### 1. Smaller, safer chunks
 
-Nothing else changes:
-- `raw_text` storage — untouched.
-- Requirement shape, categories, `applies_to`, citation formatting, `requirement_key` — untouched.
-- De-dupe against existing requirements in the DB (`existingKeys`) — untouched.
-- Assisted-setup / `markDraftedByNectar` path — untouched.
-- Legacy `sow_clause` fallback — untouched.
-- `raw_text: text.slice(0, 50000)` in `ingestWebSource` (web-page snapshots) — out of scope; this task is specifically about long file uploads like the SOW, and web-page truncation is a separate rule.
+Change `chunkDocumentText` defaults from 55k / 2k overlap to **~30,000 chars with ~1,500 overlap** (still paragraph-aware, still hard-capped at 40 chunks). Smaller input → smaller expected output → far less risk of truncated JSON, and each call finishes faster.
 
-## Verification
-Upload the full State Scope of Work as an authoritative source, click "Draft requirements". Confirm the drafted list includes requirements from late sections of the document (e.g., billing/EVV sections past §10, appendices, attachments) — not only early sections. Cross-check by opening one late-section requirement and confirming its citation points to the correct high-numbered section.
+### 2. Don't silently drop a chunk
+
+In `extractRequirementsFromText`:
+
+- Raise `ReqExtraction`'s `.max(200)` to **`.max(500)`** so a dense chunk isn't wholesale rejected.
+- On JSON parse failure OR Zod parse failure OR non-OK response, **retry that chunk once** by splitting it in half and processing the halves. If the retry still fails, record the chunk index + reason in a `chunkFailures: string[]` array instead of silently continuing.
+- Keep the existing `429` / `402` early throws so credit/rate-limit errors still bubble up immediately.
+
+### 3. Run chunks with limited parallelism
+
+Process chunks with a concurrency of **3 at a time** (simple `Promise.all` over sliced batches). Cuts wall time roughly 3x for a 260k document without hammering the AI gateway.
+
+### 4. Batch-insert requirements
+
+Replace the per-row `.insert(...).select().single()` loop with a **single `.insert(rows).select("id")`** call per group of 100 rows, deduped up-front against `existingKeys`. Preserves the same `assisted` → `markDraftedByNectar` follow-up (run those after the bulk insert, over the returned ids). This turns hundreds of round-trips into a handful.
+
+### 5. Surface what happened
+
+`generateRequirementsFromSource` returns a richer object the existing toast code already handles gracefully:
+
+- On full success: `{ inserted, reason: "ok" }` (unchanged — existing green toast).
+- On partial: `{ inserted, reason: "partial", message: "Drafted N requirements. M of K sections of the document couldn't be read on this pass — click Draft again to retry those sections." }`.
+- On zero-with-failures: `{ inserted: 0, reason: "extractor_incomplete", message: "NECTAR couldn't finish reading this document (K sections failed). Click Draft again to retry — this often clears on a second pass. If it keeps failing, the parsed text may be malformed." }` and file the existing `platform_event` with the failure summary.
+- Existing `ai_error`, `no_text`, `no_requirements`, and `non_obligation_kind` paths stay exactly as they are.
+
+Idempotency is already handled by `existingKeys` + `requirement_key`, so re-clicking Draft only fills in what's missing — no duplicates.
+
+## Out of scope
+
+- No changes to the UI, the toast wording template, or the progress bar.
+- No changes to requirement shape, categories, `applies_to`, citation formatting, or the sow_clause fallback.
+- No changes to `raw_text` storage, upload, or parsing.
+- No model swap (staying on `google/gemini-2.5-flash`).
+
+## Success check
+
+Draft requirements from the full Scope of Work → the toast reports a few hundred requirements drafted, the Requirements list shows entries citing sections from both the beginning and the end of the document, and any chunk that failed is named in a follow-up warning instead of vanishing.

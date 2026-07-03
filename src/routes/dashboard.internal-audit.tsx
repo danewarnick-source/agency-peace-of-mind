@@ -434,6 +434,14 @@ export function InternalAuditPage() {
         <SummaryStat label="Minor" value={summary?.totals.minor ?? 0} tone="minor" />
       </div>
 
+      {/* Requirement scope (Prompt 33): dormant reqs never touch the score. */}
+      <div className="grid gap-3 md:grid-cols-4">
+        <ScopeStat label="In scope" value={summary?.inScopeCount ?? 0} />
+        <ScopeStat label="Dormant" value={summary?.dormantCount ?? 0} muted />
+        <ScopeStat label="Auto-satisfied" value={summary?.autoSatisfiedCount ?? 0} tone="ok" />
+        <ScopeStat label="Need evidence" value={summary?.needsEvidenceCount ?? 0} tone="warn" />
+      </div>
+
       {/* By-area breakdown */}
       {summary && (
         <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
@@ -560,6 +568,35 @@ function SummaryStat({
         <Icon className="h-4 w-4 text-muted-foreground" />
       </div>
       <div className="mt-1 text-3xl font-bold">{value}</div>
+    </div>
+  );
+}
+
+function ScopeStat({
+  label,
+  value,
+  tone,
+  muted,
+}: {
+  label: string;
+  value: number;
+  tone?: "ok" | "warn";
+  muted?: boolean;
+}) {
+  const toneCls =
+    tone === "ok"
+      ? "text-emerald-700"
+      : tone === "warn"
+      ? "text-amber-700"
+      : muted
+      ? "text-muted-foreground"
+      : "text-foreground";
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
+      <div className={`mt-1 text-3xl font-bold ${toneCls}`}>{value}</div>
     </div>
   );
 }

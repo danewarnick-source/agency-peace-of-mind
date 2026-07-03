@@ -61,6 +61,12 @@ export interface AuditSummary {
   totals: { critical: number; attention: number; minor: number; total: number };
   /** 0-100 — proportion of checks that came back clean, weighted by severity. */
   readinessScore: number;
+  /** Requirement-scope counters (Prompt 33). Dormant requirements do not
+   *  count toward the readiness score. */
+  inScopeCount: number;
+  dormantCount: number;
+  autoSatisfiedCount: number;
+  needsEvidenceCount: number;
   byArea: Record<FindingArea, number>;
   findings: AuditFinding[];
 }
@@ -112,6 +118,12 @@ export const runInternalAudit = createServerFn({ method: "POST" })
     const wantArea = data.area ?? null;
 
     const findings: AuditFinding[] = [];
+    let reqScopeCounts = {
+      inScopeCount: 0,
+      dormantCount: 0,
+      autoSatisfiedCount: 0,
+      needsEvidenceCount: 0,
+    };
     const include = (area: FindingArea) => !wantArea || wantArea === area;
 
     // ------- Lookups --------
@@ -745,6 +757,8 @@ export const runInternalAudit = createServerFn({ method: "POST" })
         }
       };
 
+      let autoSatisfiedCount = 0;
+      let needsEvidenceCount = 0;
       for (const r of inScopeReqs) {
         const b = bindingByReq.get(r.id);
         const base = {
@@ -756,6 +770,7 @@ export const runInternalAudit = createServerFn({ method: "POST" })
         };
 
         if (!b || b.satisfied_by === "unbound") {
+          needsEvidenceCount += 1;
           findings.push({
             ...base,
             id: `req-unbound-${r.id}`,
@@ -805,7 +820,10 @@ export const runInternalAudit = createServerFn({ method: "POST" })
             missTitle = `Requirement not resolvable — ${r.title}`;
         }
 
-        if (!satisfied) {
+        if (satisfied) {
+          autoSatisfiedCount += 1;
+        } else {
+          needsEvidenceCount += 1;
           findings.push({
             ...base,
             id: `req-evidence-${r.id}`,
@@ -816,6 +834,15 @@ export const runInternalAudit = createServerFn({ method: "POST" })
           });
         }
       }
+
+      const inScopeCount = inScopeReqs.length;
+      const dormantCount = Math.max(0, reqById.size - inScopeCount);
+      reqScopeCounts = {
+        inScopeCount,
+        dormantCount,
+        autoSatisfiedCount,
+        needsEvidenceCount,
+      };
 
       const unknownUnconfirmed = maps.filter((m) => m.scope_kind === "unknown" && !m.confirmed);
       if (unknownUnconfirmed.length) {
@@ -962,6 +989,10 @@ export const runInternalAudit = createServerFn({ method: "POST" })
       },
       totals,
       readinessScore,
+      inScopeCount: reqScopeCounts.inScopeCount,
+      dormantCount: reqScopeCounts.dormantCount,
+      autoSatisfiedCount: reqScopeCounts.autoSatisfiedCount,
+      needsEvidenceCount: reqScopeCounts.needsEvidenceCount,
       byArea,
       findings: filtered,
     };

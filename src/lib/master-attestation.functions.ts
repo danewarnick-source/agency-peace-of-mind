@@ -57,14 +57,22 @@ async function loadScopeSnapshot(sb: any, orgId: string) {
   return { held, inScopeCount };
 }
 
+// Master attestation signing text (Prompt 34). This is the PRIMARY body
+// rendered above the signature block and stored on every master_attestations
+// row as attestation_text. REDUCED_LIABILITY_NOTICE stays available for
+// smaller in-app confirmations but is not the master signing body.
+// Attestation wording pending healthcare-compliance attorney review before
+// first design-partner signature.
+export const MASTER_ATTESTATION_BODY = `By signing below, I confirm that I am an authorized representative of this provider agency and that I have reviewed the authoritative sources, compliance requirements, and supporting documents maintained in this system for the service codes my agency is authorized to deliver. I acknowledge that these requirements are derived from my agency's contract and State Scope of Work, and that my agency — not Hive or NECTAR — is solely responsible for meeting them, for the accuracy and completeness of all information and documents uploaded or entered, and for all submissions made to the State. I understand that Hive and NECTAR organize, surface, and help track this information but do not independently verify its accuracy, do not provide legal or compliance advice, and do not guarantee compliance with any State or federal requirement. I accept full responsibility for reviewing all forms, records, and documents for accuracy before relying on or submitting them. I understand this attestation covers the full set of requirements scoped to my authorized service codes as they exist on the date signed, and that I will be asked to re-attest when my authorized codes change, when my Scope of Work is updated, or on an annual basis.`;
+
 function buildAttestationText(scopeCodes: string[], count: number, version: number) {
   const codes = scopeCodes.length ? scopeCodes.join(", ") : "(no held codes on file)";
   return [
     `Master compliance attestation — version ${version}`,
+    `Service codes in scope: ${codes}`,
+    `Requirements covered: ${count}`,
     ``,
-    `You are attesting, on behalf of your organization, that you have reviewed the ${count} compliance requirement${count === 1 ? "" : "s"} currently in scope for your held service codes (${codes}), and that your organization intends to meet each of them.`,
-    ``,
-    REDUCED_LIABILITY_NOTICE,
+    MASTER_ATTESTATION_BODY,
   ].join("\n");
 }
 

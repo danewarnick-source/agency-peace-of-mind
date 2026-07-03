@@ -28,6 +28,7 @@ import { OrgSwitcher, DemoBadge, DemoOrgBanner } from "@/components/org-switcher
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getInboxUnreadCount } from "@/lib/inbox-messages.functions";
+import { useEntitlements } from "@/hooks/use-entitlements";
 import { BillingBanner } from "@/components/billing/billing-banner";
 import { DraftJobsProvider } from "@/components/nectar/draft-jobs-driver";
 import { DraftJobsHeaderPill } from "@/components/nectar/draft-jobs-header-pill";
@@ -252,7 +253,11 @@ function DashboardLayout() {
     isCommitteeMember            ? COMMITTEE_NAV :
     effectiveView === "hive_exec" ? execNav :
     effectiveView === "admin"     ? ADMIN_NAV : STAFF_NAV;
-  const nav: NavItem[] = baseNav.filter((n) => !n.perm || can(n.perm) || role === "admin" || role === "super_admin");
+  const { hasAddon } = useEntitlements();
+  const hiveTrainingEnabled = hasAddon("hive_training");
+  const nav: NavItem[] = baseNav
+    .filter((n) => !n.perm || can(n.perm) || role === "admin" || role === "super_admin")
+    .filter((n) => hiveTrainingEnabled || n.to !== "/dashboard/hive-training");
 
   // Load states for the State portal dropdown (executives only).
   useEffect(() => {

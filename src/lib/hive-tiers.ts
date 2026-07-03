@@ -12,7 +12,8 @@ export type AddonId =
   | "nectar_infusion" // Guided Mode, plain-language answers, NECTAR-accelerated controls
   | "internal_audit" // Internal Audit / QA audit-prep tool
   | "requirements_engine" // Requirements proposals + extraction approvals
-  | "priority_support"; // Faster SLA on Support Queue
+  | "priority_support" // Faster SLA on Support Queue
+  | "hive_training"; // DSPD-aligned course library, competency sign-off, verifiable certs
 
 export interface AddonDef {
   id: AddonId;
@@ -50,6 +51,11 @@ export const ADDON_CATALOG: Record<AddonId, AddonDef> = {
     name: "Priority Support",
     blurb: "Faster SLAs in the HIVE Support Queue.",
   },
+  hive_training: {
+    id: "hive_training",
+    name: "HIVE Training",
+    blurb: "DSPD-aligned course library with competency sign-off and verifiable certificates.",
+  },
 };
 
 export const TIER_CATALOG: TierDef[] = [
@@ -66,20 +72,21 @@ export const TIER_CATALOG: TierDef[] = [
     name: "Pro",
     tagline: "Adds NECTAR Infusion across the platform.",
     monthlyPriceCents: 49900,
-    addons: ["nectar_infusion"],
-    highlights: ["Everything in Starter", "NECTAR Infusion", "Guided Mode"],
+    addons: ["nectar_infusion", "hive_training"],
+    highlights: ["Everything in Starter", "NECTAR Infusion", "Guided Mode", "HIVE Training"],
   },
   {
     id: "enterprise",
     name: "Enterprise",
     tagline: "Audit-prep, requirements automation, and priority support.",
     monthlyPriceCents: 129900,
-    addons: ["nectar_infusion", "internal_audit", "requirements_engine", "priority_support"],
+    addons: ["nectar_infusion", "internal_audit", "requirements_engine", "priority_support", "hive_training"],
     highlights: [
       "Everything in Pro",
       "Internal Audit / QA",
       "Requirements Engine",
       "Priority Support",
+      "HIVE Training",
     ],
   },
   {
@@ -87,7 +94,7 @@ export const TIER_CATALOG: TierDef[] = [
     name: "Custom",
     tagline: "Bespoke entitlement set — negotiated per company.",
     monthlyPriceCents: null,
-    addons: ["nectar_infusion", "internal_audit", "requirements_engine", "priority_support"],
+    addons: ["nectar_infusion", "internal_audit", "requirements_engine", "priority_support", "hive_training"],
     highlights: ["Custom pricing", "Configurable add-on bundle"],
   },
 ];

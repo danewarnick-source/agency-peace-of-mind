@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -27,6 +27,9 @@ import { RequirePermission } from "@/components/rbac-guard";
 import { CustomAttributesSection } from "@/components/custom-attributes-section";
 import { LifecyclePanel } from "@/components/lifecycle-panel";
 import { SuggestedTopicsInput } from "@/components/ce/suggested-topics-input";
+import { getRosterTrainingStatus } from "@/lib/hive-training-roster.functions";
+import { useEntitlements } from "@/hooks/use-entitlements";
+import { StaffTrainingStrip, type StaffTrainingStatus } from "@/components/training/staff-training-strip";
 
 function genPassword(len = 14) {
   const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
@@ -133,6 +136,21 @@ export function EmployeesPage() {
     for (const row of staffPii ?? []) m.set(row.staff_id, row);
     return m;
   }, [staffPii]);
+
+  const fetchTrainingStatus = useServerFn(getRosterTrainingStatus);
+  const { hasAddon } = useEntitlements();
+  const hiveTrainingEnabled = hasAddon("hive_training");
+  const { data: trainingStatus } = useQuery({
+    enabled: !!org && hiveTrainingEnabled,
+    queryKey: ["roster-training-status", org?.organization_id],
+    queryFn: async () => await fetchTrainingStatus({ data: { organizationId: org!.organization_id } }),
+  });
+  const trainingByStaff = useMemo(() => {
+    const m = new Map<string, StaffTrainingStatus[]>();
+    for (const row of trainingStatus ?? []) m.set(row.userId, row.trainings);
+    return m;
+  }, [trainingStatus]);
+
 
 
   const { data: invites } = useQuery({
@@ -420,10 +438,11 @@ export function EmployeesPage() {
                     ceSuggestedTopics: topics,
                   });
                 };
+                const trainings = trainingByStaff.get(m.user_id) ?? [];
                 return (
+                  <React.Fragment key={m.id}>
                   <tr
-                    key={m.id}
-                    className="cursor-pointer h-12 border-b border-border last:border-0 hover:bg-muted/50 transition-colors"
+                    className="cursor-pointer h-12 border-b border-border/50 hover:bg-muted/50 transition-colors"
                     onClick={openProfile}
                   >
                     <td className="px-4 py-2 font-medium whitespace-nowrap">
@@ -508,6 +527,15 @@ export function EmployeesPage() {
                       </div>
                     </td>
                   </tr>
+                  {trainings.length > 0 && (
+                    <tr className="border-b border-border last:border-0 bg-muted/20">
+                      <td colSpan={6} className="px-4 pb-2">
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">DSPD required trainings</div>
+                        <StaffTrainingStrip trainings={trainings} hiveTrainingEnabled={hiveTrainingEnabled} />
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 );
               })}
             </tbody>

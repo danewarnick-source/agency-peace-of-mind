@@ -6936,6 +6936,7 @@ export type Database = {
       }
       hive_training_courses: {
         Row: {
+          baseline_key: string | null
           catalog_id: string | null
           cert_validity_months: number
           cover_url: string | null
@@ -6949,6 +6950,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          baseline_key?: string | null
           catalog_id?: string | null
           cert_validity_months?: number
           cover_url?: string | null
@@ -6962,6 +6964,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          baseline_key?: string | null
           catalog_id?: string | null
           cert_validity_months?: number
           cover_url?: string | null

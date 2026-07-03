@@ -491,70 +491,48 @@ function SourceRow({
   });
   const qc = useQueryClient();
   const startFn = useServerFn(startRequirementsDraft);
-  const processFn = useServerFn(processDraftChunk);
-  const finalizeFn = useServerFn(finalizeRequirementsDraft);
-  const [progress, setProgress] = useState(0);
+  const driverProgress = useDraftJobProgress(source.id);
   const generate = useMutation({
     mutationFn: async () => {
-      setProgress(2);
       const start = await startFn({ data: { documentId: source.id } });
-      // Early-exit reasons (no_text / non_obligation_kind) come back with
-      // jobId === null — surface exactly like the old flow did.
-      if (!start.jobId) {
-        return {
-          inserted: 0,
-          reason: start.reason,
-          message: (start as { message?: string }).message,
-        };
-      }
-      const total = start.totalChunks;
-      // Bounded concurrency of 3 — same as the old server-side loop, but now
-      // each round is one round-trip so progress moves in real time.
-      let cursor = 0;
-      let done = 0;
-      const CONCURRENCY = 3;
-      const worker = async () => {
-        while (true) {
-          const i = cursor++;
-          if (i >= total) return;
-          const r = await processFn({
-            data: { jobId: start.jobId!, chunkIndex: i },
-          });
-          done = Math.max(done, r.processed);
-          // Cap at 90% so the finalize step has visible headroom.
-          setProgress(Math.min(90, Math.round((done / total) * 90)));
-        }
-      };
-      await Promise.all(
-        Array.from({ length: Math.min(CONCURRENCY, total) }, () => worker()),
-      );
-      setProgress(93);
-      const finalize = await finalizeFn({ data: { jobId: start.jobId } });
-      return finalize;
+      return start;
     },
     onSuccess: (r) => {
-      setProgress(100);
-      const inserted = (r as { inserted: number }).inserted ?? 0;
-      const message = (r as { message?: string }).message;
-      if (inserted > 0) {
-        toast.success(
-          `NECTAR drafted ${inserted} requirement${inserted === 1 ? "" : "s"} from this source. Review them in the Requirements tab.`,
-        );
-      } else {
+      // Early-exit reasons (no_text / non_obligation_kind) come back with
+      // jobId === null — surface immediately, no background work started.
+      const start = r as { jobId: string | null; reason?: string; message?: string };
+      if (!start.jobId) {
         toast.warning(
-          message ??
-            "NECTAR read the document but didn't find clear requirement language. You can add them by hand from the Requirements tab.",
+          start.message ??
+            "NECTAR read the document but didn't find clear requirement language.",
           { duration: 9000 },
         );
+        return;
       }
-      qc.invalidateQueries({ queryKey: ["requirements", orgId] });
-      window.setTimeout(() => setProgress(0), 600);
+      // The global DraftJobsProvider will pick this job up on its next poll
+      // and drive it to completion — even across page navigation.
+      qc.invalidateQueries({ queryKey: ["nectar-draft-jobs", orgId] });
+      toast.info(
+        "Drafting started. NECTAR will keep working in the background — you can navigate away and check back.",
+        { duration: 6000 },
+      );
     },
     onError: (e: Error) => {
-      setProgress(0);
       toast.error(e.message);
     },
   });
+
+  // Effective "in progress" state combines the initial start-request
+  // roundtrip with any live driver progress for this document.
+  const isDrafting = generate.isPending || driverProgress !== null;
+  const progress = driverProgress?.progressPct ?? (generate.isPending ? 2 : 0);
+  const etaLabel = driverProgress ? formatEta(driverProgress.etaMs) : "";
+  const draftingLabel = driverProgress
+    ? driverProgress.finalizing
+      ? `Finalizing… ${Math.round(progress)}%`
+      : `Drafting… ${Math.round(progress)}%${etaLabel ? ` · ${etaLabel}` : ""}`
+    : `Drafting… ${Math.round(progress)}%`;
+
 
 
 

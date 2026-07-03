@@ -1386,12 +1386,13 @@ export const rebuildRequirementsForOrg = createServerFn({ method: "POST" })
       throw new Error("Admin or super-admin only.");
     }
 
-    // Wipe existing requirements for this org only (mappings and bindings
-    // cascade / go orphan-safe via existing FKs — intended).
-    const { error: delErr } = await supabase
-      .from("nectar_requirements")
-      .delete()
-      .eq("organization_id", data.organizationId);
+    // Wipe existing requirements for this org only. Uses a SECURITY DEFINER
+    // helper that temporarily suspends triggers so it can also clear the
+    // append-only nectar_requirement_approval_events rows tied to those
+    // requirements (which would otherwise block the cascade delete).
+    const { error: delErr } = await supabase.rpc(
+      "rebuild_wipe_requirements_tns_fake",
+    );
     if (delErr) throw new Error(`Delete failed: ${delErr.message}`);
 
     // Enumerate eligible authoritative sources (not ignored, obligation-bearing).

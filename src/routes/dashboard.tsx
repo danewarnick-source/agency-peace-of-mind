@@ -727,7 +727,7 @@ function SidebarBody({
               >
                 <Icon className="h-4 w-4 opacity-60" />
                 <span className="flex-1 text-left">{item.label}</span>
-                <LockIcon />
+                <Lock className="h-3 w-3 opacity-70" />
               </button>
             );
           }

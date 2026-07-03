@@ -162,8 +162,6 @@ export function DraftJobsProvider({ children }: { children: React.ReactNode }) {
         );
       }
       const durations = [...job.chunkDurationsMs];
-      let cursor = 0;
-      let cancelled = false;
 
       const runWorker = async () => {
         while (!cancelled) {

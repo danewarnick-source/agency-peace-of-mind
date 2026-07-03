@@ -63,7 +63,9 @@ import {
   listAuthoritativeSources,
   markAsAuthoritativeSource,
   listRequirements,
-  generateRequirementsFromSource,
+  startRequirementsDraft,
+  processDraftChunk,
+  finalizeRequirementsDraft,
   upsertRequirement,
 
   setRequirementReviewStatus,
@@ -486,12 +488,47 @@ function SourceRow({
     onError: (e: Error) => toast.error(e.message),
   });
   const qc = useQueryClient();
-  const genFn = useServerFn(generateRequirementsFromSource);
+  const startFn = useServerFn(startRequirementsDraft);
+  const processFn = useServerFn(processDraftChunk);
+  const finalizeFn = useServerFn(finalizeRequirementsDraft);
   const [progress, setProgress] = useState(0);
   const generate = useMutation({
-    mutationFn: () => genFn({ data: { documentId: source.id } }),
-    onMutate: () => {
-      setProgress(4);
+    mutationFn: async () => {
+      setProgress(2);
+      const start = await startFn({ data: { documentId: source.id } });
+      // Early-exit reasons (no_text / non_obligation_kind) come back with
+      // jobId === null — surface exactly like the old flow did.
+      if (!start.jobId) {
+        return {
+          inserted: 0,
+          reason: start.reason,
+          message: (start as { message?: string }).message,
+        };
+      }
+      const total = start.totalChunks;
+      // Bounded concurrency of 3 — same as the old server-side loop, but now
+      // each round is one round-trip so progress moves in real time.
+      let cursor = 0;
+      let done = 0;
+      const CONCURRENCY = 3;
+      const worker = async () => {
+        while (true) {
+          const i = cursor++;
+          if (i >= total) return;
+          const r = await processFn({
+            data: { jobId: start.jobId!, chunkIndex: i },
+          });
+          done = Math.max(done, r.processed);
+          // Cap at 90% so the finalize step has visible headroom.
+          setProgress(Math.min(90, Math.round((done / total) * 90)));
+        }
+      };
+      await Promise.all(
+        Array.from({ length: Math.min(CONCURRENCY, total) }, () => worker()),
+      );
+      setProgress(93);
+      const finalize = await finalizeFn({ data: { jobId: start.jobId } });
+      return finalize;
     },
     onSuccess: (r) => {
       setProgress(100);
@@ -509,7 +546,6 @@ function SourceRow({
         );
       }
       qc.invalidateQueries({ queryKey: ["requirements", orgId] });
-      // Let the bar reach 100% briefly before resetting
       window.setTimeout(() => setProgress(0), 600);
     },
     onError: (e: Error) => {
@@ -518,21 +554,7 @@ function SourceRow({
     },
   });
 
-  // Simulated progress while NECTAR works server-side. Creeps toward 92%
-  // and snaps to 100% on completion — gives the admin honest "still working"
-  // feedback on long documents without claiming false precision.
-  useEffect(() => {
-    if (!generate.isPending) return;
-    const id = window.setInterval(() => {
-      setProgress((p) => {
-        if (p >= 92) return p;
-        // Slower as we approach the ceiling
-        const step = p < 30 ? 6 : p < 60 ? 3 : p < 80 ? 1.5 : 0.6;
-        return Math.min(92, p + step);
-      });
-    }, 450);
-    return () => window.clearInterval(id);
-  }, [generate.isPending]);
+
 
 
   const hasDraft = !!stats && stats.total > 0;

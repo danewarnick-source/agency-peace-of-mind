@@ -11,6 +11,8 @@ import {
   NON_OBLIGATION_KINDS,
   stripHtmlToText,
   extractRequirementsFromText,
+  extractChunkWithRetry,
+  chunkDocumentRanges,
   EXPLAIN_SYSTEM_PROMPT,
   ExplainResp,
 } from "./authoritative-sources.server";
@@ -1134,7 +1136,445 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     return { inserted, reason: "ok" as const };
   });
 
+// =============================================================
+// Chunk-at-a-time drafting pipeline.
+//
+// The monolithic generateRequirementsFromSource above stalls on long SOWs
+// because a single server-fn call has to do chunking, N Gemini calls,
+// dedup, batch inserts, and dozens of HIVE-ticket writes — easily blowing
+// past the worker wall-clock. The pipeline below splits the work into
+// three narrow server fns the client drives step-by-step, so each call
+// stays well inside the wall-clock and the client sees real progress.
+// =============================================================
+
+type DraftItem = {
+  title: string;
+  description?: string | null;
+  category?: "audit_doc" | "obligation" | "rule" | "billing" | null;
+  citation?: string | null;
+  applies_to?: "company" | "staff" | "client" | null;
+};
+
+async function loadDraftJobDoc(
+  supabase: import("@supabase/supabase-js").SupabaseClient,
+  jobId: string,
+  userId: string,
+) {
+  const { data: job, error } = await supabase
+    .from("nectar_draft_jobs")
+    .select(
+      "id, organization_id, document_id, status, total_chunks, processed_chunks, chunk_ranges, extracted_items, chunk_failures",
+    )
+    .eq("id", jobId)
+    .single();
+  if (error || !job) throw new Error(error?.message ?? "Draft job not found");
+  await requireOrgMembership(
+    supabase,
+    userId,
+    job.organization_id as string,
+    "manager",
+  );
+  return job;
+}
+
+export const startRequirementsDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ documentId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: doc, error: dErr } = await supabase
+      .from("nectar_documents")
+      .select(
+        "id, organization_id, title, raw_text, authoritative_kind, is_authoritative_source, file_name, mime_type, metadata",
+      )
+      .eq("id", data.documentId)
+      .single();
+    if (dErr || !doc) throw new Error(dErr?.message ?? "Document not found");
+    await requireOrgMembership(
+      supabase,
+      userId,
+      doc.organization_id as string,
+      "manager",
+    );
+
+    if (!doc.is_authoritative_source)
+      throw new Error("Document is not marked as an authoritative source.");
+
+    const meta = (doc.metadata ?? {}) as { ignored?: boolean };
+    if (meta.ignored) {
+      throw new Error(
+        "This source is set aside (ignored). Reactivate it before drafting requirements.",
+      );
+    }
+    if (NON_OBLIGATION_KINDS.has((doc.authoritative_kind as string) ?? "")) {
+      return {
+        jobId: null as string | null,
+        totalChunks: 0,
+        reason: "non_obligation_kind" as const,
+        message:
+          "This document is labeled as a tool or template. NECTAR doesn't extract obligations from review/audit tools — change the kind if it actually contains state or contract requirements.",
+      };
+    }
+
+    const rawText = ((doc.raw_text as string | null) ?? "").trim();
+    const letterCount = (rawText.match(/[a-zA-Z]/g) ?? []).length;
+    if (rawText.length < 400 || letterCount < 100) {
+      const looksLikePdf =
+        (doc.mime_type as string | null)?.toLowerCase().includes("pdf") ||
+        ((doc.file_name as string | null) ?? "").toLowerCase().endsWith(".pdf");
+      return {
+        jobId: null as string | null,
+        totalChunks: 0,
+        reason: "no_text" as const,
+        message: looksLikePdf
+          ? "Couldn't read enough text from this PDF — it may be a scanned image. Try uploading a text-based PDF (export from Word/Pages, or run OCR first). You can still add requirements by hand from the Requirements tab."
+          : "No readable text was extracted from this file. You can still add requirements by hand from the Requirements tab.",
+      };
+    }
+
+    const ranges = chunkDocumentRanges(rawText);
+    const { data: jobRow, error: jobErr } = await supabase
+      .from("nectar_draft_jobs")
+      .insert({
+        organization_id: doc.organization_id as string,
+        document_id: doc.id as string,
+        created_by: userId,
+        status: "extracting",
+        total_chunks: ranges.length,
+        processed_chunks: 0,
+        chunk_ranges: ranges as unknown as Json,
+        extracted_items: [] as unknown as Json,
+        chunk_failures: [] as unknown as Json,
+      })
+      .select("id")
+      .single();
+    if (jobErr || !jobRow) throw new Error(jobErr?.message ?? "Could not start draft job");
+
+    return {
+      jobId: jobRow.id as string,
+      totalChunks: ranges.length,
+      reason: "ok" as const,
+    };
+  });
+
+export const processDraftChunk = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({ jobId: z.string().uuid(), chunkIndex: z.number().int().min(0) })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const job = await loadDraftJobDoc(supabase, data.jobId, userId);
+    const ranges = (job.chunk_ranges as unknown as Array<[number, number]>) ?? [];
+    if (data.chunkIndex >= ranges.length)
+      throw new Error(`Chunk ${data.chunkIndex} out of range (total ${ranges.length})`);
+    const [start, end] = ranges[data.chunkIndex];
+
+    // Fetch just the raw_text for this doc. RLS already vetted the job row.
+    const { data: doc } = await supabase
+      .from("nectar_documents")
+      .select("raw_text")
+      .eq("id", job.document_id as string)
+      .single();
+    const rawText = ((doc?.raw_text as string | null) ?? "").trim();
+    const window = rawText.slice(start, end);
+
+    let items: DraftItem[] = [];
+    let failures: string[] = [];
+    try {
+      const got = await extractChunkWithRetry(
+        window,
+        `PART ${data.chunkIndex + 1} OF ${ranges.length}`,
+      );
+      items = got.items;
+      failures = got.failures;
+    } catch (err) {
+      failures = [
+        `PART ${data.chunkIndex + 1}: ${(err as Error).message.slice(0, 300)}`,
+      ];
+    }
+
+    const priorItems = (job.extracted_items as unknown as DraftItem[]) ?? [];
+    const priorFailures = (job.chunk_failures as unknown as string[]) ?? [];
+    const nextProcessed = (job.processed_chunks as number) + 1;
+    const { error: updErr } = await supabase
+      .from("nectar_draft_jobs")
+      .update({
+        processed_chunks: nextProcessed,
+        extracted_items: [...priorItems, ...items] as unknown as Json,
+        chunk_failures: [...priorFailures, ...failures] as unknown as Json,
+      })
+      .eq("id", data.jobId);
+    if (updErr) throw new Error(`Failed to persist chunk result: ${updErr.message}`);
+
+    return {
+      processed: nextProcessed,
+      total: ranges.length,
+      itemsAdded: items.length,
+      failuresAdded: failures,
+    };
+  });
+
+export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ jobId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const job = await loadDraftJobDoc(supabase, data.jobId, userId);
+    const items = (job.extracted_items as unknown as DraftItem[]) ?? [];
+    const chunkFailures = (job.chunk_failures as unknown as string[]) ?? [];
+    const chunkCount = job.total_chunks as number;
+
+    const { data: doc } = await supabase
+      .from("nectar_documents")
+      .select(
+        "id, organization_id, title, authoritative_kind, file_name, source, external_ids, assisted_setup_requested, raw_text",
+      )
+      .eq("id", job.document_id as string)
+      .single();
+    if (!doc) throw new Error("Draft job's document is missing");
+    const rawText = ((doc.raw_text as string | null) ?? "").trim();
+
+    const { data: orgRow } = await supabase
+      .from("organizations")
+      .select("name")
+      .eq("id", doc.organization_id as string)
+      .maybeSingle();
+    const orgName = (orgRow?.name as string | null) ?? null;
+
+    // Dedupe against existing requirements for this source.
+    const { data: existing } = await supabase
+      .from("nectar_requirements")
+      .select("requirement_key")
+      .eq("organization_id", doc.organization_id as string)
+      .eq("source_document_id", doc.id as string);
+    const existingKeys = new Set(
+      (existing ?? []).map((r) => (r.requirement_key as string) ?? ""),
+    );
+
+    const ext = (doc.external_ids ?? {}) as {
+      source_url?: string;
+      captured_at?: string;
+    };
+    const isWeb = (doc.source as string | null) === "web" && !!ext.source_url;
+    const webSuffix = isWeb
+      ? ` (per ${ext.source_url}${
+          ext.captured_at ? `, captured ${ext.captured_at.slice(0, 10)}` : ""
+        })`
+      : "";
+    const baseLabel = (doc.title as string) ?? "Source";
+    const assisted =
+      (doc.assisted_setup_requested as boolean | null) === true;
+
+    type AiRow = {
+      organization_id: string;
+      source_document_id: string;
+      origin: "document";
+      requirement_key: string;
+      title: string;
+      description: string | null;
+      category: "audit_doc" | "obligation" | "rule" | "billing";
+      source_citation: string;
+      applies_to: "company" | "staff" | "client";
+      approval_state: string | null;
+    };
+    const rows: Array<{ row: AiRow; key: string }> = [];
+    for (const item of items) {
+      const titleClean = item.title.trim().slice(0, 200);
+      if (!titleClean) continue;
+      const key = `${(doc.authoritative_kind as string) ?? "src"}:ai:${titleClean}:${item.citation ?? ""}`
+        .toLowerCase()
+        .slice(0, 120);
+      if (existingKeys.has(key)) continue;
+      existingKeys.add(key);
+      const citation = item.citation
+        ? `${baseLabel} — ${item.citation}${webSuffix}`
+        : `${baseLabel}${webSuffix}`;
+      rows.push({
+        key,
+        row: {
+          organization_id: doc.organization_id as string,
+          source_document_id: doc.id as string,
+          origin: "document",
+          requirement_key: key,
+          title: titleClean,
+          description: item.description ?? null,
+          category: item.category ?? "obligation",
+          source_citation: citation,
+          applies_to: item.applies_to ?? "company",
+          approval_state: assisted ? "nectar_drafted" : null,
+        },
+      });
+    }
+
+    let inserted = 0;
+    const BATCH = 100;
+    for (let i = 0; i < rows.length; i += BATCH) {
+      const slice = rows.slice(i, i + BATCH);
+      const { data: ins, error } = await supabase
+        .from("nectar_requirements")
+        .insert(slice.map((s) => s.row))
+        .select("id");
+      if (error) throw new Error(`Requirement insert failed: ${error.message}`);
+      inserted += ins?.length ?? 0;
+      if (assisted && ins) {
+        for (const r of ins) {
+          await markDraftedByNectar({
+            organizationId: doc.organization_id as string,
+            requirementId: r.id as string,
+          });
+        }
+      }
+    }
+
+    // Fire-and-forget HIVE tickets for unmapped requirements / unknown codes.
+    // Serialized on purpose (helper handles its own errors).
+    const KNOWN_REQ_CATEGORIES = new Set([
+      "audit_doc",
+      "obligation",
+      "rule",
+      "billing",
+    ]);
+    for (const item of items) {
+      const titleClean = item.title.trim().slice(0, 200);
+      if (!titleClean) continue;
+      const cat = (item.category ?? "").toString();
+      if (cat && KNOWN_REQ_CATEGORIES.has(cat)) continue;
+      const reqKey = `${(doc.authoritative_kind as string) ?? "src"}:ai:${titleClean}:${item.citation ?? ""}`
+        .toLowerCase()
+        .slice(0, 120);
+      await reportPlatformEvent({
+        eventKind: "requirement_unmapped",
+        organizationId: doc.organization_id as string,
+        organizationName: orgName,
+        title: `Unmapped requirement — "${titleClean.slice(0, 120)}"`,
+        detail: `NECTAR extracted a requirement from document ${doc.id} ("${(doc.title as string) ?? doc.file_name}") but could not map it to a known HIVE category bucket. Extracted title: "${titleClean}". Citation: ${item.citation ?? "(none)"}. Applies to: ${item.applies_to ?? "(unset)"}.`,
+        category: "mapping_gap",
+        severity: "low",
+        dedupeKey: `requirement_unmapped:${doc.id}:${reqKey}`,
+        eventRef: {
+          documentId: doc.id,
+          requirementKey: reqKey,
+          extractedTitle: titleClean,
+        },
+      });
+    }
+
+    // Unknown-code scan across the raw text (moved verbatim from the old
+    // monolithic handler so ticket coverage doesn't regress).
+    const knownCodes = new Set(EVV_SERVICE_CODES.map((c) => c.code));
+    const codeCandidates = new Set<string>();
+    const codeRegexes: RegExp[] = [
+      /\bcodes?\s+([A-Z]{2,4}\d?)\b/g,
+      /\bservice\s+codes?\s+([A-Z]{2,4}\d?)\b/g,
+      /\(([A-Z]{2,4}\d?)\)/g,
+      /\b([A-Z]{2,4}\d?)\s*[-—–]\s*[A-Z][a-z]/g,
+    ];
+    for (const rx of codeRegexes) {
+      let m: RegExpExecArray | null;
+      while ((m = rx.exec(rawText)) !== null) {
+        const tok = m[1];
+        if (!tok) continue;
+        if (knownCodes.has(tok)) continue;
+        if (
+          /^(THE|AND|FOR|ALL|NOT|YOU|ARE|WAS|WITH|FROM|HAS|HAD|USA|LLC|INC|CFR|USC|DSP|DHS|DHHS|DSPD|SOW|PDF|PCSP|HCBS|EVV|UPI|UEVV)$/.test(
+            tok,
+          )
+        )
+          continue;
+        codeCandidates.add(tok);
+      }
+    }
+    for (const code of codeCandidates) {
+      const snippetMatch = rawText.match(
+        new RegExp(`.{0,80}\\b${code}\\b.{0,80}`),
+      );
+      const snippet = snippetMatch ? snippetMatch[0].replace(/\s+/g, " ").trim() : null;
+      await reportPlatformEvent({
+        eventKind: "unknown_code_structure",
+        organizationId: doc.organization_id as string,
+        organizationName: orgName,
+        title: `Unknown code/structure "${code}" — no HIVE template`,
+        detail: `Authoritative source ${doc.id} ("${(doc.title as string) ?? doc.file_name}") references "${code}", which is not in HIVE's known service-code registry.${snippet ? ` Context: "${snippet.slice(0, 280)}"` : ""}`,
+        category: "expansion_need",
+        severity: "low",
+        dedupeKey: `unknown_code_structure:${code}`,
+        eventRef: { documentId: doc.id, unknownCode: code, contextSnippet: snippet },
+      });
+    }
+
+    // Mark job done.
+    await supabase
+      .from("nectar_draft_jobs")
+      .update({
+        status: "done",
+        inserted_count: inserted,
+      })
+      .eq("id", data.jobId);
+
+    if (inserted === 0) {
+      if (chunkFailures.length > 0) {
+        await reportPlatformEvent({
+          eventKind: "ai_error",
+          organizationId: doc.organization_id as string,
+          organizationName: orgName,
+          title: `Extractor couldn't finish "${(doc.title as string) ?? doc.file_name}"`,
+          detail: `Document ${doc.id} was split into ${chunkCount} sections; ${chunkFailures.length} failed to parse and yielded 0 requirements. First failure: ${chunkFailures[0]?.slice(0, 300)}`,
+          category: "parsing_failure",
+          severity: "medium",
+          dedupeKey: `extractor_incomplete:${doc.id}`,
+          eventRef: { documentId: doc.id, chunkCount, failedChunks: chunkFailures.length },
+        });
+        return {
+          inserted: 0,
+          chunkCount,
+          chunkFailures,
+          reason: "extractor_incomplete" as const,
+          message: `NECTAR couldn't finish reading this document — ${chunkFailures.length} of ${chunkCount} sections failed to parse. Click Draft again to retry.`,
+        };
+      }
+      await reportPlatformEvent({
+        eventKind: "no_requirements_found",
+        organizationId: doc.organization_id as string,
+        organizationName: orgName,
+        title: `Extractor returned 0 requirements from "${(doc.title as string) ?? doc.file_name}"`,
+        detail: `Document ${doc.id} parsed cleanly but produced no drafted requirements.`,
+        category: "parsing_failure",
+        severity: "low",
+        dedupeKey: `no_requirements:${doc.id}`,
+        eventRef: { documentId: doc.id },
+      });
+      return {
+        inserted: 0,
+        chunkCount,
+        chunkFailures,
+        reason: "no_requirements" as const,
+        message:
+          "NECTAR read the document but didn't find clear requirement language. You can add them by hand from the Requirements tab.",
+      };
+    }
+
+    if (chunkFailures.length > 0) {
+      return {
+        inserted,
+        chunkCount,
+        chunkFailures,
+        reason: "partial" as const,
+        message: `Drafted ${inserted} requirements. ${chunkFailures.length} of ${chunkCount} sections of the document couldn't be read on this pass — click Draft again to retry those sections.`,
+      };
+    }
+
+    return { inserted, chunkCount, chunkFailures: [] as string[], reason: "ok" as const };
+  });
+
 // ---------- Attestation log ----------
+
 
 export const recordAttestation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

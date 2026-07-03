@@ -342,6 +342,136 @@ export type Database = {
           },
         ]
       }
+      audit_package_access: {
+        Row: {
+          audit_package_id: string
+          auditor_account_id: string
+          granted_at: string
+          granted_by: string
+          id: string
+          revoked_at: string | null
+        }
+        Insert: {
+          audit_package_id: string
+          auditor_account_id: string
+          granted_at?: string
+          granted_by: string
+          id?: string
+          revoked_at?: string | null
+        }
+        Update: {
+          audit_package_id?: string
+          auditor_account_id?: string
+          granted_at?: string
+          granted_by?: string
+          id?: string
+          revoked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_package_access_audit_package_id_fkey"
+            columns: ["audit_package_id"]
+            isOneToOne: false
+            referencedRelation: "audit_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_package_access_auditor_account_id_fkey"
+            columns: ["auditor_account_id"]
+            isOneToOne: false
+            referencedRelation: "auditor_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_package_subjects: {
+        Row: {
+          added_at: string
+          audit_package_id: string
+          id: string
+          subject_id: string
+          subject_label: string | null
+          subject_type: string
+        }
+        Insert: {
+          added_at?: string
+          audit_package_id: string
+          id?: string
+          subject_id: string
+          subject_label?: string | null
+          subject_type: string
+        }
+        Update: {
+          added_at?: string
+          audit_package_id?: string
+          id?: string
+          subject_id?: string
+          subject_label?: string | null
+          subject_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_package_subjects_audit_package_id_fkey"
+            columns: ["audit_package_id"]
+            isOneToOne: false
+            referencedRelation: "audit_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_packages: {
+        Row: {
+          created_at: string
+          created_by: string
+          date_range_end: string
+          date_range_start: string
+          id: string
+          notes: string | null
+          organization_id: string
+          released_at: string | null
+          state_agency: string
+          status: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          date_range_end: string
+          date_range_start: string
+          id?: string
+          notes?: string | null
+          organization_id: string
+          released_at?: string | null
+          state_agency: string
+          status?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          date_range_end?: string
+          date_range_start?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          released_at?: string | null
+          state_agency?: string
+          status?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_packages_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_packet_items: {
         Row: {
           created_at: string
@@ -458,6 +588,39 @@ export type Database = {
           timeline_end?: string | null
           timeline_start?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      auditor_accounts: {
+        Row: {
+          agency_name: string
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          agency_name: string
+          created_at?: string
+          email: string
+          full_name: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          agency_name?: string
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -15303,6 +15466,7 @@ export type Database = {
           similarity: number
         }[]
       }
+      is_active_auditor: { Args: { _uid: string }; Returns: boolean }
       is_admin_anywhere: { Args: { _user: string }; Returns: boolean }
       is_company_executive: {
         Args: { _org: string; _user: string }

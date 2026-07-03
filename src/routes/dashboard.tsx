@@ -130,6 +130,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/summaries", label: "Summaries", icon: FileText },
   { to: "/dashboard/hub/finances", label: "Finances", icon: Receipt, perm: "view_billing", feature: "pba_ledgers" },
   { to: "/dashboard/hive-training", label: "HIVE Training", icon: GraduationCap, feature: "hive_training" },
+  { to: "/dashboard/state-audit", label: "State Audit", icon: ShieldCheck, feature: "state_audit", perm: "view_analytics" },
   { to: "/dashboard/reports", label: "Reports", icon: FileText, perm: "export_reports" },
   { to: "/dashboard/inbox", label: "Inbox", icon: Inbox },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },

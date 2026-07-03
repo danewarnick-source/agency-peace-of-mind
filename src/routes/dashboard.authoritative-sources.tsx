@@ -64,6 +64,9 @@ import {
   markAsAuthoritativeSource,
   listRequirements,
   generateRequirementsFromSource,
+  startRequirementsDraft,
+  processDraftChunk,
+  finalizeRequirementsDraft,
   upsertRequirement,
 
   setRequirementReviewStatus,

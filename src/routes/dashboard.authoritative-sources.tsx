@@ -4285,3 +4285,92 @@ function FormPickerForRequirement({
     </div>
   );
 }
+
+// Admin-only demo-data rebuild for the TNS FAKE workspace. Deletes existing
+// requirements for the org and re-extracts from every active authoritative
+// source (Prompt 39). Guarded by role check + typed "REBUILD" confirmation.
+const TNS_FAKE_ORG_ID = "7fabcf5d-f826-487f-8730-8b0c3f1969bb";
+
+function RebuildDemoRequirementsButton({ orgId }: { orgId: string }) {
+  const { data: org } = useCurrentOrg();
+  const role = (org?.role as string | null) ?? null;
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const rebuildFn = useServerFn(rebuildRequirementsForOrg);
+  const rebuild = useMutation({
+    mutationFn: () =>
+      rebuildFn({ data: { organizationId: orgId, confirm: "REBUILD" as const } }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["requirements", orgId] });
+      qc.invalidateQueries({ queryKey: ["req-mappings-all", orgId] });
+      toast.success(
+        `Rebuilt from ${r.documentsProcessed}/${r.eligibleCount} sources · ${r.totalInserted} requirements inserted${
+          r.failures.length ? ` · ${r.failures.length} failed` : ""
+        }`,
+      );
+      setOpen(false);
+      setTyped("");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  if (orgId !== TNS_FAKE_ORG_ID) return null;
+  if (role !== "admin" && role !== "super_admin") return null;
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 border-red-500/50 text-[11px] text-red-700 hover:bg-red-500/10 dark:text-red-200"
+          title="Delete this workspace's requirements and re-extract them from every active authoritative source. Demo workspace only."
+        >
+          Re-extract from sources (rebuild)
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Rebuild requirements from sources</DialogTitle>
+          <DialogDescription>
+            This deletes every requirement in the TNS FAKE workspace and
+            re-runs NECTAR extraction against each active authoritative source.
+            Authorized codes and source documents are preserved. This action
+            cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Type <span className="font-mono font-semibold">REBUILD</span> to confirm.
+          </p>
+          <Input
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            placeholder="REBUILD"
+            autoFocus
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={rebuild.isPending}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={typed !== "REBUILD" || rebuild.isPending}
+            onClick={() => rebuild.mutate()}
+          >
+            {rebuild.isPending ? (
+              <>
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                Rebuilding…
+              </>
+            ) : (
+              "Delete and re-extract"
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

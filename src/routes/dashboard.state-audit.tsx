@@ -66,9 +66,9 @@ function StateAuditPage() {
       </header>
 
       <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
-        <PackageList orgId={org.id} selectedId={selectedId} onSelect={setSelectedId} />
+        <PackageList orgId={org.organization_id} selectedId={selectedId} onSelect={setSelectedId} />
         {selectedId ? (
-          <PackageDetail packageId={selectedId} orgId={org.id} />
+          <PackageDetail packageId={selectedId} orgId={org.organization_id} />
         ) : (
           <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-muted-foreground">
             Select or create an audit package to begin.

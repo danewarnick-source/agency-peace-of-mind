@@ -3702,3 +3702,187 @@ function FinalConfirmRow({
     </li>
   );
 }
+
+// ---------- Requirement binding editor ----------
+// Additive per-row control: declare HOW this requirement is satisfied so the
+// audit can resolve it automatically. Writes to public.requirement_bindings.
+type SatisfiedBy =
+  | "unbound"
+  | "auto"
+  | "form"
+  | "credential"
+  | "training"
+  | "upload"
+  | "attestation";
+
+const NATIVE_FEATURES: { value: string; label: string }[] = [
+  { value: "daily_logs", label: "Daily logs" },
+  { value: "evv", label: "EVV / timesheets" },
+  { value: "med_admin", label: "Medication administration (eMAR)" },
+  { value: "incidents", label: "Incident reports" },
+  { value: "hrc", label: "Human Rights Committee" },
+  { value: "billing", label: "Billing 520 submissions" },
+  { value: "scheduling", label: "Scheduling / coverage" },
+];
+
+const SATISFIED_BY_OPTIONS: { value: SatisfiedBy; label: string }[] = [
+  { value: "unbound", label: "Not set" },
+  { value: "auto", label: "Auto (native feature)" },
+  { value: "form", label: "Form submission" },
+  { value: "credential", label: "Credential / certification" },
+  { value: "training", label: "Training course" },
+  { value: "upload", label: "Document upload" },
+  { value: "attestation", label: "Attestation" },
+];
+
+function RequirementBindingEditor({ requirementId }: { requirementId: string }) {
+  const listFn = useServerFn(listBindings);
+  const setFn = useServerFn(setBinding);
+  const qc = useQueryClient();
+
+  const q = useQuery({
+    queryKey: ["requirement-binding", requirementId],
+    queryFn: () => listFn({ data: { requirementIds: [requirementId] } }),
+  });
+
+  const current = (q.data?.bindings ?? []).find(
+    (b) => b.requirement_id === requirementId,
+  );
+
+  const [satisfiedBy, setSatisfiedBy] = useState<SatisfiedBy>(
+    (current?.satisfied_by as SatisfiedBy) ?? "unbound",
+  );
+  const [nativeFeature, setNativeFeature] = useState<string>(
+    current?.native_feature ?? "",
+  );
+  const [engineRef, setEngineRef] = useState<string>(current?.engine_ref ?? "");
+
+  useEffect(() => {
+    if (current) {
+      setSatisfiedBy((current.satisfied_by as SatisfiedBy) ?? "unbound");
+      setNativeFeature(current.native_feature ?? "");
+      setEngineRef(current.engine_ref ?? "");
+    }
+  }, [current?.id, current?.satisfied_by, current?.native_feature, current?.engine_ref]);
+
+  const save = useMutation({
+    mutationFn: (vars: {
+      satisfied_by: SatisfiedBy;
+      native_feature?: string | null;
+      engine_ref?: string | null;
+    }) =>
+      setFn({
+        data: {
+          requirementId,
+          satisfied_by: vars.satisfied_by,
+          native_feature: vars.native_feature ?? null,
+          engine_ref: vars.engine_ref ?? null,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Binding saved");
+      qc.invalidateQueries({ queryKey: ["requirement-binding", requirementId] });
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Failed to save binding"),
+  });
+
+  const showNative = satisfiedBy === "auto";
+  const showEngine =
+    satisfiedBy === "form" ||
+    satisfiedBy === "credential" ||
+    satisfiedBy === "training";
+
+  const engineLabel =
+    satisfiedBy === "form"
+      ? "Form id or key"
+      : satisfiedBy === "credential"
+        ? "Certification type id or key"
+        : "Training course id or key";
+
+  const dirty =
+    satisfiedBy !== ((current?.satisfied_by as SatisfiedBy) ?? "unbound") ||
+    (nativeFeature ?? "") !== (current?.native_feature ?? "") ||
+    (engineRef ?? "") !== (current?.engine_ref ?? "");
+
+  return (
+    <div className="mt-2 rounded-md border border-border/60 bg-muted/30 p-2 text-xs">
+      <div className="mb-1 flex items-center gap-2 text-muted-foreground">
+        <ShieldCheck className="h-3 w-3" />
+        <span className="font-medium">How this is satisfied</span>
+        {current?.updated_at && (
+          <span className="ml-auto text-[10px] opacity-70">
+            Last saved {new Date(current.updated_at).toLocaleDateString()}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-[180px]">
+          <Label className="text-[10px] text-muted-foreground">Satisfied by</Label>
+          <Select
+            value={satisfiedBy}
+            onValueChange={(v) => setSatisfiedBy(v as SatisfiedBy)}
+          >
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SATISFIED_BY_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value} className="text-xs">
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {showNative && (
+          <div className="min-w-[200px]">
+            <Label className="text-[10px] text-muted-foreground">Native feature</Label>
+            <Select value={nativeFeature} onValueChange={setNativeFeature}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Select a feature…" />
+              </SelectTrigger>
+              <SelectContent>
+                {NATIVE_FEATURES.map((o) => (
+                  <SelectItem key={o.value} value={o.value} className="text-xs">
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {showEngine && (
+          <div className="min-w-[220px] flex-1">
+            <Label className="text-[10px] text-muted-foreground">{engineLabel}</Label>
+            <Input
+              value={engineRef}
+              onChange={(e) => setEngineRef(e.target.value)}
+              placeholder="paste id or key"
+              className="h-8 text-xs"
+            />
+          </div>
+        )}
+
+        <Button
+          size="sm"
+          className="h-8"
+          disabled={!dirty || save.isPending || q.isLoading}
+          onClick={() =>
+            save.mutate({
+              satisfied_by: satisfiedBy,
+              native_feature: showNative ? nativeFeature || null : null,
+              engine_ref: showEngine ? engineRef || null : null,
+            })
+          }
+        >
+          {save.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+          Save
+        </Button>
+      </div>
+    </div>
+  );
+}
+

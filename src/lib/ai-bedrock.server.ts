@@ -393,6 +393,17 @@ export async function gatewayFetch(
       }
     }
 
+    // Map Bedrock's stopReason to an OpenAI-style finish_reason so callers can
+    // detect truncation ("length") vs a normal stop and react (e.g. retry with
+    // smaller input). Bedrock values: end_turn | tool_use | max_tokens |
+    // stop_sequence | guardrail_intervened | content_filtered.
+    const stop = out.stopReason;
+    let finishReason: "stop" | "length" | "tool_calls" | "content_filter" = "stop";
+    if (toolCalls.length || stop === "tool_use") finishReason = "tool_calls";
+    else if (stop === "max_tokens") finishReason = "length";
+    else if (stop === "content_filtered" || stop === "guardrail_intervened")
+      finishReason = "content_filter";
+
     const openAIResponse = {
       id: `bedrock-${Date.now()}`,
       object: "chat.completion",
@@ -405,10 +416,11 @@ export async function gatewayFetch(
             content: textOut || null,
             ...(toolCalls.length ? { tool_calls: toolCalls } : {}),
           },
-          finish_reason: toolCalls.length ? "tool_calls" : "stop",
+          finish_reason: finishReason,
         },
       ],
     };
+
 
     return {
       ok: true,

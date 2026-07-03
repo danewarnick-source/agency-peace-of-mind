@@ -512,9 +512,12 @@ function SourceRow({
   const etaLabel = driverProgress ? formatEta(driverProgress.etaMs) : "";
   const draftingLabel = driverProgress
     ? driverProgress.finalizing
-      ? `Finalizing… ${Math.round(progress)}%`
-      : `Drafting… ${Math.round(progress)}%${etaLabel ? ` · ${etaLabel}` : ""}`
-    : `Drafting… ${Math.round(progress)}%`;
+      ? `Finalizing ${driverProgress.totalChunks} sections…`
+      : `Reading section ${Math.min(
+          driverProgress.processedChunks + 1,
+          driverProgress.totalChunks,
+        )} of ${driverProgress.totalChunks}…${etaLabel ? ` · ${etaLabel}` : ""}`
+    : `Starting…`;
 
 
 

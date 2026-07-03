@@ -108,7 +108,7 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 import type { Permission } from "@/lib/rbac";
-type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean; perm?: Permission; feature?: string };
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean; perm?: Permission; feature?: string; isLocked?: boolean };
 
 const STAFF_NAV: NavItem[] = [
   { to: "/dashboard", label: "My Caseload", icon: LayoutDashboard, exact: true },

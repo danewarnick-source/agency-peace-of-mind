@@ -18,8 +18,11 @@ function fmtMoney(cents: number): string {
 function CompaniesPage() {
   const kpisFn = useServerFn(getExecKpis);
   const listFn = useServerFn(listCompanies);
+  const pendingFn = useServerFn(getPendingUpgradeRequestCount);
   const kpisQ = useQuery({ queryKey: ["hive-exec-kpis"], queryFn: () => kpisFn(), refetchInterval: 30_000 });
   const listQ = useQuery({ queryKey: ["hive-exec-companies"], queryFn: () => listFn(), refetchInterval: 30_000 });
+  const pendingQ = useQuery({ queryKey: ["hive-exec-upgrade-pending-count"], queryFn: () => pendingFn(), refetchInterval: 30_000 });
+
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");

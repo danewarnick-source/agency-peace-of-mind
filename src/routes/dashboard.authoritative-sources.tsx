@@ -96,6 +96,12 @@ import {
   providerConfirmRequirement,
   providerRejectRequirement,
 } from "@/lib/nectar-approvals.functions";
+import {
+  listBindings,
+  setBinding,
+} from "@/lib/requirement-bindings.functions";
+
+
 
 
 

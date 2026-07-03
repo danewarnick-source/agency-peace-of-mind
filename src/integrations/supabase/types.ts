@@ -5376,9 +5376,11 @@ export type Database = {
           fields: Json
           frequency: string
           id: string
+          managed_by_requirement: boolean
           name: string
           organization_id: string
           published_at: string | null
+          requirement_id: string | null
           schedule: Json
           settings: Json
           status: string
@@ -5396,9 +5398,11 @@ export type Database = {
           fields?: Json
           frequency?: string
           id?: string
+          managed_by_requirement?: boolean
           name: string
           organization_id: string
           published_at?: string | null
+          requirement_id?: string | null
           schedule?: Json
           settings?: Json
           status?: string
@@ -5416,9 +5420,11 @@ export type Database = {
           fields?: Json
           frequency?: string
           id?: string
+          managed_by_requirement?: boolean
           name?: string
           organization_id?: string
           published_at?: string | null
+          requirement_id?: string | null
           schedule?: Json
           settings?: Json
           status?: string
@@ -5430,6 +5436,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forms_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_requirements"
             referencedColumns: ["id"]
           },
         ]

@@ -295,14 +295,14 @@ export function DraftJobsProvider({ children }: { children: React.ReactNode }) {
       const now = Date.now();
       if (now - lastNudge.current < 1_000) return;
       lastNudge.current = now;
-      // We can't sign the body client-side (no shared secret), so instead
-      // we call the authenticated startRequirementsDraft-style pathway:
-      // POST to /api/nectar/draft-nudge (no such route exists) — fall back
-      // to just letting the driver auto-resume on reopen. See note above.
-      // NOTE: intentionally no-op for now; server-side background loop is
-      // seeded by startRequirementsDraft's initial fireDraftTick. Leaving
-      // the hook in place so we can wire an authenticated nudge later.
-      void jobs;
+      // Fire authenticated server-fn nudges so the server-side tick keeps
+      // chunking after the tab is hidden or closed. Best-effort — the
+      // browser may cancel some requests on pagehide, but any completed
+      // request will run runDraftTick up to its 45s budget. Idempotency
+      // in processDraftChunk makes overlap with the client driver safe.
+      for (const j of jobs) {
+        void nudgeFn({ data: { jobId: j.jobId } }).catch(() => undefined);
+      }
     };
     const onVis = () => {
       if (document.visibilityState === "hidden") nudge();

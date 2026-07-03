@@ -240,7 +240,7 @@ export const ingestDocument = createServerFn({ method: "POST" })
         .update({
           parse_status: "parsed",
           parsed_at: new Date().toISOString(),
-          raw_text: text.slice(0, 50000),
+          raw_text: text,
           parse_error: autofillError ? `autofill: ${autofillError}` : null,
           // Backfill any fields the parser identified more confidently than the user input
           fiscal_year: data.fiscalYear ?? ai.fiscal_year ?? null,

@@ -1163,7 +1163,7 @@ async function loadDraftJobDoc(
   const { data: job, error } = await supabase
     .from("nectar_draft_jobs")
     .select(
-      "id, organization_id, document_id, status, total_chunks, processed_chunks, chunk_ranges, extracted_items, chunk_failures",
+      "id, organization_id, document_id, status, total_chunks, processed_chunks, processed_indices, started_at, chunk_durations_ms, chunk_ranges, extracted_items, chunk_failures",
     )
     .eq("id", jobId)
     .single();

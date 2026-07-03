@@ -261,10 +261,10 @@ function DashboardLayout() {
   const { isEnabled: isFeatureOn } = useOrgFeatures();
   const nav: NavItem[] = baseNav
     .filter((n) => !n.perm || can(n.perm) || role === "admin" || role === "super_admin")
-    // Master-Controller gating: hide any nav item whose feature is toggled OFF for this org.
-    .filter((n) => isFeatureOn(n.feature))
     // Legacy add-on tier gate still applies to HIVE Training (paid entitlement).
-    .filter((n) => hiveTrainingEntitled || n.to !== "/dashboard/hive-training");
+    .filter((n) => hiveTrainingEntitled || n.to !== "/dashboard/hive-training")
+    // Master-Controller gating: keep item visible; mark isLocked when feature is OFF.
+    .map((n) => ({ ...n, isLocked: n.feature ? !isFeatureOn(n.feature) : false }));
 
 
   // Load states for the State portal dropdown (executives only).

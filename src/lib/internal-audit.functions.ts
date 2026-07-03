@@ -792,10 +792,13 @@ export const runInternalAudit = createServerFn({ method: "POST" })
             missTitle = `Document not on file — ${r.title}`;
             break;
           case "attestation":
-            // Master-attestation coverage lands in Prompt 32. Until then,
-            // fall back to any active attestation-style document on file.
-            satisfied = activeDocByReq.has(r.id);
-            missTitle = `Attestation needed — ${r.title}`;
+            // Prompt 32 — an attestation-type requirement is satisfied when
+            // a current (non-due) master attestation covers its service_code.
+            // Falls back to any per-requirement document attestation on file.
+            satisfied = isCoveredByMaster(r.service_code) || activeDocByReq.has(r.id);
+            missTitle = masterCurrent && masterIsDue
+              ? `Re-attestation needed — ${r.title}`
+              : `Attestation needed — ${r.title}`;
             break;
           default:
             satisfied = false;

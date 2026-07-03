@@ -1,4 +1,3 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -103,22 +102,6 @@ import {
 
 
 
-export const Route = createFileRoute("/dashboard/authoritative-sources")({
-  head: () => ({
-    meta: [
-      { title: "Authoritative Sources — HIVE" },
-      {
-        name: "description",
-        content:
-          "Upload your State SOW, contracts, and DSPD/DHS requirement documents. NECTAR reads from these as the source of truth.",
-      },
-    ],
-  }),
-  validateSearch: (s: Record<string, unknown>) => ({
-    focus: typeof s.focus === "string" ? s.focus : undefined,
-  }),
-  component: AuthoritativeSourcesPage,
-});
 
 const AUTH_KINDS = [
   { value: "state_sow", label: "State Scope of Work (SOW)" },

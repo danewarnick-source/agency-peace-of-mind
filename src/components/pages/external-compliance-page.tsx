@@ -1,4 +1,3 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
@@ -24,10 +23,6 @@ import {
   type ExternalSystem,
 } from "@/lib/external-compliance.functions";
 
-export const Route = createFileRoute("/dashboard/external-compliance")({
-  head: () => ({ meta: [{ title: "External Compliance — HIVE" }] }),
-  component: ExternalCompliancePage,
-});
 
 type Item = {
   id: string;

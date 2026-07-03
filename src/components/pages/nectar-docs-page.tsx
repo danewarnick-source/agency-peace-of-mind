@@ -1,4 +1,3 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -47,19 +46,6 @@ import {
   deleteDocument,
 } from "@/lib/nectar-documents.functions";
 
-export const Route = createFileRoute("/dashboard/nectar-docs")({
-  head: () => ({
-    meta: [
-      { title: "Company Docs — HIVE" },
-      {
-        name: "description",
-        content:
-          "Client and staff document uploads — PCSPs, 1056 budgets, intake/referrals, assessments, certifications, training records. NECTAR parses every file on upload.",
-      },
-    ],
-  }),
-  component: NectarDocsPage,
-});
 
 const DOC_TYPES = [
   { value: "all", label: "All types" },

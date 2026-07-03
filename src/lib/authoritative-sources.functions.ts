@@ -1378,7 +1378,7 @@ const TNS_FAKE_ORG_ID = "7fabcf5d-f826-487f-8730-8b0c3f1969bb";
 // metadata.rebuild_pending = true alongside the originals, then swapped
 // atomically by commitRebuildForOrg (or discarded by rollbackRebuildForOrg).
 async function assertTnsFakeRebuildAdmin(
-  supabase: Awaited<ReturnType<typeof requireSupabaseAuth>>["context"]["supabase"] extends infer S ? S : never,
+  supabase: any,
   userId: string,
   organizationId: string,
 ) {

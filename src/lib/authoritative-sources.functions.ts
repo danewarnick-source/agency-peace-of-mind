@@ -6,60 +6,23 @@ import type { Json } from "@/integrations/supabase/types";
 import { reportPlatformEvent } from "./hive-tickets.functions";
 import { markDraftedByNectar } from "./nectar-approvals.functions";
 import { EVV_SERVICE_CODES } from "./evv-codes";
-
-
-
+import {
+  AUTH_KINDS,
+  NON_OBLIGATION_KINDS,
+  stripHtmlToText,
+  extractRequirementsFromText,
+  EXPLAIN_SYSTEM_PROMPT,
+  ExplainResp,
+} from "./authoritative-sources.server";
 import { gatewayFetch } from "@/lib/ai-bedrock.server";
 
 // =============================================================
 // Foundation B — Authoritative sources, derived requirements,
 // and the immutable attestation log.
 // HIVE organizes; the company's uploaded documents are the source of truth.
+// Shared helpers/prompts/schemas live in ./authoritative-sources.server.ts
+// to avoid ?tss-serverfn-split ReferenceErrors from sibling declarations.
 // =============================================================
-
-const AUTH_KINDS = [
-  "state_sow",
-  "provider_contract",
-  "dspd_requirement",
-  "dhs_requirement",
-  "public_record",
-  "tool_template",
-  "other",
-] as const;
-
-// Document kinds where NECTAR should NOT try to extract obligations.
-// Tools/templates (review tools, audit checklists, scoring forms) describe
-// HOW someone reviews compliance, not WHAT the provider must do — drafting
-// from them produces the misleading "no requirement language" message.
-const NON_OBLIGATION_KINDS = new Set<string>(["tool_template"]);
-
-// ---------- Web-page authoritative sources ----------
-// NECTAR reads content that is directly rendered on the page itself.
-// Files linked FROM the page (PDFs, attachments) are NOT followed —
-// the user must download those and upload them separately.
-
-function stripHtmlToText(html: string): { title: string | null; text: string } {
-  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  const title = titleMatch ? titleMatch[1].trim().slice(0, 200) : null;
-  let cleaned = html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-    .replace(/<!--[\s\S]*?-->/g, " ")
-    .replace(/<\/(p|div|section|article|li|h[1-6]|tr|br)>/gi, "\n")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, " ");
-  cleaned = cleaned
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&[a-z]+;/gi, " ");
-  cleaned = cleaned.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
-  return { title, text: cleaned };
-}
 
 export const ingestWebSource = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -705,195 +668,6 @@ export const verifyRequirement = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// ---------- Generate suggested requirements from an authoritative source ----------
-// NECTAR proposes — admin verifies. Source-citation always carried.
-
-// SOW/contract requirements live as prose clauses, not tabular fields.
-// We ask the AI to read narrative text and pull obligations + required
-// documents directly. Source-citation always carried; nothing fabricated.
-const REQ_SYSTEM_PROMPT = `You are NECTAR, reading a Utah DSPD provider's State Scope of Work, provider contract, or DSPD/DHS requirement document.
-
-Your job is to extract REQUIREMENTS the provider must meet — written as prose clauses, numbered sections, "the Provider shall…", "must maintain…", "required documents include…", etc. This is narrative text, NOT a structured table.
-
-Return STRICT JSON only, shape:
-{
-  "requirements": [
-    {
-      "title": "short imperative phrase, <=140 chars",
-      "description": "exact or close paraphrase of the obligation, <=600 chars",
-      "category": "audit_doc" | "obligation" | "rule" | "billing",
-      "citation": "best locator you can identify, e.g. '§4.2', 'Section 3.1', 'page 7', 'Attachment A'",
-      "applies_to": "company" | "staff" | "client"
-    }
-  ]
-}
-
-Rules:
-- Only include items actually stated in the document text. Do NOT invent.
-- "category":
-    audit_doc  = a document the provider must produce, retain, or submit (PCSPs on file, incident reports, training records, etc.)
-    obligation = a thing the provider must do (notify within X hours, conduct annual review, maintain insurance, etc.)
-    rule       = a constraint / prohibition (no overlapping services, staff-to-client ratio caps, etc.)
-    billing    = a billing/reimbursement requirement (EVV, claim timeliness, prior auth)
-- Prefer fewer high-quality items over many vague ones.
-- If the text contains no requirement language at all, return {"requirements": []}.`;
-
-const ReqItem = z.object({
-  title: z.string().min(1).max(200),
-  description: z.string().max(2000).optional().nullable(),
-  category: z.enum(["audit_doc", "obligation", "rule", "billing"]).optional().nullable(),
-  citation: z.string().max(200).optional().nullable(),
-  applies_to: z.enum(["company", "staff", "client"]).optional().nullable(),
-});
-const ReqExtraction = z.object({ requirements: z.array(ReqItem).max(500).default([]) });
-
-// Split a long document into overlapping windows so NECTAR reads the entire
-// text. Smaller windows keep model output well under its token ceiling so
-// JSON doesn't come back truncated. Overlap prevents a clause that straddles
-// a window boundary from being missed on both sides.
-function chunkDocumentText(
-  text: string,
-  windowSize = 30_000,
-  overlap = 1_500,
-  maxChunks = 40,
-): string[] {
-  if (text.length <= windowSize) return [text];
-  const chunks: string[] = [];
-  let start = 0;
-  while (start < text.length && chunks.length < maxChunks) {
-    let end = Math.min(start + windowSize, text.length);
-    // Prefer a paragraph boundary within the last 3k chars of the window so we
-    // don't cut mid-sentence. Fall back to a hard cut when none is found.
-    if (end < text.length) {
-      const searchFrom = Math.max(start + windowSize - 3_000, start + 1);
-      const boundary = text.lastIndexOf("\n\n", end);
-      if (boundary >= searchFrom) end = boundary;
-    }
-    chunks.push(text.slice(start, end));
-    if (end >= text.length) break;
-    start = Math.max(end - overlap, start + 1);
-  }
-  return chunks;
-}
-
-// Single AI call for one text window. Returns the parsed items or throws a
-// classified error (429/402 bubble up; parse errors are typed so the caller
-// can retry with a smaller window).
-class ChunkParseError extends Error {}
-
-async function extractOnce(
-  windowText: string,
-  partLabel: string,
-): Promise<Array<z.infer<typeof ReqItem>>> {
-  const res = await gatewayFetch({
-    model: "google/gemini-2.5-flash",
-    messages: [
-      { role: "system", content: REQ_SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: `${partLabel}\n\nDOCUMENT TEXT:\n\n${windowText}`,
-      },
-    ],
-    response_format: { type: "json_object" },
-  });
-  if (res.status === 429) throw new Error("AI rate limit reached. Try again in a moment.");
-  if (res.status === 402)
-    throw new Error("AI credits exhausted. Add funds in Settings → Workspace → Usage.");
-  if (!res.ok) throw new ChunkParseError(`AI gateway error ${res.status}`);
-  const json = await res.json();
-  const content: string = json.choices?.[0]?.message?.content ?? "{}";
-  let raw: unknown;
-  try {
-    raw = JSON.parse(content);
-  } catch {
-    throw new ChunkParseError("model returned invalid/truncated JSON");
-  }
-  const parsed = ReqExtraction.safeParse(raw);
-  if (!parsed.success)
-    throw new ChunkParseError("model output failed schema validation");
-  return parsed.data.requirements;
-}
-
-// Extract with a single retry: if a window fails to parse, split it in half
-// and try each half once. Failed halves are reported (not silently dropped).
-async function extractChunkWithRetry(
-  windowText: string,
-  partLabel: string,
-): Promise<{ items: Array<z.infer<typeof ReqItem>>; failures: string[] }> {
-  try {
-    const items = await extractOnce(windowText, partLabel);
-    return { items, failures: [] };
-  } catch (err) {
-    if (!(err instanceof ChunkParseError)) throw err; // 429/402/etc → bubble
-    // Retry by splitting in half at a paragraph boundary where possible.
-    const mid = Math.floor(windowText.length / 2);
-    const boundary = windowText.lastIndexOf("\n\n", mid + 2_000);
-    const split = boundary > windowText.length * 0.2 ? boundary : mid;
-    const halves = [windowText.slice(0, split), windowText.slice(split)];
-    const items: Array<z.infer<typeof ReqItem>> = [];
-    const failures: string[] = [];
-    for (let h = 0; h < halves.length; h += 1) {
-      try {
-        const got = await extractOnce(halves[h], `${partLabel} (retry ${h + 1}/2)`);
-        items.push(...got);
-      } catch (retryErr) {
-        if (!(retryErr instanceof ChunkParseError)) throw retryErr;
-        failures.push(
-          `${partLabel} half ${h + 1}: ${(retryErr as Error).message}`,
-        );
-      }
-    }
-    return { items, failures };
-  }
-}
-
-// Concurrency-limited map: runs up to `limit` promises at a time.
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let cursor = 0;
-  const workers = new Array(Math.min(limit, items.length)).fill(0).map(async () => {
-    while (true) {
-      const i = cursor++;
-      if (i >= items.length) return;
-      results[i] = await fn(items[i], i);
-    }
-  });
-  await Promise.all(workers);
-  return results;
-}
-
-async function extractRequirementsFromText(text: string): Promise<{
-  items: Array<z.infer<typeof ReqItem>>;
-  chunkCount: number;
-  chunkFailures: string[];
-}> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
-
-  const chunks = chunkDocumentText(text);
-  const perChunk = await mapWithConcurrency(chunks, 3, (chunk, i) =>
-    extractChunkWithRetry(chunk, `PART ${i + 1} OF ${chunks.length}`),
-  );
-
-  const merged: Array<z.infer<typeof ReqItem>> = [];
-  const seen = new Set<string>();
-  const chunkFailures: string[] = [];
-  for (const r of perChunk) {
-    chunkFailures.push(...r.failures);
-    for (const item of r.items) {
-      const dedupeKey = `${item.title.trim().toLowerCase()}|${(item.citation ?? "").trim().toLowerCase()}`;
-      if (seen.has(dedupeKey)) continue;
-      seen.add(dedupeKey);
-      merged.push(item);
-    }
-  }
-  return { items: merged, chunkCount: chunks.length, chunkFailures };
-}
-
 
 export const generateRequirementsFromSource = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -1441,38 +1215,6 @@ export const listAttestations = createServerFn({ method: "POST" })
 
 export const REDUCED_LIABILITY_NOTICE = `The documents, checklists, and data shown here are generated from materials you uploaded (including your contracts and State Scope of Work) and from information entered by your staff. HIVE/NECTAR organizes and surfaces this information but does not independently verify its accuracy or guarantee compliance with State requirements. You are strongly encouraged to review all forms and documents for accuracy. By proceeding, you confirm you have reviewed this information and accept responsibility for its accuracy and for your submissions to the State.`;
 
-// ---------- NECTAR plain-language explanation (aid to comprehension only) ----------
-// LEGAL_REVIEW: nectar-explain-requirement-disclaimer
-const EXPLAIN_SYSTEM_PROMPT = `You are NECTAR. Your job is to RESTATE a compliance requirement in plain, everyday English so a busy provider-admin can understand what it is saying.
-
-STRICT RULES:
-- You are NOT giving legal, compliance, or audit advice.
-- You DO NOT tell the reader whether they are compliant, whether the rule applies to them, or what they "must" do beyond what the source already says.
-- You DO NOT add obligations, deadlines, dollar figures, or specifics that are not in the source text.
-- You stay close to the source. If the source is vague, your restatement is vague.
-- If you cannot confidently restate it without inventing meaning, say so.
-
-Return STRICT JSON only:
-{
-  "plain_language": "2-5 short sentences restating the requirement in plain English. No bullet points. No headings.",
-  "key_terms": [
-    { "term": "string from the source", "plain": "short plain-English gloss" }
-  ],
-  "confidence": "high" | "medium" | "low",
-  "caveat": "one short sentence noting any ambiguity or what the reader should double-check in the source"
-}
-
-key_terms is at most 4 items. Only include terms that actually appear in the requirement text and are likely unfamiliar to a non-lawyer.`;
-
-const ExplainResp = z.object({
-  plain_language: z.string().max(2000),
-  key_terms: z
-    .array(z.object({ term: z.string().max(120), plain: z.string().max(400) }))
-    .max(6)
-    .default([]),
-  confidence: z.enum(["high", "medium", "low"]).default("medium"),
-  caveat: z.string().max(400).optional().nullable(),
-});
 
 export const explainRequirement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

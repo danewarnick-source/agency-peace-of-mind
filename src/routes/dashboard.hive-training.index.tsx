@@ -19,6 +19,8 @@ import {
   Repeat, CreditCard, CheckCircle2,
 } from "lucide-react";
 import { z } from "zod";
+import { useEntitlements } from "@/hooks/use-entitlements";
+import { FeatureLocked } from "@/components/feature-locked";
 
 const searchSchema = z.object({
   checkout: z.enum(["success", "cancelled"]).optional(),

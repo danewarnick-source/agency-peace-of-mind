@@ -2354,13 +2354,15 @@ function AttestationsPanel({ orgId }: { orgId: string }) {
   });
 
   return (
-    <div className="rounded-2xl border border-border/60 bg-background/60 p-4 backdrop-blur">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Immutable attestation log</h2>
-        <Badge variant="outline" className="text-[10px]">
-          {data?.attestations?.length ?? 0} entries
-        </Badge>
-      </div>
+    <div className="space-y-4">
+      <MasterAttestationPanel orgId={orgId} />
+      <div className="rounded-2xl border border-border/60 bg-background/60 p-4 backdrop-blur">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Immutable attestation log</h2>
+          <Badge variant="outline" className="text-[10px]">
+            {data?.attestations?.length ?? 0} entries
+          </Badge>
+        </div>
       <p className="mb-3 text-xs text-muted-foreground">
         Every "Confirm" you click in HIVE is logged here with user, timestamp,
         and the exact statement you attested to. This log is append-only.

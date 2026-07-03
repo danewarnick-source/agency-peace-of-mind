@@ -1304,7 +1304,26 @@ export const processDraftChunk = createServerFn({ method: "POST" })
       .from("nectar_documents")
       .select("raw_text")
       .eq("id", job.document_id as string)
-      .single();
+      .maybeSingle();
+    if (!doc) {
+      // Source document was deleted out from under this job — mark failed so
+      // the driver stops retrying instead of looping forever.
+      await supabase
+        .from("nectar_draft_jobs")
+        .update({
+          status: "failed",
+          error_message: "Source document was deleted; draft job cancelled.",
+        })
+        .eq("id", data.jobId);
+      return {
+        processed: (job.processed_chunks as number) ?? priorIndices.length,
+        total: ranges.length,
+        itemsAdded: 0,
+        failuresAdded: [] as string[],
+        skipped: true as const,
+        aborted: true as const,
+      };
+    }
     const rawText = ((doc?.raw_text as string | null) ?? "").trim();
     const window = rawText.slice(start, end);
 

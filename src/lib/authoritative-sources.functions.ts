@@ -1252,6 +1252,17 @@ export const startRequirementsDraft = createServerFn({ method: "POST" })
       .single();
     if (jobErr || !jobRow) throw new Error(jobErr?.message ?? "Could not start draft job");
 
+    // Best-effort: kick off a server-side background tick so drafting keeps
+    // moving even if the user leaves the page or closes the tab. The client
+    // driver races this and idempotency in processDraftChunk makes any
+    // overlap a no-op.
+    try {
+      const { fireDraftTick } = await import("./nectar-draft-tick.server");
+      await fireDraftTick(jobRow.id as string, { wait: false });
+    } catch {
+      // Non-fatal — the client driver will still pick up the job.
+    }
+
     return {
       jobId: jobRow.id as string,
       totalChunks: ranges.length,

@@ -624,7 +624,7 @@ function SourceRow({
             size="sm"
             variant="ghost"
             onClick={() => generate.mutate()}
-            disabled={generate.isPending || source.parse_status !== "parsed" || !canDraft}
+            disabled={isDrafting || source.parse_status !== "parsed" || !canDraft}
             title={
               !canDraft
                 ? "Drafting requirements is an Admin View action. Switch to this company's Admin View with an Admin, Manager, or Super Admin role to re-draft."
@@ -632,12 +632,12 @@ function SourceRow({
             }
             className="h-7 px-2 text-[11px]"
           >
-            {generate.isPending ? (
+            {isDrafting ? (
               <Loader2 className="mr-1 h-3 w-3 animate-spin text-[color:var(--amber-600,#d97706)]" />
             ) : (
               <RefreshCw className="mr-1 h-3 w-3" />
             )}
-            {generate.isPending ? `Drafting… ${Math.round(progress)}%` : "Re-draft"}
+            {isDrafting ? draftingLabel : "Re-draft"}
           </Button>
 
         </div>
@@ -647,7 +647,7 @@ function SourceRow({
             size="sm"
             variant="outline"
             onClick={() => generate.mutate()}
-            disabled={generate.isPending || source.parse_status !== "parsed" || !canDraft}
+            disabled={isDrafting || source.parse_status !== "parsed" || !canDraft}
             title={
               !canDraft
                 ? "Drafting requirements is an Admin View action. Switch to this company's Admin View with an Admin, Manager, or Super Admin role to draft from authoritative sources."
@@ -656,20 +656,20 @@ function SourceRow({
                   : "Parsing must finish before requirements can be drafted"
             }
             className={
-              generate.isPending
+              isDrafting
                 ? "border-[color:var(--amber-500,#f4a93a)]/60 bg-[color:var(--amber-50,#fffbeb)] text-[color:var(--amber-900,#78350f)] hover:bg-[color:var(--amber-100,#fef3c7)]"
                 : undefined
             }
           >
-            {generate.isPending ? (
+            {isDrafting ? (
               <Sparkles className="mr-1 h-3.5 w-3.5 animate-pulse text-[color:var(--amber-600,#d97706)]" />
             ) : (
               <Sparkles className="mr-1 h-3.5 w-3.5" />
             )}
-            {generate.isPending ? `Drafting… ${Math.round(progress)}%` : "Draft requirements"}
+            {isDrafting ? draftingLabel : "Draft requirements"}
           </Button>
 
-          {generate.isPending && (
+          {isDrafting && (
             <div
               className="h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--amber-100,#fef3c7)] sm:w-44"
               role="progressbar"

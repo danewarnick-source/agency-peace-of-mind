@@ -434,6 +434,14 @@ export function InternalAuditPage() {
         <SummaryStat label="Minor" value={summary?.totals.minor ?? 0} tone="minor" />
       </div>
 
+      {/* Requirement scope (Prompt 33): dormant reqs never touch the score. */}
+      <div className="grid gap-3 md:grid-cols-4">
+        <ScopeStat label="In scope" value={summary?.inScopeCount ?? 0} />
+        <ScopeStat label="Dormant" value={summary?.dormantCount ?? 0} muted />
+        <ScopeStat label="Auto-satisfied" value={summary?.autoSatisfiedCount ?? 0} tone="ok" />
+        <ScopeStat label="Need evidence" value={summary?.needsEvidenceCount ?? 0} tone="warn" />
+      </div>
+
       {/* By-area breakdown */}
       {summary && (
         <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">

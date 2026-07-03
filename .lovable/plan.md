@@ -1,25 +1,25 @@
-## Restore "Review renewals" button (and make it scroll)
+# Keep full document text on upload
 
-**Change (single edit in `src/routes/dashboard.hive-training.index.tsx`, ~line 394):**
+## Problem
+When a document is uploaded and parsed (Scope of Work, PCSP, etc.), the extracted plain text is saved to `nectar_documents.raw_text` but capped at 50,000 characters. Anything past that cap is silently dropped, so long documents like the State SOW lose their tail end.
 
-Revert the unassigned-staff banner line back to its original label and handler:
-
-```tsx
-cta="Review renewals"
-onClick={() => scrollToRenewals()}
+Source of the cut: `src/lib/nectar-documents.functions.ts`, line 243:
+```ts
+raw_text: text.slice(0, 50000),
 ```
 
-**Why this now works:** `scrollToRenewals()` was already hardened in the previous fix to fall back through targets that actually exist on the page:
+That is the only place upload text is truncated. State onboarding / template uploads don't add their own cap.
 
-```
-ht-renewals  →  ht-storefront  →  ht-roster
-```
+## Fix
+One-line change in `src/lib/nectar-documents.functions.ts`:
 
-So even when there are no renewal rows (renewals section not rendered), the click will smooth-scroll to the storefront (or the roster as a last resort) instead of silently doing nothing.
+- Replace `raw_text: text.slice(0, 50000),` with `raw_text: text,` so the full extracted text is stored regardless of length.
 
-**No other changes:**
-- Keep `scrollToRenewals()`, `scrollToStorefront()`, `scrollToRoster()` as they are.
-- Keep the `id="ht-storefront"` on the Storefront section.
-- No copy or behavior changes elsewhere.
+The `raw_text` column is Postgres `text` (unbounded), so no schema change is needed.
 
-**Verify:** on the training dashboard, click "Review renewals" in the readiness banner and confirm the page scrolls (to renewals if present, otherwise storefront).
+## Out of scope (unchanged, per your ask)
+- Upload UI, file size limits, parsing pipeline, extraction prompts, autofill logic — all untouched.
+- The 120,000-char slice we send to the AI extractor stays as-is; that's a model-input guardrail, not storage. It only affects what the extractor sees, not what we keep. If you later want the AI to also read the full document, that's a separate change.
+
+## Verification
+Upload the full State Scope of Work, then check `nectar_documents.raw_text` length for that row — it should match the real extracted length of the PDF instead of stopping at 50,000.

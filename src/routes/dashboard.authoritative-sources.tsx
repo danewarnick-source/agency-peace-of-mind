@@ -64,8 +64,6 @@ import {
   markAsAuthoritativeSource,
   listRequirements,
   startRequirementsDraft,
-  processDraftChunk,
-  finalizeRequirementsDraft,
   upsertRequirement,
 
   setRequirementReviewStatus,
@@ -74,6 +72,10 @@ import {
   ingestWebSource,
   explainRequirement,
 } from "@/lib/authoritative-sources.functions";
+import {
+  useDraftJobProgress,
+  formatEta,
+} from "@/components/nectar/draft-jobs-driver";
 import {
   proposeRequirementMappings,
   listRequirementMappings,
@@ -489,70 +491,48 @@ function SourceRow({
   });
   const qc = useQueryClient();
   const startFn = useServerFn(startRequirementsDraft);
-  const processFn = useServerFn(processDraftChunk);
-  const finalizeFn = useServerFn(finalizeRequirementsDraft);
-  const [progress, setProgress] = useState(0);
+  const driverProgress = useDraftJobProgress(source.id);
   const generate = useMutation({
     mutationFn: async () => {
-      setProgress(2);
       const start = await startFn({ data: { documentId: source.id } });
-      // Early-exit reasons (no_text / non_obligation_kind) come back with
-      // jobId === null — surface exactly like the old flow did.
-      if (!start.jobId) {
-        return {
-          inserted: 0,
-          reason: start.reason,
-          message: (start as { message?: string }).message,
-        };
-      }
-      const total = start.totalChunks;
-      // Bounded concurrency of 3 — same as the old server-side loop, but now
-      // each round is one round-trip so progress moves in real time.
-      let cursor = 0;
-      let done = 0;
-      const CONCURRENCY = 3;
-      const worker = async () => {
-        while (true) {
-          const i = cursor++;
-          if (i >= total) return;
-          const r = await processFn({
-            data: { jobId: start.jobId!, chunkIndex: i },
-          });
-          done = Math.max(done, r.processed);
-          // Cap at 90% so the finalize step has visible headroom.
-          setProgress(Math.min(90, Math.round((done / total) * 90)));
-        }
-      };
-      await Promise.all(
-        Array.from({ length: Math.min(CONCURRENCY, total) }, () => worker()),
-      );
-      setProgress(93);
-      const finalize = await finalizeFn({ data: { jobId: start.jobId } });
-      return finalize;
+      return start;
     },
     onSuccess: (r) => {
-      setProgress(100);
-      const inserted = (r as { inserted: number }).inserted ?? 0;
-      const message = (r as { message?: string }).message;
-      if (inserted > 0) {
-        toast.success(
-          `NECTAR drafted ${inserted} requirement${inserted === 1 ? "" : "s"} from this source. Review them in the Requirements tab.`,
-        );
-      } else {
+      // Early-exit reasons (no_text / non_obligation_kind) come back with
+      // jobId === null — surface immediately, no background work started.
+      const start = r as { jobId: string | null; reason?: string; message?: string };
+      if (!start.jobId) {
         toast.warning(
-          message ??
-            "NECTAR read the document but didn't find clear requirement language. You can add them by hand from the Requirements tab.",
+          start.message ??
+            "NECTAR read the document but didn't find clear requirement language.",
           { duration: 9000 },
         );
+        return;
       }
-      qc.invalidateQueries({ queryKey: ["requirements", orgId] });
-      window.setTimeout(() => setProgress(0), 600);
+      // The global DraftJobsProvider will pick this job up on its next poll
+      // and drive it to completion — even across page navigation.
+      qc.invalidateQueries({ queryKey: ["nectar-draft-jobs", orgId] });
+      toast.info(
+        "Drafting started. NECTAR will keep working in the background — you can navigate away and check back.",
+        { duration: 6000 },
+      );
     },
     onError: (e: Error) => {
-      setProgress(0);
       toast.error(e.message);
     },
   });
+
+  // Effective "in progress" state combines the initial start-request
+  // roundtrip with any live driver progress for this document.
+  const isDrafting = generate.isPending || driverProgress !== null;
+  const progress = driverProgress?.progressPct ?? (generate.isPending ? 2 : 0);
+  const etaLabel = driverProgress ? formatEta(driverProgress.etaMs) : "";
+  const draftingLabel = driverProgress
+    ? driverProgress.finalizing
+      ? `Finalizing… ${Math.round(progress)}%`
+      : `Drafting… ${Math.round(progress)}%${etaLabel ? ` · ${etaLabel}` : ""}`
+    : `Drafting… ${Math.round(progress)}%`;
+
 
 
 
@@ -644,7 +624,7 @@ function SourceRow({
             size="sm"
             variant="ghost"
             onClick={() => generate.mutate()}
-            disabled={generate.isPending || source.parse_status !== "parsed" || !canDraft}
+            disabled={isDrafting || source.parse_status !== "parsed" || !canDraft}
             title={
               !canDraft
                 ? "Drafting requirements is an Admin View action. Switch to this company's Admin View with an Admin, Manager, or Super Admin role to re-draft."
@@ -652,12 +632,12 @@ function SourceRow({
             }
             className="h-7 px-2 text-[11px]"
           >
-            {generate.isPending ? (
+            {isDrafting ? (
               <Loader2 className="mr-1 h-3 w-3 animate-spin text-[color:var(--amber-600,#d97706)]" />
             ) : (
               <RefreshCw className="mr-1 h-3 w-3" />
             )}
-            {generate.isPending ? `Drafting… ${Math.round(progress)}%` : "Re-draft"}
+            {isDrafting ? draftingLabel : "Re-draft"}
           </Button>
 
         </div>
@@ -667,7 +647,7 @@ function SourceRow({
             size="sm"
             variant="outline"
             onClick={() => generate.mutate()}
-            disabled={generate.isPending || source.parse_status !== "parsed" || !canDraft}
+            disabled={isDrafting || source.parse_status !== "parsed" || !canDraft}
             title={
               !canDraft
                 ? "Drafting requirements is an Admin View action. Switch to this company's Admin View with an Admin, Manager, or Super Admin role to draft from authoritative sources."
@@ -676,20 +656,20 @@ function SourceRow({
                   : "Parsing must finish before requirements can be drafted"
             }
             className={
-              generate.isPending
+              isDrafting
                 ? "border-[color:var(--amber-500,#f4a93a)]/60 bg-[color:var(--amber-50,#fffbeb)] text-[color:var(--amber-900,#78350f)] hover:bg-[color:var(--amber-100,#fef3c7)]"
                 : undefined
             }
           >
-            {generate.isPending ? (
+            {isDrafting ? (
               <Sparkles className="mr-1 h-3.5 w-3.5 animate-pulse text-[color:var(--amber-600,#d97706)]" />
             ) : (
               <Sparkles className="mr-1 h-3.5 w-3.5" />
             )}
-            {generate.isPending ? `Drafting… ${Math.round(progress)}%` : "Draft requirements"}
+            {isDrafting ? draftingLabel : "Draft requirements"}
           </Button>
 
-          {generate.isPending && (
+          {isDrafting && (
             <div
               className="h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--amber-100,#fef3c7)] sm:w-44"
               role="progressbar"

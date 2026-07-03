@@ -9425,6 +9425,7 @@ export type Database = {
       }
       nectar_draft_jobs: {
         Row: {
+          chunk_durations_ms: number[]
           chunk_failures: Json
           chunk_ranges: Json
           created_at: string
@@ -9436,11 +9437,14 @@ export type Database = {
           inserted_count: number
           organization_id: string
           processed_chunks: number
+          processed_indices: number[]
+          started_at: string
           status: string
           total_chunks: number
           updated_at: string
         }
         Insert: {
+          chunk_durations_ms?: number[]
           chunk_failures?: Json
           chunk_ranges?: Json
           created_at?: string
@@ -9452,11 +9456,14 @@ export type Database = {
           inserted_count?: number
           organization_id: string
           processed_chunks?: number
+          processed_indices?: number[]
+          started_at?: string
           status?: string
           total_chunks?: number
           updated_at?: string
         }
         Update: {
+          chunk_durations_ms?: number[]
           chunk_failures?: Json
           chunk_ranges?: Json
           created_at?: string
@@ -9468,6 +9475,8 @@ export type Database = {
           inserted_count?: number
           organization_id?: string
           processed_chunks?: number
+          processed_indices?: number[]
+          started_at?: string
           status?: string
           total_chunks?: number
           updated_at?: string

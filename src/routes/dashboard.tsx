@@ -29,6 +29,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getInboxUnreadCount } from "@/lib/inbox-messages.functions";
 import { BillingBanner } from "@/components/billing/billing-banner";
+import { DraftJobsProvider } from "@/components/nectar/draft-jobs-driver";
+import { DraftJobsHeaderPill } from "@/components/nectar/draft-jobs-header-pill";
+
 
 
 function DashboardShellError({ error }: { error: Error; reset: () => void }) {
@@ -350,8 +353,10 @@ function DashboardLayout() {
 
 
   return (
+    <DraftJobsProvider>
     <div className="flex h-screen h-[100dvh] flex-col overflow-hidden">
       <ImpersonationBanner />
+
 
       {/* Mobile shell — staff view only (below md) */}
       {isStaffView && !isMobilePreview && (
@@ -446,6 +451,7 @@ function DashboardLayout() {
               >
                 <ListChecks className="h-3.5 w-3.5 text-[#f4a93a]" /> <span className="hidden md:inline">Guide me</span>
               </button>
+              {isAdminCapable && effectiveView === "admin" && <DraftJobsHeaderPill />}
               {isAdminCapable && effectiveView === "admin" && <NotificationBell />}
               <Button onClick={signOut} variant="ghost" size="sm" className="md:hidden">
                 <LogOut className="h-4 w-4" />
@@ -529,8 +535,10 @@ function DashboardLayout() {
         </div>
       </div>
     </div>
+    </DraftJobsProvider>
   );
 }
+
 
 /**
  * Hoisted to module scope so it keeps a stable component identity across

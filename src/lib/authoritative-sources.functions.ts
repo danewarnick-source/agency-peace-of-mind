@@ -1163,7 +1163,7 @@ async function loadDraftJobDoc(
   const { data: job, error } = await supabase
     .from("nectar_draft_jobs")
     .select(
-      "id, organization_id, document_id, status, total_chunks, processed_chunks, chunk_ranges, extracted_items, chunk_failures",
+      "id, organization_id, document_id, status, total_chunks, processed_chunks, processed_indices, started_at, chunk_durations_ms, chunk_ranges, extracted_items, chunk_failures",
     )
     .eq("id", jobId)
     .single();
@@ -1252,6 +1252,17 @@ export const startRequirementsDraft = createServerFn({ method: "POST" })
       .single();
     if (jobErr || !jobRow) throw new Error(jobErr?.message ?? "Could not start draft job");
 
+    // Best-effort: kick off a server-side background tick so drafting keeps
+    // moving even if the user leaves the page or closes the tab. The client
+    // driver races this and idempotency in processDraftChunk makes any
+    // overlap a no-op.
+    try {
+      const { fireDraftTick } = await import("./nectar-draft-tick.server");
+      await fireDraftTick(jobRow.id as string, { wait: false });
+    } catch {
+      // Non-fatal — the client driver will still pick up the job.
+    }
+
     return {
       jobId: jobRow.id as string,
       totalChunks: ranges.length,
@@ -1272,9 +1283,23 @@ export const processDraftChunk = createServerFn({ method: "POST" })
     const ranges = (job.chunk_ranges as unknown as Array<[number, number]>) ?? [];
     if (data.chunkIndex >= ranges.length)
       throw new Error(`Chunk ${data.chunkIndex} out of range (total ${ranges.length})`);
-    const [start, end] = ranges[data.chunkIndex];
 
-    // Fetch just the raw_text for this doc. RLS already vetted the job row.
+    // Idempotency guard — if this chunk is already recorded, return current
+    // counters without re-invoking the AI. Two parallel drivers (client loop
+    // + server tick) both try to work the same job.
+    const priorIndices = ((job as { processed_indices?: number[] | null })
+      .processed_indices ?? []) as number[];
+    if (priorIndices.includes(data.chunkIndex)) {
+      return {
+        processed: (job.processed_chunks as number) ?? priorIndices.length,
+        total: ranges.length,
+        itemsAdded: 0,
+        failuresAdded: [] as string[],
+        skipped: true as const,
+      };
+    }
+
+    const [start, end] = ranges[data.chunkIndex];
     const { data: doc } = await supabase
       .from("nectar_documents")
       .select("raw_text")
@@ -1283,6 +1308,7 @@ export const processDraftChunk = createServerFn({ method: "POST" })
     const rawText = ((doc?.raw_text as string | null) ?? "").trim();
     const window = rawText.slice(start, end);
 
+    const t0 = Date.now();
     let items: DraftItem[] = [];
     let failures: string[] = [];
     try {
@@ -1297,14 +1323,20 @@ export const processDraftChunk = createServerFn({ method: "POST" })
         `PART ${data.chunkIndex + 1}: ${(err as Error).message.slice(0, 300)}`,
       ];
     }
+    const durationMs = Math.max(1, Date.now() - t0);
 
     const priorItems = (job.extracted_items as unknown as DraftItem[]) ?? [];
     const priorFailures = (job.chunk_failures as unknown as string[]) ?? [];
+    const priorDurations = ((job as { chunk_durations_ms?: number[] | null })
+      .chunk_durations_ms ?? []) as number[];
     const nextProcessed = (job.processed_chunks as number) + 1;
+
     const { error: updErr } = await supabase
       .from("nectar_draft_jobs")
       .update({
         processed_chunks: nextProcessed,
+        processed_indices: [...priorIndices, data.chunkIndex],
+        chunk_durations_ms: [...priorDurations, durationMs],
         extracted_items: [...priorItems, ...items] as unknown as Json,
         chunk_failures: [...priorFailures, ...failures] as unknown as Json,
       })
@@ -1316,6 +1348,60 @@ export const processDraftChunk = createServerFn({ method: "POST" })
       total: ranges.length,
       itemsAdded: items.length,
       failuresAdded: failures,
+      skipped: false as const,
+    };
+  });
+
+// Lists active (extracting) draft jobs for the caller's org so the global
+// driver can pick them up on mount and resume. Includes the timing metadata
+// the driver needs to compute a real ETA.
+export const getActiveDraftJobs = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ organizationId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+    const { data: rows, error } = await supabase
+      .from("nectar_draft_jobs")
+      .select(
+        "id, document_id, status, total_chunks, processed_chunks, processed_indices, started_at, chunk_durations_ms",
+      )
+      .eq("organization_id", data.organizationId)
+      .eq("status", "extracting")
+      .order("started_at", { ascending: true })
+      .limit(50);
+    if (error) throw new Error(error.message);
+
+    const docIds = Array.from(
+      new Set((rows ?? []).map((r) => r.document_id as string)),
+    );
+    const titles = new Map<string, string>();
+    if (docIds.length > 0) {
+      const { data: docs } = await supabase
+        .from("nectar_documents")
+        .select("id, title, file_name")
+        .in("id", docIds);
+      for (const d of docs ?? []) {
+        titles.set(
+          d.id as string,
+          ((d.title as string | null) ?? (d.file_name as string | null) ?? "Untitled") as string,
+        );
+      }
+    }
+
+    return {
+      jobs: (rows ?? []).map((r) => ({
+        jobId: r.id as string,
+        documentId: r.document_id as string,
+        documentTitle: titles.get(r.document_id as string) ?? "Untitled",
+        totalChunks: (r.total_chunks as number) ?? 0,
+        processedChunks: (r.processed_chunks as number) ?? 0,
+        processedIndices: (r.processed_indices as number[] | null) ?? [],
+        startedAt: r.started_at as string,
+        chunkDurationsMs: (r.chunk_durations_ms as number[] | null) ?? [],
+      })),
     };
   });
 

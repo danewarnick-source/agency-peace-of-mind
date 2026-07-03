@@ -1,95 +1,100 @@
-## What's actually happening
+## Problem
 
-The "92%" is a fake progress bar in `src/routes/dashboard.authoritative-sources.tsx` (line 521). It creeps toward 92 % and only snaps to 100 % when the server call returns. Stuck at 92 % means the single server call — `generateRequirementsFromSource` in `src/lib/authoritative-sources.functions.ts` — never returns before the platform kills it.
+Drafting a long SOW starts, creeps up (2% → …), then the page reloads or the user leaves and the client-side loop that was driving `processDraftChunk` dies. The job row in `nectar_draft_jobs` keeps its state, but nothing picks it back up. Even worse: if the user closes the tab, drafting stops entirely. And there is no ETA — users have no idea if it's minutes or hours away.
 
-For a 260 000-character SOW that one call has to:
+Fix: (a) make chunks idempotent so resume is safe, (b) run the loop from a global app-level driver so it survives route changes, (c) add true server-side background continuation so it keeps going with the tab closed, (d) surface a real estimated time remaining based on measured per-chunk timings.
 
-1. Split the text into ~9 chunks.
-2. Make ~9 Gemini calls (currently 3 in parallel — so ~3 rounds).
-3. Dedupe against existing requirements and batch-insert.
-4. Emit one HIVE ticket per unmapped requirement and per unknown service code (dozens of extra server round-trips).
-5. If assisted mode is on, call `markDraftedByNectar` per inserted row.
+## Fix
 
-All in one server-function invocation. On a long SOW that easily blows past the worker's wall-clock, so the client just sits at 92 % forever.
+### 1. Idempotent chunks + resume + timing metadata
 
-## Fix — split the one giant call into a job the client drives step by step
+Add to `nectar_draft_jobs` (migration + `docs/SQL_HANDOFF.md`):
 
-Turn drafting into a small state machine backed by a job row. Each server call does a bounded amount of work (one AI chunk, or one batch of DB writes), returns, and the client asks for the next step. The progress bar becomes real — it moves as chunks actually finish — and no single call has to fit inside the wall-clock.
+- `processed_indices int[] not null default '{}'` — which chunk indices are done.
+- `started_at timestamptz not null default now()` — when the first tick began work.
+- `chunk_durations_ms int[] not null default '{}'` — one entry per completed chunk, for ETA.
 
-### 1. New table `nectar_draft_jobs`
+`processDraftChunk` in `src/lib/authoritative-sources.functions.ts`:
+- If `chunkIndex` already in `processed_indices`, return current counters — no AI call.
+- Otherwise time the extraction and, in the same update, append the index to `processed_indices` and the elapsed ms to `chunk_durations_ms`.
 
-Sent through `docs/SQL_HANDOFF.md` (Lovable Cloud rules — no direct DB access).
+New server function `getActiveDraftJobs()` — returns all `nectar_draft_jobs` for the caller's org with status `extracting`, each including `{ jobId, documentId, documentTitle, totalChunks, processedChunks, processedIndices, startedAt, chunkDurationsMs }`. Auth-gated the same way.
 
-Columns:
-- `id uuid pk`, `organization_id uuid`, `document_id uuid`, `created_by uuid`
-- `status text` — `queued | extracting | inserting | done | failed`
-- `total_chunks int`, `processed_chunks int default 0`
-- `chunk_texts jsonb` — array of the pre-split window strings (populated at start; read one at a time)
-- `extracted_items jsonb default '[]'` — accumulated `{title, description, category, citation, applies_to}` objects
-- `chunk_failures jsonb default '[]'` — per-chunk failure notes
-- `inserted_count int default 0`
-- `error_message text`
-- `created_at`, `updated_at`
+### 2. Global background driver (survives route changes)
 
-RLS: org-scoped via `is_org_admin_or_manager(organization_id)`. Full GRANT block per the public-schema-grants rule (`authenticated`, `service_role`).
+New provider `src/components/nectar/draft-jobs-driver.tsx`, mounted once inside the authenticated dashboard shell:
 
-### 2. Three narrow server functions replacing the monolith
+- Polls `getActiveDraftJobs()` every 5s via `useQuery`.
+- For each active job, runs a bounded-concurrency (3) loop over `[0..totalChunks-1]` skipping any index already in `processedIndices`, then calls `finalizeRequirementsDraft`.
+- Publishes live `{ processed, total, progressPct, etaMs }` per `documentId` into a small React context store the source-row UI reads.
+- Lives above the route, so navigating between dashboard pages does NOT stop drafting.
+- On finalize, invalidates `["requirements", orgId]` / `["auth-sources", orgId]` and toasts once.
 
-In `src/lib/authoritative-sources.functions.ts` (or a new `nectar-draft-jobs.functions.ts` — I'll put them alongside so the route import surface stays small):
+Per-source-row "Draft requirements" button becomes a thin trigger: call `startRequirementsDraft`, then the driver picks up the new job on its next poll. Button label reads `Drafting… N% · ~Xm Ys left`.
 
-- `startRequirementsDraft({ documentId })`
-  - All the preflight `generateRequirementsFromSource` already does (role check, `is_authoritative_source`, `NON_OBLIGATION_KINDS`, `no_text`).
-  - Chunk the raw text via `chunkDocumentText` (already in `authoritative-sources.server.ts`).
-  - Insert a `nectar_draft_jobs` row with `chunk_texts`, `total_chunks`, `status='extracting'`, `processed_chunks=0`.
-  - Return `{ jobId, totalChunks, reason: 'ok' | 'no_text' | 'non_obligation_kind' | ... }` so existing early-exit UX is unchanged.
+### 3. Server-side background continuation (survives tab close)
 
-- `processDraftChunk({ jobId, chunkIndex })`
-  - Load job, run `extractChunkWithRetry` on `chunk_texts[chunkIndex]`.
-  - Append items to `extracted_items`, append any failures to `chunk_failures`, `processed_chunks++`.
-  - Return `{ processed, total, chunkFailures: newFailuresThisCall }`.
-  - One AI call per invocation — safely inside the wall-clock even on the worst chunk.
+Public API route `src/routes/api/public/nectar-draft-tick.ts`:
 
-- `finalizeRequirementsDraft({ jobId })`
-  - Dedupe accumulated `extracted_items` against existing `nectar_requirements.requirement_key`.
-  - Batch-insert in groups of 100 (already the existing shape).
-  - Set `status='done'`, `inserted_count`.
-  - Return `{ inserted, chunkCount, chunkFailures, reason: 'ok' | 'partial' | 'extractor_incomplete' | 'no_requirements' }` — matches today's response shape so the toast copy doesn't change.
-  - The HIVE-ticket emissions (`reportPlatformEvent` for `ai_error`, `no_requirements_found`, `requirement_unmapped`, `unknown_code_structure`) all move here. Two cleanups while I'm here so this step is fast:
-    - Import `reportPlatformEvent`'s underlying helper directly instead of calling it as a server-fn from another server-fn (the current pattern hits the "Server function info not found for &lt;hash&gt;" published-build failure documented in `tanstack-server-functions`). If a plain helper doesn't exist yet, I'll extract one into `hive-tickets.server.ts`.
-    - Same treatment for `markDraftedByNectar`.
+- `POST { jobId }`, verified by HMAC header signed with a stored `NECTAR_DRAFT_TICK_SECRET` (via `secrets--add_secret`).
+- Loads the job with `supabaseAdmin`, then loops: pick next unprocessed index, run the same extraction as `processDraftChunk`, append to `processed_indices` / `extracted_items` / `chunk_durations_ms`. Stops when either (a) all chunks processed → runs finalize inline, or (b) ~20s wall-clock elapsed to stay under the Worker CPU budget.
+- Before returning, if work remains, calls itself via `fetch(sameOriginUrl, { method:'POST', keepalive:true, headers:{signature} })` inside `ctx.waitUntil(...)` (Cloudflare `waitUntil`) so the chain continues after the HTTP response is sent, with no client involvement.
 
-### 3. Client drives the loop
+`startRequirementsDraft` fires the first tick before returning so background work begins immediately.
 
-In `src/routes/dashboard.authoritative-sources.tsx` around the current `generate` mutation (lines 488–535):
+Result:
+- Tab open on Knowledge page → client driver + server ticks race; idempotency guard makes double-work a no-op.
+- Tab on any other dashboard page → client driver still runs, server ticks also run.
+- Tab closed → server ticks keep the job moving; next open shows the finished (or further-along) job.
 
-- Kill the fake `useEffect` that creeps to 92 %.
-- New flow inside the mutation:
-  1. `start = await startRequirementsDraft(...)` → get `jobId` and `totalChunks`. Early-exit reasons (`no_text`, `non_obligation_kind`) short-circuit exactly like today.
-  2. Run a bounded-concurrency loop (limit 3, same as today's server concurrency) over `0..totalChunks-1` calling `processDraftChunk`. After each returned call: `setProgress(Math.round((processed / total) * 90))` — real progress capped at 90 % so the finalize step has room.
-  3. `finalize = await finalizeRequirementsDraft({ jobId })` → move to 100 % and show the existing success/warn toast with `inserted` / `message`.
-- Errors surface per step; a failure in step 2 leaves the job row intact, so clicking Draft again with an "existing job?" resume path is an easy follow-up (out of scope for this fix — a fresh click just starts a new job).
+### 4. Real ETA (not fake creep)
 
-### 4. Keep `generateRequirementsFromSource` as a shim (optional, cheap)
+In the driver store, for each active job compute:
 
-Rewrite it to call the three new fns in sequence, so any other caller (or the old client bundle in a cache) still works. Deletable once the client is redeployed.
+```
+completed = chunkDurationsMs.length
+if (completed >= 2) {
+  // Use a trailing average over the last 8 chunks, weighted by real concurrency
+  window = chunkDurationsMs.slice(-8)
+  avgPerChunkMs = mean(window)
+  effectiveConcurrency = min(3, totalChunks - processedChunks)
+  remainingChunks = totalChunks - processedChunks
+  etaMs = (remainingChunks * avgPerChunkMs) / effectiveConcurrency
+} else if (completed === 1) {
+  etaMs = chunkDurationsMs[0] * (totalChunks - 1) / 3
+} else {
+  // Before any chunk finishes, fall back to elapsed-since-startedAt with a
+  // conservative "still measuring…" label instead of a number.
+  etaMs = null
+}
+```
 
-## Files to touch
+Format: `~2m 15s left` when `>= 60s`, `~45s left` when `< 60s`, `still measuring…` when `etaMs === null`, and hide entirely when `processedChunks === totalChunks` (finalizing). Because timings are read from the job row, ETA is correct whether the user just opened the page or was watching all along, and it survives reloads.
 
-- `docs/SQL_HANDOFF.md` — migration for `nectar_draft_jobs` + GRANTs + RLS
-- `src/lib/authoritative-sources.functions.ts` — add three new server fns, retire the monolith
-- `src/lib/hive-tickets.server.ts` (new) — plain helper `reportPlatformEventDirect(...)` shared by the server-fn wrapper and the drafting finalizer
-- `src/lib/nectar-approvals.server.ts` (new, if not already) — plain helper for `markDraftedByNectar`
-- `src/routes/dashboard.authoritative-sources.tsx` — swap the mutation body, delete the fake-progress `useEffect`, real progress from the loop
-- `src/integrations/supabase/types.ts` — regenerated for the new table
+### 5. UX
+
+- Persistent header pill: `Drafting N sources · ~Xm Ys left` (min ETA across active jobs), links to Knowledge.
+- Source row button states:
+  - No job: `Draft requirements` (or `Re-draft` if drafted before).
+  - Active: `Drafting… N% · ~Xm Ys left` (disabled).
+  - Failed: `Resume drafting` (re-fires a tick).
 
 ## Out of scope
 
-- Resumable jobs across page reloads (job row exists, but resuming a half-finished job needs a UI affordance — not part of this fix).
-- Changing what NECTAR extracts, how requirements are rendered, or the review flow.
-- Auto-retrying failed chunks server-side beyond the existing single "split in half and retry" already in `extractChunkWithRetry`.
+- Cross-org admin views of job history; retry beyond the existing "split in half" retry in `extractChunkWithRetry`; replacing the client driver with pure server ticks (kept as belt-and-suspenders for snappier updates when the tab is open).
 
-## Verification
+## Files touched
 
-- Draft on the 260 k-char SOW → progress bar moves in ~10 real jumps (one per chunk), never sticks, and the success toast reports a real requirement count.
-- Draft on a short doc → completes in one or two updates, same UX as today.
-- A parse-fail on one chunk → we still return `partial` with the accurate "X of N sections couldn't be read on this pass" message, and the successful chunks' requirements are inserted.
+- `docs/SQL_HANDOFF.md` and a new `supabase/migrations/*.sql` — add the three columns.
+- `src/integrations/supabase/types.ts` — regenerated columns.
+- `src/lib/authoritative-sources.functions.ts` — idempotency + timing in `processDraftChunk`; new `getActiveDraftJobs`; `startRequirementsDraft` fires first tick.
+- `src/lib/nectar-draft-tick.server.ts` (new) — signed tick loop + self-chaining via `waitUntil`.
+- `src/routes/api/public/nectar-draft-tick.ts` (new) — HMAC-verified POST route.
+- `src/components/nectar/draft-jobs-driver.tsx` (new) — polling, concurrency loop, progress+ETA store.
+- Authenticated dashboard shell — mount the driver once.
+- `src/routes/dashboard.authoritative-sources.tsx` — remove per-row loop; read progress/ETA from store; new button labels.
+- Secret: `NECTAR_DRAFT_TICK_SECRET`.
+
+## Success check
+
+Start a draft on the 260k-char SOW. Within ~10s the button shows `Drafting… N% · ~Xm Ys left` with a plausible ETA. Navigate to another dashboard page — the header pill keeps counting down. Close the tab, wait a couple minutes, reopen — the job is further along or done and requirements from the later sections are visible in the Requirements list.

@@ -927,12 +927,7 @@ const AuthorizedCodeSource = z.enum([
 export const listAuthorizedCodes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
-    z
-      .object({
-        organizationId: z.string().uuid(),
-        includeArchived: z.boolean().optional(),
-      })
-      .parse(input),
+    z.object({ organizationId: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
@@ -941,7 +936,7 @@ export const listAuthorizedCodes = createServerFn({ method: "POST" })
     const { data: authRows, error } = await supabase
       .from("provider_authorized_codes")
       .select(
-        "id, code, label, status, source, source_document_id, notes, created_at, updated_at, archived_at, confirmed_at",
+        "id, code, label, status, source, source_document_id, notes, created_at, updated_at",
       )
       .eq("organization_id", data.organizationId)
       .order("code", { ascending: true });
@@ -952,26 +947,6 @@ export const listAuthorizedCodes = createServerFn({ method: "POST" })
         r.code.toUpperCase(),
       ),
     );
-
-    // Prompt 35: hasActiveClient — a client_billing_codes row exists for this
-    // service_code with no past service_end_date (currently authorized).
-    // Runs against active (non-archived) clients only.
-    const { data: cbcRows } = await supabase
-      .from("client_billing_codes")
-      .select("service_code, service_end_date, client_id, clients!inner(organization_id, archived_at)")
-      .eq("clients.organization_id", data.organizationId)
-      .is("clients.archived_at", null);
-    const today = new Date().toISOString().slice(0, 10);
-    const activeClientCodes = new Set<string>();
-    for (const r of (cbcRows ?? []) as Array<{
-      service_code: string | null;
-      service_end_date: string | null;
-    }>) {
-      const c = (r.service_code ?? "").trim().toUpperCase();
-      if (!c) continue;
-      if (r.service_end_date && r.service_end_date < today) continue;
-      activeClientCodes.add(c);
-    }
 
     // Count confirmed mappings per code so the UI can show coverage.
     const { data: maps } = await supabase
@@ -1005,8 +980,6 @@ export const listAuthorizedCodes = createServerFn({ method: "POST" })
         notes: "Detected from client/staff data — promote to lock it into your authorized set.",
         created_at: null,
         updated_at: null,
-        archived_at: null as string | null,
-        confirmed_at: null as string | null,
       }));
 
     const explicit = ((authRows ?? []) as Array<{
@@ -1019,8 +992,6 @@ export const listAuthorizedCodes = createServerFn({ method: "POST" })
       notes: string | null;
       created_at: string;
       updated_at: string;
-      archived_at: string | null;
-      confirmed_at: string | null;
     }>).map((r) => ({
       ...r,
       code: r.code.toUpperCase(),
@@ -1028,59 +999,32 @@ export const listAuthorizedCodes = createServerFn({ method: "POST" })
       status: facts.activeCodes.includes(r.code.toUpperCase()) ? "active" : r.status,
     }));
 
-    const includeArchived = data.includeArchived ?? false;
     const rows = [...explicit, ...inferred]
-      .filter((r) => includeArchived || !r.archived_at)
-      .map((r) => {
-        const hasActiveClient = activeClientCodes.has(r.code);
-        const isArchived = !!r.archived_at;
-        const isUnverified = r.source === "manual" || r.source === "inferred";
-        let displayStatus: "active" | "standby" | "standby-unverified" | "archived";
-        if (isArchived) displayStatus = "archived";
-        else if (hasActiveClient) displayStatus = "active";
-        else if (isUnverified && !r.confirmed_at) displayStatus = "standby-unverified";
-        else displayStatus = "standby";
-        return {
-          ...r,
-          confirmedRequirements: confirmedByCode.get(r.code) ?? 0,
-          proposedRequirements: proposedByCode.get(r.code) ?? 0,
-          inUse: facts.activeCodes.includes(r.code),
-          hasActiveClient,
-          displayStatus,
-        };
-      })
+      .map((r) => ({
+        ...r,
+        confirmedRequirements: confirmedByCode.get(r.code) ?? 0,
+        proposedRequirements: proposedByCode.get(r.code) ?? 0,
+        inUse: facts.activeCodes.includes(r.code),
+      }))
       .sort((a, b) => {
-        const order: Record<string, number> = {
-          active: 0,
-          standby: 1,
-          "standby-unverified": 2,
-          archived: 3,
-        };
-        const ao = order[a.displayStatus] ?? 9;
-        const bo = order[b.displayStatus] ?? 9;
-        if (ao !== bo) return ao - bo;
+        // active first, then dormant, then by code
+        const ar = a.inUse ? 0 : 1;
+        const br = b.inUse ? 0 : 1;
+        if (ar !== br) return ar - br;
         return a.code.localeCompare(b.code);
       });
 
-    const nonArchived = rows.filter((r) => r.displayStatus !== "archived");
     return {
       codes: rows,
       summary: {
-        total: nonArchived.length,
-        authorized: nonArchived.length,
-        withActiveClients: nonArchived.filter((r) => r.hasActiveClient).length,
-        standby: nonArchived.filter(
-          (r) => !r.hasActiveClient && r.displayStatus !== "archived",
-        ).length,
-        active: nonArchived.filter((r) => r.inUse).length,
-        dormant: nonArchived.filter((r) => !r.inUse).length,
-        authorizedExplicit: explicit.filter((r) => includeArchived || !r.archived_at).length,
+        total: rows.length,
+        active: rows.filter((r) => r.inUse).length,
+        dormant: rows.filter((r) => !r.inUse).length,
+        authorizedExplicit: explicit.length,
         inferredOnly: inferred.length,
-        archivedCount: explicit.filter((r) => r.archived_at).length,
       },
     };
   });
-
 
 export const upsertAuthorizedCode = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -1144,92 +1088,6 @@ export const removeAuthorizedCode = createServerFn({ method: "POST" })
     const { error } = await supabase
       .from("provider_authorized_codes")
       .delete()
-      .eq("id", data.id);
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
-
-// Prompt 35 — Soft archive/confirm for authorized codes.
-// Codes are NEVER hard-deleted (7-year retention). Archiving hides a code
-// from the default list; confirming marks a manual/inferred code as
-// admin-verified so it no longer prompts "confirm this belongs on your contract".
-
-export const archiveAuthorizedCode = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
-    z.object({ id: z.string().uuid() }).parse(input),
-  )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    const { data: existing, error: exErr } = await supabase
-      .from("provider_authorized_codes")
-      .select("organization_id")
-      .eq("id", data.id)
-      .maybeSingle();
-    if (exErr || !existing) throw new Error("Authorized code not found");
-    await requireOrgMembership(
-      supabase,
-      userId,
-      (existing as { organization_id: string }).organization_id,
-      "manager",
-    );
-    const { error } = await supabase
-      .from("provider_authorized_codes")
-      .update({ archived_at: new Date().toISOString() })
-      .eq("id", data.id);
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
-
-export const unarchiveAuthorizedCode = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
-    z.object({ id: z.string().uuid() }).parse(input),
-  )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    const { data: existing, error: exErr } = await supabase
-      .from("provider_authorized_codes")
-      .select("organization_id")
-      .eq("id", data.id)
-      .maybeSingle();
-    if (exErr || !existing) throw new Error("Authorized code not found");
-    await requireOrgMembership(
-      supabase,
-      userId,
-      (existing as { organization_id: string }).organization_id,
-      "manager",
-    );
-    const { error } = await supabase
-      .from("provider_authorized_codes")
-      .update({ archived_at: null })
-      .eq("id", data.id);
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
-
-export const confirmAuthorizedCode = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
-    z.object({ id: z.string().uuid() }).parse(input),
-  )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    const { data: existing, error: exErr } = await supabase
-      .from("provider_authorized_codes")
-      .select("organization_id")
-      .eq("id", data.id)
-      .maybeSingle();
-    if (exErr || !existing) throw new Error("Authorized code not found");
-    await requireOrgMembership(
-      supabase,
-      userId,
-      (existing as { organization_id: string }).organization_id,
-      "manager",
-    );
-    const { error } = await supabase
-      .from("provider_authorized_codes")
-      .update({ confirmed_at: new Date().toISOString(), confirmed_by: userId })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };

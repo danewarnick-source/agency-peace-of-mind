@@ -1577,7 +1577,6 @@ export type Database = {
       }
       certifications: {
         Row: {
-          certification_type_code: string | null
           course_id: string
           course_title: string | null
           created_at: string
@@ -1585,14 +1584,11 @@ export type Database = {
           id: string
           issued_at: string
           organization_id: string
-          origin: string | null
           recipient_name: string | null
-          requirement_id: string | null
           user_id: string
           verification_code: string
         }
         Insert: {
-          certification_type_code?: string | null
           course_id: string
           course_title?: string | null
           created_at?: string
@@ -1600,14 +1596,11 @@ export type Database = {
           id?: string
           issued_at?: string
           organization_id: string
-          origin?: string | null
           recipient_name?: string | null
-          requirement_id?: string | null
           user_id: string
           verification_code?: string
         }
         Update: {
-          certification_type_code?: string | null
           course_id?: string
           course_title?: string | null
           created_at?: string
@@ -1615,9 +1608,7 @@ export type Database = {
           id?: string
           issued_at?: string
           organization_id?: string
-          origin?: string | null
           recipient_name?: string | null
-          requirement_id?: string | null
           user_id?: string
           verification_code?: string
         }
@@ -1634,13 +1625,6 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "certifications_requirement_id_fkey"
-            columns: ["requirement_id"]
-            isOneToOne: false
-            referencedRelation: "nectar_requirements"
             referencedColumns: ["id"]
           },
         ]
@@ -5376,11 +5360,9 @@ export type Database = {
           fields: Json
           frequency: string
           id: string
-          managed_by_requirement: boolean
           name: string
           organization_id: string
           published_at: string | null
-          requirement_id: string | null
           schedule: Json
           settings: Json
           status: string
@@ -5398,11 +5380,9 @@ export type Database = {
           fields?: Json
           frequency?: string
           id?: string
-          managed_by_requirement?: boolean
           name: string
           organization_id: string
           published_at?: string | null
-          requirement_id?: string | null
           schedule?: Json
           settings?: Json
           status?: string
@@ -5420,11 +5400,9 @@ export type Database = {
           fields?: Json
           frequency?: string
           id?: string
-          managed_by_requirement?: boolean
           name?: string
           organization_id?: string
           published_at?: string | null
-          requirement_id?: string | null
           schedule?: Json
           settings?: Json
           status?: string
@@ -5436,13 +5414,6 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "forms_requirement_id_fkey"
-            columns: ["requirement_id"]
-            isOneToOne: false
-            referencedRelation: "nectar_requirements"
             referencedColumns: ["id"]
           },
         ]
@@ -9060,53 +9031,6 @@ export type Database = {
           },
         ]
       }
-      master_attestations: {
-        Row: {
-          attestation_text: string
-          id: string
-          organization_id: string
-          requirement_count: number
-          scope_codes: string[]
-          signed_at: string
-          signed_by: string
-          signed_by_name: string | null
-          superseded_at: string | null
-          version: number
-        }
-        Insert: {
-          attestation_text: string
-          id?: string
-          organization_id: string
-          requirement_count?: number
-          scope_codes?: string[]
-          signed_at?: string
-          signed_by: string
-          signed_by_name?: string | null
-          superseded_at?: string | null
-          version: number
-        }
-        Update: {
-          attestation_text?: string
-          id?: string
-          organization_id?: string
-          requirement_count?: number
-          scope_codes?: string[]
-          signed_at?: string
-          signed_by?: string
-          signed_by_name?: string | null
-          superseded_at?: string | null
-          version?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "master_attestations_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       medication_transfers: {
         Row: {
           client_id: string
@@ -9797,10 +9721,6 @@ export type Database = {
           origin: string
           requirement_key: string
           review_status: string
-          satisfied_by: string | null
-          scope_level: string | null
-          service_code: string | null
-          service_codes_all: string[] | null
           source_citation: string | null
           source_document_id: string | null
           title: string
@@ -9822,10 +9742,6 @@ export type Database = {
           origin?: string
           requirement_key: string
           review_status?: string
-          satisfied_by?: string | null
-          scope_level?: string | null
-          service_code?: string | null
-          service_codes_all?: string[] | null
           source_citation?: string | null
           source_document_id?: string | null
           title: string
@@ -9847,10 +9763,6 @@ export type Database = {
           origin?: string
           requirement_key?: string
           review_status?: string
-          satisfied_by?: string | null
-          scope_level?: string | null
-          service_code?: string | null
-          service_codes_all?: string[] | null
           source_citation?: string | null
           source_document_id?: string | null
           title?: string
@@ -11039,11 +10951,8 @@ export type Database = {
       provider_authorized_codes: {
         Row: {
           added_by: string | null
-          archived_at: string | null
           carve_out: boolean
           code: string
-          confirmed_at: string | null
-          confirmed_by: string | null
           created_at: string
           id: string
           kind: string
@@ -11059,11 +10968,8 @@ export type Database = {
         }
         Insert: {
           added_by?: string | null
-          archived_at?: string | null
           carve_out?: boolean
           code: string
-          confirmed_at?: string | null
-          confirmed_by?: string | null
           created_at?: string
           id?: string
           kind?: string
@@ -11079,11 +10985,8 @@ export type Database = {
         }
         Update: {
           added_by?: string | null
-          archived_at?: string | null
           carve_out?: boolean
           code?: string
-          confirmed_at?: string | null
-          confirmed_by?: string | null
           created_at?: string
           id?: string
           kind?: string
@@ -11901,50 +11804,6 @@ export type Database = {
             columns: ["support_coordinator_id"]
             isOneToOne: false
             referencedRelation: "support_coordinators"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      requirement_bindings: {
-        Row: {
-          bound_by: string | null
-          created_at: string
-          engine_ref: string | null
-          id: string
-          native_feature: string | null
-          notes: string | null
-          requirement_id: string
-          satisfied_by: string
-          updated_at: string
-        }
-        Insert: {
-          bound_by?: string | null
-          created_at?: string
-          engine_ref?: string | null
-          id?: string
-          native_feature?: string | null
-          notes?: string | null
-          requirement_id: string
-          satisfied_by?: string
-          updated_at?: string
-        }
-        Update: {
-          bound_by?: string | null
-          created_at?: string
-          engine_ref?: string | null
-          id?: string
-          native_feature?: string | null
-          notes?: string | null
-          requirement_id?: string
-          satisfied_by?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "requirement_bindings_requirement_id_fkey"
-            columns: ["requirement_id"]
-            isOneToOne: true
-            referencedRelation: "nectar_requirements"
             referencedColumns: ["id"]
           },
         ]
@@ -14983,10 +14842,6 @@ export type Database = {
           origin: string
           requirement_key: string
           review_status: string
-          satisfied_by: string | null
-          scope_level: string | null
-          service_code: string | null
-          service_codes_all: string[] | null
           source_citation: string | null
           source_document_id: string | null
           title: string
@@ -15017,10 +14872,6 @@ export type Database = {
           origin: string
           requirement_key: string
           review_status: string
-          satisfied_by: string | null
-          scope_level: string | null
-          service_code: string | null
-          service_codes_all: string[] | null
           source_citation: string | null
           source_document_id: string | null
           title: string
@@ -15165,9 +15016,6 @@ export type Database = {
         Args: { _organization_id: string }
         Returns: number
       }
-      rebuild_wipe_requirements_tns_fake:
-        | { Args: never; Returns: number }
-        | { Args: { p_keep_pending?: boolean }; Returns: number }
       restore_my_admin_role: { Args: never; Returns: undefined }
       seed_standard_service_codes: {
         Args: { _org: string }

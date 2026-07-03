@@ -94,7 +94,6 @@ function EditForm() {
     groups, users, allClients, clients, settings,
   }), [name, description, category, fields, frequency, schedule, groups, users, allClients, clients, settings]);
   const isDirty = baseline !== "" && currentSnapshot !== baseline;
-  const managedByReq = Boolean((data?.form as { managed_by_requirement?: boolean } | undefined)?.managed_by_requirement);
 
   // Browser-level unsaved warning
   useEffect(() => {
@@ -195,9 +194,7 @@ function EditForm() {
           <DirtyBadge isDirty={isDirty} />
           <Button variant="outline" onClick={() => setShowNectar(true)}><Sparkles className="mr-1.5 h-4 w-4 text-amber-500" /> Build with Nectar</Button>
           <Button variant="outline" onClick={() => setShowSettings(true)}><SettingsIcon className="mr-1.5 h-4 w-4" /> Settings</Button>
-          <Button variant="outline" onClick={() => setShowAssign(true)} disabled={managedByReq}
-            title={managedByReq ? "Audience is managed by the linked requirement" : undefined}
-          ><Users className="mr-1.5 h-4 w-4" /> Assign</Button>
+          <Button variant="outline" onClick={() => setShowAssign(true)}><Users className="mr-1.5 h-4 w-4" /> Assign</Button>
           <Button variant="outline" className="text-rose-700 hover:text-rose-800 hover:bg-rose-50 border-rose-200"
             onClick={() => setDeleteOpen(true)}>
             <Trash2 className="mr-1.5 h-4 w-4" /> Delete
@@ -213,12 +210,6 @@ function EditForm() {
       {isNectarDraft && (
         <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
           <Sparkles className="inline h-4 w-4 mr-1" /> <strong>Nectar draft</strong> — review and edit every field before publishing.
-        </div>
-      )}
-
-      {managedByReq && (
-        <div className="rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-xs text-sky-800">
-          <strong>Managed by requirement</strong> — schedule and audience come from the linked compliance requirement and are read-only here. Edit the requirement to change them.
         </div>
       )}
 
@@ -283,9 +274,7 @@ function EditForm() {
                   </div>
                 )}
               </div>
-              <div className={managedByReq ? "pointer-events-none opacity-60" : ""} title={managedByReq ? "Managed by requirement" : undefined}>
-                <FrequencyControl frequency={frequency} schedule={schedule} setFrequency={setFrequency} setSchedule={setSchedule} />
-              </div>
+              <FrequencyControl frequency={frequency} schedule={schedule} setFrequency={setFrequency} setSchedule={setSchedule} />
             </div>
           </Card>
 

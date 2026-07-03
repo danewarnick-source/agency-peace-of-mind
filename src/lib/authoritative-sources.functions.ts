@@ -711,17 +711,6 @@ export const verifyRequirement = createServerFn({ method: "POST" })
 // SOW/contract requirements live as prose clauses, not tabular fields.
 // We ask the AI to read narrative text and pull obligations + required
 // documents directly. Source-citation always carried; nothing fabricated.
-const KNOWN_SERVICE_CODES = EVV_SERVICE_CODES.map((c) => c.code);
-const KNOWN_SERVICE_CODE_SET = new Set(KNOWN_SERVICE_CODES);
-
-/** Uppercase/trim an AI-supplied code; drop anything not in the known registry. */
-function normalizeCode(raw: unknown): string | null {
-  if (typeof raw !== "string") return null;
-  const v = raw.trim().toUpperCase();
-  if (!v) return null;
-  return KNOWN_SERVICE_CODE_SET.has(v) ? v : null;
-}
-
 const REQ_SYSTEM_PROMPT = `You are NECTAR, reading a Utah DSPD provider's State Scope of Work, provider contract, or DSPD/DHS requirement document.
 
 Your job is to extract REQUIREMENTS the provider must meet — written as prose clauses, numbered sections, "the Provider shall…", "must maintain…", "required documents include…", etc. This is narrative text, NOT a structured table.
@@ -734,8 +723,7 @@ Return STRICT JSON only, shape:
       "description": "exact or close paraphrase of the obligation, <=600 chars",
       "category": "audit_doc" | "obligation" | "rule" | "billing",
       "citation": "best locator you can identify, e.g. '§4.2', 'Section 3.1', 'page 7', 'Attachment A'",
-      "applies_to": "company" | "staff" | "client",
-      "service_code": "one DSPD code from the known list, or null"
+      "applies_to": "company" | "staff" | "client"
     }
   ]
 }
@@ -747,7 +735,6 @@ Rules:
     obligation = a thing the provider must do (notify within X hours, conduct annual review, maintain insurance, etc.)
     rule       = a constraint / prohibition (no overlapping services, staff-to-client ratio caps, etc.)
     billing    = a billing/reimbursement requirement (EVV, claim timeliness, prior auth)
-- "service_code" = the single DSPD service code this requirement governs (e.g. 'HHS','DSI','RHS','SLN','SLH','SEI'), taken from the citation or clause. Use ONLY codes from this known list: ${KNOWN_SERVICE_CODES.join(", ")}. If the requirement is general and applies to the whole provider regardless of code, set service_code to null. If a requirement names multiple codes, pick the single most specific one it is primarily about; if truly equal, use null. Never invent a code not in the known list.
 - Prefer fewer high-quality items over many vague ones.
 - If the text contains no requirement language at all, return {"requirements": []}.`;
 
@@ -757,7 +744,6 @@ const ReqItem = z.object({
   category: z.enum(["audit_doc", "obligation", "rule", "billing"]).optional().nullable(),
   citation: z.string().max(200).optional().nullable(),
   applies_to: z.enum(["company", "staff", "client"]).optional().nullable(),
-  service_code: z.string().max(10).optional().nullable(),
 });
 const ReqExtraction = z.object({ requirements: z.array(ReqItem).max(200).default([]) });
 
@@ -794,10 +780,6 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     z
       .object({
         documentId: z.string().uuid(),
-        // When true, newly inserted requirements are tagged with
-        // metadata.rebuild_pending = true so a subsequent commitRebuild
-        // can atomically swap the old set for the new set.
-        rebuildBatch: z.boolean().optional(),
       })
       .parse(input),
   )
@@ -903,22 +885,15 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     }
 
 
-    // Existing requirements (so we can de-dupe across re-runs).
-    // In rebuildBatch mode we intentionally skip dedupe: new rows land tagged
-    // rebuild_pending alongside the old rows so commitRebuild can swap them.
+    // Existing requirements (so we can de-dupe across re-runs)
     const { data: existing } = await supabase
       .from("nectar_requirements")
       .select("requirement_key")
       .eq("organization_id", doc.organization_id)
       .eq("source_document_id", doc.id);
-    const existingKeys = data.rebuildBatch
-      ? new Set<string>()
-      : new Set(
-          (existing ?? []).map((r) => (r.requirement_key as string) ?? ""),
-        );
-    const rebuildMeta = data.rebuildBatch
-      ? ({ rebuild_pending: true } as Json)
-      : null;
+    const existingKeys = new Set(
+      (existing ?? []).map((r) => (r.requirement_key as string) ?? ""),
+    );
 
     // 1. Prose-clause extraction (the real path for SOW / contracts)
     let aiItems: Array<{
@@ -927,7 +902,6 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       category?: "audit_doc" | "obligation" | "rule" | "billing" | null;
       citation?: string | null;
       applies_to?: "company" | "staff" | "client" | null;
-      service_code?: string | null;
     }> = [];
     try {
       aiItems = await extractRequirementsFromText(rawText);
@@ -1002,9 +976,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
           category: item.category ?? "obligation",
           source_citation: citation,
           applies_to: item.applies_to ?? "company",
-          service_code: normalizeCode(item.service_code),
           approval_state: assisted ? "nectar_drafted" : null,
-          ...(rebuildMeta ? { metadata: rebuildMeta } : {}),
         })
         .select("id")
         .single();
@@ -1045,7 +1017,6 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
             : `${baseLabel}${webSuffix}`,
           applies_to: "company",
           approval_state: assisted ? "nectar_drafted" : null,
-          ...(rebuildMeta ? { metadata: rebuildMeta } : {}),
         })
         .select("id")
         .single();
@@ -1366,152 +1337,3 @@ REQUIREMENT TEXT: ${req.description ?? "(no extended text — restate the title 
         "This is a NECTAR plain-language restatement to aid your understanding. It is NOT legal, compliance, or audit advice, and does NOT replace the original source text. Always review the original requirement and consult counsel as needed before acting.",
     };
   });
-
-// ---------- Demo-data rebuild (TNS FAKE only) ----------
-// Deletes the org's existing requirements and re-runs extraction against
-// every active authoritative source. Scoped to the TNS FAKE org id so a
-// misclick can never wipe another workspace. Admin/super_admin only.
-const TNS_FAKE_ORG_ID = "7fabcf5d-f826-487f-8730-8b0c3f1969bb";
-
-// NON-DESTRUCTIVE START. Verifies admin, returns the eligible source
-// documents. NO delete happens here — new requirements are extracted with
-// metadata.rebuild_pending = true alongside the originals, then swapped
-// atomically by commitRebuildForOrg (or discarded by rollbackRebuildForOrg).
-async function assertTnsFakeRebuildAdmin(
-  supabase: any,
-  userId: string,
-  organizationId: string,
-) {
-  if (organizationId !== TNS_FAKE_ORG_ID) {
-    throw new Error("Rebuild is only available for the TNS FAKE demo workspace.");
-  }
-  const { data: member } = await supabase
-    .from("organization_members")
-    .select("role, active")
-    .eq("organization_id", organizationId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  const role = (member?.role as string | null) ?? null;
-  if (!member?.active || (role !== "admin" && role !== "super_admin")) {
-    throw new Error("Admin or super-admin only.");
-  }
-}
-
-export const wipeRequirementsForOrgRebuild = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
-    z
-      .object({
-        organizationId: z.string().uuid(),
-        confirm: z.literal("REBUILD"),
-      })
-      .parse(input),
-  )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    await assertTnsFakeRebuildAdmin(supabase, userId, data.organizationId);
-
-    // Safety: clear any stray rebuild_pending rows from a previously
-    // aborted rebuild so this run starts clean.
-    await supabase
-      .from("nectar_requirements")
-      .delete()
-      .eq("organization_id", data.organizationId)
-      .contains("metadata", { rebuild_pending: true });
-
-    const { data: sources, error: sErr } = await supabase
-      .from("nectar_documents")
-      .select("id, title, file_name, authoritative_kind, metadata")
-      .eq("organization_id", data.organizationId)
-      .eq("is_authoritative_source", true);
-    if (sErr) throw new Error(`Source list failed: ${sErr.message}`);
-
-    const documents = (sources ?? [])
-      .filter((s) => {
-        const kind = (s.authoritative_kind as string | null) ?? "";
-        if (NON_OBLIGATION_KINDS.has(kind)) return false;
-        const meta = (s.metadata ?? {}) as { ignored?: boolean };
-        if (meta.ignored) return false;
-        return true;
-      })
-      .map((s) => ({
-        id: s.id as string,
-        title:
-          ((s.title as string | null) ?? (s.file_name as string | null)) ||
-          "Untitled source",
-      }));
-
-    return { ok: true as const, documents };
-  });
-
-// Commit: delete OLD (non-pending) requirements for the org, then clear
-// the rebuild_pending flag on the new ones. Wrapped inside the append-only
-// trigger workaround (SECURITY DEFINER RPC) for the delete.
-export const commitRebuildForOrg = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
-    z
-      .object({
-        organizationId: z.string().uuid(),
-        confirm: z.literal("REBUILD"),
-      })
-      .parse(input),
-  )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    await assertTnsFakeRebuildAdmin(supabase, userId, data.organizationId);
-
-    // Delete only OLD requirements (those without rebuild_pending) via the
-    // SECURITY DEFINER RPC that disables the append-only approval trigger.
-    const { error: delErr } = await supabase.rpc(
-      "rebuild_wipe_requirements_tns_fake",
-      { p_keep_pending: true } as never,
-    );
-    if (delErr) throw new Error(`Commit delete failed: ${delErr.message}`);
-
-    // Clear the rebuild_pending flag on the new rows.
-    const { data: pending } = await supabase
-      .from("nectar_requirements")
-      .select("id, metadata")
-      .eq("organization_id", data.organizationId)
-      .contains("metadata", { rebuild_pending: true });
-
-    let cleared = 0;
-    for (const r of pending ?? []) {
-      const meta = { ...((r.metadata ?? {}) as Record<string, unknown>) };
-      delete meta.rebuild_pending;
-      const { error } = await supabase
-        .from("nectar_requirements")
-        .update({ metadata: meta as Json })
-        .eq("id", r.id as string);
-      if (!error) cleared += 1;
-    }
-
-    return { ok: true as const, cleared };
-  });
-
-// Rollback: throw away the new pending rows, leave the originals intact.
-export const rollbackRebuildForOrg = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
-    z
-      .object({
-        organizationId: z.string().uuid(),
-        confirm: z.literal("REBUILD"),
-      })
-      .parse(input),
-  )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    await assertTnsFakeRebuildAdmin(supabase, userId, data.organizationId);
-
-    const { error } = await supabase
-      .from("nectar_requirements")
-      .delete()
-      .eq("organization_id", data.organizationId)
-      .contains("metadata", { rebuild_pending: true });
-    if (error) throw new Error(`Rollback failed: ${error.message}`);
-    return { ok: true as const };
-  });
-
-

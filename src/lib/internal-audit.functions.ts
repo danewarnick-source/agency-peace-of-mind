@@ -61,12 +61,6 @@ export interface AuditSummary {
   totals: { critical: number; attention: number; minor: number; total: number };
   /** 0-100 — proportion of checks that came back clean, weighted by severity. */
   readinessScore: number;
-  /** Requirement-scope counters (Prompt 33). Dormant requirements do not
-   *  count toward the readiness score. */
-  inScopeCount: number;
-  dormantCount: number;
-  autoSatisfiedCount: number;
-  needsEvidenceCount: number;
   byArea: Record<FindingArea, number>;
   findings: AuditFinding[];
 }
@@ -118,12 +112,6 @@ export const runInternalAudit = createServerFn({ method: "POST" })
     const wantArea = data.area ?? null;
 
     const findings: AuditFinding[] = [];
-    let reqScopeCounts = {
-      inScopeCount: 0,
-      dormantCount: 0,
-      autoSatisfiedCount: 0,
-      needsEvidenceCount: 0,
-    };
     const include = (area: FindingArea) => !wantArea || wantArea === area;
 
     // ------- Lookups --------
@@ -232,7 +220,6 @@ export const runInternalAudit = createServerFn({ method: "POST" })
       category: string | null;
       metadata: Record<string, unknown> | null;
       approval_state: string | null;
-      service_code: string | null;
     };
     const reqRows = (reqsRes.data ?? []) as ReqRow[];
     const reqById = new Map(reqRows.map((r) => [r.id, r]));
@@ -528,322 +515,22 @@ export const runInternalAudit = createServerFn({ method: "POST" })
         if (m.confirmed)
           confirmedByReq.set(m.requirement_id, (confirmedByReq.get(m.requirement_id) ?? 0) + 1);
       }
-
-      const { data: heldCodesRows } = await supabase
-        .from("provider_authorized_codes")
-        .select("code")
-        .eq("organization_id", orgId);
-      const heldCodes = new Set<string>((heldCodesRows ?? []).map((r) => r.code));
-
-      // Prompt 32 — load the current master attestation once per run. An
-      // attestation-type requirement is satisfied when a current (non-due)
-      // master attestation covers its service_code.
-      const { data: masterRows } = await supabase
-        .from("master_attestations")
-        .select("scope_codes, requirement_count, signed_at")
-        .eq("organization_id", orgId)
-        .is("superseded_at", null)
-        .order("version", { ascending: false })
-        .limit(1);
-      const masterCurrent = ((masterRows ?? [])[0] ?? null) as {
-        scope_codes: string[] | null;
-        requirement_count: number | null;
-        signed_at: string;
-      } | null;
-      let masterIsDue = !masterCurrent;
-      if (masterCurrent) {
-        const ageMs = Date.now() - new Date(masterCurrent.signed_at).getTime();
-        if (ageMs > 365 * 24 * 60 * 60 * 1000) masterIsDue = true;
-        const snap = [...(masterCurrent.scope_codes ?? [])].sort();
-        const now = [...heldCodes].sort();
-        if (snap.length !== now.length || snap.some((c, i) => c !== now[i]))
-          masterIsDue = true;
-      }
-      const masterScopeCodes = new Set<string>(masterCurrent?.scope_codes ?? []);
-      const isCoveredByMaster = (code: string | null): boolean => {
-        if (!masterCurrent || masterIsDue) return false;
-        if (!code) return true;
-        return masterScopeCodes.has(code);
-      };
-
-      // ---------- Lazy resolver (Prompt 29) ----------
-      // Instead of firing on missing nectar_requirement_mappings rows, resolve
-      // each in-scope requirement against its requirement_bindings row + live
-      // evidence in the current audit window. NECTAR proposals still populate
-      // nectar_requirement_mappings; we simply don't gate the finding on them.
-      const inScopeReqs = Array.from(reqById.values()).filter(
-        (r) => !(r.service_code && !heldCodes.has(r.service_code)),
-      );
-      const inScopeIds = inScopeReqs.map((r) => r.id);
-
-      // Audit period: honour explicit dateFrom/dateTo, else default to last 90d.
-      const periodStart =
-        dateFrom ??
-        new Date(now.getTime() - 90 * 86_400_000).toISOString().slice(0, 10);
-      const periodEnd = dateTo ?? todayIso();
-      const periodStartIso = new Date(periodStart + "T00:00:00Z").toISOString();
-      const periodEndIso = new Date(periodEnd + "T23:59:59Z").toISOString();
-      const nowIso = new Date().toISOString();
-
-      // Load bindings in one shot.
-      const { data: bindingRows } = inScopeIds.length
-        ? await supabase
-            .from("requirement_bindings")
-            .select("requirement_id, satisfied_by, native_feature, engine_ref, notes")
-            .in("requirement_id", inScopeIds)
-        : { data: [] as Array<{
-            requirement_id: string;
-            satisfied_by: string;
-            native_feature: string | null;
-            engine_ref: string | null;
-            notes: string | null;
-          }> };
-      const bindingByReq = new Map(
-        (bindingRows ?? []).map((b) => [b.requirement_id as string, b]),
-      );
-
-      // Group requirements by the evidence source we'll need to query, so we
-      // can batch-load evidence once instead of per-requirement.
-      const formIds = new Set<string>();
-      const courseIds = new Set<string>();
-      const certTypeKeys = new Set<string>();
-      for (const r of inScopeReqs) {
-        const b = bindingByReq.get(r.id);
-        if (!b) continue;
-        if (b.satisfied_by === "form" && b.engine_ref) formIds.add(b.engine_ref);
-        if (b.satisfied_by === "training" && b.engine_ref) courseIds.add(b.engine_ref);
-        if (b.satisfied_by === "credential" && b.engine_ref) certTypeKeys.add(b.engine_ref);
-      }
-
-      const nativeFeatureNeeded = new Set<string>();
-      for (const r of inScopeReqs) {
-        const b = bindingByReq.get(r.id);
-        if (b?.satisfied_by === "auto" && b.native_feature)
-          nativeFeatureNeeded.add(b.native_feature);
-      }
-
-      const [
-        formSubsRes,
-        trainingCertsRes,
-        credCertsRes,
-        docAttestRes,
-        dailyLogsAnyRes,
-        evvAnyRes,
-        emarAnyRes,
-        incidentsAnyRes,
-        hrcAnyRes,
-      ] = await Promise.all([
-        formIds.size
-          ? supabase
-              .from("form_submissions")
-              .select("form_id, submitted_at")
-              .eq("organization_id", orgId)
-              .in("form_id", Array.from(formIds))
-              .gte("submitted_at", periodStartIso)
-              .lte("submitted_at", periodEndIso)
-          : Promise.resolve({ data: [] as Array<{ form_id: string; submitted_at: string }> }),
-        courseIds.size
-          ? supabase
-              .from("hive_training_assignments")
-              .select("course_id, completed_at, expires_at")
-              .eq("organization_id", orgId)
-              .in("course_id", Array.from(courseIds))
-              .not("completed_at", "is", null)
-          : Promise.resolve({
-              data: [] as Array<{
-                course_id: string;
-                completed_at: string | null;
-                expires_at: string | null;
-              }>,
-            }),
-        certTypeKeys.size
-          ? supabase
-              .from("certifications")
-              .select("id, course_id, expires_at")
-              .eq("organization_id", orgId)
-              .in("course_id", Array.from(certTypeKeys))
-          : Promise.resolve({
-              data: [] as Array<{ id: string; course_id: string; expires_at: string | null }>,
-            }),
-        supabase
-          .from("document_attestations")
-          .select("subject_ref, created_at")
-          .eq("organization_id", orgId)
-          .eq("subject_kind", "requirement")
-          .in(
-            "subject_ref",
-            inScopeIds.length ? inScopeIds : ["00000000-0000-0000-0000-000000000000"],
-          ),
-
-        nativeFeatureNeeded.has("daily_logs")
-          ? supabase
-              .from("daily_logs")
-              .select("id", { count: "exact", head: true })
-              .eq("organization_id", orgId)
-              .gte("log_date", periodStart)
-              .lte("log_date", periodEnd)
-          : Promise.resolve({ count: 0 }),
-        nativeFeatureNeeded.has("evv")
-          ? supabase
-              .from("evv_timesheets")
-              .select("id", { count: "exact", head: true })
-              .eq("organization_id", orgId)
-              .gte("clock_in_timestamp", periodStartIso)
-              .lte("clock_in_timestamp", periodEndIso)
-          : Promise.resolve({ count: 0 }),
-        nativeFeatureNeeded.has("med_admin")
-          ? supabase
-              .from("emar_logs")
-              .select("id", { count: "exact", head: true })
-              .eq("organization_id", orgId)
-              .gte("scheduled_time", periodStartIso)
-              .lte("scheduled_time", periodEndIso)
-          : Promise.resolve({ count: 0 }),
-        nativeFeatureNeeded.has("incidents")
-          ? supabase
-              .from("incident_reports")
-              .select("id", { count: "exact", head: true })
-              .eq("organization_id", orgId)
-              .gte("created_at", periodStartIso)
-              .lte("created_at", periodEndIso)
-          : Promise.resolve({ count: 0 }),
-        nativeFeatureNeeded.has("hrc")
-          ? supabase
-              .from("hrc_meetings")
-              .select("id", { count: "exact", head: true })
-              .eq("organization_id", orgId)
-              .gte("meeting_date", periodStart)
-              .lte("meeting_date", periodEnd)
-          : Promise.resolve({ count: 0 }),
-      ]);
-
-      const formSubsByForm = new Set<string>();
-      for (const s of (formSubsRes.data ?? []) as Array<{ form_id: string }>)
-        formSubsByForm.add(s.form_id);
-      const trainingCourseHas = new Set<string>();
-      for (const t of (trainingCertsRes.data ?? []) as Array<{
-        course_id: string;
-        expires_at: string | null;
-      }>) {
-        if (!t.expires_at || t.expires_at > nowIso) trainingCourseHas.add(t.course_id);
-      }
-      const validCertsByCourse = new Set<string>();
-      for (const c of (credCertsRes.data ?? []) as Array<{
-        course_id: string;
-        expires_at: string | null;
-      }>) {
-        if (!c.expires_at || c.expires_at > nowIso) validCertsByCourse.add(c.course_id);
-      }
-      const activeDocByReq = new Set<string>();
-      for (const d of (docAttestRes.data ?? []) as Array<{ subject_ref: string }>) {
-        activeDocByReq.add(d.subject_ref);
-      }
-
-
-      const nativeHas = (feature: string): boolean => {
-        switch (feature) {
-          case "daily_logs":
-            return (dailyLogsAnyRes.count ?? 0) > 0;
-          case "evv":
-            return (evvAnyRes.count ?? 0) > 0;
-          case "med_admin":
-            return (emarAnyRes.count ?? 0) > 0;
-          case "incidents":
-            return (incidentsAnyRes.count ?? 0) > 0;
-          case "hrc":
-            return (hrcAnyRes.count ?? 0) > 0;
-          default:
-            return false;
-        }
-      };
-
-      let autoSatisfiedCount = 0;
-      let needsEvidenceCount = 0;
-      for (const r of inScopeReqs) {
-        const b = bindingByReq.get(r.id);
-        const base = {
-          area: "requirements_engine" as const,
-          sourceCitation: r.source_citation ?? null,
-          subjectKind: "provider" as const,
-          fixHref: "/dashboard/authoritative-sources",
-          asOf: todayIso(),
-        };
-
-        if (!b || b.satisfied_by === "unbound") {
-          needsEvidenceCount += 1;
+      for (const r of reqById.values()) {
+        if ((confirmedByReq.get(r.id) ?? 0) === 0) {
           findings.push({
-            ...base,
-            id: `req-unbound-${r.id}`,
-            severity: "minor",
-            title: `Requirement not yet configured — ${r.title}`,
-            detail:
-              "This requirement is confirmed but has no binding yet — set 'How this is satisfied' in the Requirements tab so the audit can resolve it automatically.",
-            fixLabel: "Configure binding",
-          });
-          continue;
-        }
-
-        let satisfied = false;
-        let missTitle = "";
-        switch (b.satisfied_by) {
-          case "auto":
-            satisfied = !!b.native_feature && nativeHas(b.native_feature);
-            missTitle = `Evidence missing — ${r.title}`;
-            break;
-          case "form":
-            satisfied = !!b.engine_ref && formSubsByForm.has(b.engine_ref);
-            missTitle = `Form not submitted — ${r.title}`;
-            break;
-          case "credential":
-            satisfied = !!b.engine_ref && validCertsByCourse.has(b.engine_ref);
-            missTitle = `Credential missing or expired — ${r.title}`;
-            break;
-          case "training":
-            satisfied = !!b.engine_ref && trainingCourseHas.has(b.engine_ref);
-            missTitle = `Training not completed — ${r.title}`;
-            break;
-          case "upload":
-            satisfied = activeDocByReq.has(r.id);
-            missTitle = `Document not on file — ${r.title}`;
-            break;
-          case "attestation":
-            // Prompt 32 — an attestation-type requirement is satisfied when
-            // a current (non-due) master attestation covers its service_code.
-            // Falls back to any per-requirement document attestation on file.
-            satisfied = isCoveredByMaster(r.service_code) || activeDocByReq.has(r.id);
-            missTitle = masterCurrent && masterIsDue
-              ? `Re-attestation needed — ${r.title}`
-              : `Attestation needed — ${r.title}`;
-            break;
-          default:
-            satisfied = false;
-            missTitle = `Requirement not resolvable — ${r.title}`;
-        }
-
-        if (satisfied) {
-          autoSatisfiedCount += 1;
-        } else {
-          needsEvidenceCount += 1;
-          findings.push({
-            ...base,
-            id: `req-evidence-${r.id}`,
+            id: `req-unmapped-${r.id}`,
+            area: "requirements_engine",
             severity: "attention",
-            title: missTitle,
-            detail: `"${r.title}" is in scope for this provider but its bound evidence (${b.satisfied_by}${b.native_feature ? `: ${b.native_feature}` : b.engine_ref ? `: ${b.engine_ref}` : ""}) was not found for ${periodStart}–${periodEnd}.`,
-            fixLabel: "Review requirement",
+            title: "Confirmed requirement has no mapping",
+            detail: `"${r.title}" is confirmed but isn't mapped to any code/role/client/provider scope.`,
+            sourceCitation: r.source_citation ?? null,
+            subjectKind: "provider",
+            fixHref: "/dashboard/authoritative-sources",
+            fixLabel: "Map requirement",
+            asOf: todayIso(),
           });
         }
       }
-
-      const inScopeCount = inScopeReqs.length;
-      const dormantCount = Math.max(0, reqById.size - inScopeCount);
-      reqScopeCounts = {
-        inScopeCount,
-        dormantCount,
-        autoSatisfiedCount,
-        needsEvidenceCount,
-      };
-
       const unknownUnconfirmed = maps.filter((m) => m.scope_kind === "unknown" && !m.confirmed);
       if (unknownUnconfirmed.length) {
         findings.push({
@@ -989,10 +676,6 @@ export const runInternalAudit = createServerFn({ method: "POST" })
       },
       totals,
       readinessScore,
-      inScopeCount: reqScopeCounts.inScopeCount,
-      dormantCount: reqScopeCounts.dormantCount,
-      autoSatisfiedCount: reqScopeCounts.autoSatisfiedCount,
-      needsEvidenceCount: reqScopeCounts.needsEvidenceCount,
       byArea,
       findings: filtered,
     };

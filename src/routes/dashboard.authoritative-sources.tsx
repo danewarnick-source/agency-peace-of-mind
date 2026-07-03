@@ -4534,6 +4534,17 @@ function RebuildDemoRequirementsButton({ orgId }: { orgId: string }) {
               </Button>
             </>
           )}
+          {running && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                cancelRef.current = true;
+              }}
+              disabled={cancelRef.current}
+            >
+              {cancelRef.current ? "Cancelling…" : "Cancel (keep originals)"}
+            </Button>
+          )}
           {phase === "done" && (
             <Button
               onClick={() => {

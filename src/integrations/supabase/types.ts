@@ -11817,6 +11817,50 @@ export type Database = {
           },
         ]
       }
+      requirement_bindings: {
+        Row: {
+          bound_by: string | null
+          created_at: string
+          engine_ref: string | null
+          id: string
+          native_feature: string | null
+          notes: string | null
+          requirement_id: string
+          satisfied_by: string
+          updated_at: string
+        }
+        Insert: {
+          bound_by?: string | null
+          created_at?: string
+          engine_ref?: string | null
+          id?: string
+          native_feature?: string | null
+          notes?: string | null
+          requirement_id: string
+          satisfied_by?: string
+          updated_at?: string
+        }
+        Update: {
+          bound_by?: string | null
+          created_at?: string
+          engine_ref?: string | null
+          id?: string
+          native_feature?: string | null
+          notes?: string | null
+          requirement_id?: string
+          satisfied_by?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "requirement_bindings_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: true
+            referencedRelation: "nectar_requirements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       respite_stays: {
         Row: {
           created_at: string

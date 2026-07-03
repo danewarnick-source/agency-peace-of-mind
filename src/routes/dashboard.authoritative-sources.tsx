@@ -3768,23 +3768,31 @@ function RequirementBindingEditor({ requirementId }: { requirementId: string }) 
     }
   }, [current?.id, current?.satisfied_by, current?.native_feature, current?.engine_ref]);
 
+  const linkFn = useServerFn(linkFormToRequirement);
+
   const save = useMutation({
-    mutationFn: (vars: {
+    mutationFn: async (vars: {
       satisfied_by: SatisfiedBy;
       native_feature?: string | null;
       engine_ref?: string | null;
-    }) =>
-      setFn({
+    }) => {
+      // Form binding: link + stamp the form (also writes the binding row).
+      if (vars.satisfied_by === "form" && vars.engine_ref) {
+        return linkFn({ data: { requirementId, formId: vars.engine_ref } });
+      }
+      return setFn({
         data: {
           requirementId,
           satisfied_by: vars.satisfied_by,
           native_feature: vars.native_feature ?? null,
           engine_ref: vars.engine_ref ?? null,
         },
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success("Binding saved");
       qc.invalidateQueries({ queryKey: ["requirement-binding", requirementId] });
+      qc.invalidateQueries({ queryKey: ["requirement-forms", requirementId] });
     },
     onError: (e: unknown) =>
       toast.error(e instanceof Error ? e.message : "Failed to save binding"),

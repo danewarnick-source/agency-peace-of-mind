@@ -11,6 +11,8 @@ import {
   NON_OBLIGATION_KINDS,
   stripHtmlToText,
   extractRequirementsFromText,
+  extractChunkWithRetry,
+  chunkDocumentRanges,
   EXPLAIN_SYSTEM_PROMPT,
   ExplainResp,
 } from "./authoritative-sources.server";

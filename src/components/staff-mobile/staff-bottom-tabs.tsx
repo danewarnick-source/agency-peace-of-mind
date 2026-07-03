@@ -55,7 +55,7 @@ export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
               {t.feature && !isEnabled(t.feature) ? (
                 <button
                   type="button"
-                  onClick={() => setUpgradeFeatureKey(t.feature)}
+                  onClick={() => setUpgradeFeatureKey(t.feature!)}
                   className="relative flex min-h-[56px] w-full flex-col items-center justify-center gap-0.5 px-1 py-2 text-[11px] font-medium tracking-tight text-white/35 transition-all duration-150 active:scale-[0.95]"
                   aria-label={`${t.label} — locked. Click to request upgrade.`}
                 >

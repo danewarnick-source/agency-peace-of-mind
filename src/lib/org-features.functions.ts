@@ -89,7 +89,7 @@ export const getOrgFeatureBundle = createServerFn({ method: "GET" })
 
     const { data: registry } = await supabase
       .from("feature_registry")
-      .select("id, feature_key, label, description, parent_key, category, default_enabled, sort_order")
+      .select("id, feature_key, label, description, parent_key, category, default_enabled, sort_order, required_tier, upgrade_blurb")
       .order("sort_order");
 
     const { data: overrides } = await supabase
@@ -124,7 +124,7 @@ export const getMyOrgFeatures = createServerFn({ method: "GET" })
 
     const { data: registry } = await supabase
       .from("feature_registry")
-      .select("id, feature_key, label, description, parent_key, category, default_enabled, sort_order")
+      .select("id, feature_key, label, description, parent_key, category, default_enabled, sort_order, required_tier, upgrade_blurb")
       .order("sort_order");
     const reg = (registry ?? []) as FeatureRegistryRow[];
 

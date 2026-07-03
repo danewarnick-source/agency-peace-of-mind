@@ -2,12 +2,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
-import { Building2, Search, AlertTriangle, Lock, Users, Contact2, DollarSign } from "lucide-react";
+import { Building2, Search, AlertTriangle, Lock, Users, Contact2, DollarSign, Sparkles, ArrowRight } from "lucide-react";
 import { getExecKpis, listCompanies, type CompanyRow } from "@/lib/hive-exec.functions";
+import { getPendingUpgradeRequestCount } from "@/lib/org-features.functions";
 
 export const Route = createFileRoute("/dashboard/hive-exec/")({
   component: CompaniesPage,
 });
+
 
 function fmtMoney(cents: number): string {
   return `$${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -16,8 +18,11 @@ function fmtMoney(cents: number): string {
 function CompaniesPage() {
   const kpisFn = useServerFn(getExecKpis);
   const listFn = useServerFn(listCompanies);
+  const pendingFn = useServerFn(getPendingUpgradeRequestCount);
   const kpisQ = useQuery({ queryKey: ["hive-exec-kpis"], queryFn: () => kpisFn(), refetchInterval: 30_000 });
   const listQ = useQuery({ queryKey: ["hive-exec-companies"], queryFn: () => listFn(), refetchInterval: 30_000 });
+  const pendingQ = useQuery({ queryKey: ["hive-exec-upgrade-pending-count"], queryFn: () => pendingFn(), refetchInterval: 30_000 });
+
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -33,8 +38,34 @@ function CompaniesPage() {
 
   const k = kpisQ.data;
 
+  const pendingCount = pendingQ.data?.count ?? 0;
+
   return (
     <div className="space-y-4">
+      {pendingCount > 0 && (
+        <Link
+          to="/dashboard/hive-exec/upgrade-requests"
+          className="group flex items-center justify-between gap-3 rounded-xl border-2 border-[#d97a1c] bg-gradient-to-r from-[#fff7ed] to-[#ffedd5] p-4 shadow-sm transition-all hover:shadow-md"
+        >
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-[#d97a1c] text-white shadow-sm">
+              <Sparkles className="h-5 w-5" />
+            </span>
+            <div>
+              <div className="font-display text-base font-bold text-[#0f1b3d]">
+                {pendingCount} {pendingCount === 1 ? "organization is" : "organizations are"} requesting upgrades
+              </div>
+              <div className="text-xs text-[#9a3412]">
+                Pending feature access requests — grant or dismiss from the queue.
+              </div>
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1 rounded-md bg-[#0f1b3d] px-3 py-2 text-sm font-semibold text-white group-hover:bg-[#1a2a5a]">
+            Review queue <ArrowRight className="h-4 w-4" />
+          </span>
+        </Link>
+      )}
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi icon={Building2} label="Active companies" value={k?.active_companies ?? "—"} />
         <Kpi icon={DollarSign} label="MRR" value={k ? fmtMoney(k.mrr_cents) : "—"} />

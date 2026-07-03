@@ -116,6 +116,7 @@ import { Route as DashboardHubDocumentationRouteImport } from './routes/dashboar
 import { Route as DashboardHubClientsRouteImport } from './routes/dashboard.hub.clients'
 import { Route as DashboardHrAdminSettingsRouteImport } from './routes/dashboard.hr-admin.settings'
 import { Route as DashboardHomesTeamIdRouteImport } from './routes/dashboard.homes.$teamId'
+import { Route as DashboardHiveExecUpgradeRequestsRouteImport } from './routes/dashboard.hive-exec.upgrade-requests'
 import { Route as DashboardHiveExecTicketsRouteImport } from './routes/dashboard.hive-exec.tickets'
 import { Route as DashboardHiveExecStatesRouteImport } from './routes/dashboard.hive-exec.states'
 import { Route as DashboardHiveExecPlansRouteImport } from './routes/dashboard.hive-exec.plans'
@@ -743,6 +744,12 @@ const DashboardHomesTeamIdRoute = DashboardHomesTeamIdRouteImport.update({
   path: '/$teamId',
   getParentRoute: () => DashboardHomesRoute,
 } as any)
+const DashboardHiveExecUpgradeRequestsRoute =
+  DashboardHiveExecUpgradeRequestsRouteImport.update({
+    id: '/upgrade-requests',
+    path: '/upgrade-requests',
+    getParentRoute: () => DashboardHiveExecRoute,
+  } as any)
 const DashboardHiveExecTicketsRoute =
   DashboardHiveExecTicketsRouteImport.update({
     id: '/tickets',
@@ -1256,6 +1263,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/states': typeof DashboardHiveExecStatesRouteWithChildren
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
+  '/dashboard/hive-exec/upgrade-requests': typeof DashboardHiveExecUpgradeRequestsRoute
   '/dashboard/homes/$teamId': typeof DashboardHomesTeamIdRoute
   '/dashboard/hr-admin/settings': typeof DashboardHrAdminSettingsRoute
   '/dashboard/hub/clients': typeof DashboardHubClientsRoute
@@ -1426,6 +1434,7 @@ export interface FileRoutesByTo {
   '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/states': typeof DashboardHiveExecStatesRouteWithChildren
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
+  '/dashboard/hive-exec/upgrade-requests': typeof DashboardHiveExecUpgradeRequestsRoute
   '/dashboard/homes/$teamId': typeof DashboardHomesTeamIdRoute
   '/dashboard/hr-admin/settings': typeof DashboardHrAdminSettingsRoute
   '/dashboard/hub/clients': typeof DashboardHubClientsRoute
@@ -1604,6 +1613,7 @@ export interface FileRoutesById {
   '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/states': typeof DashboardHiveExecStatesRouteWithChildren
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
+  '/dashboard/hive-exec/upgrade-requests': typeof DashboardHiveExecUpgradeRequestsRoute
   '/dashboard/homes/$teamId': typeof DashboardHomesTeamIdRoute
   '/dashboard/hr-admin/settings': typeof DashboardHrAdminSettingsRoute
   '/dashboard/hub/clients': typeof DashboardHubClientsRoute
@@ -1783,6 +1793,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/states'
     | '/dashboard/hive-exec/tickets'
+    | '/dashboard/hive-exec/upgrade-requests'
     | '/dashboard/homes/$teamId'
     | '/dashboard/hr-admin/settings'
     | '/dashboard/hub/clients'
@@ -1953,6 +1964,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/states'
     | '/dashboard/hive-exec/tickets'
+    | '/dashboard/hive-exec/upgrade-requests'
     | '/dashboard/homes/$teamId'
     | '/dashboard/hr-admin/settings'
     | '/dashboard/hub/clients'
@@ -2130,6 +2142,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/states'
     | '/dashboard/hive-exec/tickets'
+    | '/dashboard/hive-exec/upgrade-requests'
     | '/dashboard/homes/$teamId'
     | '/dashboard/hr-admin/settings'
     | '/dashboard/hub/clients'
@@ -2964,6 +2977,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardHomesTeamIdRouteImport
       parentRoute: typeof DashboardHomesRoute
     }
+    '/dashboard/hive-exec/upgrade-requests': {
+      id: '/dashboard/hive-exec/upgrade-requests'
+      path: '/upgrade-requests'
+      fullPath: '/dashboard/hive-exec/upgrade-requests'
+      preLoaderRoute: typeof DashboardHiveExecUpgradeRequestsRouteImport
+      parentRoute: typeof DashboardHiveExecRoute
+    }
     '/dashboard/hive-exec/tickets': {
       id: '/dashboard/hive-exec/tickets'
       path: '/tickets'
@@ -3586,6 +3606,7 @@ interface DashboardHiveExecRouteChildren {
   DashboardHiveExecPlansRoute: typeof DashboardHiveExecPlansRoute
   DashboardHiveExecStatesRoute: typeof DashboardHiveExecStatesRouteWithChildren
   DashboardHiveExecTicketsRoute: typeof DashboardHiveExecTicketsRoute
+  DashboardHiveExecUpgradeRequestsRoute: typeof DashboardHiveExecUpgradeRequestsRoute
   DashboardHiveExecIndexRoute: typeof DashboardHiveExecIndexRoute
 }
 
@@ -3605,6 +3626,7 @@ const DashboardHiveExecRouteChildren: DashboardHiveExecRouteChildren = {
   DashboardHiveExecPlansRoute: DashboardHiveExecPlansRoute,
   DashboardHiveExecStatesRoute: DashboardHiveExecStatesRouteWithChildren,
   DashboardHiveExecTicketsRoute: DashboardHiveExecTicketsRoute,
+  DashboardHiveExecUpgradeRequestsRoute: DashboardHiveExecUpgradeRequestsRoute,
   DashboardHiveExecIndexRoute: DashboardHiveExecIndexRoute,
 }
 

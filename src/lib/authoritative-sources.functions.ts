@@ -903,15 +903,22 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     }
 
 
-    // Existing requirements (so we can de-dupe across re-runs)
+    // Existing requirements (so we can de-dupe across re-runs).
+    // In rebuildBatch mode we intentionally skip dedupe: new rows land tagged
+    // rebuild_pending alongside the old rows so commitRebuild can swap them.
     const { data: existing } = await supabase
       .from("nectar_requirements")
       .select("requirement_key")
       .eq("organization_id", doc.organization_id)
       .eq("source_document_id", doc.id);
-    const existingKeys = new Set(
-      (existing ?? []).map((r) => (r.requirement_key as string) ?? ""),
-    );
+    const existingKeys = data.rebuildBatch
+      ? new Set<string>()
+      : new Set(
+          (existing ?? []).map((r) => (r.requirement_key as string) ?? ""),
+        );
+    const rebuildMeta = data.rebuildBatch
+      ? ({ rebuild_pending: true } as Json)
+      : null;
 
     // 1. Prose-clause extraction (the real path for SOW / contracts)
     let aiItems: Array<{

@@ -2099,8 +2099,12 @@ function RequirementRow({
       </div>
       </div>
       {!isRemoved && (
+        <RequirementBindingEditor requirementId={req.id} />
+      )}
+      {!isRemoved && (
         <ApplicabilityPanel orgId={orgId} requirementId={req.id} />
       )}
+
       <RequirementDetailDialog
         open={detailOpen}
         onOpenChange={setDetailOpen}

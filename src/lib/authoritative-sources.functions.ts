@@ -1424,6 +1424,28 @@ export const getActiveDraftJobs = createServerFn({ method: "POST" })
     };
   });
 
+// Fire a server-side background tick for an active job. Thin authenticated
+// wrapper around fireDraftTick() so the client can nudge the server to keep
+// chunking when the tab is hidden or about to close. Idempotency in
+// processDraftChunk / persistChunkResult makes overlap with the client
+// driver a no-op.
+export const nudgeDraftJob = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ jobId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    // Auth: only members of the job's org can nudge it.
+    await loadDraftJobDoc(supabase, data.jobId, userId);
+    try {
+      const { fireDraftTick } = await import("./nectar-draft-tick.server");
+      await fireDraftTick(data.jobId, { wait: false });
+    } catch (err) {
+      // Best-effort; the client driver is authoritative.
+      console.warn("[nudgeDraftJob] fireDraftTick failed", (err as Error).message);
+    }
+    return { ok: true as const };
+  });
+
 export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>

@@ -11,7 +11,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
-import { REDUCED_LIABILITY_NOTICE } from "@/lib/authoritative-sources.functions";
+// REDUCED_LIABILITY_NOTICE remains exported from
+// @/lib/authoritative-sources.functions for smaller in-app confirmations.
+// The master attestation body below (MASTER_ATTESTATION_BODY) is the
+// primary signing text and intentionally does not embed the shorter notice.
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 

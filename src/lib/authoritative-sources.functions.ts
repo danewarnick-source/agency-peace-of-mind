@@ -1845,7 +1845,7 @@ REQUIREMENT TITLE: ${req.title}
 REQUIREMENT TEXT: ${req.description ?? "(no extended text — restate the title only)"}`;
 
     const res = await gatewayFetch({
-        model: "google/gemini-2.5-flash",
+        model: "bedrock",
         messages: [
           { role: "system", content: EXPLAIN_SYSTEM_PROMPT },
           { role: "user", content: userBody },

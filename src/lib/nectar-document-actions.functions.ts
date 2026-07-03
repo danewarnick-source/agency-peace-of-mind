@@ -88,7 +88,7 @@ async function classifyWithAI(
   if (!apiKey) return { type: "unknown", confidence: 0, reason: "no_api_key" };
   const snippet = (text || "").slice(0, 12000);
   const res = await gatewayFetch({
-      model: "google/gemini-2.5-flash",
+      model: "bedrock",
       messages: [
         { role: "system", content: CLASSIFY_SYSTEM },
         {
@@ -206,7 +206,7 @@ async function extractChecklistItems(text: string): Promise<DraftItem[]> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) return [];
   const res = await gatewayFetch({
-      model: "google/gemini-2.5-flash",
+      model: "bedrock",
       messages: [
         { role: "system", content: CHECKLIST_SYSTEM },
         { role: "user", content: text.slice(0, 50000) },

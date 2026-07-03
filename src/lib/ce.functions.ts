@@ -261,7 +261,7 @@ OUTPUT — STRICT JSON, no markdown, matching this shape:
 FLOOR: at least 3 lesson+check pairs and exactly 1 reflect. Target ≥30 total steps. Every check has 3–4 options, exactly one correct, every option gets per-option feedback. Plain language. No markdown inside body strings.`;
 
   const res = await gatewayFetch({
-      model: "google/gemini-3-flash-preview",
+      model: "bedrock",
       messages: [
         { role: "system", content: system },
         { role: "user", content: prompt },

@@ -65,7 +65,7 @@ async function callAI(system: string, user: string): Promise<string> {
   if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured.");
 
   const res = await gatewayFetch({
-      model: "google/gemini-3-flash-preview",
+      model: "bedrock",
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },

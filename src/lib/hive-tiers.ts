@@ -12,7 +12,8 @@ export type AddonId =
   | "nectar_infusion" // Guided Mode, plain-language answers, NECTAR-accelerated controls
   | "internal_audit" // Internal Audit / QA audit-prep tool
   | "requirements_engine" // Requirements proposals + extraction approvals
-  | "priority_support"; // Faster SLA on Support Queue
+  | "priority_support" // Faster SLA on Support Queue
+  | "hive_training"; // DSPD-aligned course library, competency sign-off, verifiable certs
 
 export interface AddonDef {
   id: AddonId;

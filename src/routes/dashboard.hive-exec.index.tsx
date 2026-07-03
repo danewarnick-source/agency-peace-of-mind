@@ -2,12 +2,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
-import { Building2, Search, AlertTriangle, Lock, Users, Contact2, DollarSign } from "lucide-react";
+import { Building2, Search, AlertTriangle, Lock, Users, Contact2, DollarSign, Sparkles, ArrowRight } from "lucide-react";
 import { getExecKpis, listCompanies, type CompanyRow } from "@/lib/hive-exec.functions";
+import { getPendingUpgradeRequestCount } from "@/lib/org-features.functions";
 
 export const Route = createFileRoute("/dashboard/hive-exec/")({
   component: CompaniesPage,
 });
+
 
 function fmtMoney(cents: number): string {
   return `$${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;

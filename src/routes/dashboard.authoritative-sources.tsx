@@ -2508,36 +2508,15 @@ function MasterAttestationPanel({ orgId }: { orgId: string }) {
         </div>
       )}
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              {current ? `Re-attest — version ${(current.version ?? 0) + 1}` : "Sign master attestation"}
-            </DialogTitle>
-            <DialogDescription>
-              Review the statement below carefully before signing. Your signature
-              will be logged in the immutable attestation trail.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[50vh] overflow-y-auto whitespace-pre-wrap rounded-xl border border-border/60 bg-background/40 p-3 text-sm leading-relaxed">
-            {status?.attestationTextTemplate ?? ""}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)} disabled={sign.isPending}>
-              Cancel
-            </Button>
-            <Button onClick={() => sign.mutate()} disabled={sign.isPending}>
-              {sign.isPending ? (
-                <>
-                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> Signing…
-                </>
-              ) : (
-                "I attest and sign"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MasterAttestationSignDialog
+        open={open}
+        onOpenChange={setOpen}
+        orgId={orgId}
+        current={current}
+        bodyText={status?.attestationTextTemplate ?? ""}
+        onSign={() => sign.mutate()}
+        isSigning={sign.isPending}
+      />
     </div>
   );
 }

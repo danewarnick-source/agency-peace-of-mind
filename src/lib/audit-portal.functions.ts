@@ -241,6 +241,7 @@ export const grantAuditorAccess = createServerFn({ method: "POST" })
     z.object({
       auditPackageId: z.string().uuid(),
       auditorAccountId: z.string().uuid(),
+      siteOrigin: z.string().url().optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
@@ -258,6 +259,21 @@ export const grantAuditorAccess = createServerFn({ method: "POST" })
         { onConflict: "audit_package_id,auditor_account_id" },
       );
     if (error) throw error;
+
+    // Package-specific invite email — sends the auditor a fresh set-password
+    // link that lands on /audit-portal/set-password?packageId=…, so they end
+    // up directly on the granted package, never the HIVE homepage.
+    try {
+      await sendAuditorPackageInvite({
+        supabase,
+        auditPackageId: data.auditPackageId,
+        auditorAccountId: data.auditorAccountId,
+        siteOrigin: data.siteOrigin ?? "",
+      });
+    } catch (e) {
+      // Non-fatal — access is granted; the email can be resent from the UI.
+      console.error("Auditor invite email failed:", e);
+    }
     return { ok: true };
   });
 

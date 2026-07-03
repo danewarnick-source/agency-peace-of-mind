@@ -989,6 +989,10 @@ export const runInternalAudit = createServerFn({ method: "POST" })
       },
       totals,
       readinessScore,
+      inScopeCount: reqScopeCounts.inScopeCount,
+      dormantCount: reqScopeCounts.dormantCount,
+      autoSatisfiedCount: reqScopeCounts.autoSatisfiedCount,
+      needsEvidenceCount: reqScopeCounts.needsEvidenceCount,
       byArea,
       findings: filtered,
     };

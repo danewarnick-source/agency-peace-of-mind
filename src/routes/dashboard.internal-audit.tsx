@@ -572,6 +572,35 @@ function SummaryStat({
   );
 }
 
+function ScopeStat({
+  label,
+  value,
+  tone,
+  muted,
+}: {
+  label: string;
+  value: number;
+  tone?: "ok" | "warn";
+  muted?: boolean;
+}) {
+  const toneCls =
+    tone === "ok"
+      ? "text-emerald-700"
+      : tone === "warn"
+      ? "text-amber-700"
+      : muted
+      ? "text-muted-foreground"
+      : "text-foreground";
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
+      <div className={`mt-1 text-3xl font-bold ${toneCls}`}>{value}</div>
+    </div>
+  );
+}
+
 function FindingRow({ f }: { f: AuditFinding }) {
   const b = SEVERITY_BADGE[f.severity];
   const Icon = b.Icon;

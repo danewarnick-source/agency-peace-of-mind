@@ -88,10 +88,15 @@ function StateAuditPage() {
         <div className="space-y-4">
           {tab === "admin" ? (
             selectedId ? (
-              <PackageDetail packageId={selectedId} orgId={org.organization_id} />
+              <>
+                <PackageDetail packageId={selectedId} orgId={org.organization_id} />
+                <ProvisionedAuditorsSection orgId={org.organization_id} auditPackageId={selectedId} />
+              </>
             ) : (
               <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-muted-foreground">
-                Select or create an audit package to begin.
+                Select or create an audit package to begin. Auditor invitations
+                are always scoped to a specific package — the invite email names
+                that package and the accept link opens it directly.
               </div>
             )
           ) : selectedId ? (
@@ -101,11 +106,9 @@ function StateAuditPage() {
               Select a package to preview the auditor view.
             </div>
           )}
-
-          {/* Auditor provisioning always visible in Admin View, org-wide */}
-          {tab === "admin" && <ProvisionedAuditorsSection orgId={org.organization_id} />}
         </div>
       </div>
+
     </div>
   );
 }

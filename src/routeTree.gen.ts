@@ -85,6 +85,7 @@ import { Route as DashboardAuditRouteImport } from './routes/dashboard.audit'
 import { Route as DashboardAssignmentsRouteImport } from './routes/dashboard.assignments'
 import { Route as DashboardAskNectarRouteImport } from './routes/dashboard.ask-nectar'
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
+import { Route as AuditPortalSetPasswordRouteImport } from './routes/audit-portal.set-password'
 import { Route as AuditPortalPackageIdRouteImport } from './routes/audit-portal.$packageId'
 import { Route as DashboardTrainingIndexRouteImport } from './routes/dashboard.training.index'
 import { Route as DashboardSmartImportIndexRouteImport } from './routes/dashboard.smart-import.index'
@@ -575,6 +576,11 @@ const DashboardAskNectarRoute = DashboardAskNectarRouteImport.update({
 const CertificateCodeRoute = CertificateCodeRouteImport.update({
   id: '/certificate/$code',
   path: '/certificate/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuditPortalSetPasswordRoute = AuditPortalSetPasswordRouteImport.update({
+  id: '/audit-portal/set-password',
+  path: '/audit-portal/set-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuditPortalPackageIdRoute = AuditPortalPackageIdRouteImport.update({
@@ -1175,6 +1181,7 @@ export interface FileRoutesByFullPath {
   '/training': typeof TrainingRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/audit-portal/$packageId': typeof AuditPortalPackageIdRoute
+  '/audit-portal/set-password': typeof AuditPortalSetPasswordRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/ask-nectar': typeof DashboardAskNectarRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
@@ -1355,6 +1362,7 @@ export interface FileRoutesByTo {
   '/training': typeof TrainingRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/audit-portal/$packageId': typeof AuditPortalPackageIdRoute
+  '/audit-portal/set-password': typeof AuditPortalSetPasswordRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/ask-nectar': typeof DashboardAskNectarRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
@@ -1531,6 +1539,7 @@ export interface FileRoutesById {
   '/training': typeof TrainingRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/audit-portal/$packageId': typeof AuditPortalPackageIdRoute
+  '/audit-portal/set-password': typeof AuditPortalSetPasswordRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/ask-nectar': typeof DashboardAskNectarRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
@@ -1714,6 +1723,7 @@ export interface FileRouteTypes {
     | '/training'
     | '/unauthorized'
     | '/audit-portal/$packageId'
+    | '/audit-portal/set-password'
     | '/certificate/$code'
     | '/dashboard/ask-nectar'
     | '/dashboard/assignments'
@@ -1894,6 +1904,7 @@ export interface FileRouteTypes {
     | '/training'
     | '/unauthorized'
     | '/audit-portal/$packageId'
+    | '/audit-portal/set-password'
     | '/certificate/$code'
     | '/dashboard/ask-nectar'
     | '/dashboard/assignments'
@@ -2069,6 +2080,7 @@ export interface FileRouteTypes {
     | '/training'
     | '/unauthorized'
     | '/audit-portal/$packageId'
+    | '/audit-portal/set-password'
     | '/certificate/$code'
     | '/dashboard/ask-nectar'
     | '/dashboard/assignments'
@@ -2251,6 +2263,7 @@ export interface RootRouteChildren {
   TrainingRoute: typeof TrainingRoute
   UnauthorizedRoute: typeof UnauthorizedRoute
   AuditPortalPackageIdRoute: typeof AuditPortalPackageIdRoute
+  AuditPortalSetPasswordRoute: typeof AuditPortalSetPasswordRoute
   CertificateCodeRoute: typeof CertificateCodeRoute
   VerifyCodeRoute: typeof VerifyCodeRoute
   AuditPortalIndexRoute: typeof AuditPortalIndexRoute
@@ -2796,6 +2809,13 @@ declare module '@tanstack/react-router' {
       path: '/certificate/$code'
       fullPath: '/certificate/$code'
       preLoaderRoute: typeof CertificateCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/audit-portal/set-password': {
+      id: '/audit-portal/set-password'
+      path: '/audit-portal/set-password'
+      fullPath: '/audit-portal/set-password'
+      preLoaderRoute: typeof AuditPortalSetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/audit-portal/$packageId': {
@@ -3995,6 +4015,7 @@ const rootRouteChildren: RootRouteChildren = {
   TrainingRoute: TrainingRoute,
   UnauthorizedRoute: UnauthorizedRoute,
   AuditPortalPackageIdRoute: AuditPortalPackageIdRoute,
+  AuditPortalSetPasswordRoute: AuditPortalSetPasswordRoute,
   CertificateCodeRoute: CertificateCodeRoute,
   VerifyCodeRoute: VerifyCodeRoute,
   AuditPortalIndexRoute: AuditPortalIndexRoute,

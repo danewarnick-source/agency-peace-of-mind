@@ -181,6 +181,7 @@ export const requestFeatureUpgrade = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw error;
+    // notification seam: on new pending request, notify execs (email/Slack via Resend rail) here.
     return { ok: true, id: row!.id };
   });
 

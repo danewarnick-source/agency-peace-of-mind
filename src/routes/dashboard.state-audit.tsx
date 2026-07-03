@@ -310,8 +310,12 @@ function PackageDetail({ packageId, orgId }: { packageId: string; orgId: string 
   });
   const grantMut = useMutation({
     mutationFn: (auditorAccountId: string) =>
-      grantFn({ data: { auditPackageId: packageId, auditorAccountId } }),
-    onSuccess: () => { toast.success("Auditor granted access"); invalidate(); },
+      grantFn({ data: {
+        auditPackageId: packageId,
+        auditorAccountId,
+        siteOrigin: typeof window !== "undefined" ? window.location.origin : undefined,
+      } }),
+    onSuccess: () => { toast.success("Auditor granted access — invite email sent"); invalidate(); },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
   const revokeMut = useMutation({

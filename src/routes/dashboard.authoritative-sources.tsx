@@ -3857,7 +3857,13 @@ function RequirementBindingEditor({ requirementId }: { requirementId: string }) 
           </div>
         )}
 
-        {showEngine && (
+        {showEngine && satisfiedBy === "form" ? (
+          <FormPickerForRequirement
+            requirementId={requirementId}
+            engineRef={engineRef}
+            setEngineRef={setEngineRef}
+          />
+        ) : showEngine ? (
           <div className="min-w-[220px] flex-1">
             <Label className="text-[10px] text-muted-foreground">{engineLabel}</Label>
             <Input
@@ -3867,7 +3873,7 @@ function RequirementBindingEditor({ requirementId }: { requirementId: string }) 
               className="h-8 text-xs"
             />
           </div>
-        )}
+        ) : null}
 
         <Button
           size="sm"

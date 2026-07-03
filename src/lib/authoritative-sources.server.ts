@@ -78,27 +78,38 @@ export const ReqExtraction = z.object({
   requirements: z.array(ReqItem).max(500).default([]),
 });
 
-export function chunkDocumentText(
+export function chunkDocumentRanges(
   text: string,
   windowSize = 30_000,
   overlap = 1_500,
   maxChunks = 40,
-): string[] {
-  if (text.length <= windowSize) return [text];
-  const chunks: string[] = [];
+): Array<[number, number]> {
+  if (text.length <= windowSize) return [[0, text.length]];
+  const ranges: Array<[number, number]> = [];
   let start = 0;
-  while (start < text.length && chunks.length < maxChunks) {
+  while (start < text.length && ranges.length < maxChunks) {
     let end = Math.min(start + windowSize, text.length);
     if (end < text.length) {
       const searchFrom = Math.max(start + windowSize - 3_000, start + 1);
       const boundary = text.lastIndexOf("\n\n", end);
       if (boundary >= searchFrom) end = boundary;
     }
-    chunks.push(text.slice(start, end));
+    ranges.push([start, end]);
     if (end >= text.length) break;
     start = Math.max(end - overlap, start + 1);
   }
-  return chunks;
+  return ranges;
+}
+
+export function chunkDocumentText(
+  text: string,
+  windowSize = 30_000,
+  overlap = 1_500,
+  maxChunks = 40,
+): string[] {
+  return chunkDocumentRanges(text, windowSize, overlap, maxChunks).map(([s, e]) =>
+    text.slice(s, e),
+  );
 }
 
 export class ChunkParseError extends Error {}

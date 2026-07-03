@@ -803,6 +803,14 @@ function SidebarBody({
         )}
       </nav>
 
+      {upgradeFeatureKey && (
+        <UpgradeGate
+          featureKey={upgradeFeatureKey}
+          open={!!upgradeFeatureKey}
+          onOpenChange={(o) => { if (!o) setUpgradeFeatureKey(null); }}
+        />
+      )}
+
       <div className="border-t border-sidebar-border p-4">
         <div className="mb-3 text-xs text-sidebar-foreground/60">
           <div className="font-medium text-sidebar-foreground">{user?.user_metadata?.full_name ?? user?.email}</div>

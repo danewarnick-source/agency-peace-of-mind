@@ -794,6 +794,10 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     z
       .object({
         documentId: z.string().uuid(),
+        // When true, newly inserted requirements are tagged with
+        // metadata.rebuild_pending = true so a subsequent commitRebuild
+        // can atomically swap the old set for the new set.
+        rebuildBatch: z.boolean().optional(),
       })
       .parse(input),
   )

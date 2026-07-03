@@ -97,6 +97,10 @@ import {
   providerRejectRequirement,
 } from "@/lib/nectar-approvals.functions";
 import {
+  getCurrentMasterAttestation,
+  signMasterAttestation,
+} from "@/lib/master-attestation.functions";
+import {
   listBindings,
   setBinding,
   listFormsForRequirement,

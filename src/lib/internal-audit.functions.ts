@@ -601,10 +601,18 @@ export const runInternalAudit = createServerFn({ method: "POST" })
           : Promise.resolve({ data: [] as Array<{ form_id: string; submitted_at: string }> }),
         courseIds.size
           ? supabase
-              .from("hive_training_certificates")
-              .select("course_id:hive_course_id, issued_at" as unknown as string)
-              .in("hive_course_id", Array.from(courseIds))
-          : Promise.resolve({ data: [] as Array<{ course_id: string }> }),
+              .from("hive_training_assignments")
+              .select("course_id, completed_at, expires_at")
+              .eq("organization_id", orgId)
+              .in("course_id", Array.from(courseIds))
+              .not("completed_at", "is", null)
+          : Promise.resolve({
+              data: [] as Array<{
+                course_id: string;
+                completed_at: string | null;
+                expires_at: string | null;
+              }>,
+            }),
         certTypeKeys.size
           ? supabase
               .from("certifications")
@@ -616,9 +624,14 @@ export const runInternalAudit = createServerFn({ method: "POST" })
             }),
         supabase
           .from("document_attestations")
-          .select("requirement_id, expires_at, created_at")
+          .select("subject_ref, created_at")
           .eq("organization_id", orgId)
-          .in("requirement_id", inScopeIds.length ? inScopeIds : ["00000000-0000-0000-0000-000000000000"]),
+          .eq("subject_kind", "requirement")
+          .in(
+            "subject_ref",
+            inScopeIds.length ? inScopeIds : ["00000000-0000-0000-0000-000000000000"],
+          ),
+
         nativeFeatureNeeded.has("daily_logs")
           ? supabase
               .from("daily_logs")

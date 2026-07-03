@@ -99,6 +99,7 @@ import {
 import {
   getCurrentMasterAttestation,
   signMasterAttestation,
+  listMasterAttestationReview,
 } from "@/lib/master-attestation.functions";
 import {
   listBindings,
@@ -2507,39 +2508,162 @@ function MasterAttestationPanel({ orgId }: { orgId: string }) {
         </div>
       )}
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              {current ? `Re-attest — version ${(current.version ?? 0) + 1}` : "Sign master attestation"}
-            </DialogTitle>
-            <DialogDescription>
-              Review the statement below carefully before signing. Your signature
-              will be logged in the immutable attestation trail.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[50vh] overflow-y-auto whitespace-pre-wrap rounded-xl border border-border/60 bg-background/40 p-3 text-sm leading-relaxed">
-            {status?.attestationTextTemplate ?? ""}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)} disabled={sign.isPending}>
-              Cancel
-            </Button>
-            <Button onClick={() => sign.mutate()} disabled={sign.isPending}>
-              {sign.isPending ? (
-                <>
-                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> Signing…
-                </>
-              ) : (
-                "I attest and sign"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MasterAttestationSignDialog
+        open={open}
+        onOpenChange={setOpen}
+        orgId={orgId}
+        current={current ?? null}
+        bodyText={status?.attestationTextTemplate ?? ""}
+        onSign={() => sign.mutate()}
+        isSigning={sign.isPending}
+      />
     </div>
   );
 }
+
+function MasterAttestationSignDialog({
+  open,
+  onOpenChange,
+  orgId,
+  current,
+  bodyText,
+  onSign,
+  isSigning,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  orgId: string;
+  current: { version: number } | null;
+  bodyText: string;
+  onSign: () => void;
+  isSigning: boolean;
+}) {
+  const reviewFn = useServerFn(listMasterAttestationReview);
+  const reviewQ = useQuery({
+    enabled: open,
+    queryKey: ["master-attestation-review", orgId],
+    queryFn: () => reviewFn({ data: { orgId } }),
+  });
+  const [reviewed, setReviewed] = useState(false);
+  useEffect(() => {
+    if (!open) setReviewed(false);
+  }, [open]);
+
+  const nextVersion = (current?.version ?? 0) + 1;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>
+            {current ? `Re-attest — version ${nextVersion}` : "Sign master attestation"}
+          </DialogTitle>
+          <DialogDescription>
+            Review every in-scope requirement and its supporting evidence below.
+            You will sign ONCE covering the entire scoped set.
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Step 1 — Review before signing */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold">Review before signing</h3>
+            {reviewQ.data && (
+              <Badge variant="outline" className="text-[10px]">
+                {reviewQ.data.totalRequirements} requirement
+                {reviewQ.data.totalRequirements === 1 ? "" : "s"}
+              </Badge>
+            )}
+          </div>
+          <div className="max-h-[32vh] overflow-y-auto rounded-xl border border-border/60 bg-background/40 p-3 text-xs">
+            {reviewQ.isLoading ? (
+              <p className="text-muted-foreground">
+                <Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" /> Loading scope…
+              </p>
+            ) : !reviewQ.data || reviewQ.data.groups.length === 0 ? (
+              <p className="text-muted-foreground">
+                No in-scope requirements found. Confirm your held service codes and
+                requirements first.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {reviewQ.data.groups.map((g) => (
+                  <div key={g.code}>
+                    <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {g.label}
+                    </div>
+                    <ul className="space-y-1.5">
+                      {g.requirements.map((r) => (
+                        <li key={r.id} className="rounded-md border border-border/40 bg-background/60 p-2">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <span className="font-medium leading-snug">{r.title}</span>
+                            <Badge variant="outline" className="shrink-0 text-[9px]">
+                              {r.satisfied_by}
+                            </Badge>
+                          </div>
+                          {r.source_citation && (
+                            <div className="mt-0.5 text-[10px] italic text-muted-foreground">
+                              per {r.source_citation}
+                            </div>
+                          )}
+                          {r.evidence_note && (
+                            <div
+                              className={`mt-0.5 text-[10px] ${
+                                r.evidence_note === "none on file yet"
+                                  ? "text-amber-700"
+                                  : "text-emerald-700"
+                              }`}
+                            >
+                              {r.evidence_note}
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Step 2 — Attestation body */}
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold">Attestation</h3>
+          <div className="max-h-[28vh] overflow-y-auto whitespace-pre-wrap rounded-xl border border-border/60 bg-background/40 p-3 text-sm leading-relaxed">
+            {bodyText}
+          </div>
+        </div>
+
+        {/* Step 3 — Single review checkbox */}
+        <label className="flex items-start gap-2 rounded-lg border border-border/60 bg-background/40 p-3 text-sm">
+          <Checkbox
+            checked={reviewed}
+            onCheckedChange={(v) => setReviewed(v === true)}
+            className="mt-0.5"
+          />
+          <span>I have reviewed the requirements and documents above.</span>
+        </label>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSigning}>
+            Cancel
+          </Button>
+          <Button onClick={onSign} disabled={isSigning || !reviewed}>
+            {isSigning ? (
+              <>
+                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> Signing…
+              </>
+            ) : (
+              "I attest and sign"
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 
 // ---------- NECTAR Requirements Engine — applicability mapping ----------

@@ -11,7 +11,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
-import { REDUCED_LIABILITY_NOTICE } from "@/lib/authoritative-sources.functions";
+// REDUCED_LIABILITY_NOTICE remains exported from
+// @/lib/authoritative-sources.functions for smaller in-app confirmations.
+// The master attestation body below (MASTER_ATTESTATION_BODY) is the
+// primary signing text and intentionally does not embed the shorter notice.
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -37,6 +40,24 @@ export interface MasterAttestationStatus {
   attestationTextTemplate: string;
 }
 
+export interface ReviewRequirement {
+  id: string;
+  title: string;
+  source_citation: string | null;
+  satisfied_by: string;
+  evidence_note: string | null;
+}
+export interface ReviewGroup {
+  code: string; // held service code, or "__provider__" for provider-wide
+  label: string;
+  requirements: ReviewRequirement[];
+}
+export interface MasterAttestationReview {
+  groups: ReviewGroup[];
+  totalRequirements: number;
+  heldCodes: string[];
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function loadScopeSnapshot(sb: any, orgId: string) {
   const [codesRes, reqsRes] = await Promise.all([
@@ -57,14 +78,22 @@ async function loadScopeSnapshot(sb: any, orgId: string) {
   return { held, inScopeCount };
 }
 
+// Master attestation signing text (Prompt 34). This is the PRIMARY body
+// rendered above the signature block and stored on every master_attestations
+// row as attestation_text. REDUCED_LIABILITY_NOTICE stays available for
+// smaller in-app confirmations but is not the master signing body.
+// Attestation wording pending healthcare-compliance attorney review before
+// first design-partner signature.
+export const MASTER_ATTESTATION_BODY = `By signing below, I confirm that I am an authorized representative of this provider agency and that I have reviewed the authoritative sources, compliance requirements, and supporting documents maintained in this system for the service codes my agency is authorized to deliver. I acknowledge that these requirements are derived from my agency's contract and State Scope of Work, and that my agency — not Hive or NECTAR — is solely responsible for meeting them, for the accuracy and completeness of all information and documents uploaded or entered, and for all submissions made to the State. I understand that Hive and NECTAR organize, surface, and help track this information but do not independently verify its accuracy, do not provide legal or compliance advice, and do not guarantee compliance with any State or federal requirement. I accept full responsibility for reviewing all forms, records, and documents for accuracy before relying on or submitting them. I understand this attestation covers the full set of requirements scoped to my authorized service codes as they exist on the date signed, and that I will be asked to re-attest when my authorized codes change, when my Scope of Work is updated, or on an annual basis.`;
+
 function buildAttestationText(scopeCodes: string[], count: number, version: number) {
   const codes = scopeCodes.length ? scopeCodes.join(", ") : "(no held codes on file)";
   return [
     `Master compliance attestation — version ${version}`,
+    `Service codes in scope: ${codes}`,
+    `Requirements covered: ${count}`,
     ``,
-    `You are attesting, on behalf of your organization, that you have reviewed the ${count} compliance requirement${count === 1 ? "" : "s"} currently in scope for your held service codes (${codes}), and that your organization intends to meet each of them.`,
-    ``,
-    REDUCED_LIABILITY_NOTICE,
+    MASTER_ATTESTATION_BODY,
   ].join("\n");
 }
 
@@ -197,6 +226,107 @@ export const signMasterAttestation = createServerFn({ method: "POST" })
     });
 
     return { row: inserted as MasterAttestationRow };
+  });
+
+// Prompt 34 — "Review before signing" data source. Returns every in-scope
+// requirement grouped by held service code so the provider can scroll through
+// the full scoped set (titles, source citations, satisfied-by type, and
+// whether an upload/attestation-type requirement has evidence on file).
+// This is READ-ONLY review — the signature itself happens via
+// signMasterAttestation and is ONE signature over the whole set.
+export const listMasterAttestationReview = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ orgId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }): Promise<MasterAttestationReview> => {
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.orgId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+
+    const [codesRes, reqsRes] = await Promise.all([
+      sb.from("provider_authorized_codes").select("code").eq("organization_id", data.orgId),
+      sb
+        .from("nectar_requirements")
+        .select("id, title, source_citation, service_code")
+        .eq("organization_id", data.orgId),
+    ]);
+    const held = Array.from(
+      new Set<string>(((codesRes.data ?? []) as Array<{ code: string }>).map((r) => r.code)),
+    ).sort();
+    const heldSet = new Set(held);
+    const reqs = ((reqsRes.data ?? []) as Array<{
+      id: string;
+      title: string;
+      source_citation: string | null;
+      service_code: string | null;
+    }>).filter((r) => !(r.service_code && !heldSet.has(r.service_code)));
+
+    const reqIds = reqs.map((r) => r.id);
+    const [bindingsRes, docRes] = await Promise.all([
+      reqIds.length
+        ? sb
+            .from("requirement_bindings")
+            .select("requirement_id, satisfied_by")
+            .in("requirement_id", reqIds)
+        : Promise.resolve({ data: [] }),
+      reqIds.length
+        ? sb
+            .from("document_attestations")
+            .select("subject_ref, attested_at, attested_by_name")
+            .eq("organization_id", data.orgId)
+            .eq("subject_kind", "requirement")
+            .in("subject_ref", reqIds)
+            .order("attested_at", { ascending: false })
+        : Promise.resolve({ data: [] }),
+    ]);
+    const bindByReq = new Map<string, string>();
+    for (const b of (bindingsRes.data ?? []) as Array<{
+      requirement_id: string;
+      satisfied_by: string;
+    }>) {
+      bindByReq.set(b.requirement_id, b.satisfied_by);
+    }
+    const docByReq = new Map<string, { attested_at: string; attested_by_name: string | null }>();
+    for (const d of (docRes.data ?? []) as Array<{
+      subject_ref: string;
+      attested_at: string;
+      attested_by_name: string | null;
+    }>) {
+      if (!docByReq.has(d.subject_ref))
+        docByReq.set(d.subject_ref, { attested_at: d.attested_at, attested_by_name: d.attested_by_name });
+    }
+
+    const groupMap = new Map<string, ReviewGroup>();
+    for (const r of reqs) {
+      const code = r.service_code ?? "__provider__";
+      const label = r.service_code ?? "Provider-wide";
+      if (!groupMap.has(code)) groupMap.set(code, { code, label, requirements: [] });
+      const satisfied_by = bindByReq.get(r.id) ?? "unbound";
+      let evidence_note: string | null = null;
+      if (satisfied_by === "upload" || satisfied_by === "attestation") {
+        const doc = docByReq.get(r.id);
+        evidence_note = doc
+          ? `On file since ${new Date(doc.attested_at).toLocaleDateString()}${doc.attested_by_name ? ` (${doc.attested_by_name})` : ""}`
+          : "none on file yet";
+      }
+      groupMap.get(code)!.requirements.push({
+        id: r.id,
+        title: r.title,
+        source_citation: r.source_citation,
+        satisfied_by,
+        evidence_note,
+      });
+    }
+
+    // Sort: provider-wide first, then codes alphabetical; requirements by title.
+    const groups = Array.from(groupMap.values()).sort((a, b) => {
+      if (a.code === "__provider__") return -1;
+      if (b.code === "__provider__") return 1;
+      return a.code.localeCompare(b.code);
+    });
+    for (const g of groups) g.requirements.sort((a, b) => a.title.localeCompare(b.title));
+
+    return { groups, totalRequirements: reqs.length, heldCodes: held };
   });
 
 // Resolver helper — a service_code is considered covered by the master

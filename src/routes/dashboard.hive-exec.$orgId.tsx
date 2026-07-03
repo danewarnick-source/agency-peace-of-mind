@@ -183,8 +183,22 @@ function CompanyDetailPage() {
         </div>
       </header>
 
+      <div className="flex gap-1 border-b border-border">
+        <TabButton active={activeTab === "profile"} onClick={() => setActiveTab("profile")} icon={Building2}>
+          Company Profile
+        </TabButton>
+        <TabButton active={activeTab === "controller"} onClick={() => setActiveTab("controller")} icon={ShieldCheck}>
+          Organization Master Controller
+        </TabButton>
+      </div>
+
+      {activeTab === "controller" ? (
+        <MasterController organizationId={orgId} />
+      ) : (
+      <>
       <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
         <div className="mb-3 flex items-center justify-between gap-2">
+
           <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
             <Pencil className="h-4 w-4" /> Identifying information
           </h2>

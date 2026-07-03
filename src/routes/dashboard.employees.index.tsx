@@ -438,10 +438,11 @@ export function EmployeesPage() {
                     ceSuggestedTopics: topics,
                   });
                 };
+                const trainings = trainingByStaff.get(m.user_id) ?? [];
                 return (
+                  <React.Fragment key={m.id}>
                   <tr
-                    key={m.id}
-                    className="cursor-pointer h-12 border-b border-border last:border-0 hover:bg-muted/50 transition-colors"
+                    className="cursor-pointer h-12 border-b border-border/50 hover:bg-muted/50 transition-colors"
                     onClick={openProfile}
                   >
                     <td className="px-4 py-2 font-medium whitespace-nowrap">
@@ -526,6 +527,15 @@ export function EmployeesPage() {
                       </div>
                     </td>
                   </tr>
+                  {trainings.length > 0 && (
+                    <tr className="border-b border-border last:border-0 bg-muted/20">
+                      <td colSpan={6} className="px-4 pb-2">
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">DSPD required trainings</div>
+                        <StaffTrainingStrip trainings={trainings} hiveTrainingEnabled={hiveTrainingEnabled} />
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 );
               })}
             </tbody>

@@ -108,7 +108,10 @@ export const getOrgFeatureBundle = createServerFn({ method: "GET" })
  */
 export const getMyOrgFeatures = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<{ organization_id: string | null; effective: Record<string, boolean>; registry: FeatureRegistryRow[] }> => {
+  .inputValidator((d: unknown) =>
+    z.object({ activeOrganizationId: z.string().uuid().nullable().optional() }).parse(d ?? {}),
+  )
+  .handler(async ({ data, context }): Promise<{ organization_id: string | null; effective: Record<string, boolean>; registry: FeatureRegistryRow[] }> => {
     const { supabase, userId } = context;
 
     const { data: memberships } = await supabase
@@ -120,7 +123,9 @@ export const getMyOrgFeatures = createServerFn({ method: "GET" })
     const rank: Record<string, number> = { super_admin: 0, admin: 1, manager: 2, employee: 3 };
     const sorted = [...((memberships ?? []) as Array<{ organization_id: string; role: string }>)]
       .sort((a, b) => (rank[a.role] ?? 9) - (rank[b.role] ?? 9));
-    const primary = sorted[0];
+    const primary = data.activeOrganizationId
+      ? sorted.find((m) => m.organization_id === data.activeOrganizationId) ?? sorted[0]
+      : sorted[0];
 
     const { data: registry } = await supabase
       .from("feature_registry")

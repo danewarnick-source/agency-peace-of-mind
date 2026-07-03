@@ -37,6 +37,7 @@ import {
   type Severity,
 } from "@/lib/internal-audit.functions";
 import { RequirePermission } from "@/components/rbac-guard";
+import { FeatureGate } from "@/components/upgrade-gate";
 import { SamplePicker } from "@/components/internal-audit/sample-picker";
 import { toast } from "sonner";
 
@@ -45,7 +46,9 @@ export const Route = createFileRoute("/dashboard/internal-audit")({
   head: () => ({ meta: [{ title: "Internal Audit — NECTAR — HIVE" }] }),
   component: () => (
     <RequirePermission perm="view_analytics">
-      <InternalAuditPage />
+      <FeatureGate featureKey="state_audit">
+        <InternalAuditPage />
+      </FeatureGate>
     </RequirePermission>
   ),
 });

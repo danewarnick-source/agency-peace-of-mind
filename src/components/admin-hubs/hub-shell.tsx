@@ -1,10 +1,14 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Link, useSearch } from "@tanstack/react-router";
+import { Lock } from "lucide-react";
+import { UpgradeGate, FeatureLockedRoute } from "@/components/upgrade-gate";
+import { useOrgFeatures } from "@/hooks/use-feature-enabled";
 
 export type HubTab = {
   key: string;
   label: string;
   render: () => ReactNode;
+  feature?: string;
 };
 
 type Props = {
@@ -21,8 +25,11 @@ type Props = {
  */
 export function HubShell({ title, subtitle, tabs, basePath }: Props) {
   const search = useSearch({ strict: false }) as { tab?: string };
+  const { isEnabled } = useOrgFeatures();
+  const [upgradeFeatureKey, setUpgradeFeatureKey] = useState<string | null>(null);
   const activeKey = tabs.find((t) => t.key === search.tab)?.key ?? tabs[0].key;
   const active = tabs.find((t) => t.key === activeKey)!;
+  const activeLocked = active.feature ? !isEnabled(active.feature) : false;
 
   return (
     <div className="flex min-h-full flex-col">
@@ -36,6 +43,24 @@ export function HubShell({ title, subtitle, tabs, basePath }: Props) {
           <nav className="-mb-px flex flex-wrap gap-1" aria-label="Tabs">
             {tabs.map((t) => {
               const isActive = t.key === activeKey;
+              const locked = t.feature ? !isEnabled(t.feature) : false;
+              if (locked) {
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => t.feature && setUpgradeFeatureKey(t.feature)}
+                    className={`inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                      isActive
+                        ? "border-[#137182] text-muted-foreground"
+                        : "border-transparent text-muted-foreground/60 hover:border-border hover:text-muted-foreground"
+                    }`}
+                  >
+                    {t.label}
+                    <Lock className="h-3 w-3" />
+                  </button>
+                );
+              }
               return (
                 <Link
                   key={t.key}
@@ -56,7 +81,16 @@ export function HubShell({ title, subtitle, tabs, basePath }: Props) {
         </div>
       )}
 
-      <div className="min-w-0 flex-1">{active.render()}</div>
+      <div className="min-w-0 flex-1">
+        {activeLocked && active.feature ? <FeatureLockedRoute featureKey={active.feature} /> : active.render()}
+      </div>
+      {upgradeFeatureKey && (
+        <UpgradeGate
+          featureKey={upgradeFeatureKey}
+          open={!!upgradeFeatureKey}
+          onOpenChange={(o) => { if (!o) setUpgradeFeatureKey(null); }}
+        />
+      )}
     </div>
   );
 }

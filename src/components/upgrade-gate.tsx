@@ -153,3 +153,9 @@ export function FeatureLockedRoute({ featureKey }: { featureKey: string }) {
     </div>
   );
 }
+
+export function FeatureGate({ featureKey, children }: { featureKey: string; children: ReactNode }) {
+  const { isEnabled } = useOrgFeatures();
+  if (!isEnabled(featureKey)) return <FeatureLockedRoute featureKey={featureKey} />;
+  return <>{children}</>;
+}

@@ -1148,3 +1148,89 @@ export const removeAuthorizedCode = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// Prompt 35 — Soft archive/confirm for authorized codes.
+// Codes are NEVER hard-deleted (7-year retention). Archiving hides a code
+// from the default list; confirming marks a manual/inferred code as
+// admin-verified so it no longer prompts "confirm this belongs on your contract".
+
+export const archiveAuthorizedCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: existing, error: exErr } = await supabase
+      .from("provider_authorized_codes")
+      .select("organization_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (exErr || !existing) throw new Error("Authorized code not found");
+    await requireOrgMembership(
+      supabase,
+      userId,
+      (existing as { organization_id: string }).organization_id,
+      "manager",
+    );
+    const { error } = await supabase
+      .from("provider_authorized_codes")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const unarchiveAuthorizedCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: existing, error: exErr } = await supabase
+      .from("provider_authorized_codes")
+      .select("organization_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (exErr || !existing) throw new Error("Authorized code not found");
+    await requireOrgMembership(
+      supabase,
+      userId,
+      (existing as { organization_id: string }).organization_id,
+      "manager",
+    );
+    const { error } = await supabase
+      .from("provider_authorized_codes")
+      .update({ archived_at: null })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const confirmAuthorizedCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: existing, error: exErr } = await supabase
+      .from("provider_authorized_codes")
+      .select("organization_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (exErr || !existing) throw new Error("Authorized code not found");
+    await requireOrgMembership(
+      supabase,
+      userId,
+      (existing as { organization_id: string }).organization_id,
+      "manager",
+    );
+    const { error } = await supabase
+      .from("provider_authorized_codes")
+      .update({ confirmed_at: new Date().toISOString(), confirmed_by: userId })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

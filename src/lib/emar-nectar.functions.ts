@@ -84,7 +84,7 @@ export const emarNectarHelper = createServerFn({ method: "POST" })
     };
 
     const res = await gatewayFetch({
-      model: "google/gemini-2.5-flash",
+      model: "bedrock",
       messages: [
         {
           role: "system",

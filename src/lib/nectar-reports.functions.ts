@@ -139,7 +139,7 @@ Examples:
 `;
 
   const res = await gatewayFetch({
-      model: "google/gemini-3-flash-preview",
+      model: "bedrock",
       messages: [
         { role: "system", content: system },
         { role: "user", content: prompt.slice(0, 2000) },

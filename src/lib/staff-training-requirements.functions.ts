@@ -489,7 +489,7 @@ If a field is not clearly visible on the document, return null for that field. D
         "Lovable-API-Key": apiKey,
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "bedrock",
         messages: [{ role: "user", content: contentBlocks }],
         response_format: { type: "json_object" },
       }),

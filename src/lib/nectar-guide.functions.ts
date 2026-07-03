@@ -43,7 +43,7 @@ async function callAi(messages: Array<{ role: string; content: string }>) {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("AI gateway is not configured.");
   const res = await gatewayFetch({
-      model: "google/gemini-2.5-flash",
+      model: "bedrock",
       messages,
       response_format: { type: "json_object" },
     });

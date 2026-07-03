@@ -1511,7 +1511,7 @@ Schema:
 }
 Rules: 6–16 fields total. Use real interactive types — never a blank text box where a date/dropdown/rating fits. Mark obviously-required fields required. Keep labels under 80 chars. Never invent PHI; structure-only.`;
     const res = await gatewayFetch({
-        model: "google/gemini-3-flash-preview",
+        model: "bedrock",
         messages: [{ role: "system", content: system }, { role: "user", content: data.description }],
         response_format: { type: "json_object" },
       });
@@ -1608,7 +1608,7 @@ Quality rules:
 
     const userText = `Extract the form structure from this PDF into the JSON schema above.${data.hint ? `\n\nHint from the uploader: ${data.hint}` : ""}${data.filename ? `\n\nFilename: ${data.filename}` : ""}`;
     const res = await gatewayFetch({
-        model: "google/gemini-2.5-flash",
+        model: "bedrock",
         messages: [
           { role: "system", content: system },
           { role: "user", content: [
@@ -1686,7 +1686,7 @@ Schedule JSON: ${JSON.stringify(data.schedule)}
 Required fields: ${required.length ? required.join("; ") : "(none)"}
 Total questions: ${data.fields.length}`;
     const res = await gatewayFetch({
-        model: "google/gemini-3-flash-preview",
+        model: "bedrock",
         messages: [{ role: "system", content: system }, { role: "user", content: userMsg }],
         response_format: { type: "json_object" },
       });
@@ -1752,7 +1752,7 @@ Rules: propose only based on the purpose text and field labels. Never invent. If
     });
 
     const res = await gatewayFetch({
-        model: "google/gemini-3-flash-preview",
+        model: "bedrock",
         messages: [{ role: "system", content: system }, { role: "user", content: userMsg }],
         response_format: { type: "json_object" },
       });

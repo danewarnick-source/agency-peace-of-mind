@@ -129,7 +129,7 @@ async function callNectar(systemPrompt: string, userPrompt: string) {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
   const res = await gatewayFetch({
-      model: "google/gemini-2.5-flash",
+      model: "bedrock",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },

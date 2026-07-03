@@ -82,7 +82,7 @@ Rules:
 - Return ONLY JSON, no commentary.`;
 
     const res = await gatewayFetch({
-        model: "google/gemini-2.5-pro",
+        model: "bedrock",
         messages: [
           { role: "system", content: system },
           {

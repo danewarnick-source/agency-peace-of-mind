@@ -1079,7 +1079,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
         return {
           inserted: 0,
           reason: "extractor_incomplete" as const,
-          message: `NECTAR couldn't finish reading this document — ${chunkFailures.length} of ${chunkCount} sections failed to parse. Click Draft again to retry. If it keeps failing, the parsed text may be malformed.`,
+          message: `NECTAR couldn't finish reading this document — ${chunkFailures.length} of ${chunkCount} sections failed to parse. First failure: ${chunkFailures[0]?.slice(0, 200) ?? "(unknown)"}. Click Draft again to retry.`,
         };
       }
 
@@ -1129,7 +1129,8 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       return {
         inserted,
         reason: "partial" as const,
-        message: `Drafted ${inserted} requirements. ${chunkFailures.length} of ${chunkCount} sections of the document couldn't be read on this pass — click Draft again to retry those sections.`,
+        message: `Drafted ${inserted} requirements. ${chunkFailures.length} of ${chunkCount} sections couldn't be read on this pass (first failure: ${chunkFailures[0]?.slice(0, 200) ?? "unknown"}). Click Draft again to retry those sections.`,
+
       };
     }
 
@@ -1688,7 +1689,7 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
           chunkCount,
           chunkFailures,
           reason: "extractor_incomplete" as const,
-          message: `NECTAR couldn't finish reading this document — ${chunkFailures.length} of ${chunkCount} sections failed to parse. Click Draft again to retry.`,
+          message: `NECTAR couldn't finish reading this document — ${chunkFailures.length} of ${chunkCount} sections failed to parse. First failure: ${chunkFailures[0]?.slice(0, 200) ?? "(unknown)"}. Click Draft again to retry.`,
         };
       }
       await reportPlatformEvent({
@@ -1718,7 +1719,7 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
         chunkCount,
         chunkFailures,
         reason: "partial" as const,
-        message: `Drafted ${inserted} requirements. ${chunkFailures.length} of ${chunkCount} sections of the document couldn't be read on this pass — click Draft again to retry those sections.`,
+        message: `Drafted ${inserted} requirements. ${chunkFailures.length} of ${chunkCount} sections couldn't be read on this pass (first failure: ${chunkFailures[0]?.slice(0, 200) ?? "unknown"}). Click Draft again to retry those sections.`,
       };
     }
 
@@ -1844,7 +1845,7 @@ REQUIREMENT TITLE: ${req.title}
 REQUIREMENT TEXT: ${req.description ?? "(no extended text — restate the title only)"}`;
 
     const res = await gatewayFetch({
-        model: "google/gemini-2.5-flash",
+        model: "bedrock",
         messages: [
           { role: "system", content: EXPLAIN_SYSTEM_PROMPT },
           { role: "user", content: userBody },

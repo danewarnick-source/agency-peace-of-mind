@@ -163,7 +163,7 @@ SERVICE CODES: ["SLH","SLN","COM","PAC","RP2","RP4","RP5","HHS","RHS","DSI","DSG
         Authorization: `Bearer ${key}`,
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "bedrock",
         messages: [
           { role: "system", content: system },
           { role: "user", content: userContent },

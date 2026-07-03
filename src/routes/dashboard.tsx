@@ -582,6 +582,7 @@ function SidebarBody({
   onNavigate,
   inboxUnread,
 }: SidebarBodyProps) {
+  const [upgradeFeatureKey, setUpgradeFeatureKey] = useState<string | null>(null);
   return (
     <>
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6 font-display text-lg font-bold tracking-tight">

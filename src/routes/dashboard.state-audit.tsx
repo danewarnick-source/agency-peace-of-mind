@@ -40,6 +40,7 @@ export const Route = createFileRoute("/dashboard/state-audit")({
 function StateAuditPage() {
   const { data: org } = useCurrentOrg();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [tab, setTab] = useState<"admin" | "auditor-view">("admin");
 
   if (!org) return <div className="p-6 text-sm text-muted-foreground">Loading organization…</div>;
 
@@ -55,8 +56,8 @@ function StateAuditPage() {
               <div className="text-xs uppercase tracking-wider text-[#9a3412]">State Audit</div>
               <h1 className="font-display text-xl font-bold text-[#0f1b3d]">Audit Packages</h1>
               <p className="text-xs text-[#9a3412]">
-                Assemble packets of subject-level records for a state agency and grant
-                named auditors read-only access at{" "}
+                Assemble packets of subject-level records, provision auditors, and preview
+                exactly what they see at{" "}
                 <a href="/audit-portal" target="_blank" rel="noopener" className="inline-flex items-center gap-1 font-medium underline">
                   the State Audit Portal <ExternalLink className="h-3 w-3" />
                 </a>.
@@ -72,19 +73,58 @@ function StateAuditPage() {
         </div>
       </header>
 
+      {/* Sub-tabs: Admin View / Auditor View */}
+      <div className="flex flex-wrap gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+        <SubTabButton active={tab === "admin"} onClick={() => setTab("admin")} icon={<Settings className="h-3.5 w-3.5" />}>
+          Admin View
+        </SubTabButton>
+        <SubTabButton active={tab === "auditor-view"} onClick={() => setTab("auditor-view")} icon={<Eye className="h-3.5 w-3.5" />}>
+          Auditor View
+        </SubTabButton>
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
         <PackageList orgId={org.organization_id} selectedId={selectedId} onSelect={setSelectedId} />
-        {selectedId ? (
-          <PackageDetail packageId={selectedId} orgId={org.organization_id} />
-        ) : (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-muted-foreground">
-            Select or create an audit package to begin.
-          </div>
-        )}
+        <div className="space-y-4">
+          {tab === "admin" ? (
+            selectedId ? (
+              <PackageDetail packageId={selectedId} orgId={org.organization_id} />
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-muted-foreground">
+                Select or create an audit package to begin.
+              </div>
+            )
+          ) : selectedId ? (
+            <AuditorPackagePreview packageId={selectedId} mode="org" />
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-muted-foreground">
+              Select a package to preview the auditor view.
+            </div>
+          )}
+
+          {/* Auditor provisioning always visible in Admin View, org-wide */}
+          {tab === "admin" && <ProvisionedAuditorsSection orgId={org.organization_id} />}
+        </div>
       </div>
     </div>
   );
 }
+
+function SubTabButton({ active, onClick, icon, children }: {
+  active: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors ${
+        active ? "bg-[#0f1b3d] text-white" : "text-slate-600 hover:bg-slate-100"
+      }`}
+    >
+      {icon} {children}
+    </button>
+  );
+}
+
 
 // ============================================================
 // Package list + create

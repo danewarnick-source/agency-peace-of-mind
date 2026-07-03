@@ -9423,6 +9423,57 @@ export type Database = {
           },
         ]
       }
+      nectar_draft_jobs: {
+        Row: {
+          chunk_failures: Json
+          chunk_ranges: Json
+          created_at: string
+          created_by: string
+          document_id: string
+          error_message: string | null
+          extracted_items: Json
+          id: string
+          inserted_count: number
+          organization_id: string
+          processed_chunks: number
+          status: string
+          total_chunks: number
+          updated_at: string
+        }
+        Insert: {
+          chunk_failures?: Json
+          chunk_ranges?: Json
+          created_at?: string
+          created_by: string
+          document_id: string
+          error_message?: string | null
+          extracted_items?: Json
+          id?: string
+          inserted_count?: number
+          organization_id: string
+          processed_chunks?: number
+          status?: string
+          total_chunks?: number
+          updated_at?: string
+        }
+        Update: {
+          chunk_failures?: Json
+          chunk_ranges?: Json
+          created_at?: string
+          created_by?: string
+          document_id?: string
+          error_message?: string | null
+          extracted_items?: Json
+          id?: string
+          inserted_count?: number
+          organization_id?: string
+          processed_chunks?: number
+          status?: string
+          total_chunks?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       nectar_extracted_fields: {
         Row: {
           confidence: number | null

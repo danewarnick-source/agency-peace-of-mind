@@ -27,6 +27,7 @@ import { Route as AuditorRouteImport } from './routes/auditor'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
+import { Route as AuditPortalIndexRouteImport } from './routes/audit-portal.index'
 import { Route as VerifyCodeRouteImport } from './routes/verify.$code'
 import { Route as DashboardTracksRouteImport } from './routes/dashboard.tracks'
 import { Route as DashboardTimeclockRouteImport } from './routes/dashboard.timeclock'
@@ -34,6 +35,7 @@ import { Route as DashboardTeamsRouteImport } from './routes/dashboard.teams'
 import { Route as DashboardTeamRouteImport } from './routes/dashboard.team'
 import { Route as DashboardSuperAdminRouteImport } from './routes/dashboard.super-admin'
 import { Route as DashboardSummariesRouteImport } from './routes/dashboard.summaries'
+import { Route as DashboardStateAuditRouteImport } from './routes/dashboard.state-audit'
 import { Route as DashboardSmartImportRouteImport } from './routes/dashboard.smart-import'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
 import { Route as DashboardSchedulingRouteImport } from './routes/dashboard.scheduling'
@@ -83,6 +85,7 @@ import { Route as DashboardAuditRouteImport } from './routes/dashboard.audit'
 import { Route as DashboardAssignmentsRouteImport } from './routes/dashboard.assignments'
 import { Route as DashboardAskNectarRouteImport } from './routes/dashboard.ask-nectar'
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
+import { Route as AuditPortalPackageIdRouteImport } from './routes/audit-portal.$packageId'
 import { Route as DashboardTrainingIndexRouteImport } from './routes/dashboard.training.index'
 import { Route as DashboardSmartImportIndexRouteImport } from './routes/dashboard.smart-import.index'
 import { Route as DashboardHiveTrainingIndexRouteImport } from './routes/dashboard.hive-training.index'
@@ -276,6 +279,11 @@ const DashboardIndexRoute = DashboardIndexRouteImport.update({
   path: '/',
   getParentRoute: () => DashboardRoute,
 } as any)
+const AuditPortalIndexRoute = AuditPortalIndexRouteImport.update({
+  id: '/audit-portal/',
+  path: '/audit-portal/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VerifyCodeRoute = VerifyCodeRouteImport.update({
   id: '/verify/$code',
   path: '/verify/$code',
@@ -309,6 +317,11 @@ const DashboardSuperAdminRoute = DashboardSuperAdminRouteImport.update({
 const DashboardSummariesRoute = DashboardSummariesRouteImport.update({
   id: '/summaries',
   path: '/summaries',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardStateAuditRoute = DashboardStateAuditRouteImport.update({
+  id: '/state-audit',
+  path: '/state-audit',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardSmartImportRoute = DashboardSmartImportRouteImport.update({
@@ -562,6 +575,11 @@ const DashboardAskNectarRoute = DashboardAskNectarRouteImport.update({
 const CertificateCodeRoute = CertificateCodeRouteImport.update({
   id: '/certificate/$code',
   path: '/certificate/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuditPortalPackageIdRoute = AuditPortalPackageIdRouteImport.update({
+  id: '/audit-portal/$packageId',
+  path: '/audit-portal/$packageId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardTrainingIndexRoute = DashboardTrainingIndexRouteImport.update({
@@ -1156,6 +1174,7 @@ export interface FileRoutesByFullPath {
   '/super-admin': typeof SuperAdminRoute
   '/training': typeof TrainingRoute
   '/unauthorized': typeof UnauthorizedRoute
+  '/audit-portal/$packageId': typeof AuditPortalPackageIdRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/ask-nectar': typeof DashboardAskNectarRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
@@ -1205,6 +1224,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
   '/dashboard/smart-import': typeof DashboardSmartImportRouteWithChildren
+  '/dashboard/state-audit': typeof DashboardStateAuditRoute
   '/dashboard/summaries': typeof DashboardSummariesRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
@@ -1212,6 +1232,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
+  '/audit-portal/': typeof AuditPortalIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
@@ -1333,6 +1354,7 @@ export interface FileRoutesByTo {
   '/super-admin': typeof SuperAdminRoute
   '/training': typeof TrainingRoute
   '/unauthorized': typeof UnauthorizedRoute
+  '/audit-portal/$packageId': typeof AuditPortalPackageIdRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/ask-nectar': typeof DashboardAskNectarRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
@@ -1376,6 +1398,7 @@ export interface FileRoutesByTo {
   '/dashboard/scheduler': typeof DashboardSchedulerRoute
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
+  '/dashboard/state-audit': typeof DashboardStateAuditRoute
   '/dashboard/summaries': typeof DashboardSummariesRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
@@ -1383,6 +1406,7 @@ export interface FileRoutesByTo {
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
+  '/audit-portal': typeof AuditPortalIndexRoute
   '/dashboard': typeof DashboardIndexRoute
   '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
@@ -1506,6 +1530,7 @@ export interface FileRoutesById {
   '/super-admin': typeof SuperAdminRoute
   '/training': typeof TrainingRoute
   '/unauthorized': typeof UnauthorizedRoute
+  '/audit-portal/$packageId': typeof AuditPortalPackageIdRoute
   '/certificate/$code': typeof CertificateCodeRoute
   '/dashboard/ask-nectar': typeof DashboardAskNectarRoute
   '/dashboard/assignments': typeof DashboardAssignmentsRoute
@@ -1555,6 +1580,7 @@ export interface FileRoutesById {
   '/dashboard/scheduling': typeof DashboardSchedulingRoute
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
   '/dashboard/smart-import': typeof DashboardSmartImportRouteWithChildren
+  '/dashboard/state-audit': typeof DashboardStateAuditRoute
   '/dashboard/summaries': typeof DashboardSummariesRoute
   '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
@@ -1562,6 +1588,7 @@ export interface FileRoutesById {
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
   '/verify/$code': typeof VerifyCodeRoute
+  '/audit-portal/': typeof AuditPortalIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
@@ -1686,6 +1713,7 @@ export interface FileRouteTypes {
     | '/super-admin'
     | '/training'
     | '/unauthorized'
+    | '/audit-portal/$packageId'
     | '/certificate/$code'
     | '/dashboard/ask-nectar'
     | '/dashboard/assignments'
@@ -1735,6 +1763,7 @@ export interface FileRouteTypes {
     | '/dashboard/scheduling'
     | '/dashboard/settings'
     | '/dashboard/smart-import'
+    | '/dashboard/state-audit'
     | '/dashboard/summaries'
     | '/dashboard/super-admin'
     | '/dashboard/team'
@@ -1742,6 +1771,7 @@ export interface FileRouteTypes {
     | '/dashboard/timeclock'
     | '/dashboard/tracks'
     | '/verify/$code'
+    | '/audit-portal/'
     | '/dashboard/'
     | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
@@ -1863,6 +1893,7 @@ export interface FileRouteTypes {
     | '/super-admin'
     | '/training'
     | '/unauthorized'
+    | '/audit-portal/$packageId'
     | '/certificate/$code'
     | '/dashboard/ask-nectar'
     | '/dashboard/assignments'
@@ -1906,6 +1937,7 @@ export interface FileRouteTypes {
     | '/dashboard/scheduler'
     | '/dashboard/scheduling'
     | '/dashboard/settings'
+    | '/dashboard/state-audit'
     | '/dashboard/summaries'
     | '/dashboard/super-admin'
     | '/dashboard/team'
@@ -1913,6 +1945,7 @@ export interface FileRouteTypes {
     | '/dashboard/timeclock'
     | '/dashboard/tracks'
     | '/verify/$code'
+    | '/audit-portal'
     | '/dashboard'
     | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
@@ -2035,6 +2068,7 @@ export interface FileRouteTypes {
     | '/super-admin'
     | '/training'
     | '/unauthorized'
+    | '/audit-portal/$packageId'
     | '/certificate/$code'
     | '/dashboard/ask-nectar'
     | '/dashboard/assignments'
@@ -2084,6 +2118,7 @@ export interface FileRouteTypes {
     | '/dashboard/scheduling'
     | '/dashboard/settings'
     | '/dashboard/smart-import'
+    | '/dashboard/state-audit'
     | '/dashboard/summaries'
     | '/dashboard/super-admin'
     | '/dashboard/team'
@@ -2091,6 +2126,7 @@ export interface FileRouteTypes {
     | '/dashboard/timeclock'
     | '/dashboard/tracks'
     | '/verify/$code'
+    | '/audit-portal/'
     | '/dashboard/'
     | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
@@ -2214,8 +2250,10 @@ export interface RootRouteChildren {
   SuperAdminRoute: typeof SuperAdminRoute
   TrainingRoute: typeof TrainingRoute
   UnauthorizedRoute: typeof UnauthorizedRoute
+  AuditPortalPackageIdRoute: typeof AuditPortalPackageIdRoute
   CertificateCodeRoute: typeof CertificateCodeRoute
   VerifyCodeRoute: typeof VerifyCodeRoute
+  AuditPortalIndexRoute: typeof AuditPortalIndexRoute
   SignEmployeeLoanTokenRoute: typeof SignEmployeeLoanTokenRoute
   ApiPublicHooksBillingDailyCheckRoute: typeof ApiPublicHooksBillingDailyCheckRoute
   ApiPublicHooksGmailIngestRoute: typeof ApiPublicHooksGmailIngestRoute
@@ -2354,6 +2392,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/audit-portal/': {
+      id: '/audit-portal/'
+      path: '/audit-portal'
+      fullPath: '/audit-portal/'
+      preLoaderRoute: typeof AuditPortalIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/verify/$code': {
       id: '/verify/$code'
       path: '/verify/$code'
@@ -2401,6 +2446,13 @@ declare module '@tanstack/react-router' {
       path: '/summaries'
       fullPath: '/dashboard/summaries'
       preLoaderRoute: typeof DashboardSummariesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/state-audit': {
+      id: '/dashboard/state-audit'
+      path: '/state-audit'
+      fullPath: '/dashboard/state-audit'
+      preLoaderRoute: typeof DashboardStateAuditRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/smart-import': {
@@ -2744,6 +2796,13 @@ declare module '@tanstack/react-router' {
       path: '/certificate/$code'
       fullPath: '/certificate/$code'
       preLoaderRoute: typeof CertificateCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/audit-portal/$packageId': {
+      id: '/audit-portal/$packageId'
+      path: '/audit-portal/$packageId'
+      fullPath: '/audit-portal/$packageId'
+      preLoaderRoute: typeof AuditPortalPackageIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard/training/': {
@@ -3786,6 +3845,7 @@ interface DashboardRouteChildren {
   DashboardSchedulingRoute: typeof DashboardSchedulingRoute
   DashboardSettingsRoute: typeof DashboardSettingsRouteWithChildren
   DashboardSmartImportRoute: typeof DashboardSmartImportRouteWithChildren
+  DashboardStateAuditRoute: typeof DashboardStateAuditRoute
   DashboardSummariesRoute: typeof DashboardSummariesRoute
   DashboardSuperAdminRoute: typeof DashboardSuperAdminRoute
   DashboardTeamRoute: typeof DashboardTeamRoute
@@ -3872,6 +3932,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardSchedulingRoute: DashboardSchedulingRoute,
   DashboardSettingsRoute: DashboardSettingsRouteWithChildren,
   DashboardSmartImportRoute: DashboardSmartImportRouteWithChildren,
+  DashboardStateAuditRoute: DashboardStateAuditRoute,
   DashboardSummariesRoute: DashboardSummariesRoute,
   DashboardSuperAdminRoute: DashboardSuperAdminRoute,
   DashboardTeamRoute: DashboardTeamRoute,
@@ -3933,8 +3994,10 @@ const rootRouteChildren: RootRouteChildren = {
   SuperAdminRoute: SuperAdminRoute,
   TrainingRoute: TrainingRoute,
   UnauthorizedRoute: UnauthorizedRoute,
+  AuditPortalPackageIdRoute: AuditPortalPackageIdRoute,
   CertificateCodeRoute: CertificateCodeRoute,
   VerifyCodeRoute: VerifyCodeRoute,
+  AuditPortalIndexRoute: AuditPortalIndexRoute,
   SignEmployeeLoanTokenRoute: SignEmployeeLoanTokenRoute,
   ApiPublicHooksBillingDailyCheckRoute: ApiPublicHooksBillingDailyCheckRoute,
   ApiPublicHooksGmailIngestRoute: ApiPublicHooksGmailIngestRoute,

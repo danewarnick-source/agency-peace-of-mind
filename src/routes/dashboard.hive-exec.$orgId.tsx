@@ -488,9 +488,28 @@ function CompanyDetailPage() {
           )}
         </section>
       </div>
+      </>
+      )}
     </div>
   );
 }
+
+function TabButton({ active, onClick, icon: Icon, children }: { active: boolean; onClick: () => void; icon: typeof Users; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+        active
+          ? "border-[#0f1b3d] text-[#0f1b3d]"
+          : "border-transparent text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      <Icon className="h-4 w-4" /> {children}
+    </button>
+  );
+}
+
 
 function ReadOnly({ label, value, mono }: { label: string; value: string | number; mono?: boolean }) {
   return (

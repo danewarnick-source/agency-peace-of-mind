@@ -26,6 +26,8 @@ export interface FeatureRegistryRow {
   category: "tab" | "subtab" | "nectar_feature";
   default_enabled: boolean;
   sort_order: number;
+  required_tier: string | null;
+  upgrade_blurb: string | null;
 }
 
 export interface OrgFeatureRow {

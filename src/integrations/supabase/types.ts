@@ -5244,6 +5244,53 @@ export type Database = {
           },
         ]
       }
+      feature_registry: {
+        Row: {
+          category: string
+          created_at: string
+          default_enabled: boolean
+          description: string | null
+          feature_key: string
+          id: string
+          label: string
+          parent_key: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          default_enabled?: boolean
+          description?: string | null
+          feature_key: string
+          id?: string
+          label: string
+          parent_key?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          default_enabled?: boolean
+          description?: string | null
+          feature_key?: string
+          id?: string
+          label?: string
+          parent_key?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feature_registry_parent_key_fkey"
+            columns: ["parent_key"]
+            isOneToOne: false
+            referencedRelation: "feature_registry"
+            referencedColumns: ["feature_key"]
+          },
+        ]
+      }
       form_notifications: {
         Row: {
           body: string
@@ -10466,6 +10513,51 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "org_training_orders_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_features: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          feature_key: string
+          id: string
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          feature_key: string
+          id?: string
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          feature_key?: string
+          id?: string
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_features_feature_key_fkey"
+            columns: ["feature_key"]
+            isOneToOne: false
+            referencedRelation: "feature_registry"
+            referencedColumns: ["feature_key"]
+          },
+          {
+            foreignKeyName: "organization_features_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"

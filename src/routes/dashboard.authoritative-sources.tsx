@@ -2512,7 +2512,7 @@ function MasterAttestationPanel({ orgId }: { orgId: string }) {
         open={open}
         onOpenChange={setOpen}
         orgId={orgId}
-        current={current}
+        current={current ?? null}
         bodyText={status?.attestationTextTemplate ?? ""}
         onSign={() => sign.mutate()}
         isSigning={sign.isPending}

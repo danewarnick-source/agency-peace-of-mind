@@ -9721,6 +9721,9 @@ export type Database = {
           origin: string
           requirement_key: string
           review_status: string
+          satisfied_by: string | null
+          scope_level: string | null
+          service_code: string | null
           source_citation: string | null
           source_document_id: string | null
           title: string
@@ -9742,6 +9745,9 @@ export type Database = {
           origin?: string
           requirement_key: string
           review_status?: string
+          satisfied_by?: string | null
+          scope_level?: string | null
+          service_code?: string | null
           source_citation?: string | null
           source_document_id?: string | null
           title: string
@@ -9763,6 +9769,9 @@ export type Database = {
           origin?: string
           requirement_key?: string
           review_status?: string
+          satisfied_by?: string | null
+          scope_level?: string | null
+          service_code?: string | null
           source_citation?: string | null
           source_document_id?: string | null
           title?: string
@@ -14842,6 +14851,9 @@ export type Database = {
           origin: string
           requirement_key: string
           review_status: string
+          satisfied_by: string | null
+          scope_level: string | null
+          service_code: string | null
           source_citation: string | null
           source_document_id: string | null
           title: string
@@ -14872,6 +14884,9 @@ export type Database = {
           origin: string
           requirement_key: string
           review_status: string
+          satisfied_by: string | null
+          scope_level: string | null
+          service_code: string | null
           source_citation: string | null
           source_document_id: string | null
           title: string

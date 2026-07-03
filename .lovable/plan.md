@@ -1,56 +1,89 @@
-## Goal
-Show each staff member's DSPD-required-training status directly on their roster pill, and gate the "HIVE Training" section on an org-level opt-in.
+# Goal
 
-## 1. Entitlement: `hive_training` add-on
+Clicking **Draft requirements** on a Scope of Work in Authoritative Sources must:
+1. Return immediately (no 5–10 min single call).
+2. Show "Reading section X of Y…" progress as it works.
+3. Persist per-section progress in the database so a crash / tab close / reload never re-pays for a section already read.
+4. Auto-resume on next page load / next click, skipping completed sections.
 
-**File:** `src/lib/hive-tiers.ts`
-- Add `"hive_training"` to `AddonId`
-- Add catalog entry ("HIVE Training — DSPD-aligned courses, competency sign-off, verifiable certs")
-- Include in Pro + Enterprise `addons` arrays (Starter = opt-out by default; HIVE Exec can toggle)
+# What already exists (verified)
 
-**No new hook needed** — call sites use `useEntitlements().hasAddon("hive_training")`.
+- **DB queue:** `nectar_draft_jobs` with `chunk_ranges`, `processed_indices`, `processed_chunks`, `extracted_items`, `chunk_failures`, `chunk_durations_ms`, `status` (`extracting` → `ready_for_review` → `completed`/`failed`).
+- **Three server fns** in `src/lib/authoritative-sources.functions.ts`:
+  - `startRequirementsDraft` — pre-chunks the raw text, inserts the job row, returns `{ jobId, totalChunks }` in one quick call.
+  - `processDraftChunk({ jobId, chunkIndex })` — runs the AI on one chunk, appends to `extracted_items`, records the index in `processed_indices`. Idempotent — a second call on the same index returns `skipped:true` and does NOT call the AI (this is the "don't pay twice" guarantee).
+  - `finalizeRequirementsDraft({ jobId })` — dedupes and inserts requirements once every chunk is done.
+- **Global driver:** `src/components/nectar/draft-jobs-driver.tsx` (`DraftJobsProvider`) mounted in `src/routes/dashboard.tsx` polls `getActiveDraftJobs` every 5s, runs 3 parallel `processDraftChunk` calls per active job, then finalizes. On mount it picks up any still-`extracting` job from a previous session — that's the resume path.
+- **Server-side tick:** `runDraftTick` in `src/lib/nectar-draft-tick.server.ts` + public route `/api/public/hooks/nectar-draft-tick` process chunks server-side within a 45s budget. `startRequirementsDraft` fires it once at start; the client `visibilitychange`/`pagehide` nudge is currently a **documented no-op** (`NOTE: intentionally no-op for now`).
 
-### Gate the HIVE Training tab
-- **Sidebar** (`src/components/site-header.tsx` or wherever the "HIVE Training" nav link lives — will grep): if `!hasAddon("hive_training")`, render with lock icon + tooltip "Enable HIVE Training on your plan" and route to `/dashboard/billing/subscription` instead of the hub.
-- **Route guard** at top of `dashboard.hive-training.index.tsx` (and course player): if entitlement missing, render a small `<FeatureLocked feature="HIVE Training" />` card. Server functions that create assignments/orders already run through `assertAddonForOrg` — extend the same check to `hive_training`.
+The pieces are there; the failure mode you're seeing is either the driver not actually engaging on this SOW, or the UI not surfacing the per-chunk progress clearly enough to look like anything other than "one long run".
 
-## 2. Per-staff training status on the roster
+# Plan
 
-### Data model — no schema change
-Reuse existing tables:
-- `BASELINE_STAFF_TRAININGS` from `src/lib/staff-training-requirements.ts` = the canonical DSPD list (30-Day, CPR/First Aid, De-escalation, ABI, Annual 12h)
-- `hive_training_assignments` (status, completed_at, expires_at, course_id)
-- `hive_training_courses` — extend the existing seed to tag each course with a `baseline_key` mapping to `BASELINE_STAFF_TRAININGS.key`. Small migration: `ALTER TABLE hive_training_courses ADD COLUMN baseline_key text;` + backfill for the 4-5 courses we already ship. GRANTs already exist.
+## 1. Diagnose the specific SOW (do this first, before touching code)
 
-A staffer is "certified" for baseline X if there exists a `hive_training_assignments` row where `course.baseline_key = X` AND `status = 'completed'` AND (`expires_at IS NULL OR expires_at > now()`).
+Open browser DevTools with Authoritative Sources loaded and click **Draft requirements** on the Scope of Work. Confirm in Network / Console:
 
-### New server fn
-`src/lib/hive-training-roster.functions.ts` → `getRosterTrainingStatus({ organizationId })` (uses `requireSupabaseAuth`):
-- Fetches org members (user_id, full_name, hire_date, applicability flags for behavior/ABI already computed by existing `getStaffChecklist` logic — reuse the helper)
-- Fetches completed+active `hive_training_assignments` joined to `hive_training_courses` for those users
-- Returns `Array<{ userId, fullName, trainings: Array<{ baselineKey, title, status: 'certified'|'missing', completedAt?, expiresAt?, courseId? }> }>`
+- The `startRequirementsDraft` request returns within ~1–2s with `{ jobId, totalChunks: N }` (not a long-hanging request).
+- Within 5s the `getActiveDraftJobs` poll picks up the new job, and `processDraftChunk` calls start firing (one per chunk, ~3 in flight).
+- `nectar_draft_jobs` row shows `processed_indices` growing as each chunk finishes.
 
-### Roster pill UI
-In `src/routes/dashboard.employees.index.tsx` — under each member row, render a compact "DSPD training strip":
-```
-[✓ 30-Day  Aug 2025 → Aug 2026]  [✓ CPR/First Aid ...]  [⊕ Assign: De-escalation]  ...
-```
-- Green check + completed/renewal dates when certified
-- "Assign training" button when missing → opens existing assignment dialog (reuse `assignCourse` mutation from hive-training page, keyed to the mapped course). Button disabled with lock tooltip if org lacks `hive_training` add-on.
-- Only rows that pass applicability (behavior/ABI conditionals) are shown for a given staffer.
+If any of the above is missing, that's the real bug — likeliest suspects, in order:
+- `startRequirementsDraft` returning `jobId: null` (no_text / non_obligation_kind) — surface `message` clearly.
+- `DraftJobsProvider` context not reaching the Authoritative Sources tree (double-check the route is under the dashboard shell — it is, per `src/routes/dashboard.authoritative-sources.tsx` under `_authenticated` via dashboard).
+- Driver crashing on a chunk because the AI gateway 429s and the loop bails — currently we `doneSet.add(i)` on failure to avoid infinite retry, so this shouldn't strand the job, but confirm.
 
-Add a small `<StaffTrainingStrip staffer={...} />` component in `src/components/training/staff-training-strip.tsx` to keep the roster file lean.
+I'll report the actual observed sequence before applying fixes 2–4.
 
-## 3. Out of scope
-- No changes to billing/checkout flows.
-- No new tables beyond the one `baseline_key` column.
-- External certifications (uploaded outside HIVE Training) remain visible via existing `certifications` UI; this strip is HIVE Training-only per your description.
+## 2. Make progress explicit: "Reading section X of Y"
 
-## Files to create/edit
-- edit `src/lib/hive-tiers.ts` (add addon)
-- edit sidebar nav (find + gate HIVE Training link)
-- edit `src/routes/dashboard.hive-training.index.tsx` (route-level lock)
-- new migration: `hive_training_courses.baseline_key` + backfill
-- new `src/lib/hive-training-roster.functions.ts`
-- new `src/components/training/staff-training-strip.tsx`
-- edit `src/routes/dashboard.employees.index.tsx` (render strip per member)
+Change the button/progress label copy in `src/components/pages/authoritative-sources-page.tsx` (the `draftingLabel` computation) and in `src/components/nectar/draft-jobs-driver.tsx` (`DraftJobProgress` — expose `processedChunks` / `totalChunks` explicitly, which it already does).
+
+New label shape:
+- While extracting: `Reading section {processedChunks + 1} of {totalChunks}…` (+ ETA if measured, e.g. `· ~2m 10s left`).
+- While finalizing: `Finalizing {totalChunks} sections…`.
+- Same treatment on the "Re-draft" button.
+
+Show a toast on start: `NECTAR started reading "{title}" — {totalChunks} sections. Progress saves as it goes; safe to leave the page.`
+
+## 3. Keep background progress moving when the tab is hidden
+
+Replace the current no-op nudge in `DraftJobsProvider` with a real authenticated server-fn call:
+
+- Add a tiny `nudgeDraftJob({ jobId })` server fn (auth-middleware, org-membership check on the job) that just calls `fireDraftTick(jobId, { wait: false })` and returns `{ ok: true }`.
+- Call it via `useServerFn` from the existing `visibilitychange:hidden` / `pagehide` handler for each active job (debounced as today).
+- Keep the server-side `runDraftTick` bounded at 45s / concurrency 3 — no changes needed.
+
+This means: user starts the draft, closes the tab, comes back 10 minutes later, and finds the job already partway (or fully) done — with zero re-pays because each chunk is guarded by `processed_indices`.
+
+## 4. Prove the "don't pay twice" guarantee
+
+Add an assertion-style test path only visible in dev (or a short manual verification checklist):
+
+- Start a draft on the SOW.
+- Kill the tab mid-way (say, after 5 chunks).
+- Query `nectar_draft_jobs`: confirm `processed_indices` has 5 entries and `extracted_items` has the results.
+- Reload Authoritative Sources.
+- Confirm the driver resumes at chunk 6 (via a `console.debug` in `runWorker` on the first skipped index — `[nectar-draft] resuming job {jobId} at chunk {i}, skipping {N} already-processed`).
+- Confirm the AI Gateway logs show N fewer calls than total chunks.
+
+No new billing table needed — `processed_indices` is already the record.
+
+## 5. Minor UX polish (only if diagnosis confirms the core flow works)
+
+- On the Authoritative Sources page, if any job for the current org is `extracting`, render a small persistent status strip at the top summarizing active jobs and their per-section counters, so the user sees progress even when scrolled away from the specific row.
+- Wrap the "Draft requirements" button in a tooltip that reads: `Reads the document in ~30s chunks. Progress is saved after every section — closing the tab is safe.`
+
+# Out of scope
+
+- Rewriting the extractor prompt or chunk size — not needed for this ask.
+- Migrating to a dedicated queue (BullMQ etc.) — `nectar_draft_jobs` + the tick endpoint already function as the queue.
+- Touching `generateRequirementsFromSource` (the old monolithic fn) — it's no longer wired to the button; leave it as dead-but-referenced until a later cleanup pass.
+
+# Files that will change
+
+- `src/components/pages/authoritative-sources-page.tsx` — progress label copy, start-toast copy, optional status strip.
+- `src/components/nectar/draft-jobs-driver.tsx` — expose `Reading section X of Y` state, wire real nudge on visibility change.
+- `src/lib/authoritative-sources.functions.ts` — add `nudgeDraftJob` server fn (thin wrapper over `fireDraftTick`).
+
+No schema migration required.

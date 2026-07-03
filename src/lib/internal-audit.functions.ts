@@ -220,6 +220,7 @@ export const runInternalAudit = createServerFn({ method: "POST" })
       category: string | null;
       metadata: Record<string, unknown> | null;
       approval_state: string | null;
+      service_code: string | null;
     };
     const reqRows = (reqsRes.data ?? []) as ReqRow[];
     const reqById = new Map(reqRows.map((r) => [r.id, r]));
@@ -515,7 +516,17 @@ export const runInternalAudit = createServerFn({ method: "POST" })
         if (m.confirmed)
           confirmedByReq.set(m.requirement_id, (confirmedByReq.get(m.requirement_id) ?? 0) + 1);
       }
+
+      const { data: heldCodesRows } = await supabase
+        .from("provider_authorized_codes")
+        .select("code")
+        .eq("organization_id", orgId);
+      const heldCodes = new Set<string>((heldCodesRows ?? []).map((r) => r.code));
+
       for (const r of reqById.values()) {
+        // DORMANT: skip requirements tied to service codes the provider does not hold.
+        if (r.service_code && !heldCodes.has(r.service_code)) continue;
+
         if ((confirmedByReq.get(r.id) ?? 0) === 0) {
           findings.push({
             id: `req-unmapped-${r.id}`,

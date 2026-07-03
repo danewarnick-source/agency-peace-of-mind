@@ -241,6 +241,7 @@ export const grantAuditorAccess = createServerFn({ method: "POST" })
     z.object({
       auditPackageId: z.string().uuid(),
       auditorAccountId: z.string().uuid(),
+      siteOrigin: z.string().url().optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
@@ -258,6 +259,21 @@ export const grantAuditorAccess = createServerFn({ method: "POST" })
         { onConflict: "audit_package_id,auditor_account_id" },
       );
     if (error) throw error;
+
+    // Package-specific invite email — sends the auditor a fresh set-password
+    // link that lands on /audit-portal/set-password?packageId=…, so they end
+    // up directly on the granted package, never the HIVE homepage.
+    try {
+      await sendAuditorPackageInvite({
+        supabase,
+        auditPackageId: data.auditPackageId,
+        auditorAccountId: data.auditorAccountId,
+        siteOrigin: data.siteOrigin ?? "",
+      });
+    } catch (e) {
+      // Non-fatal — access is granted; the email can be resent from the UI.
+      console.error("Auditor invite email failed:", e);
+    }
     return { ok: true };
   });
 
@@ -737,10 +753,12 @@ export const listOrgAuditors = createServerFn({ method: "GET" })
   });
 
 /**
- * Org admin creates an auditor account. Uses admin.inviteUserByEmail so
- * Supabase sends the invite email — the auditor sets their own password.
- * Org never enters or stores the auditor's password.
+ * Org admin creates an auditor account, grants access to a specific package,
+ * and sends a branded, package-specific invite email (not Supabase's generic
+ * app invite). The auditor's set-password link lands them directly on
+ * /audit-portal/{packageId} — never the HIVE homepage.
  */
+
 export const provisionOrgAuditor = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
@@ -749,6 +767,8 @@ export const provisionOrgAuditor = createServerFn({ method: "POST" })
       email: z.string().email().max(255),
       fullName: z.string().trim().min(1).max(200),
       agencyName: z.string().trim().min(1).max(200),
+      auditPackageId: z.string().uuid(),
+      siteOrigin: z.string().url(),
     }).parse(d),
   )
   .handler(async ({ data, context }): Promise<{ auditorAccountId: string }> => {
@@ -757,7 +777,8 @@ export const provisionOrgAuditor = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Look up or invite the auth user
+    // Find or create the auth user WITHOUT sending Supabase's generic invite.
+    // We send our own branded, package-specific email below.
     let authUserId: string | null = null;
     const { data: existing } = await (supabaseAdmin.auth.admin as unknown as {
       listUsers: (opts?: { page?: number; perPage?: number }) => Promise<{
@@ -768,20 +789,21 @@ export const provisionOrgAuditor = createServerFn({ method: "POST" })
     if (found) {
       authUserId = found.id;
     } else {
-      const { data: invited, error: invErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
-        data: {
+      const { data: created, error: cErr } = await supabaseAdmin.auth.admin.createUser({
+        email: data.email,
+        email_confirm: true,
+        user_metadata: {
           role: "auditor",
           full_name: data.fullName,
           agency_name: data.agencyName,
           organization_id: data.organizationId,
         },
-        redirectTo: `${process.env.PUBLIC_SITE_URL ?? ""}/audit-portal`,
       });
-      if (invErr || !invited?.user) throw new Error(invErr?.message ?? "Failed to invite auditor");
-      authUserId = invited.user.id;
+      if (cErr || !created?.user) throw new Error(cErr?.message ?? "Failed to create auditor auth user");
+      authUserId = created.user.id;
     }
 
-    // Upsert auditor_accounts row (org-scoped)
+    // Upsert auditor_accounts row (org-scoped, no organization_members entry).
     const { data: row, error: upErr } = await (supabase as unknown as {
       from: (t: string) => {
         upsert: (v: Record<string, unknown>, o: { onConflict: string }) => {
@@ -806,8 +828,146 @@ export const provisionOrgAuditor = createServerFn({ method: "POST" })
       .single();
     if (upErr) throw upErr;
 
+    // Grant access to the specific package.
+    const { error: accErr } = await supabase
+      .from("audit_package_access")
+      .upsert(
+        {
+          audit_package_id: data.auditPackageId,
+          auditor_account_id: row!.id,
+          granted_by: userId,
+          granted_at: new Date().toISOString(),
+          revoked_at: null,
+        },
+        { onConflict: "audit_package_id,auditor_account_id" },
+      );
+    if (accErr) throw accErr;
+
+    // Send the branded, package-specific invite email.
+    await sendAuditorPackageInvite({
+      supabase,
+      auditPackageId: data.auditPackageId,
+      auditorAccountId: row!.id,
+      siteOrigin: data.siteOrigin,
+    });
+
     return { auditorAccountId: row!.id };
   });
+
+/**
+ * Shared helper: generates a Supabase recovery/invite link scoped to the
+ * auditor and sends a branded, package-specific email via the send-email
+ * edge function (Resend). The recovery link redirects to
+ * /audit-portal/set-password?packageId={id}, so upon password set the
+ * auditor lands directly on their granted package — never the HIVE homepage.
+ *
+ * // notification seam — email/Slack alerts to execs could fire from here.
+ */
+async function sendAuditorPackageInvite(args: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any;
+  auditPackageId: string;
+  auditorAccountId: string;
+  siteOrigin: string;
+}): Promise<void> {
+  const { supabase, auditPackageId, auditorAccountId, siteOrigin } = args;
+
+  const [{ data: pkg }, { data: aud }] = await Promise.all([
+    supabase
+      .from("audit_packages")
+      .select("id, title, state_agency, date_range_start, date_range_end, organization_id")
+      .eq("id", auditPackageId)
+      .maybeSingle(),
+    supabase
+      .from("auditor_accounts")
+      .select("email, full_name")
+      .eq("id", auditorAccountId)
+      .maybeSingle(),
+  ]);
+  if (!pkg || !aud) throw new Error("Package or auditor not found");
+
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("name")
+    .eq("id", pkg.organization_id)
+    .maybeSingle();
+
+  const packageLabel: string = (pkg.title as string | null) ?? `${pkg.state_agency} audit`;
+  const orgName: string = (org?.name as string | null) ?? "the provider";
+
+  // Build redirect target: after set-password, land directly on the package.
+  const origin = siteOrigin || process.env.PUBLIC_SITE_URL || "";
+  const redirectTo = `${origin}/audit-portal/set-password?packageId=${auditPackageId}`;
+
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+  // Generate a recovery link (works for both new and existing users). If the
+  // user has never signed in, this doubles as the set-password link.
+  const { data: linkData, error: linkErr } = await (supabaseAdmin.auth.admin as unknown as {
+    generateLink: (opts: {
+      type: "recovery" | "invite";
+      email: string;
+      options?: { redirectTo?: string };
+    }) => Promise<{ data: { properties?: { action_link?: string } } | null; error: { message: string } | null }>;
+  }).generateLink({
+    type: "recovery",
+    email: aud.email as string,
+    options: { redirectTo },
+  });
+  if (linkErr || !linkData?.properties?.action_link) {
+    throw new Error(linkErr?.message ?? "Failed to generate auditor invite link");
+  }
+  const actionLink = linkData.properties.action_link;
+
+  const subject = `You've been invited to view ${packageLabel}`;
+  const html = `
+    <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f1b3d">
+      <div style="border-bottom:2px solid #fed7aa;padding-bottom:12px;margin-bottom:20px">
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#9a3412">HIVE — State Audit Portal</div>
+        <div style="font-size:20px;font-weight:700;margin-top:4px">${escapeHtml(packageLabel)}</div>
+      </div>
+      <p>Hello ${escapeHtml((aud.full_name as string) ?? "auditor")},</p>
+      <p>${escapeHtml(orgName)} has released an audit package for your review:
+        <strong>${escapeHtml(packageLabel)}</strong>
+        (${escapeHtml(pkg.date_range_start as string)} → ${escapeHtml(pkg.date_range_end as string)}).</p>
+      <p>Click the button below to set your password and open the package directly. This is a
+        read-only auditor portal — it is separate from ${escapeHtml(orgName)}'s regular application.</p>
+      <p style="margin:28px 0">
+        <a href="${actionLink}"
+           style="display:inline-block;background:#0f1b3d;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600">
+          Set password & open audit package
+        </a>
+      </p>
+      <p style="color:#666;font-size:12px">If the button doesn't work, copy and paste this link into your browser:<br/>
+        <span style="word-break:break-all">${actionLink}</span>
+      </p>
+      <p style="color:#666;font-size:12px;margin-top:24px">
+        You received this because a HIVE-provisioned auditor account was created for
+        <strong>${escapeHtml(aud.email as string)}</strong>. If you did not expect this,
+        you can ignore this email.
+      </p>
+    </div>
+  `;
+
+  const { error: sendErr } = await supabase.functions.invoke("send-email", {
+    body: {
+      from: "HIVE State Audit <onboarding@resend.dev>",
+      to: aud.email,
+      subject,
+      html,
+    },
+  });
+  if (sendErr) throw new Error(sendErr.message);
+}
+
+function escapeHtml(s: string): string {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 export const revokeOrgAuditor = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

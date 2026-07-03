@@ -66,6 +66,21 @@ export const Route = createFileRoute("/dashboard")({
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user?.id) return;
 
+    // Realm mutual exclusion: auditor accounts can NEVER load /dashboard/*.
+    // They are a distinct account class (auditor_accounts row, no org
+    // membership). If somehow signed into the dashboard app, kick them
+    // out to the auditor portal.
+    const { data: auditor } = await supabase
+      .from("auditor_accounts")
+      .select("id, status")
+      .eq("user_id", session.user.id)
+      .eq("status", "active")
+      .maybeSingle();
+    if (auditor) {
+      throw redirect({ to: "/audit-portal" });
+    }
+
+
     // Resolve active org (matches use-org.ts contract).
     let activeOrgId: string | null = null;
     try { activeOrgId = window.localStorage.getItem("hive.activeOrgId"); } catch { /* ignore */ }

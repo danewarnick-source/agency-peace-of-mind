@@ -1577,6 +1577,7 @@ export type Database = {
       }
       certifications: {
         Row: {
+          certification_type_code: string | null
           course_id: string
           course_title: string | null
           created_at: string
@@ -1584,11 +1585,14 @@ export type Database = {
           id: string
           issued_at: string
           organization_id: string
+          origin: string | null
           recipient_name: string | null
+          requirement_id: string | null
           user_id: string
           verification_code: string
         }
         Insert: {
+          certification_type_code?: string | null
           course_id: string
           course_title?: string | null
           created_at?: string
@@ -1596,11 +1600,14 @@ export type Database = {
           id?: string
           issued_at?: string
           organization_id: string
+          origin?: string | null
           recipient_name?: string | null
+          requirement_id?: string | null
           user_id: string
           verification_code?: string
         }
         Update: {
+          certification_type_code?: string | null
           course_id?: string
           course_title?: string | null
           created_at?: string
@@ -1608,7 +1615,9 @@ export type Database = {
           id?: string
           issued_at?: string
           organization_id?: string
+          origin?: string | null
           recipient_name?: string | null
+          requirement_id?: string | null
           user_id?: string
           verification_code?: string
         }
@@ -1625,6 +1634,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certifications_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_requirements"
             referencedColumns: ["id"]
           },
         ]

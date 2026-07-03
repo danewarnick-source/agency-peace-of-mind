@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { ShieldCheck, LogOut, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 import { getAuditorContext, type AuditorContext } from "@/lib/audit-portal.functions";
 import { toast } from "sonner";
 
@@ -17,14 +18,26 @@ interface Props {
  * shows the org sidebar or nav.
  */
 export function AuditPortalShell({ children }: Props) {
+  const { session, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const ctxFn = useServerFn(getAuditorContext);
   const ctxQ = useQuery({
-    queryKey: ["auditor-context"],
+    queryKey: ["auditor-context", session?.user?.id ?? null],
     queryFn: () => ctxFn(),
     retry: false,
+    enabled: !!session?.user?.id,
   });
 
-  if (ctxQ.isLoading) {
+  // Realm mutual exclusion: a signed-in user with no active auditor account
+  // does NOT belong in the auditor portal — kick them to /dashboard.
+  useEffect(() => {
+    if (authLoading) return;
+    if (!session?.user?.id) return;
+    if (ctxQ.isLoading || ctxQ.isFetching) return;
+    if (!ctxQ.data) navigate({ to: "/dashboard", replace: true });
+  }, [authLoading, session?.user?.id, ctxQ.isLoading, ctxQ.isFetching, ctxQ.data, navigate]);
+
+  if (authLoading || (session?.user?.id && ctxQ.isLoading)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="text-sm text-muted-foreground">Loading auditor portal…</div>
@@ -33,7 +46,13 @@ export function AuditPortalShell({ children }: Props) {
   }
 
   const auditor = ctxQ.data ?? null;
-  if (!auditor) return <AuditorLoginPanel onSignedIn={() => ctxQ.refetch()} />;
+  if (!session?.user?.id) return <AuditorLoginPanel onSignedIn={() => ctxQ.refetch()} />;
+  if (!auditor) {
+    // Signed in but not an auditor — redirect in progress; render nothing.
+    return null;
+  }
+
+
 
   return (
     <div className="min-h-screen bg-slate-50">

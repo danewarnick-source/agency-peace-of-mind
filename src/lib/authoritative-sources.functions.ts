@@ -1285,7 +1285,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       // distinct HIVE ticket. Re-clicking Draft retries.
       if (chunkFailures.length > 0) {
         await reportPlatformEvent({
-          eventKind: "extractor_incomplete",
+          eventKind: "ai_error",
           organizationId: doc.organization_id as string,
           organizationName: orgName,
           title: `Extractor couldn't finish "${(doc.title as string) ?? doc.file_name}"`,
@@ -1335,7 +1335,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
 
     if (chunkFailures.length > 0) {
       await reportPlatformEvent({
-        eventKind: "extractor_incomplete",
+        eventKind: "ai_error",
         organizationId: doc.organization_id as string,
         organizationName: orgName,
         title: `Partial extract on "${(doc.title as string) ?? doc.file_name}"`,

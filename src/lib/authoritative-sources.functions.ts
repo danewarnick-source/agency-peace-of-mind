@@ -1454,13 +1454,20 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
       throw new Error(`Draft job's document could not be loaded: ${docErr.message}`);
     }
     if (!doc) {
+      await supabase
+        .from("nectar_draft_jobs")
+        .update({
+          status: "failed",
+          error_message: "Source document was deleted; draft job cancelled.",
+        })
+        .eq("id", data.jobId);
       console.error("[finalizeRequirementsDraft] doc missing", {
         jobId: data.jobId,
         documentId: job.document_id,
         orgId: job.organization_id,
         userId,
       });
-      throw new Error("Draft job's document is missing (id=" + String(job.document_id) + ")");
+      throw new Error("Draft job's source document was deleted; the job has been cancelled.");
     }
     const rawText = ((doc.raw_text as string | null) ?? "").trim();
 

@@ -63,7 +63,6 @@ import {
   listAuthoritativeSources,
   markAsAuthoritativeSource,
   listRequirements,
-  generateRequirementsFromSource,
   startRequirementsDraft,
   processDraftChunk,
   finalizeRequirementsDraft,

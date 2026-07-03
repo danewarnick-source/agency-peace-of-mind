@@ -501,3 +501,121 @@ function AuditorGrantPicker({ available, onGrant }: {
     </div>
   );
 }
+
+// ============================================================
+// Provisioned Auditors (org admin — invisible to auditor)
+// ============================================================
+
+function ProvisionedAuditorsSection({ orgId }: { orgId: string }) {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listOrgAuditors);
+  const provisionFn = useServerFn(provisionOrgAuditor);
+  const revokeFn = useServerFn(revokeOrgAuditor);
+
+  const listQ = useQuery({
+    queryKey: ["org-auditors", orgId],
+    queryFn: () => listFn({ data: { organizationId: orgId } }),
+  });
+
+  const provisionMut = useMutation({
+    mutationFn: (v: { email: string; fullName: string; agencyName: string }) =>
+      provisionFn({ data: { organizationId: orgId, ...v } }),
+    onSuccess: () => {
+      toast.success("Auditor invited — set-password email sent");
+      qc.invalidateQueries({ queryKey: ["org-auditors", orgId] });
+      qc.invalidateQueries({ queryKey: ["state-audit-package-detail"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
+  const revokeMut = useMutation({
+    mutationFn: (auditorAccountId: string) =>
+      revokeFn({ data: { organizationId: orgId, auditorAccountId } }),
+    onSuccess: () => {
+      toast.success("Auditor revoked");
+      qc.invalidateQueries({ queryKey: ["org-auditors", orgId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
+
+  const rows = listQ.data ?? [];
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center gap-2">
+        <UserPlus className="h-4 w-4 text-[#0f1b3d]" />
+        <h4 className="font-display text-sm font-semibold text-[#0f1b3d]">Provisioned auditors</h4>
+      </div>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Create an auditor account for a named state worker. Supabase sends them an
+        invite email so they set their own password — you never enter or store it.
+      </p>
+
+      <ProvisionForm onSubmit={(v) => provisionMut.mutate(v)} busy={provisionMut.isPending} />
+
+      <ul className="mt-3 space-y-1">
+        {listQ.isLoading ? (
+          <li className="text-xs text-muted-foreground">Loading…</li>
+        ) : rows.length === 0 ? (
+          <li className="rounded-md border border-dashed border-slate-300 p-3 text-center text-xs text-muted-foreground">
+            No auditors provisioned yet.
+          </li>
+        ) : (
+          rows.map((a) => <AuditorRow key={a.id} auditor={a} onRevoke={() => revokeMut.mutate(a.id)} />)
+        )}
+      </ul>
+    </section>
+  );
+}
+
+function ProvisionForm({ onSubmit, busy }: {
+  onSubmit: (v: { email: string; fullName: string; agencyName: string }) => void;
+  busy: boolean;
+}) {
+  const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [agencyName, setAgencyName] = useState("Utah DSPD");
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit({ email: email.trim(), fullName: fullName.trim(), agencyName: agencyName.trim() });
+        setEmail(""); setFullName("");
+      }}
+      className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 md:grid-cols-[1fr_1fr_1fr_auto]"
+    >
+      <input value={fullName} onChange={(e) => setFullName(e.target.value)} required placeholder="Full name"
+        className="min-h-[40px] rounded-md border border-slate-300 px-2 text-sm" />
+      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="Email"
+        className="min-h-[40px] rounded-md border border-slate-300 px-2 text-sm" />
+      <input value={agencyName} onChange={(e) => setAgencyName(e.target.value)} required placeholder="Agency name"
+        className="min-h-[40px] rounded-md border border-slate-300 px-2 text-sm" />
+      <button type="submit" disabled={busy}
+        className="inline-flex min-h-[40px] items-center justify-center gap-1 rounded-md bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
+        <Mail className="h-4 w-4" /> {busy ? "Inviting…" : "Create access"}
+      </button>
+    </form>
+  );
+}
+
+function AuditorRow({ auditor, onRevoke }: { auditor: OrgAuditorRow; onRevoke: () => void }) {
+  return (
+    <li className="flex items-center justify-between rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+      <div>
+        <div className="font-medium text-[#0f1b3d]">
+          {auditor.full_name}{" "}
+          <span className={`ml-1 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase ${
+            auditor.status === "active" ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-600"
+          }`}>{auditor.status}</span>
+        </div>
+        <div className="text-xs text-muted-foreground">
+          {auditor.email} · {auditor.agency_name} · {auditor.package_access_count} active package{auditor.package_access_count === 1 ? "" : "s"}
+        </div>
+      </div>
+      {auditor.status === "active" && (
+        <button onClick={onRevoke} className="text-xs font-medium text-red-600 hover:text-red-800">
+          Revoke
+        </button>
+      )}
+    </li>
+  );
+}

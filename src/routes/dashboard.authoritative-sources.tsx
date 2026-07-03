@@ -64,7 +64,7 @@ import {
   markAsAuthoritativeSource,
   listRequirements,
   generateRequirementsFromSource,
-  rebuildRequirementsForOrg,
+  wipeRequirementsForOrgRebuild,
   upsertRequirement,
 
   setRequirementReviewStatus,
@@ -4297,29 +4297,90 @@ function RebuildDemoRequirementsButton({ orgId }: { orgId: string }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
-  const rebuildFn = useServerFn(rebuildRequirementsForOrg);
-  const rebuild = useMutation({
-    mutationFn: () =>
-      rebuildFn({ data: { organizationId: orgId, confirm: "REBUILD" as const } }),
-    onSuccess: (r) => {
-      qc.invalidateQueries({ queryKey: ["requirements", orgId] });
-      qc.invalidateQueries({ queryKey: ["req-mappings-all", orgId] });
-      toast.success(
-        `Rebuilt from ${r.documentsProcessed}/${r.eligibleCount} sources · ${r.totalInserted} requirements inserted${
-          r.failures.length ? ` · ${r.failures.length} failed` : ""
-        }`,
-      );
-      setOpen(false);
-      setTyped("");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
+  const [phase, setPhase] = useState<"idle" | "wiping" | "extracting" | "done">("idle");
+  const [docs, setDocs] = useState<Array<{ id: string; title: string }>>([]);
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [inserted, setInserted] = useState(0);
+  const [failures, setFailures] = useState<Array<{ title: string; error: string }>>([]);
+  const cancelRef = useRef(false);
+
+  const wipeFn = useServerFn(wipeRequirementsForOrgRebuild);
+  const extractFn = useServerFn(generateRequirementsFromSource);
 
   if (orgId !== TNS_FAKE_ORG_ID) return null;
   if (role !== "admin" && role !== "super_admin") return null;
 
+  const running = phase === "wiping" || phase === "extracting";
+  const total = docs.length;
+
+  function resetState() {
+    setPhase("idle");
+    setDocs([]);
+    setCurrentIdx(0);
+    setInserted(0);
+    setFailures([]);
+    setTyped("");
+    cancelRef.current = false;
+  }
+
+  async function run() {
+    cancelRef.current = false;
+    setPhase("wiping");
+    setInserted(0);
+    setFailures([]);
+    setCurrentIdx(0);
+    try {
+      const wipeRes = await wipeFn({
+        data: { organizationId: orgId, confirm: "REBUILD" as const },
+      });
+      const list = wipeRes.documents ?? [];
+      setDocs(list);
+      qc.invalidateQueries({ queryKey: ["requirements", orgId] });
+      setPhase("extracting");
+      let insCount = 0;
+      const fails: Array<{ title: string; error: string }> = [];
+      for (let i = 0; i < list.length; i++) {
+        if (cancelRef.current) break;
+        setCurrentIdx(i);
+        const doc = list[i];
+        try {
+          const r = (await extractFn({ data: { documentId: doc.id } })) as {
+            inserted?: number;
+          };
+          insCount += typeof r?.inserted === "number" ? r.inserted : 0;
+          setInserted(insCount);
+        } catch (e) {
+          fails.push({ title: doc.title, error: (e as Error).message ?? "unknown" });
+          setFailures([...fails]);
+        }
+      }
+      setCurrentIdx(list.length);
+      setPhase("done");
+      qc.invalidateQueries({ queryKey: ["requirements", orgId] });
+      qc.invalidateQueries({ queryKey: ["req-mappings-all", orgId] });
+      toast.success(
+        `Rebuilt from ${list.length - fails.length}/${list.length} sources · ${insCount} requirements inserted${
+          fails.length ? ` · ${fails.length} failed` : ""
+        }`,
+      );
+    } catch (e) {
+      toast.error((e as Error).message);
+      setPhase("idle");
+    }
+  }
+
+  const currentDoc = docs[Math.min(currentIdx, docs.length - 1)];
+  const pct = total > 0 ? Math.round((currentIdx / total) * 100) : 0;
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (running) return; // don't allow closing mid-run
+        setOpen(v);
+        if (!v) resetState();
+      }}
+    >
       <DialogTrigger asChild>
         <Button
           size="sm"
@@ -4335,42 +4396,101 @@ function RebuildDemoRequirementsButton({ orgId }: { orgId: string }) {
           <DialogTitle>Rebuild requirements from sources</DialogTitle>
           <DialogDescription>
             This deletes every requirement in the TNS FAKE workspace and
-            re-runs NECTAR extraction against each active authoritative source.
-            Authorized codes and source documents are preserved. This action
-            cannot be undone.
+            re-runs NECTAR extraction against each active authoritative
+            source, one at a time. Authorized codes and source documents are
+            preserved. This action cannot be undone.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">
-            Type <span className="font-mono font-semibold">REBUILD</span> to confirm.
-          </p>
-          <Input
-            value={typed}
-            onChange={(e) => setTyped(e.target.value)}
-            placeholder="REBUILD"
-            autoFocus
-          />
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)} disabled={rebuild.isPending}>
-            Cancel
-          </Button>
-          <Button
-            variant="destructive"
-            disabled={typed !== "REBUILD" || rebuild.isPending}
-            onClick={() => rebuild.mutate()}
-          >
-            {rebuild.isPending ? (
-              <>
-                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                Rebuilding…
-              </>
-            ) : (
-              "Delete and re-extract"
+
+        {phase === "idle" && (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Type <span className="font-mono font-semibold">REBUILD</span> to confirm.
+            </p>
+            <Input
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              placeholder="REBUILD"
+              autoFocus
+            />
+          </div>
+        )}
+
+        {phase !== "idle" && (
+          <div className="space-y-2 text-xs">
+            {phase === "wiping" && (
+              <p className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Deleting existing requirements…
+              </p>
             )}
-          </Button>
+            {phase === "extracting" && (
+              <>
+                <p className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Extracting {currentIdx + 1} of {total}
+                  {currentDoc ? ` — ${currentDoc.title}` : ""}
+                </p>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full bg-primary transition-all"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {inserted} requirements inserted so far
+                  {failures.length ? ` · ${failures.length} failed` : ""}
+                </p>
+              </>
+            )}
+            {phase === "done" && (
+              <>
+                <p className="font-medium text-foreground">
+                  Done — {inserted} requirements inserted from{" "}
+                  {total - failures.length}/{total} sources.
+                </p>
+                {failures.length > 0 && (
+                  <div className="max-h-32 space-y-1 overflow-y-auto rounded border border-amber-500/30 bg-amber-500/10 p-2 text-amber-900 dark:text-amber-200">
+                    {failures.map((f, i) => (
+                      <div key={i}>
+                        <span className="font-medium">{f.title}:</span> {f.error}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        <DialogFooter>
+          {phase === "idle" && (
+            <>
+              <Button variant="outline" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={typed !== "REBUILD"}
+                onClick={() => void run()}
+              >
+                Delete and re-extract
+              </Button>
+            </>
+          )}
+          {phase === "done" && (
+            <Button
+              onClick={() => {
+                setOpen(false);
+                resetState();
+              }}
+            >
+              Done
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+

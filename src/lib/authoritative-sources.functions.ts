@@ -1360,7 +1360,7 @@ REQUIREMENT TEXT: ${req.description ?? "(no extended text — restate the title 
 // misclick can never wipe another workspace. Admin/super_admin only.
 const TNS_FAKE_ORG_ID = "7fabcf5d-f826-487f-8730-8b0c3f1969bb";
 
-export const rebuildRequirementsForOrg = createServerFn({ method: "POST" })
+export const wipeRequirementsForOrgRebuild = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
     z
@@ -1386,59 +1386,34 @@ export const rebuildRequirementsForOrg = createServerFn({ method: "POST" })
       throw new Error("Admin or super-admin only.");
     }
 
-    // Wipe existing requirements for this org only. Uses a SECURITY DEFINER
-    // helper that temporarily suspends triggers so it can also clear the
-    // append-only nectar_requirement_approval_events rows tied to those
-    // requirements (which would otherwise block the cascade delete).
+    // Fast wipe (append-only trigger handled inside the SECURITY DEFINER RPC).
     const { error: delErr } = await supabase.rpc(
       "rebuild_wipe_requirements_tns_fake",
     );
     if (delErr) throw new Error(`Delete failed: ${delErr.message}`);
 
-    // Enumerate eligible authoritative sources (not ignored, obligation-bearing).
     const { data: sources, error: sErr } = await supabase
       .from("nectar_documents")
-      .select("id, authoritative_kind, metadata")
+      .select("id, title, file_name, authoritative_kind, metadata")
       .eq("organization_id", data.organizationId)
       .eq("is_authoritative_source", true);
     if (sErr) throw new Error(`Source list failed: ${sErr.message}`);
 
-    const eligible = (sources ?? []).filter((s) => {
-      const kind = (s.authoritative_kind as string | null) ?? "";
-      if (NON_OBLIGATION_KINDS.has(kind)) return false;
-      const meta = (s.metadata ?? {}) as { ignored?: boolean };
-      if (meta.ignored) return false;
-      return true;
-    });
+    const documents = (sources ?? [])
+      .filter((s) => {
+        const kind = (s.authoritative_kind as string | null) ?? "";
+        if (NON_OBLIGATION_KINDS.has(kind)) return false;
+        const meta = (s.metadata ?? {}) as { ignored?: boolean };
+        if (meta.ignored) return false;
+        return true;
+      })
+      .map((s) => ({
+        id: s.id as string,
+        title:
+          ((s.title as string | null) ?? (s.file_name as string | null)) ||
+          "Untitled source",
+      }));
 
-    let documentsProcessed = 0;
-    let totalInserted = 0;
-    const failures: Array<{ documentId: string; error: string }> = [];
-
-    for (const src of eligible) {
-      try {
-        const result = await generateRequirementsFromSource({
-          data: { documentId: src.id as string },
-        });
-        documentsProcessed += 1;
-        const ins =
-          typeof (result as { inserted?: unknown })?.inserted === "number"
-            ? (result as { inserted: number }).inserted
-            : 0;
-        totalInserted += ins;
-      } catch (e) {
-        failures.push({
-          documentId: src.id as string,
-          error: (e as Error).message ?? "unknown",
-        });
-      }
-    }
-
-    return {
-      ok: true as const,
-      documentsProcessed,
-      totalInserted,
-      eligibleCount: eligible.length,
-      failures,
-    };
+    return { ok: true as const, documents };
   });
+

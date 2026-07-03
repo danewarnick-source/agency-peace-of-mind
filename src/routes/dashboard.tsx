@@ -449,6 +449,7 @@ function DashboardLayout() {
               >
                 <ListChecks className="h-3.5 w-3.5 text-[#f4a93a]" /> <span className="hidden md:inline">Guide me</span>
               </button>
+              {isAdminCapable && effectiveView === "admin" && <DraftJobsHeaderPill />}
               {isAdminCapable && effectiveView === "admin" && <NotificationBell />}
               <Button onClick={signOut} variant="ghost" size="sm" className="md:hidden">
                 <LogOut className="h-4 w-4" />

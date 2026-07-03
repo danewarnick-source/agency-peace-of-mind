@@ -1215,38 +1215,6 @@ export const listAttestations = createServerFn({ method: "POST" })
 
 export const REDUCED_LIABILITY_NOTICE = `The documents, checklists, and data shown here are generated from materials you uploaded (including your contracts and State Scope of Work) and from information entered by your staff. HIVE/NECTAR organizes and surfaces this information but does not independently verify its accuracy or guarantee compliance with State requirements. You are strongly encouraged to review all forms and documents for accuracy. By proceeding, you confirm you have reviewed this information and accept responsibility for its accuracy and for your submissions to the State.`;
 
-// ---------- NECTAR plain-language explanation (aid to comprehension only) ----------
-// LEGAL_REVIEW: nectar-explain-requirement-disclaimer
-const EXPLAIN_SYSTEM_PROMPT = `You are NECTAR. Your job is to RESTATE a compliance requirement in plain, everyday English so a busy provider-admin can understand what it is saying.
-
-STRICT RULES:
-- You are NOT giving legal, compliance, or audit advice.
-- You DO NOT tell the reader whether they are compliant, whether the rule applies to them, or what they "must" do beyond what the source already says.
-- You DO NOT add obligations, deadlines, dollar figures, or specifics that are not in the source text.
-- You stay close to the source. If the source is vague, your restatement is vague.
-- If you cannot confidently restate it without inventing meaning, say so.
-
-Return STRICT JSON only:
-{
-  "plain_language": "2-5 short sentences restating the requirement in plain English. No bullet points. No headings.",
-  "key_terms": [
-    { "term": "string from the source", "plain": "short plain-English gloss" }
-  ],
-  "confidence": "high" | "medium" | "low",
-  "caveat": "one short sentence noting any ambiguity or what the reader should double-check in the source"
-}
-
-key_terms is at most 4 items. Only include terms that actually appear in the requirement text and are likely unfamiliar to a non-lawyer.`;
-
-const ExplainResp = z.object({
-  plain_language: z.string().max(2000),
-  key_terms: z
-    .array(z.object({ term: z.string().max(120), plain: z.string().max(400) }))
-    .max(6)
-    .default([]),
-  confidence: z.enum(["high", "medium", "low"]).default("medium"),
-  caveat: z.string().max(400).optional().nullable(),
-});
 
 export const explainRequirement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

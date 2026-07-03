@@ -831,8 +831,7 @@ export const runInternalAudit = createServerFn({ method: "POST" })
 
       const inScopeCount = inScopeReqs.length;
       const dormantCount = Math.max(0, reqById.size - inScopeCount);
-      // Expose scope counters on the outer scope so the summary can return them.
-      (findings as unknown as { __reqCounts?: unknown }).__reqCounts = {
+      reqScopeCounts = {
         inScopeCount,
         dormantCount,
         autoSatisfiedCount,

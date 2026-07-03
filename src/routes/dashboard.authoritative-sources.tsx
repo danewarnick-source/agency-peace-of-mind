@@ -64,7 +64,7 @@ import {
   markAsAuthoritativeSource,
   listRequirements,
   generateRequirementsFromSource,
-  rebuildRequirementsForOrg,
+  wipeRequirementsForOrgRebuild,
   upsertRequirement,
 
   setRequirementReviewStatus,

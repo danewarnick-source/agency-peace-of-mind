@@ -99,6 +99,9 @@ import {
 import {
   listBindings,
   setBinding,
+  listFormsForRequirement,
+  linkFormToRequirement,
+  createFormForRequirement,
 } from "@/lib/requirement-bindings.functions";
 
 
@@ -3765,23 +3768,31 @@ function RequirementBindingEditor({ requirementId }: { requirementId: string }) 
     }
   }, [current?.id, current?.satisfied_by, current?.native_feature, current?.engine_ref]);
 
+  const linkFn = useServerFn(linkFormToRequirement);
+
   const save = useMutation({
-    mutationFn: (vars: {
+    mutationFn: async (vars: {
       satisfied_by: SatisfiedBy;
       native_feature?: string | null;
       engine_ref?: string | null;
-    }) =>
-      setFn({
+    }) => {
+      // Form binding: link + stamp the form (also writes the binding row).
+      if (vars.satisfied_by === "form" && vars.engine_ref) {
+        return linkFn({ data: { requirementId, formId: vars.engine_ref } });
+      }
+      return setFn({
         data: {
           requirementId,
           satisfied_by: vars.satisfied_by,
           native_feature: vars.native_feature ?? null,
           engine_ref: vars.engine_ref ?? null,
         },
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success("Binding saved");
       qc.invalidateQueries({ queryKey: ["requirement-binding", requirementId] });
+      qc.invalidateQueries({ queryKey: ["requirement-forms", requirementId] });
     },
     onError: (e: unknown) =>
       toast.error(e instanceof Error ? e.message : "Failed to save binding"),
@@ -3854,7 +3865,13 @@ function RequirementBindingEditor({ requirementId }: { requirementId: string }) 
           </div>
         )}
 
-        {showEngine && (
+        {showEngine && satisfiedBy === "form" ? (
+          <FormPickerForRequirement
+            requirementId={requirementId}
+            engineRef={engineRef}
+            setEngineRef={setEngineRef}
+          />
+        ) : showEngine ? (
           <div className="min-w-[220px] flex-1">
             <Label className="text-[10px] text-muted-foreground">{engineLabel}</Label>
             <Input
@@ -3864,7 +3881,7 @@ function RequirementBindingEditor({ requirementId }: { requirementId: string }) 
               className="h-8 text-xs"
             />
           </div>
-        )}
+        ) : null}
 
         <Button
           size="sm"
@@ -3886,3 +3903,109 @@ function RequirementBindingEditor({ requirementId }: { requirementId: string }) 
   );
 }
 
+
+function FormPickerForRequirement({
+  requirementId,
+  engineRef,
+  setEngineRef,
+}: {
+  requirementId: string;
+  engineRef: string;
+  setEngineRef: (v: string) => void;
+}) {
+  const listFormsFn = useServerFn(listFormsForRequirement);
+  const createFn = useServerFn(createFormForRequirement);
+  const linkFn = useServerFn(linkFormToRequirement);
+  const qc = useQueryClient();
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+
+  const q = useQuery({
+    queryKey: ["requirement-forms", requirementId],
+    queryFn: () => listFormsFn({ data: { requirementId } }),
+  });
+
+  const forms = (q.data?.forms ?? []) as Array<{
+    id: string;
+    name: string;
+    status: string | null;
+    requirement_id: string | null;
+    managed_by_requirement: boolean | null;
+  }>;
+
+  const create = useMutation({
+    mutationFn: async () => {
+      const { formId } = await createFn({
+        data: { requirementId, name: newName.trim() || "New requirement form" },
+      });
+      await linkFn({ data: { requirementId, formId } });
+      return formId;
+    },
+    onSuccess: (formId) => {
+      toast.success("Form created and linked");
+      setEngineRef(formId);
+      setCreating(false);
+      setNewName("");
+      qc.invalidateQueries({ queryKey: ["requirement-forms", requirementId] });
+      qc.invalidateQueries({ queryKey: ["requirement-binding", requirementId] });
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Failed to create form"),
+  });
+
+  return (
+    <div className="min-w-[240px] flex-1 space-y-1.5">
+      <Label className="text-[10px] text-muted-foreground">Form</Label>
+      <div className="flex items-center gap-2">
+        <Select value={engineRef} onValueChange={(v) => setEngineRef(v)}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue placeholder={q.isLoading ? "Loading…" : "Pick a form…"} />
+          </SelectTrigger>
+          <SelectContent>
+            {forms.length === 0 && (
+              <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                No forms yet — create one.
+              </div>
+            )}
+            {forms.map((f) => (
+              <SelectItem key={f.id} value={f.id} className="text-xs">
+                {f.name}
+                {f.requirement_id && f.requirement_id !== requirementId ? " (linked elsewhere)" : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-8"
+          onClick={() => setCreating((v) => !v)}
+        >
+          {creating ? "Cancel" : "New"}
+        </Button>
+      </div>
+      {creating && (
+        <div className="flex items-center gap-2">
+          <Input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Form name"
+            className="h-8 text-xs"
+            maxLength={160}
+          />
+          <Button
+            type="button"
+            size="sm"
+            className="h-8"
+            disabled={create.isPending || !newName.trim()}
+            onClick={() => create.mutate()}
+          >
+            {create.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+            Create + link
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { HubShell } from "@/components/admin-hubs/hub-shell";
-import { AuthoritativeSourcesPage } from "./dashboard.authoritative-sources";
-import { NectarDocsPage } from "./dashboard.nectar-docs";
-import { ExternalCompliancePage } from "./dashboard.external-compliance";
+import { AuthoritativeSourcesPage } from "@/components/pages/authoritative-sources-page";
+import { NectarDocsPage } from "@/components/pages/nectar-docs-page";
+import { ExternalCompliancePage } from "@/components/pages/external-compliance-page";
 
 const search = z.object({ tab: z.enum(["sources", "docs", "external"]).optional() });
 

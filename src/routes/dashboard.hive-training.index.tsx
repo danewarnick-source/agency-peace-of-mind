@@ -21,6 +21,8 @@ import {
 import { z } from "zod";
 import { useEntitlements } from "@/hooks/use-entitlements";
 import { FeatureLocked } from "@/components/feature-locked";
+import { useFeatureEnabled } from "@/hooks/use-feature-enabled";
+import { FeatureLockedRoute } from "@/components/upgrade-gate";
 
 const searchSchema = z.object({
   checkout: z.enum(["success", "cancelled"]).optional(),

@@ -513,7 +513,7 @@ function AuditorGrantPicker({ available, onGrant }: {
 // Provisioned Auditors (org admin — invisible to auditor)
 // ============================================================
 
-function ProvisionedAuditorsSection({ orgId }: { orgId: string }) {
+function ProvisionedAuditorsSection({ orgId, auditPackageId }: { orgId: string; auditPackageId: string }) {
   const qc = useQueryClient();
   const listFn = useServerFn(listOrgAuditors);
   const provisionFn = useServerFn(provisionOrgAuditor);
@@ -526,11 +526,17 @@ function ProvisionedAuditorsSection({ orgId }: { orgId: string }) {
 
   const provisionMut = useMutation({
     mutationFn: (v: { email: string; fullName: string; agencyName: string }) =>
-      provisionFn({ data: { organizationId: orgId, ...v } }),
+      provisionFn({ data: {
+        organizationId: orgId,
+        auditPackageId,
+        siteOrigin: typeof window !== "undefined" ? window.location.origin : "",
+        ...v,
+      } }),
     onSuccess: () => {
-      toast.success("Auditor invited — set-password email sent");
+      toast.success("Auditor invited — package-specific email sent");
       qc.invalidateQueries({ queryKey: ["org-auditors", orgId] });
-      qc.invalidateQueries({ queryKey: ["state-audit-package-detail"] });
+      qc.invalidateQueries({ queryKey: ["state-audit-package-detail", auditPackageId] });
+      qc.invalidateQueries({ queryKey: ["state-audit-packages", orgId] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
@@ -550,16 +556,18 @@ function ProvisionedAuditorsSection({ orgId }: { orgId: string }) {
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center gap-2">
         <UserPlus className="h-4 w-4 text-[#0f1b3d]" />
-        <h4 className="font-display text-sm font-semibold text-[#0f1b3d]">Provisioned auditors</h4>
+        <h4 className="font-display text-sm font-semibold text-[#0f1b3d]">Invite a new auditor to this package</h4>
       </div>
       <p className="mb-3 text-xs text-muted-foreground">
-        Create an auditor account for a named state worker. Supabase sends them an
-        invite email so they set their own password — you never enter or store it.
+        Creates a separate auditor account (not an org member). The invite email
+        names this specific package, and the accept link lands them directly on
+        the package page — never the HIVE app.
       </p>
 
       <ProvisionForm onSubmit={(v) => provisionMut.mutate(v)} busy={provisionMut.isPending} />
 
-      <ul className="mt-3 space-y-1">
+      <div className="mt-4 mb-2 text-xs font-semibold uppercase text-muted-foreground">All provisioned auditors</div>
+      <ul className="mt-1 space-y-1">
         {listQ.isLoading ? (
           <li className="text-xs text-muted-foreground">Loading…</li>
         ) : rows.length === 0 ? (

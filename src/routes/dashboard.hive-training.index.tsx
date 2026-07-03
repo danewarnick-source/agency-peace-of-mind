@@ -21,6 +21,8 @@ import {
 import { z } from "zod";
 import { useEntitlements } from "@/hooks/use-entitlements";
 import { FeatureLocked } from "@/components/feature-locked";
+import { useFeatureEnabled } from "@/hooks/use-feature-enabled";
+import { FeatureLockedRoute } from "@/components/upgrade-gate";
 
 const searchSchema = z.object({
   checkout: z.enum(["success", "cancelled"]).optional(),
@@ -64,6 +66,7 @@ function HiveTrainingHub() {
   const search = useSearch({ from: Route.id });
   const { view, hydrated } = usePortalView();
   const { hasAddon, loading: entLoading } = useEntitlements();
+  const featureOn = useFeatureEnabled("hive_training");
 
   useEffect(() => {
     if (search.checkout === "success") toast.success("Payment received. Seats/assignments will appear shortly.");
@@ -78,6 +81,12 @@ function HiveTrainingHub() {
     );
   }
 
+  // Master Controller (org-level toggle) — same gate as the nav bubble.
+  if (!featureOn) {
+    return <FeatureLockedRoute featureKey="hive_training" />;
+  }
+
+  // Legacy paid add-on entitlement — separate gate for tier-locked access.
   if (!hasAddon("hive_training")) {
     return <FeatureLocked featureName="HIVE Training" />;
   }

@@ -5254,8 +5254,10 @@ export type Database = {
           id: string
           label: string
           parent_key: string | null
+          required_tier: string | null
           sort_order: number
           updated_at: string
+          upgrade_blurb: string | null
         }
         Insert: {
           category?: string
@@ -5266,8 +5268,10 @@ export type Database = {
           id?: string
           label: string
           parent_key?: string | null
+          required_tier?: string | null
           sort_order?: number
           updated_at?: string
+          upgrade_blurb?: string | null
         }
         Update: {
           category?: string
@@ -5278,8 +5282,10 @@ export type Database = {
           id?: string
           label?: string
           parent_key?: string | null
+          required_tier?: string | null
           sort_order?: number
           updated_at?: string
+          upgrade_blurb?: string | null
         }
         Relationships: [
           {
@@ -5288,6 +5294,53 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "feature_registry"
             referencedColumns: ["feature_key"]
+          },
+        ]
+      }
+      feature_upgrade_requests: {
+        Row: {
+          created_at: string
+          feature_key: string
+          id: string
+          note: string | null
+          organization_id: string
+          requested_by: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          feature_key: string
+          id?: string
+          note?: string | null
+          organization_id: string
+          requested_by: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          feature_key?: string
+          id?: string
+          note?: string | null
+          organization_id?: string
+          requested_by?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feature_upgrade_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }

@@ -26,6 +26,8 @@ export interface FeatureRegistryRow {
   category: "tab" | "subtab" | "nectar_feature";
   default_enabled: boolean;
   sort_order: number;
+  required_tier: string | null;
+  upgrade_blurb: string | null;
 }
 
 export interface OrgFeatureRow {
@@ -87,7 +89,7 @@ export const getOrgFeatureBundle = createServerFn({ method: "GET" })
 
     const { data: registry } = await supabase
       .from("feature_registry")
-      .select("id, feature_key, label, description, parent_key, category, default_enabled, sort_order")
+      .select("id, feature_key, label, description, parent_key, category, default_enabled, sort_order, required_tier, upgrade_blurb")
       .order("sort_order");
 
     const { data: overrides } = await supabase
@@ -106,7 +108,7 @@ export const getOrgFeatureBundle = createServerFn({ method: "GET" })
  */
 export const getMyOrgFeatures = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<{ organization_id: string | null; effective: Record<string, boolean> }> => {
+  .handler(async ({ context }): Promise<{ organization_id: string | null; effective: Record<string, boolean>; registry: FeatureRegistryRow[] }> => {
     const { supabase, userId } = context;
 
     const { data: memberships } = await supabase
@@ -122,7 +124,7 @@ export const getMyOrgFeatures = createServerFn({ method: "GET" })
 
     const { data: registry } = await supabase
       .from("feature_registry")
-      .select("id, feature_key, label, description, parent_key, category, default_enabled, sort_order")
+      .select("id, feature_key, label, description, parent_key, category, default_enabled, sort_order, required_tier, upgrade_blurb")
       .order("sort_order");
     const reg = (registry ?? []) as FeatureRegistryRow[];
 
@@ -130,6 +132,7 @@ export const getMyOrgFeatures = createServerFn({ method: "GET" })
       return {
         organization_id: null,
         effective: Object.fromEntries(reg.map((r) => [r.feature_key, r.default_enabled])),
+        registry: reg,
       };
     }
 
@@ -141,7 +144,39 @@ export const getMyOrgFeatures = createServerFn({ method: "GET" })
     return {
       organization_id: primary.organization_id,
       effective: resolveEffective(reg, (overrides ?? []) as OrgFeatureRow[]),
+      registry: reg,
     };
+  });
+
+export const requestFeatureUpgrade = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      organizationId: z.string().uuid(),
+      featureKey: z.string().min(1),
+      note: z.string().max(500).optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }): Promise<{ ok: true; id: string }> => {
+    const { supabase, userId } = context;
+    const { data: row, error } = await (supabase as unknown as {
+      from: (t: string) => {
+        insert: (v: Record<string, unknown>) => {
+          select: (c: string) => { single: () => Promise<{ data: { id: string } | null; error: unknown }> };
+        };
+      };
+    })
+      .from("feature_upgrade_requests")
+      .insert({
+        organization_id: data.organizationId,
+        feature_key: data.featureKey,
+        requested_by: userId,
+        note: data.note ?? null,
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    return { ok: true, id: row!.id };
   });
 
 export const setOrgFeature = createServerFn({ method: "POST" })

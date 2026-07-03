@@ -24,6 +24,7 @@ import { StaffMobilePreviewFrame } from "@/components/staff-mobile/staff-mobile-
 import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";
 import { NectarSearchBar } from "@/components/nectar/nectar-search-bar";
 import { ListChecks } from "lucide-react";
+import { UpgradeGate } from "@/components/upgrade-gate";
 import { OrgSwitcher, DemoBadge, DemoOrgBanner } from "@/components/org-switcher";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -108,7 +109,7 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 import type { Permission } from "@/lib/rbac";
-type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean; perm?: Permission; feature?: string };
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean; perm?: Permission; feature?: string; isLocked?: boolean };
 
 const STAFF_NAV: NavItem[] = [
   { to: "/dashboard", label: "My Caseload", icon: LayoutDashboard, exact: true },
@@ -261,10 +262,10 @@ function DashboardLayout() {
   const { isEnabled: isFeatureOn } = useOrgFeatures();
   const nav: NavItem[] = baseNav
     .filter((n) => !n.perm || can(n.perm) || role === "admin" || role === "super_admin")
-    // Master-Controller gating: hide any nav item whose feature is toggled OFF for this org.
-    .filter((n) => isFeatureOn(n.feature))
     // Legacy add-on tier gate still applies to HIVE Training (paid entitlement).
-    .filter((n) => hiveTrainingEntitled || n.to !== "/dashboard/hive-training");
+    .filter((n) => hiveTrainingEntitled || n.to !== "/dashboard/hive-training")
+    // Master-Controller gating: keep item visible; mark isLocked when feature is OFF.
+    .map((n) => ({ ...n, isLocked: n.feature ? !isFeatureOn(n.feature) : false }));
 
 
   // Load states for the State portal dropdown (executives only).
@@ -581,6 +582,7 @@ function SidebarBody({
   onNavigate,
   inboxUnread,
 }: SidebarBodyProps) {
+  const [upgradeFeatureKey, setUpgradeFeatureKey] = useState<string | null>(null);
   return (
     <>
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6 font-display text-lg font-bold tracking-tight">
@@ -711,6 +713,25 @@ function SidebarBody({
           const Icon = item.icon;
           const slug = item.to.replace(/^\/dashboard\/?/, "") || "home";
           const isNectar = item.label === "NECTAR";
+          const locked = !!item.isLocked;
+
+          if (locked) {
+            return (
+              <button
+                key={item.to}
+                type="button"
+                data-tour={`nav.${slug}`}
+                onClick={() => item.feature && setUpgradeFeatureKey(item.feature)}
+                aria-label={`${item.label} — locked. Click to request upgrade.`}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/40 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground/60 transition-colors cursor-pointer"
+              >
+                <Icon className="h-4 w-4 opacity-60" />
+                <span className="flex-1 text-left">{item.label}</span>
+                <Lock className="h-3 w-3 opacity-70" />
+              </button>
+            );
+          }
+
           return (
             <Link
               key={item.to}
@@ -781,6 +802,14 @@ function SidebarBody({
           </div>
         )}
       </nav>
+
+      {upgradeFeatureKey && (
+        <UpgradeGate
+          featureKey={upgradeFeatureKey}
+          open={!!upgradeFeatureKey}
+          onOpenChange={(o) => { if (!o) setUpgradeFeatureKey(null); }}
+        />
+      )}
 
       <div className="border-t border-sidebar-border p-4">
         <div className="mb-3 text-xs text-sidebar-foreground/60">

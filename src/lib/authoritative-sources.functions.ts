@@ -1024,8 +1024,13 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       citation?: string | null;
       applies_to?: "company" | "staff" | "client" | null;
     }> = [];
+    let chunkCount = 1;
+    let chunkFailures: string[] = [];
     try {
-      aiItems = await extractRequirementsFromText(rawText);
+      const extraction = await extractRequirementsFromText(rawText);
+      aiItems = extraction.items;
+      chunkCount = extraction.chunkCount;
+      chunkFailures = extraction.chunkFailures;
     } catch (err) {
       // Surface AI errors as a soft failure (e.g. rate-limit/credits) so the
       // user can retry rather than seeing a silent 0.
@@ -1075,6 +1080,13 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     let inserted = 0;
     const assisted = (doc.assisted_setup_requested as boolean | null) === true;
 
+    // Build rows up-front, dedupe against existing keys, then bulk-insert in
+    // groups. Per-row inserts against a 260k-char SOW easily exceed the
+    // server-function wall-clock; a handful of batches finishes in seconds.
+    const aiRows: Array<{
+      row: Record<string, unknown>;
+      key: string;
+    }> = [];
     for (const item of aiItems) {
       const titleClean = item.title.trim().slice(0, 200);
       if (!titleClean) continue;
@@ -1082,12 +1094,13 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
         .toLowerCase()
         .slice(0, 120);
       if (existingKeys.has(key)) continue;
+      existingKeys.add(key);
       const citation = item.citation
         ? `${baseLabel} — ${item.citation}${webSuffix}`
         : `${baseLabel}${webSuffix}`;
-      const { data: ins, error } = await supabase
-        .from("nectar_requirements")
-        .insert({
+      aiRows.push({
+        key,
+        row: {
           organization_id: doc.organization_id,
           source_document_id: doc.id,
           origin: "document",
@@ -1098,13 +1111,26 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
           source_citation: citation,
           applies_to: item.applies_to ?? "company",
           approval_state: assisted ? "nectar_drafted" : null,
-        })
-        .select("id")
-        .single();
-      if (!error && ins) {
-        existingKeys.add(key);
-        inserted += 1;
-        if (assisted) {
+        },
+      });
+    }
+
+    const BATCH = 100;
+    for (let i = 0; i < aiRows.length; i += BATCH) {
+      const slice = aiRows.slice(i, i + BATCH);
+      const { data: insRows, error } = await supabase
+        .from("nectar_requirements")
+        .insert(slice.map((s) => s.row))
+        .select("id");
+      if (error) {
+        // Roll back the optimistic existingKeys additions for this slice so a
+        // retry can re-attempt them.
+        for (const s of slice) existingKeys.delete(s.key);
+        throw new Error(`Requirement insert failed: ${error.message}`);
+      }
+      inserted += insRows?.length ?? 0;
+      if (assisted && insRows) {
+        for (const ins of insRows) {
           await markDraftedByNectar({
             organizationId: doc.organization_id as string,
             requirementId: ins.id as string,
@@ -1112,6 +1138,8 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
         }
       }
     }
+
+
 
     for (const f of sowFields) {
       const title =

@@ -154,6 +154,13 @@ export function DraftJobsProvider({ children }: { children: React.ReactNode }) {
       // Snapshot mutable state per job.
       const totals = { total: job.totalChunks };
       const doneSet = new Set<number>(job.processedIndices);
+      let cursor = 0;
+      let cancelled = false;
+      if (doneSet.size > 0) {
+        console.debug(
+          `[nectar-draft] resuming job ${job.jobId} — ${doneSet.size} of ${job.totalChunks} sections already read, skipping to next`,
+        );
+      }
       const durations = [...job.chunkDurationsMs];
       let cursor = 0;
       let cancelled = false;

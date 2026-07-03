@@ -24,7 +24,7 @@ import { StaffMobilePreviewFrame } from "@/components/staff-mobile/staff-mobile-
 import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";
 import { NectarSearchBar } from "@/components/nectar/nectar-search-bar";
 import { ListChecks } from "lucide-react";
-import { UpgradeGate } from "@/components/upgrade-gate";
+import { FeatureLockedRoute, UpgradeGate } from "@/components/upgrade-gate";
 import { OrgSwitcher, DemoBadge, DemoOrgBanner } from "@/components/org-switcher";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -137,8 +137,8 @@ const ADMIN_NAV: NavItem[] = [
 
 
 const NECTAR_NAV: NavItem[] = [
-  { to: "/dashboard/help", label: "Ask NECTAR", icon: HelpCircle },
-  { to: "/dashboard/hub/knowledge", label: "Knowledge base", icon: Database },
+  { to: "/dashboard/help", label: "Ask NECTAR", icon: HelpCircle, feature: "nectar" },
+  { to: "/dashboard/hub/knowledge", label: "Knowledge base", icon: Database, feature: "nectar" },
 ];
 
 
@@ -162,6 +162,7 @@ type SidebarBodyProps = {
   states: PlatformStateLite[];
   currentPreviewState: PlatformStateLite | null;
   nav: NavItem[];
+  nectarNav: NavItem[];
   showNectarCluster: boolean;
   pathname: string;
   signOut: () => Promise<void>;
@@ -335,8 +336,14 @@ function DashboardLayout() {
   };
 
 
-  const nectarNavForView = effectiveView === "admin" ? NECTAR_NAV : [];
+  const nectarNavForView = effectiveView === "admin"
+    ? NECTAR_NAV.map((n) => ({ ...n, isLocked: n.feature ? !isFeatureOn(n.feature) : false }))
+    : [];
   const allNav = [...nav, ...nectarNavForView];
+  const lockedRouteItem = allNav
+    .filter((n) => n.feature && n.isLocked)
+    .sort((a, b) => b.to.length - a.to.length)
+    .find((n) => (n.exact ? pathname === n.to : pathname === n.to || pathname.startsWith(`${n.to}/`)));
   const pageTitle =
     allNav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ?? "Dashboard";
   const isStaffView = effectiveView === "staff";
@@ -358,6 +365,7 @@ function DashboardLayout() {
     states,
     currentPreviewState,
     nav,
+    nectarNav: nectarNavForView,
     showNectarCluster: effectiveView === "admin",
     pathname,
     signOut,
@@ -538,6 +546,8 @@ function DashboardLayout() {
                   </Link>
                 )}
               </div>
+            ) : lockedRouteItem?.feature ? (
+              <FeatureLockedRoute featureKey={lockedRouteItem.feature} />
             ) : isMobilePreview ? (
               <StaffMobilePreviewFrame title={pageTitle}>
                 <Outlet />
@@ -576,6 +586,7 @@ function SidebarBody({
   states,
   currentPreviewState,
   nav,
+  nectarNav,
   showNectarCluster,
   pathname,
   signOut,
@@ -777,10 +788,27 @@ function SidebarBody({
             </div>
 
             <div className="mx-1 space-y-0.5 rounded-xl border border-[#f4a93a]/10 bg-[#f4a93a]/[0.04] p-1.5">
-              {NECTAR_NAV.map((item) => {
+              {nectarNav.map((item) => {
                 const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
                 const Icon = item.icon;
                 const slug = item.to.replace(/^\/dashboard\/?/, "") || "home";
+                const locked = !!item.isLocked;
+                if (locked) {
+                  return (
+                    <button
+                      key={item.to}
+                      type="button"
+                      onClick={() => item.feature && setUpgradeFeatureKey(item.feature)}
+                      data-tour={`nav.${slug}`}
+                      aria-label={`${item.label} — locked. Click to request upgrade.`}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/40 transition-colors hover:bg-[#f4a93a]/10 hover:text-sidebar-foreground/60"
+                    >
+                      <Icon className="h-4 w-4 text-[#f4a93a]/50" />
+                      <span className="flex-1 text-left">{item.label}</span>
+                      <Lock className="h-3 w-3 opacity-70" />
+                    </button>
+                  );
+                }
                 return (
                   <Link
                     key={item.to}

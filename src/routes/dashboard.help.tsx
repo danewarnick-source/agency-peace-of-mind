@@ -8,6 +8,7 @@ import { askNectarHelp, escalateHelpToHive, getHelpTicketStatus, type NectarHelp
 import { NectarBadge, NectarMark, NectarButton } from "@/components/nectar/nectar-brand";
 import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";
 import { NectarAnswer } from "@/components/nectar/nectar-answer";
+import { FeatureGate } from "@/components/upgrade-gate";
 
 export const Route = createFileRoute("/dashboard/help")({
   head: () => ({ meta: [{ title: "Need help? — NECTAR" }] }),
@@ -162,6 +163,7 @@ function HelpPage() {
 
 
   return (
+    <FeatureGate featureKey="nectar">
     <div className="mx-auto flex h-[calc(100vh-9rem)] max-w-3xl flex-col">
       <header className="mb-2 flex flex-wrap items-end justify-between gap-2 sm:mb-3 sm:gap-3">
         <div className="flex items-center gap-2 sm:gap-3">
@@ -289,6 +291,7 @@ function HelpPage() {
         initialGoal={pendingGoal}
       />
     </div>
+    </FeatureGate>
   );
 }
 

@@ -1,7 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/hooks/use-auth";
+import { useCurrentOrg } from "@/hooks/use-org";
 import { getMyOrgFeatures, type FeatureRegistryRow } from "@/lib/org-features.functions";
+
+const KNOWN_GATED_FEATURES = new Set([
+  "hive_training",
+  "nectar",
+  "state_audit",
+  "pba_ledgers",
+  "evv_timesheets",
+  "client_intake",
+  "pcsp",
+  "staff_onboarding",
+]);
 
 /**
  * Single client-side gate for the Organization Master Controller.
@@ -13,11 +25,17 @@ import { getMyOrgFeatures, type FeatureRegistryRow } from "@/lib/org-features.fu
  */
 export function useOrgFeatures() {
   const { session } = useAuth();
+  const { data: currentOrg, isLoading: orgLoading } = useCurrentOrg();
   const fn = useServerFn(getMyOrgFeatures);
   const q = useQuery({
-    queryKey: ["my-org-features", session?.user?.id ?? "anon"],
-    enabled: !!session?.user?.id,
-    queryFn: () => fn(),
+    queryKey: ["my-org-features", session?.user?.id ?? "anon", currentOrg?.organization_id ?? null],
+    enabled: !!session?.user?.id && !orgLoading,
+    queryFn: () =>
+      fn({
+        data: {
+          activeOrganizationId: currentOrg?.organization_id ?? null,
+        },
+      }),
     staleTime: 30_000,
   });
   const effective = q.data?.effective ?? {};
@@ -31,8 +49,14 @@ export function useOrgFeatures() {
     registry,
     registryByKey,
     organizationId: q.data?.organization_id ?? null,
-    /** true if the feature is enabled OR unknown (unknown = not in registry yet → don't block) */
-    isEnabled: (key: string | undefined | null) => (key ? effective[key] !== false : true),
+    /** Unknown feature keys stay open; known/registered gates fail closed until the org-scoped read resolves. */
+    isEnabled: (key: string | undefined | null) => {
+      if (!key) return true;
+      const meta = registryByKey[key];
+      if (meta) return effective[key] ?? meta.default_enabled;
+      if (q.isLoading || q.isError || !q.data) return !KNOWN_GATED_FEATURES.has(key);
+      return true;
+    },
     /** registry metadata for the upgrade bubble */
     getMeta: (key: string | undefined | null) => (key ? registryByKey[key] ?? null : null),
   };

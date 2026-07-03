@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AuthoritativeSourcesPage } from "@/components/pages/authoritative-sources-page";
+import { FeatureGate } from "@/components/upgrade-gate";
 
 export const Route = createFileRoute("/dashboard/authoritative-sources")({
   head: () => ({
@@ -15,5 +16,9 @@ export const Route = createFileRoute("/dashboard/authoritative-sources")({
   validateSearch: (s: Record<string, unknown>) => ({
     focus: typeof s.focus === "string" ? s.focus : undefined,
   }),
-  component: AuthoritativeSourcesPage,
+  component: () => (
+    <FeatureGate featureKey="nectar">
+      <AuthoritativeSourcesPage />
+    </FeatureGate>
+  ),
 });

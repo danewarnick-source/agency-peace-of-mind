@@ -678,8 +678,12 @@ export const runInternalAudit = createServerFn({ method: "POST" })
       for (const s of (formSubsRes.data ?? []) as Array<{ form_id: string }>)
         formSubsByForm.add(s.form_id);
       const trainingCourseHas = new Set<string>();
-      for (const t of (trainingCertsRes.data ?? []) as Array<{ course_id: string }>)
-        trainingCourseHas.add(t.course_id);
+      for (const t of (trainingCertsRes.data ?? []) as Array<{
+        course_id: string;
+        expires_at: string | null;
+      }>) {
+        if (!t.expires_at || t.expires_at > nowIso) trainingCourseHas.add(t.course_id);
+      }
       const validCertsByCourse = new Set<string>();
       for (const c of (credCertsRes.data ?? []) as Array<{
         course_id: string;
@@ -688,12 +692,10 @@ export const runInternalAudit = createServerFn({ method: "POST" })
         if (!c.expires_at || c.expires_at > nowIso) validCertsByCourse.add(c.course_id);
       }
       const activeDocByReq = new Set<string>();
-      for (const d of (docAttestRes.data ?? []) as Array<{
-        requirement_id: string;
-        expires_at: string | null;
-      }>) {
-        if (!d.expires_at || d.expires_at > nowIso) activeDocByReq.add(d.requirement_id);
+      for (const d of (docAttestRes.data ?? []) as Array<{ subject_ref: string }>) {
+        activeDocByReq.add(d.subject_ref);
       }
+
 
       const nativeHas = (feature: string): boolean => {
         switch (feature) {

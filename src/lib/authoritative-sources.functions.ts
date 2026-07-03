@@ -6,60 +6,23 @@ import type { Json } from "@/integrations/supabase/types";
 import { reportPlatformEvent } from "./hive-tickets.functions";
 import { markDraftedByNectar } from "./nectar-approvals.functions";
 import { EVV_SERVICE_CODES } from "./evv-codes";
-
-
-
+import {
+  AUTH_KINDS,
+  NON_OBLIGATION_KINDS,
+  stripHtmlToText,
+  extractRequirementsFromText,
+  EXPLAIN_SYSTEM_PROMPT,
+  ExplainResp,
+} from "./authoritative-sources.server";
 import { gatewayFetch } from "@/lib/ai-bedrock.server";
 
 // =============================================================
 // Foundation B — Authoritative sources, derived requirements,
 // and the immutable attestation log.
 // HIVE organizes; the company's uploaded documents are the source of truth.
+// Shared helpers/prompts/schemas live in ./authoritative-sources.server.ts
+// to avoid ?tss-serverfn-split ReferenceErrors from sibling declarations.
 // =============================================================
-
-const AUTH_KINDS = [
-  "state_sow",
-  "provider_contract",
-  "dspd_requirement",
-  "dhs_requirement",
-  "public_record",
-  "tool_template",
-  "other",
-] as const;
-
-// Document kinds where NECTAR should NOT try to extract obligations.
-// Tools/templates (review tools, audit checklists, scoring forms) describe
-// HOW someone reviews compliance, not WHAT the provider must do — drafting
-// from them produces the misleading "no requirement language" message.
-const NON_OBLIGATION_KINDS = new Set<string>(["tool_template"]);
-
-// ---------- Web-page authoritative sources ----------
-// NECTAR reads content that is directly rendered on the page itself.
-// Files linked FROM the page (PDFs, attachments) are NOT followed —
-// the user must download those and upload them separately.
-
-function stripHtmlToText(html: string): { title: string | null; text: string } {
-  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  const title = titleMatch ? titleMatch[1].trim().slice(0, 200) : null;
-  let cleaned = html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-    .replace(/<!--[\s\S]*?-->/g, " ")
-    .replace(/<\/(p|div|section|article|li|h[1-6]|tr|br)>/gi, "\n")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, " ");
-  cleaned = cleaned
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&[a-z]+;/gi, " ");
-  cleaned = cleaned.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
-  return { title, text: cleaned };
-}
 
 export const ingestWebSource = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

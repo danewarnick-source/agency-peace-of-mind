@@ -179,6 +179,7 @@ import { Route as DashboardCoursesCourseIdEditRouteImport } from './routes/dashb
 import { Route as ApiPublicWebhooksStripeRouteImport } from './routes/api/public/webhooks/stripe'
 import { Route as ApiPublicHooksSmartImportRemindersRouteImport } from './routes/api/public/hooks/smart-import-reminders'
 import { Route as ApiPublicHooksNectarSchedulesRouteImport } from './routes/api/public/hooks/nectar-schedules'
+import { Route as ApiPublicHooksNectarDraftTickRouteImport } from './routes/api/public/hooks/nectar-draft-tick'
 import { Route as ApiPublicHooksGmailIngestRouteImport } from './routes/api/public/hooks/gmail-ingest'
 import { Route as ApiPublicHooksBillingDailyCheckRouteImport } from './routes/api/public/hooks/billing-daily-check'
 import { Route as DashboardHiveExecStatesStateCodeOnboardingRouteImport } from './routes/dashboard.hive-exec.states.$stateCode.onboarding'
@@ -1099,6 +1100,12 @@ const ApiPublicHooksNectarSchedulesRoute =
     path: '/api/public/hooks/nectar-schedules',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksNectarDraftTickRoute =
+  ApiPublicHooksNectarDraftTickRouteImport.update({
+    id: '/api/public/hooks/nectar-draft-tick',
+    path: '/api/public/hooks/nectar-draft-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksGmailIngestRoute =
   ApiPublicHooksGmailIngestRouteImport.update({
     id: '/api/public/hooks/gmail-ingest',
@@ -1284,6 +1291,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/billing-daily-check': typeof ApiPublicHooksBillingDailyCheckRoute
   '/api/public/hooks/gmail-ingest': typeof ApiPublicHooksGmailIngestRoute
+  '/api/public/hooks/nectar-draft-tick': typeof ApiPublicHooksNectarDraftTickRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
@@ -1453,6 +1461,7 @@ export interface FileRoutesByTo {
   '/dashboard/training': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/billing-daily-check': typeof ApiPublicHooksBillingDailyCheckRoute
   '/api/public/hooks/gmail-ingest': typeof ApiPublicHooksGmailIngestRoute
+  '/api/public/hooks/nectar-draft-tick': typeof ApiPublicHooksNectarDraftTickRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
@@ -1630,6 +1639,7 @@ export interface FileRoutesById {
   '/dashboard/training/': typeof DashboardTrainingIndexRoute
   '/api/public/hooks/billing-daily-check': typeof ApiPublicHooksBillingDailyCheckRoute
   '/api/public/hooks/gmail-ingest': typeof ApiPublicHooksGmailIngestRoute
+  '/api/public/hooks/nectar-draft-tick': typeof ApiPublicHooksNectarDraftTickRoute
   '/api/public/hooks/nectar-schedules': typeof ApiPublicHooksNectarSchedulesRoute
   '/api/public/hooks/smart-import-reminders': typeof ApiPublicHooksSmartImportRemindersRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
@@ -1808,6 +1818,7 @@ export interface FileRouteTypes {
     | '/dashboard/training/'
     | '/api/public/hooks/billing-daily-check'
     | '/api/public/hooks/gmail-ingest'
+    | '/api/public/hooks/nectar-draft-tick'
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
     | '/api/public/webhooks/stripe'
@@ -1977,6 +1988,7 @@ export interface FileRouteTypes {
     | '/dashboard/training'
     | '/api/public/hooks/billing-daily-check'
     | '/api/public/hooks/gmail-ingest'
+    | '/api/public/hooks/nectar-draft-tick'
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
     | '/api/public/webhooks/stripe'
@@ -2153,6 +2165,7 @@ export interface FileRouteTypes {
     | '/dashboard/training/'
     | '/api/public/hooks/billing-daily-check'
     | '/api/public/hooks/gmail-ingest'
+    | '/api/public/hooks/nectar-draft-tick'
     | '/api/public/hooks/nectar-schedules'
     | '/api/public/hooks/smart-import-reminders'
     | '/api/public/webhooks/stripe'
@@ -2193,6 +2206,7 @@ export interface RootRouteChildren {
   SignEmployeeLoanTokenRoute: typeof SignEmployeeLoanTokenRoute
   ApiPublicHooksBillingDailyCheckRoute: typeof ApiPublicHooksBillingDailyCheckRoute
   ApiPublicHooksGmailIngestRoute: typeof ApiPublicHooksGmailIngestRoute
+  ApiPublicHooksNectarDraftTickRoute: typeof ApiPublicHooksNectarDraftTickRoute
   ApiPublicHooksNectarSchedulesRoute: typeof ApiPublicHooksNectarSchedulesRoute
   ApiPublicHooksSmartImportRemindersRoute: typeof ApiPublicHooksSmartImportRemindersRoute
   ApiPublicWebhooksStripeRoute: typeof ApiPublicWebhooksStripeRoute
@@ -3391,6 +3405,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksNectarSchedulesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/nectar-draft-tick': {
+      id: '/api/public/hooks/nectar-draft-tick'
+      path: '/api/public/hooks/nectar-draft-tick'
+      fullPath: '/api/public/hooks/nectar-draft-tick'
+      preLoaderRoute: typeof ApiPublicHooksNectarDraftTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/gmail-ingest': {
       id: '/api/public/hooks/gmail-ingest'
       path: '/api/public/hooks/gmail-ingest'
@@ -3895,6 +3916,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignEmployeeLoanTokenRoute: SignEmployeeLoanTokenRoute,
   ApiPublicHooksBillingDailyCheckRoute: ApiPublicHooksBillingDailyCheckRoute,
   ApiPublicHooksGmailIngestRoute: ApiPublicHooksGmailIngestRoute,
+  ApiPublicHooksNectarDraftTickRoute: ApiPublicHooksNectarDraftTickRoute,
   ApiPublicHooksNectarSchedulesRoute: ApiPublicHooksNectarSchedulesRoute,
   ApiPublicHooksSmartImportRemindersRoute:
     ApiPublicHooksSmartImportRemindersRoute,

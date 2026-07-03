@@ -535,8 +535,10 @@ function DashboardLayout() {
         </div>
       </div>
     </div>
+    </DraftJobsProvider>
   );
 }
+
 
 /**
  * Hoisted to module scope so it keeps a stable component identity across

@@ -64,8 +64,6 @@ import {
   markAsAuthoritativeSource,
   listRequirements,
   startRequirementsDraft,
-  processDraftChunk,
-  finalizeRequirementsDraft,
   upsertRequirement,
 
   setRequirementReviewStatus,
@@ -74,6 +72,10 @@ import {
   ingestWebSource,
   explainRequirement,
 } from "@/lib/authoritative-sources.functions";
+import {
+  useDraftJobProgress,
+  formatEta,
+} from "@/components/nectar/draft-jobs-driver";
 import {
   proposeRequirementMappings,
   listRequirementMappings,

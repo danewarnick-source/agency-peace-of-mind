@@ -120,7 +120,10 @@ export async function extractOnce(
   partLabel: string,
 ): Promise<Array<z.infer<typeof ReqItem>>> {
   const res = await gatewayFetch({
-    model: "google/gemini-2.5-flash",
+    // NOTE: this string is ignored by the Bedrock shim in
+    // `src/lib/ai-bedrock.server.ts` (it uses BEDROCK_MODEL_ID). Kept as
+    // "bedrock" so nobody reading the code thinks we're calling Google.
+    model: "bedrock",
     messages: [
       { role: "system", content: REQ_SYSTEM_PROMPT },
       {
@@ -129,13 +132,18 @@ export async function extractOnce(
       },
     ],
     response_format: { type: "json_object" },
+    max_tokens: 8192,
   });
   if (res.status === 429) throw new Error("AI rate limit reached. Try again in a moment.");
   if (res.status === 402)
     throw new Error("AI credits exhausted. Add funds in Settings → Workspace → Usage.");
   if (!res.ok) throw new ChunkParseError(`AI gateway error ${res.status}`);
   const json = await res.json();
+  const finishReason: string | undefined = json.choices?.[0]?.finish_reason;
   const content: string = json.choices?.[0]?.message?.content ?? "{}";
+  if (finishReason === "length") {
+    throw new ChunkParseError("output truncated (hit max_tokens)");
+  }
   let raw: unknown;
   try {
     raw = JSON.parse(content);
@@ -147,6 +155,7 @@ export async function extractOnce(
     throw new ChunkParseError("model output failed schema validation");
   return parsed.data.requirements;
 }
+
 
 export async function extractChunkWithRetry(
   windowText: string,

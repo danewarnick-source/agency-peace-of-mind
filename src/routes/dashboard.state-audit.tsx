@@ -3,11 +3,13 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  Plus, Send, Trash2, User, Contact2, Calendar, Building2, ShieldCheck, ExternalLink, AlertTriangle,
+  Plus, Send, Trash2, User, Contact2, Calendar, Building2, ShieldCheck, ExternalLink,
+  AlertTriangle, Eye, Settings, UserPlus, Mail,
 } from "lucide-react";
 import { FeatureGate } from "@/components/upgrade-gate";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { toast } from "sonner";
+import { AuditorPackagePreview } from "@/components/audit-portal/auditor-package-preview";
 import {
   listOrgAuditPackages,
   createAuditPackage,
@@ -18,8 +20,13 @@ import {
   releaseAuditPackage,
   grantAuditorAccess,
   revokeAuditorAccess,
+  listOrgAuditors,
+  provisionOrgAuditor,
+  revokeOrgAuditor,
   type AuditPackageRow,
+  type OrgAuditorRow,
 } from "@/lib/audit-portal.functions";
+
 
 export const Route = createFileRoute("/dashboard/state-audit")({
   head: () => ({ meta: [{ title: "State Audit Packages — HIVE" }] }),

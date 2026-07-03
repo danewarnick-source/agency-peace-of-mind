@@ -745,15 +745,16 @@ const ReqItem = z.object({
   citation: z.string().max(200).optional().nullable(),
   applies_to: z.enum(["company", "staff", "client"]).optional().nullable(),
 });
-const ReqExtraction = z.object({ requirements: z.array(ReqItem).max(200).default([]) });
+const ReqExtraction = z.object({ requirements: z.array(ReqItem).max(500).default([]) });
 
 // Split a long document into overlapping windows so NECTAR reads the entire
-// text, not just the first ~60k characters. Overlap prevents a clause that
-// straddles a window boundary from being missed on both sides.
+// text. Smaller windows keep model output well under its token ceiling so
+// JSON doesn't come back truncated. Overlap prevents a clause that straddles
+// a window boundary from being missed on both sides.
 function chunkDocumentText(
   text: string,
-  windowSize = 55_000,
-  overlap = 2_000,
+  windowSize = 30_000,
+  overlap = 1_500,
   maxChunks = 40,
 ): string[] {
   if (text.length <= windowSize) return [text];
@@ -775,50 +776,122 @@ function chunkDocumentText(
   return chunks;
 }
 
-async function extractRequirementsFromText(text: string) {
+// Single AI call for one text window. Returns the parsed items or throws a
+// classified error (429/402 bubble up; parse errors are typed so the caller
+// can retry with a smaller window).
+class ChunkParseError extends Error {}
+
+async function extractOnce(
+  windowText: string,
+  partLabel: string,
+): Promise<Array<z.infer<typeof ReqItem>>> {
+  const res = await gatewayFetch({
+    model: "google/gemini-2.5-flash",
+    messages: [
+      { role: "system", content: REQ_SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: `${partLabel}\n\nDOCUMENT TEXT:\n\n${windowText}`,
+      },
+    ],
+    response_format: { type: "json_object" },
+  });
+  if (res.status === 429) throw new Error("AI rate limit reached. Try again in a moment.");
+  if (res.status === 402)
+    throw new Error("AI credits exhausted. Add funds in Settings → Workspace → Usage.");
+  if (!res.ok) throw new ChunkParseError(`AI gateway error ${res.status}`);
+  const json = await res.json();
+  const content: string = json.choices?.[0]?.message?.content ?? "{}";
+  let raw: unknown;
+  try {
+    raw = JSON.parse(content);
+  } catch {
+    throw new ChunkParseError("model returned invalid/truncated JSON");
+  }
+  const parsed = ReqExtraction.safeParse(raw);
+  if (!parsed.success)
+    throw new ChunkParseError("model output failed schema validation");
+  return parsed.data.requirements;
+}
+
+// Extract with a single retry: if a window fails to parse, split it in half
+// and try each half once. Failed halves are reported (not silently dropped).
+async function extractChunkWithRetry(
+  windowText: string,
+  partLabel: string,
+): Promise<{ items: Array<z.infer<typeof ReqItem>>; failures: string[] }> {
+  try {
+    const items = await extractOnce(windowText, partLabel);
+    return { items, failures: [] };
+  } catch (err) {
+    if (!(err instanceof ChunkParseError)) throw err; // 429/402/etc → bubble
+    // Retry by splitting in half at a paragraph boundary where possible.
+    const mid = Math.floor(windowText.length / 2);
+    const boundary = windowText.lastIndexOf("\n\n", mid + 2_000);
+    const split = boundary > windowText.length * 0.2 ? boundary : mid;
+    const halves = [windowText.slice(0, split), windowText.slice(split)];
+    const items: Array<z.infer<typeof ReqItem>> = [];
+    const failures: string[] = [];
+    for (let h = 0; h < halves.length; h += 1) {
+      try {
+        const got = await extractOnce(halves[h], `${partLabel} (retry ${h + 1}/2)`);
+        items.push(...got);
+      } catch (retryErr) {
+        if (!(retryErr instanceof ChunkParseError)) throw retryErr;
+        failures.push(
+          `${partLabel} half ${h + 1}: ${(retryErr as Error).message}`,
+        );
+      }
+    }
+    return { items, failures };
+  }
+}
+
+// Concurrency-limited map: runs up to `limit` promises at a time.
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+  const workers = new Array(Math.min(limit, items.length)).fill(0).map(async () => {
+    while (true) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      results[i] = await fn(items[i], i);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+async function extractRequirementsFromText(text: string): Promise<{
+  items: Array<z.infer<typeof ReqItem>>;
+  chunkCount: number;
+  chunkFailures: string[];
+}> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
 
   const chunks = chunkDocumentText(text);
+  const perChunk = await mapWithConcurrency(chunks, 3, (chunk, i) =>
+    extractChunkWithRetry(chunk, `PART ${i + 1} OF ${chunks.length}`),
+  );
+
   const merged: Array<z.infer<typeof ReqItem>> = [];
   const seen = new Set<string>();
-
-  for (let i = 0; i < chunks.length; i += 1) {
-    const partHeader =
-      chunks.length > 1 ? `PART ${i + 1} OF ${chunks.length}\n\n` : "";
-    const res = await gatewayFetch({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        { role: "system", content: REQ_SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: `${partHeader}DOCUMENT TEXT:\n\n${chunks[i]}`,
-        },
-      ],
-      response_format: { type: "json_object" },
-    });
-    if (res.status === 429) throw new Error("AI rate limit reached. Try again in a moment.");
-    if (res.status === 402)
-      throw new Error("AI credits exhausted. Add funds in Settings → Workspace → Usage.");
-    if (!res.ok) throw new Error(`AI gateway error ${res.status}`);
-    const json = await res.json();
-    const content: string = json.choices?.[0]?.message?.content ?? "{}";
-    let raw: unknown;
-    try {
-      raw = JSON.parse(content);
-    } catch {
-      raw = {};
-    }
-    const parsed = ReqExtraction.safeParse(raw);
-    if (!parsed.success) continue;
-    for (const item of parsed.data.requirements) {
+  const chunkFailures: string[] = [];
+  for (const r of perChunk) {
+    chunkFailures.push(...r.failures);
+    for (const item of r.items) {
       const dedupeKey = `${item.title.trim().toLowerCase()}|${(item.citation ?? "").trim().toLowerCase()}`;
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
       merged.push(item);
     }
   }
-  return merged;
+  return { items: merged, chunkCount: chunks.length, chunkFailures };
 }
 
 
@@ -951,8 +1024,13 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       citation?: string | null;
       applies_to?: "company" | "staff" | "client" | null;
     }> = [];
+    let chunkCount = 1;
+    let chunkFailures: string[] = [];
     try {
-      aiItems = await extractRequirementsFromText(rawText);
+      const extraction = await extractRequirementsFromText(rawText);
+      aiItems = extraction.items;
+      chunkCount = extraction.chunkCount;
+      chunkFailures = extraction.chunkFailures;
     } catch (err) {
       // Surface AI errors as a soft failure (e.g. rate-limit/credits) so the
       // user can retry rather than seeing a silent 0.
@@ -1002,6 +1080,22 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     let inserted = 0;
     const assisted = (doc.assisted_setup_requested as boolean | null) === true;
 
+    // Build rows up-front, dedupe against existing keys, then bulk-insert in
+    // groups. Per-row inserts against a 260k-char SOW easily exceed the
+    // server-function wall-clock; a handful of batches finishes in seconds.
+    type AiRow = {
+      organization_id: string;
+      source_document_id: string;
+      origin: "document";
+      requirement_key: string;
+      title: string;
+      description: string | null;
+      category: "audit_doc" | "obligation" | "rule" | "billing";
+      source_citation: string;
+      applies_to: "company" | "staff" | "client";
+      approval_state: string | null;
+    };
+    const aiRows: Array<{ row: AiRow; key: string }> = [];
     for (const item of aiItems) {
       const titleClean = item.title.trim().slice(0, 200);
       if (!titleClean) continue;
@@ -1009,12 +1103,13 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
         .toLowerCase()
         .slice(0, 120);
       if (existingKeys.has(key)) continue;
+      existingKeys.add(key);
       const citation = item.citation
         ? `${baseLabel} — ${item.citation}${webSuffix}`
         : `${baseLabel}${webSuffix}`;
-      const { data: ins, error } = await supabase
-        .from("nectar_requirements")
-        .insert({
+      aiRows.push({
+        key,
+        row: {
           organization_id: doc.organization_id,
           source_document_id: doc.id,
           origin: "document",
@@ -1025,13 +1120,26 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
           source_citation: citation,
           applies_to: item.applies_to ?? "company",
           approval_state: assisted ? "nectar_drafted" : null,
-        })
-        .select("id")
-        .single();
-      if (!error && ins) {
-        existingKeys.add(key);
-        inserted += 1;
-        if (assisted) {
+        },
+      });
+    }
+
+    const BATCH = 100;
+    for (let i = 0; i < aiRows.length; i += BATCH) {
+      const slice = aiRows.slice(i, i + BATCH);
+      const { data: insRows, error } = await supabase
+        .from("nectar_requirements")
+        .insert(slice.map((s) => s.row))
+        .select("id");
+      if (error) {
+        // Roll back the optimistic existingKeys additions for this slice so a
+        // retry can re-attempt them.
+        for (const s of slice) existingKeys.delete(s.key);
+        throw new Error(`Requirement insert failed: ${error.message}`);
+      }
+      inserted += insRows?.length ?? 0;
+      if (assisted && insRows) {
+        for (const ins of insRows) {
           await markDraftedByNectar({
             organizationId: doc.organization_id as string,
             requirementId: ins.id as string,
@@ -1039,6 +1147,8 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
         }
       }
     }
+
+
 
     for (const f of sowFields) {
       const title =
@@ -1170,6 +1280,32 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     }
 
     if (inserted === 0) {
+      // If any chunks failed to parse, this is an "extractor incomplete"
+      // situation, not a "no obligations" one — say so clearly and file a
+      // distinct HIVE ticket. Re-clicking Draft retries.
+      if (chunkFailures.length > 0) {
+        await reportPlatformEvent({
+          eventKind: "ai_error",
+          organizationId: doc.organization_id as string,
+          organizationName: orgName,
+          title: `Extractor couldn't finish "${(doc.title as string) ?? doc.file_name}"`,
+          detail: `Document ${doc.id} (${rawText.length} chars) was split into ${chunkCount} sections; ${chunkFailures.length} failed to parse and yielded 0 requirements. First failure: ${chunkFailures[0]?.slice(0, 300)}`,
+          category: "parsing_failure",
+          severity: "medium",
+          dedupeKey: `extractor_incomplete:${doc.id}`,
+          eventRef: {
+            documentId: doc.id,
+            chunkCount,
+            failedChunks: chunkFailures.length,
+            firstFailure: chunkFailures[0]?.slice(0, 400),
+          },
+        });
+        return {
+          inserted: 0,
+          reason: "extractor_incomplete" as const,
+          message: `NECTAR couldn't finish reading this document — ${chunkFailures.length} of ${chunkCount} sections failed to parse. Click Draft again to retry. If it keeps failing, the parsed text may be malformed.`,
+        };
+      }
 
       // Document parsed cleanly but yielded zero requirements. Worth a HIVE
       // ticket for the platform team to investigate — either the extractor
@@ -1197,6 +1333,29 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       };
     }
 
+    if (chunkFailures.length > 0) {
+      await reportPlatformEvent({
+        eventKind: "ai_error",
+        organizationId: doc.organization_id as string,
+        organizationName: orgName,
+        title: `Partial extract on "${(doc.title as string) ?? doc.file_name}"`,
+        detail: `Document ${doc.id}: ${inserted} requirements drafted; ${chunkFailures.length} of ${chunkCount} sections failed to parse. First failure: ${chunkFailures[0]?.slice(0, 300)}`,
+        category: "parsing_failure",
+        severity: "low",
+        dedupeKey: `extractor_incomplete:${doc.id}`,
+        eventRef: {
+          documentId: doc.id,
+          chunkCount,
+          failedChunks: chunkFailures.length,
+          inserted,
+        },
+      });
+      return {
+        inserted,
+        reason: "partial" as const,
+        message: `Drafted ${inserted} requirements. ${chunkFailures.length} of ${chunkCount} sections of the document couldn't be read on this pass — click Draft again to retry those sections.`,
+      };
+    }
 
     return { inserted, reason: "ok" as const };
   });

@@ -711,6 +711,17 @@ export const verifyRequirement = createServerFn({ method: "POST" })
 // SOW/contract requirements live as prose clauses, not tabular fields.
 // We ask the AI to read narrative text and pull obligations + required
 // documents directly. Source-citation always carried; nothing fabricated.
+const KNOWN_SERVICE_CODES = EVV_SERVICE_CODES.map((c) => c.code);
+const KNOWN_SERVICE_CODE_SET = new Set(KNOWN_SERVICE_CODES);
+
+/** Uppercase/trim an AI-supplied code; drop anything not in the known registry. */
+function normalizeCode(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const v = raw.trim().toUpperCase();
+  if (!v) return null;
+  return KNOWN_SERVICE_CODE_SET.has(v) ? v : null;
+}
+
 const REQ_SYSTEM_PROMPT = `You are NECTAR, reading a Utah DSPD provider's State Scope of Work, provider contract, or DSPD/DHS requirement document.
 
 Your job is to extract REQUIREMENTS the provider must meet — written as prose clauses, numbered sections, "the Provider shall…", "must maintain…", "required documents include…", etc. This is narrative text, NOT a structured table.
@@ -723,7 +734,8 @@ Return STRICT JSON only, shape:
       "description": "exact or close paraphrase of the obligation, <=600 chars",
       "category": "audit_doc" | "obligation" | "rule" | "billing",
       "citation": "best locator you can identify, e.g. '§4.2', 'Section 3.1', 'page 7', 'Attachment A'",
-      "applies_to": "company" | "staff" | "client"
+      "applies_to": "company" | "staff" | "client",
+      "service_code": "one DSPD code from the known list, or null"
     }
   ]
 }
@@ -735,6 +747,7 @@ Rules:
     obligation = a thing the provider must do (notify within X hours, conduct annual review, maintain insurance, etc.)
     rule       = a constraint / prohibition (no overlapping services, staff-to-client ratio caps, etc.)
     billing    = a billing/reimbursement requirement (EVV, claim timeliness, prior auth)
+- "service_code" = the single DSPD service code this requirement governs (e.g. 'HHS','DSI','RHS','SLN','SLH','SEI'), taken from the citation or clause. Use ONLY codes from this known list: ${KNOWN_SERVICE_CODES.join(", ")}. If the requirement is general and applies to the whole provider regardless of code, set service_code to null. If a requirement names multiple codes, pick the single most specific one it is primarily about; if truly equal, use null. Never invent a code not in the known list.
 - Prefer fewer high-quality items over many vague ones.
 - If the text contains no requirement language at all, return {"requirements": []}.`;
 
@@ -744,6 +757,7 @@ const ReqItem = z.object({
   category: z.enum(["audit_doc", "obligation", "rule", "billing"]).optional().nullable(),
   citation: z.string().max(200).optional().nullable(),
   applies_to: z.enum(["company", "staff", "client"]).optional().nullable(),
+  service_code: z.string().max(10).optional().nullable(),
 });
 const ReqExtraction = z.object({ requirements: z.array(ReqItem).max(200).default([]) });
 

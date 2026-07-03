@@ -94,6 +94,7 @@ function EditForm() {
     groups, users, allClients, clients, settings,
   }), [name, description, category, fields, frequency, schedule, groups, users, allClients, clients, settings]);
   const isDirty = baseline !== "" && currentSnapshot !== baseline;
+  const managedByReq = Boolean((data?.form as { managed_by_requirement?: boolean } | undefined)?.managed_by_requirement);
 
   // Browser-level unsaved warning
   useEffect(() => {

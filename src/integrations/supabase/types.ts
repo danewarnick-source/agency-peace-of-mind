@@ -9800,6 +9800,7 @@ export type Database = {
           satisfied_by: string | null
           scope_level: string | null
           service_code: string | null
+          service_codes_all: string[] | null
           source_citation: string | null
           source_document_id: string | null
           title: string
@@ -9824,6 +9825,7 @@ export type Database = {
           satisfied_by?: string | null
           scope_level?: string | null
           service_code?: string | null
+          service_codes_all?: string[] | null
           source_citation?: string | null
           source_document_id?: string | null
           title: string
@@ -9848,6 +9850,7 @@ export type Database = {
           satisfied_by?: string | null
           scope_level?: string | null
           service_code?: string | null
+          service_codes_all?: string[] | null
           source_citation?: string | null
           source_document_id?: string | null
           title?: string
@@ -14983,6 +14986,7 @@ export type Database = {
           satisfied_by: string | null
           scope_level: string | null
           service_code: string | null
+          service_codes_all: string[] | null
           source_citation: string | null
           source_document_id: string | null
           title: string
@@ -15016,6 +15020,7 @@ export type Database = {
           satisfied_by: string | null
           scope_level: string | null
           service_code: string | null
+          service_codes_all: string[] | null
           source_citation: string | null
           source_document_id: string | null
           title: string

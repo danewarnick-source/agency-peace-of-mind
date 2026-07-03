@@ -61,6 +61,12 @@ export interface AuditSummary {
   totals: { critical: number; attention: number; minor: number; total: number };
   /** 0-100 — proportion of checks that came back clean, weighted by severity. */
   readinessScore: number;
+  /** Requirement-scope counters (Prompt 33). Dormant requirements do not
+   *  count toward the readiness score. */
+  inScopeCount: number;
+  dormantCount: number;
+  autoSatisfiedCount: number;
+  needsEvidenceCount: number;
   byArea: Record<FindingArea, number>;
   findings: AuditFinding[];
 }

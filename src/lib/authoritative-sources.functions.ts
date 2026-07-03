@@ -1004,6 +1004,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
           applies_to: item.applies_to ?? "company",
           service_code: normalizeCode(item.service_code),
           approval_state: assisted ? "nectar_drafted" : null,
+          ...(rebuildMeta ? { metadata: rebuildMeta } : {}),
         })
         .select("id")
         .single();

@@ -216,6 +216,12 @@ function EditForm() {
         </div>
       )}
 
+      {managedByReq && (
+        <div className="rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-xs text-sky-800">
+          <strong>Managed by requirement</strong> — schedule and audience come from the linked compliance requirement and are read-only here. Edit the requirement to change them.
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4">
         {/* Builder */}
         <div className="space-y-3">

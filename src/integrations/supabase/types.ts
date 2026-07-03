@@ -15165,6 +15165,7 @@ export type Database = {
         Args: { _organization_id: string }
         Returns: number
       }
+      rebuild_wipe_requirements_tns_fake: { Args: never; Returns: number }
       restore_my_admin_role: { Args: never; Returns: undefined }
       seed_standard_service_codes: {
         Args: { _org: string }

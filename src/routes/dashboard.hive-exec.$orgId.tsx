@@ -46,6 +46,8 @@ function CompanyDetailPage() {
   const [acronymEdit, setAcronymEdit] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [attest, setAttest] = useState(false);
+  const [activeTab, setActiveTab] = useState<"profile" | "controller">("profile");
+
 
   // Account contact edit state
   const [contactName, setContactName] = useState("");

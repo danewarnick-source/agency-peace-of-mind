@@ -916,6 +916,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       category?: "audit_doc" | "obligation" | "rule" | "billing" | null;
       citation?: string | null;
       applies_to?: "company" | "staff" | "client" | null;
+      service_code?: string | null;
     }> = [];
     try {
       aiItems = await extractRequirementsFromText(rawText);

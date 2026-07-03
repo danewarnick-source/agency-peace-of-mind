@@ -1129,7 +1129,8 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       return {
         inserted,
         reason: "partial" as const,
-        message: `Drafted ${inserted} requirements. ${chunkFailures.length} of ${chunkCount} sections of the document couldn't be read on this pass — click Draft again to retry those sections.`,
+        message: `Drafted ${inserted} requirements. ${chunkFailures.length} of ${chunkCount} sections couldn't be read on this pass (first failure: ${chunkFailures[0]?.slice(0, 200) ?? "unknown"}). Click Draft again to retry those sections.`,
+
       };
     }
 

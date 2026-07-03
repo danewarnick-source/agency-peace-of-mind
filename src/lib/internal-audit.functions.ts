@@ -745,6 +745,8 @@ export const runInternalAudit = createServerFn({ method: "POST" })
         }
       };
 
+      let autoSatisfiedCount = 0;
+      let needsEvidenceCount = 0;
       for (const r of inScopeReqs) {
         const b = bindingByReq.get(r.id);
         const base = {
@@ -756,6 +758,7 @@ export const runInternalAudit = createServerFn({ method: "POST" })
         };
 
         if (!b || b.satisfied_by === "unbound") {
+          needsEvidenceCount += 1;
           findings.push({
             ...base,
             id: `req-unbound-${r.id}`,
@@ -805,7 +808,10 @@ export const runInternalAudit = createServerFn({ method: "POST" })
             missTitle = `Requirement not resolvable — ${r.title}`;
         }
 
-        if (!satisfied) {
+        if (satisfied) {
+          autoSatisfiedCount += 1;
+        } else {
+          needsEvidenceCount += 1;
           findings.push({
             ...base,
             id: `req-evidence-${r.id}`,
@@ -816,6 +822,16 @@ export const runInternalAudit = createServerFn({ method: "POST" })
           });
         }
       }
+
+      const inScopeCount = inScopeReqs.length;
+      const dormantCount = Math.max(0, reqById.size - inScopeCount);
+      // Expose scope counters on the outer scope so the summary can return them.
+      (findings as unknown as { __reqCounts?: unknown }).__reqCounts = {
+        inScopeCount,
+        dormantCount,
+        autoSatisfiedCount,
+        needsEvidenceCount,
+      };
 
       const unknownUnconfirmed = maps.filter((m) => m.scope_kind === "unknown" && !m.confirmed);
       if (unknownUnconfirmed.length) {

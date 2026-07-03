@@ -65,7 +65,7 @@ export const getRosterTrainingStatus = createServerFn({ method: "POST" })
       .not("baseline_key" as any, "is", null);
     if (cErr) throw cErr;
     const courseByBaseline = new Map<string, string>();
-    for (const c of (courses ?? []) as Array<{ id: string; baseline_key: string | null }>) {
+    for (const c of ((courses ?? []) as unknown) as Array<{ id: string; baseline_key: string | null }>) {
       if (c.baseline_key && !courseByBaseline.has(c.baseline_key)) {
         courseByBaseline.set(c.baseline_key, c.id);
       }

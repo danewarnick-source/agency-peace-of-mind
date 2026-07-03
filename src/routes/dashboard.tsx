@@ -29,6 +29,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getInboxUnreadCount } from "@/lib/inbox-messages.functions";
 import { useEntitlements } from "@/hooks/use-entitlements";
+import { useOrgFeatures } from "@/hooks/use-feature-enabled";
+
 import { BillingBanner } from "@/components/billing/billing-banner";
 import { DraftJobsProvider } from "@/components/nectar/draft-jobs-driver";
 import { DraftJobsHeaderPill } from "@/components/nectar/draft-jobs-header-pill";
@@ -106,31 +108,32 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 import type { Permission } from "@/lib/rbac";
-type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean; perm?: Permission };
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean; perm?: Permission; feature?: string };
 
 const STAFF_NAV: NavItem[] = [
   { to: "/dashboard", label: "My Caseload", icon: LayoutDashboard, exact: true },
-  { to: "/dashboard/schedule", label: "Schedule", icon: CalendarDays },
+  { to: "/dashboard/schedule", label: "Schedule", icon: CalendarDays, feature: "evv_timesheets" },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
-  { to: "/dashboard/ask-nectar", label: "Ask NECTAR", icon: Sparkles },
-  { to: "/dashboard/courses", label: "My Trainings", icon: GraduationCap },
-  { to: "/dashboard/hive-training", label: "HIVE Training", icon: GraduationCap },
+  { to: "/dashboard/ask-nectar", label: "Ask NECTAR", icon: Sparkles, feature: "nectar" },
+  { to: "/dashboard/courses", label: "My Trainings", icon: GraduationCap, feature: "staff_onboarding" },
+  { to: "/dashboard/hive-training", label: "HIVE Training", icon: GraduationCap, feature: "hive_training" },
 ];
 
 const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard", label: "Home", icon: LayoutDashboard, exact: true },
-  { to: "/dashboard/hub/employees", label: "Employees", icon: Users },
-  { to: "/dashboard/hub/clients", label: "Clients", icon: Contact2 },
-  { to: "/dashboard/scheduler", label: "Scheduler", icon: CalendarDays },
-  { to: "/dashboard/hub/documentation", label: "Documentation", icon: ClipboardCheck },
+  { to: "/dashboard/hub/employees", label: "Employees", icon: Users, feature: "staff_onboarding" },
+  { to: "/dashboard/hub/clients", label: "Clients", icon: Contact2, feature: "client_intake" },
+  { to: "/dashboard/scheduler", label: "Scheduler", icon: CalendarDays, feature: "evv_timesheets" },
+  { to: "/dashboard/hub/documentation", label: "Documentation", icon: ClipboardCheck, feature: "pcsp" },
   { to: "/dashboard/deadlines", label: "Deadlines", icon: AlarmClock },
   { to: "/dashboard/summaries", label: "Summaries", icon: FileText },
-  { to: "/dashboard/hub/finances", label: "Finances", icon: Receipt, perm: "view_billing" },
-  { to: "/dashboard/hive-training", label: "HIVE Training", icon: GraduationCap },
+  { to: "/dashboard/hub/finances", label: "Finances", icon: Receipt, perm: "view_billing", feature: "pba_ledgers" },
+  { to: "/dashboard/hive-training", label: "HIVE Training", icon: GraduationCap, feature: "hive_training" },
   { to: "/dashboard/reports", label: "Reports", icon: FileText, perm: "export_reports" },
   { to: "/dashboard/inbox", label: "Inbox", icon: Inbox },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
+
 
 const NECTAR_NAV: NavItem[] = [
   { to: "/dashboard/help", label: "Ask NECTAR", icon: HelpCircle },
@@ -254,10 +257,15 @@ function DashboardLayout() {
     effectiveView === "hive_exec" ? execNav :
     effectiveView === "admin"     ? ADMIN_NAV : STAFF_NAV;
   const { hasAddon } = useEntitlements();
-  const hiveTrainingEnabled = hasAddon("hive_training");
+  const hiveTrainingEntitled = hasAddon("hive_training");
+  const { isEnabled: isFeatureOn } = useOrgFeatures();
   const nav: NavItem[] = baseNav
     .filter((n) => !n.perm || can(n.perm) || role === "admin" || role === "super_admin")
-    .filter((n) => hiveTrainingEnabled || n.to !== "/dashboard/hive-training");
+    // Master-Controller gating: hide any nav item whose feature is toggled OFF for this org.
+    .filter((n) => isFeatureOn(n.feature))
+    // Legacy add-on tier gate still applies to HIVE Training (paid entitlement).
+    .filter((n) => hiveTrainingEntitled || n.to !== "/dashboard/hive-training");
+
 
   // Load states for the State portal dropdown (executives only).
   useEffect(() => {

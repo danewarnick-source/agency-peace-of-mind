@@ -2,13 +2,15 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
-import { ArrowLeft, Save, Users, Contact2, Clock, Activity, Pencil, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Save, Users, Contact2, Clock, Activity, Pencil, AlertTriangle, ShieldCheck, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { getCompanyDetail, upsertSubscription, updateOrgNames, updateAccountContact } from "@/lib/hive-exec.functions";
+import { MasterController } from "@/components/hive-exec/master-controller";
 
 export const Route = createFileRoute("/dashboard/hive-exec/$orgId")({
   component: CompanyDetailPage,
 });
+
 
 
 function fmtMoney(cents: number): string {
@@ -44,6 +46,8 @@ function CompanyDetailPage() {
   const [acronymEdit, setAcronymEdit] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [attest, setAttest] = useState(false);
+  const [activeTab, setActiveTab] = useState<"profile" | "controller">("profile");
+
 
   // Account contact edit state
   const [contactName, setContactName] = useState("");
@@ -179,8 +183,22 @@ function CompanyDetailPage() {
         </div>
       </header>
 
+      <div className="flex gap-1 border-b border-border">
+        <TabButton active={activeTab === "profile"} onClick={() => setActiveTab("profile")} icon={Building2}>
+          Company Profile
+        </TabButton>
+        <TabButton active={activeTab === "controller"} onClick={() => setActiveTab("controller")} icon={ShieldCheck}>
+          Organization Master Controller
+        </TabButton>
+      </div>
+
+      {activeTab === "controller" ? (
+        <MasterController organizationId={orgId} />
+      ) : (
+      <>
       <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
         <div className="mb-3 flex items-center justify-between gap-2">
+
           <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
             <Pencil className="h-4 w-4" /> Identifying information
           </h2>
@@ -470,9 +488,28 @@ function CompanyDetailPage() {
           )}
         </section>
       </div>
+      </>
+      )}
     </div>
   );
 }
+
+function TabButton({ active, onClick, icon: Icon, children }: { active: boolean; onClick: () => void; icon: typeof Users; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+        active
+          ? "border-[#0f1b3d] text-[#0f1b3d]"
+          : "border-transparent text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      <Icon className="h-4 w-4" /> {children}
+    </button>
+  );
+}
+
 
 function ReadOnly({ label, value, mono }: { label: string; value: string | number; mono?: boolean }) {
   return (

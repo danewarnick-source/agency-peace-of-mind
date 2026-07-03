@@ -747,32 +747,80 @@ const ReqItem = z.object({
 });
 const ReqExtraction = z.object({ requirements: z.array(ReqItem).max(200).default([]) });
 
+// Split a long document into overlapping windows so NECTAR reads the entire
+// text, not just the first ~60k characters. Overlap prevents a clause that
+// straddles a window boundary from being missed on both sides.
+function chunkDocumentText(
+  text: string,
+  windowSize = 55_000,
+  overlap = 2_000,
+  maxChunks = 40,
+): string[] {
+  if (text.length <= windowSize) return [text];
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < text.length && chunks.length < maxChunks) {
+    let end = Math.min(start + windowSize, text.length);
+    // Prefer a paragraph boundary within the last 3k chars of the window so we
+    // don't cut mid-sentence. Fall back to a hard cut when none is found.
+    if (end < text.length) {
+      const searchFrom = Math.max(start + windowSize - 3_000, start + 1);
+      const boundary = text.lastIndexOf("\n\n", end);
+      if (boundary >= searchFrom) end = boundary;
+    }
+    chunks.push(text.slice(start, end));
+    if (end >= text.length) break;
+    start = Math.max(end - overlap, start + 1);
+  }
+  return chunks;
+}
+
 async function extractRequirementsFromText(text: string) {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
-  const res = await gatewayFetch({
+
+  const chunks = chunkDocumentText(text);
+  const merged: Array<z.infer<typeof ReqItem>> = [];
+  const seen = new Set<string>();
+
+  for (let i = 0; i < chunks.length; i += 1) {
+    const partHeader =
+      chunks.length > 1 ? `PART ${i + 1} OF ${chunks.length}\n\n` : "";
+    const res = await gatewayFetch({
       model: "google/gemini-2.5-flash",
       messages: [
         { role: "system", content: REQ_SYSTEM_PROMPT },
-        { role: "user", content: `DOCUMENT TEXT:\n\n${text.slice(0, 60000)}` },
+        {
+          role: "user",
+          content: `${partHeader}DOCUMENT TEXT:\n\n${chunks[i]}`,
+        },
       ],
       response_format: { type: "json_object" },
     });
-  if (res.status === 429) throw new Error("AI rate limit reached. Try again in a moment.");
-  if (res.status === 402)
-    throw new Error("AI credits exhausted. Add funds in Settings → Workspace → Usage.");
-  if (!res.ok) throw new Error(`AI gateway error ${res.status}`);
-  const json = await res.json();
-  const content: string = json.choices?.[0]?.message?.content ?? "{}";
-  let raw: unknown;
-  try {
-    raw = JSON.parse(content);
-  } catch {
-    raw = {};
+    if (res.status === 429) throw new Error("AI rate limit reached. Try again in a moment.");
+    if (res.status === 402)
+      throw new Error("AI credits exhausted. Add funds in Settings → Workspace → Usage.");
+    if (!res.ok) throw new Error(`AI gateway error ${res.status}`);
+    const json = await res.json();
+    const content: string = json.choices?.[0]?.message?.content ?? "{}";
+    let raw: unknown;
+    try {
+      raw = JSON.parse(content);
+    } catch {
+      raw = {};
+    }
+    const parsed = ReqExtraction.safeParse(raw);
+    if (!parsed.success) continue;
+    for (const item of parsed.data.requirements) {
+      const dedupeKey = `${item.title.trim().toLowerCase()}|${(item.citation ?? "").trim().toLowerCase()}`;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      merged.push(item);
+    }
   }
-  const parsed = ReqExtraction.safeParse(raw);
-  return parsed.success ? parsed.data.requirements : [];
+  return merged;
 }
+
 
 export const generateRequirementsFromSource = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

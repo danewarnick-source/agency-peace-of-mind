@@ -65,6 +65,8 @@ import {
   listRequirements,
   generateRequirementsFromSource,
   wipeRequirementsForOrgRebuild,
+  commitRebuildForOrg,
+  rollbackRebuildForOrg,
   upsertRequirement,
 
   setRequirementReviewStatus,

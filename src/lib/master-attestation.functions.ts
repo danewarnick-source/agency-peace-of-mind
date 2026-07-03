@@ -228,6 +228,107 @@ export const signMasterAttestation = createServerFn({ method: "POST" })
     return { row: inserted as MasterAttestationRow };
   });
 
+// Prompt 34 — "Review before signing" data source. Returns every in-scope
+// requirement grouped by held service code so the provider can scroll through
+// the full scoped set (titles, source citations, satisfied-by type, and
+// whether an upload/attestation-type requirement has evidence on file).
+// This is READ-ONLY review — the signature itself happens via
+// signMasterAttestation and is ONE signature over the whole set.
+export const listMasterAttestationReview = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ orgId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }): Promise<MasterAttestationReview> => {
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.orgId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+
+    const [codesRes, reqsRes] = await Promise.all([
+      sb.from("provider_authorized_codes").select("code").eq("organization_id", data.orgId),
+      sb
+        .from("nectar_requirements")
+        .select("id, title, source_citation, service_code")
+        .eq("organization_id", data.orgId),
+    ]);
+    const held = Array.from(
+      new Set<string>(((codesRes.data ?? []) as Array<{ code: string }>).map((r) => r.code)),
+    ).sort();
+    const heldSet = new Set(held);
+    const reqs = ((reqsRes.data ?? []) as Array<{
+      id: string;
+      title: string;
+      source_citation: string | null;
+      service_code: string | null;
+    }>).filter((r) => !(r.service_code && !heldSet.has(r.service_code)));
+
+    const reqIds = reqs.map((r) => r.id);
+    const [bindingsRes, docRes] = await Promise.all([
+      reqIds.length
+        ? sb
+            .from("requirement_bindings")
+            .select("requirement_id, satisfied_by")
+            .in("requirement_id", reqIds)
+        : Promise.resolve({ data: [] }),
+      reqIds.length
+        ? sb
+            .from("document_attestations")
+            .select("subject_ref, attested_at, attested_by_name")
+            .eq("organization_id", data.orgId)
+            .eq("subject_kind", "requirement")
+            .in("subject_ref", reqIds)
+            .order("attested_at", { ascending: false })
+        : Promise.resolve({ data: [] }),
+    ]);
+    const bindByReq = new Map<string, string>();
+    for (const b of (bindingsRes.data ?? []) as Array<{
+      requirement_id: string;
+      satisfied_by: string;
+    }>) {
+      bindByReq.set(b.requirement_id, b.satisfied_by);
+    }
+    const docByReq = new Map<string, { attested_at: string; attested_by_name: string | null }>();
+    for (const d of (docRes.data ?? []) as Array<{
+      subject_ref: string;
+      attested_at: string;
+      attested_by_name: string | null;
+    }>) {
+      if (!docByReq.has(d.subject_ref))
+        docByReq.set(d.subject_ref, { attested_at: d.attested_at, attested_by_name: d.attested_by_name });
+    }
+
+    const groupMap = new Map<string, ReviewGroup>();
+    for (const r of reqs) {
+      const code = r.service_code ?? "__provider__";
+      const label = r.service_code ?? "Provider-wide";
+      if (!groupMap.has(code)) groupMap.set(code, { code, label, requirements: [] });
+      const satisfied_by = bindByReq.get(r.id) ?? "unbound";
+      let evidence_note: string | null = null;
+      if (satisfied_by === "upload" || satisfied_by === "attestation") {
+        const doc = docByReq.get(r.id);
+        evidence_note = doc
+          ? `On file since ${new Date(doc.attested_at).toLocaleDateString()}${doc.attested_by_name ? ` (${doc.attested_by_name})` : ""}`
+          : "none on file yet";
+      }
+      groupMap.get(code)!.requirements.push({
+        id: r.id,
+        title: r.title,
+        source_citation: r.source_citation,
+        satisfied_by,
+        evidence_note,
+      });
+    }
+
+    // Sort: provider-wide first, then codes alphabetical; requirements by title.
+    const groups = Array.from(groupMap.values()).sort((a, b) => {
+      if (a.code === "__provider__") return -1;
+      if (b.code === "__provider__") return 1;
+      return a.code.localeCompare(b.code);
+    });
+    for (const g of groups) g.requirements.sort((a, b) => a.title.localeCompare(b.title));
+
+    return { groups, totalRequirements: reqs.length, heldCodes: held };
+  });
+
 // Resolver helper — a service_code is considered covered by the master
 // attestation when a current (non-due) master attestation exists whose
 // scope_codes snapshot contains that code. Provider-wide requirements

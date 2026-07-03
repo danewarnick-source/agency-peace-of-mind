@@ -1353,3 +1353,91 @@ REQUIREMENT TEXT: ${req.description ?? "(no extended text — restate the title 
         "This is a NECTAR plain-language restatement to aid your understanding. It is NOT legal, compliance, or audit advice, and does NOT replace the original source text. Always review the original requirement and consult counsel as needed before acting.",
     };
   });
+
+// ---------- Demo-data rebuild (TNS FAKE only) ----------
+// Deletes the org's existing requirements and re-runs extraction against
+// every active authoritative source. Scoped to the TNS FAKE org id so a
+// misclick can never wipe another workspace. Admin/super_admin only.
+const TNS_FAKE_ORG_ID = "7fabcf5d-f826-487f-8730-8b0c3f1969bb";
+
+export const rebuildRequirementsForOrg = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        confirm: z.literal("REBUILD"),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    if (data.organizationId !== TNS_FAKE_ORG_ID) {
+      throw new Error("Rebuild is only available for the TNS FAKE demo workspace.");
+    }
+    const { data: member } = await supabase
+      .from("organization_members")
+      .select("role, active")
+      .eq("organization_id", data.organizationId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    const role = (member?.role as string | null) ?? null;
+    if (!member?.active || (role !== "admin" && role !== "super_admin")) {
+      throw new Error("Admin or super-admin only.");
+    }
+
+    // Wipe existing requirements for this org only (mappings and bindings
+    // cascade / go orphan-safe via existing FKs — intended).
+    const { error: delErr } = await supabase
+      .from("nectar_requirements")
+      .delete()
+      .eq("organization_id", data.organizationId);
+    if (delErr) throw new Error(`Delete failed: ${delErr.message}`);
+
+    // Enumerate eligible authoritative sources (not ignored, obligation-bearing).
+    const { data: sources, error: sErr } = await supabase
+      .from("nectar_documents")
+      .select("id, authoritative_kind, metadata")
+      .eq("organization_id", data.organizationId)
+      .eq("is_authoritative_source", true);
+    if (sErr) throw new Error(`Source list failed: ${sErr.message}`);
+
+    const eligible = (sources ?? []).filter((s) => {
+      const kind = (s.authoritative_kind as string | null) ?? "";
+      if (NON_OBLIGATION_KINDS.has(kind)) return false;
+      const meta = (s.metadata ?? {}) as { ignored?: boolean };
+      if (meta.ignored) return false;
+      return true;
+    });
+
+    let documentsProcessed = 0;
+    let totalInserted = 0;
+    const failures: Array<{ documentId: string; error: string }> = [];
+
+    for (const src of eligible) {
+      try {
+        const result = await generateRequirementsFromSource({
+          data: { documentId: src.id as string },
+        });
+        documentsProcessed += 1;
+        const ins =
+          typeof (result as { inserted?: unknown })?.inserted === "number"
+            ? (result as { inserted: number }).inserted
+            : 0;
+        totalInserted += ins;
+      } catch (e) {
+        failures.push({
+          documentId: src.id as string,
+          error: (e as Error).message ?? "unknown",
+        });
+      }
+    }
+
+    return {
+      ok: true as const,
+      documentsProcessed,
+      totalInserted,
+      eligibleCount: eligible.length,
+      failures,
+    };
+  });

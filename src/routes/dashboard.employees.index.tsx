@@ -134,6 +134,21 @@ export function EmployeesPage() {
     return m;
   }, [staffPii]);
 
+  const fetchTrainingStatus = useServerFn(getRosterTrainingStatus);
+  const { hasAddon } = useEntitlements();
+  const hiveTrainingEnabled = hasAddon("hive_training");
+  const { data: trainingStatus } = useQuery({
+    enabled: !!org && hiveTrainingEnabled,
+    queryKey: ["roster-training-status", org?.organization_id],
+    queryFn: async () => await fetchTrainingStatus({ data: { organizationId: org!.organization_id } }),
+  });
+  const trainingByStaff = useMemo(() => {
+    const m = new Map<string, StaffTrainingStatus[]>();
+    for (const row of trainingStatus ?? []) m.set(row.userId, row.trainings);
+    return m;
+  }, [trainingStatus]);
+
+
 
   const { data: invites } = useQuery({
     enabled: !!org,

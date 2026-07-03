@@ -495,9 +495,12 @@ function SourceRow({
       // The global DraftJobsProvider will pick this job up on its next poll
       // and drive it to completion — even across page navigation.
       qc.invalidateQueries({ queryKey: ["nectar-draft-jobs", orgId] });
+      const total = (r as { totalChunks?: number }).totalChunks ?? 0;
       toast.info(
-        "Drafting started. NECTAR will keep working in the background — you can navigate away and check back.",
-        { duration: 6000 },
+        total > 0
+          ? `NECTAR started reading "${source.title}" — ${total} section${total === 1 ? "" : "s"}. Progress saves after every section, so it's safe to leave the page.`
+          : "Drafting started. NECTAR will keep working in the background.",
+        { duration: 7000 },
       );
     },
     onError: (e: Error) => {
@@ -512,9 +515,12 @@ function SourceRow({
   const etaLabel = driverProgress ? formatEta(driverProgress.etaMs) : "";
   const draftingLabel = driverProgress
     ? driverProgress.finalizing
-      ? `Finalizing… ${Math.round(progress)}%`
-      : `Drafting… ${Math.round(progress)}%${etaLabel ? ` · ${etaLabel}` : ""}`
-    : `Drafting… ${Math.round(progress)}%`;
+      ? `Finalizing ${driverProgress.totalChunks} sections…`
+      : `Reading section ${Math.min(
+          driverProgress.processedChunks + 1,
+          driverProgress.totalChunks,
+        )} of ${driverProgress.totalChunks}…${etaLabel ? ` · ${etaLabel}` : ""}`
+    : `Starting…`;
 
 
 

@@ -23,6 +23,7 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import {
   finalizeRequirementsDraft,
   getActiveDraftJobs,
+  nudgeDraftJob,
   processDraftChunk,
 } from "@/lib/authoritative-sources.functions";
 
@@ -94,6 +95,7 @@ export function DraftJobsProvider({ children }: { children: React.ReactNode }) {
   const getActive = useServerFn(getActiveDraftJobs);
   const processFn = useServerFn(processDraftChunk);
   const finalizeFn = useServerFn(finalizeRequirementsDraft);
+  const nudgeFn = useServerFn(nudgeDraftJob);
 
   const [progress, setProgress] = useState<Record<string, DraftJobProgress>>({});
   // Track which jobIds have an in-flight driver loop so polling doesn't
@@ -152,9 +154,14 @@ export function DraftJobsProvider({ children }: { children: React.ReactNode }) {
       // Snapshot mutable state per job.
       const totals = { total: job.totalChunks };
       const doneSet = new Set<number>(job.processedIndices);
-      const durations = [...job.chunkDurationsMs];
       let cursor = 0;
       let cancelled = false;
+      if (doneSet.size > 0) {
+        console.debug(
+          `[nectar-draft] resuming job ${job.jobId} — ${doneSet.size} of ${job.totalChunks} sections already read, skipping to next`,
+        );
+      }
+      const durations = [...job.chunkDurationsMs];
 
       const runWorker = async () => {
         while (!cancelled) {
@@ -288,14 +295,14 @@ export function DraftJobsProvider({ children }: { children: React.ReactNode }) {
       const now = Date.now();
       if (now - lastNudge.current < 1_000) return;
       lastNudge.current = now;
-      // We can't sign the body client-side (no shared secret), so instead
-      // we call the authenticated startRequirementsDraft-style pathway:
-      // POST to /api/nectar/draft-nudge (no such route exists) — fall back
-      // to just letting the driver auto-resume on reopen. See note above.
-      // NOTE: intentionally no-op for now; server-side background loop is
-      // seeded by startRequirementsDraft's initial fireDraftTick. Leaving
-      // the hook in place so we can wire an authenticated nudge later.
-      void jobs;
+      // Fire authenticated server-fn nudges so the server-side tick keeps
+      // chunking after the tab is hidden or closed. Best-effort — the
+      // browser may cancel some requests on pagehide, but any completed
+      // request will run runDraftTick up to its 45s budget. Idempotency
+      // in processDraftChunk makes overlap with the client driver safe.
+      for (const j of jobs) {
+        void nudgeFn({ data: { jobId: j.jobId } }).catch(() => undefined);
+      }
     };
     const onVis = () => {
       if (document.visibilityState === "hidden") nudge();

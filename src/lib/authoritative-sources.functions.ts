@@ -1045,6 +1045,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
             : `${baseLabel}${webSuffix}`,
           applies_to: "company",
           approval_state: assisted ? "nectar_drafted" : null,
+          ...(rebuildMeta ? { metadata: rebuildMeta } : {}),
         })
         .select("id")
         .single();

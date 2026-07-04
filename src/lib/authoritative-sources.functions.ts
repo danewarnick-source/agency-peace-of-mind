@@ -13,6 +13,7 @@ import {
   extractRequirementsFromText,
   extractChunkWithRetry,
   chunkDocumentRanges,
+  isTransientAIError,
   EXPLAIN_SYSTEM_PROMPT,
   ExplainResp,
 } from "./authoritative-sources.server";
@@ -1343,6 +1344,11 @@ export const processDraftChunk = createServerFn({ method: "POST" })
       items = got.items;
       failures = got.failures;
     } catch (err) {
+      if (isTransientAIError(err)) {
+        throw new Error(
+          `AI is temporarily rate-limited. NECTAR will retry section ${data.chunkIndex + 1} shortly.`,
+        );
+      }
       failures = [
         `PART ${data.chunkIndex + 1}: ${(err as Error).message.slice(0, 300)}`,
       ];
@@ -1462,6 +1468,13 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
     const items = (job.extracted_items as unknown as DraftItem[]) ?? [];
     const chunkFailures = (job.chunk_failures as unknown as string[]) ?? [];
     const chunkCount = job.total_chunks as number;
+    const processedCount = (job.processed_chunks as number) ?? 0;
+
+    if (processedCount < chunkCount) {
+      throw new Error(
+        `NECTAR is still reading this document (${processedCount} of ${chunkCount} sections complete). It will continue automatically.`,
+      );
+    }
 
     const { data: doc, error: docErr } = await supabase
       .from("nectar_documents")

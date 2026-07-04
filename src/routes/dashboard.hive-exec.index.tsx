@@ -25,12 +25,14 @@ function CompaniesPage() {
 
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("active");
 
   const rows = useMemo<CompanyRow[]>(() => {
     const data = listQ.data ?? [];
     return data.filter((r) => {
-      if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (statusFilter === "active") {
+        if (r.status !== "active" && r.status !== "trial") return false;
+      } else if (statusFilter !== "all" && r.status !== statusFilter) return false;
       if (search && !r.name.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     });
@@ -91,8 +93,9 @@ function CompaniesPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="min-h-[44px] rounded-md border border-border bg-background px-2 text-sm"
             >
+              <option value="active">Active (incl. trial)</option>
               <option value="all">All statuses</option>
-              <option value="active">Active</option>
+              <option value="trial">Trial only</option>
               <option value="past_due">Past due</option>
               <option value="locked">Locked</option>
               <option value="cancelled">Cancelled</option>

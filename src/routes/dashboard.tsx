@@ -15,7 +15,10 @@ import {
   LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink, Sparkles, MapPin, TrendingUp, HandCoins, Scale, FileText, Inbox, Search, AlarmClock,
 } from "lucide-react";
 import { useIsHiveExecutive } from "@/hooks/use-hive-executive";
-import { EXEC_NAV } from "@/lib/exec-nav";
+import { EXEC_NAV, EXEC_DOMAINS, COMMAND_CENTER_ITEM } from "@/lib/exec-nav";
+import { useExecCapabilities } from "@/hooks/use-exec-capability";
+import { getPendingUpgradeRequestCount } from "@/lib/org-features.functions";
+import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -610,6 +613,24 @@ function SidebarBody({
   inboxUnread,
 }: SidebarBodyProps) {
   const [upgradeFeatureKey, setUpgradeFeatureKey] = useState<string | null>(null);
+  const [collapsedDomains, setCollapsedDomains] = useState<Record<string, boolean>>({});
+  const toggleDomain = (id: string) =>
+    setCollapsedDomains((c) => ({ ...c, [id]: !c[id] }));
+  const { capabilities: execCaps } = useExecCapabilities();
+  const execCountFn = useServerFn(getPendingUpgradeRequestCount);
+  const execPendingQ = useQuery({
+    queryKey: ["hive-exec-upgrade-pending-count"],
+    queryFn: () => execCountFn(),
+    refetchInterval: 30_000,
+    enabled: isHiveExecView,
+  });
+  const execBadges: Record<string, number> = {
+    upgrade_requests_pending: execPendingQ.data?.count ?? 0,
+  };
+  const execVisibleDomains = EXEC_DOMAINS.map((d) => ({
+    ...d,
+    items: d.items.filter((i) => execCaps.includes(i.capability)),
+  })).filter((d) => d.items.length > 0);
   return (
     <>
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6 font-display text-lg font-bold tracking-tight">
@@ -735,7 +756,69 @@ function SidebarBody({
       )}
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {nav.map((item) => {
+        {isHiveExecView ? (
+          <div className="space-y-3">
+            <Link
+              to={COMMAND_CENTER_ITEM.to}
+              onClick={onNavigate}
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                pathname === COMMAND_CENTER_ITEM.to
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              }`}
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              <span className="flex-1">{COMMAND_CENTER_ITEM.label}</span>
+            </Link>
+            {execVisibleDomains.map((d) => {
+              const isCollapsed = collapsedDomains[d.id] ?? false;
+              return (
+                <div key={d.id}>
+                  <button
+                    type="button"
+                    onClick={() => toggleDomain(d.id)}
+                    className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent/50"
+                    aria-expanded={!isCollapsed}
+                  >
+                    <span>{d.label}</span>
+                    <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isCollapsed ? "-rotate-90" : ""}`} />
+                  </button>
+                  {!isCollapsed && (
+                    <div className="mt-0.5 space-y-0.5">
+                      {d.items.map((t) => {
+                        const active = t.exact ? pathname === t.to : pathname.startsWith(t.to);
+                        const Icon = t.icon;
+                        const badgeCount = t.badgeKey ? execBadges[t.badgeKey] ?? 0 : 0;
+                        return (
+                          <Link
+                            key={t.to}
+                            to={t.to}
+                            onClick={onNavigate}
+                            className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                              active
+                                ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                                : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                            }`}
+                          >
+                            <span className="inline-flex items-center gap-2">
+                              <Icon className="h-4 w-4" /> {t.label}
+                            </span>
+                            {badgeCount > 0 && (
+                              <span className={`inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-white text-[#0f1b3d]" : "bg-[#d97a1c] text-white"}`}>
+                                {badgeCount}
+                              </span>
+                            )}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+        nav.map((item) => {
           const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
           const Icon = item.icon;
           const slug = item.to.replace(/^\/dashboard\/?/, "") || "home";
@@ -787,7 +870,8 @@ function SidebarBody({
               )}
             </Link>
           );
-        })}
+        })
+        )}
 
         {showNectarCluster && (
           <div className="mt-5 border-t border-sidebar-border pt-5">

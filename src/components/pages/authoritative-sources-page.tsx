@@ -412,7 +412,7 @@ function SourceRow({
   onJumpToRequirements,
   currentRole,
 }: {
-  source: { id: string; title: string; authoritative_kind: string | null; fiscal_year: string | null; effective_start: string | null; effective_end: string | null; file_name: string; uploaded_by_name: string | null; created_at: string; parse_status: string | null; metadata?: Record<string, unknown> | null };
+  source: { id: string; title: string; authoritative_kind: string | null; is_authoritative_source?: boolean | null; fiscal_year: string | null; effective_start: string | null; effective_end: string | null; file_name: string; uploaded_by_name: string | null; created_at: string; parse_status: string | null; metadata?: Record<string, unknown> | null };
   orgId: string;
   stats:
     | {

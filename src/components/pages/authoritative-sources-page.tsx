@@ -558,9 +558,28 @@ function SourceRow({
         <div className="flex flex-wrap items-center gap-2">
           <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
           <span className="truncate text-sm font-medium">{source.title}</span>
-          <Badge variant="secondary" className="text-[10px]">
-            {KIND_LABEL[source.authoritative_kind ?? "other"] ?? "Source"}
-          </Badge>
+          {kindMissing ? (
+            <Select
+              value=""
+              onValueChange={(v) => markMutation.mutate(v)}
+              disabled={markMutation.isPending || !canDraft}
+            >
+              <SelectTrigger className="h-6 w-auto gap-1 border-dashed border-amber-500/50 bg-amber-500/5 px-2 py-0 text-[10px] text-amber-900 dark:text-amber-200">
+                <SelectValue placeholder={markMutation.isPending ? "Saving…" : "Set kind"} />
+              </SelectTrigger>
+              <SelectContent>
+                {AUTH_KINDS.map((k) => (
+                  <SelectItem key={k.value} value={k.value} className="text-xs">
+                    {k.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Badge variant="secondary" className="text-[10px]">
+              {KIND_LABEL[source.authoritative_kind ?? "other"] ?? "Source"}
+            </Badge>
+          )}
           {source.parse_status === "parsed" && (
             <Badge className="bg-emerald-500/15 text-[10px] text-emerald-700 dark:text-emerald-300">
               Parsed

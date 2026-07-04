@@ -60,9 +60,10 @@ const DraftJobsContext = createContext<Ctx>({
   minEtaMs: null,
 });
 
-const CLIENT_CONCURRENCY = 2;
-const LARGE_DOC_CHUNK_THRESHOLD = 10;
-const LARGE_DOC_INTER_CALL_PAUSE_MS = 1_500;
+// Concurrency stays at 1: the server-side Bedrock rate limiter caps all
+// workers at 8 requests/minute anyway, so running more parallel workers here
+// just spends budget waiting on the bucket.
+const CLIENT_CONCURRENCY = 1;
 const POLL_INTERVAL_MS = 5_000;
 const TRANSIENT_RETRY_PAUSE_MS = 30_000;
 

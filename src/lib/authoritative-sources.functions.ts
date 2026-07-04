@@ -1345,9 +1345,17 @@ export const processDraftChunk = createServerFn({ method: "POST" })
       failures = got.failures;
     } catch (err) {
       if (isTransientAIError(err)) {
-        throw new Error(
-          `AI is temporarily rate-limited. NECTAR will retry section ${data.chunkIndex + 1} shortly.`,
-        );
+        // Do NOT throw — throwing from a server fn logs as a runtime error
+        // and can trigger the route error boundary. Return a soft transient
+        // status; the client driver retries this same section after a pause.
+        return {
+          processed: (job.processed_chunks as number) ?? priorIndices.length,
+          total: ranges.length,
+          itemsAdded: 0,
+          failuresAdded: [] as string[],
+          skipped: true as const,
+          transient: true as const,
+        };
       }
       failures = [
         `PART ${data.chunkIndex + 1}: ${(err as Error).message.slice(0, 300)}`,

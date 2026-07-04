@@ -15,6 +15,7 @@ import {
   ToggleRight,
   Wrench,
   LayoutDashboard,
+  BookOpen,
   type LucideIcon,
 } from "lucide-react";
 import type { ExecCapability } from "@/lib/exec-capabilities";
@@ -72,6 +73,7 @@ export const EXEC_DOMAINS: ExecDomain[] = [
       { to: "/dashboard/hive-exec/states", label: "States", icon: MapPin, capability: "states.edit" },
       { to: "/dashboard/hive-exec/permissions", label: "Permissions & Roles", icon: UserCog, capability: "roles.manage" },
       { to: "/dashboard/hive-exec/features", label: "Feature Registry", icon: ToggleRight, capability: "features.manage" },
+      { to: "/dashboard/hive-exec/knowledge", label: "Knowledge Base", icon: BookOpen, capability: "knowledge.manage" },
     ],
   },
   {

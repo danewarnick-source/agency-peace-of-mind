@@ -1,12 +1,9 @@
-import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { Shield, ShieldAlert, LayoutDashboard, HelpCircle, ChevronDown } from "lucide-react";
+import { Shield, ShieldAlert, HelpCircle } from "lucide-react";
 import { RequireHiveExecutive } from "@/components/hive-executive-guard";
-import { EXEC_DOMAINS, COMMAND_CENTER_ITEM, EXEC_NAV } from "@/lib/exec-nav";
-import { getPendingUpgradeRequestCount } from "@/lib/org-features.functions";
-import { useExecCapabilities, useCapability } from "@/hooks/use-exec-capability";
+import { EXEC_NAV } from "@/lib/exec-nav";
+import { useCapability } from "@/hooks/use-exec-capability";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SteveDockPanel } from "@/components/hive-exec/command/steve-panel";
@@ -22,21 +19,6 @@ export const Route = createFileRoute("/dashboard/hive-exec")({
 
 function ExecCommandCenterLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const countFn = useServerFn(getPendingUpgradeRequestCount);
-  const pendingQ = useQuery({
-    queryKey: ["hive-exec-upgrade-pending-count"],
-    queryFn: () => countFn(),
-    refetchInterval: 30_000,
-  });
-  const badges: Record<string, number> = {
-    upgrade_requests_pending: pendingQ.data?.count ?? 0,
-  };
-  const { capabilities } = useExecCapabilities();
-
-  const visibleDomains = EXEC_DOMAINS.map((d) => ({
-    ...d,
-    items: d.items.filter((i) => capabilities.includes(i.capability)),
-  })).filter((d) => d.items.length > 0);
 
   // Match current path to a nav entry to bias Steve's retrieval.
   const currentNav = useMemo(
@@ -45,8 +27,7 @@ function ExecCommandCenterLayout() {
   );
   const { allowed: steveAllowed } = useCapability("steve.use");
   const [guideOpen, setGuideOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const toggleDomain = (id: string) => setCollapsed((c) => ({ ...c, [id]: !c[id] }));
+
 
   return (
     <div className="space-y-4">

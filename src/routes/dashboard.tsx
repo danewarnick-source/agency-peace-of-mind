@@ -617,10 +617,13 @@ function SidebarBody({
   // default. The current route's domain auto-expands when the active domain
   // changes so the location stays visible; explicit user toggles persist while
   // the active domain stays the same.
+  const initialActiveDomain = EXEC_DOMAINS.find((d) =>
+    d.items.some((t) => (t.exact ? pathname === t.to : pathname.startsWith(t.to)))
+  )?.id ?? null;
   const [collapsedDomains, setCollapsedDomains] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(EXEC_DOMAINS.map((d) => [d.id, true]))
+    Object.fromEntries(EXEC_DOMAINS.map((d) => [d.id, d.id !== initialActiveDomain]))
   );
-  const lastActiveDomain = useRef<string | null>(null);
+  const lastActiveDomain = useRef<string | null>(initialActiveDomain);
   const toggleDomain = (id: string) =>
     setCollapsedDomains((c) => ({ ...c, [id]: !c[id] }));
   const { capabilities: execCaps } = useExecCapabilities();

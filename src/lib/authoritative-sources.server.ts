@@ -62,7 +62,12 @@ Return STRICT JSON only, shape:
   ]
 }
 
-Rules:
+Output rules (STRICT — the parser will reject anything else):
+- Return ONLY the raw JSON object. No markdown code fences. No prose before or after. No explanation.
+- Single-line minified JSON, no unnecessary whitespace.
+- Omit optional fields entirely when null (do not emit "citation": null).
+
+Content rules:
 - Only include items actually stated in the document text. Do NOT invent.
 - "category":
     audit_doc  = a document the provider must produce, retain, or submit (PCSPs on file, incident reports, training records, etc.)
@@ -71,7 +76,7 @@ Rules:
     billing    = a billing/reimbursement requirement (EVV, claim timeliness, prior auth)
 - Keep every field concise. Do not echo large sections of the document text. The goal is a compact list.
 - Prefer fewer high-quality items over many vague ones.
-- If the text contains no requirement language at all, return {"requirements": []}.`;
+- If the text contains no requirement language at all, return {"requirements":[]}.`;
 
 export const ReqItem = z.object({
   title: z.string().min(1).max(200),

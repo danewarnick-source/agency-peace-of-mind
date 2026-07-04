@@ -302,15 +302,6 @@ export async function runDraftTick(jobId: string): Promise<{
     }
   };
 
-      const [s, e] = initial.chunk_ranges[chunkIndex];
-      const windowText = rawText.slice(s, e);
-      const result = await processOneChunk(jobId, chunkIndex, windowText, total);
-      if (result.transient) return;
-      await persistChunkResult(jobId, chunkIndex, result);
-      chunksThisTick += 1;
-    }
-  };
-
   await Promise.all(
     Array.from(
       { length: Math.min(TICK_CONCURRENCY, remaining.length) },

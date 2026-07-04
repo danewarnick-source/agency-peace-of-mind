@@ -161,12 +161,16 @@ export async function extractOnce(
 export async function extractChunkWithRetry(
   windowText: string,
   partLabel: string,
+  depth = 0,
 ): Promise<{ items: Array<z.infer<typeof ReqItem>>; failures: string[] }> {
   try {
     const items = await extractOnce(windowText, partLabel);
     return { items, failures: [] };
   } catch (err) {
     if (!(err instanceof ChunkParseError)) throw err;
+    if (depth >= 4) {
+      return { items: [], failures: [`${partLabel}: ${(err as Error).message}`] };
+    }
     const mid = Math.floor(windowText.length / 2);
     const boundary = windowText.lastIndexOf("\n\n", mid + 2_000);
     const split = boundary > windowText.length * 0.2 ? boundary : mid;
@@ -174,13 +178,10 @@ export async function extractChunkWithRetry(
     const items: Array<z.infer<typeof ReqItem>> = [];
     const failures: string[] = [];
     for (let h = 0; h < halves.length; h += 1) {
-      try {
-        const got = await extractOnce(halves[h], `${partLabel} (retry ${h + 1}/2)`);
-        items.push(...got);
-      } catch (retryErr) {
-        if (!(retryErr instanceof ChunkParseError)) throw retryErr;
-        failures.push(`${partLabel} half ${h + 1}: ${(retryErr as Error).message}`);
-      }
+      const label = `${partLabel} (d${depth + 1} ${h + 1}/2)`;
+      const result = await extractChunkWithRetry(halves[h], label, depth + 1);
+      items.push(...result.items);
+      failures.push(...result.failures);
     }
     return { items, failures };
   }

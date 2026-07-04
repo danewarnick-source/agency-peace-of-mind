@@ -9792,6 +9792,7 @@ export type Database = {
       nectar_draft_jobs: {
         Row: {
           attempts_started: number
+          chunk_attempts: Json
           chunk_durations_ms: number[]
           chunk_failures: Json
           chunk_ranges: Json
@@ -9816,6 +9817,7 @@ export type Database = {
         }
         Insert: {
           attempts_started?: number
+          chunk_attempts?: Json
           chunk_durations_ms?: number[]
           chunk_failures?: Json
           chunk_ranges?: Json
@@ -9840,6 +9842,7 @@ export type Database = {
         }
         Update: {
           attempts_started?: number
+          chunk_attempts?: Json
           chunk_durations_ms?: number[]
           chunk_failures?: Json
           chunk_ranges?: Json
@@ -10018,6 +10021,33 @@ export type Database = {
           surface?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      nectar_rate_state: {
+        Row: {
+          day_start: string
+          day_tokens_used: number
+          key: string
+          updated_at: string
+          window_count: number
+          window_start: string
+        }
+        Insert: {
+          day_start?: string
+          day_tokens_used?: number
+          key: string
+          updated_at?: string
+          window_count?: number
+          window_start?: string
+        }
+        Update: {
+          day_start?: string
+          day_tokens_used?: number
+          key?: string
+          updated_at?: string
+          window_count?: number
+          window_start?: string
         }
         Relationships: []
       }
@@ -15627,9 +15657,29 @@ export type Database = {
           similarity: number
         }[]
       }
+      nectar_bump_chunk_attempt: {
+        Args: { p_index: number; p_job: string }
+        Returns: number
+      }
       nectar_bump_draft_attempt: { Args: { p_job: string }; Returns: undefined }
       nectar_bump_draft_transient: {
         Args: { p_job: string; p_msg: string }
+        Returns: undefined
+      }
+      nectar_check_rate: {
+        Args: {
+          p_daily_token_cap: number
+          p_key: string
+          p_max_per_min: number
+        }
+        Returns: {
+          day_full: boolean
+          day_tokens_used: number
+          wait_ms: number
+        }[]
+      }
+      nectar_record_tokens: {
+        Args: { p_key: string; p_tokens: number }
         Returns: undefined
       }
       notify_incident_filed: {

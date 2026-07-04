@@ -1,40 +1,33 @@
 ## Goal
-Make SOW 2026 (and any similarly large document) draft requirements reliably end-to-end, without losing progress on retries and without repeatedly tripping the AI rate limit.
 
-## What changes
+Reduce the number of AI requests NECTAR makes per authoritative-source document by making each chunk ~5× larger. Nothing about extraction, retries, pacing, persistence, or dedupe changes.
 
-### 1. Successfully-read sections are permanent
-- Every section that returns valid extracted requirements is written to the draft immediately and its chunk index is marked `processed` in the job row.
-- Retry logic only looks at sections whose status is `failed` or `pending` (never attempted). Already-`processed` sections are skipped entirely — no re-read, no re-prompt, no additional AI cost.
-- The "still working" guard added last round (`processedCount < chunkCount` blocks finalize) stays, so a job cannot silently complete with gaps.
-- Transient errors (429 / 5xx) leave the section as `pending` (not `processed`, not `failed-permanent`) so the next tick picks it up.
+## The single change
 
-### 2. Pacing for large documents to avoid rate limits proactively
-- For documents above a size threshold (SOW 2026 at ~24 sections qualifies), the driver runs **2 sections at a time** with a short pause (~1.5s) between AI calls, instead of the current "as fast as possible then back off."
-- Concrete settings for large docs:
-  - `TICK_CONCURRENCY = 2`
-  - `CLIENT_CONCURRENCY = 2`
-  - Inter-call pause: ~1.5s between chunk extractions within a tick
-  - Between ticks: ~3s pause
-- Small/normal docs keep current speed — pacing only kicks in when `total_chunks > 10` (tunable) so short PDFs aren't slowed down.
-- Transient-error backoff (0.3s / 1.5s / 3s from last round) remains as the recovery path if the rate limit is still hit.
+In `src/lib/authoritative-sources.server.ts`, raise the default chunk-window size (and proportionally the overlap) used by `chunkDocumentRanges` / `chunkDocumentText`:
 
-### 3. Resume SOW 2026 cleanly
-- The previously-failed SOW 2026 job stays marked failed. When the user clicks **Draft requirements** again, a fresh job starts under the new pacing rules and processes all 24 sections — no re-upload needed.
-- If any old partial results exist for that document, they are discarded at job start so the new run is a clean slate (avoids mixing old truncated output with new).
+- `windowSize`: `12_000` → `60_000` characters (5×)
+- `overlap`: `800` → `4_000` characters (kept at the same ~6–7% of window so section boundaries still get double-covered)
+- `maxChunks`: `80` → `20` (still well above the new expected max of ~4–5 for a large SOW, but no longer allows the old 20+ small-chunk behavior as a fallback)
 
-### 4. Visible progress
-- Progress driver copy: "Processing section X of Y — pacing AI calls to stay under the rate limit."
-- On transient retry: "Waiting for AI capacity, resuming automatically." (no error toast)
-- On permanent failure of a single section: surface which section failed so the user knows draft is partial and can retry just that one.
+That's it — same function signature, same return shape, same boundary-snapping logic (still prefers a `\n\n` break near the tail of each window). Every caller already relies on the defaults:
+
+- `src/lib/authoritative-sources.functions.ts:1243` — `chunkDocumentRanges(rawText)`
+- `src/lib/authoritative-sources.server.ts:270` — `chunkDocumentText(text)` inside `extractRequirementsFromText`
+
+so no call sites need edits.
+
+## What is deliberately NOT changing
+
+- `extractOnce` / `extractChunkWithRetry` / `extractOnceWithTransientRetry` — same prompt, same `max_tokens: 8192`, same JSON schema, same split-in-half fallback on `ChunkParseError` (so if a 60k window ever returns truncated JSON, it recursively halves down to ~30k, ~15k, etc., preserving completeness).
+- `TICK_CONCURRENCY`, `LARGE_DOC_CHUNK_THRESHOLD`, `LARGE_DOC_INTER_CALL_PAUSE_MS` in `src/lib/nectar-draft-tick.server.ts` — pacing stays exactly as tuned. A large SOW at ~5 chunks is still `> LARGE_DOC_CHUNK_THRESHOLD` under some inputs but the pacing logic is safe either way; not touching it.
+- Client driver in `src/components/nectar/draft-jobs-driver.tsx` — shared `pausedUntil` backoff on 429 stays as-is.
+- Job schema, `chunk_ranges` persistence, dedupe keys, failure reporting — untouched.
+
+## How we'll know it worked
+
+Uploading the same large SOW that previously produced ~20 chunks now produces ~4–5 chunks (visible in the draft job's `total_chunks` and the "reading section X of N" indicator). Extracted requirement counts should be comparable to the previous run (the halving fallback catches the rare case where a 60k window trips the model's output limit).
 
 ## Files touched
-- `src/lib/authoritative-sources.server.ts` — pacing knobs, "skip already-processed" guard in retry path, size-based concurrency selection.
-- `src/lib/nectar-draft-tick.server.ts` — 2-at-a-time worker with inter-call delay for large docs; keep transient-vs-permanent distinction.
-- `src/lib/authoritative-sources.functions.ts` — finalize guard already in place; add "reset partial results on fresh job start" for the same source.
-- `src/components/nectar/draft-jobs-driver.tsx` — updated user-facing copy for pacing/waiting states.
 
-## Non-goals
-- No schema changes.
-- No change to extraction prompt or requirement shape.
-- No change to how small documents draft today.
+- `src/lib/authoritative-sources.server.ts` — three default arg values on `chunkDocumentRanges` (and the mirrored defaults on `chunkDocumentText`).

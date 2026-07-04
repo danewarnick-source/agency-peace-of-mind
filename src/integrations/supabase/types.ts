@@ -9791,6 +9791,7 @@ export type Database = {
       }
       nectar_draft_jobs: {
         Row: {
+          attempts_started: number
           chunk_durations_ms: number[]
           chunk_failures: Json
           chunk_ranges: Json
@@ -9801,15 +9802,20 @@ export type Database = {
           extracted_items: Json
           id: string
           inserted_count: number
+          last_attempt_at: string | null
+          last_transient_at: string | null
+          last_transient_message: string | null
           organization_id: string
           processed_chunks: number
           processed_indices: number[]
           started_at: string
           status: string
           total_chunks: number
+          transient_errors: number
           updated_at: string
         }
         Insert: {
+          attempts_started?: number
           chunk_durations_ms?: number[]
           chunk_failures?: Json
           chunk_ranges?: Json
@@ -9820,15 +9826,20 @@ export type Database = {
           extracted_items?: Json
           id?: string
           inserted_count?: number
+          last_attempt_at?: string | null
+          last_transient_at?: string | null
+          last_transient_message?: string | null
           organization_id: string
           processed_chunks?: number
           processed_indices?: number[]
           started_at?: string
           status?: string
           total_chunks?: number
+          transient_errors?: number
           updated_at?: string
         }
         Update: {
+          attempts_started?: number
           chunk_durations_ms?: number[]
           chunk_failures?: Json
           chunk_ranges?: Json
@@ -9839,12 +9850,16 @@ export type Database = {
           extracted_items?: Json
           id?: string
           inserted_count?: number
+          last_attempt_at?: string | null
+          last_transient_at?: string | null
+          last_transient_message?: string | null
           organization_id?: string
           processed_chunks?: number
           processed_indices?: number[]
           started_at?: string
           status?: string
           total_chunks?: number
+          transient_errors?: number
           updated_at?: string
         }
         Relationships: []
@@ -15611,6 +15626,11 @@ export type Database = {
           id: string
           similarity: number
         }[]
+      }
+      nectar_bump_draft_attempt: { Args: { p_job: string }; Returns: undefined }
+      nectar_bump_draft_transient: {
+        Args: { p_job: string; p_msg: string }
+        Returns: undefined
       }
       notify_incident_filed: {
         Args: {

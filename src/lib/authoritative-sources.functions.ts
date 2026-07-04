@@ -1331,6 +1331,12 @@ export const processDraftChunk = createServerFn({ method: "POST" })
     const t0 = Date.now();
     let items: DraftItem[] = [];
     let failures: string[] = [];
+    // Heartbeat: record that we're kicking off an AI call so a DB observer
+    // (or the UI) can see the difference between "silently 429-looping" and
+    // "AI call genuinely in-flight". Best-effort; ignore errors.
+    await supabase
+      .rpc("nectar_bump_draft_attempt", { p_job: data.jobId })
+      .then(() => undefined, () => undefined);
     try {
       const got = await extractChunkWithRetry(
         window,
@@ -1350,6 +1356,11 @@ export const processDraftChunk = createServerFn({ method: "POST" })
             ? 30_000
             : null;
       if (retryAfterMs !== null) {
+        // Record the transient hit so we can see rate-limit pressure in the DB.
+        const msg = (err as Error | undefined)?.message ?? "transient AI error";
+        await supabase
+          .rpc("nectar_bump_draft_transient", { p_job: data.jobId, p_msg: msg })
+          .then(() => undefined, () => undefined);
         // Do NOT throw — throwing from a server fn logs as a runtime error
         // and can trigger the route error boundary. Return a soft transient
         // status; the client driver retries this same section after a pause.
@@ -1367,6 +1378,7 @@ export const processDraftChunk = createServerFn({ method: "POST" })
         `PART ${data.chunkIndex + 1}: ${(err as Error).message.slice(0, 300)}`,
       ];
     }
+
     const durationMs = Math.max(1, Date.now() - t0);
 
     const priorItems = (job.extracted_items as unknown as DraftItem[]) ?? [];

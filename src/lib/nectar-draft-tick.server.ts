@@ -159,6 +159,10 @@ async function processOneChunk(
   const t0 = Date.now();
   let items: DraftItem[] = [];
   let failures: string[] = [];
+  // Heartbeat before every AI call so the DB shows genuine in-flight work.
+  await supabaseAdmin
+    .rpc("nectar_bump_draft_attempt", { p_job: jobId })
+    .then(() => undefined, () => undefined);
   try {
     const got = await extractChunkWithRetry(
       windowText,
@@ -168,12 +172,17 @@ async function processOneChunk(
     failures = got.failures;
   } catch (err) {
     if (isTransientAIError(err)) {
+      const msg = (err as Error | undefined)?.message ?? "transient AI error";
+      await supabaseAdmin
+        .rpc("nectar_bump_draft_transient", { p_job: jobId, p_msg: msg })
+        .then(() => undefined, () => undefined);
       return { items: [], failures: [], durationMs: Math.max(1, Date.now() - t0), transient: true };
     }
     failures = [
       `PART ${chunkIndex + 1}: ${(err as Error).message.slice(0, 300)}`,
     ];
   }
+
   const durationMs = Math.max(1, Date.now() - t0);
   void jobId;
   return { items, failures, durationMs, transient: false };

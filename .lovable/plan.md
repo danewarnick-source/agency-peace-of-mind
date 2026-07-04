@@ -1,33 +1,81 @@
 ## Goal
 
-Reduce the number of AI requests NECTAR makes per authoritative-source document by making each chunk ~5× larger. Nothing about extraction, retries, pacing, persistence, or dedupe changes.
+Give us a way to tell — from the DB and from the UI — whether NECTAR is *actually calling the AI* or *silently 429-looping*, without touching extraction, retries, or pacing.
 
-## The single change
+## What "in-flight" means here
 
-In `src/lib/authoritative-sources.server.ts`, raise the default chunk-window size (and proportionally the overlap) used by `chunkDocumentRanges` / `chunkDocumentText`:
+Every AI attempt writes a lightweight heartbeat before and after the call. Successes and hard failures already leave a trace (`processed_indices` / `chunk_failures`). Only transient errors are invisible today. We add:
 
-- `windowSize`: `12_000` → `60_000` characters (5×)
-- `overlap`: `800` → `4_000` characters (kept at the same ~6–7% of window so section boundaries still get double-covered)
-- `maxChunks`: `80` → `20` (still well above the new expected max of ~4–5 for a large SOW, but no longer allows the old 20+ small-chunk behavior as a fallback)
+- a counter for total AI attempts started
+- a counter for transient errors
+- the last transient message + when it happened
+- the wall-clock time of the last attempt (so we can see "an AI call is currently mid-flight — started 40s ago")
 
-That's it — same function signature, same return shape, same boundary-snapping logic (still prefers a `\n\n` break near the tail of each window). Every caller already relies on the defaults:
+If `attempts_started` keeps climbing but `processed_chunks` doesn't, that's a throttle loop. If `attempts_started` climbs and `processed_chunks` follows a beat later, the AI is genuinely reading.
 
-- `src/lib/authoritative-sources.functions.ts:1243` — `chunkDocumentRanges(rawText)`
-- `src/lib/authoritative-sources.server.ts:270` — `chunkDocumentText(text)` inside `extractRequirementsFromText`
+## Schema change (migration)
 
-so no call sites need edits.
+Add four columns to `public.nectar_draft_jobs`:
+
+```sql
+alter table public.nectar_draft_jobs
+  add column if not exists attempts_started integer not null default 0,
+  add column if not exists transient_errors integer not null default 0,
+  add column if not exists last_attempt_at timestamptz,
+  add column if not exists last_transient_at timestamptz,
+  add column if not exists last_transient_message text;
+```
+
+No new RLS policies needed — existing job policies already cover the row. No GRANT changes needed for the same reason (columns inherit the table's grants).
+
+## Server changes (both driver paths)
+
+Two places call `extractChunkWithRetry` for a job chunk today; both get the same three-step wrap. No behavior change, no new retry logic, no extra AI calls.
+
+**`src/lib/nectar-draft-tick.server.ts` → `processOneChunk`:**
+1. Before the `extractChunkWithRetry(...)` call: `update nectar_draft_jobs set attempts_started = attempts_started + 1, last_attempt_at = now() where id = jobId`.
+2. On `TransientAIError`: `update ... set transient_errors = transient_errors + 1, last_transient_at = now(), last_transient_message = <first 300 chars of err.message>`.
+3. On success or hard failure: nothing extra — existing `persistChunkResult` already records the outcome.
+
+**`src/lib/authoritative-sources.functions.ts` → `processDraftChunk` handler** (the client-driver path): same three-step wrap around its `extractChunkWithRetry` call, using `supabaseAdmin` (already loaded there for the job update).
+
+Both use small targeted `UPDATE` statements (not read-modify-write) so concurrent workers can't clobber each other. The columns are pure counters + timestamps, so a lost update is at worst a slightly-low count.
+
+## Type + UI surface
+
+- Regenerate `src/integrations/supabase/types.ts` picks up the new columns automatically on the next Supabase types sync — no manual edit.
+- In `src/components/nectar/draft-jobs-driver.tsx` (or whichever component renders the "reading section X of N" indicator — I'll grep to confirm the exact file), extend the existing job subscription/select to include the four new fields and render a small muted line under the progress bar:
+  - When `attempts_started > processed_chunks + (chunk_failures.length)` **and** the delta is growing across polls → show "AI call in flight (started {relative time})".
+  - When `transient_errors > 0` in the last 60s → show "Waiting for AI capacity — {transient_errors} rate-limit signal(s), last: {relative time}".
+  - Otherwise → no extra line (keeps the UI quiet when things are healthy).
+
+This is display-only text; it doesn't change the driver's control flow, backoff, or `pausedUntil`.
 
 ## What is deliberately NOT changing
 
-- `extractOnce` / `extractChunkWithRetry` / `extractOnceWithTransientRetry` — same prompt, same `max_tokens: 8192`, same JSON schema, same split-in-half fallback on `ChunkParseError` (so if a 60k window ever returns truncated JSON, it recursively halves down to ~30k, ~15k, etc., preserving completeness).
-- `TICK_CONCURRENCY`, `LARGE_DOC_CHUNK_THRESHOLD`, `LARGE_DOC_INTER_CALL_PAUSE_MS` in `src/lib/nectar-draft-tick.server.ts` — pacing stays exactly as tuned. A large SOW at ~5 chunks is still `> LARGE_DOC_CHUNK_THRESHOLD` under some inputs but the pacing logic is safe either way; not touching it.
-- Client driver in `src/components/nectar/draft-jobs-driver.tsx` — shared `pausedUntil` backoff on 429 stays as-is.
-- Job schema, `chunk_ranges` persistence, dedupe keys, failure reporting — untouched.
+- Chunk size / overlap / max chunks (the recent 5× change stays).
+- `extractOnce` / `extractChunkWithRetry` / prompt / `max_tokens` / JSON schema / halving fallback.
+- `TICK_CONCURRENCY`, `LARGE_DOC_CHUNK_THRESHOLD`, `LARGE_DOC_INTER_CALL_PAUSE_MS`.
+- Client-driver `pausedUntil` shared backoff.
+- Persistence of `extracted_items`, `chunk_failures`, `processed_indices`, `chunk_durations_ms`.
 
 ## How we'll know it worked
 
-Uploading the same large SOW that previously produced ~20 chunks now produces ~4–5 chunks (visible in the draft job's `total_chunks` and the "reading section X of N" indicator). Extracted requirement counts should be comparable to the previous run (the halving fallback catches the rare case where a 60k window trips the model's output limit).
+For the currently-stuck job (`87c85fad…`), within 30s of shipping this we can run:
+
+```sql
+select attempts_started, transient_errors, processed_chunks,
+       last_attempt_at, last_transient_at, last_transient_message
+from public.nectar_draft_jobs where id = '87c85fad-2288-4edf-b5c7-b91ab5a07789';
+```
+
+and get an unambiguous answer:
+- `attempts_started` climbing + `last_transient_message` populated → Bedrock is throttling, not reading.
+- `attempts_started` = 1 or 2, `last_attempt_at` fresh, no transient → AI call is genuinely mid-flight; wait.
 
 ## Files touched
 
-- `src/lib/authoritative-sources.server.ts` — three default arg values on `chunkDocumentRanges` (and the mirrored defaults on `chunkDocumentText`).
+- new `supabase/migrations/<timestamp>_nectar_draft_job_inflight.sql`
+- `src/lib/nectar-draft-tick.server.ts` (wrap `processOneChunk`)
+- `src/lib/authoritative-sources.functions.ts` (wrap `processDraftChunk` handler)
+- one component file rendering the progress indicator (confirmed via grep before edit — likely `src/components/nectar/draft-jobs-driver.tsx` or a sibling in `src/components/nectar/`)

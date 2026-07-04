@@ -1,44 +1,40 @@
-## What’s happening
+## Goal
+Make SOW 2026 (and any similarly large document) draft requirements reliably end-to-end, without losing progress on retries and without repeatedly tripping the AI rate limit.
 
-SOW 2026 does **not** need to be deleted or re-uploaded. The file text is present and parsed: about **259k characters**, split into **24 sections**.
+## What changes
 
-The latest draft job shows the real failure pattern:
-- It processed only **13 of 24 sections**.
-- All 13 recorded failures were AI rate-limit errors, starting with: **“AI rate limit reached. Try again in a moment.”**
-- Because each failed section is currently counted as “processed,” the job can finalize early with **0 requirements**, even though 11 sections were never attempted.
-- The current retry behavior only splits chunks for malformed/truncated AI output; it does **not** properly back off and retry rate-limit failures.
+### 1. Successfully-read sections are permanent
+- Every section that returns valid extracted requirements is written to the draft immediately and its chunk index is marked `processed` in the job row.
+- Retry logic only looks at sections whose status is `failed` or `pending` (never attempted). Already-`processed` sections are skipped entirely — no re-read, no re-prompt, no additional AI cost.
+- The "still working" guard added last round (`processedCount < chunkCount` blocks finalize) stays, so a job cannot silently complete with gaps.
+- Transient errors (429 / 5xx) leave the section as `pending` (not `processed`, not `failed-permanent`) so the next tick picks it up.
 
-## Plan
+### 2. Pacing for large documents to avoid rate limits proactively
+- For documents above a size threshold (SOW 2026 at ~24 sections qualifies), the driver runs **2 sections at a time** with a short pause (~1.5s) between AI calls, instead of the current "as fast as possible then back off."
+- Concrete settings for large docs:
+  - `TICK_CONCURRENCY = 2`
+  - `CLIENT_CONCURRENCY = 2`
+  - Inter-call pause: ~1.5s between chunk extractions within a tick
+  - Between ticks: ~3s pause
+- Small/normal docs keep current speed — pacing only kicks in when `total_chunks > 10` (tunable) so short PDFs aren't slowed down.
+- Transient-error backoff (0.3s / 1.5s / 3s from last round) remains as the recovery path if the rate limit is still hit.
 
-1. **Stop treating rate limits as completed sections**
-   - Change the chunk processor so transient AI failures like rate limits are not saved as permanently processed chunks.
-   - Keep those chunks eligible for retry instead of letting the job finalize with missing sections.
+### 3. Resume SOW 2026 cleanly
+- The previously-failed SOW 2026 job stays marked failed. When the user clicks **Draft requirements** again, a fresh job starts under the new pacing rules and processes all 24 sections — no re-upload needed.
+- If any old partial results exist for that document, they are discarded at job start so the new run is a clean slate (avoids mixing old truncated output with new).
 
-2. **Add controlled retry/backoff for large SOWs**
-   - Add a delay-and-retry path for 429/rate-limit errors.
-   - Lower draft concurrency for large documents so the app does not fire too many AI calls at once.
-   - Keep the background job model, but make it slower and steadier rather than failing fast.
+### 4. Visible progress
+- Progress driver copy: "Processing section X of Y — pacing AI calls to stay under the rate limit."
+- On transient retry: "Waiting for AI capacity, resuming automatically." (no error toast)
+- On permanent failure of a single section: surface which section failed so the user knows draft is partial and can retry just that one.
 
-3. **Finalize only when every section is actually done**
-   - Update finalization to refuse completion when `processed_chunks < total_chunks`.
-   - Return a “still working / retrying” state instead of a failed draft if sections remain.
+## Files touched
+- `src/lib/authoritative-sources.server.ts` — pacing knobs, "skip already-processed" guard in retry path, size-based concurrency selection.
+- `src/lib/nectar-draft-tick.server.ts` — 2-at-a-time worker with inter-call delay for large docs; keep transient-vs-permanent distinction.
+- `src/lib/authoritative-sources.functions.ts` — finalize guard already in place; add "reset partial results on fresh job start" for the same source.
+- `src/components/nectar/draft-jobs-driver.tsx` — updated user-facing copy for pacing/waiting states.
 
-4. **Make retry behavior visible and understandable**
-   - Update the progress driver so a transient chunk failure pauses/retries instead of showing a final extraction error.
-   - Use user-facing copy like “NECTAR is waiting for the AI rate limit to clear, then will continue.”
-
-5. **Clean up the stuck SOW 2026 job state**
-   - After the code fix, reset/restart the failed SOW 2026 draft job so it can run through all 24 sections under the safer retry rules.
-   - Existing uploaded document stays in place.
-
-## Technical notes
-
-Files likely to change:
-- `src/lib/authoritative-sources.server.ts`
-- `src/lib/authoritative-sources.functions.ts`
-- `src/lib/nectar-draft-tick.server.ts`
-- `src/components/nectar/draft-jobs-driver.tsx`
-
-Database/data cleanup:
-- Mark the current incomplete `nectar_draft_jobs` row for SOW 2026 as failed or superseded, or start a fresh job after the fix.
-- No schema migration should be needed unless the existing job table lacks enough state for retry timing; current columns appear sufficient for a code-only fix.
+## Non-goals
+- No schema changes.
+- No change to extraction prompt or requirement shape.
+- No change to how small documents draft today.

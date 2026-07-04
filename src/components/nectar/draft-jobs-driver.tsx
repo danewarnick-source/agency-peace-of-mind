@@ -60,7 +60,9 @@ const DraftJobsContext = createContext<Ctx>({
   minEtaMs: null,
 });
 
-const CLIENT_CONCURRENCY = 1;
+const CLIENT_CONCURRENCY = 2;
+const LARGE_DOC_CHUNK_THRESHOLD = 10;
+const LARGE_DOC_INTER_CALL_PAUSE_MS = 1_500;
 const POLL_INTERVAL_MS = 5_000;
 const TRANSIENT_RETRY_PAUSE_MS = 30_000;
 
@@ -174,7 +176,10 @@ export function DraftJobsProvider({ children }: { children: React.ReactNode }) {
       }
       const durations = [...job.chunkDurationsMs];
 
+      const paced = totals.total > LARGE_DOC_CHUNK_THRESHOLD;
+
       const runWorker = async () => {
+        let firstCall = true;
         while (!cancelled) {
           // Find next index that isn't already done. Advance cursor past
           // any recorded index to avoid unnecessary AI calls (idempotency
@@ -183,6 +188,11 @@ export function DraftJobsProvider({ children }: { children: React.ReactNode }) {
           const i = cursor;
           if (i >= totals.total) return;
           cursor += 1;
+
+          // Pace subsequent calls in this worker on large docs so we
+          // stay under the AI rate limit instead of only recovering.
+          if (paced && !firstCall) await wait(LARGE_DOC_INTER_CALL_PAUSE_MS);
+          firstCall = false;
 
           const t0 = Date.now();
           let processedNow = 0;

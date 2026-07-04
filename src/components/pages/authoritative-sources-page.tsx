@@ -474,6 +474,22 @@ function SourceRow({
   });
   const qc = useQueryClient();
   const startFn = useServerFn(startRequirementsDraft);
+  const markFn = useServerFn(markAsAuthoritativeSource);
+  const markMutation = useMutation({
+    mutationFn: (nextKind: string) =>
+      markFn({
+        data: {
+          documentId: source.id,
+          authoritativeKind: nextKind as "state_sow" | "provider_contract" | "dspd_requirement" | "dhs_requirement" | "public_record" | "tool_template" | "other",
+          isAuthoritative: true,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Document kind set — NECTAR can now draft from it.");
+      qc.invalidateQueries({ queryKey: ["auth-sources", orgId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const driverProgress = useDraftJobProgress(source.id);
   const generate = useMutation({
     mutationFn: async () => {

@@ -60,8 +60,19 @@ const DraftJobsContext = createContext<Ctx>({
   minEtaMs: null,
 });
 
-const CLIENT_CONCURRENCY = 3;
+const CLIENT_CONCURRENCY = 1;
 const POLL_INTERVAL_MS = 5_000;
+const TRANSIENT_RETRY_PAUSE_MS = 30_000;
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isTransientDraftError(err: unknown): boolean {
+  return /rate-limit|rate limit|temporarily|still reading|retry section/i.test(
+    (err as Error)?.message ?? "",
+  );
+}
 
 function computeEtaMs(
   totalChunks: number,
@@ -188,6 +199,26 @@ export function DraftJobsProvider({ children }: { children: React.ReactNode }) {
             doneSet.add(i);
             if (!r.skipped) durations.push(Math.max(1, Date.now() - t0));
           } catch (err) {
+            if (isTransientDraftError(err)) {
+              console.info(
+                `[nectar-draft] section ${i} is waiting for AI capacity for job ${job.jobId}:`,
+                (err as Error).message,
+              );
+              cursor = Math.min(cursor, i);
+              setProgress((prev) => {
+                const cur = prev[job.documentId];
+                if (!cur) return prev;
+                return {
+                  ...prev,
+                  [job.documentId]: {
+                    ...cur,
+                    etaMs: TRANSIENT_RETRY_PAUSE_MS,
+                  },
+                };
+              });
+              await wait(TRANSIENT_RETRY_PAUSE_MS);
+              continue;
+            }
             // Log but keep going with other chunks — the server records
             // per-chunk failures in chunk_failures and finalize surfaces
             // them to the user.
@@ -266,9 +297,16 @@ export function DraftJobsProvider({ children }: { children: React.ReactNode }) {
             qc.invalidateQueries({ queryKey: ["auth-sources", orgId] });
           }
         } catch (err) {
-          toast.error(
-            `Drafting “${job.documentTitle}” failed: ${(err as Error).message}`,
-          );
+          if (isTransientDraftError(err)) {
+            toast.info(
+              `NECTAR is waiting for AI capacity, then will continue reading “${job.documentTitle}”.`,
+              { duration: 7000 },
+            );
+          } else {
+            toast.error(
+              `Drafting “${job.documentTitle}” failed: ${(err as Error).message}`,
+            );
+          }
         } finally {
           cancelled = true;
           activeLoops.current.delete(job.jobId);

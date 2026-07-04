@@ -117,25 +117,12 @@ const askSchema = z.object({
   featureKeyContext: z.string().max(120).nullable().optional(),
 });
 
-/**
- * Tokenize a natural-language question into a Postgres tsquery-safe prefix
- * expression. Falls back to a plain trigram-ish OR list if empty.
- */
-function toTsQuery(q: string): string {
-  const words = q
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .filter((w) => w.length >= 3 && !STOPWORDS.has(w))
-    .slice(0, 12);
-  if (words.length === 0) return "";
-  return words.map((w) => `${w}:*`).join(" | ");
-}
 const STOPWORDS = new Set([
   "the","and","for","with","how","what","when","where","why","who","does","this","that",
   "from","have","has","are","was","were","can","could","would","should","about","into",
   "you","your","our","their","them","his","her","its","not","but","get","got",
 ]);
+
 
 export const askSteve = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

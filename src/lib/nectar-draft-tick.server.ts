@@ -278,10 +278,8 @@ export async function runDraftTick(jobId: string): Promise<{
 
   let cursor = 0;
   let chunksThisTick = 0;
-  const paced = total > LARGE_DOC_CHUNK_THRESHOLD;
 
   const worker = async () => {
-    let firstCall = true;
     while (true) {
       if (Date.now() - startedAt > TICK_BUDGET_MS) return;
       const i = cursor++;
@@ -292,9 +290,17 @@ export async function runDraftTick(jobId: string): Promise<{
       if (!fresh || fresh.status !== "extracting") return;
       if (fresh.processed_indices.includes(chunkIndex)) continue;
 
-      // Pace subsequent AI calls in this worker to stay under rate limits.
-      if (paced && !firstCall) await sleep(LARGE_DOC_INTER_CALL_PAUSE_MS);
-      firstCall = false;
+      // No inter-call pause: the shared rate limiter in extractOnce() gates
+      // every Bedrock request across all workers.
+
+      const [s, e] = initial.chunk_ranges[chunkIndex];
+      const windowText = rawText.slice(s, e);
+      const result = await processOneChunk(jobId, chunkIndex, windowText, total);
+      if (result.transient) return;
+      await persistChunkResult(jobId, chunkIndex, result);
+      chunksThisTick += 1;
+    }
+  };
 
       const [s, e] = initial.chunk_ranges[chunkIndex];
       const windowText = rawText.slice(s, e);

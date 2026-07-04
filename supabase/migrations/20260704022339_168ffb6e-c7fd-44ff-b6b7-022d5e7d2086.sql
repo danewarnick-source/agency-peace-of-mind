@@ -1,0 +1,1 @@
+UPDATE public.nectar_draft_jobs SET status = 'failed', error_message = 'Cancelled: AWS Bedrock rate-limited every request (ThrottlingException on claude-sonnet-4-6). Retry after quota increase or model switch.' WHERE id = 'c4c48ead-ea86-48bd-9d8e-0399e7410ebe';

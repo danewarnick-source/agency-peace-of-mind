@@ -15,7 +15,7 @@ export function CommandCenterLanding() {
   const needsFn = useServerFn(getNeedsYouSummary);
   const metricsQ = useQuery({ queryKey: ["exec-cmd-metrics"], queryFn: () => metricsFn(), refetchInterval: 60_000 });
   const needsQ = useQuery({ queryKey: ["exec-cmd-needs"], queryFn: () => needsFn(), refetchInterval: 60_000 });
-  const { capabilities } = useExecCapabilities();
+  
 
   const m = metricsQ.data;
   const n = needsQ.data;

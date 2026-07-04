@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Json } from "@/integrations/supabase/types";
 
 async function ensureExecutive(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -27,13 +28,12 @@ export interface FunctionalityReport {
   source: "self_report" | "auto_detect";
   screen: string | null;
   description: string;
-  technical_context: Record<string, unknown>;
+  technical_context: Json;
   status: FunctionalityReportStatus;
   resolution_notes: string | null;
   created_at: string;
   updated_at: string;
 }
-type FunctionalityReportRow = Omit<FunctionalityReport, "organization_name">;
 
 export const listFunctionalityReports = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -46,7 +46,7 @@ export const listFunctionalityReports = createServerFn({ method: "GET" })
       .order("created_at", { ascending: false })
       .limit(200);
     if (error) throw error;
-    const rows = (data ?? []) as FunctionalityReport[];
+    const rows = ((data ?? []) as unknown) as Array<Omit<FunctionalityReport, "organization_name">>;
     const orgIds = Array.from(new Set(rows.map((r) => r.organization_id).filter(Boolean))) as string[];
     if (orgIds.length === 0) return rows.map((r) => ({ ...r, organization_name: null }));
     const { data: orgs } = await supabase.from("organizations").select("id, name").in("id", orgIds);
@@ -98,7 +98,7 @@ export const createFunctionalityReport = createServerFn({ method: "POST" })
       source: data.source,
       screen: data.screen ?? null,
       description: data.description,
-      technical_context: stripPhi(data.technical_context ?? {}) as object,
+      technical_context: stripPhi(data.technical_context ?? {}) as Json,
     });
     if (error) throw error;
     return { ok: true };
@@ -124,7 +124,8 @@ export const updateFunctionalityReport = createServerFn({ method: "POST" })
       patch.resolved_at = new Date().toISOString();
       patch.resolved_by = userId;
     }
-    const { error } = await supabase.from("functionality_reports").update(patch).eq("id", data.id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from("functionality_reports") as any).update(patch).eq("id", data.id);
     if (error) throw error;
     return { ok: true };
   });

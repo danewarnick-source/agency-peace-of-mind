@@ -93,8 +93,9 @@ function CompaniesPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="min-h-[44px] rounded-md border border-border bg-background px-2 text-sm"
             >
+              <option value="active">Active (incl. trial)</option>
               <option value="all">All statuses</option>
-              <option value="active">Active</option>
+              <option value="trial">Trial only</option>
               <option value="past_due">Past due</option>
               <option value="locked">Locked</option>
               <option value="cancelled">Cancelled</option>

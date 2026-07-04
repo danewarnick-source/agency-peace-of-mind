@@ -111,39 +111,53 @@ function ExecCommandCenterLayout() {
             <LayoutDashboard className="h-4 w-4" /> {COMMAND_CENTER_ITEM.label}
           </Link>
 
-          {visibleDomains.map((d) => (
-            <div key={d.id}>
-              <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {d.label}
+          {visibleDomains.map((d) => {
+            const isCollapsed = collapsed[d.id] ?? false;
+            return (
+              <div key={d.id}>
+                <button
+                  type="button"
+                  onClick={() => toggleDomain(d.id)}
+                  className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:bg-muted/60"
+                  aria-expanded={!isCollapsed}
+                >
+                  <span>{d.label}</span>
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 transition-transform ${isCollapsed ? "-rotate-90" : ""}`}
+                  />
+                </button>
+                {!isCollapsed && (
+                  <div className="mt-0.5 space-y-0.5">
+                    {d.items.map((t) => {
+                      const active = t.exact ? pathname === t.to : pathname.startsWith(t.to);
+                      const Icon = t.icon;
+                      const badgeCount = t.badgeKey ? badges[t.badgeKey] ?? 0 : 0;
+                      return (
+                        <Link
+                          key={t.to}
+                          to={t.to}
+                          className={`flex items-center justify-between gap-2 rounded-md px-3 py-1.5 text-sm transition-colors ${
+                            active ? "bg-[#0f1b3d] text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          }`}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <Icon className="h-4 w-4" /> {t.label}
+                          </span>
+                          {badgeCount > 0 && (
+                            <span className={`inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-white text-[#0f1b3d]" : "bg-[#d97a1c] text-white"}`}>
+                              {badgeCount}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-              <div className="space-y-0.5">
-                {d.items.map((t) => {
-                  const active = t.exact ? pathname === t.to : pathname.startsWith(t.to);
-                  const Icon = t.icon;
-                  const badgeCount = t.badgeKey ? badges[t.badgeKey] ?? 0 : 0;
-                  return (
-                    <Link
-                      key={t.to}
-                      to={t.to}
-                      className={`flex items-center justify-between gap-2 rounded-md px-3 py-1.5 text-sm transition-colors ${
-                        active ? "bg-[#0f1b3d] text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                      }`}
-                    >
-                      <span className="inline-flex items-center gap-2">
-                        <Icon className="h-4 w-4" /> {t.label}
-                      </span>
-                      {badgeCount > 0 && (
-                        <span className={`inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-white text-[#0f1b3d]" : "bg-[#d97a1c] text-white"}`}>
-                          {badgeCount}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </nav>
+
 
         <div className="min-w-0">
           <Outlet />

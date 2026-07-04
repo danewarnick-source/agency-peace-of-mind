@@ -1,81 +1,81 @@
-## Goal
+## The real bottleneck
 
-Give us a way to tell — from the DB and from the UI — whether NECTAR is *actually calling the AI* or *silently 429-looping*, without touching extraction, retries, or pacing.
+AWS quotas (not adjustable at our tier):
+- **10 requests/minute** on cross-region + global cross-region inference for Sonnet 4.6 → 1 call every 6 s, hard cap.
+- **5.4M invocation tokens/day** → roughly 150–200 real-world calls/day, shared across all NECTAR features.
+- Everything else (TPM, batch sizes) is far above what we'd hit.
 
-## What "in-flight" means here
+The current pipeline is designed as if the limits are elastic: concurrency 2, recursive splits (1 chunk can spawn up to 16 sub-calls), 3 transient retries per call, all chunks re-run from scratch on any transient. On a 5-chunk doc that easily balloons to 30–50 requests, which trips the 10 RPM cap, which fires the transient path, which restarts chunks, which spends more requests. That's the loop.
 
-Every AI attempt writes a lightweight heartbeat before and after the call. Successes and hard failures already leave a trace (`processed_indices` / `chunk_failures`). Only transient errors are invisible today. We add:
+## Design goal
 
-- a counter for total AI attempts started
-- a counter for transient errors
-- the last transient message + when it happened
-- the wall-clock time of the last attempt (so we can see "an AI call is currently mid-flight — started 40s ago")
+**Every requirements draft = exactly N requests where N = number of chunks. No retries that spawn extra requests unless truly necessary. No concurrency. No recursive splits.**
 
-If `attempts_started` keeps climbing but `processed_chunks` doesn't, that's a throttle loop. If `attempts_started` climbs and `processed_chunks` follows a beat later, the AI is genuinely reading.
+## Fix plan (in priority order)
 
-## Schema change (migration)
+### 1. Kill recursive splitting entirely
+`extractChunkWithRetry` currently splits a failing chunk in half up to depth 4 → up to 16 calls per chunk. Replace with:
+- On `finish_reason: "length"` (real truncation): retry the SAME chunk ONCE with `max_tokens` doubled (16k → 32k → give up). No text splitting.
+- On parse error: run JSON repair locally (strip ```` ``` ```` fences, extract first balanced `{...}`). If repair fails, record failure and move on. Zero extra requests.
+- On transient/429: wait per the rate limiter (see §3), retry ONCE, then record failure and move on.
 
-Add four columns to `public.nectar_draft_jobs`:
+Net: worst case per chunk = 2 requests, best case = 1.
 
-```sql
-alter table public.nectar_draft_jobs
-  add column if not exists attempts_started integer not null default 0,
-  add column if not exists transient_errors integer not null default 0,
-  add column if not exists last_attempt_at timestamptz,
-  add column if not exists last_transient_at timestamptz,
-  add column if not exists last_transient_message text;
-```
+### 2. Right-size chunks so 1 chunk = 1 successful call
+- Chunk window: 60k → **40k chars** (~10–12k input tokens).
+- `max_tokens`: 8192 → **24000** (Sonnet 4.6 supports 64k output; 24k gives huge margin for dense reg text).
+- Overlap: keep at 4k.
+- Result: a typical 200k-char reg PDF becomes 5–6 chunks, each finishing in one call.
 
-No new RLS policies needed — existing job policies already cover the row. No GRANT changes needed for the same reason (columns inherit the table's grants).
+### 3. Serialize with a token-bucket rate limiter
+Replace `TICK_CONCURRENCY = 2` + `LARGE_DOC_INTER_CALL_PAUSE_MS = 1500` with:
+- Concurrency = **1** (always).
+- A shared token bucket: **8 requests per rolling 60 s window** (80% of the 10 RPM cap — leaves headroom for other NECTAR features and the retry in §1).
+- Bucket state lives in a small table (or a `nectar_rate_state` row) keyed by model id, so multiple tabs / the cron tick / other server fns all share the same budget. In-memory won't work — Workers are stateless.
+- Before each call: `await acquireToken()`. If bucket is empty, sleep until the next slot; do NOT throw.
 
-## Server changes (both driver paths)
+### 4. Preemptive daily-token guard
+- Track daily invocation tokens (sum of `usage.input_tokens + usage.output_tokens` from Bedrock responses) in the same `nectar_rate_state` row, resetting at UTC midnight.
+- Before starting a new draft, estimate `chunks × 30k` tokens. If that would exceed the remaining daily budget, refuse the job with a clear message ("Bedrock daily token budget nearly exhausted, resets at HH:MM UTC — try again then") instead of starting and stalling halfway.
 
-Two places call `extractChunkWithRetry` for a job chunk today; both get the same three-step wrap. No behavior change, no new retry logic, no extra AI calls.
+### 5. Compact JSON output prompt
+Cuts output tokens 30–50%, which directly extends daily capacity:
+- System prompt addendum: "Return ONLY the raw JSON object. No markdown fences. No prose. No pretty-printing — single line, no unnecessary whitespace. Omit optional fields when null."
+- Keep the Zod schema strict on parse so we still validate.
 
-**`src/lib/nectar-draft-tick.server.ts` → `processOneChunk`:**
-1. Before the `extractChunkWithRetry(...)` call: `update nectar_draft_jobs set attempts_started = attempts_started + 1, last_attempt_at = now() where id = jobId`.
-2. On `TransientAIError`: `update ... set transient_errors = transient_errors + 1, last_transient_at = now(), last_transient_message = <first 300 chars of err.message>`.
-3. On success or hard failure: nothing extra — existing `persistChunkResult` already records the outcome.
+### 6. Local JSON repair (no extra request)
+In `extractOnce` before `JSON.parse`:
+- Strip ```` ```json ```` / ```` ``` ```` fences from start/end.
+- Trim any preamble before the first `{` and any suffix after the matching `}` (balanced-brace scan).
+- Only throw `ChunkParseError` if repair still fails.
+- Distinguish `TruncationError` (finish_reason=length) from `ParseError` so §1 can react differently.
 
-**`src/lib/authoritative-sources.functions.ts` → `processDraftChunk` handler** (the client-driver path): same three-step wrap around its `extractChunkWithRetry` call, using `supabaseAdmin` (already loaded there for the job update).
+### 7. Hard per-chunk attempt cap + always advance
+`processOneChunk` tracks attempts per chunk (persisted as `chunk_attempts: number[]` on the job row). After **2** full-chunk attempts (whether transient, truncation, or parse), force-persist the chunk with a `failures: ["chunk N failed after 2 attempts: <last error>"]` note and advance `processed_chunks`. Guarantees the job reaches `total_chunks` in bounded time — no more 12-hour "reading section 2".
 
-Both use small targeted `UPDATE` statements (not read-modify-write) so concurrent workers can't clobber each other. The columns are pure counters + timestamps, so a lost update is at worst a slightly-low count.
+### 8. Finalize job transition
+After each `persistChunkResult`, if `processed_chunks === total_chunks`, transition status to `completed` (or `completed_with_failures` if any `chunk_failures`). Verify this exists; add if missing.
 
-## Type + UI surface
+## Expected behavior after fix
 
-- Regenerate `src/integrations/supabase/types.ts` picks up the new columns automatically on the next Supabase types sync — no manual edit.
-- In `src/components/nectar/draft-jobs-driver.tsx` (or whichever component renders the "reading section X of N" indicator — I'll grep to confirm the exact file), extend the existing job subscription/select to include the four new fields and render a small muted line under the progress bar:
-  - When `attempts_started > processed_chunks + (chunk_failures.length)` **and** the delta is growing across polls → show "AI call in flight (started {relative time})".
-  - When `transient_errors > 0` in the last 60s → show "Waiting for AI capacity — {transient_errors} rate-limit signal(s), last: {relative time}".
-  - Otherwise → no extra line (keeps the UI quiet when things are healthy).
+| Doc size | Chunks | Requests (best) | Requests (worst) | Wall-clock (best) |
+| --- | --- | --- | --- | --- |
+| 100k chars | 3 | 3 | 6 | ~20 s |
+| 200k chars | 6 | 6 | 12 | ~45 s |
+| 400k chars | 11 | 11 | 22 | ~90 s |
 
-This is display-only text; it doesn't change the driver's control flow, backoff, or `pausedUntil`.
-
-## What is deliberately NOT changing
-
-- Chunk size / overlap / max chunks (the recent 5× change stays).
-- `extractOnce` / `extractChunkWithRetry` / prompt / `max_tokens` / JSON schema / halving fallback.
-- `TICK_CONCURRENCY`, `LARGE_DOC_CHUNK_THRESHOLD`, `LARGE_DOC_INTER_CALL_PAUSE_MS`.
-- Client-driver `pausedUntil` shared backoff.
-- Persistence of `extracted_items`, `chunk_failures`, `processed_indices`, `chunk_durations_ms`.
-
-## How we'll know it worked
-
-For the currently-stuck job (`87c85fad…`), within 30s of shipping this we can run:
-
-```sql
-select attempts_started, transient_errors, processed_chunks,
-       last_attempt_at, last_transient_at, last_transient_message
-from public.nectar_draft_jobs where id = '87c85fad-2288-4edf-b5c7-b91ab5a07789';
-```
-
-and get an unambiguous answer:
-- `attempts_started` climbing + `last_transient_message` populated → Bedrock is throttling, not reading.
-- `attempts_started` = 1 or 2, `last_attempt_at` fresh, no transient → AI call is genuinely mid-flight; wait.
+At 8 RPM effective rate, a 200k-char doc finishes in under a minute. The old pipeline's stuck job burned 22 requests and produced 0 items — new pipeline caps that same doc at 12 requests and always finishes.
 
 ## Files touched
 
-- new `supabase/migrations/<timestamp>_nectar_draft_job_inflight.sql`
-- `src/lib/nectar-draft-tick.server.ts` (wrap `processOneChunk`)
-- `src/lib/authoritative-sources.functions.ts` (wrap `processDraftChunk` handler)
-- one component file rendering the progress indicator (confirmed via grep before edit — likely `src/components/nectar/draft-jobs-driver.tsx` or a sibling in `src/components/nectar/`)
+- `src/lib/authoritative-sources.server.ts` — JSON repair, error taxonomy (Truncation vs Parse), remove recursive split, single truncation retry with bumped `max_tokens`, chunk window 40k, compact-JSON prompt.
+- `src/lib/nectar-draft-tick.server.ts` — concurrency 1, remove inter-call pause (rate limiter owns it), per-chunk attempt cap, always-advance guarantee, finalize transition, token-bucket integration.
+- **New**: `src/lib/nectar-rate-limit.server.ts` — token-bucket (8 req / 60s) and daily-token counter, backed by a small DB row.
+- **New migration**: `nectar_rate_state` table (one row per model id: `window_start`, `window_count`, `day_start`, `day_tokens_used`) + GRANTs + service_role-only policy.
+- No app UI changes required. Optional follow-up: show remaining daily budget on the Authoritative Sources screen.
+
+## Not included (intentionally)
+
+- No model swap — Sonnet 4.5/4.6 is correct for this workload; the constraint is quota, not quality.
+- No batch-inference migration — the batch API is 100-record minimum with hours-long turnaround; wrong tool for interactive drafts.
+- No provisioned throughput — that's a paid AWS commitment, not something we solve in code.

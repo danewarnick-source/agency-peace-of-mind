@@ -1331,6 +1331,20 @@ export const processDraftChunk = createServerFn({ method: "POST" })
     const t0 = Date.now();
     let items: DraftItem[] = [];
     let failures: string[] = [];
+    // Per-chunk attempt cap: bump BEFORE the AI call and gave-up if we already
+    // exceeded the limit on a prior invocation. Must stay in sync with
+    // MAX_CHUNK_ATTEMPTS in nectar-draft-tick.server.ts.
+    const MAX_CHUNK_ATTEMPTS = 2;
+    let attemptsSoFar = 1;
+    try {
+      const { data: attemptCount } = await supabase.rpc("nectar_bump_chunk_attempt", {
+        p_job: data.jobId,
+        p_index: data.chunkIndex,
+      });
+      attemptsSoFar = Number(attemptCount ?? 1);
+    } catch {
+      // Best-effort — proceed even if the counter fails.
+    }
     // Heartbeat: record that we're kicking off an AI call so a DB observer
     // (or the UI) can see the difference between "silently 429-looping" and
     // "AI call genuinely in-flight". Best-effort; ignore errors.
@@ -1361,22 +1375,30 @@ export const processDraftChunk = createServerFn({ method: "POST" })
         await supabase
           .rpc("nectar_bump_draft_transient", { p_job: data.jobId, p_msg: msg })
           .then(() => undefined, () => undefined);
-        // Do NOT throw — throwing from a server fn logs as a runtime error
-        // and can trigger the route error boundary. Return a soft transient
-        // status; the client driver retries this same section after a pause.
-        return {
-          processed: (job.processed_chunks as number) ?? priorIndices.length,
-          total: ranges.length,
-          itemsAdded: 0,
-          failuresAdded: [] as string[],
-          skipped: true as const,
-          transient: true as const,
-          retryAfterMs,
-        };
+        if (attemptsSoFar >= MAX_CHUNK_ATTEMPTS) {
+          // Enough — record as failure and advance instead of retrying forever.
+          failures = [
+            `PART ${data.chunkIndex + 1}: gave up after ${attemptsSoFar} attempts (last error: ${msg.slice(0, 200)})`,
+          ];
+        } else {
+          // Do NOT throw — throwing from a server fn logs as a runtime error
+          // and can trigger the route error boundary. Return a soft transient
+          // status; the client driver retries this same section after a pause.
+          return {
+            processed: (job.processed_chunks as number) ?? priorIndices.length,
+            total: ranges.length,
+            itemsAdded: 0,
+            failuresAdded: [] as string[],
+            skipped: true as const,
+            transient: true as const,
+            retryAfterMs,
+          };
+        }
+      } else {
+        failures = [
+          `PART ${data.chunkIndex + 1}: ${(err as Error).message.slice(0, 300)}`,
+        ];
       }
-      failures = [
-        `PART ${data.chunkIndex + 1}: ${(err as Error).message.slice(0, 300)}`,
-      ];
     }
 
     const durationMs = Math.max(1, Date.now() - t0);

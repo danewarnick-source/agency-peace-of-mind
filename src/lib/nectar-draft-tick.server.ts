@@ -12,17 +12,17 @@ const TICK_PATH = "/api/public/hooks/nectar-draft-tick";
 // well under the Cloudflare Workers CPU cap; the loop stops early if it
 // runs out of time and the next tick (or the client driver) picks up.
 const TICK_BUDGET_MS = 45_000;
-// Pace AI calls for large documents to avoid tripping the rate limit
-// proactively (instead of just recovering from it). Small docs (<= threshold)
-// run at concurrency 2 with no inter-call pause. Large docs run at
-// concurrency 2 with a short pause between calls per worker.
-const TICK_CONCURRENCY = 2;
-const LARGE_DOC_CHUNK_THRESHOLD = 10;
-const LARGE_DOC_INTER_CALL_PAUSE_MS = 1_500;
+// Concurrency is fixed at 1: the shared Bedrock rate limiter
+// (nectar-rate-limit.server) already caps us at 8 requests/minute across all
+// workers. Running more concurrent workers here would just spend budget
+// waiting on the bucket. See acquireBedrockSlot().
+const TICK_CONCURRENCY = 1;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
+// Per-chunk attempt cap — must match processDraftChunk in authoritative-sources.functions.ts.
+const MAX_CHUNK_ATTEMPTS = 2;
 
 function tickSecret(): string {
   const secret = process.env.NECTAR_DRAFT_TICK_SECRET;
@@ -159,6 +159,18 @@ async function processOneChunk(
   const t0 = Date.now();
   let items: DraftItem[] = [];
   let failures: string[] = [];
+  // Attempt cap: enforce even under repeated transients so the chunk always
+  // advances instead of the job stalling in "extracting" forever.
+  let attemptsSoFar = 0;
+  try {
+    const { data } = await supabaseAdmin.rpc("nectar_bump_chunk_attempt", {
+      p_job: jobId,
+      p_index: chunkIndex,
+    });
+    attemptsSoFar = Number(data ?? 1);
+  } catch {
+    attemptsSoFar = 1;
+  }
   // Heartbeat before every AI call so the DB shows genuine in-flight work.
   await supabaseAdmin
     .rpc("nectar_bump_draft_attempt", { p_job: jobId })
@@ -176,6 +188,17 @@ async function processOneChunk(
       await supabaseAdmin
         .rpc("nectar_bump_draft_transient", { p_job: jobId, p_msg: msg })
         .then(() => undefined, () => undefined);
+      if (attemptsSoFar >= MAX_CHUNK_ATTEMPTS) {
+        // Give up on this chunk so the job can finalize.
+        return {
+          items: [],
+          failures: [
+            `PART ${chunkIndex + 1}: gave up after ${attemptsSoFar} attempts (last error: ${msg.slice(0, 200)})`,
+          ],
+          durationMs: Math.max(1, Date.now() - t0),
+          transient: false,
+        };
+      }
       return { items: [], failures: [], durationMs: Math.max(1, Date.now() - t0), transient: true };
     }
     failures = [
@@ -255,10 +278,8 @@ export async function runDraftTick(jobId: string): Promise<{
 
   let cursor = 0;
   let chunksThisTick = 0;
-  const paced = total > LARGE_DOC_CHUNK_THRESHOLD;
 
   const worker = async () => {
-    let firstCall = true;
     while (true) {
       if (Date.now() - startedAt > TICK_BUDGET_MS) return;
       const i = cursor++;
@@ -269,9 +290,8 @@ export async function runDraftTick(jobId: string): Promise<{
       if (!fresh || fresh.status !== "extracting") return;
       if (fresh.processed_indices.includes(chunkIndex)) continue;
 
-      // Pace subsequent AI calls in this worker to stay under rate limits.
-      if (paced && !firstCall) await sleep(LARGE_DOC_INTER_CALL_PAUSE_MS);
-      firstCall = false;
+      // No inter-call pause: the shared rate limiter in extractOnce() gates
+      // every Bedrock request across all workers.
 
       const [s, e] = initial.chunk_ranges[chunkIndex];
       const windowText = rawText.slice(s, e);

@@ -177,7 +177,7 @@ export const listAuthoritativeSources = createServerFn({ method: "POST" })
         "id, title, document_type, authoritative_kind, fiscal_year, effective_start, effective_end, file_name, uploaded_by_name, created_at, parse_status, is_current, version, is_authoritative_source, metadata",
       )
       .eq("organization_id", data.organizationId)
-      .eq("owner_kind", "company")
+      .in("owner_kind", ["company", "state"])
       .order("is_authoritative_source", { ascending: false })
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);

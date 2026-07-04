@@ -613,7 +613,14 @@ function SidebarBody({
   inboxUnread,
 }: SidebarBodyProps) {
   const [upgradeFeatureKey, setUpgradeFeatureKey] = useState<string | null>(null);
-  const [collapsedDomains, setCollapsedDomains] = useState<Record<string, boolean>>({});
+  // Domain sections in the Executive Command Center sidebar are collapsed by
+  // default. The current route's domain auto-expands when the active domain
+  // changes so the location stays visible; explicit user toggles persist while
+  // the active domain stays the same.
+  const [collapsedDomains, setCollapsedDomains] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(EXEC_DOMAINS.map((d) => [d.id, true]))
+  );
+  const lastActiveDomain = useRef<string | null>(null);
   const toggleDomain = (id: string) =>
     setCollapsedDomains((c) => ({ ...c, [id]: !c[id] }));
   const { capabilities: execCaps } = useExecCapabilities();
@@ -631,6 +638,25 @@ function SidebarBody({
     ...d,
     items: d.items.filter((i) => execCaps.includes(i.capability)),
   })).filter((d) => d.items.length > 0);
+
+  const activeExecDomain = useMemo(() => {
+    return (
+      execVisibleDomains.find((d) =>
+        d.items.some((t) => (t.exact ? pathname === t.to : pathname.startsWith(t.to)))
+      )?.id ?? null
+    );
+  }, [pathname, execVisibleDomains]);
+
+  useEffect(() => {
+    if (!activeExecDomain) {
+      lastActiveDomain.current = null;
+      return;
+    }
+    if (activeExecDomain !== lastActiveDomain.current) {
+      lastActiveDomain.current = activeExecDomain;
+      setCollapsedDomains((c) => ({ ...c, [activeExecDomain]: false }));
+    }
+  }, [activeExecDomain]);
   return (
     <>
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6 font-display text-lg font-bold tracking-tight">

@@ -140,7 +140,7 @@ function wait(ms: number): Promise<void> {
 }
 
 function retryDelay(attempt: number): number {
-  return [6_000, 15_000, 30_000][Math.min(attempt, 2)] ?? 30_000;
+  return [2_000, 5_000][Math.min(attempt, 1)] ?? 5_000;
 }
 
 export async function extractOnce(
@@ -194,7 +194,7 @@ async function extractOnceWithTransientRetry(
   partLabel: string,
 ): Promise<Array<z.infer<typeof ReqItem>>> {
   let lastTransient: TransientAIError | null = null;
-  for (let attempt = 0; attempt < 4; attempt += 1) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       return await extractOnce(windowText, partLabel);
     } catch (err) {
@@ -203,7 +203,7 @@ async function extractOnceWithTransientRetry(
         err instanceof TransientAIError
           ? err
           : new TransientAIError((err as Error).message);
-      if (attempt >= 3) break;
+      if (attempt >= 2) break;
       await wait(retryDelay(attempt));
     }
   }

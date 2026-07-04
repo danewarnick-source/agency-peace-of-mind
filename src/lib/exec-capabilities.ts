@@ -20,6 +20,7 @@ export const EXEC_CAPABILITIES = [
   "health.read",
   "support.manage",
   "steve.use",
+  "knowledge.manage",
 ] as const;
 
 export type ExecCapability = (typeof EXEC_CAPABILITIES)[number];

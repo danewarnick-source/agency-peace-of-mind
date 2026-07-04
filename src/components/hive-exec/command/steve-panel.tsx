@@ -103,13 +103,13 @@ export function SteveDockPanel({ routeContext = null, featureKeyContext = null, 
                     <span key={j} className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2 py-0.5 text-[10px] text-muted-foreground">
                       [{j + 1}] {s.title}
                       {s.related_route && (
-                        <Link
-                          to={s.related_route as unknown as string}
+                        <a
+                          href={s.related_route}
                           className="inline-flex items-center text-[#d97a1c] hover:underline"
                           title={`Open ${s.related_route}`}
                         >
                           <ExternalLink className="ml-0.5 h-2.5 w-2.5" />
-                        </Link>
+                        </a>
                       )}
                     </span>
                   ))}

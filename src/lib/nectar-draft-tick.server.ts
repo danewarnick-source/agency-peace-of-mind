@@ -159,6 +159,18 @@ async function processOneChunk(
   const t0 = Date.now();
   let items: DraftItem[] = [];
   let failures: string[] = [];
+  // Attempt cap: enforce even under repeated transients so the chunk always
+  // advances instead of the job stalling in "extracting" forever.
+  let attemptsSoFar = 0;
+  try {
+    const { data } = await supabaseAdmin.rpc("nectar_bump_chunk_attempt", {
+      p_job: jobId,
+      p_index: chunkIndex,
+    });
+    attemptsSoFar = Number(data ?? 1);
+  } catch {
+    attemptsSoFar = 1;
+  }
   // Heartbeat before every AI call so the DB shows genuine in-flight work.
   await supabaseAdmin
     .rpc("nectar_bump_draft_attempt", { p_job: jobId })
@@ -176,6 +188,17 @@ async function processOneChunk(
       await supabaseAdmin
         .rpc("nectar_bump_draft_transient", { p_job: jobId, p_msg: msg })
         .then(() => undefined, () => undefined);
+      if (attemptsSoFar >= MAX_CHUNK_ATTEMPTS) {
+        // Give up on this chunk so the job can finalize.
+        return {
+          items: [],
+          failures: [
+            `PART ${chunkIndex + 1}: gave up after ${attemptsSoFar} attempts (last error: ${msg.slice(0, 200)})`,
+          ],
+          durationMs: Math.max(1, Date.now() - t0),
+          transient: false,
+        };
+      }
       return { items: [], failures: [], durationMs: Math.max(1, Date.now() - t0), transient: true };
     }
     failures = [

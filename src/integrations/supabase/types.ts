@@ -153,6 +153,39 @@ export type Database = {
           },
         ]
       }
+      agreement_requirements: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          renewal_period_months: number | null
+          required: boolean
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          renewal_period_months?: number | null
+          required?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          renewal_period_months?: number | null
+          required?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       assignment_map: {
         Row: {
           client_record_id: string | null
@@ -5810,6 +5843,62 @@ export type Database = {
           },
         ]
       }
+      functionality_reports: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          organization_id: string | null
+          reported_by: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          screen: string | null
+          source: Database["public"]["Enums"]["functionality_report_source"]
+          status: Database["public"]["Enums"]["functionality_report_status"]
+          technical_context: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          organization_id?: string | null
+          reported_by?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          screen?: string | null
+          source?: Database["public"]["Enums"]["functionality_report_source"]
+          status?: Database["public"]["Enums"]["functionality_report_status"]
+          technical_context?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          organization_id?: string | null
+          reported_by?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          screen?: string | null
+          source?: Database["public"]["Enums"]["functionality_report_source"]
+          status?: Database["public"]["Enums"]["functionality_report_status"]
+          technical_context?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "functionality_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       general_shifts: {
         Row: {
           category: string
@@ -10881,6 +10970,66 @@ export type Database = {
           },
         ]
       }
+      organization_agreements: {
+        Row: {
+          created_at: string
+          expiration_date: string | null
+          file_path: string | null
+          id: string
+          notes: string | null
+          organization_id: string
+          renewal_due_date: string | null
+          requirement_id: string
+          signed_date: string | null
+          status: Database["public"]["Enums"]["agreement_status"]
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          expiration_date?: string | null
+          file_path?: string | null
+          id?: string
+          notes?: string | null
+          organization_id: string
+          renewal_due_date?: string | null
+          requirement_id: string
+          signed_date?: string | null
+          status?: Database["public"]["Enums"]["agreement_status"]
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          expiration_date?: string | null
+          file_path?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          renewal_due_date?: string | null
+          requirement_id?: string
+          signed_date?: string | null
+          status?: Database["public"]["Enums"]["agreement_status"]
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_agreements_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_agreements_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "agreement_requirements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_features: {
         Row: {
           created_at: string
@@ -15746,6 +15895,7 @@ export type Database = {
       }
     }
     Enums: {
+      agreement_status: "not_started" | "sent" | "signed" | "expired"
       app_role:
         | "admin"
         | "manager"
@@ -15760,6 +15910,8 @@ export type Database = {
       bc_flag_type: "credential_mismatch" | "deadline_overdue" | "coverage_gap"
       bc_review_note_type: "monthly_review" | "note"
       external_cert_status: "pending" | "approved" | "rejected" | "expired"
+      functionality_report_source: "self_report" | "auto_detect"
+      functionality_report_status: "open" | "triaged" | "resolved" | "dismissed"
       hhp_cue_card_source: "questionnaire" | "manual"
       hhp_cue_card_status: "onboarding" | "ready" | "placed"
       hive_ticket_category:
@@ -15949,6 +16101,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      agreement_status: ["not_started", "sent", "signed", "expired"],
       app_role: [
         "admin",
         "manager",
@@ -15964,6 +16117,8 @@ export const Constants = {
       bc_flag_type: ["credential_mismatch", "deadline_overdue", "coverage_gap"],
       bc_review_note_type: ["monthly_review", "note"],
       external_cert_status: ["pending", "approved", "rejected", "expired"],
+      functionality_report_source: ["self_report", "auto_detect"],
+      functionality_report_status: ["open", "triaged", "resolved", "dismissed"],
       hhp_cue_card_source: ["questionnaire", "manual"],
       hhp_cue_card_status: ["onboarding", "ready", "placed"],
       hive_ticket_category: [

@@ -27,12 +27,13 @@ export interface FunctionalityReport {
   source: "self_report" | "auto_detect";
   screen: string | null;
   description: string;
-  technical_context: unknown;
+  technical_context: Record<string, unknown>;
   status: FunctionalityReportStatus;
   resolution_notes: string | null;
   created_at: string;
   updated_at: string;
 }
+type FunctionalityReportRow = Omit<FunctionalityReport, "organization_name">;
 
 export const listFunctionalityReports = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

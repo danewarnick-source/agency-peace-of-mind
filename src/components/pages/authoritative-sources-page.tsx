@@ -655,7 +655,7 @@ function SourceRow({
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => generate.mutate()}
+            onClick={startDraft}
             disabled={isDrafting || source.parse_status !== "parsed" || !canDraft}
             title={
               !canDraft
@@ -678,7 +678,7 @@ function SourceRow({
           <Button
             size="sm"
             variant="outline"
-            onClick={() => generate.mutate()}
+            onClick={startDraft}
             disabled={isDrafting || source.parse_status !== "parsed" || !canDraft}
             title={
               !canDraft

@@ -15,7 +15,10 @@ import {
   LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink, Sparkles, MapPin, TrendingUp, HandCoins, Scale, FileText, Inbox, Search, AlarmClock,
 } from "lucide-react";
 import { useIsHiveExecutive } from "@/hooks/use-hive-executive";
-import { EXEC_NAV } from "@/lib/exec-nav";
+import { EXEC_NAV, EXEC_DOMAINS, COMMAND_CENTER_ITEM } from "@/lib/exec-nav";
+import { useExecCapabilities } from "@/hooks/use-exec-capability";
+import { getPendingUpgradeRequestCount } from "@/lib/org-features.functions";
+import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { NotificationBell } from "@/components/NotificationBell";

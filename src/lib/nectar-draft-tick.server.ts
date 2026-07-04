@@ -5,14 +5,14 @@ import { getRequest } from "@tanstack/react-start/server";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
-import { extractChunkWithRetry } from "./authoritative-sources.server";
+import { extractChunkWithRetry, isTransientAIError } from "./authoritative-sources.server";
 
 const TICK_PATH = "/api/public/hooks/nectar-draft-tick";
 // Wall-clock budget per tick invocation. AI calls are I/O so this stays
 // well under the Cloudflare Workers CPU cap; the loop stops early if it
 // runs out of time and the next tick (or the client driver) picks up.
 const TICK_BUDGET_MS = 45_000;
-const TICK_CONCURRENCY = 3;
+const TICK_CONCURRENCY = 1;
 
 function tickSecret(): string {
   const secret = process.env.NECTAR_DRAFT_TICK_SECRET;
@@ -145,7 +145,7 @@ async function processOneChunk(
   chunkIndex: number,
   windowText: string,
   totalChunks: number,
-): Promise<{ items: DraftItem[]; failures: string[]; durationMs: number }> {
+): Promise<{ items: DraftItem[]; failures: string[]; durationMs: number; transient: boolean }> {
   const t0 = Date.now();
   let items: DraftItem[] = [];
   let failures: string[] = [];
@@ -157,20 +157,24 @@ async function processOneChunk(
     items = got.items;
     failures = got.failures;
   } catch (err) {
+    if (isTransientAIError(err)) {
+      return { items: [], failures: [], durationMs: Math.max(1, Date.now() - t0), transient: true };
+    }
     failures = [
       `PART ${chunkIndex + 1}: ${(err as Error).message.slice(0, 300)}`,
     ];
   }
   const durationMs = Math.max(1, Date.now() - t0);
   void jobId;
-  return { items, failures, durationMs };
+  return { items, failures, durationMs, transient: false };
 }
 
 async function persistChunkResult(
   jobId: string,
   chunkIndex: number,
-  result: { items: DraftItem[]; failures: string[]; durationMs: number },
+  result: { items: DraftItem[]; failures: string[]; durationMs: number; transient?: boolean },
 ): Promise<void> {
+  if (result.transient) return;
   // Re-read the row so we merge against the freshest state — the client
   // driver may have written to the same row between our fetch and update.
   const job = await loadJob(jobId);
@@ -247,6 +251,7 @@ export async function runDraftTick(jobId: string): Promise<{
       const [s, e] = initial.chunk_ranges[chunkIndex];
       const windowText = rawText.slice(s, e);
       const result = await processOneChunk(jobId, chunkIndex, windowText, total);
+      if (result.transient) return;
       await persistChunkResult(jobId, chunkIndex, result);
       chunksThisTick += 1;
     }

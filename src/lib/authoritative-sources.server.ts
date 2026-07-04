@@ -268,7 +268,7 @@ export async function extractRequirementsFromText(text: string): Promise<{
   if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
 
   const chunks = chunkDocumentText(text);
-  const perChunk = await mapWithConcurrency(chunks, 3, (chunk, i) =>
+  const perChunk = await mapWithConcurrency(chunks, 1, (chunk, i) =>
     extractChunkWithRetry(chunk, `PART ${i + 1} OF ${chunks.length}`),
   );
 

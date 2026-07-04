@@ -60,28 +60,6 @@ export function CommandCenterLanding() {
           </div>
         </section>
 
-        <section className="grid gap-3 sm:grid-cols-2">
-          {EXEC_DOMAINS.map((d) => {
-            const visible = d.items.filter((i) => capabilities.includes(i.capability));
-            if (visible.length === 0) return null;
-            const first = visible[0];
-            return (
-              <Link
-                key={d.id}
-                to={first.to}
-                className="group rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-[#d97a1c] hover:shadow-md"
-              >
-                <div className="flex items-center justify-between">
-                  <h3 className="font-display text-base font-semibold text-[#0f1b3d]">{d.label}</h3>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {visible.map((i) => i.label).join(" · ")}
-                </p>
-              </Link>
-            );
-          })}
-        </section>
       </div>
 
       <SteveDockPanel />

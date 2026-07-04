@@ -60,7 +60,9 @@ const DraftJobsContext = createContext<Ctx>({
   minEtaMs: null,
 });
 
-const CLIENT_CONCURRENCY = 1;
+const CLIENT_CONCURRENCY = 2;
+const LARGE_DOC_CHUNK_THRESHOLD = 10;
+const LARGE_DOC_INTER_CALL_PAUSE_MS = 1_500;
 const POLL_INTERVAL_MS = 5_000;
 const TRANSIENT_RETRY_PAUSE_MS = 30_000;
 

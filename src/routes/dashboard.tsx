@@ -613,6 +613,24 @@ function SidebarBody({
   inboxUnread,
 }: SidebarBodyProps) {
   const [upgradeFeatureKey, setUpgradeFeatureKey] = useState<string | null>(null);
+  const [collapsedDomains, setCollapsedDomains] = useState<Record<string, boolean>>({});
+  const toggleDomain = (id: string) =>
+    setCollapsedDomains((c) => ({ ...c, [id]: !c[id] }));
+  const { capabilities: execCaps } = useExecCapabilities();
+  const execCountFn = useServerFn(getPendingUpgradeRequestCount);
+  const execPendingQ = useQuery({
+    queryKey: ["hive-exec-upgrade-pending-count"],
+    queryFn: () => execCountFn(),
+    refetchInterval: 30_000,
+    enabled: isHiveExecView,
+  });
+  const execBadges: Record<string, number> = {
+    upgrade_requests_pending: execPendingQ.data?.count ?? 0,
+  };
+  const execVisibleDomains = EXEC_DOMAINS.map((d) => ({
+    ...d,
+    items: d.items.filter((i) => execCaps.includes(i.capability)),
+  })).filter((d) => d.items.length > 0);
   return (
     <>
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6 font-display text-lg font-bold tracking-tight">

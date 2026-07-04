@@ -27,24 +27,6 @@ import { gatewayFetch } from "@/lib/ai-bedrock.server";
 // to avoid ?tss-serverfn-split ReferenceErrors from sibling declarations.
 // =============================================================
 
-function getDraftTransientRetryMs(err: unknown): number | null {
-  const retryAfterMs = (err as { retryAfterMs?: unknown })?.retryAfterMs;
-  if (typeof retryAfterMs === "number" && Number.isFinite(retryAfterMs)) {
-    return Math.max(5_000, Math.min(120_000, retryAfterMs));
-  }
-  const message =
-    typeof err === "string" ? err : ((err as Error | undefined)?.message ?? "");
-  if (
-    isTransientAIError(err) ||
-    /rate[-\s]?limit|throttl|temporar|timeout|timed out|429|503|502|504/i.test(
-      message,
-    )
-  ) {
-    return 30_000;
-  }
-  return null;
-}
-
 export const ingestWebSource = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
@@ -1357,7 +1339,16 @@ export const processDraftChunk = createServerFn({ method: "POST" })
       items = got.items;
       failures = got.failures;
     } catch (err) {
-      const retryAfterMs = getDraftTransientRetryMs(err);
+      const rawRetryAfterMs = (err as { retryAfterMs?: unknown })?.retryAfterMs;
+      const retryAfterMs =
+        typeof rawRetryAfterMs === "number" && Number.isFinite(rawRetryAfterMs)
+          ? Math.max(5_000, Math.min(120_000, rawRetryAfterMs))
+          : isTransientAIError(err) ||
+              /rate[-\s]?limit|throttl|temporar|timeout|timed out|429|503|502|504/i.test(
+                typeof err === "string" ? err : ((err as Error | undefined)?.message ?? ""),
+              )
+            ? 30_000
+            : null;
       if (retryAfterMs !== null) {
         // Do NOT throw — throwing from a server fn logs as a runtime error
         // and can trigger the route error boundary. Return a soft transient

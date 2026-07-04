@@ -6996,6 +6996,42 @@ export type Database = {
         }
         Relationships: []
       }
+      hive_knowledge: {
+        Row: {
+          body: string
+          category: string
+          created_at: string
+          id: string
+          related_feature_key: string | null
+          related_route: string | null
+          slug: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          category: string
+          created_at?: string
+          id?: string
+          related_feature_key?: string | null
+          related_route?: string | null
+          slug: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          category?: string
+          created_at?: string
+          id?: string
+          related_feature_key?: string | null
+          related_route?: string | null
+          slug?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       hive_platform_tickets: {
         Row: {
           affected_orgs: number

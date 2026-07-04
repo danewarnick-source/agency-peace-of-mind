@@ -143,37 +143,40 @@ export const askSteve = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<SteveAnswer> => {
     await ensureExecutive(context.supabase, context.userId);
 
-    // ── 1. Retrieve candidate articles ──
-    const tsq = toTsQuery(data.question);
+    // ── 1. Retrieve candidate articles (keyword ILIKE for now) ──
+    const words = data.question
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length >= 3 && !STOPWORDS.has(w))
+      .slice(0, 8);
     let rows: HiveKnowledgeRow[] = [];
-
-    if (tsq) {
-      const { data: r1, error } = await context.supabase
-        .from("hive_knowledge")
-        .select("id, title, slug, category, body, related_feature_key, related_route, updated_at")
-        .textSearch("fts_body" as never, tsq, { type: "websearch", config: "english" })
-        .limit(5);
-      // fts_body isn't a real column — fallback to ilike below if this errors
-      if (!error && r1) rows = r1 as HiveKnowledgeRow[];
-    }
-
-    if (rows.length === 0) {
-      // ILIKE fallback across title + body
-      const words = data.question
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, " ")
-        .split(/\s+/)
-        .filter((w) => w.length >= 3 && !STOPWORDS.has(w))
-        .slice(0, 6);
-      const pattern = words.length ? `%${words.join("%")}%` : `%${data.question.slice(0, 40)}%`;
+    if (words.length > 0) {
+      // OR each word across title/body/category so any keyword can hit
+      const orClauses = words.flatMap((w) => [
+        `title.ilike.%${w}%`,
+        `body.ilike.%${w}%`,
+        `category.ilike.%${w}%`,
+      ]).join(",");
       const { data: r2, error } = await context.supabase
         .from("hive_knowledge")
         .select("id, title, slug, category, body, related_feature_key, related_route, updated_at")
-        .or(`title.ilike.${pattern},body.ilike.${pattern},category.ilike.${pattern}`)
-        .limit(5);
+        .or(orClauses)
+        .limit(8);
       if (error) throw error;
       rows = (r2 ?? []) as HiveKnowledgeRow[];
+      // Rank client-side by keyword hit count
+      rows = rows
+        .map((r) => {
+          const hay = `${r.title} ${r.body} ${r.category}`.toLowerCase();
+          const score = words.reduce((s, w) => s + (hay.includes(w) ? (r.title.toLowerCase().includes(w) ? 3 : 1) : 0), 0);
+          return { r, score };
+        })
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5)
+        .map((x) => x.r);
     }
+
 
     // Bias by feature/route context if provided
     if (data.featureKeyContext || data.routeContext) {

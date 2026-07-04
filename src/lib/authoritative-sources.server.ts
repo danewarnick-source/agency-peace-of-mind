@@ -140,24 +140,60 @@ export class TransientAIError extends Error {
 export function isTransientAIError(err: unknown): err is TransientAIError {
   return (
     err instanceof TransientAIError ||
+    err instanceof RateLimitError ||
     /rate limit|temporar|timeout|timed out|429|503|502|504/i.test(
       (err as Error)?.message ?? "",
     )
   );
 }
 
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function retryDelay(attempt: number): number {
-  return [2_000, 5_000][Math.min(attempt, 1)] ?? 5_000;
+/**
+ * Best-effort repair of model JSON output before parsing.
+ *  - Strip surrounding markdown code fences (```json ... ``` or ``` ... ```).
+ *  - Trim any prose before the first '{' and after the matching '}'.
+ * Zero extra AI calls; runs entirely locally.
+ */
+export function repairJsonPayload(raw: string): string {
+  let s = (raw ?? "").trim();
+  if (!s) return s;
+  // Fenced block: ```json\n...\n``` or ```\n...\n```
+  const fenced = s.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
+  if (fenced) s = fenced[1].trim();
+  // Extract first balanced { ... } object
+  const first = s.indexOf("{");
+  if (first < 0) return s;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = first; i < s.length; i += 1) {
+    const c = s[i];
+    if (escape) { escape = false; continue; }
+    if (inString) {
+      if (c === "\\") { escape = true; continue; }
+      if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') { inString = true; continue; }
+    if (c === "{") depth += 1;
+    else if (c === "}") {
+      depth -= 1;
+      if (depth === 0) return s.slice(first, i + 1);
+    }
+  }
+  return s.slice(first); // unbalanced — let JSON.parse fail
 }
 
 export async function extractOnce(
   windowText: string,
   partLabel: string,
+  opts: { maxTokens?: number } = {},
 ): Promise<Array<z.infer<typeof ReqItem>>> {
+  const maxTokens = opts.maxTokens ?? 16_000;
+
+  // Wait for a rate-limit slot before actually calling Bedrock. This is the
+  // ONLY place that talks to the model, so gating here is sufficient.
+  await acquireBedrockSlot();
+
   const res = await gatewayFetch({
     // NOTE: this string is ignored by the Bedrock shim in
     // `src/lib/ai-bedrock.server.ts` (it uses BEDROCK_MODEL_ID). Kept as
@@ -171,7 +207,7 @@ export async function extractOnce(
       },
     ],
     response_format: { type: "json_object" },
-    max_tokens: 8192,
+    max_tokens: maxTokens,
   });
   if (res.status === 429) {
     throw new TransientAIError("AI rate limit reached. Try again in a moment.");
@@ -183,16 +219,28 @@ export async function extractOnce(
   }
   if (!res.ok) throw new ChunkParseError(`AI gateway error ${res.status}`);
   const json = await res.json();
+
+  // Record token usage into the daily bucket (best-effort).
+  const usage = (json?.usage ?? {}) as { total_tokens?: number; input_tokens?: number; output_tokens?: number };
+  const totalTokens =
+    typeof usage.total_tokens === "number"
+      ? usage.total_tokens
+      : (Number(usage.input_tokens ?? 0) + Number(usage.output_tokens ?? 0));
+  if (totalTokens > 0) void recordBedrockTokens(totalTokens);
+
   const finishReason: string | undefined = json.choices?.[0]?.finish_reason;
   const content: string = json.choices?.[0]?.message?.content ?? "{}";
   if (finishReason === "length") {
-    throw new ChunkParseError("output truncated (hit max_tokens)");
+    throw new ChunkTruncationError(`output truncated at max_tokens=${maxTokens}`);
   }
+  // Local repair before parse — kills the vast majority of "invalid JSON"
+  // errors caused by markdown fences or a preamble like "Here is the JSON:".
+  const repaired = repairJsonPayload(content);
   let raw: unknown;
   try {
-    raw = JSON.parse(content);
+    raw = JSON.parse(repaired);
   } catch {
-    throw new ChunkParseError("model returned invalid/truncated JSON");
+    throw new ChunkParseError("model returned invalid JSON (after repair)");
   }
   const parsed = ReqExtraction.safeParse(raw);
   if (!parsed.success)
@@ -200,57 +248,45 @@ export async function extractOnce(
   return parsed.data.requirements;
 }
 
-async function extractOnceWithTransientRetry(
+/**
+ * Run ONE chunk through the model. No recursive splitting.
+ *  - Transient errors (rate limit / 5xx) bubble up so the caller can retry.
+ *  - True output truncation (finish_reason=length) triggers ONE retry with
+ *    max_tokens doubled (up to a hard cap). If that still truncates, record
+ *    a failure and move on.
+ *  - Parse/schema errors record a failure immediately (splitting doesn't fix
+ *    a formatting problem — repairJsonPayload already tried).
+ */
+export async function extractChunkOnce(
   windowText: string,
   partLabel: string,
-): Promise<Array<z.infer<typeof ReqItem>>> {
-  let lastTransient: TransientAIError | null = null;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      return await extractOnce(windowText, partLabel);
-    } catch (err) {
-      if (!isTransientAIError(err)) throw err;
-      lastTransient =
-        err instanceof TransientAIError
-          ? err
-          : new TransientAIError((err as Error).message);
-      if (attempt >= 2) break;
-      await wait(retryDelay(attempt));
-    }
-  }
-  throw lastTransient ?? new TransientAIError("AI temporarily unavailable. NECTAR will retry.");
-}
-
-
-export async function extractChunkWithRetry(
-  windowText: string,
-  partLabel: string,
-  depth = 0,
 ): Promise<{ items: Array<z.infer<typeof ReqItem>>; failures: string[] }> {
-  try {
-    const items = await extractOnceWithTransientRetry(windowText, partLabel);
-    return { items, failures: [] };
-  } catch (err) {
-    if (isTransientAIError(err)) throw err;
-    if (!(err instanceof ChunkParseError)) throw err;
-    if (depth >= 4) {
-      return { items: [], failures: [`${partLabel}: ${(err as Error).message}`] };
+  const attempts: Array<{ maxTokens: number }> = [
+    { maxTokens: 16_000 },
+    { maxTokens: 32_000 },
+  ];
+  let lastErr: Error | null = null;
+  for (let i = 0; i < attempts.length; i += 1) {
+    try {
+      const items = await extractOnce(windowText, partLabel, attempts[i]);
+      return { items, failures: [] };
+    } catch (err) {
+      if (isTransientAIError(err)) throw err; // caller decides how to back off
+      lastErr = err as Error;
+      if (err instanceof ChunkTruncationError && i < attempts.length - 1) {
+        // Retry once with a larger output budget.
+        continue;
+      }
+      // Parse/schema/other permanent error — record and stop.
+      break;
     }
-    const mid = Math.floor(windowText.length / 2);
-    const boundary = windowText.lastIndexOf("\n\n", mid + 2_000);
-    const split = boundary > windowText.length * 0.2 ? boundary : mid;
-    const halves = [windowText.slice(0, split), windowText.slice(split)];
-    const items: Array<z.infer<typeof ReqItem>> = [];
-    const failures: string[] = [];
-    for (let h = 0; h < halves.length; h += 1) {
-      const label = `${partLabel} (d${depth + 1} ${h + 1}/2)`;
-      const result = await extractChunkWithRetry(halves[h], label, depth + 1);
-      items.push(...result.items);
-      failures.push(...result.failures);
-    }
-    return { items, failures };
   }
+  const msg = lastErr?.message ?? "unknown extraction error";
+  return { items: [], failures: [`${partLabel}: ${msg}`] };
 }
+
+/** @deprecated Kept as a thin alias so existing imports don't break. */
+export const extractChunkWithRetry = extractChunkOnce;
 
 export async function mapWithConcurrency<T, R>(
   items: T[],

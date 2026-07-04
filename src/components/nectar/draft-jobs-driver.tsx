@@ -204,7 +204,23 @@ export function DraftJobsProvider({ children }: { children: React.ReactNode }) {
               total: number;
               itemsAdded: number;
               skipped: boolean;
+              transient?: boolean;
             };
+            if (r.transient) {
+              // Server hit a rate limit on this section — don't mark it done.
+              // Rewind cursor so this worker retries it after a pause.
+              cursor = Math.min(cursor, i);
+              setProgress((prev) => {
+                const cur = prev[job.documentId];
+                if (!cur) return prev;
+                return {
+                  ...prev,
+                  [job.documentId]: { ...cur, etaMs: TRANSIENT_RETRY_PAUSE_MS },
+                };
+              });
+              await wait(TRANSIENT_RETRY_PAUSE_MS);
+              continue;
+            }
             processedNow = r.processed;
             doneSet.add(i);
             if (!r.skipped) durations.push(Math.max(1, Date.now() - t0));

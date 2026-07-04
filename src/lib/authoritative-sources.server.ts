@@ -116,6 +116,33 @@ export function chunkDocumentText(
 
 export class ChunkParseError extends Error {}
 
+export class TransientAIError extends Error {
+  retryAfterMs: number;
+
+  constructor(message: string, retryAfterMs = 30_000) {
+    super(message);
+    this.name = "TransientAIError";
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
+export function isTransientAIError(err: unknown): err is TransientAIError {
+  return (
+    err instanceof TransientAIError ||
+    /rate limit|temporar|timeout|timed out|429|503|502|504/i.test(
+      (err as Error)?.message ?? "",
+    )
+  );
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function retryDelay(attempt: number): number {
+  return [2_000, 5_000][Math.min(attempt, 1)] ?? 5_000;
+}
+
 export async function extractOnce(
   windowText: string,
   partLabel: string,
@@ -135,9 +162,14 @@ export async function extractOnce(
     response_format: { type: "json_object" },
     max_tokens: 8192,
   });
-  if (res.status === 429) throw new Error("AI rate limit reached. Try again in a moment.");
+  if (res.status === 429) {
+    throw new TransientAIError("AI rate limit reached. Try again in a moment.");
+  }
   if (res.status === 402)
     throw new Error("AI credits exhausted. Add funds in Settings → Workspace → Usage.");
+  if ([408, 500, 502, 503, 504].includes(res.status)) {
+    throw new TransientAIError(`AI temporarily unavailable (${res.status}). NECTAR will retry.`);
+  }
   if (!res.ok) throw new ChunkParseError(`AI gateway error ${res.status}`);
   const json = await res.json();
   const finishReason: string | undefined = json.choices?.[0]?.finish_reason;
@@ -157,6 +189,27 @@ export async function extractOnce(
   return parsed.data.requirements;
 }
 
+async function extractOnceWithTransientRetry(
+  windowText: string,
+  partLabel: string,
+): Promise<Array<z.infer<typeof ReqItem>>> {
+  let lastTransient: TransientAIError | null = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await extractOnce(windowText, partLabel);
+    } catch (err) {
+      if (!isTransientAIError(err)) throw err;
+      lastTransient =
+        err instanceof TransientAIError
+          ? err
+          : new TransientAIError((err as Error).message);
+      if (attempt >= 2) break;
+      await wait(retryDelay(attempt));
+    }
+  }
+  throw lastTransient ?? new TransientAIError("AI temporarily unavailable. NECTAR will retry.");
+}
+
 
 export async function extractChunkWithRetry(
   windowText: string,
@@ -164,9 +217,10 @@ export async function extractChunkWithRetry(
   depth = 0,
 ): Promise<{ items: Array<z.infer<typeof ReqItem>>; failures: string[] }> {
   try {
-    const items = await extractOnce(windowText, partLabel);
+    const items = await extractOnceWithTransientRetry(windowText, partLabel);
     return { items, failures: [] };
   } catch (err) {
+    if (isTransientAIError(err)) throw err;
     if (!(err instanceof ChunkParseError)) throw err;
     if (depth >= 4) {
       return { items: [], failures: [`${partLabel}: ${(err as Error).message}`] };
@@ -214,7 +268,7 @@ export async function extractRequirementsFromText(text: string): Promise<{
   if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
 
   const chunks = chunkDocumentText(text);
-  const perChunk = await mapWithConcurrency(chunks, 3, (chunk, i) =>
+  const perChunk = await mapWithConcurrency(chunks, 1, (chunk, i) =>
     extractChunkWithRetry(chunk, `PART ${i + 1} OF ${chunks.length}`),
   );
 

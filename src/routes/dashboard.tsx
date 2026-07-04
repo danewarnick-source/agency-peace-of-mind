@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { usePermissions } from "@/hooks/use-permissions";

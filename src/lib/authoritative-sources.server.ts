@@ -81,9 +81,9 @@ export const ReqExtraction = z.object({
 
 export function chunkDocumentRanges(
   text: string,
-  windowSize = 12_000,
-  overlap = 800,
-  maxChunks = 80,
+  windowSize = 60_000,
+  overlap = 4_000,
+  maxChunks = 20,
 ): Array<[number, number]> {
   if (text.length <= windowSize) return [[0, text.length]];
   const ranges: Array<[number, number]> = [];
@@ -104,9 +104,9 @@ export function chunkDocumentRanges(
 
 export function chunkDocumentText(
   text: string,
-  windowSize = 12_000,
-  overlap = 800,
-  maxChunks = 80,
+  windowSize = 60_000,
+  overlap = 4_000,
+  maxChunks = 20,
 ): string[] {
   return chunkDocumentRanges(text, windowSize, overlap, maxChunks).map(([s, e]) =>
     text.slice(s, e),

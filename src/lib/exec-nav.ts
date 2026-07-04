@@ -15,6 +15,7 @@ import {
   ToggleRight,
   Wrench,
   LayoutDashboard,
+  BookOpen,
   type LucideIcon,
 } from "lucide-react";
 import type { ExecCapability } from "@/lib/exec-capabilities";

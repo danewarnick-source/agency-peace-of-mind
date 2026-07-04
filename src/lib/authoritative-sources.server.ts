@@ -49,7 +49,7 @@ Return STRICT JSON only, shape:
   "requirements": [
     {
       "title": "short imperative phrase, <=140 chars",
-      "description": "exact or close paraphrase of the obligation, <=600 chars",
+      "description": "brief summary of the obligation in your own words, <=200 chars, do not copy long passages from the source.",
       "category": "audit_doc" | "obligation" | "rule" | "billing",
       "citation": "best locator you can identify, e.g. '§4.2', 'Section 3.1', 'page 7', 'Attachment A'",
       "applies_to": "company" | "staff" | "client"
@@ -64,6 +64,7 @@ Rules:
     obligation = a thing the provider must do (notify within X hours, conduct annual review, maintain insurance, etc.)
     rule       = a constraint / prohibition (no overlapping services, staff-to-client ratio caps, etc.)
     billing    = a billing/reimbursement requirement (EVV, claim timeliness, prior auth)
+- Keep every field concise. Do not echo large sections of the document text. The goal is a compact list.
 - Prefer fewer high-quality items over many vague ones.
 - If the text contains no requirement language at all, return {"requirements": []}.`;
 

@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Link } from "@tanstack/react-router";
+// Note: source route citations use <a href> because related_route is authored
+// freeform in the knowledge base and won't satisfy TanStack's typed <Link>.
+
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Send, Sparkles, Loader2, ExternalLink, ShieldAlert } from "lucide-react";

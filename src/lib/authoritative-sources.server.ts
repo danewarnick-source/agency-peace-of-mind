@@ -4,6 +4,11 @@
 // from within handler bodies. See docs/tanstack-serverfn-splitting.
 import { z } from "zod";
 import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import {
+  acquireBedrockSlot,
+  recordBedrockTokens,
+  RateLimitError,
+} from "@/lib/nectar-rate-limit.server";
 
 export const AUTH_KINDS = [
   "state_sow",

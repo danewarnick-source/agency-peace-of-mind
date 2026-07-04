@@ -491,6 +491,14 @@ function SourceRow({
     onError: (e: Error) => toast.error(e.message),
   });
   const driverProgress = useDraftJobProgress(source.id);
+  const kindMissing = !source.authoritative_kind;
+  const startDraft = () => {
+    if (kindMissing) {
+      toast.warning("Pick a document kind first so NECTAR knows how to read it.");
+      return;
+    }
+    generate.mutate();
+  };
   const generate = useMutation({
     mutationFn: async () => {
       const start = await startFn({ data: { documentId: source.id } });

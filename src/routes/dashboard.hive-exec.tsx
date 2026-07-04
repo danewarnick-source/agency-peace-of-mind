@@ -2,7 +2,7 @@ import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-r
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useMemo } from "react";
-import { Shield, ShieldAlert, LayoutDashboard, HelpCircle } from "lucide-react";
+import { Shield, ShieldAlert, LayoutDashboard, HelpCircle, ChevronDown } from "lucide-react";
 import { RequireHiveExecutive } from "@/components/hive-executive-guard";
 import { EXEC_DOMAINS, COMMAND_CENTER_ITEM, EXEC_NAV } from "@/lib/exec-nav";
 import { getPendingUpgradeRequestCount } from "@/lib/org-features.functions";

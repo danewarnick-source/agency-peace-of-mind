@@ -91,7 +91,7 @@ export const ReqExtraction = z.object({
 
 export function chunkDocumentRanges(
   text: string,
-  windowSize = 60_000,
+  windowSize = 40_000,
   overlap = 4_000,
   maxChunks = 20,
 ): Array<[number, number]> {
@@ -114,7 +114,7 @@ export function chunkDocumentRanges(
 
 export function chunkDocumentText(
   text: string,
-  windowSize = 60_000,
+  windowSize = 40_000,
   overlap = 4_000,
   maxChunks = 20,
 ): string[] {
@@ -125,6 +125,7 @@ export function chunkDocumentText(
 
 
 export class ChunkParseError extends Error {}
+export class ChunkTruncationError extends Error {}
 
 export class TransientAIError extends Error {
   retryAfterMs: number;

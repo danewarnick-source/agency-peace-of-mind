@@ -1258,16 +1258,11 @@ export const startRequirementsDraft = createServerFn({ method: "POST" })
       .single();
     if (jobErr || !jobRow) throw new Error(jobErr?.message ?? "Could not start draft job");
 
-    // Best-effort: kick off a server-side background tick so drafting keeps
-    // moving even if the user leaves the page or closes the tab. The client
-    // driver races this and idempotency in processDraftChunk makes any
-    // overlap a no-op.
-    try {
-      const { fireDraftTick } = await import("./nectar-draft-tick.server");
-      await fireDraftTick(jobRow.id as string, { wait: false });
-    } catch {
-      // Non-fatal — the client driver will still pick up the job.
-    }
+    // The mounted client driver is the active-page worker. Do not also start
+    // the server tick here: for large SOWs that briefly doubled concurrency
+    // (client 2 + tick 2) and could trigger the AI rate limit before pacing
+    // had a chance to help. The tab-hide/pagehide nudge still starts the
+    // server tick when the user actually leaves the page.
 
     return {
       jobId: jobRow.id as string,
@@ -1344,7 +1339,17 @@ export const processDraftChunk = createServerFn({ method: "POST" })
       items = got.items;
       failures = got.failures;
     } catch (err) {
-      if (isTransientAIError(err)) {
+      const rawRetryAfterMs = (err as { retryAfterMs?: unknown })?.retryAfterMs;
+      const retryAfterMs =
+        typeof rawRetryAfterMs === "number" && Number.isFinite(rawRetryAfterMs)
+          ? Math.max(5_000, Math.min(120_000, rawRetryAfterMs))
+          : isTransientAIError(err) ||
+              /rate[-\s]?limit|throttl|temporar|timeout|timed out|429|503|502|504/i.test(
+                typeof err === "string" ? err : ((err as Error | undefined)?.message ?? ""),
+              )
+            ? 30_000
+            : null;
+      if (retryAfterMs !== null) {
         // Do NOT throw — throwing from a server fn logs as a runtime error
         // and can trigger the route error boundary. Return a soft transient
         // status; the client driver retries this same section after a pause.
@@ -1355,6 +1360,7 @@ export const processDraftChunk = createServerFn({ method: "POST" })
           failuresAdded: [] as string[],
           skipped: true as const,
           transient: true as const,
+          retryAfterMs,
         };
       }
       failures = [

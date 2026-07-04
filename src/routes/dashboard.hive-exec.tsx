@@ -38,6 +38,14 @@ function ExecCommandCenterLayout() {
     items: d.items.filter((i) => capabilities.includes(i.capability)),
   })).filter((d) => d.items.length > 0);
 
+  // Match current path to a nav entry to bias Steve's retrieval.
+  const currentNav = useMemo(
+    () => EXEC_NAV.find((i) => (i.exact ? pathname === i.to : pathname.startsWith(i.to))) ?? null,
+    [pathname],
+  );
+  const { allowed: steveAllowed } = useCapability("steve.use");
+  const [guideOpen, setGuideOpen] = useState(false);
+
   return (
     <div className="space-y-4">
       <header className="rounded-xl border border-[#fed7aa] bg-gradient-to-r from-[#0f1b3d] to-[#1a2a5a] p-4 text-white shadow-sm">
@@ -53,12 +61,40 @@ function ExecCommandCenterLayout() {
               <h1 className="font-display text-xl font-bold tracking-tight">Platform operations</h1>
             </div>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#fed7aa] bg-[#0f1b3d] px-3 py-1.5 text-xs font-medium text-[#fed7aa]">
-            <ShieldAlert className="h-3.5 w-3.5" />
-            Account &amp; billing only — no client records or PHI
+          <div className="flex flex-wrap items-center gap-2">
+            {steveAllowed && (
+              <Button
+                size="sm"
+                variant="secondary"
+                className="bg-[#d97a1c] text-white hover:bg-[#b8641a]"
+                onClick={() => setGuideOpen(true)}
+              >
+                <HelpCircle className="mr-1 h-3.5 w-3.5" /> Guide me
+              </Button>
+            )}
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#fed7aa] bg-[#0f1b3d] px-3 py-1.5 text-xs font-medium text-[#fed7aa]">
+              <ShieldAlert className="h-3.5 w-3.5" />
+              Account &amp; billing only — no client records or PHI
+            </div>
           </div>
         </div>
       </header>
+
+      <Dialog open={guideOpen} onOpenChange={setGuideOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>
+              Guide me{currentNav ? ` · ${currentNav.label}` : ""}
+            </DialogTitle>
+          </DialogHeader>
+          <SteveDockPanel
+            routeContext={currentNav?.to ?? pathname}
+            featureKeyContext={currentNav?.capability ?? null}
+            expanded
+          />
+        </DialogContent>
+      </Dialog>
+
 
       <div className="grid gap-4 md:grid-cols-[220px_1fr]">
         <nav className="space-y-3 rounded-xl border border-border bg-card p-3 shadow-sm md:sticky md:top-4 md:self-start">

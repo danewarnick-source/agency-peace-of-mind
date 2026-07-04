@@ -25,12 +25,14 @@ function CompaniesPage() {
 
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("active");
 
   const rows = useMemo<CompanyRow[]>(() => {
     const data = listQ.data ?? [];
     return data.filter((r) => {
-      if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (statusFilter === "active") {
+        if (r.status !== "active" && r.status !== "trial") return false;
+      } else if (statusFilter !== "all" && r.status !== statusFilter) return false;
       if (search && !r.name.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     });

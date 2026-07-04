@@ -177,6 +177,7 @@ export function DraftJobsProvider({ children }: { children: React.ReactNode }) {
       const durations = [...job.chunkDurationsMs];
 
       const paced = totals.total > LARGE_DOC_CHUNK_THRESHOLD;
+      let pausedUntil = 0;
 
       const runWorker = async () => {
         let firstCall = true;
@@ -191,6 +192,8 @@ export function DraftJobsProvider({ children }: { children: React.ReactNode }) {
 
           // Pace subsequent calls in this worker on large docs so we
           // stay under the AI rate limit instead of only recovering.
+          const pauseRemaining = pausedUntil - Date.now();
+          if (pauseRemaining > 0) await wait(pauseRemaining);
           if (paced && !firstCall) await wait(LARGE_DOC_INTER_CALL_PAUSE_MS);
           firstCall = false;
 
@@ -214,6 +217,7 @@ export function DraftJobsProvider({ children }: { children: React.ReactNode }) {
                 5_000,
                 Math.min(120_000, r.retryAfterMs ?? TRANSIENT_RETRY_PAUSE_MS),
               );
+              pausedUntil = Math.max(pausedUntil, Date.now() + retryAfterMs);
               cursor = Math.min(cursor, i);
               setProgress((prev) => {
                 const cur = prev[job.documentId];
@@ -235,6 +239,7 @@ export function DraftJobsProvider({ children }: { children: React.ReactNode }) {
                 `[nectar-draft] section ${i} is waiting for AI capacity for job ${job.jobId}:`,
                 (err as Error).message,
               );
+              pausedUntil = Math.max(pausedUntil, Date.now() + TRANSIENT_RETRY_PAUSE_MS);
               cursor = Math.min(cursor, i);
               setProgress((prev) => {
                 const cur = prev[job.documentId];

@@ -45,6 +45,8 @@ function ExecCommandCenterLayout() {
   );
   const { allowed: steveAllowed } = useCapability("steve.use");
   const [guideOpen, setGuideOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const toggleDomain = (id: string) => setCollapsed((c) => ({ ...c, [id]: !c[id] }));
 
   return (
     <div className="space-y-4">

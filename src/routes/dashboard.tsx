@@ -441,7 +441,7 @@ function DashboardLayout() {
                 </h1>
                 <p className="truncate text-xs text-muted-foreground">
                   {isHiveExecView
-                    ? "HIVE Platform · HIVE Executive"
+                    ? "HIVE Platform · Executive Command Center"
                     : isStatePreview
                       ? `State Build/Preview · ${currentPreviewState?.name ?? "—"} · ${subView === "admin" ? "Admin" : "Staff"} view`
                       : (
@@ -651,7 +651,7 @@ function SidebarBody({
               {isExecutive && (
                 <SelectItem value="hive_exec">
                   <span className="inline-flex items-center gap-2">
-                    <Lock className="h-3.5 w-3.5" /> HIVE Executive
+                    <Lock className="h-3.5 w-3.5" /> Executive Command Center
                   </span>
                 </SelectItem>
               )}

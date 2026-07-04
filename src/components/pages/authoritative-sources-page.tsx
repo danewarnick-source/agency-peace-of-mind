@@ -412,7 +412,7 @@ function SourceRow({
   onJumpToRequirements,
   currentRole,
 }: {
-  source: { id: string; title: string; authoritative_kind: string | null; fiscal_year: string | null; effective_start: string | null; effective_end: string | null; file_name: string; uploaded_by_name: string | null; created_at: string; parse_status: string | null; metadata?: Record<string, unknown> | null };
+  source: { id: string; title: string; authoritative_kind: string | null; is_authoritative_source?: boolean | null; fiscal_year: string | null; effective_start: string | null; effective_end: string | null; file_name: string; uploaded_by_name: string | null; created_at: string; parse_status: string | null; metadata?: Record<string, unknown> | null };
   orgId: string;
   stats:
     | {
@@ -474,7 +474,31 @@ function SourceRow({
   });
   const qc = useQueryClient();
   const startFn = useServerFn(startRequirementsDraft);
+  const markFn = useServerFn(markAsAuthoritativeSource);
+  const markMutation = useMutation({
+    mutationFn: (nextKind: string) =>
+      markFn({
+        data: {
+          documentId: source.id,
+          authoritativeKind: nextKind as "state_sow" | "provider_contract" | "dspd_requirement" | "dhs_requirement" | "public_record" | "tool_template" | "other",
+          isAuthoritative: true,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Document kind set — NECTAR can now draft from it.");
+      qc.invalidateQueries({ queryKey: ["auth-sources", orgId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const driverProgress = useDraftJobProgress(source.id);
+  const kindMissing = !source.authoritative_kind;
+  const startDraft = () => {
+    if (kindMissing) {
+      toast.warning("Pick a document kind first so NECTAR knows how to read it.");
+      return;
+    }
+    generate.mutate();
+  };
   const generate = useMutation({
     mutationFn: async () => {
       const start = await startFn({ data: { documentId: source.id } });
@@ -534,9 +558,28 @@ function SourceRow({
         <div className="flex flex-wrap items-center gap-2">
           <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
           <span className="truncate text-sm font-medium">{source.title}</span>
-          <Badge variant="secondary" className="text-[10px]">
-            {KIND_LABEL[source.authoritative_kind ?? "other"] ?? "Source"}
-          </Badge>
+          {kindMissing ? (
+            <Select
+              value=""
+              onValueChange={(v) => markMutation.mutate(v)}
+              disabled={markMutation.isPending || !canDraft}
+            >
+              <SelectTrigger className="h-6 w-auto gap-1 border-dashed border-amber-500/50 bg-amber-500/5 px-2 py-0 text-[10px] text-amber-900 dark:text-amber-200">
+                <SelectValue placeholder={markMutation.isPending ? "Saving…" : "Set kind"} />
+              </SelectTrigger>
+              <SelectContent>
+                {AUTH_KINDS.map((k) => (
+                  <SelectItem key={k.value} value={k.value} className="text-xs">
+                    {k.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Badge variant="secondary" className="text-[10px]">
+              {KIND_LABEL[source.authoritative_kind ?? "other"] ?? "Source"}
+            </Badge>
+          )}
           {source.parse_status === "parsed" && (
             <Badge className="bg-emerald-500/15 text-[10px] text-emerald-700 dark:text-emerald-300">
               Parsed
@@ -612,7 +655,7 @@ function SourceRow({
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => generate.mutate()}
+            onClick={startDraft}
             disabled={isDrafting || source.parse_status !== "parsed" || !canDraft}
             title={
               !canDraft
@@ -635,7 +678,7 @@ function SourceRow({
           <Button
             size="sm"
             variant="outline"
-            onClick={() => generate.mutate()}
+            onClick={startDraft}
             disabled={isDrafting || source.parse_status !== "parsed" || !canDraft}
             title={
               !canDraft

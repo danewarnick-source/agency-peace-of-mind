@@ -168,13 +168,17 @@ export const listAuthoritativeSources = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    // Sources tab shows every company-owned doc — the authoritative flag /
+    // authoritative_kind just controls whether NECTAR can draft from it yet.
+    // Client/staff docs stay filtered out so PHI-scoped files don't leak in.
     const { data: rows, error } = await supabase
       .from("nectar_documents")
       .select(
-        "id, title, document_type, authoritative_kind, fiscal_year, effective_start, effective_end, file_name, uploaded_by_name, created_at, parse_status, is_current, version, metadata",
+        "id, title, document_type, authoritative_kind, fiscal_year, effective_start, effective_end, file_name, uploaded_by_name, created_at, parse_status, is_current, version, is_authoritative_source, metadata",
       )
       .eq("organization_id", data.organizationId)
-      .eq("is_authoritative_source", true)
+      .eq("owner_kind", "company")
+      .order("is_authoritative_source", { ascending: false })
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return { sources: rows ?? [] };

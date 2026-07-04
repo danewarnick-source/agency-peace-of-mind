@@ -12,17 +12,17 @@ const TICK_PATH = "/api/public/hooks/nectar-draft-tick";
 // well under the Cloudflare Workers CPU cap; the loop stops early if it
 // runs out of time and the next tick (or the client driver) picks up.
 const TICK_BUDGET_MS = 45_000;
-// Pace AI calls for large documents to avoid tripping the rate limit
-// proactively (instead of just recovering from it). Small docs (<= threshold)
-// run at concurrency 2 with no inter-call pause. Large docs run at
-// concurrency 2 with a short pause between calls per worker.
-const TICK_CONCURRENCY = 2;
-const LARGE_DOC_CHUNK_THRESHOLD = 10;
-const LARGE_DOC_INTER_CALL_PAUSE_MS = 1_500;
+// Concurrency is fixed at 1: the shared Bedrock rate limiter
+// (nectar-rate-limit.server) already caps us at 8 requests/minute across all
+// workers. Running more concurrent workers here would just spend budget
+// waiting on the bucket. See acquireBedrockSlot().
+const TICK_CONCURRENCY = 1;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
+// Per-chunk attempt cap — must match processDraftChunk in authoritative-sources.functions.ts.
+const MAX_CHUNK_ATTEMPTS = 2;
 
 function tickSecret(): string {
   const secret = process.env.NECTAR_DRAFT_TICK_SECRET;

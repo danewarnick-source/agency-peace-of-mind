@@ -15627,6 +15627,11 @@ export type Database = {
           similarity: number
         }[]
       }
+      nectar_bump_draft_attempt: { Args: { p_job: string }; Returns: undefined }
+      nectar_bump_draft_transient: {
+        Args: { p_job: string; p_msg: string }
+        Returns: undefined
+      }
       notify_incident_filed: {
         Args: {
           p_client_name: string

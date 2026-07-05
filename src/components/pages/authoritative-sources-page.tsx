@@ -1636,6 +1636,14 @@ function DocumentRequirementGroup({
                   key: "fully_confirmed" as const,
                   label: `Fully confirmed (${doneItems.length})`,
                 },
+                ...(notApplicableItems.length > 0
+                  ? ([
+                      {
+                        key: "not_applicable" as const,
+                        label: `Not applicable (${notApplicableItems.length})`,
+                      },
+                    ] as const)
+                  : ([] as const)),
               ] as const
             ).map((f) => (
               <button
@@ -1646,6 +1654,7 @@ function DocumentRequirementGroup({
                   if (f.key === "all") setConfirmedCollapsed(true);
                   if (f.key === "fully_confirmed") setConfirmedCollapsed(false);
                 }}
+
                 className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition ${
                   rowFilter === f.key
                     ? "bg-foreground text-background"

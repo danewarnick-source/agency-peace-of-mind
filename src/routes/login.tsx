@@ -118,7 +118,7 @@ function LoginPage() {
       if (!cancelled) navigate({ to: target, replace: true });
     })();
     return () => { cancelled = true; };
-  }, [loading, session, navigate, execCheck]);
+  }, [loading, session, navigate, execCheck, nextPath]);
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

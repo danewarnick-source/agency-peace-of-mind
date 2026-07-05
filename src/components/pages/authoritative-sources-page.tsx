@@ -324,10 +324,19 @@ function SourcesPanel({
         scopePending: number;
         needs: number;
         removed: number;
+        notApplicable: number;
         lastDraftedAt: string | null;
       }
     >();
-    type Row = { id: string; source_document_id: string | null; review_status: string | null; verified: boolean | null; created_at: string | null };
+    type Row = {
+      id: string;
+      origin: string;
+      source_document_id: string | null;
+      review_status: string | null;
+      verified: boolean | null;
+      created_at: string | null;
+      scope_state?: "in_scope" | "out_of_scope" | null;
+    };
     const rows = ((reqData?.requirements ?? []) as unknown) as Row[];
     for (const r of rows) {
       if (!r.source_document_id) continue;
@@ -338,16 +347,23 @@ function SourcesPanel({
         scopePending: 0,
         needs: 0,
         removed: 0,
+        notApplicable: 0,
         lastDraftedAt: null as string | null,
       };
       cur.total += 1;
       const s = r.review_status ?? (r.verified ? "confirmed" : "needs_attention");
-      if (s === "confirmed") {
+      // Precedence: removed > not_applicable (auto) > confirmed/needs_attention.
+      if (s === "removed") {
+        cur.removed += 1;
+      } else if (r.scope_state === "out_of_scope") {
+        cur.notApplicable += 1;
+      } else if (s === "confirmed") {
         cur.confirmed += 1;
         if (isScopeReady(applicByReq.get(r.id))) cur.fullyConfirmed += 1;
         else cur.scopePending += 1;
-      } else if (s === "removed") cur.removed += 1;
-      else cur.needs += 1;
+      } else {
+        cur.needs += 1;
+      }
       if (r.created_at && (!cur.lastDraftedAt || r.created_at > cur.lastDraftedAt)) {
         cur.lastDraftedAt = r.created_at;
       }
@@ -355,6 +371,7 @@ function SourcesPanel({
     }
     return map;
   }, [reqData, applicByReq]);
+
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_360px]">

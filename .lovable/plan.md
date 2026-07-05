@@ -1,51 +1,53 @@
-# Auto set-aside out-of-scope SOW requirements
+# Slow down NECTAR Pre-fill so applicability suggestions stop failing
 
-## Goal
-On the Authoritative Sources → Requirements tab, requirements NECTAR drafted from a source document (SOW etc.) that are tied to a service code the organization is NOT authorized for (active OR future) should automatically appear as **"Not applicable — out of scope"**, be excluded from the "needs attention" count, and never be deleted. If the org later gets authorized for that code, the requirement automatically becomes reviewable again. Manual removal (`review_status = 'removed'`) is left completely alone — this new state is separate and visibly distinct.
+## Problem
 
-## Scope guardrails
-- Applies ONLY to rows in `nectar_requirements` where `origin = 'document'` (drafted from an authoritative source).
-- Does NOT touch: manual requirements, suggestions, `agreement_requirements`, checklists, tenant features, forms, or any other to-do surface.
-- Does NOT modify manual removal flow, its audit-trail warning, or the "removed" banner/section.
-- Nothing is deleted, ever. This is a computed/derived state.
+The SOW drafting step already survives our AI provider's 8-req/min ceiling: every model call is gated by `acquireBedrockSlot()` (shared Postgres bucket in `src/lib/nectar-rate-limit.server.ts`), and transient failures (429/5xx) are thrown as `TransientAIError` and retried by the caller.
 
-## Approach: derive, don't mutate
-Because the state is a pure function of `(requirement's service codes) × (org's authorized codes today)`, compute it on read. This makes it automatically reversible the moment `provider_authorized_codes` changes — no background job, no drift.
+The "Pre-fill with NECTAR" applicability step (`prefillRequirementMappings` in `src/lib/nectar-engine.functions.ts`) does neither:
 
-Rules used to decide "out of scope":
-- Collect authorized code set = all rows in `provider_authorized_codes` for the org where `archived_at IS NULL` (both active and future/held count — carve_out flag does not disqualify; only archived does).
-- A requirement is **out_of_scope** when it has at least one associated code (`service_code` or any entry in `service_codes_all`) AND *none* of its associated codes are in the authorized set.
-- Requirements with no code association (`service_code` null AND `service_codes_all` empty/null) are NOT auto-set-aside — they remain in their current review flow (they're org-wide obligations).
-- `review_status = 'removed'` always wins — a manually removed row stays "removed" regardless of scope.
+- It fans out `PREFILL_CONCURRENCY = 4` workers, each calling `aiPropose` → `callBedrockChatCompletions` directly.
+- `aiPropose` never calls `acquireBedrockSlot()`, so 4 workers race past the 8/min quota within seconds.
+- On a `BedrockError` with `status === 429` it throws a generic `Error("AI rate limit reached…")`. The worker `catch { failed += 1; }` block swallows it and skips that requirement — no retry, no wait. A batch of 50+ ends up mostly failed.
 
-## Data / server changes
-1. **Extend `listRequirements` in `src/lib/authoritative-sources.functions.ts`** — **the current `.select()` at line 396 does NOT include `service_code` or `service_codes_all`; both must be explicitly added to that select string**, otherwise the derived scope calculation has nothing to read. Then fetch the org's non-archived `provider_authorized_codes.code` set once and return each row with a derived `scope_state: 'in_scope' | 'out_of_scope'` field plus the list of offending codes.
-2. **Extend the per-source-document requirements fetcher** (the other `.select(` at ~line 1171/1195 that feeds the source drill-down) with the same two columns added to its `.select()` and the same derived field — only for `origin = 'document'` rows; other origins get `scope_state: 'in_scope'` unconditionally.
-3. **Extend the org-wide requirements fetcher** used by `authoritative-sources-page.tsx` (the one populating `Row[]` at line ~330) with the same derived field. Verify its `.select()` also lists `service_code, service_codes_all` before use.
+Fix: route pre-fill through the same slot gate + transient-retry pattern used for drafting. Scope is intentionally narrow — only the applicability pre-fill path.
 
-No migration is required. No new column. No RLS change.
+## Changes
 
-## UI changes (Authoritative Sources page only)
+### 1. `src/lib/nectar-engine.functions.ts` — gate + classify AI calls
 
-`src/components/pages/authoritative-sources-page.tsx`:
+- Convert `aiPropose` from a `.functions.ts` inline helper into a thin wrapper that calls a new server-only helper. Since `.functions.ts` module-scope code ships to the client, move the AI + rate-limit imports inside the handler (already dynamic for `ai-bedrock.server`; do the same for the new helper) OR simply add the logic inside `aiPropose` using dynamic imports for `acquireBedrockSlot`, `recordBedrockTokens`, and the `TransientAIError` class from `@/lib/authoritative-sources.server` + `@/lib/nectar-rate-limit.server`.
+- Inside `aiPropose`, before `callBedrockChatCompletions`:
+  - `await acquireBedrockSlot()` — blocks up to 60s for a shared slot.
+  - If `acquireBedrockSlot` throws `RateLimitError`, re-throw as `TransientAIError` with its `waitMs` so the caller can retry.
+- On `BedrockError`:
+  - `status === 429` or `[408, 500, 502, 503, 504].includes(status)` → throw `TransientAIError(msg, 30_000)` (matches `extractOnce`).
+  - `status === 402` → re-throw as a hard error (credits — no retry).
+  - Other statuses → keep as hard error.
+- On success, best-effort `recordBedrockTokens(usage.total_tokens)` using the returned `json.usage` (mirrors `extractOnce`).
 
-1. **`statusOf` / bucket logic** — introduce a derived bucket `not_applicable` that takes precedence over `needs_attention` / `confirmed` but NOT over `removed`. Order of precedence: `removed` → `not_applicable` (auto) → existing (`confirmed` / `needs_attention`).
-2. **Top-of-page stats block** (~line 340): add a `notApplicable` counter. Subtract these from `needs` so the "needs attention" number reflects only in-scope items awaiting review. Show the new count as an inline chip: `· N not applicable (out of scope)`.
-3. **Per-source group stats** (~line 1413) and per-doc row filter tabs: add a `not_applicable` count next to `removed`. Add a new filter tab **"Not applicable"** alongside All / Needs attention / Fully confirmed / Removed.
-4. **Per-item rendering**: when `scope_state = 'out_of_scope'` and status is not `removed`, render the row in a muted style with a small badge **"Not applicable — service code not authorized"** and a tooltip listing which code(s) are out of scope. Suppress the Confirm/Remove primary actions for these rows (they're set aside, not actionable). Keep the row visible so the human can see what was auto-filtered.
-5. **Sorting**: `not_applicable` sorts after `fully_confirmed` and before `removed` in the per-doc list.
-6. **Copy on the missing-attention banner** stays exclusive to true `needs_attention`; the "removed" banner stays untouched.
+### 2. `prefillRequirementMappings` worker loop — retry transient errors, lower concurrency
 
-## Reversibility
-Because scope is derived every read, the moment a user adds a code to `provider_authorized_codes` (or unarchives one), the affected requirements automatically flip back to `needs_attention` / `confirmed` on next fetch — no migration, no backfill, no cleanup.
+Same file, handler at lines ~637-789:
 
-## Files touched
-- `src/lib/authoritative-sources.functions.ts` — add `service_code, service_codes_all` to every requirement `.select()` used here; join authorized codes into the fetchers; return `scope_state` + list of offending codes.
-- `src/components/pages/authoritative-sources-page.tsx` — stats, filter tabs, row styling, bucket precedence.
+- Drop `PREFILL_CONCURRENCY` from `4` to `2`. The slot gate already serializes to ~8/min; two workers keep steady pressure without stampeding when several requests wake at once.
+- Wrap the `aiPropose(...)` call in a per-requirement retry loop, mirroring `processDraftChunk`:
+  - `MAX_ATTEMPTS = 4`.
+  - On caught error: if `isTransientAIError(err)` (imported from `@/lib/authoritative-sources.server`), read `err.retryAfterMs` (fallback `30_000`), clamp to `[5_000, 120_000]`, `await sleep(retryAfterMs)`, and retry.
+  - Non-transient error, or attempts exhausted → increment `failed` and continue (existing behavior).
+- Keep the existing "unknown placeholder" insert path for `normalized.length === 0`.
+- No changes to schema, RLS, DB, or UI counters. The returned `{ processed, inserted, failed, skipped }` shape is unchanged; `failed` should now be near-zero for typical batches.
 
-## Verification (against TNS FAKE, SOW 2026)
-- The top-line "needs attention" chip decreases; a new "not applicable" chip appears with the delta.
-- The SOW 2026 group shows a **Not applicable** tab; items in it list codes TNS FAKE doesn't hold.
-- Manually-removed items still appear only under **Removed** with their existing audit warning.
-- Adding an out-of-scope code to `provider_authorized_codes` and reloading moves the affected requirements back into **Needs attention** automatically.
-- No requirement rows deleted; no schema migration required.
+### 3. Nothing else changes
+
+- Drafting path (`processDraftChunk`, `extractOnce`, `nectar-draft-tick.server.ts`) is untouched.
+- Other AI features platform-wide are untouched.
+- No new tables, migrations, or edge functions.
+- `PREFILL_CONCURRENCY` stays a module constant; only its value and the retry loop change.
+
+## Verification
+
+- Click **Pre-fill with NECTAR** on a batch of 50+ unmapped SOW requirements. Expect `inserted` ≈ `candidates`, `failed` ≈ 0, wall-clock ~6–8 minutes at 8 rpm.
+- `nectar_rate_state` shows steady per-minute counters instead of a burst.
+- Manually forced 429 (e.g. throttled Bedrock) causes retries with backoff, not immediate failure.
+- Drafting a fresh SOW still works identically (no regression on the shared helpers).

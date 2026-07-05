@@ -1472,13 +1472,19 @@ function DocumentRequirementGroup({
     let scopePending = 0;
     let needs = 0;
     let removed = 0;
+    let notApplicable = 0;
     for (const i of group.items) {
-      const s = statusOf(i);
-      if (s === "confirmed") {
+      const eff = effectiveStatusOf(i);
+      if (eff === "removed") {
+        removed += 1;
+      } else if (eff === "not_applicable") {
+        notApplicable += 1;
+      } else if (eff === "confirmed") {
         if (isScopeReady(applicByReq.get(i.id))) fullyConfirmed += 1;
         else scopePending += 1;
-      } else if (s === "removed") removed += 1;
-      else needs += 1;
+      } else {
+        needs += 1;
+      }
     }
     return {
       total: group.items.length,
@@ -1487,6 +1493,7 @@ function DocumentRequirementGroup({
       scopePending,
       needs,
       removed,
+      notApplicable,
     };
   }, [group.items, applicByReq]);
 
@@ -1497,17 +1504,18 @@ function DocumentRequirementGroup({
   }, [forceOpen]);
 
   // Sort: needs_attention first (with proposals first), then scope_pending,
-  // then fully_confirmed, then removed
+  // then fully_confirmed, then not_applicable, then removed.
   const sortedItems = useMemo(() => {
     const score = (r: ReqRow) => {
-      const s = statusOf(r);
-      if (s === "removed") return 4;
-      if (s === "needs_attention") {
+      const eff = effectiveStatusOf(r);
+      if (eff === "removed") return 5;
+      if (eff === "not_applicable") return 4;
+      if (eff === "needs_attention") {
         const stats = applicByReq.get(r.id);
         const hasProposals = stats && stats.pending > 0 && stats.unknown === 0;
         return hasProposals ? -1 : 0;
       }
-      if (s === "confirmed") {
+      if (eff === "confirmed") {
         return isScopeReady(applicByReq.get(r.id)) ? 3 : 1;
       }
       return 2;
@@ -1518,22 +1526,26 @@ function DocumentRequirementGroup({
   }, [group.items, applicByReq]);
 
   const [rowFilter, setRowFilter] = useState<
-    "all" | "needs_attention" | "fully_confirmed"
+    "all" | "needs_attention" | "fully_confirmed" | "not_applicable"
   >("all");
   const [confirmedCollapsed, setConfirmedCollapsed] = useState(true);
 
   const activeItems = sortedItems.filter((r) => {
-    const s = statusOf(r);
+    const eff = effectiveStatusOf(r);
     return (
-      s === "needs_attention" ||
-      (s === "confirmed" && !isScopeReady(applicByReq.get(r.id)))
+      eff === "needs_attention" ||
+      (eff === "confirmed" && !isScopeReady(applicByReq.get(r.id)))
     );
   });
   const doneItems = sortedItems.filter((r) => {
-    const s = statusOf(r);
-    return s === "confirmed" && isScopeReady(applicByReq.get(r.id));
+    const eff = effectiveStatusOf(r);
+    return eff === "confirmed" && isScopeReady(applicByReq.get(r.id));
   });
+  const notApplicableItems = sortedItems.filter(
+    (r) => effectiveStatusOf(r) === "not_applicable",
+  );
   const removedItems = sortedItems.filter((r) => statusOf(r) === "removed");
+
 
   return (
     <section

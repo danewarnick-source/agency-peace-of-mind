@@ -240,7 +240,7 @@ PROVIDER ENTITIES:
 
   // Best-effort daily-token bookkeeping so pre-fill counts against the same
   // daily cap as drafting.
-  const usage = (json?.usage ?? {}) as {
+  const usage = ((json as unknown as { usage?: unknown })?.usage ?? {}) as {
     total_tokens?: number;
     input_tokens?: number;
     output_tokens?: number;

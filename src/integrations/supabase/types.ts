@@ -15471,6 +15471,22 @@ export type Database = {
         }
         Relationships: []
       }
+      mcp_column_catalog: {
+        Row: {
+          column_name: unknown
+          data_type: string | null
+          is_nullable: string | null
+          ordinal_position: number | null
+          table_name: unknown
+        }
+        Relationships: []
+      }
+      mcp_table_catalog: {
+        Row: {
+          table_name: unknown
+        }
+        Relationships: []
+      }
       org_member_directory: {
         Row: {
           account_status: string | null
@@ -15842,6 +15858,7 @@ export type Database = {
           similarity: number
         }[]
       }
+      mcp_exec_read_sql: { Args: { query: string }; Returns: Json }
       nectar_bump_chunk_attempt: {
         Args: { p_index: number; p_job: string }
         Returns: number

@@ -454,6 +454,16 @@ export const deleteDocument = createServerFn({ method: "POST" })
     if (doc?.storage_path) {
       await supabase.storage.from(doc.storage_bucket as string).remove([doc.storage_path as string]);
     }
+    // Retract unconfirmed requirements drafted from this source so they stop
+    // appearing in "needs attention" once the source document is gone.
+    // Confirmed requirements are left alone (they represent human-attested obligations).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: reqErr } = await (supabase as any)
+      .from("nectar_requirements")
+      .update({ review_status: "removed", updated_at: new Date().toISOString() })
+      .eq("source_document_id", data.documentId)
+      .neq("review_status", "confirmed");
+    if (reqErr) throw new Error(reqErr.message);
     const { error } = await supabase.from("nectar_documents").delete().eq("id", data.documentId);
     if (error) throw new Error(error.message);
     return { ok: true };

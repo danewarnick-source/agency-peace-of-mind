@@ -15,6 +15,7 @@ import { Route as SuperAdminRouteImport } from './routes/super-admin'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as McpRouteImport } from './routes/mcp'
 import { Route as ManagerRouteImport } from './routes/manager'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
@@ -87,6 +88,8 @@ import { Route as DashboardAskNectarRouteImport } from './routes/dashboard.ask-n
 import { Route as CertificateCodeRouteImport } from './routes/certificate.$code'
 import { Route as AuditPortalSetPasswordRouteImport } from './routes/audit-portal.set-password'
 import { Route as AuditPortalPackageIdRouteImport } from './routes/audit-portal.$packageId'
+import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as DashboardTrainingIndexRouteImport } from './routes/dashboard.training.index'
 import { Route as DashboardSmartImportIndexRouteImport } from './routes/dashboard.smart-import.index'
 import { Route as DashboardHiveTrainingIndexRouteImport } from './routes/dashboard.hive-training.index'
@@ -176,6 +179,8 @@ import { Route as DashboardBillingClientIdRouteImport } from './routes/dashboard
 import { Route as DashboardBehaviorSupportClientIdRouteImport } from './routes/dashboard.behavior-support.$clientId'
 import { Route as DashboardAdminEmarAuditRouteImport } from './routes/dashboard.admin.emar-audit'
 import { Route as DashboardAdminCeHoursRouteImport } from './routes/dashboard.admin.ce-hours'
+import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as DashboardSmartImportJobIdReviewRouteImport } from './routes/dashboard.smart-import.$jobId.review'
 import { Route as DashboardSmartImportJobIdDoneRouteImport } from './routes/dashboard.smart-import.$jobId.done'
 import { Route as DashboardHiveTrainingCourseAssignmentIdRouteImport } from './routes/dashboard.hive-training.course.$assignmentId'
@@ -225,6 +230,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
   path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ManagerRoute = ManagerRouteImport.update({
@@ -595,6 +605,18 @@ const AuditPortalPackageIdRoute = AuditPortalPackageIdRouteImport.update({
   path: '/audit-portal/$packageId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const Char91DotwellKnownChar93OauthProtectedResourceRoute =
+  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const Char91DotmcpChar93ListToolsRoute =
+  Char91DotmcpChar93ListToolsRouteImport.update({
+    id: '/.mcp/list-tools',
+    path: '/.mcp/list-tools',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const DashboardTrainingIndexRoute = DashboardTrainingIndexRouteImport.update({
   id: '/training/',
   path: '/training/',
@@ -1091,6 +1113,17 @@ const DashboardAdminCeHoursRoute = DashboardAdminCeHoursRouteImport.update({
   path: '/admin/ce-hours',
   getParentRoute: () => DashboardRoute,
 } as any)
+const Char91DotmcpChar93InvokeToolToolRoute =
+  Char91DotmcpChar93InvokeToolToolRouteImport.update({
+    id: '/.mcp/invoke-tool/$tool',
+    path: '/.mcp/invoke-tool/$tool',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardSmartImportJobIdReviewRoute =
   DashboardSmartImportJobIdReviewRouteImport.update({
     id: '/$jobId/review',
@@ -1223,12 +1256,15 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/manager': typeof ManagerRoute
+  '/mcp': typeof McpRoute
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/super-admin': typeof SuperAdminRoute
   '/training': typeof TrainingRoute
   '/unauthorized': typeof UnauthorizedRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/audit-portal/$packageId': typeof AuditPortalPackageIdRoute
   '/audit-portal/set-password': typeof AuditPortalSetPasswordRoute
   '/certificate/$code': typeof CertificateCodeRoute
@@ -1290,6 +1326,8 @@ export interface FileRoutesByFullPath {
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal/': typeof AuditPortalIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/behavior-support/$clientId': typeof DashboardBehaviorSupportClientIdRoute
@@ -1411,12 +1449,15 @@ export interface FileRoutesByTo {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/manager': typeof ManagerRoute
+  '/mcp': typeof McpRoute
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/super-admin': typeof SuperAdminRoute
   '/training': typeof TrainingRoute
   '/unauthorized': typeof UnauthorizedRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/audit-portal/$packageId': typeof AuditPortalPackageIdRoute
   '/audit-portal/set-password': typeof AuditPortalSetPasswordRoute
   '/certificate/$code': typeof CertificateCodeRoute
@@ -1472,6 +1513,8 @@ export interface FileRoutesByTo {
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal': typeof AuditPortalIndexRoute
   '/dashboard': typeof DashboardIndexRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/behavior-support/$clientId': typeof DashboardBehaviorSupportClientIdRoute
@@ -1595,12 +1638,15 @@ export interface FileRoutesById {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/manager': typeof ManagerRoute
+  '/mcp': typeof McpRoute
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/super-admin': typeof SuperAdminRoute
   '/training': typeof TrainingRoute
   '/unauthorized': typeof UnauthorizedRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/audit-portal/$packageId': typeof AuditPortalPackageIdRoute
   '/audit-portal/set-password': typeof AuditPortalSetPasswordRoute
   '/certificate/$code': typeof CertificateCodeRoute
@@ -1662,6 +1708,8 @@ export interface FileRoutesById {
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal/': typeof AuditPortalIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/behavior-support/$clientId': typeof DashboardBehaviorSupportClientIdRoute
@@ -1786,12 +1834,15 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/manager'
+    | '/mcp'
     | '/pricing'
     | '/reset-password'
     | '/signup'
     | '/super-admin'
     | '/training'
     | '/unauthorized'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/audit-portal/$packageId'
     | '/audit-portal/set-password'
     | '/certificate/$code'
@@ -1853,6 +1904,8 @@ export interface FileRouteTypes {
     | '/verify/$code'
     | '/audit-portal/'
     | '/dashboard/'
+    | '/.lovable/oauth/consent'
+    | '/.mcp/invoke-tool/$tool'
     | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
     | '/dashboard/behavior-support/$clientId'
@@ -1974,12 +2027,15 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/manager'
+    | '/mcp'
     | '/pricing'
     | '/reset-password'
     | '/signup'
     | '/super-admin'
     | '/training'
     | '/unauthorized'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/audit-portal/$packageId'
     | '/audit-portal/set-password'
     | '/certificate/$code'
@@ -2035,6 +2091,8 @@ export interface FileRouteTypes {
     | '/verify/$code'
     | '/audit-portal'
     | '/dashboard'
+    | '/.lovable/oauth/consent'
+    | '/.mcp/invoke-tool/$tool'
     | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
     | '/dashboard/behavior-support/$clientId'
@@ -2157,12 +2215,15 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/manager'
+    | '/mcp'
     | '/pricing'
     | '/reset-password'
     | '/signup'
     | '/super-admin'
     | '/training'
     | '/unauthorized'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/audit-portal/$packageId'
     | '/audit-portal/set-password'
     | '/certificate/$code'
@@ -2224,6 +2285,8 @@ export interface FileRouteTypes {
     | '/verify/$code'
     | '/audit-portal/'
     | '/dashboard/'
+    | '/.lovable/oauth/consent'
+    | '/.mcp/invoke-tool/$tool'
     | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
     | '/dashboard/behavior-support/$clientId'
@@ -2347,17 +2410,22 @@ export interface RootRouteChildren {
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
   ManagerRoute: typeof ManagerRoute
+  McpRoute: typeof McpRoute
   PricingRoute: typeof PricingRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   SuperAdminRoute: typeof SuperAdminRoute
   TrainingRoute: typeof TrainingRoute
   UnauthorizedRoute: typeof UnauthorizedRoute
+  Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
+  Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   AuditPortalPackageIdRoute: typeof AuditPortalPackageIdRoute
   AuditPortalSetPasswordRoute: typeof AuditPortalSetPasswordRoute
   CertificateCodeRoute: typeof CertificateCodeRoute
   VerifyCodeRoute: typeof VerifyCodeRoute
   AuditPortalIndexRoute: typeof AuditPortalIndexRoute
+  DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
+  Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   SignEmployeeLoanTokenRoute: typeof SignEmployeeLoanTokenRoute
   ApiPublicHooksBillingDailyCheckRoute: typeof ApiPublicHooksBillingDailyCheckRoute
   ApiPublicHooksGmailIngestRoute: typeof ApiPublicHooksGmailIngestRoute
@@ -2410,6 +2478,13 @@ declare module '@tanstack/react-router' {
       path: '/pricing'
       fullPath: '/pricing'
       preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/manager': {
@@ -2914,6 +2989,20 @@ declare module '@tanstack/react-router' {
       path: '/audit-portal/$packageId'
       fullPath: '/audit-portal/$packageId'
       preLoaderRoute: typeof AuditPortalPackageIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.well-known/oauth-protected-resource': {
+      id: '/.well-known/oauth-protected-resource'
+      path: '/.well-known/oauth-protected-resource'
+      fullPath: '/.well-known/oauth-protected-resource'
+      preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.mcp/list-tools': {
+      id: '/.mcp/list-tools'
+      path: '/.mcp/list-tools'
+      fullPath: '/.mcp/list-tools'
+      preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard/training/': {
@@ -3538,6 +3627,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/admin/ce-hours'
       preLoaderRoute: typeof DashboardAdminCeHoursRouteImport
       parentRoute: typeof DashboardRoute
+    }
+    '/.mcp/invoke-tool/$tool': {
+      id: '/.mcp/invoke-tool/$tool'
+      path: '/.mcp/invoke-tool/$tool'
+      fullPath: '/.mcp/invoke-tool/$tool'
+      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.lovable/oauth/consent': {
+      id: '/.lovable/oauth/consent'
+      path: '/.lovable/oauth/consent'
+      fullPath: '/.lovable/oauth/consent'
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/dashboard/smart-import/$jobId/review': {
       id: '/dashboard/smart-import/$jobId/review'
@@ -4177,17 +4280,23 @@ const rootRouteChildren: RootRouteChildren = {
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
   ManagerRoute: ManagerRoute,
+  McpRoute: McpRoute,
   PricingRoute: PricingRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   SuperAdminRoute: SuperAdminRoute,
   TrainingRoute: TrainingRoute,
   UnauthorizedRoute: UnauthorizedRoute,
+  Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
+  Char91DotwellKnownChar93OauthProtectedResourceRoute:
+    Char91DotwellKnownChar93OauthProtectedResourceRoute,
   AuditPortalPackageIdRoute: AuditPortalPackageIdRoute,
   AuditPortalSetPasswordRoute: AuditPortalSetPasswordRoute,
   CertificateCodeRoute: CertificateCodeRoute,
   VerifyCodeRoute: VerifyCodeRoute,
   AuditPortalIndexRoute: AuditPortalIndexRoute,
+  DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
+  Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   SignEmployeeLoanTokenRoute: SignEmployeeLoanTokenRoute,
   ApiPublicHooksBillingDailyCheckRoute: ApiPublicHooksBillingDailyCheckRoute,
   ApiPublicHooksGmailIngestRoute: ApiPublicHooksGmailIngestRoute,
@@ -4201,3 +4310,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

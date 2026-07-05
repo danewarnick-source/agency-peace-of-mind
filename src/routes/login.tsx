@@ -12,8 +12,15 @@ import { signInWithUsername } from "@/lib/login.functions";
 import { checkHiveExecutive } from "@/lib/hive-exec.functions";
 import { toast } from "sonner";
 
+function isSafeNext(v: unknown): v is string {
+  return typeof v === "string" && v.startsWith("/") && !v.startsWith("//");
+}
+
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Sign in — HIVE" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    next: isSafeNext(s.next) ? s.next : undefined,
+  }),
   component: LoginPage,
 });
 
@@ -80,6 +87,8 @@ function LoginPage() {
   const signIn = useServerFn(signInWithUsername);
   const execCheck = useServerFn(checkHiveExecutive);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const search = Route.useSearch();
+  const nextPath = search.next;
 
   // Resolve the correct landing route ONCE per authenticated session, then
   // navigate with `replace` so the dashboard shell isn't forced to reconcile
@@ -88,6 +97,12 @@ function LoginPage() {
     if (loading || !session) return;
     let cancelled = false;
     (async () => {
+      // If a same-origin `next` path was preserved (e.g. MCP OAuth consent),
+      // honor it and skip the exec-route resolution.
+      if (nextPath) {
+        if (!cancelled) window.location.replace(nextPath);
+        return;
+      }
       let target = "/dashboard";
       try {
         const r = await execCheck();
@@ -103,7 +118,7 @@ function LoginPage() {
       if (!cancelled) navigate({ to: target, replace: true });
     })();
     return () => { cancelled = true; };
-  }, [loading, session, navigate, execCheck]);
+  }, [loading, session, navigate, execCheck, nextPath]);
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

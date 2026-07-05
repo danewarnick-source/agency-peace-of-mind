@@ -1786,6 +1786,55 @@ function DocumentRequirementGroup({
             ))}
           </div>
 
+          {/* Batch confirmation bar — only visible when needs-attention
+              SOW rows are currently rendered. */}
+          {(rowFilter === "all" || rowFilter === "needs_attention") &&
+            selectableIds.length > 0 && (
+              <div className="mx-4 mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px]">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <Checkbox
+                    checked={allShownSelected}
+                    onCheckedChange={() => toggleAllShown()}
+                    aria-label="Select all requirements currently shown"
+                  />
+                  <span className="font-medium">
+                    Select all shown ({selectableIds.length})
+                  </span>
+                </label>
+                <span className="text-muted-foreground">
+                  {selected.size > 0
+                    ? `${selected.size} selected — each will be logged individually to the attestation trail.`
+                    : "Tick individual rows below, or select all shown."}
+                </span>
+                <div className="ml-auto flex items-center gap-1.5">
+                  {selected.size > 0 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-[11px]"
+                      onClick={() => setSelected(new Set())}
+                      disabled={batchRunning}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    className="h-7 bg-amber-500 text-[11px] text-amber-950 hover:bg-amber-400"
+                    onClick={() => runBatchConfirm()}
+                    disabled={selected.size === 0 || batchRunning}
+                  >
+                    {batchRunning ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="mr-1 h-3 w-3" />
+                    )}
+                    Confirm {selected.size > 0 ? selected.size : ""} selected
+                  </Button>
+                </div>
+              </div>
+            )}
+
           <ul className="divide-y divide-border/40 px-4 pb-2">
             {group.items.length === 0 && (
               <li className="py-4 text-xs text-muted-foreground">
@@ -1806,15 +1855,22 @@ function DocumentRequirementGroup({
 
             {/* Active items */}
             {(rowFilter === "all" || rowFilter === "needs_attention") &&
-              activeItems.map((r) => (
-                <RequirementRow
-                  key={r.id}
-                  req={r}
-                  orgId={orgId}
-                  sourceMeta={group.source}
-                  applicStats={applicByReq.get(r.id)}
-                />
-              ))}
+              activeItems.map((r) => {
+                const isSelectable = selectableIdSet.has(r.id);
+                return (
+                  <RequirementRow
+                    key={r.id}
+                    req={r}
+                    orgId={orgId}
+                    sourceMeta={group.source}
+                    applicStats={applicByReq.get(r.id)}
+                    selectable={isSelectable}
+                    selected={isSelectable && selected.has(r.id)}
+                    onToggleSelect={isSelectable ? toggleOne : undefined}
+                  />
+                );
+              })}
+
 
             {/* Fully confirmed collapsible section (default "all" view) */}
             {rowFilter === "all" && doneItems.length > 0 && (

@@ -1742,6 +1742,25 @@ function DocumentRequirementGroup({
                 />
               ))}
 
+            {/* Not-applicable items (auto set aside for out-of-scope codes).
+                Rendered above the removed section in "all" and as the sole
+                content when the filter is explicitly "not_applicable". */}
+            {(rowFilter === "all" || rowFilter === "not_applicable") &&
+              notApplicableItems.map((r) => (
+                <RequirementRow
+                  key={r.id}
+                  req={r}
+                  orgId={orgId}
+                  sourceMeta={group.source}
+                  applicStats={applicByReq.get(r.id)}
+                />
+              ))}
+            {rowFilter === "not_applicable" && notApplicableItems.length === 0 && (
+              <li className="py-4 text-xs text-muted-foreground">
+                No auto set-aside requirements in this group.
+              </li>
+            )}
+
             {/* Removed items at bottom for "all" view */}
             {rowFilter === "all" &&
               removedItems.map((r) => (
@@ -1753,6 +1772,7 @@ function DocumentRequirementGroup({
                   applicStats={applicByReq.get(r.id)}
                 />
               ))}
+
           </ul>
         </div>
       )}

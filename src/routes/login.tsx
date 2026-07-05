@@ -87,6 +87,8 @@ function LoginPage() {
   const signIn = useServerFn(signInWithUsername);
   const execCheck = useServerFn(checkHiveExecutive);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const search = Route.useSearch();
+  const nextPath = search.next;
 
   // Resolve the correct landing route ONCE per authenticated session, then
   // navigate with `replace` so the dashboard shell isn't forced to reconcile
@@ -95,6 +97,12 @@ function LoginPage() {
     if (loading || !session) return;
     let cancelled = false;
     (async () => {
+      // If a same-origin `next` path was preserved (e.g. MCP OAuth consent),
+      // honor it and skip the exec-route resolution.
+      if (nextPath) {
+        if (!cancelled) window.location.replace(nextPath);
+        return;
+      }
       let target = "/dashboard";
       try {
         const r = await execCheck();

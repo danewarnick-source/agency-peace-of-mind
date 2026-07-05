@@ -751,12 +751,13 @@ export const prefillRequirementMappings = createServerFn({ method: "POST" })
         const req = queue.shift();
         if (!req) break;
         try {
-          const proposals = await aiPropose(
+          const proposals = await aiProposeWithRetry(
             req.title,
             req.description,
             req.source_citation,
             facts,
           );
+
           processed += 1;
 
           const normalized = proposals

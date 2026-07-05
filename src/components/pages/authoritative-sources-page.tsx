@@ -1231,11 +1231,12 @@ function RequirementsPanel({
     });
     // Sort doc groups by needs-attention desc (so review work surfaces first).
     docGroups.sort((a, b) => {
-      const na = a.items.filter((i) => statusOf(i) === "needs_attention").length;
-      const nb = b.items.filter((i) => statusOf(i) === "needs_attention").length;
+      const na = a.items.filter((i) => effectiveStatusOf(i) === "needs_attention").length;
+      const nb = b.items.filter((i) => effectiveStatusOf(i) === "needs_attention").length;
       if (nb !== na) return nb - na;
       return a.title.localeCompare(b.title);
     });
+
     const tail: ReqGroup[] = [];
     if (suggestions.length)
       tail.push({

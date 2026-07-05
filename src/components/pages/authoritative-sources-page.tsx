@@ -2076,7 +2076,18 @@ function RequirementRow({
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
 
+      {selectable && onToggleSelect && (
+        <div className="mt-1 shrink-0 sm:mr-2">
+          <Checkbox
+            checked={selected}
+            onCheckedChange={(v) => onToggleSelect(req.id, v === true)}
+            aria-label={`Select requirement: ${req.title}`}
+          />
+        </div>
+      )}
+
       <div className="min-w-0 flex-1">
+
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"

@@ -661,7 +661,33 @@ export const listEngineGapsAsTasks = createServerFn({ method: "POST" })
 // rather than building from scratch. Pre-filled rows stay `confirmed: false`
 // (proposed by nectar) — nothing is self-confirmed.
 
-const PREFILL_CONCURRENCY = 4;
+const PREFILL_CONCURRENCY = 2;
+const PREFILL_MAX_ATTEMPTS = 4;
+
+const sleepMs = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function aiProposeWithRetry(
+  ...args: Parameters<typeof aiPropose>
+): Promise<Awaited<ReturnType<typeof aiPropose>>> {
+  const { isTransientAIError } = await import("@/lib/authoritative-sources.server");
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= PREFILL_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await aiPropose(...args);
+    } catch (err) {
+      lastErr = err;
+      if (!isTransientAIError(err) || attempt >= PREFILL_MAX_ATTEMPTS) throw err;
+      const raw = (err as { retryAfterMs?: unknown }).retryAfterMs;
+      const wait =
+        typeof raw === "number" && Number.isFinite(raw)
+          ? Math.max(5_000, Math.min(120_000, raw))
+          : 30_000;
+      await sleepMs(wait);
+    }
+  }
+  throw lastErr;
+}
+
 
 export const prefillRequirementMappings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

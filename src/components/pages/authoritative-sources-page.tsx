@@ -1970,6 +1970,23 @@ function RequirementRow({
               Removed — not tracked for audit
             </Badge>
           )}
+          {isNotApplicable && (
+            <Badge
+              variant="outline"
+              className="text-[10px] border-slate-400/50 text-muted-foreground"
+              title={
+                offendingCodes.length > 0
+                  ? `Auto set aside — your org isn't authorized for service code${
+                      offendingCodes.length === 1 ? "" : "s"
+                    } ${offendingCodes.join(", ")}. Reversible: if authorization is added, this becomes reviewable again automatically.`
+                  : "Auto set aside — your org isn't authorized for the service code(s) this requirement is tied to. Reversible."
+              }
+            >
+              Not applicable — service code not authorized
+              {offendingCodes.length > 0 ? ` (${offendingCodes.join(", ")})` : ""}
+            </Badge>
+          )}
+
           {classification === "external" ? (
             <Badge
               variant="outline"

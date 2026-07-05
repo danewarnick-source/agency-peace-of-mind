@@ -1967,12 +1967,19 @@ function RequirementRow({
   orgId,
   sourceMeta,
   applicStats,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
 }: {
   req: ReqRow;
   orgId: string;
   sourceMeta?: SourceMeta | null;
   applicStats?: ApplicStats;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string, next: boolean) => void;
 }) {
+
   const qc = useQueryClient();
   const setStatusFn = useServerFn(setRequirementReviewStatus);
   const confirmAllFn = useServerFn(confirmRequirementWithScopes);

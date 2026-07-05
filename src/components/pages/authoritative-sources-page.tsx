@@ -665,6 +665,15 @@ function SourceRow({
                 · {stats!.removed} removed
               </span>
             )}
+            {stats!.notApplicable > 0 && (
+              <span
+                className="text-muted-foreground"
+                title="Auto set aside — tied to service codes this org isn't authorized for. Reversible when authorization changes."
+              >
+                · {stats!.notApplicable} not applicable
+              </span>
+            )}
+
             {stats!.lastDraftedAt && (
               <span className="opacity-60">
                 · {new Date(stats!.lastDraftedAt).toLocaleDateString()}

@@ -1598,9 +1598,19 @@ function DocumentRequirementGroup({
           >
             {counts.needs} needs attention
           </Badge>
+          {counts.notApplicable > 0 && (
+            <Badge
+              variant="outline"
+              className="text-[10px] text-muted-foreground"
+              title="Auto set aside — tied to service codes this org isn't authorized for. Reversible."
+            >
+              {counts.notApplicable} not applicable
+            </Badge>
+          )}
           <Badge variant="outline" className="text-[10px] text-muted-foreground">
             {counts.removed} removed
           </Badge>
+
           <span
             className={`ml-1 inline-block text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
             aria-hidden

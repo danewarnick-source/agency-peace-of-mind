@@ -176,6 +176,7 @@ import { Route as DashboardBillingClientIdRouteImport } from './routes/dashboard
 import { Route as DashboardBehaviorSupportClientIdRouteImport } from './routes/dashboard.behavior-support.$clientId'
 import { Route as DashboardAdminEmarAuditRouteImport } from './routes/dashboard.admin.emar-audit'
 import { Route as DashboardAdminCeHoursRouteImport } from './routes/dashboard.admin.ce-hours'
+import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as DashboardSmartImportJobIdReviewRouteImport } from './routes/dashboard.smart-import.$jobId.review'
 import { Route as DashboardSmartImportJobIdDoneRouteImport } from './routes/dashboard.smart-import.$jobId.done'
 import { Route as DashboardHiveTrainingCourseAssignmentIdRouteImport } from './routes/dashboard.hive-training.course.$assignmentId'
@@ -1091,6 +1092,11 @@ const DashboardAdminCeHoursRoute = DashboardAdminCeHoursRouteImport.update({
   path: '/admin/ce-hours',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardSmartImportJobIdReviewRoute =
   DashboardSmartImportJobIdReviewRouteImport.update({
     id: '/$jobId/review',
@@ -1290,6 +1296,7 @@ export interface FileRoutesByFullPath {
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal/': typeof AuditPortalIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/behavior-support/$clientId': typeof DashboardBehaviorSupportClientIdRoute
@@ -1472,6 +1479,7 @@ export interface FileRoutesByTo {
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal': typeof AuditPortalIndexRoute
   '/dashboard': typeof DashboardIndexRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/behavior-support/$clientId': typeof DashboardBehaviorSupportClientIdRoute
@@ -1662,6 +1670,7 @@ export interface FileRoutesById {
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal/': typeof AuditPortalIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/behavior-support/$clientId': typeof DashboardBehaviorSupportClientIdRoute
@@ -1853,6 +1862,7 @@ export interface FileRouteTypes {
     | '/verify/$code'
     | '/audit-portal/'
     | '/dashboard/'
+    | '/.lovable/oauth/consent'
     | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
     | '/dashboard/behavior-support/$clientId'
@@ -2035,6 +2045,7 @@ export interface FileRouteTypes {
     | '/verify/$code'
     | '/audit-portal'
     | '/dashboard'
+    | '/.lovable/oauth/consent'
     | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
     | '/dashboard/behavior-support/$clientId'
@@ -2224,6 +2235,7 @@ export interface FileRouteTypes {
     | '/verify/$code'
     | '/audit-portal/'
     | '/dashboard/'
+    | '/.lovable/oauth/consent'
     | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
     | '/dashboard/behavior-support/$clientId'
@@ -2358,6 +2370,7 @@ export interface RootRouteChildren {
   CertificateCodeRoute: typeof CertificateCodeRoute
   VerifyCodeRoute: typeof VerifyCodeRoute
   AuditPortalIndexRoute: typeof AuditPortalIndexRoute
+  DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   SignEmployeeLoanTokenRoute: typeof SignEmployeeLoanTokenRoute
   ApiPublicHooksBillingDailyCheckRoute: typeof ApiPublicHooksBillingDailyCheckRoute
   ApiPublicHooksGmailIngestRoute: typeof ApiPublicHooksGmailIngestRoute
@@ -3539,6 +3552,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminCeHoursRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/.lovable/oauth/consent': {
+      id: '/.lovable/oauth/consent'
+      path: '/.lovable/oauth/consent'
+      fullPath: '/.lovable/oauth/consent'
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard/smart-import/$jobId/review': {
       id: '/dashboard/smart-import/$jobId/review'
       path: '/$jobId/review'
@@ -4188,6 +4208,7 @@ const rootRouteChildren: RootRouteChildren = {
   CertificateCodeRoute: CertificateCodeRoute,
   VerifyCodeRoute: VerifyCodeRoute,
   AuditPortalIndexRoute: AuditPortalIndexRoute,
+  DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   SignEmployeeLoanTokenRoute: SignEmployeeLoanTokenRoute,
   ApiPublicHooksBillingDailyCheckRoute: ApiPublicHooksBillingDailyCheckRoute,
   ApiPublicHooksGmailIngestRoute: ApiPublicHooksGmailIngestRoute,

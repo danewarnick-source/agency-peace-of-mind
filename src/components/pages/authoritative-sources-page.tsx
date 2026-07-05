@@ -1546,6 +1546,126 @@ function DocumentRequirementGroup({
   );
   const removedItems = sortedItems.filter((r) => statusOf(r) === "removed");
 
+  // ---- Batch confirmation (SOW/authoritative-source rows only) ----
+  const qc = useQueryClient();
+  const setStatusFn = useServerFn(setRequirementReviewStatus);
+  const confirmAllFn = useServerFn(confirmRequirementWithScopes);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [batchRunning, setBatchRunning] = useState(false);
+
+  // A row is batch-selectable only if it's from an authoritative document,
+  // currently needs attention, and visible under the active filter.
+  const selectableIds = useMemo(() => {
+    const visible =
+      rowFilter === "needs_attention" || rowFilter === "all"
+        ? activeItems
+        : [];
+    return visible
+      .filter(
+        (r) =>
+          r.origin === "document" &&
+          effectiveStatusOf(r) === "needs_attention",
+      )
+      .map((r) => r.id);
+  }, [activeItems, rowFilter]);
+  const selectableIdSet = useMemo(() => new Set(selectableIds), [selectableIds]);
+
+  // Prune selection when the visible/selectable set changes.
+  useEffect(() => {
+    setSelected((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (selectableIdSet.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [selectableIdSet]);
+
+  const toggleOne = (id: string, next: boolean) => {
+    setSelected((prev) => {
+      const s = new Set(prev);
+      if (next) s.add(id);
+      else s.delete(id);
+      return s;
+    });
+  };
+
+  const allShownSelected =
+    selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
+
+  const toggleAllShown = () => {
+    setSelected((prev) => {
+      if (allShownSelected) {
+        const next = new Set(prev);
+        for (const id of selectableIds) next.delete(id);
+        return next;
+      }
+      const next = new Set(prev);
+      for (const id of selectableIds) next.add(id);
+      return next;
+    });
+  };
+
+  const runBatchConfirm = async () => {
+    const ids = Array.from(selected).filter((id) => selectableIdSet.has(id));
+    if (ids.length === 0) return;
+    setBatchRunning(true);
+    let ok = 0;
+    let failed = 0;
+    const byId = new Map(sortedItems.map((r) => [r.id, r] as const));
+    const CONCURRENCY = 4;
+    let cursor = 0;
+    const workers = Array.from(
+      { length: Math.min(CONCURRENCY, ids.length) },
+      async () => {
+        while (true) {
+          const i = cursor++;
+          if (i >= ids.length) return;
+          const id = ids[i];
+          const r = byId.get(id);
+          if (!r) {
+            failed += 1;
+            continue;
+          }
+          const stats = applicByReq.get(id);
+          const pendingProposals = stats
+            ? Math.max(0, stats.pending - stats.unknown)
+            : 0;
+          const useScopes = pendingProposals > 0;
+          try {
+            if (useScopes) {
+              await confirmAllFn({ data: { requirementId: id } });
+            } else {
+              await setStatusFn({ data: { id, status: "confirmed" } });
+            }
+            ok += 1;
+          } catch {
+            failed += 1;
+          }
+        }
+      },
+    );
+    await Promise.all(workers);
+    qc.invalidateQueries({ queryKey: ["requirements", orgId] });
+    qc.invalidateQueries({ queryKey: ["req-mappings-all", orgId] });
+    qc.invalidateQueries({ queryKey: ["attestations", orgId] });
+    setSelected(new Set());
+    setBatchRunning(false);
+    if (failed === 0) {
+      toast.success(`Confirmed ${ok} requirement${ok === 1 ? "" : "s"}.`);
+    } else if (ok === 0) {
+      toast.error(`Couldn't confirm any of the ${failed} selected requirements.`);
+    } else {
+      toast.error(
+        `Confirmed ${ok} of ${ok + failed}. ${failed} failed — try again.`,
+      );
+    }
+  };
+
+
+
 
   return (
     <section
@@ -1666,6 +1786,55 @@ function DocumentRequirementGroup({
             ))}
           </div>
 
+          {/* Batch confirmation bar — only visible when needs-attention
+              SOW rows are currently rendered. */}
+          {(rowFilter === "all" || rowFilter === "needs_attention") &&
+            selectableIds.length > 0 && (
+              <div className="mx-4 mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px]">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <Checkbox
+                    checked={allShownSelected}
+                    onCheckedChange={() => toggleAllShown()}
+                    aria-label="Select all requirements currently shown"
+                  />
+                  <span className="font-medium">
+                    Select all shown ({selectableIds.length})
+                  </span>
+                </label>
+                <span className="text-muted-foreground">
+                  {selected.size > 0
+                    ? `${selected.size} selected — each will be logged individually to the attestation trail.`
+                    : "Tick individual rows below, or select all shown."}
+                </span>
+                <div className="ml-auto flex items-center gap-1.5">
+                  {selected.size > 0 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-[11px]"
+                      onClick={() => setSelected(new Set())}
+                      disabled={batchRunning}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    className="h-7 bg-amber-500 text-[11px] text-amber-950 hover:bg-amber-400"
+                    onClick={() => runBatchConfirm()}
+                    disabled={selected.size === 0 || batchRunning}
+                  >
+                    {batchRunning ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="mr-1 h-3 w-3" />
+                    )}
+                    Confirm {selected.size > 0 ? selected.size : ""} selected
+                  </Button>
+                </div>
+              </div>
+            )}
+
           <ul className="divide-y divide-border/40 px-4 pb-2">
             {group.items.length === 0 && (
               <li className="py-4 text-xs text-muted-foreground">
@@ -1686,15 +1855,22 @@ function DocumentRequirementGroup({
 
             {/* Active items */}
             {(rowFilter === "all" || rowFilter === "needs_attention") &&
-              activeItems.map((r) => (
-                <RequirementRow
-                  key={r.id}
-                  req={r}
-                  orgId={orgId}
-                  sourceMeta={group.source}
-                  applicStats={applicByReq.get(r.id)}
-                />
-              ))}
+              activeItems.map((r) => {
+                const isSelectable = selectableIdSet.has(r.id);
+                return (
+                  <RequirementRow
+                    key={r.id}
+                    req={r}
+                    orgId={orgId}
+                    sourceMeta={group.source}
+                    applicStats={applicByReq.get(r.id)}
+                    selectable={isSelectable}
+                    selected={isSelectable && selected.has(r.id)}
+                    onToggleSelect={isSelectable ? toggleOne : undefined}
+                  />
+                );
+              })}
+
 
             {/* Fully confirmed collapsible section (default "all" view) */}
             {rowFilter === "all" && doneItems.length > 0 && (
@@ -1791,12 +1967,19 @@ function RequirementRow({
   orgId,
   sourceMeta,
   applicStats,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
 }: {
   req: ReqRow;
   orgId: string;
   sourceMeta?: SourceMeta | null;
   applicStats?: ApplicStats;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string, next: boolean) => void;
 }) {
+
   const qc = useQueryClient();
   const setStatusFn = useServerFn(setRequirementReviewStatus);
   const confirmAllFn = useServerFn(confirmRequirementWithScopes);
@@ -1893,7 +2076,18 @@ function RequirementRow({
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
 
+      {selectable && onToggleSelect && (
+        <div className="mt-1 shrink-0 sm:mr-2">
+          <Checkbox
+            checked={selected}
+            onCheckedChange={(v) => onToggleSelect(req.id, v === true)}
+            aria-label={`Select requirement: ${req.title}`}
+          />
+        </div>
+      )}
+
       <div className="min-w-0 flex-1">
+
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"

@@ -1,60 +1,54 @@
-# Batch-confirm SOW requirements from the Authoritative Sources list
+# Give Claude full access to HIVE via MCP
 
-## What changes for the user
+Since there's no PHI concern, we can expose the whole platform. Rather than hand-writing 200+ per-table tools, the fastest and most flexible path is a small set of **powerful generic tools** that run as the signed-in HIVE user (RLS still applies as that user, so Claude inherits exactly the permissions of whoever connected), plus a handful of **curated high-value domain tools** for the workflows you'll ask Claude about most often.
 
-Inside each document's requirement group on the Requirements tab, admins can:
+## Tools to add
 
-1. Tick a checkbox next to any requirement that currently needs attention.
-2. Or click **Select all shown** to select every needs-attention row currently rendered under the active row filter (e.g. after choosing the **Needs attention** filter).
-3. Click **Confirm N selected** — every selected requirement is confirmed in one go, using the same server logic already used per-row.
+### Generic (cover everything)
+1. **`sql_query`** — Run any `SELECT` against the database as the signed-in user. Input: `sql` (string), optional `params` (array). Rejects non-SELECT statements. Returns rows as JSON. Lets Claude answer *any* question about clients, shifts, timesheets, incidents, billing, certifications, etc. without us pre-defining a tool per question.
+2. **`table_read`** — Structured Supabase read: `table`, optional `select`, `filters` (array of `{column, op, value}`), `order`, `limit`. Safer/typed alternative to raw SQL for common list/detail views.
+3. **`table_write`** — `insert` / `update` / `delete` on a table with filters + values. Respects RLS. Marked `destructiveHint: true`.
+4. **`list_tables`** — Returns the list of tables + columns Claude can see, so it can self-discover the schema instead of us describing it.
 
-Every selected row's title AND description are already rendered inline in the list today (line 2058: `req.description` printed under the title). No summary substitution. If a row is hidden (behind a collapsed section or filtered out) it cannot be selected — the checkbox lives on the row itself, so nothing off-screen is ever selectable.
+### Curated domain tools (nicer UX for common asks)
+5. **`list_clients`** — already exists; keep.
+6. **`get_client`** — full client record + active billing codes + emergency contacts + current home.
+7. **`list_shifts`** — filter by date range, staff, client, home, status.
+8. **`list_timesheets`** — EVV timesheets with filters (date range, staff, client, code, status).
+9. **`list_incidents`** — incident reports with filters.
+10. **`list_certifications`** — staff certifications with expiry filters (useful for "who's expiring in 30 days").
+11. **`list_billing_submissions`** — recent submissions + warnings.
+12. **`coverage_status`** — for a given date + home, compare `location_coverage_requirements` vs scheduled_shifts.
+13. **`nectar_flags`** — open BC flags, shift completeness flags, billing warnings in one call.
+14. **`whoami`** — already exists; keep.
 
-Scope: only the Requirements tab under Authoritative Sources (`DocumentRequirementGroup` in `src/components/pages/authoritative-sources-page.tsx`). No other confirmation/approval flow anywhere else in the platform is touched. No backend changes — reuses existing `confirmRequirementWithScopes` and `setRequirementReviewStatus` server functions.
+All tools use `requireSupabaseAuth` semantics: they act as the connected HIVE user, so admins see everything, staff see only what their RLS allows. No service-role bypass.
 
-## Implementation
+## Files touched
 
-### `src/components/pages/authoritative-sources-page.tsx` only
+- `src/lib/mcp/tools/sql-query.ts` (new)
+- `src/lib/mcp/tools/table-read.ts` (new)
+- `src/lib/mcp/tools/table-write.ts` (new)
+- `src/lib/mcp/tools/list-tables.ts` (new)
+- `src/lib/mcp/tools/get-client.ts` (new)
+- `src/lib/mcp/tools/list-shifts.ts` (new)
+- `src/lib/mcp/tools/list-timesheets.ts` (new)
+- `src/lib/mcp/tools/list-incidents.ts` (new)
+- `src/lib/mcp/tools/list-certifications.ts` (new)
+- `src/lib/mcp/tools/list-billing-submissions.ts` (new)
+- `src/lib/mcp/tools/coverage-status.ts` (new)
+- `src/lib/mcp/tools/nectar-flags.ts` (new)
+- `src/lib/mcp/index.ts` (register new tools; update `instructions` to describe the toolkit)
+- Run `app_mcp_server--extract_mcp_manifest` after edits so the manifest reflects the new toolset
 
-**1. Per-group selection state in `DocumentRequirementGroup`**
+## After deploy
 
-Add `const [selected, setSelected] = useState<Set<string>>(new Set())`. Reset when `rowFilter` changes or when items list changes materially (drop any ids no longer in `activeItems`).
+You'll need to **Publish** again so Claude sees the new tools (MCP tool list is captured at build time). Then in Claude, disconnect + reconnect the HIVE connector (or it'll auto-refresh) and the 14 tools appear.
 
-Compute `selectableIds` = `activeItems.filter(r => effectiveStatusOf(r) === "needs_attention").map(r => r.id)` — rows currently visible under the active filter and eligible for confirmation. Also filter to `req.origin === "document"` so we only offer batch confirm on requirements drafted from an authoritative source (matches the user's scope statement).
+## Safety notes (given "no PHI" stance)
 
-**2. Batch action bar** (new, inside the group's expanded body, above the `<ul>` — visible only when `rowFilter === "needs_attention"` or `rowFilter === "all"` AND `selectableIds.length > 0`)
+- Everything still runs under the connected user's RLS — so if an org member connects, Claude only sees that org's data, not other tenants.
+- `sql_query` is SELECT-only (parser check). Writes go through `table_write` so they're logged distinctly and annotated destructive.
+- Neither raw tokens nor service-role keys are ever exposed to Claude.
 
-- `Checkbox` "Select all shown (N)" — toggles the whole `selectableIds` set.
-- `Confirm N selected` primary button — disabled when `selected.size === 0` or mutation pending.
-- `Clear selection` ghost button when any selected.
-- Small helper text: "You're confirming N requirements you can see below. Each will be logged to the attestation trail individually."
-
-**3. Per-row checkbox on `RequirementRow`**
-
-Extend `RequirementRow` props with optional `selectable?: boolean`, `selected?: boolean`, `onToggleSelect?: (id, next) => void`. Render a `Checkbox` at the far left of the row's header line, only when `selectable === true`. If not `selectable` (row is fully confirmed / removed / not_applicable / manual origin / no callback provided) render nothing so existing rows are unchanged.
-
-**4. Batch confirm handler**
-
-Reuses existing server functions — no new endpoint. For each id in `selected`:
-
-- If the row has `pendingProposals > 0 && unknown === 0` (matches existing `hasPrefilledProposals` logic) → call `confirmRequirementWithScopes({ requirementId })`.
-- Otherwise → call `setRequirementReviewStatus({ id, status: "confirmed" })`.
-
-Run with concurrency 4 (`Promise.all` on chunks) so a batch of 50 finishes quickly without stampeding. Track `ok/failed` counters; on completion `toast.success("Confirmed N of M requirements.")` (or `toast.error` with count if any failed), invalidate the same query keys the single-row confirm invalidates (`["requirements", orgId]`, `["req-mappings-all", orgId]`, `["attestations", orgId]`), clear selection.
-
-Each server call still writes its own individual attestation row (existing behavior of both fns) — the batch action does not create a synthetic "batch attestation"; every requirement gets its own audit record with the same statement it would have if confirmed one-at-a-time.
-
-## What is NOT changing
-
-- `confirmRequirementWithScopes` / `setRequirementReviewStatus` in `src/lib/nectar-engine.functions.ts` and `src/lib/authoritative-sources.functions.ts` — untouched.
-- The review-queue dialog (`ReviewQueueDialog`) — untouched.
-- Removed / not-applicable / already-confirmed rows — not selectable, unchanged.
-- Applicability-scope confirmations at the mapping level — untouched.
-- No other confirmation/approval surface in the app.
-
-## Verification
-
-- On SOW 2026 group, click **Needs attention**, click **Select all shown**, then **Confirm N selected** — every row moves to confirmed with a single click; toast shows counts; attestation trail lists one entry per requirement.
-- Individually ticked mixed selection (some with proposals, some without) confirms each with the right server function.
-- Fully-confirmed / removed / not-applicable rows never render a checkbox.
-- Collapsing the group or switching to a filter that hides selected rows keeps prior selection cleaned up (selection filtered against currently-selectable ids on render).
+Confirm and I'll build it.

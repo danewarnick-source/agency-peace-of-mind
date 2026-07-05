@@ -439,9 +439,11 @@ function SourceRow({
         scopePending: number;
         needs: number;
         removed: number;
+        notApplicable: number;
         lastDraftedAt: string | null;
       }
     | null;
+
   allSources: Array<{ id: string; title: string; metadata?: Record<string, unknown> | null }>;
   onJumpToRequirements: (docId: string) => void;
   currentRole?: string | null;

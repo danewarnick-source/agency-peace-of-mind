@@ -393,7 +393,11 @@ export const listRequirements = createServerFn({ method: "POST" })
     let q = supabase
       .from("nectar_requirements")
       .select(
-        "id, source_document_id, origin, requirement_key, title, description, category, source_citation, applies_to, verified, verified_by, verified_at, review_status, created_at, metadata",
+        // NOTE: service_code + service_codes_all are required by the
+        // derived scope_state calculation below. Do not remove them from
+        // this select — the auto set-aside behavior will silently break
+        // (every doc-origin requirement collapses to in_scope).
+        "id, source_document_id, origin, requirement_key, title, description, category, source_citation, applies_to, verified, verified_by, verified_at, review_status, created_at, metadata, service_code, service_codes_all",
       )
       .eq("organization_id", data.organizationId)
       .order("origin", { ascending: true })
@@ -439,8 +443,59 @@ export const listRequirements = createServerFn({ method: "POST" })
         };
     }
 
-    return { requirements: rows ?? [], sourcesById };
+    // ---- Auto set-aside: out-of-scope service codes ----
+    // For requirements DRAFTED FROM AN AUTHORITATIVE SOURCE (origin =
+    // 'document'), if every service code they reference is one this org
+    // is NOT currently authorized for (active OR future/held), tag the
+    // row scope_state = 'out_of_scope' so the UI can visibly set it aside
+    // — separate from the manual removal flow. Reversible: derived on
+    // every read from provider_authorized_codes.
+    const { data: authRows } = await supabase
+      .from("provider_authorized_codes")
+      .select("code, archived_at")
+      .eq("organization_id", data.organizationId);
+    const authorizedCodes = new Set(
+      (authRows ?? [])
+        .filter((r) => (r as { archived_at: string | null }).archived_at == null)
+        .map((r) => String((r as { code: string }).code).toUpperCase()),
+    );
+
+    const enriched = (rows ?? []).map((r) => {
+      const row = r as {
+        origin: string;
+        service_code: string | null;
+        service_codes_all: string[] | null;
+      };
+      if (row.origin !== "document") {
+        return { ...r, scope_state: "in_scope" as const, out_of_scope_codes: [] as string[] };
+      }
+      const codes = new Set<string>();
+      if (row.service_code) codes.add(String(row.service_code).toUpperCase());
+      for (const c of row.service_codes_all ?? []) {
+        if (c) codes.add(String(c).toUpperCase());
+      }
+      if (codes.size === 0) {
+        // Org-wide obligation with no code tie — leave to normal review flow.
+        return { ...r, scope_state: "in_scope" as const, out_of_scope_codes: [] as string[] };
+      }
+      const offending: string[] = [];
+      let anyInScope = false;
+      for (const c of codes) {
+        if (authorizedCodes.has(c)) anyInScope = true;
+        else offending.push(c);
+      }
+      return {
+        ...r,
+        scope_state: (anyInScope ? "in_scope" : "out_of_scope") as
+          | "in_scope"
+          | "out_of_scope",
+        out_of_scope_codes: anyInScope ? [] : offending,
+      };
+    });
+
+    return { requirements: enriched, sourcesById };
   });
+
 
 
 export const upsertRequirement = createServerFn({ method: "POST" })

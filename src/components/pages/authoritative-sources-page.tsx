@@ -1844,6 +1844,12 @@ function RequirementRow({
   const isConfirmed = status === "confirmed";
   const isFullyConfirmed = isConfirmed && isScopeReady(applicStats);
   const isFromAuthSource = req.origin === "document" && !!req.source_document_id;
+  // Auto set-aside: derived from provider_authorized_codes, reversible on
+  // every read. Distinct from manual removal — no audit-trail warning, no
+  // human intent captured; just "your org isn't authorized for this code".
+  const isNotApplicable = !isRemoved && req.scope_state === "out_of_scope";
+  const offendingCodes = req.out_of_scope_codes ?? [];
+
 
   // NECTAR pre-fill awareness: if there are pending non-unknown proposals,
   // the admin can approve requirement + scope together in one click.

@@ -12,8 +12,15 @@ import { signInWithUsername } from "@/lib/login.functions";
 import { checkHiveExecutive } from "@/lib/hive-exec.functions";
 import { toast } from "sonner";
 
+function isSafeNext(v: unknown): v is string {
+  return typeof v === "string" && v.startsWith("/") && !v.startsWith("//");
+}
+
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Sign in — HIVE" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    next: isSafeNext(s.next) ? s.next : undefined,
+  }),
   component: LoginPage,
 });
 

@@ -2075,7 +2075,7 @@ function RequirementRow({
         >
           <Info className="mr-1 h-3.5 w-3.5" /> Details
         </Button>
-        {classification === "external" && !isRemoved && (
+        {classification === "external" && !isRemoved && !isNotApplicable && (
           <Button
             size="sm"
             variant="outline"
@@ -2087,7 +2087,14 @@ function RequirementRow({
             Attest external completion
           </Button>
         )}
-        {isRemoved ? (
+        {isNotApplicable ? (
+          <span
+            className="text-[10px] text-muted-foreground"
+            title="Auto set aside from service-code scope. Add the code under Provider authorization to make this reviewable again."
+          >
+            Auto set aside
+          </span>
+        ) : isRemoved ? (
           <Button
             size="sm"
             variant="outline"
@@ -2097,6 +2104,7 @@ function RequirementRow({
             Re-open for review
           </Button>
         ) : (
+
           <>
             {isConfirmed ? (
               <Button

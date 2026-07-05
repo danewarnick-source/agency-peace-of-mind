@@ -324,10 +324,19 @@ function SourcesPanel({
         scopePending: number;
         needs: number;
         removed: number;
+        notApplicable: number;
         lastDraftedAt: string | null;
       }
     >();
-    type Row = { id: string; source_document_id: string | null; review_status: string | null; verified: boolean | null; created_at: string | null };
+    type Row = {
+      id: string;
+      origin: string;
+      source_document_id: string | null;
+      review_status: string | null;
+      verified: boolean | null;
+      created_at: string | null;
+      scope_state?: "in_scope" | "out_of_scope" | null;
+    };
     const rows = ((reqData?.requirements ?? []) as unknown) as Row[];
     for (const r of rows) {
       if (!r.source_document_id) continue;
@@ -338,16 +347,23 @@ function SourcesPanel({
         scopePending: 0,
         needs: 0,
         removed: 0,
+        notApplicable: 0,
         lastDraftedAt: null as string | null,
       };
       cur.total += 1;
       const s = r.review_status ?? (r.verified ? "confirmed" : "needs_attention");
-      if (s === "confirmed") {
+      // Precedence: removed > not_applicable (auto) > confirmed/needs_attention.
+      if (s === "removed") {
+        cur.removed += 1;
+      } else if (r.scope_state === "out_of_scope") {
+        cur.notApplicable += 1;
+      } else if (s === "confirmed") {
         cur.confirmed += 1;
         if (isScopeReady(applicByReq.get(r.id))) cur.fullyConfirmed += 1;
         else cur.scopePending += 1;
-      } else if (s === "removed") cur.removed += 1;
-      else cur.needs += 1;
+      } else {
+        cur.needs += 1;
+      }
       if (r.created_at && (!cur.lastDraftedAt || r.created_at > cur.lastDraftedAt)) {
         cur.lastDraftedAt = r.created_at;
       }
@@ -355,6 +371,7 @@ function SourcesPanel({
     }
     return map;
   }, [reqData, applicByReq]);
+
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
@@ -422,9 +439,11 @@ function SourceRow({
         scopePending: number;
         needs: number;
         removed: number;
+        notApplicable: number;
         lastDraftedAt: string | null;
       }
     | null;
+
   allSources: Array<{ id: string; title: string; metadata?: Record<string, unknown> | null }>;
   onJumpToRequirements: (docId: string) => void;
   currentRole?: string | null;
@@ -646,6 +665,15 @@ function SourceRow({
                 · {stats!.removed} removed
               </span>
             )}
+            {stats!.notApplicable > 0 && (
+              <span
+                className="text-muted-foreground"
+                title="Auto set aside — tied to service codes this org isn't authorized for. Reversible when authorization changes."
+              >
+                · {stats!.notApplicable} not applicable
+              </span>
+            )}
+
             {stats!.lastDraftedAt && (
               <span className="opacity-60">
                 · {new Date(stats!.lastDraftedAt).toLocaleDateString()}
@@ -1021,6 +1049,10 @@ function UploadCard({
 // and Re-open hits the immutable attestation log.
 
 type ReviewStatus = "needs_attention" | "confirmed" | "removed";
+// Effective bucket combining the persisted ReviewStatus with the derived,
+// reversible "auto set aside for out-of-scope service codes" state.
+// Precedence: removed > not_applicable > confirmed/needs_attention.
+type EffectiveStatus = ReviewStatus | "not_applicable";
 
 interface ReqRow {
   id: string;
@@ -1034,6 +1066,12 @@ interface ReqRow {
   verified_at: string | null;
   review_status: ReviewStatus | string | null;
   metadata?: Record<string, unknown> | null;
+  // Derived server-side from provider_authorized_codes; only meaningful for
+  // origin === "document". Reversible on every read.
+  scope_state?: "in_scope" | "out_of_scope" | null;
+  out_of_scope_codes?: string[] | null;
+  service_code?: string | null;
+  service_codes_all?: string[] | null;
 }
 
 interface SourceMeta {
@@ -1062,6 +1100,21 @@ function statusOf(r: ReqRow): ReviewStatus {
   // Legacy rows (pre-migration): infer from verified flag.
   return r.verified ? "confirmed" : "needs_attention";
 }
+
+// Effective bucket: manual removal always wins so its audit trail is never
+// masked by auto scope filtering. Out-of-scope is a distinct, reversible
+// state — nothing is deleted.
+function effectiveStatusOf(r: ReqRow): EffectiveStatus {
+  const s = statusOf(r);
+  if (s === "removed") return "removed";
+  if (r.scope_state === "out_of_scope") return "not_applicable";
+  return s;
+}
+
+function isOutOfScope(r: ReqRow): boolean {
+  return r.scope_state === "out_of_scope" && statusOf(r) !== "removed";
+}
+
 
 // ----- Applicability (NECTAR scope) helpers -----
 // A requirement is only "fully reviewed" when both the requirement itself is
@@ -1178,11 +1231,12 @@ function RequirementsPanel({
     });
     // Sort doc groups by needs-attention desc (so review work surfaces first).
     docGroups.sort((a, b) => {
-      const na = a.items.filter((i) => statusOf(i) === "needs_attention").length;
-      const nb = b.items.filter((i) => statusOf(i) === "needs_attention").length;
+      const na = a.items.filter((i) => effectiveStatusOf(i) === "needs_attention").length;
+      const nb = b.items.filter((i) => effectiveStatusOf(i) === "needs_attention").length;
       if (nb !== na) return nb - na;
       return a.title.localeCompare(b.title);
     });
+
     const tail: ReqGroup[] = [];
     if (suggestions.length)
       tail.push({
@@ -1205,12 +1259,14 @@ function RequirementsPanel({
   }, [data]);
 
   const outstandingDocs = groups.filter(
-    (g) => g.source && g.items.some((i) => statusOf(i) === "needs_attention"),
+    (g) => g.source && g.items.some((i) => effectiveStatusOf(i) === "needs_attention"),
   ).length;
 
   // Count authoritative-source items that have been removed — this drives the
   // red high-stakes banner. Suggestion/manual removals don't count toward
   // "audit-readiness changed" because they were never traced to a state doc.
+  // NOTE: auto set-aside (not_applicable) is NOT counted here — it's not a
+  // human decision and is reversible from provider_authorized_codes.
   const removedAuthoritative = useMemo(
     () =>
       groups
@@ -1243,22 +1299,27 @@ function RequirementsPanel({
     return () => window.clearTimeout(id);
   }, [focusDocumentId, onFocusHandled]);
 
-  // Flat queue + pre-fill counts.
+  // Flat queue + pre-fill counts. Out-of-scope items are excluded — they're
+  // auto set aside and don't need human review right now.
   const allRows = useMemo(
     () => groups.flatMap((g) => g.items),
     [groups],
   );
   const queueItems = useMemo(
-    () => allRows.filter((r) => statusOf(r) === "needs_attention"),
+    () => allRows.filter((r) => effectiveStatusOf(r) === "needs_attention"),
     [allRows],
   );
   const unmappedCount = useMemo(
     () =>
       allRows.filter(
-        (r) => statusOf(r) !== "removed" && !applicByReq.has(r.id),
+        (r) =>
+          effectiveStatusOf(r) !== "removed" &&
+          effectiveStatusOf(r) !== "not_applicable" &&
+          !applicByReq.has(r.id),
       ).length,
     [allRows, applicByReq],
   );
+
 
   return (
     <div className="space-y-4" ref={containerRef}>
@@ -1411,13 +1472,19 @@ function DocumentRequirementGroup({
     let scopePending = 0;
     let needs = 0;
     let removed = 0;
+    let notApplicable = 0;
     for (const i of group.items) {
-      const s = statusOf(i);
-      if (s === "confirmed") {
+      const eff = effectiveStatusOf(i);
+      if (eff === "removed") {
+        removed += 1;
+      } else if (eff === "not_applicable") {
+        notApplicable += 1;
+      } else if (eff === "confirmed") {
         if (isScopeReady(applicByReq.get(i.id))) fullyConfirmed += 1;
         else scopePending += 1;
-      } else if (s === "removed") removed += 1;
-      else needs += 1;
+      } else {
+        needs += 1;
+      }
     }
     return {
       total: group.items.length,
@@ -1426,6 +1493,7 @@ function DocumentRequirementGroup({
       scopePending,
       needs,
       removed,
+      notApplicable,
     };
   }, [group.items, applicByReq]);
 
@@ -1436,17 +1504,18 @@ function DocumentRequirementGroup({
   }, [forceOpen]);
 
   // Sort: needs_attention first (with proposals first), then scope_pending,
-  // then fully_confirmed, then removed
+  // then fully_confirmed, then not_applicable, then removed.
   const sortedItems = useMemo(() => {
     const score = (r: ReqRow) => {
-      const s = statusOf(r);
-      if (s === "removed") return 4;
-      if (s === "needs_attention") {
+      const eff = effectiveStatusOf(r);
+      if (eff === "removed") return 5;
+      if (eff === "not_applicable") return 4;
+      if (eff === "needs_attention") {
         const stats = applicByReq.get(r.id);
         const hasProposals = stats && stats.pending > 0 && stats.unknown === 0;
         return hasProposals ? -1 : 0;
       }
-      if (s === "confirmed") {
+      if (eff === "confirmed") {
         return isScopeReady(applicByReq.get(r.id)) ? 3 : 1;
       }
       return 2;
@@ -1457,22 +1526,26 @@ function DocumentRequirementGroup({
   }, [group.items, applicByReq]);
 
   const [rowFilter, setRowFilter] = useState<
-    "all" | "needs_attention" | "fully_confirmed"
+    "all" | "needs_attention" | "fully_confirmed" | "not_applicable"
   >("all");
   const [confirmedCollapsed, setConfirmedCollapsed] = useState(true);
 
   const activeItems = sortedItems.filter((r) => {
-    const s = statusOf(r);
+    const eff = effectiveStatusOf(r);
     return (
-      s === "needs_attention" ||
-      (s === "confirmed" && !isScopeReady(applicByReq.get(r.id)))
+      eff === "needs_attention" ||
+      (eff === "confirmed" && !isScopeReady(applicByReq.get(r.id)))
     );
   });
   const doneItems = sortedItems.filter((r) => {
-    const s = statusOf(r);
-    return s === "confirmed" && isScopeReady(applicByReq.get(r.id));
+    const eff = effectiveStatusOf(r);
+    return eff === "confirmed" && isScopeReady(applicByReq.get(r.id));
   });
+  const notApplicableItems = sortedItems.filter(
+    (r) => effectiveStatusOf(r) === "not_applicable",
+  );
   const removedItems = sortedItems.filter((r) => statusOf(r) === "removed");
+
 
   return (
     <section
@@ -1525,9 +1598,19 @@ function DocumentRequirementGroup({
           >
             {counts.needs} needs attention
           </Badge>
+          {counts.notApplicable > 0 && (
+            <Badge
+              variant="outline"
+              className="text-[10px] text-muted-foreground"
+              title="Auto set aside — tied to service codes this org isn't authorized for. Reversible."
+            >
+              {counts.notApplicable} not applicable
+            </Badge>
+          )}
           <Badge variant="outline" className="text-[10px] text-muted-foreground">
             {counts.removed} removed
           </Badge>
+
           <span
             className={`ml-1 inline-block text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
             aria-hidden
@@ -1553,6 +1636,14 @@ function DocumentRequirementGroup({
                   key: "fully_confirmed" as const,
                   label: `Fully confirmed (${doneItems.length})`,
                 },
+                ...(notApplicableItems.length > 0
+                  ? ([
+                      {
+                        key: "not_applicable" as const,
+                        label: `Not applicable (${notApplicableItems.length})`,
+                      },
+                    ] as const)
+                  : ([] as const)),
               ] as const
             ).map((f) => (
               <button
@@ -1563,6 +1654,7 @@ function DocumentRequirementGroup({
                   if (f.key === "all") setConfirmedCollapsed(true);
                   if (f.key === "fully_confirmed") setConfirmedCollapsed(false);
                 }}
+
                 className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition ${
                   rowFilter === f.key
                     ? "bg-foreground text-background"
@@ -1650,6 +1742,25 @@ function DocumentRequirementGroup({
                 />
               ))}
 
+            {/* Not-applicable items (auto set aside for out-of-scope codes).
+                Rendered above the removed section in "all" and as the sole
+                content when the filter is explicitly "not_applicable". */}
+            {(rowFilter === "all" || rowFilter === "not_applicable") &&
+              notApplicableItems.map((r) => (
+                <RequirementRow
+                  key={r.id}
+                  req={r}
+                  orgId={orgId}
+                  sourceMeta={group.source}
+                  applicStats={applicByReq.get(r.id)}
+                />
+              ))}
+            {rowFilter === "not_applicable" && notApplicableItems.length === 0 && (
+              <li className="py-4 text-xs text-muted-foreground">
+                No auto set-aside requirements in this group.
+              </li>
+            )}
+
             {/* Removed items at bottom for "all" view */}
             {rowFilter === "all" &&
               removedItems.map((r) => (
@@ -1661,6 +1772,7 @@ function DocumentRequirementGroup({
                   applicStats={applicByReq.get(r.id)}
                 />
               ))}
+
           </ul>
         </div>
       )}
@@ -1732,6 +1844,12 @@ function RequirementRow({
   const isConfirmed = status === "confirmed";
   const isFullyConfirmed = isConfirmed && isScopeReady(applicStats);
   const isFromAuthSource = req.origin === "document" && !!req.source_document_id;
+  // Auto set-aside: derived from provider_authorized_codes, reversible on
+  // every read. Distinct from manual removal — no audit-trail warning, no
+  // human intent captured; just "your org isn't authorized for this code".
+  const isNotApplicable = !isRemoved && req.scope_state === "out_of_scope";
+  const offendingCodes = req.out_of_scope_codes ?? [];
+
 
   // NECTAR pre-fill awareness: if there are pending non-unknown proposals,
   // the admin can approve requirement + scope together in one click.
@@ -1770,8 +1888,9 @@ function RequirementRow({
 
   return (
     <li
-      className={`${isRemoved ? "opacity-55" : ""} ${isFullyConfirmed ? "border-l-[3px] border-l-emerald-400/50 bg-emerald-500/[0.06] py-2" : "py-3"}`}
+      className={`${isRemoved ? "opacity-55" : ""} ${isNotApplicable ? "opacity-70 bg-muted/30" : ""} ${isFullyConfirmed ? "border-l-[3px] border-l-emerald-400/50 bg-emerald-500/[0.06] py-2" : "py-3"}`}
     >
+
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
 
       <div className="min-w-0 flex-1">
@@ -1851,6 +1970,23 @@ function RequirementRow({
               Removed — not tracked for audit
             </Badge>
           )}
+          {isNotApplicable && (
+            <Badge
+              variant="outline"
+              className="text-[10px] border-slate-400/50 text-muted-foreground"
+              title={
+                offendingCodes.length > 0
+                  ? `Auto set aside — your org isn't authorized for service code${
+                      offendingCodes.length === 1 ? "" : "s"
+                    } ${offendingCodes.join(", ")}. Reversible: if authorization is added, this becomes reviewable again automatically.`
+                  : "Auto set aside — your org isn't authorized for the service code(s) this requirement is tied to. Reversible."
+              }
+            >
+              Not applicable — service code not authorized
+              {offendingCodes.length > 0 ? ` (${offendingCodes.join(", ")})` : ""}
+            </Badge>
+          )}
+
           {classification === "external" ? (
             <Badge
               variant="outline"
@@ -1939,7 +2075,7 @@ function RequirementRow({
         >
           <Info className="mr-1 h-3.5 w-3.5" /> Details
         </Button>
-        {classification === "external" && !isRemoved && (
+        {classification === "external" && !isRemoved && !isNotApplicable && (
           <Button
             size="sm"
             variant="outline"
@@ -1951,7 +2087,14 @@ function RequirementRow({
             Attest external completion
           </Button>
         )}
-        {isRemoved ? (
+        {isNotApplicable ? (
+          <span
+            className="text-[10px] text-muted-foreground"
+            title="Auto set aside from service-code scope. Add the code under Provider authorization to make this reviewable again."
+          >
+            Auto set aside
+          </span>
+        ) : isRemoved ? (
           <Button
             size="sm"
             variant="outline"
@@ -1961,6 +2104,7 @@ function RequirementRow({
             Re-open for review
           </Button>
         ) : (
+
           <>
             {isConfirmed ? (
               <Button

@@ -1258,12 +1258,14 @@ function RequirementsPanel({
   }, [data]);
 
   const outstandingDocs = groups.filter(
-    (g) => g.source && g.items.some((i) => statusOf(i) === "needs_attention"),
+    (g) => g.source && g.items.some((i) => effectiveStatusOf(i) === "needs_attention"),
   ).length;
 
   // Count authoritative-source items that have been removed — this drives the
   // red high-stakes banner. Suggestion/manual removals don't count toward
   // "audit-readiness changed" because they were never traced to a state doc.
+  // NOTE: auto set-aside (not_applicable) is NOT counted here — it's not a
+  // human decision and is reversible from provider_authorized_codes.
   const removedAuthoritative = useMemo(
     () =>
       groups
@@ -1296,22 +1298,27 @@ function RequirementsPanel({
     return () => window.clearTimeout(id);
   }, [focusDocumentId, onFocusHandled]);
 
-  // Flat queue + pre-fill counts.
+  // Flat queue + pre-fill counts. Out-of-scope items are excluded — they're
+  // auto set aside and don't need human review right now.
   const allRows = useMemo(
     () => groups.flatMap((g) => g.items),
     [groups],
   );
   const queueItems = useMemo(
-    () => allRows.filter((r) => statusOf(r) === "needs_attention"),
+    () => allRows.filter((r) => effectiveStatusOf(r) === "needs_attention"),
     [allRows],
   );
   const unmappedCount = useMemo(
     () =>
       allRows.filter(
-        (r) => statusOf(r) !== "removed" && !applicByReq.has(r.id),
+        (r) =>
+          effectiveStatusOf(r) !== "removed" &&
+          effectiveStatusOf(r) !== "not_applicable" &&
+          !applicByReq.has(r.id),
       ).length,
     [allRows, applicByReq],
   );
+
 
   return (
     <div className="space-y-4" ref={containerRef}>

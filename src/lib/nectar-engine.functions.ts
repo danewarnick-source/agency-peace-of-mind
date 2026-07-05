@@ -196,6 +196,23 @@ PROVIDER ENTITIES:
 - Jurisdictions: ${facts.jurisdictions.join(", ")}`;
 
   const { callBedrockChatCompletions, BedrockError } = await import("@/lib/ai-bedrock.server");
+  const { acquireBedrockSlot, recordBedrockTokens, RateLimitError } = await import(
+    "@/lib/nectar-rate-limit.server"
+  );
+  const { TransientAIError } = await import("@/lib/authoritative-sources.server");
+
+  // Gate every call through the shared 8-rpm Bedrock slot bucket. If the bucket
+  // is saturated beyond its wait window, surface as transient so the caller
+  // retries with backoff instead of failing outright.
+  try {
+    await acquireBedrockSlot();
+  } catch (e) {
+    if (e instanceof RateLimitError) {
+      throw new TransientAIError(e.message, Math.max(5_000, e.waitMs || 30_000));
+    }
+    throw e;
+  }
+
   let json;
   try {
     json = await callBedrockChatCompletions({
@@ -207,11 +224,33 @@ PROVIDER ENTITIES:
     });
   } catch (e) {
     if (e instanceof BedrockError) {
-      if (e.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
+      if (e.status === 429) {
+        throw new TransientAIError("AI rate limit reached. Retrying shortly.", 30_000);
+      }
+      if ([408, 500, 502, 503, 504].includes(e.status)) {
+        throw new TransientAIError(
+          `AI temporarily unavailable (${e.status}). Retrying shortly.`,
+          30_000,
+        );
+      }
       throw new Error(e.message);
     }
     throw e;
   }
+
+  // Best-effort daily-token bookkeeping so pre-fill counts against the same
+  // daily cap as drafting.
+  const usage = ((json as unknown as { usage?: unknown })?.usage ?? {}) as {
+    total_tokens?: number;
+    input_tokens?: number;
+    output_tokens?: number;
+  };
+  const totalTokens =
+    typeof usage.total_tokens === "number"
+      ? usage.total_tokens
+      : Number(usage.input_tokens ?? 0) + Number(usage.output_tokens ?? 0);
+  if (totalTokens > 0) void recordBedrockTokens(totalTokens);
+
   const raw: unknown = (() => {
     try {
       return JSON.parse(json.choices?.[0]?.message?.content ?? "{}");
@@ -222,6 +261,7 @@ PROVIDER ENTITIES:
   const parsed = MapResp.safeParse(raw);
   return parsed.success ? parsed.data.mappings : [];
 }
+
 
 // ---------- Server functions ----------
 
@@ -621,7 +661,33 @@ export const listEngineGapsAsTasks = createServerFn({ method: "POST" })
 // rather than building from scratch. Pre-filled rows stay `confirmed: false`
 // (proposed by nectar) — nothing is self-confirmed.
 
-const PREFILL_CONCURRENCY = 4;
+const PREFILL_CONCURRENCY = 2;
+const PREFILL_MAX_ATTEMPTS = 4;
+
+const sleepMs = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function aiProposeWithRetry(
+  ...args: Parameters<typeof aiPropose>
+): Promise<Awaited<ReturnType<typeof aiPropose>>> {
+  const { isTransientAIError } = await import("@/lib/authoritative-sources.server");
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= PREFILL_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await aiPropose(...args);
+    } catch (err) {
+      lastErr = err;
+      if (!isTransientAIError(err) || attempt >= PREFILL_MAX_ATTEMPTS) throw err;
+      const raw = (err as { retryAfterMs?: unknown }).retryAfterMs;
+      const wait =
+        typeof raw === "number" && Number.isFinite(raw)
+          ? Math.max(5_000, Math.min(120_000, raw))
+          : 30_000;
+      await sleepMs(wait);
+    }
+  }
+  throw lastErr;
+}
+
 
 export const prefillRequirementMappings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -685,12 +751,13 @@ export const prefillRequirementMappings = createServerFn({ method: "POST" })
         const req = queue.shift();
         if (!req) break;
         try {
-          const proposals = await aiPropose(
+          const proposals = await aiProposeWithRetry(
             req.title,
             req.description,
             req.source_citation,
             facts,
           );
+
           processed += 1;
 
           const normalized = proposals

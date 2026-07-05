@@ -1888,8 +1888,9 @@ function RequirementRow({
 
   return (
     <li
-      className={`${isRemoved ? "opacity-55" : ""} ${isFullyConfirmed ? "border-l-[3px] border-l-emerald-400/50 bg-emerald-500/[0.06] py-2" : "py-3"}`}
+      className={`${isRemoved ? "opacity-55" : ""} ${isNotApplicable ? "opacity-70 bg-muted/30" : ""} ${isFullyConfirmed ? "border-l-[3px] border-l-emerald-400/50 bg-emerald-500/[0.06] py-2" : "py-3"}`}
     >
+
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
 
       <div className="min-w-0 flex-1">

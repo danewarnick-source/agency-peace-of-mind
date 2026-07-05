@@ -1546,6 +1546,126 @@ function DocumentRequirementGroup({
   );
   const removedItems = sortedItems.filter((r) => statusOf(r) === "removed");
 
+  // ---- Batch confirmation (SOW/authoritative-source rows only) ----
+  const qc = useQueryClient();
+  const setStatusFn = useServerFn(setRequirementReviewStatus);
+  const confirmAllFn = useServerFn(confirmRequirementWithScopes);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [batchRunning, setBatchRunning] = useState(false);
+
+  // A row is batch-selectable only if it's from an authoritative document,
+  // currently needs attention, and visible under the active filter.
+  const selectableIds = useMemo(() => {
+    const visible =
+      rowFilter === "needs_attention" || rowFilter === "all"
+        ? activeItems
+        : [];
+    return visible
+      .filter(
+        (r) =>
+          r.origin === "document" &&
+          effectiveStatusOf(r) === "needs_attention",
+      )
+      .map((r) => r.id);
+  }, [activeItems, rowFilter]);
+  const selectableIdSet = useMemo(() => new Set(selectableIds), [selectableIds]);
+
+  // Prune selection when the visible/selectable set changes.
+  useEffect(() => {
+    setSelected((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (selectableIdSet.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [selectableIdSet]);
+
+  const toggleOne = (id: string, next: boolean) => {
+    setSelected((prev) => {
+      const s = new Set(prev);
+      if (next) s.add(id);
+      else s.delete(id);
+      return s;
+    });
+  };
+
+  const allShownSelected =
+    selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
+
+  const toggleAllShown = () => {
+    setSelected((prev) => {
+      if (allShownSelected) {
+        const next = new Set(prev);
+        for (const id of selectableIds) next.delete(id);
+        return next;
+      }
+      const next = new Set(prev);
+      for (const id of selectableIds) next.add(id);
+      return next;
+    });
+  };
+
+  const runBatchConfirm = async () => {
+    const ids = Array.from(selected).filter((id) => selectableIdSet.has(id));
+    if (ids.length === 0) return;
+    setBatchRunning(true);
+    let ok = 0;
+    let failed = 0;
+    const byId = new Map(sortedItems.map((r) => [r.id, r] as const));
+    const CONCURRENCY = 4;
+    let cursor = 0;
+    const workers = Array.from(
+      { length: Math.min(CONCURRENCY, ids.length) },
+      async () => {
+        while (true) {
+          const i = cursor++;
+          if (i >= ids.length) return;
+          const id = ids[i];
+          const r = byId.get(id);
+          if (!r) {
+            failed += 1;
+            continue;
+          }
+          const stats = applicByReq.get(id);
+          const pendingProposals = stats
+            ? Math.max(0, stats.pending - stats.unknown)
+            : 0;
+          const useScopes = pendingProposals > 0;
+          try {
+            if (useScopes) {
+              await confirmAllFn({ data: { requirementId: id } });
+            } else {
+              await setStatusFn({ data: { id, status: "confirmed" } });
+            }
+            ok += 1;
+          } catch {
+            failed += 1;
+          }
+        }
+      },
+    );
+    await Promise.all(workers);
+    qc.invalidateQueries({ queryKey: ["requirements", orgId] });
+    qc.invalidateQueries({ queryKey: ["req-mappings-all", orgId] });
+    qc.invalidateQueries({ queryKey: ["attestations", orgId] });
+    setSelected(new Set());
+    setBatchRunning(false);
+    if (failed === 0) {
+      toast.success(`Confirmed ${ok} requirement${ok === 1 ? "" : "s"}.`);
+    } else if (ok === 0) {
+      toast.error(`Couldn't confirm any of the ${failed} selected requirements.`);
+    } else {
+      toast.error(
+        `Confirmed ${ok} of ${ok + failed}. ${failed} failed — try again.`,
+      );
+    }
+  };
+
+
+
 
   return (
     <section

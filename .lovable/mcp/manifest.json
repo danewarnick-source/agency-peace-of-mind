@@ -12,7 +12,7 @@
   "mcp": {
     "server": {
       "name": "hive-mcp",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "title": "HIVE"
     },
     "tools": [
@@ -49,6 +49,546 @@
               "description": "Maximum number of clients to return (1-100). Defaults to 25."
             }
           },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_client",
+        "title": "Get client details",
+        "description": "Returns a client record with related billing codes and emergency contacts. Row-level security applies.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "client_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Client UUID."
+            }
+          },
+          "required": [
+            "client_id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_shifts",
+        "title": "List scheduled shifts",
+        "description": "Lists scheduled shifts with optional filters. Row-level security applies.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "start_date": {
+              "type": "string",
+              "description": "ISO date/time lower bound (inclusive)."
+            },
+            "end_date": {
+              "type": "string",
+              "description": "ISO date/time upper bound (inclusive)."
+            },
+            "staff_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "client_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "status": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_timesheets",
+        "title": "List EVV timesheets",
+        "description": "Lists EVV timesheet entries with optional filters. Row-level security applies.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "start_date": {
+              "type": "string"
+            },
+            "end_date": {
+              "type": "string"
+            },
+            "staff_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "client_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "service_code": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_incidents",
+        "title": "List incident reports",
+        "description": "Lists incident reports with optional filters. Row-level security applies.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "start_date": {
+              "type": "string"
+            },
+            "end_date": {
+              "type": "string"
+            },
+            "client_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "status": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_certifications",
+        "title": "List staff certifications",
+        "description": "Lists staff certifications. Optional `expiring_within_days` returns certs expiring in the next N days (from today).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "user_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Filter by staff user id."
+            },
+            "expiring_within_days": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 365
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_billing_submissions",
+        "title": "List billing submissions",
+        "description": "Lists recent billing submissions with optional filters, plus any warnings attached to each submission.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "start_date": {
+              "type": "string"
+            },
+            "end_date": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "coverage_status",
+        "title": "Home coverage status for a date",
+        "description": "For a given date and home (team), returns the coverage requirements and the scheduled shifts that day so the caller can compare and identify gaps.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "team_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Home / team id."
+            },
+            "date": {
+              "type": "string",
+              "description": "Date in YYYY-MM-DD."
+            }
+          },
+          "required": [
+            "team_id",
+            "date"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "nectar_flags",
+        "title": "Open Nectar flags and warnings",
+        "description": "Aggregates open behavior-collection flags, shift completeness flags, and billing submission warnings the signed-in user can see.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "limit_per_source": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_tables",
+        "title": "List tables and columns",
+        "description": "Lists tables (and optionally their columns) in the HIVE public schema so you can discover what's queryable. Read-only.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "include_columns": {
+              "type": "boolean",
+              "description": "If true, include column names and data types for each table. Defaults to false."
+            },
+            "table": {
+              "type": "string",
+              "description": "If provided, only return metadata for this table."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "table_read",
+        "title": "Read from a table",
+        "description": "Structured read from any HIVE table (row-level security applies). Provide table name, optional columns to select, filters, ordering, and limit.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "table": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Table name in the public schema, e.g. 'clients'."
+            },
+            "select": {
+              "type": "string",
+              "description": "Comma-separated columns or PostgREST select expression. Defaults to '*'."
+            },
+            "filters": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "column": {
+                    "type": "string"
+                  },
+                  "op": {
+                    "type": "string",
+                    "enum": [
+                      "eq",
+                      "neq",
+                      "gt",
+                      "gte",
+                      "lt",
+                      "lte",
+                      "like",
+                      "ilike",
+                      "is",
+                      "in"
+                    ],
+                    "description": "Filter operator."
+                  },
+                  "value": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": [
+                            "string",
+                            "number",
+                            "boolean"
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "column",
+                  "op",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              "description": "List of filters ANDed together. 'in' takes an array; 'is' takes null/true/false."
+            },
+            "order": {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "string"
+                },
+                "ascending": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          "required": [
+            "table"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "table_write",
+        "title": "Insert / update / delete rows",
+        "description": "Mutates a HIVE table (row-level security applies). Choose op = 'insert' | 'update' | 'delete'. Inserts take `values` (single object or array). Updates take `values` and `filters`. Deletes take `filters`. Returns affected rows.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "table": {
+              "type": "string",
+              "minLength": 1
+            },
+            "op": {
+              "type": "string",
+              "enum": [
+                "insert",
+                "update",
+                "delete"
+              ]
+            },
+            "values": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": {}
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  }
+                }
+              ],
+              "description": "Row data for insert or update."
+            },
+            "filters": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "column": {
+                    "type": "string"
+                  },
+                  "op": {
+                    "type": "string",
+                    "enum": [
+                      "eq",
+                      "neq",
+                      "gt",
+                      "gte",
+                      "lt",
+                      "lte",
+                      "in",
+                      "is"
+                    ]
+                  },
+                  "value": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": [
+                            "string",
+                            "number",
+                            "boolean"
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "column",
+                  "op",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Required for update/delete; disallowed for insert."
+            },
+            "returning": {
+              "type": "string",
+              "description": "PostgREST select for returned rows. Defaults to '*'."
+            }
+          },
+          "required": [
+            "table",
+            "op"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "sql_query",
+        "title": "Run SQL query (read-only)",
+        "description": "Runs a read-only SQL query against the HIVE database as the signed-in user (row-level security applies). Only SELECT/WITH statements are allowed. Returns rows as JSON. Use this for any ad-hoc question about clients, shifts, timesheets, incidents, billing, certifications, etc.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "sql": {
+              "type": "string",
+              "minLength": 1,
+              "description": "SQL to execute. Must be a single read-only statement starting with SELECT or WITH. Do NOT include a trailing semicolon."
+            }
+          },
+          "required": [
+            "sql"
+          ],
           "additionalProperties": false,
           "$schema": "http://json-schema.org/draft-07/schema#"
         },

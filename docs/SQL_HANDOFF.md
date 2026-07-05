@@ -291,3 +291,59 @@ SET content = jsonb_set(
 WHERE training_type = 'person_centered'
   AND content #>> '{sections,0,title}' = 'Person-Centered Profile';
 ```
+
+---
+
+## MCP full-access support — `mcp_exec_read_sql` + catalog views (2026-07-05)
+
+Powers the `sql_query` and `list_tables` MCP tools so Claude (and any other MCP
+client connected to HIVE) can run ad-hoc read-only SQL and discover schema.
+The RPC is `SECURITY INVOKER`, so row-level security still applies as the
+signed-in HIVE user — no privilege escalation.
+
+```sql
+-- Read-only SQL executor: only SELECT / WITH, single statement, RLS enforced.
+create or replace function public.mcp_exec_read_sql(query text)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  trimmed text := regexp_replace(query, ';+\s*$', '');
+  result  jsonb;
+begin
+  if trimmed !~* '^\s*(select|with)\b' then
+    raise exception 'Only SELECT or WITH queries are allowed';
+  end if;
+  if trimmed ~ ';\s*\S' then
+    raise exception 'Multiple statements are not allowed';
+  end if;
+  execute format('select coalesce(jsonb_agg(t), ''[]''::jsonb) from (%s) t', trimmed)
+    into result;
+  return result;
+end;
+$$;
+
+revoke all on function public.mcp_exec_read_sql(text) from public;
+grant execute on function public.mcp_exec_read_sql(text) to authenticated;
+
+-- Schema discovery views for `list_tables`.
+create or replace view public.mcp_table_catalog
+with (security_invoker = on) as
+select table_name
+from information_schema.tables
+where table_schema = 'public' and table_type = 'BASE TABLE';
+
+create or replace view public.mcp_column_catalog
+with (security_invoker = on) as
+select table_name, column_name, data_type, is_nullable, ordinal_position
+from information_schema.columns
+where table_schema = 'public';
+
+grant select on public.mcp_table_catalog  to authenticated;
+grant select on public.mcp_column_catalog to authenticated;
+```
+
+**What you'll see:** `CREATE FUNCTION`, `REVOKE`, `GRANT`, two `CREATE VIEW`,
+two more `GRANT`. After this, `sql_query` and `list_tables` in Claude work.

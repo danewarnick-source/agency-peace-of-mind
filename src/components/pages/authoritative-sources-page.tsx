@@ -1049,6 +1049,10 @@ function UploadCard({
 // and Re-open hits the immutable attestation log.
 
 type ReviewStatus = "needs_attention" | "confirmed" | "removed";
+// Effective bucket combining the persisted ReviewStatus with the derived,
+// reversible "auto set aside for out-of-scope service codes" state.
+// Precedence: removed > not_applicable > confirmed/needs_attention.
+type EffectiveStatus = ReviewStatus | "not_applicable";
 
 interface ReqRow {
   id: string;
@@ -1062,6 +1066,12 @@ interface ReqRow {
   verified_at: string | null;
   review_status: ReviewStatus | string | null;
   metadata?: Record<string, unknown> | null;
+  // Derived server-side from provider_authorized_codes; only meaningful for
+  // origin === "document". Reversible on every read.
+  scope_state?: "in_scope" | "out_of_scope" | null;
+  out_of_scope_codes?: string[] | null;
+  service_code?: string | null;
+  service_codes_all?: string[] | null;
 }
 
 interface SourceMeta {
@@ -1090,6 +1100,21 @@ function statusOf(r: ReqRow): ReviewStatus {
   // Legacy rows (pre-migration): infer from verified flag.
   return r.verified ? "confirmed" : "needs_attention";
 }
+
+// Effective bucket: manual removal always wins so its audit trail is never
+// masked by auto scope filtering. Out-of-scope is a distinct, reversible
+// state — nothing is deleted.
+function effectiveStatusOf(r: ReqRow): EffectiveStatus {
+  const s = statusOf(r);
+  if (s === "removed") return "removed";
+  if (r.scope_state === "out_of_scope") return "not_applicable";
+  return s;
+}
+
+function isOutOfScope(r: ReqRow): boolean {
+  return r.scope_state === "out_of_scope" && statusOf(r) !== "removed";
+}
+
 
 // ----- Applicability (NECTAR scope) helpers -----
 // A requirement is only "fully reviewed" when both the requirement itself is

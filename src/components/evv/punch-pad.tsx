@@ -1120,6 +1120,97 @@ export function PunchPad({
   }
 
 
+  // ── Compliance gate (billing_conflict detector) at clock-out ────────────
+  // Growth-adaptive: one useComplianceGate call, its own buildInput/buildSubject,
+  // plus a restrict-vs-override branch. Engine (dialog, rules, flags, history,
+  // freeze trigger, raise/resolve fns) and detector registry are UNTOUCHED.
+  const { role } = usePermissions();
+  const canOverrideCompliance =
+    role === "admin" || role === "manager" || role === "super_admin";
+  const detectBillingConflict = useServerFn(checkBillingEntry);
+  const raiseComplianceFlagFn = useServerFn(raiseComplianceFlag);
+
+  type EvvGatePayload = {
+    clientId: string;
+    serviceDate: string;
+    serviceCodes: string[];
+    staffId: string;
+    timesheetId: string;
+  };
+  const { gate: evvComplianceGate, dialogElement: complianceDialogEl } =
+    useComplianceGate<EvvGatePayload>({
+      organizationId: org?.organization_id ?? "",
+      detector: "billing",
+      buildInput: (p) => ({
+        clientId: p.clientId,
+        serviceDate: p.serviceDate,
+        serviceCodes: p.serviceCodes,
+        staffId: p.staffId,
+      }),
+      buildSubject: (p) => ({
+        timesheet_id: p.timesheetId,
+        client_id: p.clientId,
+        date: p.serviceDate,
+        staff_id: p.staffId,
+        source: "evv_close",
+      }),
+    });
+
+  /**
+   * Preserve the punch without finalizing billable commit. Records the
+   * clock-out timestamps only; billed_units / status / narrative are held
+   * until an admin/manager resolves the compliance review.
+   */
+  async function preservePunchOnly(clockOutIso: string) {
+    if (!active) return;
+    await supabase
+      .from("evv_timesheets")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .update({
+        clock_out_timestamp: clockOutIso,
+        raw_clock_out: clockOutIso,
+        rounded_clock_out: roundToQuarterHourISO(clockOutIso),
+      } as any)
+      .eq("id", active.id);
+    await qc.invalidateQueries({ queryKey: ["evv-active", user?.id] });
+  }
+
+  /** Gather all other service codes committed for this client on this date. */
+  async function gatherDayCommittedCodes(
+    clientId: string,
+    dateISO: string,
+    excludeTimesheetId: string,
+  ): Promise<string[]> {
+    const dayStart = `${dateISO}T00:00:00`;
+    const dayEnd = `${dateISO}T23:59:59.999`;
+    const [shiftsRes, tsRes] = await Promise.all([
+      supabase
+        .from("scheduled_shifts")
+        .select("service_code")
+        .eq("client_id", clientId)
+        .gte("starts_at", dayStart)
+        .lte("starts_at", dayEnd),
+      supabase
+        .from("evv_timesheets")
+        .select("id, service_type_code")
+        .eq("client_id", clientId)
+        .gte("clock_in_timestamp", dayStart)
+        .lte("clock_in_timestamp", dayEnd),
+    ]);
+    const codes = new Set<string>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (shiftsRes.data ?? []).forEach((r: any) => {
+      if (r?.service_code) codes.add(String(r.service_code).toUpperCase());
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (tsRes.data ?? []).forEach((r: any) => {
+      if (r?.id !== excludeTimesheetId && r?.service_type_code) {
+        codes.add(String(r.service_type_code).toUpperCase());
+      }
+    });
+    return Array.from(codes);
+  }
+
   async function finalizeClockOut(args: {
     pos: { lat: number; lng: number; acc: number } | null;
     outsideReason?: string;
@@ -1164,13 +1255,110 @@ export function PunchPad({
       update.ai_coaching_iterations  = args.aiIterationCount ?? 0;
     }
 
+    // ── Compliance gate: check confirmed billing_conflict rules against the
+    // FULL set of codes committed for this client on this date, plus this
+    // timesheet's code. Provider (admin/manager) decides via dialog; staff
+    // is restricted — punch preserved, billable commit held.
+    const serviceDateISO = clockOut.slice(0, 10);
+    const orgId = org?.organization_id ?? "";
+    const runFullCommit = async (): Promise<{ ok: true }> => {
+      const { error } = await supabase
+        .from("evv_timesheets")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update(update as any)
+        .eq("id", active.id);
+      if (error) throw error;
+      return { ok: true };
+    };
 
-    const { error } = await supabase
-      .from("evv_timesheets")
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .update(update as any)
-      .eq("id", active.id);
-    if (error) throw error;
+    if (orgId) {
+      const otherCodes = await gatherDayCommittedCodes(
+        active.client_id,
+        serviceDateISO,
+        active.id,
+      );
+      const allCodes = Array.from(
+        new Set(
+          [active.service_type_code, ...otherCodes]
+            .filter(Boolean)
+            .map((c) => String(c).toUpperCase()),
+        ),
+      );
+
+      if (canOverrideCompliance) {
+        // Admin/manager: dialog opens with acknowledge / stop.
+        const gateResult = await evvComplianceGate(
+          {
+            clientId: active.client_id,
+            serviceDate: serviceDateISO,
+            serviceCodes: allCodes,
+            staffId: user.id,
+            timesheetId: active.id,
+          },
+          runFullCommit,
+        );
+        // On Stop: preserve punch (do NOT discard timestamp) and halt.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (gateResult && (gateResult as any).stopped) {
+          await preservePunchOnly(clockOut);
+          toast.message(
+            "Punch preserved. Billable commit halted per your compliance decision.",
+          );
+          return;
+        }
+      } else {
+        // Staff (no override): detect directly; if conflict, raise OPEN flags
+        // for audit, preserve punch, and route to supervisor.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const detected = (await detectBillingConflict({
+          data: {
+            organizationId: orgId,
+            clientId: active.client_id,
+            serviceDate: serviceDateISO,
+            serviceCodes: allCodes,
+            staffId: user.id,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          } as any,
+        })) as { flags: Array<{ ruleId: string; requirementId: string; matchedCodes: string[]; source: { title: string; verbatim: string; citation: string | null } }> };
+        if (detected?.flags?.length) {
+          for (const c of detected.flags) {
+            try {
+              await raiseComplianceFlagFn({
+                data: {
+                  organizationId: orgId,
+                  ruleId: c.ruleId,
+                  requirementId: c.requirementId,
+                  detectionType: "billing_conflict",
+                  subjectContext: {
+                    timesheet_id: active.id,
+                    client_id: active.client_id,
+                    date: serviceDateISO,
+                    staff_id: user.id,
+                    source: "evv_close",
+                    matchedCodes: c.matchedCodes,
+                    restricted_for_role: role ?? "unknown",
+                  },
+                  sourceSnapshot: c.source,
+                },
+              });
+            } catch {
+              // Non-fatal: continue raising remaining flags.
+            }
+          }
+          await preservePunchOnly(clockOut);
+          toast.error(
+            "Clock-out held for compliance review. Your punch time is saved — a supervisor must resolve the flagged conflict before this timesheet can be finalized.",
+          );
+          return;
+        }
+        // No conflict — proceed to normal commit below.
+        await runFullCommit();
+      }
+    } else {
+      // No org context — fall back to the raw update (legacy behavior).
+      await runFullCommit();
+    }
+
 
     // Persist any unresolved / dismissed-with-reason completeness flags for the admin Task Center.
     if (org?.organization_id && completenessFlags.length > 0) {

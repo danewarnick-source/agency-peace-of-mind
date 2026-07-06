@@ -1272,7 +1272,7 @@ function RequirementsPanel({
         .is("deactivated_at", null);
       if (error) throw error;
       const m = new Map<string, { confirmed_at: string; confirmed_by: string }>();
-      for (const r of (rows ?? []) as Array<{
+      for (const r of ((rows ?? []) as unknown) as Array<{
         service_code: string;
         confirmed_at: string;
         confirmed_by: string;

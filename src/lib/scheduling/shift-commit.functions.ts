@@ -67,20 +67,22 @@ export const insertScheduledShiftsGated = createServerFn({ method: "POST" })
       });
       if (gate.blocked) {
         // provider chose Stop on ≥1 candidate — do not insert
-        return { status: "inserted", inserted: 0, flagsRaised: gate.candidates.length, blocked: true, rows: [] };
+        return { status: "inserted", inserted: 0, flagsRaised: gate.candidates.length, blocked: true, insertedIds: [] };
       }
       const insertRes = await supabase
         .from("scheduled_shifts")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .insert(data.rows as any)
-        .select("*");
+        .select("id");
       if (insertRes.error) throw insertRes.error;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ids = ((insertRes.data ?? []) as any[]).map((r) => String(r.id));
       return {
         status: "inserted",
-        inserted: insertRes.data?.length ?? 0,
+        inserted: ids.length,
         flagsRaised: gate.candidates.length,
         blocked: false,
-        rows: (insertRes.data ?? []) as Array<Record<string, unknown>>,
+        insertedIds: ids,
       };
     } catch (e) {
       if (e instanceof ComplianceReviewRequiredError) {

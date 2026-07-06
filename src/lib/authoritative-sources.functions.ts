@@ -1647,14 +1647,20 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
       .maybeSingle();
     const orgName = (orgRow?.name as string | null) ?? null;
 
-    // Dedupe against existing requirements for this source.
+    // Dedupe against existing requirements for this source. Seed the set
+    // from titles (normalized) so pre-existing rows written under older key
+    // formulas still block re-inserts of the same normalized clause.
     const { data: existing } = await supabase
       .from("nectar_requirements")
-      .select("requirement_key")
+      .select("title")
       .eq("organization_id", doc.organization_id as string)
-      .eq("source_document_id", doc.id as string);
+      .eq("source_document_id", doc.id as string)
+      .neq("review_status", "removed");
+    const kind = (doc.authoritative_kind as string) ?? "src";
     const existingKeys = new Set(
-      (existing ?? []).map((r) => (r.requirement_key as string) ?? ""),
+      (existing ?? [])
+        .map((r) => buildRequirementDedupKey(kind, (r.title as string | null) ?? ""))
+        .filter((k) => k.length > 0),
     );
 
     const ext = (doc.external_ids ?? {}) as {

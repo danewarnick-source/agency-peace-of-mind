@@ -194,20 +194,19 @@ async function raiseAndMaybeResolve(
   cand: CandidateFlagLike,
   ack: Acknowledgement | null,
 ) {
+  const orgLookup = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .from("nectar_compliance_rules" as any)
+    .select("organization_id")
+    .eq("id", cand.ruleId)
+    .single();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const orgId = (orgLookup.data as any)?.organization_id ?? null;
   const { data: flag, error } = await supabase
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .from("nectar_compliance_flags" as any)
     .insert({
-      organization_id: /* org derived by rule; but we have client bundle → look up via rules table already ties org via RLS.
-                          We stored orgId in the source query context — recover via a lookup on the rule. */
-        (
-          await supabase
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .from("nectar_compliance_rules" as any)
-            .select("organization_id")
-            .eq("id", cand.ruleId)
-            .single()
-        ).data?.organization_id ?? null,
+      organization_id: orgId,
       rule_id: cand.ruleId,
       requirement_id: cand.requirementId,
       detection_type: "billing_conflict",

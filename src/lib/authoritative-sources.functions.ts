@@ -414,7 +414,7 @@ export const listRequirements = createServerFn({ method: "POST" })
         // derived scope_state calculation below. Do not remove them from
         // this select — the auto set-aside behavior will silently break
         // (every doc-origin requirement collapses to in_scope).
-        "id, source_document_id, origin, requirement_key, title, description, category, source_citation, applies_to, verified, verified_by, verified_at, review_status, created_at, metadata, service_code, service_codes_all",
+        "id, source_document_id, origin, requirement_key, title, description, category, source_citation, applies_to, verified, verified_by, verified_at, review_status, created_at, metadata, service_code, service_codes_all, obligation_category, obligation_category_source, activation_state, activated_at, activated_by, confirmed_optional, original_title, original_description, original_source_citation",
       )
       .eq("organization_id", data.organizationId)
       .order("origin", { ascending: true })

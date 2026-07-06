@@ -572,11 +572,11 @@ function SourceRow({
   const hasDraft = !!stats && stats.total > 0;
 
   return (
-    <li className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <li className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span className="truncate text-sm font-medium">{source.title}</span>
+          <span className="min-w-0 break-words text-sm font-medium">{source.title}</span>
           {kindMissing ? (
             <Select
               value=""
@@ -605,13 +605,33 @@ function SourceRow({
             </Badge>
           )}
           {source.parse_status === "parsing" && (
-            <Badge className="bg-amber-500/15 text-[10px] text-amber-700 dark:text-amber-300">
-              Parsing…
+            <>
+              <Badge className="bg-amber-500/15 text-[10px] text-amber-700 dark:text-amber-300">
+                Parsing…
+              </Badge>
+              <button
+                type="button"
+                onClick={() => qc.invalidateQueries({ queryKey: ["auth-sources", orgId] })}
+                className="text-[10px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                title="Refresh status — parse runs in the background"
+              >
+                Refresh
+              </button>
+            </>
+          )}
+          {source.parse_status === "failed" && (
+            <Badge className="bg-red-500/15 text-[10px] text-red-700 dark:text-red-300">
+              Parse failed
+            </Badge>
+          )}
+          {source.parse_status === "skipped" && (
+            <Badge variant="outline" className="text-[10px] text-muted-foreground">
+              Parse skipped
             </Badge>
           )}
         </div>
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-          <span>File: {source.file_name}</span>
+          <span className="min-w-0 break-all">File: {source.file_name}</span>
           {source.fiscal_year && <span>{source.fiscal_year}</span>}
           {source.effective_start && (
             <span>
@@ -622,7 +642,14 @@ function SourceRow({
           <span>by {source.uploaded_by_name ?? "—"}</span>
           <span>{new Date(source.created_at).toLocaleDateString()}</span>
         </div>
+        {source.parse_status === "failed" && (
+          <p className="mt-1 text-[11px] text-red-700 dark:text-red-300">
+            {(source.metadata as { parse_error?: string } | null)?.parse_error ??
+              "Parse failed. Re-upload the document to try again."}
+          </p>
+        )}
       </div>
+
 
       {hasDraft ? (
         <div className="flex flex-wrap items-center gap-1.5">

@@ -1157,16 +1157,23 @@ export function PunchPad({
     });
 
   /**
-   * Preserve the punch without finalizing billable commit. Records the
-   * clock-out timestamps only; billed_units / status / narrative are held
-   * until an admin/manager resolves the compliance review.
+   * Preserve the punch without finalizing billable commit. Persists
+   * documentation fields already gathered by staff (clock-out timestamps,
+   * narrative, goals, GPS, timezone, outside-geofence reason) but withholds
+   * `billed_units` — that field is the "billable finalize done" marker the
+   * supervisor queue keys off. `billed_units IS NULL` + a clock-out + an
+   * OPEN evv_close flag identifies a held timesheet.
    */
-  async function preservePunchOnly(clockOutIso: string) {
+  async function preservePunchOnly(clockOutIso: string, fullUpdate: Record<string, unknown>) {
     if (!active) return;
+    // Strip the billable-commit marker; keep everything staff already filled in.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { billed_units, ...preserved } = fullUpdate;
     await supabase
       .from("evv_timesheets")
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .update({
+        ...preserved,
         clock_out_timestamp: clockOutIso,
         raw_clock_out: clockOutIso,
         rounded_clock_out: roundToQuarterHourISO(clockOutIso),
@@ -1174,6 +1181,7 @@ export function PunchPad({
       .eq("id", active.id);
     await qc.invalidateQueries({ queryKey: ["evv-active", user?.id] });
   }
+
 
   /** Gather all other service codes committed for this client on this date. */
   async function gatherDayCommittedCodes(

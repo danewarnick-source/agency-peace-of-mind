@@ -1693,10 +1693,9 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
     for (const item of items) {
       const titleClean = item.title.trim().slice(0, 200);
       if (!titleClean) continue;
-      // Dedup by title + source document only (see initial-draft path above).
-      const key = `${(doc.authoritative_kind as string) ?? "src"}:ai:${titleClean}`
-        .toLowerCase()
-        .slice(0, 120);
+      // Dedup by normalized title + source document (see initial-draft path).
+      const key = buildRequirementDedupKey(kind, titleClean);
+      if (!key) continue;
       if (existingKeys.has(key)) continue;
       existingKeys.add(key);
       const citation = item.citation

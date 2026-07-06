@@ -18,6 +18,7 @@ import {
   ExplainResp,
 } from "./authoritative-sources.server";
 import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { classifyServiceCodes } from "./nectar-code-classifier";
 
 // =============================================================
 // Foundation B — Authoritative sources, derived requirements,
@@ -953,6 +954,8 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       source_citation: string;
       applies_to: "company" | "staff" | "client";
       approval_state: string | null;
+      service_code: string | null;
+      service_codes_all: string[] | null;
     };
     const aiRows: Array<{ row: AiRow; key: string }> = [];
     for (const item of aiItems) {
@@ -969,6 +972,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       const citation = item.citation
         ? `${baseLabel} — ${item.citation}${webSuffix}`
         : `${baseLabel}${webSuffix}`;
+      const classified = classifyServiceCodes(titleClean, item.description ?? null);
       aiRows.push({
         key,
         row: {
@@ -982,6 +986,8 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
           source_citation: citation,
           applies_to: item.applies_to ?? "company",
           approval_state: assisted ? "nectar_drafted" : null,
+          service_code: classified.primary,
+          service_codes_all: classified.all.length > 0 ? classified.all : null,
         },
       });
     }
@@ -1688,6 +1694,8 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
       source_citation: string;
       applies_to: "company" | "staff" | "client";
       approval_state: string | null;
+      service_code: string | null;
+      service_codes_all: string[] | null;
     };
     const rows: Array<{ row: AiRow; key: string }> = [];
     for (const item of items) {
@@ -1701,6 +1709,7 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
       const citation = item.citation
         ? `${baseLabel} — ${item.citation}${webSuffix}`
         : `${baseLabel}${webSuffix}`;
+      const classified = classifyServiceCodes(titleClean, item.description ?? null);
       rows.push({
         key,
         row: {
@@ -1714,6 +1723,8 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
           source_citation: citation,
           applies_to: item.applies_to ?? "company",
           approval_state: assisted ? "nectar_drafted" : null,
+          service_code: classified.primary,
+          service_codes_all: classified.all.length > 0 ? classified.all : null,
         },
       });
     }

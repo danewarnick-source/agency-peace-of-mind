@@ -173,7 +173,9 @@ function RuleRow({ rule, onChanged }: { rule: Rule; onChanged: () => void }) {
 
       <div className="border-t pt-3 space-y-2">
         <div className="text-xs font-medium text-muted-foreground uppercase">Rule definition</div>
-        {editing || rule.status === "proposed" ? (
+        {rule.rule_type === "staff_prerequisite" ? (
+          <StaffPrereqDefinition rule={rule} />
+        ) : editing || rule.status === "proposed" ? (
           <div className="grid gap-2 sm:grid-cols-2">
             <div>
               <label className="text-xs text-muted-foreground">Conflicting codes (comma-separated)</label>

@@ -369,6 +369,10 @@ export function AuthoritativeSourceDrop({
             <DialogTitle className="text-base">
               {current ? current.file.name : "Label source"}
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              Label each uploaded document so NECTAR knows how to read it before saving into your authoritative sources.
+            </DialogDescription>
+
             {drafts.length > 1 && (
               <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                 <Badge variant="outline" className="text-[10px]">

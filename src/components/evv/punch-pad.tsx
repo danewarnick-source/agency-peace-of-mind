@@ -48,7 +48,7 @@ import {
 import { useComplianceGate } from "@/hooks/use-compliance-gate";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useServerFn } from "@tanstack/react-start";
-import { checkBillingEntry, raiseComplianceFlag } from "@/lib/nectar-compliance.functions";
+import { checkBillingEntry, checkStaffPrerequisite, raiseComplianceFlag } from "@/lib/nectar-compliance.functions";
 
 
 

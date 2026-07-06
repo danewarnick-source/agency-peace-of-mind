@@ -66,12 +66,17 @@ export function AuthorizedCodesPanel({ orgId }: { orgId: string }) {
           label: vars.label ?? null,
         },
       }),
-    onSuccess: () => {
+    onSuccess: (res, vars) => {
       qc.invalidateQueries({ queryKey: ["authorized-codes", orgId] });
-      toast.success("Authorized code saved — NECTAR will keep its requirements live.");
+      if ((res as { existed?: boolean }).existed) {
+        toast.info(`${vars.code.toUpperCase()} is already authorized — no changes made.`);
+      } else {
+        toast.success("Authorized code saved — NECTAR will keep its requirements live.");
+      }
     },
     onError: (e) => toast.error((e as Error).message),
   });
+
 
   const removeM = useMutation({
     mutationFn: (id: string) => remove({ data: { id } }),
@@ -306,10 +311,12 @@ function CodeRow({
             variant="ghost"
             onClick={onRemove}
             disabled={removing}
-            title="Remove from authorized set"
+            title={`Remove ${row.code} from authorized set`}
+            aria-label={`Remove ${row.code} from authorized codes`}
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
           </Button>
+
         )}
       </div>
     </div>

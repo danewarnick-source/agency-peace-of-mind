@@ -1114,26 +1114,46 @@ export const upsertAuthorizedCode = createServerFn({ method: "POST" })
     const code = data.code.trim().toUpperCase();
     if (!code) throw new Error("Code required");
 
+    // Never overwrite an existing row from this manual "Add code" flow —
+    // the operator's intent is "authorize this code", and a code that's
+    // already authorized shouldn't lose its status/source/notes because
+    // someone re-typed it. Return existed:true so the client can toast
+    // "already authorized" instead of a generic success message.
+    const { data: existing, error: findErr } = await supabase
+      .from("provider_authorized_codes")
+      .select("id, status, source")
+      .eq("organization_id", data.organizationId)
+      .eq("code", code)
+      .maybeSingle();
+    if (findErr) throw new Error(findErr.message);
+    if (existing) {
+      return {
+        id: (existing as { id: string }).id,
+        code,
+        existed: true as const,
+        status: (existing as { status: string }).status,
+        source: (existing as { source: string }).source,
+      };
+    }
+
     const { data: row, error } = await supabase
       .from("provider_authorized_codes")
-      .upsert(
-        {
-          organization_id: data.organizationId,
-          code,
-          label: data.label ?? null,
-          status: data.status ?? "dormant",
-          source: data.source ?? "manual",
-          source_document_id: data.sourceDocumentId ?? null,
-          notes: data.notes ?? null,
-          added_by: userId,
-        },
-        { onConflict: "organization_id,code" },
-      )
+      .insert({
+        organization_id: data.organizationId,
+        code,
+        label: data.label ?? null,
+        status: data.status ?? "dormant",
+        source: data.source ?? "manual",
+        source_document_id: data.sourceDocumentId ?? null,
+        notes: data.notes ?? null,
+        added_by: userId,
+      })
       .select("id")
       .single();
-    if (error || !row) throw new Error(error?.message ?? "Upsert failed");
-    return { id: row.id as string, code };
+    if (error || !row) throw new Error(error?.message ?? "Insert failed");
+    return { id: row.id as string, code, existed: false as const };
   });
+
 
 export const removeAuthorizedCode = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

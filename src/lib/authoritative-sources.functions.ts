@@ -27,6 +27,22 @@ import { gatewayFetch } from "@/lib/ai-bedrock.server";
 // to avoid ?tss-serverfn-split ReferenceErrors from sibling declarations.
 // =============================================================
 
+/**
+ * Build the in-memory dedup key for an AI-drafted requirement.
+ * Normalizes the title so trivial differences (punctuation, casing,
+ * whitespace, quotes) don't produce phantom duplicates when the same
+ * clause is extracted twice by overlapping chunks.
+ */
+function buildRequirementDedupKey(kind: string, title: string): string {
+  const norm = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!norm) return "";
+  return `${kind}:ai:${norm}`.slice(0, 120);
+}
+
 export const ingestWebSource = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>

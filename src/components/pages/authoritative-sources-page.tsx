@@ -1252,7 +1252,7 @@ function RequirementsPanel({
         .select("code, archived_at")
         .eq("organization_id", orgId);
       if (error) throw error;
-      return new Set(
+      return new Set<string>(
         (rows ?? [])
           .filter((r) => (r as { archived_at: string | null }).archived_at == null)
           .map((r) => String((r as { code: string }).code).toUpperCase()),

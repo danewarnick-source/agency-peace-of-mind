@@ -1803,14 +1803,16 @@ function DocumentRequirementGroup({
                   if (f.key === "fully_confirmed") setConfirmedCollapsed(false);
                 }}
 
-                className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition ${
+                aria-pressed={rowFilter === f.key}
+                className={`rounded-full px-2.5 py-0.5 text-[10px] font-medium transition ${
                   rowFilter === f.key
-                    ? "bg-foreground text-background"
+                    ? "bg-amber-500 text-amber-950 ring-1 ring-amber-600 shadow-sm"
                     : "bg-muted text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {f.label}
               </button>
+
             ))}
           </div>
 

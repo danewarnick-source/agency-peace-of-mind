@@ -64,6 +64,9 @@ export function ComplianceRulesPanel({ organizationId }: { organizationId: strin
         </span>
       </div>
 
+      <DraftStaffPrereqButton organizationId={organizationId} onDrafted={refresh} />
+
+
       <Tabs defaultValue="proposed">
         <TabsList>
           <TabsTrigger value="proposed">

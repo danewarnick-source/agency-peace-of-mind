@@ -105,6 +105,15 @@ const CreateShiftZ = z.object({
   notes: z.string().optional(),
   status: z.enum(["draft", "published"]).default("draft"),
   overrideReason: z.string().optional(),
+  acknowledgements: z
+    .array(
+      z.object({
+        ruleId: z.string().uuid(),
+        resolution: z.enum(["acknowledged_continued", "stopped"]),
+        note: z.string().max(4000).optional(),
+      }),
+    )
+    .optional(),
 });
 
 export const createShift = createServerFn({ method: "POST" })

@@ -1308,7 +1308,7 @@ export function PunchPad({
         // On Stop: preserve punch (do NOT discard timestamp) and halt.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (gateResult && (gateResult as any).stopped) {
-          await preservePunchOnly(clockOut);
+          await preservePunchOnly(clockOut, update);
           toast.message(
             "Punch preserved. Billable commit halted per your compliance decision.",
           );
@@ -1353,7 +1353,7 @@ export function PunchPad({
               // Non-fatal: continue raising remaining flags.
             }
           }
-          await preservePunchOnly(clockOut);
+          await preservePunchOnly(clockOut, update);
           toast.error(
             "Clock-out held for compliance review. Your punch time is saved — a supervisor must resolve the flagged conflict before this timesheet can be finalized.",
           );

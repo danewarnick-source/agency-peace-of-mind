@@ -1128,6 +1128,7 @@ export function PunchPad({
   const canOverrideCompliance =
     role === "admin" || role === "manager" || role === "super_admin";
   const detectBillingConflict = useServerFn(checkBillingEntry);
+  const detectStaffPrereq = useServerFn(checkStaffPrerequisite);
   const raiseComplianceFlagFn = useServerFn(raiseComplianceFlag);
 
   type EvvGatePayload = {
@@ -1153,6 +1154,35 @@ export function PunchPad({
         date: p.serviceDate,
         staff_id: p.staffId,
         source: "evv_close",
+      }),
+    });
+
+  // ── Compliance gate (staff_prerequisite detector) at clock-in ───────────
+  // Second surface on the same growth-adaptive contract: one hook call,
+  // its own buildInput/buildSubject, restrict-vs-override branch. Engine,
+  // registry, dialog, and raise/resolve fns are UNTOUCHED.
+  type EvvClockInGatePayload = {
+    clientId: string;
+    staffId: string;
+    serviceCodes: string[];
+    at: string;
+  };
+  const { gate: evvClockInGate, dialogElement: clockInComplianceDialogEl } =
+    useComplianceGate<EvvClockInGatePayload>({
+      organizationId: org?.organization_id ?? "",
+      detector: "staffPrereq",
+      buildInput: (p) => ({
+        staffId: p.staffId,
+        serviceCodes: p.serviceCodes,
+        clientId: p.clientId,
+        at: p.at,
+      }),
+      buildSubject: (p) => ({
+        client_id: p.clientId,
+        date: p.at.slice(0, 10),
+        staff_id: p.staffId,
+        service_codes: p.serviceCodes,
+        source: "evv_clock_in",
       }),
     });
 

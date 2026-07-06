@@ -17,11 +17,6 @@ const StubInput = z
 type StubResult = { flags: Array<{ ruleId: string; requirementId: string; matchedCodes: string[]; humanExplanation: string; source: { title: string; verbatim: string; citation: string | null } }> };
 const empty = (): StubResult => ({ flags: [] });
 
-export const checkStaffPrerequisite = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d) => StubInput.parse(d))
-  .handler(async () => empty());
-
 export const checkDeadline = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => StubInput.parse(d))

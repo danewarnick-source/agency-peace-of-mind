@@ -293,3 +293,66 @@ function ProposeManualRule({ organizationId, onCreated }: { organizationId: stri
     </div>
   );
 }
+
+function StaffPrereqDefinition({ rule }: { rule: Rule }) {
+  const codes = rule.rule_definition.applicable_codes ?? [];
+  const quals = rule.rule_definition.required_qualifications ?? [];
+  const scope = String(rule.rule_definition.scope ?? "per_shift");
+  return (
+    <div className="text-sm space-y-1">
+      <div>
+        Applicable codes: <span className="font-mono">{codes.join(", ") || "—"}</span>
+        <span className="ml-4">Scope: <span className="font-mono">{scope}</span></span>
+      </div>
+      <div>
+        Required qualifications:
+        <ul className="ml-4 list-disc">
+          {quals.length === 0 && <li className="text-muted-foreground">—</li>}
+          {quals.map((q, i) => (
+            <li key={i}>
+              <span className="font-mono">{q.kind}:{q.key}</span>
+              <span className="text-xs text-muted-foreground ml-2">
+                {q.must_be_unexpired === false ? "(any status)" : "(must be unexpired)"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function DraftStaffPrereqButton({
+  organizationId,
+  onDrafted,
+}: {
+  organizationId: string;
+  onDrafted: () => void;
+}) {
+  const draft = useServerFn(draftStaffPrerequisiteRules);
+  const mut = useMutation({
+    mutationFn: async () => draft({ data: { organizationId } }),
+    onSuccess: (res) => {
+      const r = res as { inserted: number; declined: Array<{ reason: string }> };
+      toast.success(
+        `Drafted ${r.inserted} staff-prerequisite rule${r.inserted === 1 ? "" : "s"} for review${
+          r.declined.length ? ` (${r.declined.length} skipped as too vague)` : ""
+        }.`,
+      );
+      onDrafted();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <div className="flex items-center gap-2 pt-1">
+      <Button size="sm" variant="outline" onClick={() => mut.mutate()} disabled={mut.isPending}>
+        <Wand2 className="h-3 w-3 mr-1" />
+        {mut.isPending ? "Drafting…" : "Draft staff-prerequisite rules from active requirements"}
+      </Button>
+      <span className="text-xs text-muted-foreground">
+        Proposes rules for codes whose source text mentions a credential or training. You confirm each below.
+      </span>
+    </div>
+  );
+}
+

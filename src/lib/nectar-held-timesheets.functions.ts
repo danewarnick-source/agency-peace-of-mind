@@ -47,8 +47,14 @@ export type HeldTimesheetFlag = {
   raised_to: string | null;
 };
 
+export type HeldKind = "clock_out_billing" | "clock_in_staff_prereq";
+
 export type HeldTimesheetRow = {
-  timesheet_id: string;
+  kind: HeldKind;
+  /** Present for clock_out_billing; null for clock_in_staff_prereq (no timesheet yet). */
+  timesheet_id: string | null;
+  /** Synthetic stable id for React keys / resolve targeting on clock-in holds. */
+  hold_key: string;
   organization_id: string;
   client_id: string | null;
   client_name: string | null;
@@ -56,8 +62,10 @@ export type HeldTimesheetRow = {
   staff_name: string | null;
   service_date: string;
   service_type_code: string | null;
-  clock_in_timestamp: string;
-  clock_out_timestamp: string;
+  /** Present for clock_out_billing; null for clock_in_staff_prereq. */
+  clock_in_timestamp: string | null;
+  /** Present for clock_out_billing; null for clock_in_staff_prereq. */
+  clock_out_timestamp: string | null;
   held_at: string;
   flags: HeldTimesheetFlag[];
 };

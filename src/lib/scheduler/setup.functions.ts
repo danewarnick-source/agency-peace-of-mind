@@ -550,7 +550,7 @@ export const applyDrafts = createServerFn({ method: "POST" })
       } else {
         if (!d.client_id || !d.service_code || !d.starts_at || !d.ends_at) continue;
         const code = d.service_code.toUpperCase();
-        const { error } = await supabase.from("scheduled_shifts").insert({
+        const insertRow = {
           organization_id: data.organization_id,
           staff_id: d.staff_id ?? null,
           client_id: d.client_id,
@@ -564,7 +564,10 @@ export const applyDrafts = createServerFn({ method: "POST" })
           notes: d.notes ?? null,
           created_by: userId,
           created_from: "nectar",
-        });
+        };
+        const { gateScheduledShiftInsert } = await import("@/lib/scheduling/shift-commit");
+        await gateScheduledShiftInsert(supabase, [insertRow as never], { mode: "bulk_auto", userId });
+        const { error } = await supabase.from("scheduled_shifts").insert(insertRow);
         if (error) throw error;
         created++;
       }

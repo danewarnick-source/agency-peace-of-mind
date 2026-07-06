@@ -10,6 +10,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   listHeldTimesheets,
   resolveHeldTimesheet,
+  resolveClockInHold,
   type HeldTimesheetRow,
 } from "@/lib/nectar-held-timesheets.functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";

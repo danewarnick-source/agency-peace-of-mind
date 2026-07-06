@@ -652,7 +652,8 @@ function SourceRow({
 
 
       {hasDraft ? (
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-col items-stretch gap-1.5 sm:min-w-0 sm:max-w-full sm:shrink-0 sm:basis-auto sm:items-end lg:max-w-[55%]">
+
           <button
             type="button"
             onClick={() => onJumpToRequirements(source.id)}

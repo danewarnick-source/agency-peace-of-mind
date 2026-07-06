@@ -958,13 +958,12 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     for (const item of aiItems) {
       const titleClean = item.title.trim().slice(0, 200);
       if (!titleClean) continue;
-      // Dedup by title + source document only. Citation intentionally excluded:
-      // chunk overlap causes the same clause to be extracted twice with slightly
-      // different citation formatting (e.g. "1.31(1)" vs "1.31"), which used to
-      // slip past this check. existingKeys is already scoped to this document.
-      const key = `${(doc.authoritative_kind as string) ?? "src"}:ai:${titleClean}`
-        .toLowerCase()
-        .slice(0, 120);
+      // Dedup by normalized title + source document. Title is normalized
+      // (case/punctuation/whitespace-insensitive) via buildRequirementDedupKey
+      // so chunk-overlap re-extractions with trivial phrasing differences
+      // don't slip through. existingKeys is already scoped to this document.
+      const key = buildRequirementDedupKey(kind, titleClean);
+      if (!key) continue;
       if (existingKeys.has(key)) continue;
       existingKeys.add(key);
       const citation = item.citation

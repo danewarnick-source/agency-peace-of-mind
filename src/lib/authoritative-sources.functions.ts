@@ -953,6 +953,8 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       source_citation: string;
       applies_to: "company" | "staff" | "client";
       approval_state: string | null;
+      service_code: string | null;
+      service_codes_all: string[] | null;
     };
     const aiRows: Array<{ row: AiRow; key: string }> = [];
     for (const item of aiItems) {

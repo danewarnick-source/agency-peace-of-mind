@@ -572,7 +572,7 @@ function SourceRow({
   const hasDraft = !!stats && stats.total > 0;
 
   return (
-    <li className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between">
+    <li className={`flex flex-col gap-2 py-3 ${hasDraft ? "" : "sm:flex-row sm:items-start sm:justify-between"}`}>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />

@@ -66,12 +66,17 @@ export function AuthorizedCodesPanel({ orgId }: { orgId: string }) {
           label: vars.label ?? null,
         },
       }),
-    onSuccess: () => {
+    onSuccess: (res, vars) => {
       qc.invalidateQueries({ queryKey: ["authorized-codes", orgId] });
-      toast.success("Authorized code saved — NECTAR will keep its requirements live.");
+      if ((res as { existed?: boolean }).existed) {
+        toast.info(`${vars.code.toUpperCase()} is already authorized — no changes made.`);
+      } else {
+        toast.success("Authorized code saved — NECTAR will keep its requirements live.");
+      }
     },
     onError: (e) => toast.error((e as Error).message),
   });
+
 
   const removeM = useMutation({
     mutationFn: (id: string) => remove({ data: { id } }),

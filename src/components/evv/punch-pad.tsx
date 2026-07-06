@@ -3020,6 +3020,7 @@ export function PunchPad({
 
         {/* NECTAR compliance flag dialog (admin/manager only; staff is restricted upstream). */}
         {complianceDialogEl}
+        {clockInComplianceDialogEl}
       </section>
     </EvvConsentGate>
   );

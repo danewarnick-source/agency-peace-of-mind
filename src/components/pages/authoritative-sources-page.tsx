@@ -2677,7 +2677,11 @@ function ManualRequirementDialog({ orgId }: { orgId: string }) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add a manual requirement</DialogTitle>
+          <DialogDescription className="text-xs">
+            Add a requirement that isn't drafted from an uploaded source. It's logged to the attestation trail like any other.
+          </DialogDescription>
         </DialogHeader>
+
         <div className="space-y-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Title</Label>

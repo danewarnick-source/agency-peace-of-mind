@@ -37,7 +37,7 @@ export type InsertScheduledShiftsResult =
       inserted: number;
       flagsRaised: number;
       blocked: boolean;
-      rows: Array<Record<string, unknown>>;
+      insertedIds: string[];
     }
   | { status: "needs_review"; candidates: CandidateFlagLike[] };
 

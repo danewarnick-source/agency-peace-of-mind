@@ -9788,6 +9788,193 @@ export type Database = {
           },
         ]
       }
+      nectar_compliance_flags: {
+        Row: {
+          detection_type: string
+          id: string
+          organization_id: string
+          raised_at: string
+          raised_to: string | null
+          requirement_id: string
+          resolution: string | null
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          rule_id: string
+          source_snapshot: Json
+          subject_context: Json
+        }
+        Insert: {
+          detection_type: string
+          id?: string
+          organization_id: string
+          raised_at?: string
+          raised_to?: string | null
+          requirement_id: string
+          resolution?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          rule_id: string
+          source_snapshot?: Json
+          subject_context?: Json
+        }
+        Update: {
+          detection_type?: string
+          id?: string
+          organization_id?: string
+          raised_at?: string
+          raised_to?: string | null
+          requirement_id?: string
+          resolution?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          rule_id?: string
+          source_snapshot?: Json
+          subject_context?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nectar_compliance_flags_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nectar_compliance_flags_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_requirements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nectar_compliance_flags_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_compliance_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nectar_compliance_rule_history: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_label: string | null
+          created_at: string
+          id: string
+          note: string | null
+          organization_id: string
+          rule_id: string
+          snapshot: Json
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_label?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          organization_id: string
+          rule_id: string
+          snapshot?: Json
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_label?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          organization_id?: string
+          rule_id?: string
+          snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nectar_compliance_rule_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nectar_compliance_rule_history_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_compliance_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nectar_compliance_rules: {
+        Row: {
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          dismissed_at: string | null
+          dismissed_by: string | null
+          id: string
+          organization_id: string
+          proposed_by: string
+          proposed_rationale: string | null
+          requirement_id: string
+          rule_definition: Json
+          rule_type: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          dismissed_at?: string | null
+          dismissed_by?: string | null
+          id?: string
+          organization_id: string
+          proposed_by?: string
+          proposed_rationale?: string | null
+          requirement_id: string
+          rule_definition?: Json
+          rule_type: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          dismissed_at?: string | null
+          dismissed_by?: string | null
+          id?: string
+          organization_id?: string
+          proposed_by?: string
+          proposed_rationale?: string | null
+          requirement_id?: string
+          rule_definition?: Json
+          rule_type?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nectar_compliance_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nectar_compliance_rules_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_requirements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nectar_document_entities: {
         Row: {
           created_at: string

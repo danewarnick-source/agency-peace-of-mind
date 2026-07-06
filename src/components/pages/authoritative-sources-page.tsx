@@ -26,6 +26,7 @@ import {
 import { useCurrentOrg } from "@/hooks/use-org";
 import { CodeActivationBanner } from "@/components/nectar/code-activation-banner";
 import { RequirementCard } from "@/components/nectar/requirement-card";
+import { ComplianceRulesPanel } from "@/components/nectar/compliance-rules-panel";
 import { activateCodeRequirements } from "@/lib/nectar-requirement-usage.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";

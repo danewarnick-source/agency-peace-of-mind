@@ -27,6 +27,22 @@ import { gatewayFetch } from "@/lib/ai-bedrock.server";
 // to avoid ?tss-serverfn-split ReferenceErrors from sibling declarations.
 // =============================================================
 
+/**
+ * Build the in-memory dedup key for an AI-drafted requirement.
+ * Normalizes the title so trivial differences (punctuation, casing,
+ * whitespace, quotes) don't produce phantom duplicates when the same
+ * clause is extracted twice by overlapping chunks.
+ */
+function buildRequirementDedupKey(kind: string, title: string): string {
+  const norm = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!norm) return "";
+  return `${kind}:ai:${norm}`.slice(0, 120);
+}
+
 export const ingestWebSource = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
@@ -842,14 +858,21 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     }
 
 
-    // Existing requirements (so we can de-dupe across re-runs)
+    // Existing requirements (so we can de-dupe across re-runs). Seed the key set
+    // from titles run through the same normalizer used for new rows, so the
+    // check is punctuation/whitespace/case-insensitive and catches rows whose
+    // stored requirement_key was written under an older, stricter formula.
     const { data: existing } = await supabase
       .from("nectar_requirements")
-      .select("requirement_key")
+      .select("title")
       .eq("organization_id", doc.organization_id)
-      .eq("source_document_id", doc.id);
+      .eq("source_document_id", doc.id)
+      .neq("review_status", "removed");
+    const kind = (doc.authoritative_kind as string) ?? "src";
     const existingKeys = new Set(
-      (existing ?? []).map((r) => (r.requirement_key as string) ?? ""),
+      (existing ?? [])
+        .map((r) => buildRequirementDedupKey(kind, (r.title as string | null) ?? ""))
+        .filter((k) => k.length > 0),
     );
 
     // 1. Prose-clause extraction (the real path for SOW / contracts)
@@ -935,13 +958,12 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     for (const item of aiItems) {
       const titleClean = item.title.trim().slice(0, 200);
       if (!titleClean) continue;
-      // Dedup by title + source document only. Citation intentionally excluded:
-      // chunk overlap causes the same clause to be extracted twice with slightly
-      // different citation formatting (e.g. "1.31(1)" vs "1.31"), which used to
-      // slip past this check. existingKeys is already scoped to this document.
-      const key = `${(doc.authoritative_kind as string) ?? "src"}:ai:${titleClean}`
-        .toLowerCase()
-        .slice(0, 120);
+      // Dedup by normalized title + source document. Title is normalized
+      // (case/punctuation/whitespace-insensitive) via buildRequirementDedupKey
+      // so chunk-overlap re-extractions with trivial phrasing differences
+      // don't slip through. existingKeys is already scoped to this document.
+      const key = buildRequirementDedupKey(kind, titleClean);
+      if (!key) continue;
       if (existingKeys.has(key)) continue;
       existingKeys.add(key);
       const citation = item.citation
@@ -1625,14 +1647,20 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
       .maybeSingle();
     const orgName = (orgRow?.name as string | null) ?? null;
 
-    // Dedupe against existing requirements for this source.
+    // Dedupe against existing requirements for this source. Seed the set
+    // from titles (normalized) so pre-existing rows written under older key
+    // formulas still block re-inserts of the same normalized clause.
     const { data: existing } = await supabase
       .from("nectar_requirements")
-      .select("requirement_key")
+      .select("title")
       .eq("organization_id", doc.organization_id as string)
-      .eq("source_document_id", doc.id as string);
+      .eq("source_document_id", doc.id as string)
+      .neq("review_status", "removed");
+    const kind = (doc.authoritative_kind as string) ?? "src";
     const existingKeys = new Set(
-      (existing ?? []).map((r) => (r.requirement_key as string) ?? ""),
+      (existing ?? [])
+        .map((r) => buildRequirementDedupKey(kind, (r.title as string | null) ?? ""))
+        .filter((k) => k.length > 0),
     );
 
     const ext = (doc.external_ids ?? {}) as {
@@ -1665,10 +1693,9 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
     for (const item of items) {
       const titleClean = item.title.trim().slice(0, 200);
       if (!titleClean) continue;
-      // Dedup by title + source document only (see initial-draft path above).
-      const key = `${(doc.authoritative_kind as string) ?? "src"}:ai:${titleClean}`
-        .toLowerCase()
-        .slice(0, 120);
+      // Dedup by normalized title + source document (see initial-draft path).
+      const key = buildRequirementDedupKey(kind, titleClean);
+      if (!key) continue;
       if (existingKeys.has(key)) continue;
       existingKeys.add(key);
       const citation = item.citation

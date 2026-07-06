@@ -115,12 +115,18 @@ export function HeldTimesheetsPanel({ organizationId }: { organizationId: string
           ) : (
             list.map((row) => (
               <div
-                key={row.timesheet_id}
+                key={row.hold_key}
                 className="rounded-md border bg-card p-3 space-y-2"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1 text-sm">
-                    <div className="font-medium">
+                    <div className="font-medium flex items-center gap-2">
+                      <Badge
+                        variant={row.kind === "clock_in_staff_prereq" ? "destructive" : "outline"}
+                        className="text-[10px]"
+                      >
+                        {row.kind === "clock_in_staff_prereq" ? "Clock-in hold" : "Clock-out hold"}
+                      </Badge>
                       {row.staff_name ?? "Unknown staff"} · {row.client_name ?? "Unknown client"}
                     </div>
                     <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">

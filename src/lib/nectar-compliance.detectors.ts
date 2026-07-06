@@ -10,8 +10,8 @@
  * Surfaces never import individual detectors; they pass a registry key to
  * useComplianceGate.
  */
-import { checkBillingEntry } from "./nectar-compliance.functions";
-import { checkStaffPrerequisite, checkDeadline, checkActivity } from "./nectar-compliance-stubs.functions";
+import { checkBillingEntry, checkStaffPrerequisite } from "./nectar-compliance.functions";
+import { checkDeadline, checkActivity } from "./nectar-compliance-stubs.functions";
 
 export const complianceDetectors = {
   billing: checkBillingEntry,

@@ -56,23 +56,26 @@ export const postOpenShift = createServerFn({ method: "POST" })
     notes: z.string().optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
+    const insertRow = {
+      organization_id: data.organizationId,
+      staff_id: null,
+      client_id: data.clientId,
+      service_code: data.serviceCode.toUpperCase(),
+      job_code: data.serviceCode.toUpperCase(),
+      starts_at: data.startsAtIso,
+      ends_at: data.endsAtIso,
+      location_id: data.locationId ?? null,
+      notes: data.notes ?? null,
+      status: "open",
+      published: true,
+      shift_type: "hourly",
+      created_from: "manual",
+    };
+    const { gateScheduledShiftInsert } = await import("@/lib/scheduling/shift-commit");
+    await gateScheduledShiftInsert(context.supabase, [insertRow as never], { mode: "bulk_auto", userId: context.userId });
     const { data: row, error } = await context.supabase
       .from("scheduled_shifts")
-      .insert({
-        organization_id: data.organizationId,
-        staff_id: null,
-        client_id: data.clientId,
-        service_code: data.serviceCode.toUpperCase(),
-        job_code: data.serviceCode.toUpperCase(),
-        starts_at: data.startsAtIso,
-        ends_at: data.endsAtIso,
-        location_id: data.locationId ?? null,
-        notes: data.notes ?? null,
-        status: "open",
-        published: true,
-        shift_type: "hourly",
-        created_from: "manual",
-      })
+      .insert(insertRow)
       .select("*").single();
     if (error) throw error;
     return row;

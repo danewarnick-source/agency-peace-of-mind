@@ -120,6 +120,8 @@ async function materializePayload(
     created_from: "template",
   }));
   if (inserts.length === 0) return { count: 0 };
+  const { gateScheduledShiftInsert } = await import("./shift-commit");
+  await gateScheduledShiftInsert(supabase, inserts as never, { mode: "bulk_auto", userId });
   const { error } = await supabase.from("scheduled_shifts").insert(inserts);
   if (error) throw error;
   return { count: inserts.length };

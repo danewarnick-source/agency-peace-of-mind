@@ -207,6 +207,8 @@ export const applyRepeat = createServerFn({ method: "POST" })
       });
     }
     if (rows.length > 0) {
+      const { gateScheduledShiftInsert } = await import("@/lib/scheduling/shift-commit");
+      await gateScheduledShiftInsert(supabase, rows as never, { mode: "bulk_auto", userId });
       const { error } = await supabase.from("scheduled_shifts").insert(rows);
       if (error) throw error;
       inserted = rows.length;
@@ -324,6 +326,8 @@ export const createRecurringShifts = createServerFn({ method: "POST" })
         created_from: "recurring",
       };
     });
+    const { gateScheduledShiftInsert } = await import("@/lib/scheduling/shift-commit");
+    await gateScheduledShiftInsert(supabase, rows as never, { mode: "bulk_auto", userId });
     const { error } = await supabase.from("scheduled_shifts").insert(rows);
     if (error) throw error;
     return { inserted: rows.length };

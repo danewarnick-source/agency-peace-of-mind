@@ -242,6 +242,9 @@ export const materializeWeek = createServerFn({ method: "POST" })
     }
 
     if (inserts.length === 0) return { created: 0, skipped };
+    // Compliance gate — raise open flags per bundle; bulk expansions proceed.
+    const { gateScheduledShiftInsert } = await import("./shift-commit");
+    await gateScheduledShiftInsert(sb, inserts as never, { mode: "bulk_auto", userId: context.userId });
     const { error: insErr } = await sb.from("scheduled_shifts").insert(inserts);
     if (insErr) throw insErr;
     return { created: inserts.length, skipped };

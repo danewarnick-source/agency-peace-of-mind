@@ -229,8 +229,12 @@ export function NectarAutoAssignDialog({
           created_by: userId,
         }));
       if (!rows.length) throw new Error("Nothing to create.");
-      const { error } = await (supabase as any).from("scheduled_shifts").insert(rows);
-      if (error) throw error;
+      // Route through compliance-gated server fn (raises open flags per bundle).
+      const { insertScheduledShiftsGated } = await import("@/lib/scheduling/shift-commit.functions");
+      const res = await insertScheduledShiftsGated({ data: { rows: rows as never } });
+      if (res.status === "needs_review") {
+        throw new Error(`${res.candidates.length} compliance flag(s) require review before NECTAR can create these shifts. Open the Flags panel.`);
+      }
       return rows.length;
     },
     onSuccess: (n) => {

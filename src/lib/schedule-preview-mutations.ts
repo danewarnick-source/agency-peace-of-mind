@@ -123,14 +123,20 @@ export async function saveShift(draft: ShiftDraft) {
     if (error) throw error;
     return draft.id;
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
-    .from("scheduled_shifts")
-    .insert(payload)
-    .select("id")
-    .single();
-  if (error) throw error;
-  return data.id as string;
+  // Route insert through the compliance-gated server fn so bundle-level
+  // billing_conflict rules can raise open flags before the row lands.
+  const { insertScheduledShiftsGated } = await import("@/lib/scheduling/shift-commit.functions");
+  const res = await insertScheduledShiftsGated({ data: { rows: [payload as never] } });
+  if (res.status === "needs_review") {
+    // Preview-page callers should catch this and open <ComplianceFlagDialog>;
+    // then re-call saveShift after decisions land. We surface it as an error
+    // with attached candidates so existing catch paths see it.
+    const e = new Error("compliance_review_required") as Error & { candidates?: unknown };
+    e.candidates = res.candidates;
+    throw e;
+  }
+  if (res.blocked) throw new Error("Blocked by compliance flag (Stop chosen)");
+  return res.insertedIds[0];
 }
 
 export async function deleteShift(id: string, organizationId: string) {

@@ -166,6 +166,8 @@ export const saveShift = createServerFn({ method: "POST" })
       if (error) throw error;
       return { id: data.id };
     }
+    const { gateScheduledShiftInsert } = await import("@/lib/scheduling/shift-commit");
+    await gateScheduledShiftInsert(supabase, [payload as never], { mode: "bulk_auto", userId });
     const { data: row, error } = await supabase
       .from("scheduled_shifts")
       .insert(payload)

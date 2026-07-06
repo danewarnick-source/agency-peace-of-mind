@@ -179,17 +179,37 @@ function ResolveHeldDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const qc = useQueryClient();
-  const resolveFn = useServerFn(resolveHeldTimesheet);
+  const resolveCloseFn = useServerFn(resolveHeldTimesheet);
+  const resolveClockInFn = useServerFn(resolveClockInHold);
   const [note, setNote] = useState("");
 
+  const isClockIn = row.kind === "clock_in_staff_prereq";
+
   const mutation = useMutation({
-    mutationFn: async (decision: "acknowledge_and_finalize" | "stop") => {
+    mutationFn: async (decision: "acknowledge" | "stop") => {
       if (!note.trim()) throw new Error("A resolution note is required.");
-      return resolveFn({
+      if (isClockIn) {
+        if (!row.staff_id || !row.client_id) {
+          throw new Error("Clock-in hold is missing staff or client context.");
+        }
+        return resolveClockInFn({
+          data: {
+            organizationId,
+            staffId: row.staff_id,
+            clientId: row.client_id,
+            serviceDate: row.service_date,
+            decision: decision === "acknowledge" ? "acknowledge_and_proceed" : "stop",
+            note: note.trim(),
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+      }
+      if (!row.timesheet_id) throw new Error("Clock-out hold is missing a timesheet id.");
+      return resolveCloseFn({
         data: {
           organizationId,
           timesheetId: row.timesheet_id,
-          decision,
+          decision: decision === "acknowledge" ? "acknowledge_and_finalize" : "stop",
           note: note.trim(),
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -200,6 +220,8 @@ function ResolveHeldDialog({
       const r = res as any;
       if (r?.finalized) {
         toast.success(`Finalized. ${r.flagsResolved} flag(s) resolved, ${r.billedUnits} units billed.`);
+      } else if (isClockIn) {
+        toast.success(`Resolved. ${r?.flagsResolved ?? 0} flag(s) closed. Staff may re-attempt clock-in.`);
       } else {
         toast.success(`Stopped. ${r?.flagsResolved ?? 0} flag(s) resolved. Timesheet remains un-billed.`);
       }
@@ -216,12 +238,13 @@ function ResolveHeldDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ShieldAlert className="h-5 w-5 text-amber-500" />
-            Review held timesheet
+            {isClockIn ? "Review held clock-in" : "Review held timesheet"}
           </DialogTitle>
           <DialogDescription>
-            NECTAR flags; you decide. Acknowledging resolves the flag and finalizes the
-            billable commit in one action. Stopping resolves the flag and keeps the
-            timesheet un-billed for correction.
+            NECTAR flags; you decide.{" "}
+            {isClockIn
+              ? "Acknowledging closes the flag with an audit note; the clock-in itself must still be performed (staff or supervisor). Stopping closes the flag with a stop record."
+              : "Acknowledging resolves the flag and finalizes the billable commit in one action. Stopping resolves the flag and keeps the timesheet un-billed for correction."}
           </DialogDescription>
         </DialogHeader>
 
@@ -229,10 +252,16 @@ function ResolveHeldDialog({
           <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
             <div><span className="text-muted-foreground">Staff:</span> {row.staff_name ?? "—"}</div>
             <div><span className="text-muted-foreground">Client:</span> {row.client_name ?? "—"}</div>
-            <div><span className="text-muted-foreground">Service date:</span> {row.service_date} · <span className="font-mono">{row.service_type_code}</span></div>
-            <div className="text-xs text-muted-foreground">
-              Clock-in {new Date(row.clock_in_timestamp).toLocaleString()} → Clock-out {new Date(row.clock_out_timestamp).toLocaleString()}
-            </div>
+            <div><span className="text-muted-foreground">Service date:</span> {row.service_date} · <span className="font-mono">{row.service_type_code ?? "—"}</span></div>
+            {row.clock_in_timestamp && row.clock_out_timestamp ? (
+              <div className="text-xs text-muted-foreground">
+                Clock-in {new Date(row.clock_in_timestamp).toLocaleString()} → Clock-out {new Date(row.clock_out_timestamp).toLocaleString()}
+              </div>
+            ) : (
+              <div className="text-xs text-muted-foreground">
+                No timesheet written — clock-in was held before insert.
+              </div>
+            )}
           </div>
 
           {row.flags.map((f) => (
@@ -274,14 +303,14 @@ function ResolveHeldDialog({
             onClick={() => mutation.mutate("stop")}
             disabled={mutation.isPending}
           >
-            Stop &amp; keep un-billed
+            {isClockIn ? "Stop" : "Stop & keep un-billed"}
           </Button>
           <Button
-            onClick={() => mutation.mutate("acknowledge_and_finalize")}
+            onClick={() => mutation.mutate("acknowledge")}
             disabled={mutation.isPending}
           >
             {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Acknowledge &amp; finalize
+            {isClockIn ? "Acknowledge & close" : "Acknowledge & finalize"}
           </Button>
         </DialogFooter>
       </DialogContent>

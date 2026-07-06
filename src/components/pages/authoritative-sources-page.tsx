@@ -958,7 +958,7 @@ function UploadCard({
           <div className="space-y-1.5">
             <Label className="text-xs">Fiscal year</Label>
             <Input
-              value={fiscalYear}
+              value={fiscalYear ?? ""}
               onChange={(e) => setFiscalYear(e.target.value)}
               placeholder="FY26"
             />
@@ -967,7 +967,7 @@ function UploadCard({
             <Label className="text-xs">Effective start</Label>
             <Input
               type="date"
-              value={effectiveStart}
+              value={effectiveStart ?? ""}
               onChange={(e) => setEffectiveStart(e.target.value)}
             />
           </div>
@@ -976,10 +976,11 @@ function UploadCard({
           <Label className="text-xs">Effective end (optional)</Label>
           <Input
             type="date"
-            value={effectiveEnd}
+            value={effectiveEnd ?? ""}
             onChange={(e) => setEffectiveEnd(e.target.value)}
           />
         </div>
+
 
         <label className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-xs leading-relaxed text-amber-900 dark:text-amber-200">
           <Checkbox

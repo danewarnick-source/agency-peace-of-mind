@@ -48,7 +48,7 @@ import {
 import { useComplianceGate } from "@/hooks/use-compliance-gate";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useServerFn } from "@tanstack/react-start";
-import { checkBillingEntry, raiseComplianceFlag } from "@/lib/nectar-compliance.functions";
+import { checkBillingEntry, checkStaffPrerequisite, raiseComplianceFlag } from "@/lib/nectar-compliance.functions";
 
 
 
@@ -633,17 +633,99 @@ export function PunchPad({
       matched_approved_location_label: matched?.label ?? null,
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await supabase.from("evv_timesheets").insert(payload as any);
-    if (error) throw error;
+    // ── Staff-prerequisite gate: block clock-in if the staff lacks a required
+    // qualification for this service code. Restrict-vs-override policy:
+    //   staff → detect + raise flag + halt (no evv_timesheets row written).
+    //   admin/manager/super_admin → dialog offers Acknowledge & continue / Stop.
+    // Engine unchanged; only a hook call + branch is added here.
+    const codesUpper = [String(serviceCode).toUpperCase()].filter(Boolean);
+    const orgId = org.organization_id;
 
-    await qc.invalidateQueries({ queryKey: ["evv-active", user.id] });
+    const runInsert = async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await supabase.from("evv_timesheets").insert(payload as any);
+      if (error) throw error;
+      await qc.invalidateQueries({ queryKey: ["evv-active", user.id] });
+      setClockInSuccess({
+        evvClean: !isOutOfBounds,
+        clientName: clientForPunch.name,
+      });
+      return { ok: true } as const;
+    };
 
-    // Show the appropriate success confirmation dialog
-    setClockInSuccess({
-      evvClean: !isOutOfBounds,
-      clientName: clientForPunch.name,
-    });
+    if (orgId && codesUpper.length > 0) {
+      if (canOverrideCompliance) {
+        const gateResult = await evvClockInGate(
+          {
+            clientId: clientForPunch.id,
+            staffId: user.id,
+            serviceCodes: codesUpper,
+            at: nowIso,
+          },
+          runInsert,
+        );
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (gateResult && (gateResult as any).stopped) {
+          toast.message(
+            "Clock-in halted per your compliance decision. Flag logged for audit.",
+          );
+          return;
+        }
+        return;
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const detected = (await detectStaffPrereq({
+          data: {
+            organizationId: orgId,
+            staffId: user.id,
+            serviceCodes: codesUpper,
+            clientId: clientForPunch.id,
+            at: nowIso,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          } as any,
+        })) as {
+          flags: Array<{
+            ruleId: string;
+            requirementId: string;
+            matchedCodes: string[];
+            source: { title: string; verbatim: string; citation: string | null };
+          }>;
+        };
+        if (detected?.flags?.length) {
+          for (const c of detected.flags) {
+            try {
+              await raiseComplianceFlagFn({
+                data: {
+                  organizationId: orgId,
+                  ruleId: c.ruleId,
+                  requirementId: c.requirementId,
+                  detectionType: "staff_prerequisite",
+                  subjectContext: {
+                    client_id: clientForPunch.id,
+                    date: nowIso.slice(0, 10),
+                    staff_id: user.id,
+                    service_codes: codesUpper,
+                    source: "evv_clock_in",
+                    missing_qualifications: c.matchedCodes,
+                    restricted_for_role: role ?? "unknown",
+                  },
+                  sourceSnapshot: c.source,
+                },
+              });
+            } catch {
+              // Non-fatal: continue raising remaining flags.
+            }
+          }
+          toast.error(
+            "Clock-in held for compliance review. A required qualification is missing — a supervisor must resolve the flag before you can clock in.",
+          );
+          return;
+        }
+      }
+    }
+
+    await runInsert();
+
   }
 
   // ────────────────────────────────────────────────────────────────────────────
@@ -1128,6 +1210,7 @@ export function PunchPad({
   const canOverrideCompliance =
     role === "admin" || role === "manager" || role === "super_admin";
   const detectBillingConflict = useServerFn(checkBillingEntry);
+  const detectStaffPrereq = useServerFn(checkStaffPrerequisite);
   const raiseComplianceFlagFn = useServerFn(raiseComplianceFlag);
 
   type EvvGatePayload = {
@@ -1153,6 +1236,35 @@ export function PunchPad({
         date: p.serviceDate,
         staff_id: p.staffId,
         source: "evv_close",
+      }),
+    });
+
+  // ── Compliance gate (staff_prerequisite detector) at clock-in ───────────
+  // Second surface on the same growth-adaptive contract: one hook call,
+  // its own buildInput/buildSubject, restrict-vs-override branch. Engine,
+  // registry, dialog, and raise/resolve fns are UNTOUCHED.
+  type EvvClockInGatePayload = {
+    clientId: string;
+    staffId: string;
+    serviceCodes: string[];
+    at: string;
+  };
+  const { gate: evvClockInGate, dialogElement: clockInComplianceDialogEl } =
+    useComplianceGate<EvvClockInGatePayload>({
+      organizationId: org?.organization_id ?? "",
+      detector: "staffPrereq",
+      buildInput: (p) => ({
+        staffId: p.staffId,
+        serviceCodes: p.serviceCodes,
+        clientId: p.clientId,
+        at: p.at,
+      }),
+      buildSubject: (p) => ({
+        client_id: p.clientId,
+        date: p.at.slice(0, 10),
+        staff_id: p.staffId,
+        service_codes: p.serviceCodes,
+        source: "evv_clock_in",
       }),
     });
 
@@ -2908,6 +3020,7 @@ export function PunchPad({
 
         {/* NECTAR compliance flag dialog (admin/manager only; staff is restricted upstream). */}
         {complianceDialogEl}
+        {clockInComplianceDialogEl}
       </section>
     </EvvConsentGate>
   );

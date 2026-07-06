@@ -47,8 +47,14 @@ export type HeldTimesheetFlag = {
   raised_to: string | null;
 };
 
+export type HeldKind = "clock_out_billing" | "clock_in_staff_prereq";
+
 export type HeldTimesheetRow = {
-  timesheet_id: string;
+  kind: HeldKind;
+  /** Present for clock_out_billing; null for clock_in_staff_prereq (no timesheet yet). */
+  timesheet_id: string | null;
+  /** Synthetic stable id for React keys / resolve targeting on clock-in holds. */
+  hold_key: string;
   organization_id: string;
   client_id: string | null;
   client_name: string | null;
@@ -56,8 +62,10 @@ export type HeldTimesheetRow = {
   staff_name: string | null;
   service_date: string;
   service_type_code: string | null;
-  clock_in_timestamp: string;
-  clock_out_timestamp: string;
+  /** Present for clock_out_billing; null for clock_in_staff_prereq. */
+  clock_in_timestamp: string | null;
+  /** Present for clock_out_billing; null for clock_in_staff_prereq. */
+  clock_out_timestamp: string | null;
   held_at: string;
   flags: HeldTimesheetFlag[];
 };
@@ -67,55 +75,83 @@ export const listHeldTimesheets = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ organizationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<HeldTimesheetRow[]> => {
     const { supabase } = context;
+    // Pull all open flags of the two detection types we surface: clock-out
+    // billing_conflict AND clock-in staff_prerequisite. Same reader, no
+    // engine change — the queue grows by matching more subject_context.source
+    // values.
     const { data: flags, error: fe } = await supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from("nectar_compliance_flags" as any)
-      .select("id, rule_id, requirement_id, subject_context, source_snapshot, raised_at, raised_to")
+      .select(
+        "id, rule_id, requirement_id, detection_type, subject_context, source_snapshot, raised_at, raised_to",
+      )
       .eq("organization_id", data.organizationId)
-      .eq("detection_type", "billing_conflict")
+      .in("detection_type", ["billing_conflict", "staff_prerequisite"])
       .is("resolution", null)
       .order("raised_at", { ascending: false });
     if (fe) throw new Error(fe.message);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const evvFlags = ((flags ?? []) as any[]).filter((f) => {
+    const allFlags = ((flags ?? []) as any[]).filter((f) => {
       const s = (f.subject_context ?? {}) as Record<string, unknown>;
-      return s.source === "evv_close" && typeof s.timesheet_id === "string";
+      if (f.detection_type === "billing_conflict") {
+        return s.source === "evv_close" && typeof s.timesheet_id === "string";
+      }
+      if (f.detection_type === "staff_prerequisite") {
+        return s.source === "evv_clock_in";
+      }
+      return false;
     });
-    if (evvFlags.length === 0) return [];
+    if (allFlags.length === 0) return [];
+
+    // Clock-out billing timesheet lookup.
+    const closeFlags = allFlags.filter((f) => f.detection_type === "billing_conflict");
+    const clockInFlags = allFlags.filter((f) => f.detection_type === "staff_prerequisite");
 
     const timesheetIds = Array.from(
-      new Set(evvFlags.map((f) => String((f.subject_context as Record<string, unknown>).timesheet_id))),
+      new Set(
+        closeFlags.map((f) =>
+          String((f.subject_context as Record<string, unknown>).timesheet_id),
+        ),
+      ),
     );
 
-    const { data: timesheets, error: te } = await supabase
-      .from("evv_timesheets")
-      .select("id, client_id, staff_id, service_type_code, clock_in_timestamp, clock_out_timestamp, billed_units, organization_id")
-      .in("id", timesheetIds)
-      .eq("organization_id", data.organizationId)
-      .not("clock_out_timestamp", "is", null)
-      .is("billed_units", null);
-    if (te) throw new Error(te.message);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let timesheets: any[] = [];
+    if (timesheetIds.length) {
+      const { data: tsData, error: te } = await supabase
+        .from("evv_timesheets")
+        .select("id, client_id, staff_id, service_type_code, clock_in_timestamp, clock_out_timestamp, billed_units, organization_id")
+        .in("id", timesheetIds)
+        .eq("organization_id", data.organizationId)
+        .not("clock_out_timestamp", "is", null)
+        .is("billed_units", null);
+      if (te) throw new Error(te.message);
+      timesheets = tsData ?? [];
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const heldById = new Map<string, any>(((timesheets ?? []) as any[]).map((t) => [String(t.id), t]));
-    if (heldById.size === 0) return [];
+    const heldById = new Map<string, any>(timesheets.map((t) => [String(t.id), t]));
 
-    const clientIds = Array.from(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      new Set(((timesheets ?? []) as any[]).map((t) => t.client_id).filter(Boolean)),
-    ) as string[];
-    const staffIds = Array.from(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      new Set(((timesheets ?? []) as any[]).map((t) => t.staff_id).filter(Boolean)),
-    ) as string[];
+    // Collect all client + staff IDs across both flag types.
+    const clientIds = new Set<string>();
+    const staffIds = new Set<string>();
+    for (const t of timesheets) {
+      if (t.client_id) clientIds.add(String(t.client_id));
+      if (t.staff_id) staffIds.add(String(t.staff_id));
+    }
+    for (const f of clockInFlags) {
+      const s = f.subject_context as Record<string, unknown>;
+      if (typeof s.client_id === "string") clientIds.add(s.client_id);
+      if (typeof s.staff_id === "string") staffIds.add(s.staff_id);
+    }
 
     const [clientsQ, profilesQ] = await Promise.all([
-      clientIds.length
-        ? supabase.from("clients").select("id, first_name, last_name").in("id", clientIds)
+      clientIds.size
+        ? supabase.from("clients").select("id, first_name, last_name").in("id", Array.from(clientIds))
         : Promise.resolve({ data: [] as unknown[], error: null }),
-      staffIds.length
-        ? supabase.from("profiles").select("id, first_name, last_name, email").in("id", staffIds)
+      staffIds.size
+        ? supabase.from("profiles").select("id, first_name, last_name, email").in("id", Array.from(staffIds))
         : Promise.resolve({ data: [] as unknown[], error: null }),
     ]);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -129,15 +165,20 @@ export const listHeldTimesheets = createServerFn({ method: "POST" })
     const staffMap = new Map(((profilesQ.data ?? []) as any[]).map((p) => [String(p.id), nameOf(p)]));
 
     const grouped = new Map<string, HeldTimesheetRow>();
-    for (const f of evvFlags) {
+
+    // ── Clock-out billing holds ────────────────────────────────────────────
+    for (const f of closeFlags) {
       const ctx = f.subject_context as Record<string, unknown>;
       const tid = String(ctx.timesheet_id);
       const ts = heldById.get(tid);
       if (!ts) continue;
-      let row = grouped.get(tid);
+      const key = `close:${tid}`;
+      let row = grouped.get(key);
       if (!row) {
         row = {
+          kind: "clock_out_billing",
           timesheet_id: tid,
+          hold_key: key,
           organization_id: data.organizationId,
           client_id: ts.client_id ?? null,
           client_name: ts.client_id ? clientMap.get(String(ts.client_id)) ?? null : null,
@@ -150,28 +191,77 @@ export const listHeldTimesheets = createServerFn({ method: "POST" })
           held_at: f.raised_at,
           flags: [],
         };
-        grouped.set(tid, row);
+        grouped.set(key, row);
       }
-      const snap = (f.source_snapshot ?? {}) as Record<string, unknown>;
-      row.flags.push({
-        id: f.id,
-        rule_id: f.rule_id,
-        requirement_id: f.requirement_id,
-        matched_codes: Array.isArray(ctx.matchedCodes) ? (ctx.matchedCodes as string[]) : [],
-        source: {
-          title: (snap.title as string) ?? "Requirement",
-          verbatim: (snap.verbatim as string) ?? "",
-          citation: (snap.citation as string | null) ?? null,
-        },
-        raised_at: f.raised_at,
-        raised_to: f.raised_to ?? null,
-      });
-      if (new Date(f.raised_at).getTime() < new Date(row.held_at).getTime()) {
-        row.held_at = f.raised_at;
-      }
+      appendFlag(row, f);
     }
+
+    // ── Clock-in staff-prereq holds (no timesheet exists yet) ──────────────
+    for (const f of clockInFlags) {
+      const ctx = f.subject_context as Record<string, unknown>;
+      const clientId = typeof ctx.client_id === "string" ? ctx.client_id : null;
+      const staffId = typeof ctx.staff_id === "string" ? ctx.staff_id : null;
+      const date =
+        typeof ctx.date === "string" ? ctx.date : String(f.raised_at).slice(0, 10);
+      const codes = Array.isArray(ctx.service_codes)
+        ? (ctx.service_codes as string[])
+        : [];
+      // Group by staff+client+date so multiple missing-cert flags at the same
+      // attempt collapse to one queue row.
+      const key = `in:${staffId ?? "-"}:${clientId ?? "-"}:${date}`;
+      let row = grouped.get(key);
+      if (!row) {
+        row = {
+          kind: "clock_in_staff_prereq",
+          timesheet_id: null,
+          hold_key: key,
+          organization_id: data.organizationId,
+          client_id: clientId,
+          client_name: clientId ? clientMap.get(clientId) ?? null : null,
+          staff_id: staffId,
+          staff_name: staffId ? staffMap.get(staffId) ?? null : null,
+          service_date: date,
+          service_type_code: codes[0] ?? null,
+          clock_in_timestamp: null,
+          clock_out_timestamp: null,
+          held_at: f.raised_at,
+          flags: [],
+        };
+        grouped.set(key, row);
+      }
+      appendFlag(row, f);
+    }
+
     return Array.from(grouped.values());
   });
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function appendFlag(row: HeldTimesheetRow, f: any) {
+  const ctx = (f.subject_context ?? {}) as Record<string, unknown>;
+  const snap = (f.source_snapshot ?? {}) as Record<string, unknown>;
+  const matched = Array.isArray(ctx.matchedCodes)
+    ? (ctx.matchedCodes as string[])
+    : Array.isArray(ctx.missing_qualifications)
+      ? (ctx.missing_qualifications as string[])
+      : [];
+  row.flags.push({
+    id: f.id,
+    rule_id: f.rule_id,
+    requirement_id: f.requirement_id,
+    matched_codes: matched,
+    source: {
+      title: (snap.title as string) ?? "Requirement",
+      verbatim: (snap.verbatim as string) ?? "",
+      citation: (snap.citation as string | null) ?? null,
+    },
+    raised_at: f.raised_at,
+    raised_to: f.raised_to ?? null,
+  });
+  if (new Date(f.raised_at).getTime() < new Date(row.held_at).getTime()) {
+    row.held_at = f.raised_at;
+  }
+}
+
 
 export const resolveHeldTimesheet = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -267,3 +357,82 @@ export const resolveHeldTimesheet = createServerFn({ method: "POST" })
       billedUnits: units,
     };
   });
+
+/**
+ * Resolve a clock-in staff-prerequisite hold. No timesheet exists yet —
+ * this closes every open flag matching the (staff, client, date, source)
+ * key so the staff can re-attempt clock-in (staff still restricted; a
+ * supervisor with override can then acknowledge on the second gate open).
+ * On "acknowledge_and_proceed" the resolution is logged as
+ * acknowledged_continued; on "stop" it is logged as stopped. Either way
+ * this ends the queue entry — no billing side effects.
+ */
+export const resolveClockInHold = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        staffId: z.string().uuid(),
+        clientId: z.string().uuid(),
+        serviceDate: z.string(),
+        decision: z.enum(["acknowledge_and_proceed", "stop"]),
+        note: z.string().trim().min(1, "Resolution note required").max(4000),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await ensureOverrideRole(supabase, userId, data.organizationId);
+
+    const { data: openFlags, error: fe } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .from("nectar_compliance_flags" as any)
+      .select("id, subject_context")
+      .eq("organization_id", data.organizationId)
+      .eq("detection_type", "staff_prerequisite")
+      .is("resolution", null);
+    if (fe) throw new Error(fe.message);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mine = ((openFlags ?? []) as any[]).filter((f) => {
+      const s = (f.subject_context ?? {}) as Record<string, unknown>;
+      return (
+        s.source === "evv_clock_in" &&
+        s.staff_id === data.staffId &&
+        s.client_id === data.clientId &&
+        s.date === data.serviceDate
+      );
+    });
+    if (mine.length === 0) {
+      throw new Error("No open compliance flag found for this clock-in — it may have been resolved already.");
+    }
+
+    const resolution =
+      data.decision === "acknowledge_and_proceed" ? "acknowledged_continued" : "stopped";
+    const nowIso = new Date().toISOString();
+
+    const { error: re } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .from("nectar_compliance_flags" as any)
+      .update({
+        resolution,
+        resolved_by: userId,
+        resolved_at: nowIso,
+        resolution_note: data.note,
+      })
+      .in(
+        "id",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (mine as any[]).map((f) => f.id),
+      )
+      .is("resolution", null);
+    if (re) throw new Error(re.message);
+
+    return {
+      ok: true as const,
+      finalized: false as const,
+      flagsResolved: mine.length,
+    };
+  });
+

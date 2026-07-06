@@ -5,13 +5,14 @@ import {
   listComplianceRules,
   proposeComplianceRule,
   updateComplianceRule,
+  draftStaffPrerequisiteRules,
 } from "@/lib/nectar-compliance.functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Sparkles, CheckCircle2, XCircle, Pencil, ShieldAlert } from "lucide-react";
+import { Sparkles, CheckCircle2, XCircle, Pencil, ShieldAlert, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 
 type Rule = {

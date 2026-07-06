@@ -14,6 +14,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { resolveStaffQualifications, qualificationKey, type QualificationKind } from "./staff-qualifications.functions";
 
 const RULE_TYPES = ["billing_conflict", "staff_prerequisite", "deadline", "activity"] as const;
 const ACTIVE_STATES = ["active", "active_by_code"] as const;

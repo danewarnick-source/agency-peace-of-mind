@@ -357,3 +357,82 @@ export const resolveHeldTimesheet = createServerFn({ method: "POST" })
       billedUnits: units,
     };
   });
+
+/**
+ * Resolve a clock-in staff-prerequisite hold. No timesheet exists yet —
+ * this closes every open flag matching the (staff, client, date, source)
+ * key so the staff can re-attempt clock-in (staff still restricted; a
+ * supervisor with override can then acknowledge on the second gate open).
+ * On "acknowledge_and_proceed" the resolution is logged as
+ * acknowledged_continued; on "stop" it is logged as stopped. Either way
+ * this ends the queue entry — no billing side effects.
+ */
+export const resolveClockInHold = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        staffId: z.string().uuid(),
+        clientId: z.string().uuid(),
+        serviceDate: z.string(),
+        decision: z.enum(["acknowledge_and_proceed", "stop"]),
+        note: z.string().trim().min(1, "Resolution note required").max(4000),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await ensureOverrideRole(supabase, userId, data.organizationId);
+
+    const { data: openFlags, error: fe } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .from("nectar_compliance_flags" as any)
+      .select("id, subject_context")
+      .eq("organization_id", data.organizationId)
+      .eq("detection_type", "staff_prerequisite")
+      .is("resolution", null);
+    if (fe) throw new Error(fe.message);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mine = ((openFlags ?? []) as any[]).filter((f) => {
+      const s = (f.subject_context ?? {}) as Record<string, unknown>;
+      return (
+        s.source === "evv_clock_in" &&
+        s.staff_id === data.staffId &&
+        s.client_id === data.clientId &&
+        s.date === data.serviceDate
+      );
+    });
+    if (mine.length === 0) {
+      throw new Error("No open compliance flag found for this clock-in — it may have been resolved already.");
+    }
+
+    const resolution =
+      data.decision === "acknowledge_and_proceed" ? "acknowledged_continued" : "stopped";
+    const nowIso = new Date().toISOString();
+
+    const { error: re } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .from("nectar_compliance_flags" as any)
+      .update({
+        resolution,
+        resolved_by: userId,
+        resolved_at: nowIso,
+        resolution_note: data.note,
+      })
+      .in(
+        "id",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (mine as any[]).map((f) => f.id),
+      )
+      .is("resolution", null);
+    if (re) throw new Error(re.message);
+
+    return {
+      ok: true as const,
+      finalized: false as const,
+      flagsResolved: mine.length,
+    };
+  });
+

@@ -956,6 +956,15 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       approval_state: string | null;
       service_code: string | null;
       service_codes_all: string[] | null;
+      obligation_category:
+        | "admin_internal"
+        | "admin_external"
+        | "client"
+        | "staff"
+        | "provider_wide"
+        | "billing_code";
+      obligation_category_source: "nectar";
+      activation_state: "active" | "pending_code_activation";
     };
     const aiRows: Array<{ row: AiRow; key: string }> = [];
     for (const item of aiItems) {
@@ -973,6 +982,18 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
         ? `${baseLabel} — ${item.citation}${webSuffix}`
         : `${baseLabel}${webSuffix}`;
       const classified = classifyServiceCodes(titleClean, item.description ?? null);
+      const appliesTo = item.applies_to ?? "company";
+      const obligationCategory: AiRow["obligation_category"] = classified.primary
+        ? "billing_code"
+        : appliesTo === "client"
+          ? "client"
+          : appliesTo === "staff"
+            ? "staff"
+            : /\b(DWS|DACS|UPI|DSPD portal|state portal|submit to state|OIG|DHHS)\b/i.test(
+                  `${titleClean} ${item.description ?? ""}`,
+                )
+              ? "admin_external"
+              : "provider_wide";
       aiRows.push({
         key,
         row: {
@@ -984,10 +1005,14 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
           description: item.description ?? null,
           category: item.category ?? "obligation",
           source_citation: citation,
-          applies_to: item.applies_to ?? "company",
+          applies_to: appliesTo,
           approval_state: assisted ? "nectar_drafted" : null,
           service_code: classified.primary,
           service_codes_all: classified.all.length > 0 ? classified.all : null,
+          obligation_category: obligationCategory,
+          obligation_category_source: "nectar",
+          activation_state:
+            obligationCategory === "billing_code" ? "pending_code_activation" : "active",
         },
       });
     }
@@ -1696,6 +1721,15 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
       approval_state: string | null;
       service_code: string | null;
       service_codes_all: string[] | null;
+      obligation_category:
+        | "admin_internal"
+        | "admin_external"
+        | "client"
+        | "staff"
+        | "provider_wide"
+        | "billing_code";
+      obligation_category_source: "nectar";
+      activation_state: "active" | "pending_code_activation";
     };
     const rows: Array<{ row: AiRow; key: string }> = [];
     for (const item of items) {
@@ -1710,6 +1744,18 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
         ? `${baseLabel} — ${item.citation}${webSuffix}`
         : `${baseLabel}${webSuffix}`;
       const classified = classifyServiceCodes(titleClean, item.description ?? null);
+      const appliesTo = item.applies_to ?? "company";
+      const obligationCategory: AiRow["obligation_category"] = classified.primary
+        ? "billing_code"
+        : appliesTo === "client"
+          ? "client"
+          : appliesTo === "staff"
+            ? "staff"
+            : /\b(DWS|DACS|UPI|DSPD portal|state portal|submit to state|OIG|DHHS)\b/i.test(
+                  `${titleClean} ${item.description ?? ""}`,
+                )
+              ? "admin_external"
+              : "provider_wide";
       rows.push({
         key,
         row: {
@@ -1721,10 +1767,14 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
           description: item.description ?? null,
           category: item.category ?? "obligation",
           source_citation: citation,
-          applies_to: item.applies_to ?? "company",
+          applies_to: appliesTo,
           approval_state: assisted ? "nectar_drafted" : null,
           service_code: classified.primary,
           service_codes_all: classified.all.length > 0 ? classified.all : null,
+          obligation_category: obligationCategory,
+          obligation_category_source: "nectar",
+          activation_state:
+            obligationCategory === "billing_code" ? "pending_code_activation" : "active",
         },
       });
     }

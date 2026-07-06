@@ -9744,6 +9744,50 @@ export type Database = {
         }
         Relationships: []
       }
+      nectar_code_activations: {
+        Row: {
+          confirmed_at: string
+          confirmed_by: string
+          created_at: string
+          deactivated_at: string | null
+          deactivated_by: string | null
+          id: string
+          organization_id: string
+          requirement_count_at_confirm: number
+          service_code: string
+        }
+        Insert: {
+          confirmed_at?: string
+          confirmed_by: string
+          created_at?: string
+          deactivated_at?: string | null
+          deactivated_by?: string | null
+          id?: string
+          organization_id: string
+          requirement_count_at_confirm?: number
+          service_code: string
+        }
+        Update: {
+          confirmed_at?: string
+          confirmed_by?: string
+          created_at?: string
+          deactivated_at?: string | null
+          deactivated_by?: string | null
+          id?: string
+          organization_id?: string
+          requirement_count_at_confirm?: number
+          service_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nectar_code_activations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nectar_document_entities: {
         Row: {
           created_at: string
@@ -10314,6 +10358,54 @@ export type Database = {
           },
         ]
       }
+      nectar_requirement_category_history: {
+        Row: {
+          change_source: string
+          changed_at: string
+          changed_by: string | null
+          from_category: string | null
+          id: string
+          organization_id: string
+          requirement_id: string
+          to_category: string
+        }
+        Insert: {
+          change_source: string
+          changed_at?: string
+          changed_by?: string | null
+          from_category?: string | null
+          id?: string
+          organization_id: string
+          requirement_id: string
+          to_category: string
+        }
+        Update: {
+          change_source?: string
+          changed_at?: string
+          changed_by?: string | null
+          from_category?: string | null
+          id?: string
+          organization_id?: string
+          requirement_id?: string
+          to_category?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nectar_requirement_category_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nectar_requirement_category_history_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_requirements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nectar_requirement_mappings: {
         Row: {
           cadence: string | null
@@ -10379,18 +10471,93 @@ export type Database = {
           },
         ]
       }
+      nectar_requirement_usage: {
+        Row: {
+          created_at: string
+          edit_reason: string | null
+          edited_at: string
+          edited_by: string
+          id: string
+          organization_id: string
+          requirement_id: string
+          supersedes_id: string | null
+          usage_note: string
+        }
+        Insert: {
+          created_at?: string
+          edit_reason?: string | null
+          edited_at?: string
+          edited_by: string
+          id?: string
+          organization_id: string
+          requirement_id: string
+          supersedes_id?: string | null
+          usage_note: string
+        }
+        Update: {
+          created_at?: string
+          edit_reason?: string | null
+          edited_at?: string
+          edited_by?: string
+          id?: string
+          organization_id?: string
+          requirement_id?: string
+          supersedes_id?: string | null
+          usage_note?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nectar_requirement_usage_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nectar_requirement_usage_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_requirements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nectar_requirement_usage_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_requirement_usage"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nectar_requirement_usage_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_requirement_usage_current_v"
+            referencedColumns: ["usage_id"]
+          },
+        ]
+      }
       nectar_requirements: {
         Row: {
+          activated_at: string | null
+          activated_by: string | null
+          activation_state: string
           applies_to: string | null
           approval_state: string | null
           category: string | null
+          confirmed_optional: boolean
           created_at: string
           description: string | null
           id: string
           jurisdiction: string | null
           metadata: Json
+          obligation_category: string | null
+          obligation_category_source: string | null
           organization_id: string
           origin: string
+          original_description: string | null
+          original_frozen_at: string | null
+          original_source_citation: string | null
+          original_title: string | null
           requirement_key: string
           review_status: string
           satisfied_by: string | null
@@ -10406,16 +10573,26 @@ export type Database = {
           verified_by: string | null
         }
         Insert: {
+          activated_at?: string | null
+          activated_by?: string | null
+          activation_state?: string
           applies_to?: string | null
           approval_state?: string | null
           category?: string | null
+          confirmed_optional?: boolean
           created_at?: string
           description?: string | null
           id?: string
           jurisdiction?: string | null
           metadata?: Json
+          obligation_category?: string | null
+          obligation_category_source?: string | null
           organization_id: string
           origin?: string
+          original_description?: string | null
+          original_frozen_at?: string | null
+          original_source_citation?: string | null
+          original_title?: string | null
           requirement_key: string
           review_status?: string
           satisfied_by?: string | null
@@ -10431,16 +10608,26 @@ export type Database = {
           verified_by?: string | null
         }
         Update: {
+          activated_at?: string | null
+          activated_by?: string | null
+          activation_state?: string
           applies_to?: string | null
           approval_state?: string | null
           category?: string | null
+          confirmed_optional?: boolean
           created_at?: string
           description?: string | null
           id?: string
           jurisdiction?: string | null
           metadata?: Json
+          obligation_category?: string | null
+          obligation_category_source?: string | null
           organization_id?: string
           origin?: string
+          original_description?: string | null
+          original_frozen_at?: string | null
+          original_source_citation?: string | null
+          original_title?: string | null
           requirement_key?: string
           review_status?: string
           satisfied_by?: string | null
@@ -15487,6 +15674,32 @@ export type Database = {
         }
         Relationships: []
       }
+      nectar_requirement_usage_current_v: {
+        Row: {
+          edited_at: string | null
+          edited_by: string | null
+          organization_id: string | null
+          requirement_id: string | null
+          usage_id: string | null
+          usage_note: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nectar_requirement_usage_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nectar_requirement_usage_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_requirements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_member_directory: {
         Row: {
           account_status: string | null
@@ -15688,16 +15901,26 @@ export type Database = {
       get_hr_client_intake_base: {
         Args: { _org: string }
         Returns: {
+          activated_at: string | null
+          activated_by: string | null
+          activation_state: string
           applies_to: string | null
           approval_state: string | null
           category: string | null
+          confirmed_optional: boolean
           created_at: string
           description: string | null
           id: string
           jurisdiction: string | null
           metadata: Json
+          obligation_category: string | null
+          obligation_category_source: string | null
           organization_id: string
           origin: string
+          original_description: string | null
+          original_frozen_at: string | null
+          original_source_citation: string | null
+          original_title: string | null
           requirement_key: string
           review_status: string
           satisfied_by: string | null
@@ -15722,16 +15945,26 @@ export type Database = {
       get_hr_staff_checklist_base: {
         Args: { _org: string }
         Returns: {
+          activated_at: string | null
+          activated_by: string | null
+          activation_state: string
           applies_to: string | null
           approval_state: string | null
           category: string | null
+          confirmed_optional: boolean
           created_at: string
           description: string | null
           id: string
           jurisdiction: string | null
           metadata: Json
+          obligation_category: string | null
+          obligation_category_source: string | null
           organization_id: string
           origin: string
+          original_description: string | null
+          original_frozen_at: string | null
+          original_source_citation: string | null
+          original_title: string | null
           requirement_key: string
           review_status: string
           satisfied_by: string | null

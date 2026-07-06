@@ -24,6 +24,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { CodeActivationBanner } from "@/components/nectar/code-activation-banner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -221,6 +222,10 @@ export function AuthoritativeSourcesPage() {
           </span>
         </div>
       )}
+
+      {orgId && <CodeActivationBanner organizationId={orgId} />}
+
+
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="flex flex-wrap gap-1 rounded-2xl border border-border/60 bg-background/60 p-1 backdrop-blur">

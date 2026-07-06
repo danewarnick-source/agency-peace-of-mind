@@ -956,6 +956,15 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       approval_state: string | null;
       service_code: string | null;
       service_codes_all: string[] | null;
+      obligation_category:
+        | "admin_internal"
+        | "admin_external"
+        | "client"
+        | "staff"
+        | "provider_wide"
+        | "billing_code";
+      obligation_category_source: "nectar";
+      activation_state: "active" | "pending_code_activation";
     };
     const aiRows: Array<{ row: AiRow; key: string }> = [];
     for (const item of aiItems) {

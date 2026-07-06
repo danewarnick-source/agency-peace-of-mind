@@ -1195,6 +1195,35 @@ function useApplicabilityByReq(orgId: string) {
   return byReq;
 }
 
+// ---------- Requirements panel (rebuilt) ----------
+//
+// Layout: per source (collapsible) → per obligation category (collapsible) →
+// RequirementCard for each item. Billing-code requirements are grouped by
+// service code with an activation header (Inactive / Pending / Active).
+// No confirm-to-activate gating: `activation_state` drives enforcement,
+// `confirmed_optional` is a non-blocking marker on each card.
+
+const OBLIGATION_ORDER: Array<{
+  key: string;
+  label: string;
+}> = [
+  { key: "admin_internal", label: "Administrative — Internal" },
+  { key: "admin_external", label: "Administrative — External (DWS, DACS, etc.)" },
+  { key: "client", label: "Client-specific" },
+  { key: "staff", label: "Staff/Employee-specific" },
+  { key: "provider_wide", label: "Provider-wide" },
+  { key: "billing_code", label: "Billing-code-specific" },
+];
+
+const KIND_LABEL_SHORT: Record<string, string> = {
+  state_sow: "State SOW",
+  state_contract: "State contract",
+  state_rule: "State rule",
+  dspd_manual: "DSPD/DHS manual",
+  policy: "Policy",
+  guidance: "Guidance",
+};
+
 function RequirementsPanel({
   orgId,
   focusDocumentId,
@@ -1204,118 +1233,88 @@ function RequirementsPanel({
   focusDocumentId?: string | null;
   onFocusHandled?: () => void;
 }) {
-  const qc = useQueryClient();
   const listReqFn = useServerFn(listRequirements);
   const { data, isLoading } = useQuery({
     queryKey: ["requirements", orgId],
     queryFn: () => listReqFn({ data: { organizationId: orgId } }),
   });
-  const applicByReq = useApplicabilityByReq(orgId);
 
-  // Prompt 31 — bulk pre-fill NECTAR proposals for any requirement with no
-  // mappings yet, and a "Review queue" walk-through mode.
-  const prefillFn = useServerFn(prefillRequirementMappings);
-  const prefill = useMutation({
-    mutationFn: () => prefillFn({ data: { organizationId: orgId, max: 60 } }),
-    onSuccess: (r) => {
-      qc.invalidateQueries({ queryKey: ["req-mappings-all", orgId] });
-      if (r.processed === 0 && r.candidates === 0) {
-        toast.message("Every requirement already has NECTAR's proposed scope.");
-      } else {
-        toast.success(
-          `NECTAR pre-filled proposals for ${r.processed} requirement${
-            r.processed === 1 ? "" : "s"
-          } (${r.inserted} scope${r.inserted === 1 ? "" : "s"} to review).`,
-        );
-      }
+  // Held codes drive Inactive vs. Pending/Active labeling for billing-code
+  // sub-sections. Non-held codes stay VIEWABLE (knowledge, not enforcement).
+  const { data: heldCodes } = useQuery({
+    queryKey: ["auth-codes-held", orgId],
+    queryFn: async () => {
+      const { data: rows, error } = await supabase
+        .from("provider_authorized_codes")
+        .select("code, archived_at")
+        .eq("organization_id", orgId);
+      if (error) throw error;
+      return new Set(
+        (rows ?? [])
+          .filter((r) => (r as { archived_at: string | null }).archived_at == null)
+          .map((r) => String((r as { code: string }).code).toUpperCase()),
+      );
     },
-    onError: (e: Error) => toast.error(e.message),
   });
-  const [queueOpen, setQueueOpen] = useState(false);
 
-
-  const groups = useMemo<ReqGroup[]>(() => {
-    const rows = (data?.requirements ?? []) as unknown as ReqRow[];
-    const byDoc = new Map<string, ReqRow[]>();
-    const suggestions: ReqRow[] = [];
-    const manual: ReqRow[] = [];
-    for (const r of rows) {
-      if (r.origin === "document" && r.source_document_id) {
-        const arr = byDoc.get(r.source_document_id) ?? [];
-        arr.push(r);
-        byDoc.set(r.source_document_id, arr);
-      } else if (r.origin === "suggestion") {
-        suggestions.push(r);
-      } else {
-        manual.push(r);
+  // Latest confirmation per code — for the "Active since X by Y" line.
+  const { data: activations } = useQuery({
+    queryKey: ["code-activations", orgId],
+    queryFn: async () => {
+      const { data: rows, error } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .from("nectar_code_activations" as any)
+        .select("service_code, confirmed_at, confirmed_by, deactivated_at")
+        .eq("organization_id", orgId)
+        .is("deactivated_at", null);
+      if (error) throw error;
+      const m = new Map<string, { confirmed_at: string; confirmed_by: string }>();
+      for (const r of (rows ?? []) as Array<{
+        service_code: string;
+        confirmed_at: string;
+        confirmed_by: string;
+      }>) {
+        m.set(r.service_code, { confirmed_at: r.confirmed_at, confirmed_by: r.confirmed_by });
       }
-    }
-    const sourcesById = (data?.sourcesById ?? {}) as Record<string, SourceMeta>;
-    const docGroups: ReqGroup[] = Array.from(byDoc.entries()).map(([id, items]) => {
-      const src = sourcesById[id] ?? null;
-      return {
-        key: id,
-        source: src,
-        title: src?.title ?? "Source document",
-        subtitle:
-          (src?.authoritative_kind ? KIND_LABEL[src.authoritative_kind] ?? src.authoritative_kind : "Authoritative source") +
-          (src?.fiscal_year ? ` · ${src.fiscal_year}` : ""),
-        items,
-      };
-    });
-    // Sort doc groups by needs-attention desc (so review work surfaces first).
-    docGroups.sort((a, b) => {
-      const na = a.items.filter((i) => effectiveStatusOf(i) === "needs_attention").length;
-      const nb = b.items.filter((i) => effectiveStatusOf(i) === "needs_attention").length;
-      if (nb !== na) return nb - na;
-      return a.title.localeCompare(b.title);
-    });
+      return m;
+    },
+  });
 
-    const tail: ReqGroup[] = [];
-    if (suggestions.length)
-      tail.push({
-        key: "__suggestions",
-        source: null,
-        title: "NECTAR suggestions (no source)",
-        subtitle:
-          "Commonly required but not traced to a document you uploaded. Confirm or remove each one.",
-        items: suggestions,
-      });
-    if (manual.length)
-      tail.push({
-        key: "__manual",
-        source: null,
-        title: "Manual entries",
-        subtitle: "Items you added by hand.",
-        items: manual,
-      });
-    return [...docGroups, ...tail];
+  const grouped = useMemo(() => {
+    const rows = ((data?.requirements ?? []) as unknown) as Array<
+      ReqRow & {
+        obligation_category: string | null;
+        obligation_category_source: "nectar" | "provider" | null;
+        activation_state: string;
+        confirmed_optional: boolean;
+        original_title: string | null;
+        original_description: string | null;
+        original_source_citation: string | null;
+      }
+    >;
+    const sourcesById = (data?.sourcesById ?? {}) as Record<string, SourceMeta>;
+    // Bucket: source_id → category → (billing_code sub: service_code) → rows
+    const bySource = new Map<string, typeof rows>();
+    for (const r of rows) {
+      const sid = r.source_document_id ?? "__no_source";
+      const arr = bySource.get(sid) ?? [];
+      arr.push(r);
+      bySource.set(sid, arr);
+    }
+    return Array.from(bySource.entries()).map(([sid, items]) => {
+      const src = sid === "__no_source" ? null : sourcesById[sid] ?? null;
+      const byCat = new Map<string, typeof items>();
+      for (const r of items) {
+        const cat = r.obligation_category ?? "provider_wide";
+        const arr = byCat.get(cat) ?? [];
+        arr.push(r);
+        byCat.set(cat, arr);
+      }
+      return { sid, src, byCat, total: items.length };
+    });
   }, [data]);
 
-  const outstandingDocs = groups.filter(
-    (g) => g.source && g.items.some((i) => effectiveStatusOf(i) === "needs_attention"),
-  ).length;
-
-  // Count authoritative-source items that have been removed — this drives the
-  // red high-stakes banner. Suggestion/manual removals don't count toward
-  // "audit-readiness changed" because they were never traced to a state doc.
-  // NOTE: auto set-aside (not_applicable) is NOT counted here — it's not a
-  // human decision and is reversible from provider_authorized_codes.
-  const removedAuthoritative = useMemo(
-    () =>
-      groups
-        .filter((g) => !!g.source)
-        .reduce(
-          (n, g) => n + g.items.filter((i) => statusOf(i) === "removed").length,
-          0,
-        ),
-    [groups],
-  );
-
-  // Auto-scroll + expand the focused group when the user jumps in from the
-  // Sources-tab pill. We scroll on the next frame so the section is in the DOM.
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const removedRef = useRef<HTMLDivElement | null>(null);
   const [highlightKey, setHighlightKey] = useState<string | null>(null);
   useEffect(() => {
     if (!focusDocumentId) return;
@@ -1333,120 +1332,20 @@ function RequirementsPanel({
     return () => window.clearTimeout(id);
   }, [focusDocumentId, onFocusHandled]);
 
-  // Flat queue + pre-fill counts. Out-of-scope items are excluded — they're
-  // auto set aside and don't need human review right now.
-  const allRows = useMemo(
-    () => groups.flatMap((g) => g.items),
-    [groups],
-  );
-  const queueItems = useMemo(
-    () => allRows.filter((r) => effectiveStatusOf(r) === "needs_attention"),
-    [allRows],
-  );
-  const unmappedCount = useMemo(
-    () =>
-      allRows.filter(
-        (r) =>
-          effectiveStatusOf(r) !== "removed" &&
-          effectiveStatusOf(r) !== "not_applicable" &&
-          !applicByReq.has(r.id),
-      ).length,
-    [allRows, applicByReq],
-  );
-
-
   return (
     <div className="space-y-4" ref={containerRef}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold">
-            NECTAR-organized requirements
-          </h2>
+          <h2 className="text-sm font-semibold">Requirements</h2>
           <p className="text-xs text-muted-foreground">
-            NECTAR pre-fills its proposed applicability. You review and
-            approve — pre-filled scope is never auto-confirmed.
+            Original wording is immutable. Edit the usage note to shape how
+            NECTAR applies each requirement — every edit is logged with your
+            name and timestamp. Confirmation is optional; requirements
+            govern by activation state.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {outstandingDocs > 0 && (
-            <Badge className="bg-amber-500/15 text-[10px] text-amber-800 dark:text-amber-200">
-              {outstandingDocs} document{outstandingDocs === 1 ? "" : "s"} need review
-            </Badge>
-          )}
-          {unmappedCount > 0 && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 border-[#d97a1c]/40 text-[11px] text-[#7a4310] hover:bg-[#d97a1c]/10 dark:text-amber-200"
-              disabled={prefill.isPending}
-              onClick={() => prefill.mutate()}
-              title="Have NECTAR pre-fill its proposed applicability for every requirement without a scope yet. You still review and confirm each one."
-            >
-              {prefill.isPending ? (
-                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-              ) : (
-                <Wand2 className="mr-1 h-3 w-3" />
-              )}
-              Pre-fill {unmappedCount} with NECTAR
-            </Button>
-          )}
-          {queueItems.length > 0 && (
-            <Button
-              size="sm"
-              className="h-8 bg-amber-500 text-[11px] text-amber-950 hover:bg-amber-400"
-              onClick={() => setQueueOpen(true)}
-              title="Walk through every requirement that still needs review, one at a time, with NECTAR's proposal shown."
-            >
-              <ListChecks className="mr-1 h-3 w-3" />
-              Review queue ({queueItems.length})
-            </Button>
-          )}
-          <ManualRequirementDialog orgId={orgId} />
-        </div>
+        <ManualRequirementDialog orgId={orgId} />
       </div>
-
-      <AwaitingFinalConfirmationPanel orgId={orgId} />
-
-
-
-
-      {removedAuthoritative > 0 && (
-        <div
-          className="flex flex-col gap-2 rounded-2xl border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-900 dark:text-red-200 sm:flex-row sm:items-center sm:justify-between"
-          role="alert"
-        >
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <div>
-              <p className="font-semibold">
-                {removedAuthoritative} authoritative-source requirement
-                {removedAuthoritative === 1 ? " has" : "s have"} been removed.
-              </p>
-              <p className="text-xs opacity-90">
-                NECTAR is no longer tracking{" "}
-                {removedAuthoritative === 1 ? "this item" : "these items"} for
-                audit readiness. Your company may no longer be fully
-                state-audit-ready as a result. Review and re-open if any
-                removal was accidental.
-              </p>
-            </div>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className="shrink-0 border-red-500/60 bg-background/40 text-red-900 hover:bg-red-500/15 dark:text-red-100"
-            onClick={() =>
-              removedRef.current?.scrollIntoView({
-                behavior: "smooth",
-                block: "start",
-              })
-            }
-          >
-            Review removed items
-          </Button>
-        </div>
-      )}
-
 
       {isLoading && (
         <p className="text-sm text-muted-foreground">
@@ -1454,38 +1353,324 @@ function RequirementsPanel({
         </p>
       )}
 
-      {!isLoading && groups.length === 0 && (
+      {!isLoading && grouped.length === 0 && (
         <div className="rounded-2xl border border-dashed border-border/60 bg-background/60 p-8 text-center text-sm text-muted-foreground">
           No requirements yet. Upload a SOW or contract above, then run
           "Draft requirements" on it — or add one by hand.
         </div>
       )}
 
-      {groups.map((g) => (
-        <DocumentRequirementGroup
-          key={g.key}
-          group={g}
+      {grouped.map((g) => (
+        <SourceRequirementsBlock
+          key={g.sid}
           orgId={orgId}
-          applicByReq={applicByReq}
-          highlight={highlightKey === g.key}
-          forceOpen={focusDocumentId === g.key}
+          sourceId={g.sid}
+          source={g.src}
+          byCat={g.byCat}
+          total={g.total}
+          heldCodes={heldCodes ?? new Set()}
+          activations={activations ?? new Map()}
+          forceOpen={focusDocumentId === g.sid}
+          highlight={highlightKey === g.sid}
         />
       ))}
-
-      {removedAuthoritative > 0 && (
-        <div ref={removedRef} aria-hidden className="-mt-2 pt-2" />
-      )}
-
-      <ReviewQueueDialog
-        open={queueOpen}
-        onOpenChange={setQueueOpen}
-        orgId={orgId}
-        items={queueItems}
-        applicByReq={applicByReq}
-      />
     </div>
   );
 }
+
+type RequirementCategoryRow = ReqRow & {
+  obligation_category: string | null;
+  obligation_category_source: "nectar" | "provider" | null;
+  activation_state: string;
+  confirmed_optional: boolean;
+  original_title: string | null;
+  original_description: string | null;
+  original_source_citation: string | null;
+};
+
+function SourceRequirementsBlock({
+  orgId,
+  sourceId,
+  source,
+  byCat,
+  total,
+  heldCodes,
+  activations,
+  forceOpen,
+  highlight,
+}: {
+  orgId: string;
+  sourceId: string;
+  source: SourceMeta | null;
+  byCat: Map<string, RequirementCategoryRow[]>;
+  total: number;
+  heldCodes: Set<string>;
+  activations: Map<string, { confirmed_at: string; confirmed_by: string }>;
+  forceOpen: boolean;
+  highlight: boolean;
+}) {
+  const [open, setOpen] = useState<boolean>(forceOpen);
+  useEffect(() => {
+    if (forceOpen) setOpen(true);
+  }, [forceOpen]);
+
+  const title =
+    source?.title ??
+    (sourceId === "__no_source" ? "Manual / Suggested requirements" : "Source");
+  const kindLabel = source?.authoritative_kind
+    ? KIND_LABEL_SHORT[source.authoritative_kind] ?? source.authoritative_kind
+    : sourceId === "__no_source"
+      ? "Not from an uploaded document"
+      : "Authoritative source";
+  const uploaded = source?.created_at
+    ? new Date(source.created_at).toLocaleDateString()
+    : null;
+
+  return (
+    <div
+      data-req-group-id={sourceId}
+      className={
+        "rounded-2xl border bg-background/60 p-3 transition-colors " +
+        (highlight ? "border-amber-400 shadow-lg" : "border-border/60")
+      }
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <ChevronDown
+            className={"h-4 w-4 transition-transform " + (open ? "" : "-rotate-90")}
+          />
+          <div>
+            <div className="text-sm font-semibold">{title}</div>
+            <div className="text-[11px] text-muted-foreground">
+              {kindLabel}
+              {uploaded ? ` · uploaded ${uploaded}` : ""} · {total} requirement
+              {total === 1 ? "" : "s"}
+            </div>
+          </div>
+        </div>
+      </button>
+
+      {open && (
+        <div className="mt-3 space-y-3">
+          {OBLIGATION_ORDER.map(({ key, label }) => {
+            const items = byCat.get(key) ?? [];
+            if (items.length === 0) return null;
+            return (
+              <CategorySection
+                key={key}
+                orgId={orgId}
+                categoryKey={key}
+                categoryLabel={label}
+                items={items}
+                heldCodes={heldCodes}
+                activations={activations}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CategorySection({
+  orgId,
+  categoryKey,
+  categoryLabel,
+  items,
+  heldCodes,
+  activations,
+}: {
+  orgId: string;
+  categoryKey: string;
+  categoryLabel: string;
+  items: RequirementCategoryRow[];
+  heldCodes: Set<string>;
+  activations: Map<string, { confirmed_at: string; confirmed_by: string }>;
+}) {
+  const [open, setOpen] = useState<boolean>(true);
+  return (
+    <div className="rounded-lg border border-border/40 bg-background p-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <ChevronDown
+            className={"h-3.5 w-3.5 transition-transform " + (open ? "" : "-rotate-90")}
+          />
+          <span className="text-xs font-semibold">{categoryLabel}</span>
+          <Badge variant="outline" className="text-[10px]">
+            {items.length}
+          </Badge>
+        </div>
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2">
+          {categoryKey === "billing_code" ? (
+            <BillingCodeSubgroups
+              orgId={orgId}
+              items={items}
+              heldCodes={heldCodes}
+              activations={activations}
+            />
+          ) : (
+            items.map((r) => (
+              <RequirementCard
+                key={r.id}
+                canEdit
+                requirement={{
+                  id: r.id,
+                  original_title: r.original_title,
+                  original_description: r.original_description,
+                  original_source_citation: r.original_source_citation,
+                  title: r.title,
+                  description: r.description,
+                  source_citation: r.source_citation,
+                  obligation_category: r.obligation_category,
+                  obligation_category_source: r.obligation_category_source,
+                  activation_state: r.activation_state,
+                  confirmed_optional: r.confirmed_optional,
+                  service_code: r.service_code ?? null,
+                }}
+              />
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BillingCodeSubgroups({
+  orgId,
+  items,
+  heldCodes,
+  activations,
+}: {
+  orgId: string;
+  items: RequirementCategoryRow[];
+  heldCodes: Set<string>;
+  activations: Map<string, { confirmed_at: string; confirmed_by: string }>;
+}) {
+  const activateFn = useServerFn(activateCodeRequirements);
+  const qc = useQueryClient();
+  const activate = useMutation({
+    mutationFn: (serviceCode: string) =>
+      activateFn({ data: { organizationId: orgId, serviceCode } }),
+    onSuccess: (res, code) => {
+      toast.success(`Activated ${res.activatedCount} requirements for ${code}`);
+      qc.invalidateQueries({ queryKey: ["requirements", orgId] });
+      qc.invalidateQueries({ queryKey: ["code-activations", orgId] });
+      qc.invalidateQueries({ queryKey: ["nectar-pending-code-activations"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const byCode = new Map<string, RequirementCategoryRow[]>();
+  for (const r of items) {
+    const code = (r.service_code ?? "__uncoded").toUpperCase();
+    const arr = byCode.get(code) ?? [];
+    arr.push(r);
+    byCode.set(code, arr);
+  }
+  const sortedCodes = Array.from(byCode.keys()).sort();
+
+  return (
+    <div className="space-y-2">
+      {sortedCodes.map((code) => {
+        const rows = byCode.get(code)!;
+        const held = heldCodes.has(code);
+        const activation = activations.get(code);
+        const pendingCount = rows.filter(
+          (r) => r.activation_state === "pending_code_activation",
+        ).length;
+
+        // Header state
+        let header: React.ReactNode;
+        if (!held) {
+          header = (
+            <span className="text-[11px] text-muted-foreground">
+              Inactive — you don't hold code {code}. Visible for planning;
+              NECTAR won't enforce these until you add the code.
+            </span>
+          );
+        } else if (activation && pendingCount === 0) {
+          header = (
+            <span className="text-[11px] text-emerald-700 dark:text-emerald-300">
+              Active since {new Date(activation.confirmed_at).toLocaleDateString()} by{" "}
+              {activation.confirmed_by.slice(0, 8)}
+            </span>
+          );
+        } else if (pendingCount > 0) {
+          header = (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={activate.isPending && activate.variables === code}
+              onClick={() => activate.mutate(code)}
+              className="h-7 border-amber-400 bg-amber-50 text-[11px] text-amber-900 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-100"
+            >
+              <CheckCircle2 className="mr-1 h-3 w-3" />
+              Pending — Activate {pendingCount} requirement
+              {pendingCount === 1 ? "" : "s"} for {code}
+            </Button>
+          );
+        } else {
+          header = (
+            <span className="text-[11px] text-muted-foreground">
+              Active for {code}
+            </span>
+          );
+        }
+
+        return (
+          <div key={code} className="rounded-md border border-border/40 bg-background p-2">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-[10px] font-mono">
+                  {code}
+                </Badge>
+                <span className="text-[11px] text-muted-foreground">
+                  {rows.length} requirement{rows.length === 1 ? "" : "s"}
+                </span>
+              </div>
+              {header}
+            </div>
+            <div className="space-y-2">
+              {rows.map((r) => (
+                <RequirementCard
+                  key={r.id}
+                  canEdit
+                  requirement={{
+                    id: r.id,
+                    original_title: r.original_title,
+                    original_description: r.original_description,
+                    original_source_citation: r.original_source_citation,
+                    title: r.title,
+                    description: r.description,
+                    source_citation: r.source_citation,
+                    obligation_category: r.obligation_category,
+                    obligation_category_source: r.obligation_category_source,
+                    activation_state: r.activation_state,
+                    confirmed_optional: r.confirmed_optional,
+                    service_code: r.service_code ?? null,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 
 
 function DocumentRequirementGroup({

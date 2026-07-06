@@ -842,14 +842,21 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
     }
 
 
-    // Existing requirements (so we can de-dupe across re-runs)
+    // Existing requirements (so we can de-dupe across re-runs). Seed the key set
+    // from titles run through the same normalizer used for new rows, so the
+    // check is punctuation/whitespace/case-insensitive and catches rows whose
+    // stored requirement_key was written under an older, stricter formula.
     const { data: existing } = await supabase
       .from("nectar_requirements")
-      .select("requirement_key")
+      .select("title")
       .eq("organization_id", doc.organization_id)
-      .eq("source_document_id", doc.id);
+      .eq("source_document_id", doc.id)
+      .neq("review_status", "removed");
+    const kind = (doc.authoritative_kind as string) ?? "src";
     const existingKeys = new Set(
-      (existing ?? []).map((r) => (r.requirement_key as string) ?? ""),
+      (existing ?? [])
+        .map((r) => buildRequirementDedupKey(kind, (r.title as string | null) ?? ""))
+        .filter((k) => k.length > 0),
     );
 
     // 1. Prose-clause extraction (the real path for SOW / contracts)

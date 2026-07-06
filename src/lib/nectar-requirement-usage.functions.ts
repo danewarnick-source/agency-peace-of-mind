@@ -191,8 +191,9 @@ export const listPendingCodeActivations = createServerFn({ method: "POST" })
     const [{ data: authCodes }, { data: pendingReqs }] = await Promise.all([
       supabase
         .from("provider_authorized_codes")
-        .select("service_code")
-        .eq("organization_id", data.organizationId),
+        .select("code")
+        .eq("organization_id", data.organizationId)
+        .is("archived_at", null),
       supabase
         .from("nectar_requirements")
         .select("service_code")
@@ -201,7 +202,7 @@ export const listPendingCodeActivations = createServerFn({ method: "POST" })
         .eq("activation_state", "pending_code_activation"),
     ]);
     const held = new Set(
-      (authCodes ?? []).map((r) => (r as { service_code: string }).service_code),
+      (authCodes ?? []).map((r) => (r as { code: string }).code),
     );
     const counts = new Map<string, number>();
     for (const r of pendingReqs ?? []) {

@@ -14,6 +14,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { resolveStaffQualifications, qualificationKey, type QualificationKind } from "./staff-qualifications.functions";
 
 const RULE_TYPES = ["billing_conflict", "staff_prerequisite", "deadline", "activity"] as const;
 const ACTIVE_STATES = ["active", "active_by_code"] as const;
@@ -376,4 +377,278 @@ export const listComplianceFlags = createServerFn({ method: "POST" })
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
     return rows ?? [];
+  });
+
+// ─── Staff-prerequisite detection ────────────────────────────────────────
+
+/**
+ * rule_definition shape (staff_prerequisite):
+ *   {
+ *     applicable_codes: string[],
+ *     required_qualifications: [
+ *       { kind: 'external_cert' | 'baseline_training' | 'hive_course' | 'client_specific_training',
+ *         key: string,
+ *         must_be_unexpired: boolean }
+ *     ],
+ *     scope: 'per_shift' | 'per_visit'
+ *   }
+ *
+ * Two-gate invariant: only rules where status='confirmed' AND the linked
+ * nectar_requirement is currently active/active_by_code will produce flags.
+ */
+const QUAL_KINDS = ["external_cert", "baseline_training", "hive_course", "client_specific_training"] as const;
+
+export const checkStaffPrerequisite = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        staffId: z.string().uuid(),
+        serviceCodes: z.array(z.string().min(1)).min(1),
+        clientId: z.string().uuid().optional(),
+        at: z.string().optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const at = data.at ?? new Date().toISOString();
+    const upperCodes = data.serviceCodes.map((c) => c.trim().toUpperCase());
+
+    const { data: rules, error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .from("nectar_compliance_rules" as any)
+      .select(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        "id, requirement_id, rule_definition, requirement:nectar_requirements!inner(id, title, original_title, description, original_description, source_citation, activation_state)" as any,
+      )
+      .eq("organization_id", data.organizationId)
+      .eq("rule_type", "staff_prerequisite")
+      .eq("status", "confirmed");
+    if (error) throw new Error(error.message);
+
+    // Load held qualifications once per call (both sets: active + all).
+    const held = await resolveStaffQualifications(supabase, {
+      organizationId: data.organizationId,
+      staffId: data.staffId,
+      at,
+    });
+    const activeSet = new Set(held.activeOnly);
+    const allSet = new Set(held.all);
+
+    const potentialFlags: Array<{
+      ruleId: string;
+      requirementId: string;
+      matchedCodes: string[]; // repurposed as "missing qualification labels" for dialog display
+      humanExplanation: string;
+      source: { title: string; verbatim: string; citation: string | null };
+    }> = [];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const r of (rules ?? []) as any[]) {
+      const req = r.requirement;
+      if (!req) continue;
+      if (!ACTIVE_STATES.includes(req.activation_state)) continue;
+      const def = r.rule_definition ?? {};
+      const applicable = Array.isArray(def.applicable_codes)
+        ? (def.applicable_codes as string[]).map((c) => String(c).toUpperCase())
+        : [];
+      const matchedCodes = applicable.filter((c) => upperCodes.includes(c));
+      if (matchedCodes.length === 0) continue;
+
+      const required = Array.isArray(def.required_qualifications)
+        ? (def.required_qualifications as Array<{
+            kind: QualificationKind;
+            key: string;
+            must_be_unexpired?: boolean;
+          }>)
+        : [];
+      if (required.length === 0) continue;
+
+      const missing: string[] = [];
+      for (const q of required) {
+        if (!QUAL_KINDS.includes(q.kind)) continue;
+        const compareSet = q.must_be_unexpired === false ? allSet : activeSet;
+        if (!compareSet.has(qualificationKey(q.kind, q.key))) {
+          const label = `${q.kind}:${q.key}${q.must_be_unexpired === false ? "" : " (unexpired)"}`;
+          missing.push(label);
+        }
+      }
+      if (missing.length === 0) continue;
+
+      potentialFlags.push({
+        ruleId: r.id,
+        requirementId: req.id,
+        matchedCodes: missing,
+        humanExplanation: `Staff is scheduled for ${matchedCodes.join(", ")} but is missing required qualification${
+          missing.length > 1 ? "s" : ""
+        }: ${missing.join(", ")}.`,
+        source: {
+          title: req.original_title ?? req.title ?? "Requirement",
+          verbatim: req.original_description ?? req.description ?? "",
+          citation: req.source_citation ?? null,
+        },
+      });
+    }
+
+    return { flags: potentialFlags };
+  });
+
+// ─── NECTAR drafter for staff_prerequisite rules ─────────────────────────
+
+/**
+ * Heuristic drafter. Reads active (or active_by_code) nectar_requirements
+ * whose applicable_codes is non-empty AND whose text mentions a
+ * credential/training keyword we can map to a canonical qualification key.
+ * Requirements too vague to make machine-checkable are skipped — the drafter
+ * declines rather than forcing a rule. Every drafted rule is written as
+ * status='proposed' so a provider must confirm it in the panel (where the
+ * verbatim source sits beside the drafted logic).
+ */
+const CREDENTIAL_HEURISTICS: Array<{
+  match: RegExp;
+  kind: QualificationKind;
+  key: string;
+  label: string;
+  must_be_unexpired: boolean;
+}> = [
+  { match: /\b(cpr|first[\s-]?aid)\b/i, kind: "external_cert", key: "cpr-fa", label: "CPR & First Aid", must_be_unexpired: true },
+  { match: /\babuse|neglect|reporting\b/i, kind: "external_cert", key: "abuse-neglect", label: "Abuse & Neglect Reporting", must_be_unexpired: true },
+  { match: /\b(medication|med[\s-]?admin(istration)?|mar)\b/i, kind: "external_cert", key: "med-admin", label: "Medication Administration", must_be_unexpired: true },
+  { match: /\b(bloodborne|blood[\s-]?borne|opim)\b/i, kind: "external_cert", key: "bloodborne", label: "Bloodborne Pathogens", must_be_unexpired: true },
+  { match: /\bhipaa\b/i, kind: "external_cert", key: "hipaa", label: "HIPAA", must_be_unexpired: false },
+  { match: /\b30[\s-]?day( training| orientation)?|new[\s-]?hire\b/i, kind: "baseline_training", key: "thirty_day", label: "30-Day Training", must_be_unexpired: false },
+  { match: /\b(de[\s-]?escalation|crisis (intervention|prevention))\b/i, kind: "baseline_training", key: "deescalation", label: "De-escalation", must_be_unexpired: true },
+];
+
+export const draftStaffPrerequisiteRules = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        dryRun: z.boolean().optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const { data: reqs, error } = await supabase
+      .from("nectar_requirements")
+      .select(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        "id, organization_id, title, description, original_title, original_description, source_citation, activation_state, service_code, service_codes_all" as any,
+      )
+      .eq("organization_id", data.organizationId)
+      .in("activation_state", ["active", "active_by_code"]);
+    if (error) throw new Error(error.message);
+
+    // Skip requirements that already have a staff_prereq rule (any status)
+    // so we don't spam duplicates on re-run.
+    const { data: existing } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .from("nectar_compliance_rules" as any)
+      .select("requirement_id")
+      .eq("organization_id", data.organizationId)
+      .eq("rule_type", "staff_prerequisite");
+    const skipReqIds = new Set(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ((existing ?? []) as any[]).map((r) => r.requirement_id),
+    );
+
+    type Draft = {
+      requirementId: string;
+      requirementTitle: string;
+      verbatim: string;
+      applicable_codes: string[];
+      required_qualifications: Array<{ kind: QualificationKind; key: string; must_be_unexpired: boolean; label: string }>;
+      rationale: string;
+    };
+
+    const drafts: Draft[] = [];
+    const declined: Array<{ requirementId: string; reason: string }> = [];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const r of (reqs ?? []) as any[]) {
+      if (skipReqIds.has(r.id)) continue;
+      const codes: string[] = Array.isArray(r.service_codes_all) && r.service_codes_all.length
+        ? r.service_codes_all
+        : r.service_code
+          ? [r.service_code]
+          : [];
+      if (codes.length === 0) continue; // no code scope = not machine-checkable at entry surface
+      const text = `${r.original_title ?? r.title ?? ""} ${r.original_description ?? r.description ?? ""}`;
+      if (text.trim().length < 20) {
+        declined.push({ requirementId: r.id, reason: "text too short to interpret" });
+        continue;
+      }
+      const hits = CREDENTIAL_HEURISTICS.filter((h) => h.match.test(text));
+      if (hits.length === 0) {
+        declined.push({ requirementId: r.id, reason: "no credential/training keyword matched" });
+        continue;
+      }
+      // Dedup hits by (kind,key)
+      const seen = new Set<string>();
+      const required = hits.filter((h) => {
+        const k = `${h.kind}:${h.key}`;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      }).map((h) => ({ kind: h.kind, key: h.key, must_be_unexpired: h.must_be_unexpired, label: h.label }));
+
+      drafts.push({
+        requirementId: r.id,
+        requirementTitle: r.original_title ?? r.title ?? "Requirement",
+        verbatim: r.original_description ?? r.description ?? "",
+        applicable_codes: codes.map((c) => String(c).toUpperCase()),
+        required_qualifications: required,
+        rationale: `Auto-drafted from active requirement text mentioning: ${required.map((q) => q.label).join(", ")}.`,
+      });
+    }
+
+    if (data.dryRun) return { drafts, declined, inserted: 0 };
+
+    let inserted = 0;
+    for (const d of drafts) {
+      const { data: rule, error: iErr } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .from("nectar_compliance_rules" as any)
+        .insert({
+          organization_id: data.organizationId,
+          requirement_id: d.requirementId,
+          rule_type: "staff_prerequisite",
+          rule_definition: {
+            applicable_codes: d.applicable_codes,
+            required_qualifications: d.required_qualifications.map((q) => ({
+              kind: q.kind,
+              key: q.key,
+              must_be_unexpired: q.must_be_unexpired,
+            })),
+            scope: "per_shift",
+          },
+          proposed_by: "nectar",
+          proposed_rationale: d.rationale,
+          status: "proposed",
+        })
+        .select("id")
+        .single();
+      if (iErr) continue;
+      inserted++;
+      await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .from("nectar_compliance_rule_history" as any)
+        .insert({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          rule_id: (rule as any).id,
+          organization_id: data.organizationId,
+          action: "proposed",
+          actor_id: userId,
+          actor_label: "nectar",
+          snapshot: { source: "draftStaffPrerequisiteRules", requirement_id: d.requirementId, draft: d },
+        });
+    }
+
+    return { drafts, declined, inserted };
   });

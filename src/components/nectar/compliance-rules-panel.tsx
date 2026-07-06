@@ -5,20 +5,26 @@ import {
   listComplianceRules,
   proposeComplianceRule,
   updateComplianceRule,
+  draftStaffPrerequisiteRules,
 } from "@/lib/nectar-compliance.functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Sparkles, CheckCircle2, XCircle, Pencil, ShieldAlert } from "lucide-react";
+import { Sparkles, CheckCircle2, XCircle, Pencil, ShieldAlert, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 
 type Rule = {
   id: string;
   requirement_id: string;
   rule_type: string;
-  rule_definition: { conflicting_codes?: string[]; scope?: string } & Record<string, unknown>;
+  rule_definition: {
+    conflicting_codes?: string[];
+    scope?: string;
+    applicable_codes?: string[];
+    required_qualifications?: Array<{ kind: string; key: string; must_be_unexpired?: boolean }>;
+  } & Record<string, unknown>;
   status: "proposed" | "confirmed" | "dismissed";
   proposed_rationale: string | null;
   confirmed_at: string | null;
@@ -57,6 +63,9 @@ export function ComplianceRulesPanel({ organizationId }: { organizationId: strin
           NECTAR proposes machine-checkable rules from your active requirements. You confirm, edit, or dismiss. Only confirmed rules whose source requirement is currently active can raise a flag.
         </span>
       </div>
+
+      <DraftStaffPrereqButton organizationId={organizationId} onDrafted={refresh} />
+
 
       <Tabs defaultValue="proposed">
         <TabsList>
@@ -164,7 +173,9 @@ function RuleRow({ rule, onChanged }: { rule: Rule; onChanged: () => void }) {
 
       <div className="border-t pt-3 space-y-2">
         <div className="text-xs font-medium text-muted-foreground uppercase">Rule definition</div>
-        {editing || rule.status === "proposed" ? (
+        {rule.rule_type === "staff_prerequisite" ? (
+          <StaffPrereqDefinition rule={rule} />
+        ) : editing || rule.status === "proposed" ? (
           <div className="grid gap-2 sm:grid-cols-2">
             <div>
               <label className="text-xs text-muted-foreground">Conflicting codes (comma-separated)</label>
@@ -282,3 +293,66 @@ function ProposeManualRule({ organizationId, onCreated }: { organizationId: stri
     </div>
   );
 }
+
+function StaffPrereqDefinition({ rule }: { rule: Rule }) {
+  const codes = rule.rule_definition.applicable_codes ?? [];
+  const quals = rule.rule_definition.required_qualifications ?? [];
+  const scope = String(rule.rule_definition.scope ?? "per_shift");
+  return (
+    <div className="text-sm space-y-1">
+      <div>
+        Applicable codes: <span className="font-mono">{codes.join(", ") || "—"}</span>
+        <span className="ml-4">Scope: <span className="font-mono">{scope}</span></span>
+      </div>
+      <div>
+        Required qualifications:
+        <ul className="ml-4 list-disc">
+          {quals.length === 0 && <li className="text-muted-foreground">—</li>}
+          {quals.map((q, i) => (
+            <li key={i}>
+              <span className="font-mono">{q.kind}:{q.key}</span>
+              <span className="text-xs text-muted-foreground ml-2">
+                {q.must_be_unexpired === false ? "(any status)" : "(must be unexpired)"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function DraftStaffPrereqButton({
+  organizationId,
+  onDrafted,
+}: {
+  organizationId: string;
+  onDrafted: () => void;
+}) {
+  const draft = useServerFn(draftStaffPrerequisiteRules);
+  const mut = useMutation({
+    mutationFn: async () => draft({ data: { organizationId } }),
+    onSuccess: (res) => {
+      const r = res as { inserted: number; declined: Array<{ reason: string }> };
+      toast.success(
+        `Drafted ${r.inserted} staff-prerequisite rule${r.inserted === 1 ? "" : "s"} for review${
+          r.declined.length ? ` (${r.declined.length} skipped as too vague)` : ""
+        }.`,
+      );
+      onDrafted();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <div className="flex items-center gap-2 pt-1">
+      <Button size="sm" variant="outline" onClick={() => mut.mutate()} disabled={mut.isPending}>
+        <Wand2 className="h-3 w-3 mr-1" />
+        {mut.isPending ? "Drafting…" : "Draft staff-prerequisite rules from active requirements"}
+      </Button>
+      <span className="text-xs text-muted-foreground">
+        Proposes rules for codes whose source text mentions a credential or training. You confirm each below.
+      </span>
+    </div>
+  );
+}
+

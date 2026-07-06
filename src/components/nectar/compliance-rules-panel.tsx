@@ -19,7 +19,12 @@ type Rule = {
   id: string;
   requirement_id: string;
   rule_type: string;
-  rule_definition: { conflicting_codes?: string[]; scope?: string } & Record<string, unknown>;
+  rule_definition: {
+    conflicting_codes?: string[];
+    scope?: string;
+    applicable_codes?: string[];
+    required_qualifications?: Array<{ kind: string; key: string; must_be_unexpired?: boolean }>;
+  } & Record<string, unknown>;
   status: "proposed" | "confirmed" | "dismissed";
   proposed_rationale: string | null;
   confirmed_at: string | null;

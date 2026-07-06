@@ -26,6 +26,7 @@ import {
 import { useCurrentOrg } from "@/hooks/use-org";
 import { CodeActivationBanner } from "@/components/nectar/code-activation-banner";
 import { RequirementCard } from "@/components/nectar/requirement-card";
+import { ComplianceRulesPanel } from "@/components/nectar/compliance-rules-panel";
 import { activateCodeRequirements } from "@/lib/nectar-requirement-usage.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -244,6 +245,9 @@ export function AuthoritativeSourcesPage() {
           <TabsTrigger value="attestations" className="gap-1">
             <ScrollText className="h-3.5 w-3.5" /> Attestation log
           </TabsTrigger>
+          <TabsTrigger value="rules" className="gap-1">
+            <ScrollText className="h-3.5 w-3.5" /> Compliance rules
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="sources">
@@ -269,6 +273,9 @@ export function AuthoritativeSourcesPage() {
         </TabsContent>
         <TabsContent value="attestations">
           {orgId ? <AttestationsPanel orgId={orgId} /> : <LoadingCard />}
+        </TabsContent>
+        <TabsContent value="rules">
+          {orgId ? <ComplianceRulesPanel organizationId={orgId} /> : <LoadingCard />}
         </TabsContent>
       </Tabs>
     </div>

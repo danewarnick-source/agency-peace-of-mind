@@ -222,6 +222,10 @@ export function AuthoritativeSourcesPage() {
         </div>
       )}
 
+      {orgId && <CodeActivationBanner organizationId={orgId} />}
+
+
+
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="flex flex-wrap gap-1 rounded-2xl border border-border/60 bg-background/60 p-1 backdrop-blur">
           <TabsTrigger value="sources" className="gap-1">

@@ -18,6 +18,7 @@ import {
   ExplainResp,
 } from "./authoritative-sources.server";
 import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { classifyServiceCodes } from "./nectar-code-classifier";
 
 // =============================================================
 // Foundation B — Authoritative sources, derived requirements,

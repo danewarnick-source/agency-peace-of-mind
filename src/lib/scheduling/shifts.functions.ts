@@ -166,6 +166,26 @@ export const createShift = createServerFn({ method: "POST" })
       shift_type: "hourly",
       override_reason: data.overrideReason ?? null,
     };
+    // Compliance gate — strict mode when acknowledgements supplied by the UI
+    // dialog, otherwise bulk_auto raises open flags but allows insert (for
+    // non-UI callers like nectar proposals / imports).
+    const { gateScheduledShiftInsert, ComplianceReviewRequiredError } = await import("./shift-commit");
+    try {
+      await gateScheduledShiftInsert(
+        context.supabase,
+        [insert as never],
+        data.acknowledgements && data.acknowledgements.length > 0
+          ? { mode: "strict_acknowledgements", userId: context.userId, acknowledgements: data.acknowledgements }
+          : { mode: "bulk_auto", userId: context.userId },
+      );
+    } catch (e) {
+      if (e instanceof ComplianceReviewRequiredError) {
+        // Surface candidates back to the client so the dialog can open.
+        // Client should re-call createShift with acknowledgements.
+        return { needsReview: true as const, candidates: e.candidates };
+      }
+      throw e;
+    }
     const { data: row, error } = await context.supabase
       .from("scheduled_shifts").insert(insert).select("*").single();
     if (error) throw error;

@@ -249,6 +249,10 @@ export function AuthoritativeSourcesPage() {
           <TabsTrigger value="rules" className="gap-1">
             <ScrollText className="h-3.5 w-3.5" /> Compliance rules
           </TabsTrigger>
+          <TabsTrigger value="held" className="gap-1">
+            <ScrollText className="h-3.5 w-3.5" /> Held timesheets
+            <HeldTimesheetsBadge organizationId={orgId ?? undefined} />
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="sources">
@@ -277,6 +281,9 @@ export function AuthoritativeSourcesPage() {
         </TabsContent>
         <TabsContent value="rules">
           {orgId ? <ComplianceRulesPanel organizationId={orgId} /> : <LoadingCard />}
+        </TabsContent>
+        <TabsContent value="held">
+          {orgId ? <HeldTimesheetsPanel organizationId={orgId} /> : <LoadingCard />}
         </TabsContent>
       </Tabs>
     </div>

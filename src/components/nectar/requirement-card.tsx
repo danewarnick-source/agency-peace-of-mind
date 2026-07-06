@@ -89,7 +89,7 @@ export function RequirementCard({
         .eq("requirement_id", requirement.id)
         .order("edited_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as Array<{
+      return ((data ?? []) as unknown) as Array<{
         id: string;
         usage_note: string;
         edited_by: string;

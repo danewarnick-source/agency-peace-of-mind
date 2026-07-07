@@ -334,11 +334,19 @@ function BudgetEditor({ budget, lines, canEdit, clientName }: { budget: Budget; 
     const toLines = (section: Section) =>
       draft
         .filter((l) => l.section === section)
+        .slice()
+        .sort((a, b) => {
+          const ad = a.day_of_month ?? 99;
+          const bd = b.day_of_month ?? 99;
+          if (ad !== bd) return ad - bd;
+          return a.sort_order - b.sort_order;
+        })
         .map((l) => ({
           label: l.label ?? "",
           non_variable: Number(l.non_variable) || 0,
           variable: Number(l.variable) || 0,
           notes: l.notes,
+          day_of_month: l.day_of_month,
         }));
     return {
       clientName,

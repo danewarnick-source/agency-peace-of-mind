@@ -572,14 +572,17 @@ function HhsHostContainer({
 function DirectSupportContainer({
   client,
   staff,
+  score,
   canDrag,
 }: {
   client: WhiteboardClient;
   staff: BoardStaff[];
+  score: ContainerScore | null;
   canDrag: boolean;
 }) {
   return (
     <Droppable id={`ds-client:${client.id}`} className="min-h-[160px]">
+      <div style={glowStyle(score)} className="rounded-2xl">
       <HumanFrame
         title={`${client.first_name} ${client.last_name}`}
         subtitle={`Direct support · ${client.authorized_dspd_codes.slice(0, 4).join("/") || "no codes"}`}
@@ -600,7 +603,9 @@ function DirectSupportContainer({
             ))
           )}
         </div>
+        <ScoreReasoning score={score} />
       </HumanFrame>
+      </div>
     </Droppable>
   );
 }
@@ -611,6 +616,7 @@ function DsSlotContainer({
   name,
   clients,
   staff,
+  score,
   canDrag,
   onRename,
   onRemove,
@@ -619,6 +625,7 @@ function DsSlotContainer({
   name: string;
   clients: Array<RhsClient | WhiteboardClient>;
   staff: BoardStaff[];
+  score: ContainerScore | null;
   canDrag: boolean;
   onRename: (v: string) => void;
   onRemove: () => void;

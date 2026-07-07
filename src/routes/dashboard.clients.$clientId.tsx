@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/table";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { ClientBudgetPanel } from "@/components/clients/client-budget-panel";
-import { ClientMealPlannerPanel } from "@/components/clients/client-meal-planner-panel";
+import { ClientMealPlannerMount } from "@/components/clients/client-meal-planner-mount";
 import { ChoreChartForClient } from "@/components/chores/chore-chart-mount";
 import { PcspTab } from "@/components/clients/pcsp-tab";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
@@ -204,7 +204,7 @@ function ClientProfileHub() {
           </CollapsibleSimpleCard>
           <PersonCenteredProfilePanel clientId={clientId} orgId={orgId} />
           <CaseloadEditor clientId={clientId} />
-          <ClientMealPlannerPanel clientId={clientId} />
+          <ClientMealPlannerMount clientId={clientId} />
           <ChoreChartForClient clientId={clientId} />
         </TabsContent>
 

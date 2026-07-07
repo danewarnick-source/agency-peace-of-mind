@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+
 import {
   Dialog,
   DialogContent,
@@ -26,7 +26,7 @@ import {
   Settings2,
   Check,
   GripVertical,
-  ShoppingCart,
+  
   BookOpen,
   Eye,
   FileText,
@@ -162,14 +162,15 @@ export function ClientMealPlannerPanel({
   const [weekStart, setWeekStart] = useState<Date>(mondayOf(new Date()));
   const weekISO = fmtISO(weekStart);
 
-  // Client dietary fields + needs_shopping_help toggle
+  // Client dietary fields (needs_shopping_help no longer read — activation
+  // now lives in client_meal_support, gated by MealSupportGate above.)
   const clientQ = useQuery({
     enabled: !!clientId,
     queryKey: ["mp-client-diet", clientId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("first_name, last_name, dietary_needs, allergies, needs_shopping_help, meal_actuals_assignee, team_id")
+        .select("first_name, last_name, dietary_needs, allergies, meal_actuals_assignee, team_id")
         .eq("id", clientId)
         .maybeSingle();
       if (error) throw error;
@@ -178,17 +179,16 @@ export function ClientMealPlannerPanel({
         last_name: string | null;
         dietary_needs: string | null;
         allergies: string[] | null;
-        needs_shopping_help: boolean | null;
         meal_actuals_assignee: string | null;
         team_id: string | null;
       } | null;
     },
   });
-  const needsHelp = !!clientQ.data?.needs_shopping_help;
   const clientName = useMemo(() => {
     const c = clientQ.data;
     return [c?.first_name, c?.last_name].filter(Boolean).join(" ").trim() || "Client";
   }, [clientQ.data]);
+
 
   // Org branding logo — loaded once and reused for PDF headers.
   const { data: branding } = useOrgBranding(orgId);
@@ -248,17 +248,9 @@ export function ClientMealPlannerPanel({
     },
   });
 
-  const toggleNeedsHelp = useMutation({
-    mutationFn: async (v: boolean) => {
-      const { error } = await supabase
-        .from("clients")
-        .update({ needs_shopping_help: v })
-        .eq("id", clientId);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["mp-client-diet", clientId] }),
-    onError: (e: Error) => toast.error(e.message),
-  });
+  // toggleNeedsHelp removed — activation now via client_meal_support.
+
+
 
   const setAssignee = useMutation({
     mutationFn: async (userId: string | null) => {
@@ -586,11 +578,9 @@ export function ClientMealPlannerPanel({
           <Utensils className="h-5 w-5 text-primary" />
           <CardTitle>Meal Planner</CardTitle>
           {!canEdit && <Badge variant="secondary">Read only</Badge>}
-          {needsHelp && (
-            <Badge className="gap-1 bg-amber-500 text-white hover:bg-amber-500">
-              <ShoppingCart className="h-3 w-3" /> Shopping help needed
-            </Badge>
-          )}
+          {/* Legacy shopping-help badge removed; activation status is shown
+              by the MealSupportGate banner above the panel (when applicable). */}
+
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -701,22 +691,9 @@ export function ClientMealPlannerPanel({
           </div>
         </div>
 
-        {/* Needs-shopping-help toggle (manager-editable). When off, the planner
-            is still available but not foregrounded in staff view. */}
-        <div className="flex items-center justify-between rounded-md border bg-muted/20 p-3">
-          <div>
-            <div className="text-sm font-semibold">Client needs help with meals & shopping</div>
-            <div className="text-xs text-muted-foreground">
-              When on, the planner is highlighted for staff (typical for RHS / HHS support).
-              When off, it stays available but not foregrounded.
-            </div>
-          </div>
-          <Switch
-            checked={needsHelp}
-            disabled={!canEdit || toggleNeedsHelp.isPending}
-            onCheckedChange={(v) => toggleNeedsHelp.mutate(v)}
-          />
-        </div>
+        {/* Legacy "needs shopping help" toggle removed — meal support is now
+            gated by the per-client activation model (client_meal_support). */}
+
 
         {/* Weekly grid — drag meal pills between cells (manager only) */}
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>

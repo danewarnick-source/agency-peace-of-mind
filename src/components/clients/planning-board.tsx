@@ -1171,14 +1171,14 @@ export function WhiteboardPlanningBoard() {
       </p>
     );
   }
-  if (rhsQ.isLoading || wbQ.isLoading || staffQ.isLoading) {
+  if (rhsQ.isLoading || wbQ.isLoading || staffQ.isLoading || currentStaffQ.isLoading) {
     return (
       <p className="rounded-md border border-border bg-muted/20 px-3 py-6 text-center text-sm text-muted-foreground">
         Loading planning board…
       </p>
     );
   }
-  const err = rhsQ.error || wbQ.error || staffQ.error;
+  const err = rhsQ.error || wbQ.error || staffQ.error || currentStaffQ.error;
   if (err) {
     return (
       <p className="rounded-md border border-rose-300 bg-rose-50 px-3 py-3 text-sm text-rose-900">
@@ -1186,7 +1186,7 @@ export function WhiteboardPlanningBoard() {
       </p>
     );
   }
-  if (!rhs || !wb || !staff) return null;
+  if (!rhs || !wb || !staff || !currentStaffPlacements) return null;
 
   // Pool contents.
   const poolClientIds = clientsByContainer.get(POOL_CLIENTS) ?? [];

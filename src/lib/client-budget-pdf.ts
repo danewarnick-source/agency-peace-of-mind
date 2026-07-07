@@ -280,7 +280,7 @@ export async function renderClientBudgetPdf(p: BudgetPdfPayload): Promise<Uint8A
     // the column-header row cannot collide with the band.
     const sub = sectionTotal(rows);
     const bandH = 22;
-    const bandTop = y;
+    const bandBottom = y - bandH;
     const bandBottom = y - bandH;
     page.drawRectangle({
       x: MARGIN_X, y: bandBottom,

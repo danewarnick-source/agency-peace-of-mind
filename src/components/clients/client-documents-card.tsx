@@ -90,6 +90,7 @@ export function ClientDocumentsCard({
   const qc = useQueryClient();
   const queryFn = useServerFn(queryDocuments);
   const delFn = useServerFn(deleteDocument);
+  const getDocFn = useServerFn(getDocument);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [offerDocId, setOfferDocId] = useState<string | null>(null);
 

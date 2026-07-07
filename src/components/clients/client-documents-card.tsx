@@ -202,6 +202,11 @@ export function ClientDocumentsCard({
             open={!!offerDocId}
             onOpenChange={(v) => { if (!v) setOfferDocId(null); }}
           />
+          <DocumentPreviewDialog
+            open={!!preview}
+            onOpenChange={(v) => { if (!v) setPreview(null); }}
+            doc={preview}
+          />
         </div>
         <p className="text-xs text-muted-foreground">
           Guardian papers, PCSP, 1056, intake/referrals, assessments, consents.

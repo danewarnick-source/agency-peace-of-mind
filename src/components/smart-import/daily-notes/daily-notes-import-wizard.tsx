@@ -637,9 +637,12 @@ export function DailyNotesImportWizard() {
           incomplete={incompleteRows}
           skipped={skippedRows}
           people={peopleQ.data}
+          repeatedIssues={repeatedIssues}
+          dupeChecking={dupeChecking}
           onChooseStaff={chooseStaff}
           onChooseClient={chooseClient}
           onLink={linkManually}
+          onBulkResolve={bulkResolve}
           onSetNarrative={setNarrative}
           onSetDate={setDate}
           onSkip={skipRow}

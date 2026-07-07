@@ -67,6 +67,21 @@ import {
   type MoveLight,
   type MoveScore,
 } from "@/lib/rhs-board-scoring";
+import { NotesPopover } from "./notes-popover";
+import { getWhiteboardNoteCounts } from "@/lib/whiteboard-notes.functions";
+
+/** Board-wide context so pills can render the notes popover without prop-drilling. */
+type NotesCtx = {
+  organizationId: string | null;
+  canWrite: boolean;
+  countsByKey: Map<string, number>;
+};
+const NotesBoardContext = createContext<NotesCtx>({
+  organizationId: null,
+  canWrite: false,
+  countsByKey: new Map(),
+});
+const notesKey = (t: "client" | "staff", id: string) => `${t}:${id}`;
 
 /** Reserved container ids. */
 const POOL_CLIENTS = "pool:clients";

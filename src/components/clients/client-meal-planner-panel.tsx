@@ -1,14 +1,22 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { useOrgBranding } from "@/components/branding/org-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Plus,
   Trash2,
@@ -20,6 +28,12 @@ import {
   GripVertical,
   ShoppingCart,
   BookOpen,
+  Eye,
+  FileText,
+  Printer,
+  Send,
+  CheckCircle2,
+  ClipboardCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -41,6 +55,16 @@ import {
   recordShoppingItemUse,
   type Recipe,
 } from "./client-meal-recipes";
+import {
+  renderMealPlanPdf,
+  renderPlanVsActualPdf,
+  mealPlanPdfFilename,
+  planVsActualPdfFilename,
+  weekTag,
+  type MealPlanLogo,
+  type PlanActualRow,
+} from "@/lib/client-meal-plan-pdf";
+
 
 
 /** 0=Mon..6=Sun (matches the reference sheet). */

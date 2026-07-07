@@ -1130,3 +1130,109 @@ function ActualsToday({
     </div>
   );
 }
+
+function ActualsAssigneeCard({
+  value,
+  staff,
+  onChange,
+}: {
+  value: string | null;
+  staff: { id: string; name: string }[];
+  onChange: (id: string | null) => void;
+}) {
+  return (
+    <div className="rounded-md border p-3">
+      <div className="mb-1 flex items-center gap-2">
+        <h4 className="text-sm font-semibold">Meal-actuals assignee</h4>
+        <Badge variant="outline" className="text-[10px]">Optional</Badge>
+      </div>
+      <p className="mb-2 text-xs text-muted-foreground">
+        Standing staff who can always record what was eaten. On-shift staff and the
+        assigned/respite host can record actuals too.
+      </p>
+      <select
+        className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value || null)}
+      >
+        <option value="">— No standing assignee —</option>
+        {staff.map((s) => (
+          <option key={s.id} value={s.id}>{s.name}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function ActualsReadOnly({
+  weekStart,
+  actuals,
+  meals,
+  staff,
+}: {
+  weekStart: Date;
+  actuals: ActualRow[];
+  meals: MealRow[];
+  staff: { id: string; name: string }[];
+}) {
+  const staffName = (id: string | null) =>
+    (id && staff.find((s) => s.id === id)?.name) || (id ? "Staff" : "—");
+  const outcomeLabel = (v: Outcome) => OUTCOMES.find((o) => o.v === v)?.label ?? v;
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const plannedFor = (dow: number, slot: Slot) =>
+    meals.filter((m) => m.day_of_week === dow && m.meal_slot === slot)
+      .map((m) => m.label || "(unnamed)").join(", ") || "—";
+  const actualFor = (dateISO: string, slot: Slot) =>
+    actuals.find((a) => a.actual_date === dateISO && a.meal_slot === slot);
+  return (
+    <div className="rounded-md border">
+      <div className="flex items-center justify-between border-b bg-muted/40 px-3 py-2">
+        <h4 className="text-sm font-semibold">Plan vs. actual — this week</h4>
+        <Badge variant="outline" className="text-[10px]">Read-only — staff records</Badge>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-muted/30 text-left">
+            <tr>
+              <th className="px-2 py-1 font-semibold">Day</th>
+              <th className="px-2 py-1 font-semibold">Slot</th>
+              <th className="px-2 py-1 font-semibold">Planned</th>
+              <th className="px-2 py-1 font-semibold">Outcome</th>
+              <th className="px-2 py-1 font-semibold">Note</th>
+              <th className="px-2 py-1 font-semibold">Confirmed by</th>
+            </tr>
+          </thead>
+          <tbody>
+            {days.flatMap((d, i) =>
+              SLOTS.map((slot) => {
+                const iso = fmtISO(d);
+                const a = actualFor(iso, slot);
+                return (
+                  <tr key={`${iso}-${slot}`} className="border-t">
+                    <td className="px-2 py-1 whitespace-nowrap">
+                      {DAYS[i].slice(0, 3)} {shortDate(d)}
+                    </td>
+                    <td className="px-2 py-1 capitalize">{slot}</td>
+                    <td className="px-2 py-1 text-muted-foreground">{plannedFor(i, slot)}</td>
+                    <td className="px-2 py-1">
+                      {a ? outcomeLabel(a.outcome) : <span className="text-muted-foreground">—</span>}
+                    </td>
+                    <td className="px-2 py-1 text-muted-foreground">{a?.note ?? ""}</td>
+                    <td className="px-2 py-1 whitespace-nowrap text-muted-foreground">
+                      {a ? (
+                        <>
+                          {staffName(a.confirmed_by)}
+                          {a.confirmed_at ? ` · ${new Date(a.confirmed_at).toLocaleDateString()}` : ""}
+                        </>
+                      ) : ""}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

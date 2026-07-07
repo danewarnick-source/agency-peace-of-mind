@@ -80,7 +80,7 @@ export async function generateChoreChartReport(
       .eq("space_id", space.id)
       .order("sort_order"),
     sb
-      .from("chore_shift_cells")
+      .from("chore_shift_assignments")
       .select("shift_row_id, day_of_week, task_text, helps_client_id, definition_id")
       .eq("space_id", space.id),
   ]);

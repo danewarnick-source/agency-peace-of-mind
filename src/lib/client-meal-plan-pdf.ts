@@ -379,7 +379,7 @@ export async function renderMealPlanPdf(p: MealPlanPdfPayload): Promise<Uint8Arr
       thickness: 0.5, color: C.rule,
     });
     // Label sits ABOVE the totals row so it never collides with the day-0 total.
-    page1.drawText(`Daily ${p.nutritionLabel} (${p.nutritionUnit})`, {
+    page1.drawText(`Daily totals — kcal · P/C/F (g)`, {
       x: gridX, y: rowTop + 4, size: 8, font: bold, color: C.muted,
     });
     DAY_NAMES.forEach((_, i) => {
@@ -390,15 +390,28 @@ export async function renderMealPlanPdf(p: MealPlanPdfPayload): Promise<Uint8Arr
           thickness: 0.4, color: C.rule,
         });
       }
-      const total = p.meals
-        .filter((m) => m.day_of_week === i)
-        .reduce((s, m) => s + (m.nutrition_value ?? 0), 0);
-      const txt = total > 0 ? `${total.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${p.nutritionUnit}` : "—";
-      const size = 10;
-      const w = bold.widthOfTextAtSize(txt, size);
-      page1.drawText(txt, {
-        x: cx + (dayColW - w) / 2, y: rowTop - 15, size, font: bold, color: C.ink,
+      const dayMeals = p.meals.filter((m) => m.day_of_week === i);
+      const sum = (f: "calories" | "protein_g" | "carbs_g" | "fat_g") =>
+        dayMeals.reduce((s, m) => s + (Number(m[f]) || 0), 0);
+      const cal = sum("calories");
+      const pg = sum("protein_g");
+      const cg = sum("carbs_g");
+      const fg = sum("fat_g");
+      const line1 = cal > 0 ? `${Math.round(cal)} kcal` : "—";
+      const line2 =
+        pg + cg + fg > 0
+          ? `${Math.round(pg)}/${Math.round(cg)}/${Math.round(fg)}g`
+          : "";
+      const w1 = bold.widthOfTextAtSize(line1, 9.5);
+      page1.drawText(line1, {
+        x: cx + (dayColW - w1) / 2, y: rowTop - 12, size: 9.5, font: bold, color: C.ink,
       });
+      if (line2) {
+        const w2 = font.widthOfTextAtSize(line2, 7.5);
+        page1.drawText(line2, {
+          x: cx + (dayColW - w2) / 2, y: rowTop - 22, size: 7.5, font, color: C.muted,
+        });
+      }
     });
   }
 

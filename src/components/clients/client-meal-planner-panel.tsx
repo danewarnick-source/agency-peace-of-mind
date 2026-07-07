@@ -162,11 +162,13 @@ export function ClientMealPlannerPanel({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("dietary_needs, allergies, needs_shopping_help, meal_actuals_assignee, team_id")
+        .select("first_name, last_name, dietary_needs, allergies, needs_shopping_help, meal_actuals_assignee, team_id")
         .eq("id", clientId)
         .maybeSingle();
       if (error) throw error;
       return data as {
+        first_name: string | null;
+        last_name: string | null;
         dietary_needs: string | null;
         allergies: string[] | null;
         needs_shopping_help: boolean | null;
@@ -176,6 +178,10 @@ export function ClientMealPlannerPanel({
     },
   });
   const needsHelp = !!clientQ.data?.needs_shopping_help;
+  const clientName = useMemo(() => {
+    const c = clientQ.data;
+    return [c?.first_name, c?.last_name].filter(Boolean).join(" ").trim() || "Client";
+  }, [clientQ.data]);
 
   // Staff pool for the standing meal-actuals assignee selector (manager only).
   const staffQ = useQuery({

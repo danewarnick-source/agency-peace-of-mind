@@ -138,29 +138,6 @@ export async function generateChoreChartReport(
       isFreeDay: r.is_free_day,
       note: r.note,
     })),
-    shiftRows: ((rowsRes.data ?? []) as Array<{
-      id: string;
-      label: string;
-      start_time: string | null;
-      end_time: string | null;
-    }>).map((r) => ({
-      id: r.id,
-      label: r.label,
-      timeRange: fmtRange(r.start_time, r.end_time),
-    })),
-    shiftCells: ((cellsRes.data ?? []) as Array<{
-      shift_row_id: string;
-      day_of_week: number;
-      task_text: string;
-      helps_client_id: string | null;
-      definition_id: string | null;
-    }>).map((c) => ({
-      shiftRowId: c.shift_row_id,
-      day: c.day_of_week,
-      taskText: c.task_text,
-      helpsClientName: c.helps_client_id ? nameOf(c.helps_client_id) || null : null,
-      definitionName: c.definition_id ? defNameById.get(c.definition_id) ?? null : null,
-    })),
   };
 
   const bytes = await renderChoreChartPdf(payload);

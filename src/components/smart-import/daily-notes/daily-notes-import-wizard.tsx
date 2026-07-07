@@ -278,28 +278,37 @@ export function DailyNotesImportWizard() {
       const clientCandidates = findCandidates(clients, clientLabel);
       const d = tryParseDate(dateStr);
 
+      const missing = {
+        staff: !staffLabel || staffCandidates.length === 0,
+        client: !clientLabel || clientCandidates.length === 0,
+        date: !dateStr || !d,
+        narrative: !narrative,
+      };
+
       let status: MatchStatus;
       let reason: string | null = null;
       let staffId: string | null = null;
       let clientId: string | null = null;
 
-      if (!staffLabel || !clientLabel || !dateStr || !narrative) {
-        status = "invalid";
-        reason = !narrative ? "narrative is empty" : "missing required cells";
-      } else if (!d) {
-        status = "invalid";
-        reason = "unreadable date";
-      } else if (staffCandidates.length === 0 || clientCandidates.length === 0) {
-        status = "no_match";
-        reason =
-          staffCandidates.length === 0 && clientCandidates.length === 0
-            ? "no staff or client match"
-            : staffCandidates.length === 0
-              ? "no staff match"
-              : "no client match";
+      const structuralGap =
+        missing.staff || missing.client || missing.date || missing.narrative;
+
+      if (structuralGap) {
+        status = "incomplete";
+        const parts: string[] = [];
+        if (missing.date) parts.push(dateStr ? "unreadable date" : "missing date");
+        if (missing.staff) parts.push(staffLabel ? "no staff match" : "missing staff");
+        if (missing.client) parts.push(clientLabel ? "no client match" : "missing client");
+        if (missing.narrative) parts.push("blank narrative");
+        reason = parts.join(" · ");
+        // Pre-fill unambiguous single candidates so the human only fills real gaps.
+        if (staffCandidates.length === 1) staffId = staffCandidates[0].id;
+        if (clientCandidates.length === 1) clientId = clientCandidates[0].id;
       } else if (staffCandidates.length > 1 || clientCandidates.length > 1) {
         status = "ambiguous";
         reason = "multiple possible matches";
+        if (staffCandidates.length === 1) staffId = staffCandidates[0].id;
+        if (clientCandidates.length === 1) clientId = clientCandidates[0].id;
       } else {
         status = "matched";
         staffId = staffCandidates[0].id;
@@ -315,11 +324,22 @@ export function DailyNotesImportWizard() {
         logDateIso: d ? d.toISOString().slice(0, 10) : null,
         status, reason,
         skipped: false,
+        missing,
       };
     });
     setRows(result);
     setStep(3);
   }, [parsed, mapping, peopleQ.data]);
+
+  // Recompute status after any manual edit. A row becomes 'matched' only when
+  // staff, client, date, and narrative are all present. Nothing here fills in
+  // missing content — that's always a human decision on the review screen.
+  const recompute = (row: ReviewRow): ReviewRow => {
+    const hasAll = !!row.staffId && !!row.clientId && !!row.logDateIso && !!row.narrative.trim();
+    if (hasAll) return { ...row, status: "matched", reason: null };
+    if (row.status === "ambiguous") return row;
+    return { ...row, status: "incomplete" };
+  };
 
   const updateRow = (idx: number, patch: Partial<ReviewRow>) => {
     setRows((r) => r.map((row) => (row.idx === idx ? { ...row, ...patch } : row)));

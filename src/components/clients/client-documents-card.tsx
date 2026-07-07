@@ -260,15 +260,20 @@ export function ClientDocumentsCard({
                     const { data: signed } = await supabase.storage
                       .from("client-documents")
                       .createSignedUrl(d.storage_path, 300);
-                    if (signed?.signedUrl) window.open(signed.signedUrl, "_blank");
-                    else toast.error("Could not generate a link for this file.");
+                    if (signed?.signedUrl) {
+                      setPreview({ fileName: d.file_name, mimeType: d.mime_type ?? null, signedUrl: signed.signedUrl });
+                    } else toast.error("Could not generate a link for this file.");
                     return;
                   }
                   try {
                     const res = await getDocFn({ data: { documentId: d.id } });
                     const url = (res as { signedUrl?: string | null })?.signedUrl;
-                    if (url) window.open(url, "_blank");
-                    else toast.error("Could not generate a link for this file.");
+                    const mime =
+                      ((res as { document?: { mime_type?: string | null } })?.document?.mime_type ?? d.mime_type) ??
+                      null;
+                    if (url) {
+                      setPreview({ fileName: d.file_name, mimeType: mime, signedUrl: url });
+                    } else toast.error("Could not generate a link for this file.");
                   } catch (e) {
                     toast.error((e as Error).message);
                   }

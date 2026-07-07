@@ -683,8 +683,17 @@ export function WhiteboardPlanningBoard() {
 
   // --- Actions -----------------------------------------------------------
 
+  function handleDragStart(e: DragStartEvent) {
+    setActiveId(String(e.active.id));
+  }
+  function handleDragCancel() {
+    setActiveId(null);
+  }
+
   function handleDragEnd(e: DragEndEvent) {
+    setActiveId(null);
     const dest = e.over?.id ? String(e.over.id) : null;
+    // No valid drop target → return-to-source (do nothing).
     if (!dest) return;
     const parsed = parseDraggable(String(e.active.id));
     if (!parsed) return;
@@ -692,14 +701,12 @@ export function WhiteboardPlanningBoard() {
     setPlan((prev) => {
       const next: Plan = { clients: { ...prev.clients }, staff: { ...prev.staff } };
       if (parsed.kind === "client") {
-        // Clients can only land in client-accepting containers (rhs-home / hhs-host / POOL_CLIENTS).
         if (!(dest.startsWith("rhs-home:") || dest.startsWith("hhs-host:") || dest === POOL_CLIENTS)) {
           return prev;
         }
         if (prev.clients[parsed.id] === dest) return prev;
         next.clients[parsed.id] = dest;
       } else {
-        // Staff can go anywhere (rhs-home / hhs-host / ds-client / POOL_STAFF).
         if (
           !(
             dest.startsWith("rhs-home:") ||

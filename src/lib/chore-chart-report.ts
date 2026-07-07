@@ -11,6 +11,8 @@ import { fetchOrgName } from "./client-report-shared";
 export type ChoreChartReportArgs = {
   spaceId: string;
   supabaseClient?: SupabaseClient;
+  /** Optional ISO Monday for the week this chart covers. */
+  weekStartISO?: string;
 };
 
 export type ChoreChartReportResult = {

@@ -3885,6 +3885,8 @@ export type Database = {
           denied_by: string | null
           followup_form_types: string[] | null
           id: string
+          import_job_id: string | null
+          import_source: string | null
           late_submission_reason: string | null
           log_date: string
           narrative: string
@@ -3914,6 +3916,8 @@ export type Database = {
           denied_by?: string | null
           followup_form_types?: string[] | null
           id?: string
+          import_job_id?: string | null
+          import_source?: string | null
           late_submission_reason?: string | null
           log_date?: string
           narrative: string
@@ -3943,6 +3947,8 @@ export type Database = {
           denied_by?: string | null
           followup_form_types?: string[] | null
           id?: string
+          import_job_id?: string | null
+          import_source?: string | null
           late_submission_reason?: string | null
           log_date?: string
           narrative?: string

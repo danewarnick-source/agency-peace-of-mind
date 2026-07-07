@@ -20,8 +20,9 @@ import {
   getSmartImportSummary,
 } from "@/lib/smart-import.functions";
 import { TimesheetsImportWizard } from "@/components/smart-import/timesheets/timesheets-import-wizard";
+import { DailyNotesImportWizard } from "@/components/smart-import/daily-notes/daily-notes-import-wizard";
 
-const SearchSchema = z.object({ mode: z.enum(["employee", "client", "timesheets"]).optional() });
+const SearchSchema = z.object({ mode: z.enum(["employee", "client", "timesheets", "daily_notes"]).optional() });
 
 export const Route = createFileRoute("/dashboard/smart-import/")({
   head: () => ({ meta: [{ title: "Smart Import — NECTAR" }] }),
@@ -33,7 +34,7 @@ export const Route = createFileRoute("/dashboard/smart-import/")({
   ),
 });
 
-type Mode = "employee" | "client" | "timesheets";
+type Mode = "employee" | "client" | "timesheets" | "daily_notes";
 type FileChip = {
   id: string;
   file: File;
@@ -400,8 +401,8 @@ function SmartImportPage() {
       </div>
 
       {/* Mode switch */}
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-card p-1 w-fit">
-        {(["client", "employee", "timesheets"] as Mode[]).map((m) => (
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-1 w-fit">
+        {(["client", "employee", "timesheets", "daily_notes"] as Mode[]).map((m) => (
           <button
             key={m}
             type="button"
@@ -411,14 +412,18 @@ function SmartImportPage() {
               mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            {m === "client" ? "Client" : m === "employee" ? "Employee" : "Historical timesheets"}
+            {m === "client" ? "Client"
+              : m === "employee" ? "Employee"
+              : m === "timesheets" ? "Historical timesheets"
+              : "Historical daily notes"}
           </button>
         ))}
       </div>
 
       {mode === "timesheets" && !jobId && <TimesheetsImportWizard />}
+      {mode === "daily_notes" && !jobId && <DailyNotesImportWizard />}
 
-      {!jobId && mode !== "timesheets" && (
+      {!jobId && mode !== "timesheets" && mode !== "daily_notes" && (
         <>
           {/* Drop zone */}
           <div

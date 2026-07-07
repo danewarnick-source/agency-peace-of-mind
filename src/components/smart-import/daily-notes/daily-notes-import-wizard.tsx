@@ -1412,3 +1412,76 @@ function DoneStep({
   );
 }
 
+
+// ─── Bulk-fix panel ────────────────────────────────────────────────────────
+// If the same unresolved raw label appears on many rows, admin picks the
+// right person once and every row sharing that label is updated.
+function BulkFixPanel({
+  repeatedIssues, people, onBulkResolve,
+}: {
+  repeatedIssues: { staffIssues: Array<[string, number]>; clientIssues: Array<[string, number]> };
+  people: { staff: Person[]; clients: Person[] };
+  onBulkResolve: (kind: "staff" | "client", rawLabel: string, id: string) => void;
+}) {
+  const { staffIssues, clientIssues } = repeatedIssues;
+  if (staffIssues.length === 0 && clientIssues.length === 0) return null;
+  return (
+    <div className="rounded-2xl border border-amber-400/50 bg-amber-500/5 p-4">
+      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-800">
+        <AlertTriangle className="h-4 w-4" /> Repeated issues — fix once, apply to every matching row
+      </div>
+      <p className="mb-3 text-xs text-muted-foreground">
+        These raw values appear on multiple rows and aren't resolved yet. Pick the correct person once and every
+        row sharing that value will update.
+      </p>
+      <div className="grid gap-3 md:grid-cols-2">
+        {staffIssues.length > 0 && (
+          <div>
+            <div className="mb-1 text-xs font-medium">Unresolved staff labels</div>
+            <div className="space-y-1.5">
+              {staffIssues.slice(0, 20).map(([label, n]) => (
+                <div key={label} className="flex items-center gap-2 rounded-md border border-border/60 bg-card p-2 text-xs">
+                  <div className="min-w-0 flex-1 truncate">
+                    <span className="font-medium">"{label}"</span>{" "}
+                    <span className="text-muted-foreground">· {n} rows</span>
+                  </div>
+                  <Select onValueChange={(id) => id && onBulkResolve("staff", label, id)}>
+                    <SelectTrigger className="h-7 w-48 text-xs"><SelectValue placeholder="Pick staff member" /></SelectTrigger>
+                    <SelectContent>
+                      {people.staff.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {clientIssues.length > 0 && (
+          <div>
+            <div className="mb-1 text-xs font-medium">Unresolved client labels</div>
+            <div className="space-y-1.5">
+              {clientIssues.slice(0, 20).map(([label, n]) => (
+                <div key={label} className="flex items-center gap-2 rounded-md border border-border/60 bg-card p-2 text-xs">
+                  <div className="min-w-0 flex-1 truncate">
+                    <span className="font-medium">"{label}"</span>{" "}
+                    <span className="text-muted-foreground">· {n} rows</span>
+                  </div>
+                  <Select onValueChange={(id) => id && onBulkResolve("client", label, id)}>
+                    <SelectTrigger className="h-7 w-48 text-xs"><SelectValue placeholder="Pick client" /></SelectTrigger>
+                    <SelectContent>
+                      {people.clients.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -405,10 +405,10 @@ function UploadDocDialog({
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
-            <Label>File (PDF, text, CSV)</Label>
+            <Label>File (PDF, Word, text, CSV)</Label>
             <Input
               type="file"
-              accept=".pdf,.txt,.csv,.md,.json,.html,.htm"
+              accept=".pdf,.doc,.docx,.txt,.csv,.md,.json,.html,.htm,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
           </div>

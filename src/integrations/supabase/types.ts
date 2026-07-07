@@ -4000,6 +4000,7 @@ export type Database = {
           last_name: string
           level_of_need: string | null
           mailing_address: string | null
+          meal_actuals_assignee: string | null
           med_prescriber_name: string | null
           med_prescriber_phone: string | null
           medicaid_case_number: string | null
@@ -4131,6 +4132,7 @@ export type Database = {
           last_name: string
           level_of_need?: string | null
           mailing_address?: string | null
+          meal_actuals_assignee?: string | null
           med_prescriber_name?: string | null
           med_prescriber_phone?: string | null
           medicaid_case_number?: string | null
@@ -4262,6 +4264,7 @@ export type Database = {
           last_name?: string
           level_of_need?: string | null
           mailing_address?: string | null
+          meal_actuals_assignee?: string | null
           med_prescriber_name?: string | null
           med_prescriber_phone?: string | null
           medicaid_case_number?: string | null
@@ -17076,6 +17079,7 @@ export type Database = {
           last_name: string
           level_of_need: string | null
           mailing_address: string | null
+          meal_actuals_assignee: string | null
           med_prescriber_name: string | null
           med_prescriber_phone: string | null
           medicaid_case_number: string | null

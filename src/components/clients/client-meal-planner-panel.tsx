@@ -735,7 +735,8 @@ export function ClientMealPlannerPanel({
         />
 
 
-        {/* Actuals — staff record; manager sees read-only plan-vs-actual */}
+        {/* Actuals — staff record on their view; manager sees the standing assignee
+            selector + generates a Plan vs. Actual report (moved out of the panel). */}
         {planId && canEdit && (
           <>
             <ActualsAssigneeCard
@@ -743,11 +744,17 @@ export function ClientMealPlannerPanel({
               staff={staffQ.data ?? []}
               onChange={(id) => setAssignee.mutate(id)}
             />
-            <ActualsReadOnly
+            <PlanVsActualReportCard
+              clientName={clientName}
               weekStart={weekStart}
-              actuals={actualsQ.data ?? []}
+              weekLabel={weekLabel}
               meals={meals}
+              actuals={actualsQ.data ?? []}
               staff={staffQ.data ?? []}
+              orgName={org?.organization_name ?? ""}
+              logo={logoState}
+              clientId={clientId}
+              organizationId={orgId ?? ""}
             />
           </>
         )}

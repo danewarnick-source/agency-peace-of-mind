@@ -110,7 +110,7 @@ export async function generateMealMenuReport(
         .eq("meal_plan_id", plan.id)
         .order("sort_order"),
     ]);
-    meals = ((mRes.data ?? []) as Array<{
+    meals = ((mRes.data ?? []) as unknown as Array<{
       day_of_week: number;
       meal_slot: MealSlot;
       label: string;

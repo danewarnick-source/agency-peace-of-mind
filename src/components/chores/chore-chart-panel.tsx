@@ -295,57 +295,6 @@ export function ChoreChartPanel({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const addShiftRow = useMutation({
-    mutationFn: async (label: string) => {
-      const { error } = await supabase.from("chore_shift_rows").insert({
-        space_id: spaceId,
-        label,
-        sort_order: shiftRows.length,
-      });
-      if (error) throw error;
-    },
-    onSuccess: invalidate,
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const updateShiftRow = useMutation({
-    mutationFn: async (v: Partial<ShiftRow> & { id: string }) => {
-      const { error } = await supabase
-        .from("chore_shift_rows")
-        .update(v)
-        .eq("id", v.id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["chore-shift-rows", spaceId] }),
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const deleteShiftRow = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("chore_shift_rows").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: invalidate,
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const upsertShiftCell = useMutation({
-    mutationFn: async (v: {
-      shift_row_id: string;
-      day_of_week: number;
-      task_text: string;
-      helps_client_id: string | null;
-      definition_id: string | null;
-    }) => {
-      const { error } = await supabase
-        .from("chore_shift_assignments")
-        .upsert(
-          { space_id: spaceId, ...v },
-          { onConflict: "space_id,shift_row_id,day_of_week" },
-        );
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["chore-shift-cells", spaceId] }),
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   const addDailyItem = useMutation({
     mutationFn: async (v: { label: string; detail: string | null }) => {

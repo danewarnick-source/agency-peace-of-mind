@@ -20,8 +20,9 @@ import {
   getSmartImportSummary,
 } from "@/lib/smart-import.functions";
 import { TimesheetsImportWizard } from "@/components/smart-import/timesheets/timesheets-import-wizard";
+import { DailyNotesImportWizard } from "@/components/smart-import/daily-notes/daily-notes-import-wizard";
 
-const SearchSchema = z.object({ mode: z.enum(["employee", "client", "timesheets"]).optional() });
+const SearchSchema = z.object({ mode: z.enum(["employee", "client", "timesheets", "daily_notes"]).optional() });
 
 export const Route = createFileRoute("/dashboard/smart-import/")({
   head: () => ({ meta: [{ title: "Smart Import — NECTAR" }] }),

@@ -806,9 +806,10 @@ export function ClientMealPlannerPanel({
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Managers: drag meal pills between cells to reschedule (shopping list is unchanged).
-          Staff: confirm what the client actually ate each day below. Pass 3 will add recipe
-          scanning, auto-populated shopping list, and budget-fit checks.
+          Managers: drag meal pills between cells to reschedule (shopping list stays put — only recipe
+          changes drive it). Add recipes from the toolbar; auto-populate shopping from recipes on the
+          plan; NECTAR suggests healthier/cheaper swaps but never overrides your call. Prices and
+          ingredients are never invented.
         </p>
       </CardContent>
     </Card>

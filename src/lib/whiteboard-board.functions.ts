@@ -35,11 +35,13 @@ export const getBoardStaff = createServerFn({ method: "GET" })
 
     const memQ = await supabase
       .from("organization_members")
-      .select("user_id, is_active")
+      .select("user_id, active")
       .eq("organization_id", data.organization_id)
-      .eq("is_active", true);
+      .eq("active", true);
     if (memQ.error) throw new Error(memQ.error.message);
-    const ids = (memQ.data ?? []).map((r: { user_id: string }) => r.user_id);
+    const ids = ((memQ.data ?? []) as Array<{ user_id: string }>).map(
+      (r) => r.user_id,
+    );
     if (ids.length === 0) return [];
 
     const profQ = await supabase

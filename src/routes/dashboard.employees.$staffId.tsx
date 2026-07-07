@@ -39,6 +39,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { StaffPhotoCard } from "@/components/staff/staff-photo-card";
+import { PersonAvatar } from "@/components/person/person-avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { RequirePermission } from "@/components/rbac-guard";
@@ -231,6 +233,12 @@ function StaffProfilePage() {
           <Button variant="ghost" size="sm" onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/hub/employees" })}>
             <ArrowLeft className="mr-1 h-4 w-4" /> Employees
           </Button>
+          <PersonAvatar
+            bucket="staff-photos"
+            path={(p?.photo_path as string | null) ?? null}
+            name={name}
+            className="h-11 w-11"
+          />
           <div>
             <h1 className="text-xl font-semibold">{name}</h1>
             <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -258,6 +266,10 @@ function StaffProfilePage() {
         {/* ----- OVERVIEW ----- */}
         <TabsContent value="profile" className="mt-4">
           <div className="grid gap-4 lg:grid-cols-2">
+
+            {/* Card 0 — Photo */}
+            <StaffPhotoCard orgId={orgId} staffId={staffId} name={name} />
+
 
             {/* Card 1 — Contact & Position */}
             <ContactCard

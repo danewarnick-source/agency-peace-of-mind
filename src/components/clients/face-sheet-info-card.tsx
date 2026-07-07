@@ -26,6 +26,8 @@ const FIELDS = [
   "religion",
   "state_id_number",
   "state_id_expires_on",
+  "pcsp_signed_date",
+  "intake_date",
   "medicaid_case_number",
   "medicaid_id",
   "medicare_number",
@@ -51,7 +53,13 @@ const FIELDS = [
   "psychiatrist_name",
   "psychiatrist_phone",
   "psychiatrist_address",
+  // Emergency contacts (address/relationship additions on clients row)
+  "emergency_contact_relationship",
+  "emergency_contact_address",
+  "emergency_contact_2_relationship",
+  "emergency_contact_2_address",
 ] as const;
+
 
 const SELECT_COLS = FIELDS.join(", ");
 
@@ -110,6 +118,12 @@ export function FaceSheetInfoCard({ clientId }: { clientId: string }) {
         religion: form.religion || null,
         state_id_number: form.state_id_number || null,
         state_id_expires_on: form.state_id_expires_on || null,
+        pcsp_signed_date: form.pcsp_signed_date || null,
+        intake_date: form.intake_date || null,
+        emergency_contact_relationship: form.emergency_contact_relationship || null,
+        emergency_contact_address: form.emergency_contact_address || null,
+        emergency_contact_2_relationship: form.emergency_contact_2_relationship || null,
+        emergency_contact_2_address: form.emergency_contact_2_address || null,
         medicaid_case_number: form.medicaid_case_number || null,
         medicaid_id: form.medicaid_id || null,
         medicare_number: form.medicare_number || null,
@@ -176,7 +190,19 @@ export function FaceSheetInfoCard({ clientId }: { clientId: string }) {
             <Field label="Religion" k="religion" form={form} set={set} editing={editing} />
             <Field label="Utah ID #" k="state_id_number" form={form} set={set} editing={editing} />
             <Field label="Utah ID expiration" k="state_id_expires_on" type="date" form={form} set={set} editing={editing} />
+            <Field label="PCSP signed date" k="pcsp_signed_date" type="date" form={form} set={set} editing={editing} />
+            <Field label="Intake date" k="intake_date" type="date" form={form} set={set} editing={editing} />
           </Section>
+
+          <Section title="Emergency contacts (extras on record)">
+            <Field label="Primary — relationship" k="emergency_contact_relationship" form={form} set={set} editing={editing} />
+            <Field label="Primary — address" k="emergency_contact_address" multiline form={form} set={set} editing={editing} full />
+            <Field label="Secondary — relationship" k="emergency_contact_2_relationship" form={form} set={set} editing={editing} />
+            <Field label="Secondary — address" k="emergency_contact_2_address" multiline form={form} set={set} editing={editing} full />
+          </Section>
+
+
+
 
           <Section title="Insurance & Payment">
             <Field label="Medicaid case #" k="medicaid_case_number" form={form} set={set} editing={editing} />

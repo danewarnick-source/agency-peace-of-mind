@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type { CaseloadClient } from "@/hooks/use-caseload";
 import { FaceSheetInfoCard } from "@/components/clients/face-sheet-info-card";
+import { ClientPhotoCard } from "@/components/clients/client-photo-card";
 
 export function AboutTab({ client }: { client: CaseloadClient }) {
   const goals = client.pcsp_goals ?? [];
@@ -108,6 +109,9 @@ export function AboutTab({ client }: { client: CaseloadClient }) {
       </Card>
 
       {/* Face Sheet Info — backs every field on the printable Client Face Sheet */}
+      <div className="md:col-span-2">
+        <ClientPhotoCard clientId={client.id} />
+      </div>
       <div className="md:col-span-2">
         <FaceSheetInfoCard clientId={client.id} />
       </div>

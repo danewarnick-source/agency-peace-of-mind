@@ -121,12 +121,12 @@ export const suggestImportColumnMapping = createServerFn({ method: "POST" })
     if (memErr) throw new Error(memErr.message);
     if (!memberRow) throw new Error("You are not a member of this organization.");
 
-    // Load roster (bounded — take up to 800 of each; NECTAR only sees a
-    // sample of names, but overlap detection uses the full set).
-    const [staffRes, clientsRes] = await Promise.all([
+    // Load roster. organization_members ↔ profiles has no FK (both key off
+    // auth.users.id), so PostgREST cannot embed them — two queries, join in JS.
+    const [memRes, clientsRes] = await Promise.all([
       supabase
         .from("organization_members")
-        .select("user_id, profiles:profiles!inner(id, first_name, last_name, full_name)")
+        .select("user_id")
         .eq("organization_id", data.organization_id)
         .eq("active", true)
         .limit(800),
@@ -136,18 +136,24 @@ export const suggestImportColumnMapping = createServerFn({ method: "POST" })
         .eq("organization_id", data.organization_id)
         .limit(800),
     ]);
-    if (staffRes.error) throw new Error(staffRes.error.message);
+    if (memRes.error) throw new Error(memRes.error.message);
     if (clientsRes.error) throw new Error(clientsRes.error.message);
 
-    type S = { profiles: { id: string; first_name: string | null; last_name: string | null; full_name: string | null } };
-    const staff: Person[] = ((staffRes.data ?? []) as unknown as S[])
-      .map((m) => m.profiles)
-      .filter(Boolean)
-      .map((p) => ({
+    const memberIds = (memRes.data ?? []).map((m: { user_id: string | null }) => m.user_id).filter(Boolean) as string[];
+    let staff: Person[] = [];
+    if (memberIds.length > 0) {
+      const profRes = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, full_name")
+        .in("id", memberIds);
+      if (profRes.error) throw new Error(profRes.error.message);
+      staff = (profRes.data ?? []).map((p: { id: string; first_name: string | null; last_name: string | null; full_name: string | null }) => ({
         id: p.id,
         label: (p.full_name?.trim()) || [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || "Staff",
         norms: personNorms(p.first_name ?? "", p.last_name ?? "", p.full_name),
       }));
+    }
+
     const clients: Person[] = ((clientsRes.data ?? []) as Array<{ id: string; first_name: string; last_name: string }>)
       .map((c) => ({
         id: c.id,

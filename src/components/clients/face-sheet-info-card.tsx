@@ -26,6 +26,8 @@ const FIELDS = [
   "religion",
   "state_id_number",
   "state_id_expires_on",
+  "pcsp_signed_date",
+  "intake_date",
   "medicaid_case_number",
   "medicaid_id",
   "medicare_number",
@@ -51,7 +53,13 @@ const FIELDS = [
   "psychiatrist_name",
   "psychiatrist_phone",
   "psychiatrist_address",
+  // Emergency contacts (address/relationship additions on clients row)
+  "emergency_contact_relationship",
+  "emergency_contact_address",
+  "emergency_contact_2_relationship",
+  "emergency_contact_2_address",
 ] as const;
+
 
 const SELECT_COLS = FIELDS.join(", ");
 

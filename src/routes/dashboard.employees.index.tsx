@@ -448,7 +448,7 @@ export function EmployeesPage() {
                           bucket="staff-photos"
                           path={(m.profile as { photo_path?: string | null } | undefined)?.photo_path ?? null}
                           name={name === "—" ? null : name}
-                          className="h-7 w-7 text-[11px]"
+                          className="h-9 w-9 text-xs"
                         />
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 truncate">

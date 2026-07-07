@@ -895,5 +895,6 @@ export function WhiteboardPlanningBoard() {
         </div>
       </div>
     </DndContext>
+    </NotesBoardContext.Provider>
   );
 }

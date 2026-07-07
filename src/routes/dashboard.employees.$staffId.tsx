@@ -557,6 +557,39 @@ function ContactCard({
                 className="text-sm"
               />
             </div>
+            <div className="pt-2 mt-2 border-t border-border/60 space-y-3">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Emergency contact</div>
+              <div className="space-y-1">
+                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Name</Label>
+                <Input
+                  type="text"
+                  value={draft.emergency_contact_name}
+                  onChange={(e) => setDraft({ ...draft, emergency_contact_name: e.target.value })}
+                  placeholder="Full name"
+                  className="text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Relationship</Label>
+                <Input
+                  type="text"
+                  value={draft.emergency_contact_relationship}
+                  onChange={(e) => setDraft({ ...draft, emergency_contact_relationship: e.target.value })}
+                  placeholder="Spouse, parent, sibling…"
+                  className="text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Phone</Label>
+                <Input
+                  type="tel"
+                  value={draft.emergency_contact_phone}
+                  onChange={(e) => setDraft({ ...draft, emergency_contact_phone: e.target.value })}
+                  placeholder="(801) 555-0100"
+                  className="text-sm"
+                />
+              </div>
+            </div>
             <div className="flex gap-2 pt-1">
               <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
                 Save

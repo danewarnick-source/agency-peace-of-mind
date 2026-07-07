@@ -279,21 +279,26 @@ export async function renderClientBudgetPdf(p: BudgetPdfPayload): Promise<Uint8A
     // current y; then we drop y by band height plus an explicit gap so
     // the column-header row cannot collide with the band.
     const sub = sectionTotal(rows);
-    const bandH = 22;
+    const bandFontSize = 10.5;
+    const bandH = 24;
     const bandBottom = y - bandH;
+    // Vertically center the text within the band using the font's true
+    // glyph height (pdf-lib's y is the baseline).
+    const glyphH = bold.heightAtSize(bandFontSize);
+    const bandTextY = bandBottom + (bandH - glyphH) / 2 + 1;
 
     page.drawRectangle({
       x: MARGIN_X, y: bandBottom,
       width: CONTENT_W, height: bandH, color: C.ink,
     });
-    const bandTextY = bandBottom + 7;
-    drawText(title.toUpperCase(), MARGIN_X + 10, bandTextY, {
-      size: 10, font: bold, color: rgb(1, 1, 1),
+    drawText(title.toUpperCase(), MARGIN_X + 12, bandTextY, {
+      size: bandFontSize, font: bold, color: rgb(1, 1, 1),
     });
-    drawRight(`Subtotal  ${fmt$(sub)}`, PAGE_W - MARGIN_X - 10, bandTextY, {
-      size: 10, font: bold, color: rgb(1, 1, 1),
+    drawRight(`Subtotal  ${fmt$(sub)}`, PAGE_W - MARGIN_X - 12, bandTextY, {
+      size: bandFontSize, font: bold, color: rgb(1, 1, 1),
     });
     y = bandBottom - 8; // clean gap between band and column-header row
+
 
     drawColumnHeaders();
 
@@ -350,19 +355,10 @@ export async function renderClientBudgetPdf(p: BudgetPdfPayload): Promise<Uint8A
       });
     }
 
-    // Subtotal echo line (helps at page-break)
-    ensure(18);
-    page.drawLine({
-      start: { x: xs.total, y: y + 2 },
-      end: { x: PAGE_W - MARGIN_X, y: y + 2 },
-      thickness: 0.5, color: C.rule,
-    });
-    drawRight("Subtotal", xs.total + COL.total - 4 - 90, y - 10, { size: 9, font: bold, color: C.muted });
-    drawRight(fmt$(sub), xs.total + COL.total - 4, y - 10, { size: 10.5, font: bold, color: C.ink });
-    y -= 18;
-
-    y -= 10; // breathing room between sections
+    // (Subtotal already shown in the section band — no duplicate row here.)
+    y -= 14; // breathing room between sections
   };
+
 
   drawSection("Income", p.income);
   drawSection("Expenses / Needs", p.expense);

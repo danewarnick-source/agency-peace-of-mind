@@ -51,7 +51,7 @@ type TeamRow = {
   organization_id: string | null;
   setting: string | null;
 };
-type StaffRow = { id: string; name: string; team_id: string | null };
+type StaffRow = { id: string; name: string; team_id: string | null; photo_path: string | null };
 type ClientRow = {
   id: string;
   first_name: string;

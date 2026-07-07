@@ -48,6 +48,7 @@ type Row = {
   incident_flag: boolean;
   denial_reason: string | null;
   utah_medicaid_member_id: string;
+  import_source: string | null;
   clients: { first_name: string; last_name: string; team_id: string | null } | null;
 };
 

@@ -93,51 +93,78 @@ function SettingsPage() {
     refetch();
   };
 
+  const isAdmin = org?.role === "admin";
+  const canBillingContact = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      <form onSubmit={saveProfile} className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-        <h2 className="text-base font-semibold">Profile</h2>
-        <p className="text-sm text-muted-foreground">Manage your personal information.</p>
-        <div className="mt-5 grid gap-4">
-          <div className="grid gap-2"><Label htmlFor="email">Email</Label><Input id="email" value={user?.email ?? ""} disabled /></div>
-          <div className="grid gap-2"><Label htmlFor="full_name">Full name</Label><Input id="full_name" value={fullName} onChange={(e) => setFullName(e.target.value)} required /></div>
-          <Button type="submit" disabled={busy}>Save profile</Button>
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] lg:col-span-2">
+        <header className="mb-2">
+          <h2 className="text-base font-semibold">Profile &amp; organization</h2>
+          <p className="text-sm text-muted-foreground">
+            All identity-related information in one place — your profile, your
+            organization, and who Hive contacts about billing.
+          </p>
+        </header>
+
+        <div className="mt-4 space-y-8">
+          <form onSubmit={saveProfile}>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <UserCircle2 className="h-4 w-4 text-muted-foreground" /> Your profile
+            </h3>
+            <div className="mt-3 grid gap-4 md:grid-cols-2">
+              <div className="grid gap-2"><Label htmlFor="email">Email</Label><Input id="email" value={user?.email ?? ""} disabled /></div>
+              <div className="grid gap-2"><Label htmlFor="full_name">Full name</Label><Input id="full_name" value={fullName} onChange={(e) => setFullName(e.target.value)} required /></div>
+            </div>
+            <div className="mt-3"><Button type="submit" disabled={busy}>Save profile</Button></div>
+          </form>
+
+          {isAdmin && (
+            <>
+              <div className="border-t border-border" />
+              <form onSubmit={saveOrg}>
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Building2 className="h-4 w-4 text-muted-foreground" /> Organization details
+                </h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Visible to your whole team. Acronym is used in dashboard labels (e.g. column headers).
+                </p>
+                <div className="mt-3 grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2"><Label htmlFor="org_name">Organization name</Label><Input id="org_name" value={orgName} onChange={(e) => setOrgName(e.target.value)} required /></div>
+                  <div className="grid gap-2"><Label htmlFor="legal_name">Legal name</Label><Input id="legal_name" value={legalName} onChange={(e) => setLegalName(e.target.value)} placeholder="e.g. Acme Supports LLC" /></div>
+                  <div className="grid gap-2"><Label htmlFor="dba_name">Doing-business-as (DBA)</Label><Input id="dba_name" value={dbaName} onChange={(e) => setDbaName(e.target.value)} placeholder="Optional" /></div>
+                  <div className="grid gap-2"><Label htmlFor="display_acronym">Display acronym</Label><Input id="display_acronym" value={displayAcronym} onChange={(e) => setDisplayAcronym(e.target.value)} placeholder="e.g. ACME" maxLength={12} /></div>
+                  <div className="grid gap-2"><Label htmlFor="dhhs_provider_id">DHHS Provider ID</Label><Input id="dhhs_provider_id" value={dhhsProviderId} onChange={(e) => setDhhsProviderId(e.target.value)} placeholder="Required for Utah EVV export" /></div>
+                  <div className="grid gap-2"><Label htmlFor="evv_vendor_name">EVV Vendor name</Label><Input id="evv_vendor_name" value={evvVendorName} onChange={(e) => setEvvVendorName(e.target.value)} placeholder="Hive" /></div>
+                </div>
+                <label className="mt-3 flex items-start gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={incidentAiEnabled}
+                    onChange={(e) => setIncidentAiEnabled(e.target.checked)}
+                  />
+                  <span>
+                    <span className="font-medium">Nectar incident-report review</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Before staff submit an incident report, Nectar reads the draft and flags missing 5-Ws or vague phrases as concrete follow-up questions. Reviewer outages never block submission — the IR is filed with an AI-skipped badge.
+                    </span>
+                  </span>
+                </label>
+                <div className="mt-3"><Button type="submit" disabled={busy}>Save organization</Button></div>
+              </form>
+            </>
+          )}
+
+          {canBillingContact && org?.organization_id && (
+            <>
+              <div className="border-t border-border" />
+              <BillingContactSection organizationId={org.organization_id} />
+            </>
+          )}
         </div>
-      </form>
+      </section>
 
-      {org?.role === "admin" && (
-        <form onSubmit={saveOrg} className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-          <h2 className="text-base font-semibold">Organization</h2>
-          <p className="text-sm text-muted-foreground">Visible to your whole team. Acronym is used in dashboard labels (e.g. column headers).</p>
-          <div className="mt-5 grid gap-4">
-            <div className="grid gap-2"><Label htmlFor="org_name">Organization name</Label><Input id="org_name" value={orgName} onChange={(e) => setOrgName(e.target.value)} required /></div>
-            <div className="grid gap-2"><Label htmlFor="legal_name">Legal name</Label><Input id="legal_name" value={legalName} onChange={(e) => setLegalName(e.target.value)} placeholder="e.g. Acme Supports LLC" /></div>
-            <div className="grid gap-2"><Label htmlFor="dba_name">Doing-business-as (DBA)</Label><Input id="dba_name" value={dbaName} onChange={(e) => setDbaName(e.target.value)} placeholder="Optional" /></div>
-            <div className="grid gap-2"><Label htmlFor="display_acronym">Display acronym</Label><Input id="display_acronym" value={displayAcronym} onChange={(e) => setDisplayAcronym(e.target.value)} placeholder="e.g. ACME" maxLength={12} /></div>
-            <div className="grid gap-2"><Label htmlFor="dhhs_provider_id">DHHS Provider ID</Label><Input id="dhhs_provider_id" value={dhhsProviderId} onChange={(e) => setDhhsProviderId(e.target.value)} placeholder="Required for Utah EVV export" /></div>
-            <div className="grid gap-2"><Label htmlFor="evv_vendor_name">EVV Vendor name</Label><Input id="evv_vendor_name" value={evvVendorName} onChange={(e) => setEvvVendorName(e.target.value)} placeholder="Hive" /></div>
-            <label className="flex items-start gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm">
-              <input
-                type="checkbox"
-                className="mt-0.5"
-                checked={incidentAiEnabled}
-                onChange={(e) => setIncidentAiEnabled(e.target.checked)}
-              />
-              <span>
-                <span className="font-medium">Nectar incident-report review</span>
-                <span className="block text-xs text-muted-foreground">
-                  Before staff submit an incident report, Nectar reads the draft and flags missing 5-Ws or vague phrases as concrete follow-up questions. Reviewer outages never block submission — the IR is filed with an AI-skipped badge.
-                </span>
-              </span>
-            </label>
-            <Button type="submit" disabled={busy}>Save organization</Button>
-          </div>
-        </form>
-      )}
-
-      {(org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin") && org?.organization_id && (
-        <AccountContactCard organizationId={org.organization_id} />
-      )}
       {(org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin") && (
         <CompanyOverviewSettings />
       )}

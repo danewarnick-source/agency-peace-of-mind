@@ -591,12 +591,40 @@ export function ClientMealPlannerPanel({
     moveMeal.mutate({ id: mealId, day, slot });
   };
 
-  const cfg = cfgQ.data ?? { id: "", nutrition_label: "Fat Grams", nutrition_unit: "g" };
+  const cfg: NutritionCfg =
+    cfgQ.data ?? {
+      id: "",
+      nutrition_label: "Fat Grams",
+      nutrition_unit: "g",
+      extra_label: null,
+      extra_unit: null,
+      use_extra_field: false,
+      calorie_target: null,
+      protein_target_g: null,
+      carbs_target_g: null,
+      fat_target_g: null,
+      extra_target: null,
+    };
   const meals = mealsQ.data ?? [];
   const cellMeals = (day: number, slot: Slot) =>
     meals.filter((m) => m.day_of_week === day && m.meal_slot === slot);
-  const dayTotal = (day: number) =>
-    meals.filter((m) => m.day_of_week === day).reduce((s, m) => s + (m.nutrition_value ?? 0), 0);
+  const dayTotals = (day: number) => {
+    const dayMeals = meals.filter((m) => m.day_of_week === day);
+    const sum = (f: MacroField) =>
+      dayMeals.reduce((s, m) => s + (Number(m[f]) || 0), 0);
+    const anyEst = (f: MacroField) =>
+      dayMeals.some((m) => Number(m[f]) > 0 && m.nutrition_estimated?.[f]);
+    return {
+      calories: sum("calories"),
+      protein_g: sum("protein_g"),
+      carbs_g: sum("carbs_g"),
+      fat_g: sum("fat_g"),
+      extra_value: sum("extra_value"),
+      estCalories: anyEst("calories"),
+      estMacros: anyEst("protein_g") || anyEst("carbs_g") || anyEst("fat_g"),
+      estExtra: anyEst("extra_value"),
+    };
+  };
   const plannedCostTotal = useMemo(
     () => meals.reduce((s, m) => s + (Number(m.estimated_cost) || 0), 0),
     [meals],

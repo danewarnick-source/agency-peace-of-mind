@@ -148,6 +148,7 @@ export function ClientBudgetPanel({ clientId }: { clientId: string }) {
           non_variable: 0,
           variable: 0,
           notes: null,
+          day_of_month: null,
         }));
       if (seedRows.length) {
         const { error: eIns } = await supabase.from("client_budget_lines").insert(seedRows);

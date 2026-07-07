@@ -36,6 +36,7 @@ import {
   ingestDocument,
   queryDocuments,
   deleteDocument,
+  getDocument,
 } from "@/lib/nectar-documents.functions";
 import { attachClientDocument } from "@/lib/import-checklist.functions";
 import { NectarDocumentActionsDialog } from "@/components/nectar/document-actions-dialog";

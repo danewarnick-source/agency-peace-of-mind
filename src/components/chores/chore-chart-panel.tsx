@@ -242,12 +242,29 @@ export function ChoreChartPanel({
   });
   const shiftCells = shiftCellsQ.data ?? [];
 
+  const dailyItemsQ = useQuery({
+    enabled: !!spaceId,
+    queryKey: ["chore-daily-items", spaceId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("chore_daily_items")
+        .select("id, label, detail, sort_order")
+        .eq("space_id", spaceId)
+        .order("sort_order")
+        .order("label");
+      if (error) throw error;
+      return (data ?? []) as DailyItem[];
+    },
+  });
+  const dailyItems = dailyItemsQ.data ?? [];
+
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["chore-defs", spaceId] });
     qc.invalidateQueries({ queryKey: ["chore-rotation", spaceId] });
     qc.invalidateQueries({ queryKey: ["chore-shift-rows", spaceId] });
     qc.invalidateQueries({ queryKey: ["chore-shift-cells", spaceId] });
     qc.invalidateQueries({ queryKey: ["chore-space-clients", spaceId] });
+    qc.invalidateQueries({ queryKey: ["chore-daily-items", spaceId] });
   };
 
   // ── Mutations

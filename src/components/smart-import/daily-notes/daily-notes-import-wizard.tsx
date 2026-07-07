@@ -408,11 +408,44 @@ export function DailyNotesImportWizard() {
         status, reason,
         skipped: false,
         missing,
+        duplicateOfId: null,
+        duplicateReason: null,
       };
     });
     setRows(result);
     setStep(3);
-  }, [parsed, mapping, peopleQ.data, wholeFile]);
+
+    // Duplicate check for every fully-resolved row (staff + client + date).
+    const resolved = result.filter((r) => r.staffId && r.clientId && r.logDateIso);
+    if (resolved.length > 0 && org?.organization_id) {
+      setDupeChecking(true);
+      checkDupes({
+        data: {
+          mode: "daily_notes" as const,
+          organization_id: org.organization_id,
+          rows: resolved.map((r) => ({
+            index: r.idx,
+            staff_id: r.staffId!,
+            client_id: r.clientId!,
+            log_date_iso: r.logDateIso!,
+          })),
+        },
+      })
+        .then((res) => {
+          if (!res.duplicates?.length) return;
+          setRows((rs) =>
+            rs.map((r) => {
+              const hit = res.duplicates.find((d: { index: number }) => d.index === r.idx);
+              if (!hit) return r;
+              return { ...r, skipped: true, duplicateOfId: hit.existing_id, duplicateReason: hit.reason };
+            }),
+          );
+          toast.info(`${res.duplicates.length} note${res.duplicates.length === 1 ? "" : "s"} look like duplicates of existing entries — auto-skipped.`);
+        })
+        .catch((e) => console.warn("Duplicate check failed:", e))
+        .finally(() => setDupeChecking(false));
+    }
+  }, [parsed, mapping, peopleQ.data, wholeFile, org?.organization_id]);
 
 
   // Recompute status after any manual edit. A row becomes 'matched' only when

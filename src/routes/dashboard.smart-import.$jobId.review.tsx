@@ -193,9 +193,10 @@ function ReviewPage() {
         onSelectSubject={setSelectedId}
       />
 
-      <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+      <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
         <SubjectQueue mode={mode} queue={queue} selectedId={selectedId} onSelect={onQueueSelect} />
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-0">
+
           {selectedId ? (
             <SubjectReview
               subjectId={selectedId}

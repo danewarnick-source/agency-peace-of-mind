@@ -60,6 +60,23 @@ type ShoppingItem = {
 
 type NutritionCfg = { id: string; nutrition_label: string; nutrition_unit: string };
 
+const OUTCOMES = [
+  { v: "ate_as_planned", label: "Ate as planned" },
+  { v: "swapped_from_another_day", label: "Swapped from another day" },
+  { v: "ate_out", label: "Ate out" },
+  { v: "changed_entirely", label: "Changed entirely" },
+] as const;
+type Outcome = typeof OUTCOMES[number]["v"];
+
+type ActualRow = {
+  id: string;
+  meal_plan_id: string;
+  actual_date: string;
+  meal_slot: Slot;
+  outcome: Outcome;
+  note: string | null;
+};
+
 function mondayOf(d: Date): Date {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);

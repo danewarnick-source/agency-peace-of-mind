@@ -506,6 +506,35 @@ export function ClientMealPlannerPanel({
       </CardHeader>
 
       <CardContent className="space-y-6">
+        {/* Pass 3 toolbar: recipes, auto-shopping, budget-fit, NECTAR suggestions */}
+        {canEdit && orgId && (
+          <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 p-2">
+            <AddRecipeDialog orgId={orgId} clientId={clientId} />
+            {planId && (
+              <AutoShoppingDialog
+                orgId={orgId}
+                planId={planId}
+                recipeIdsInPlan={recipeIdsInPlan}
+              />
+            )}
+            <SuggestionsDialog
+              meals={meals.map((m) => ({
+                day: DAYS[m.day_of_week],
+                slot: m.meal_slot,
+                label: m.label,
+                estimated_cost: m.estimated_cost,
+              }))}
+              dietaryNeeds={clientQ.data?.dietary_needs ?? null}
+              allergies={clientQ.data?.allergies ?? null}
+              foodsToAvoid={planQ.data?.foods_to_avoid ?? null}
+              budgetRemaining={null}
+            />
+            <div className="ml-auto text-[11px] text-muted-foreground">
+              Recipes are org-scoped and reusable across cells; meal moves never change the shopping list.
+            </div>
+          </div>
+        )}
+
         {/* Nutrition metric config */}
         <div className="flex flex-col gap-2 rounded-md border bg-muted/30 p-3 sm:flex-row sm:items-end">
           <Settings2 className="mt-2 h-4 w-4 text-muted-foreground sm:mt-0 sm:mb-2" />

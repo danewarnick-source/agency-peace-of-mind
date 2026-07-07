@@ -554,11 +554,11 @@ function buildStartingPlan(
   for (const c of rhs.clients) {
     clients[c.id] = c.team_id ? `rhs-home:${c.team_id}` : POOL_CLIENTS;
   }
-  // HHS clients start unplaced — no persisted host relationship to seed from.
+  // Every wb client (any category) starts in the pool unless already seeded.
+  // Planning is a sandbox — any client must be draggable anywhere, regardless
+  // of category/authorization.
   for (const c of wb.clients) {
-    if (c.inferred_category === "hhs" && !(c.id in clients)) {
-      clients[c.id] = POOL_CLIENTS;
-    }
+    if (!(c.id in clients)) clients[c.id] = POOL_CLIENTS;
   }
   // Staff always start in the pool.
   return { clients, staff: {} };

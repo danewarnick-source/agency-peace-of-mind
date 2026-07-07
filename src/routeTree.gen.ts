@@ -53,6 +53,7 @@ import { Route as DashboardPermissionsRouteImport } from './routes/dashboard.per
 import { Route as DashboardPbaLedgerRouteImport } from './routes/dashboard.pba-ledger'
 import { Route as DashboardNectarDocsRouteImport } from './routes/dashboard.nectar-docs'
 import { Route as DashboardNectarCompanyProfileRouteImport } from './routes/dashboard.nectar-company-profile'
+import { Route as DashboardMyHistoricalTimesheetsRouteImport } from './routes/dashboard.my-historical-timesheets'
 import { Route as DashboardMyClientTrainingsRouteImport } from './routes/dashboard.my-client-trainings'
 import { Route as DashboardInvitationsRouteImport } from './routes/dashboard.invitations'
 import { Route as DashboardInternalAuditRouteImport } from './routes/dashboard.internal-audit'
@@ -422,6 +423,12 @@ const DashboardNectarCompanyProfileRoute =
   DashboardNectarCompanyProfileRouteImport.update({
     id: '/nectar-company-profile',
     path: '/nectar-company-profile',
+    getParentRoute: () => DashboardRoute,
+  } as any)
+const DashboardMyHistoricalTimesheetsRoute =
+  DashboardMyHistoricalTimesheetsRouteImport.update({
+    id: '/my-historical-timesheets',
+    path: '/my-historical-timesheets',
     getParentRoute: () => DashboardRoute,
   } as any)
 const DashboardMyClientTrainingsRoute =
@@ -1300,6 +1307,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/internal-audit': typeof DashboardInternalAuditRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/my-client-trainings': typeof DashboardMyClientTrainingsRoute
+  '/dashboard/my-historical-timesheets': typeof DashboardMyHistoricalTimesheetsRoute
   '/dashboard/nectar-company-profile': typeof DashboardNectarCompanyProfileRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
@@ -1488,6 +1496,7 @@ export interface FileRoutesByTo {
   '/dashboard/internal-audit': typeof DashboardInternalAuditRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/my-client-trainings': typeof DashboardMyClientTrainingsRoute
+  '/dashboard/my-historical-timesheets': typeof DashboardMyHistoricalTimesheetsRoute
   '/dashboard/nectar-company-profile': typeof DashboardNectarCompanyProfileRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
@@ -1682,6 +1691,7 @@ export interface FileRoutesById {
   '/dashboard/internal-audit': typeof DashboardInternalAuditRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/my-client-trainings': typeof DashboardMyClientTrainingsRoute
+  '/dashboard/my-historical-timesheets': typeof DashboardMyHistoricalTimesheetsRoute
   '/dashboard/nectar-company-profile': typeof DashboardNectarCompanyProfileRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
@@ -1878,6 +1888,7 @@ export interface FileRouteTypes {
     | '/dashboard/internal-audit'
     | '/dashboard/invitations'
     | '/dashboard/my-client-trainings'
+    | '/dashboard/my-historical-timesheets'
     | '/dashboard/nectar-company-profile'
     | '/dashboard/nectar-docs'
     | '/dashboard/pba-ledger'
@@ -2066,6 +2077,7 @@ export interface FileRouteTypes {
     | '/dashboard/internal-audit'
     | '/dashboard/invitations'
     | '/dashboard/my-client-trainings'
+    | '/dashboard/my-historical-timesheets'
     | '/dashboard/nectar-company-profile'
     | '/dashboard/nectar-docs'
     | '/dashboard/pba-ledger'
@@ -2259,6 +2271,7 @@ export interface FileRouteTypes {
     | '/dashboard/internal-audit'
     | '/dashboard/invitations'
     | '/dashboard/my-client-trainings'
+    | '/dashboard/my-historical-timesheets'
     | '/dashboard/nectar-company-profile'
     | '/dashboard/nectar-docs'
     | '/dashboard/pba-ledger'
@@ -2744,6 +2757,13 @@ declare module '@tanstack/react-router' {
       path: '/nectar-company-profile'
       fullPath: '/dashboard/nectar-company-profile'
       preLoaderRoute: typeof DashboardNectarCompanyProfileRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/my-historical-timesheets': {
+      id: '/dashboard/my-historical-timesheets'
+      path: '/my-historical-timesheets'
+      fullPath: '/dashboard/my-historical-timesheets'
+      preLoaderRoute: typeof DashboardMyHistoricalTimesheetsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/my-client-trainings': {
@@ -4121,6 +4141,7 @@ interface DashboardRouteChildren {
   DashboardInternalAuditRoute: typeof DashboardInternalAuditRoute
   DashboardInvitationsRoute: typeof DashboardInvitationsRoute
   DashboardMyClientTrainingsRoute: typeof DashboardMyClientTrainingsRoute
+  DashboardMyHistoricalTimesheetsRoute: typeof DashboardMyHistoricalTimesheetsRoute
   DashboardNectarCompanyProfileRoute: typeof DashboardNectarCompanyProfileRoute
   DashboardNectarDocsRoute: typeof DashboardNectarDocsRoute
   DashboardPbaLedgerRoute: typeof DashboardPbaLedgerRoute
@@ -4208,6 +4229,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardInternalAuditRoute: DashboardInternalAuditRoute,
   DashboardInvitationsRoute: DashboardInvitationsRoute,
   DashboardMyClientTrainingsRoute: DashboardMyClientTrainingsRoute,
+  DashboardMyHistoricalTimesheetsRoute: DashboardMyHistoricalTimesheetsRoute,
   DashboardNectarCompanyProfileRoute: DashboardNectarCompanyProfileRoute,
   DashboardNectarDocsRoute: DashboardNectarDocsRoute,
   DashboardPbaLedgerRoute: DashboardPbaLedgerRoute,

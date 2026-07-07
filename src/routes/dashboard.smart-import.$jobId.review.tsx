@@ -2311,11 +2311,30 @@ function BillingRowEditor({
       </td>
       <td className="py-1 px-1.5 text-right">
         {notOurs ? (
-          <span className="text-[11px]">{ro(row.rate)}</span>
+          <span className="text-[11px]">{fmtMoney(row.rate ?? null) ?? ro(null)}</span>
         ) : (
-          <Input className="h-7 w-full px-1.5 text-[11px] text-right" inputMode="decimal" value={row.rate ?? ""} onChange={(e) => patch("rate", numOrNull(e.target.value))} />
+          <div className="relative">
+            <span className="pointer-events-none absolute left-1.5 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground">$</span>
+            <Input
+              className="h-7 w-full pl-4 pr-1.5 text-[11px] text-right"
+              inputMode="decimal"
+              value={rateText}
+              onChange={(e) => setRateText(e.target.value)}
+              onBlur={() => {
+                const t = rateText.trim().replace(/,/g, "");
+                if (!t) { patch("rate", null); setRateText(""); return; }
+                const n = Number(t);
+                if (!Number.isFinite(n)) { setRateText(row.rate == null ? "" : row.rate.toFixed(2)); return; }
+                const rounded = Math.round(n * 100) / 100;
+                patch("rate", rounded);
+                setRateText(rounded.toFixed(2));
+              }}
+              placeholder="0.00"
+            />
+          </div>
         )}
       </td>
+
       <td className="py-1 px-1.5 text-right">
         {notOurs ? (
           <span className="text-[11px]">{ro(row.max_units)}</span>

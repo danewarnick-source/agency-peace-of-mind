@@ -2015,9 +2015,10 @@ function BillingCodesEditor({
                 <th className="py-1.5 px-1.5 font-medium">Provider</th>
                 <th className="py-1.5 px-1.5 font-medium w-[150px]">Ownership</th>
                 <th className="py-1.5 px-1.5 font-medium w-[70px]">Unit</th>
-                <th className="py-1.5 px-1.5 font-medium w-[64px]">Rate</th>
-                <th className="py-1.5 px-1.5 font-medium w-[68px]">Annual</th>
-                <th className="py-1.5 px-1.5 font-medium w-[56px]">Mo</th>
+                <th className="py-1.5 px-1.5 font-medium w-[80px] text-right">Rate ($)</th>
+                <th className="py-1.5 px-1.5 font-medium w-[96px] text-right">Annual units</th>
+                <th className="py-1.5 px-1.5 font-medium w-[120px] text-right">Monthly max units</th>
+
                 <th className="py-1.5 px-1.5 font-medium w-[150px]">Term</th>
                 <th className="py-1.5 px-1.5 font-medium w-[70px]">Status</th>
                 <th className="py-1.5 px-1.5 w-[36px]" />
@@ -2161,8 +2162,13 @@ function BillingRowEditor({
   const pending = isPending(row);
   const allCodes = EVV_SERVICE_CODES.map((c) => c.code);
   const notOurs = row.ownership_ack === "not_ours";
+  const fmtMoney = (v: number | null | undefined) =>
+    v == null || !Number.isFinite(v) ? null : `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const ro = (v: string | number | null | undefined) =>
     v == null || v === "" ? <span className="text-muted-foreground/60">—</span> : <span>{v}</span>;
+  const [rateText, setRateText] = useState<string>(row.rate == null ? "" : String(row.rate));
+  useEffect(() => { setRateText(row.rate == null ? "" : String(row.rate)); }, [row.rate]);
+
 
   return (
     <tr className={`border-b border-border/60 align-middle ${notOurs ? "bg-muted/30 text-muted-foreground" : ""}`}>
@@ -2306,11 +2312,30 @@ function BillingRowEditor({
       </td>
       <td className="py-1 px-1.5 text-right">
         {notOurs ? (
-          <span className="text-[11px]">{ro(row.rate)}</span>
+          <span className="text-[11px]">{fmtMoney(row.rate ?? null) ?? ro(null)}</span>
         ) : (
-          <Input className="h-7 w-full px-1.5 text-[11px] text-right" inputMode="decimal" value={row.rate ?? ""} onChange={(e) => patch("rate", numOrNull(e.target.value))} />
+          <div className="relative">
+            <span className="pointer-events-none absolute left-1.5 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground">$</span>
+            <Input
+              className="h-7 w-full pl-4 pr-1.5 text-[11px] text-right"
+              inputMode="decimal"
+              value={rateText}
+              onChange={(e) => setRateText(e.target.value)}
+              onBlur={() => {
+                const t = rateText.trim().replace(/,/g, "");
+                if (!t) { patch("rate", null); setRateText(""); return; }
+                const n = Number(t);
+                if (!Number.isFinite(n)) { setRateText(row.rate == null ? "" : row.rate.toFixed(2)); return; }
+                const rounded = Math.round(n * 100) / 100;
+                patch("rate", rounded);
+                setRateText(rounded.toFixed(2));
+              }}
+              placeholder="0.00"
+            />
+          </div>
         )}
       </td>
+
       <td className="py-1 px-1.5 text-right">
         {notOurs ? (
           <span className="text-[11px]">{ro(row.max_units)}</span>
@@ -2940,7 +2965,7 @@ function ImportSummaryPanel({
                     <th className="px-1.5 py-1 font-medium">Provider</th>
                     <th className="px-1.5 py-1 font-medium">Status</th>
                     <th className="px-1.5 py-1 font-medium">Unit</th>
-                    <th className="px-1.5 py-1 text-right font-medium">Rate</th>
+                    <th className="px-1.5 py-1 text-right font-medium">Rate ($)</th>
                     <th className="px-1.5 py-1 text-right font-medium">Cap</th>
                     <th className="px-1.5 py-1 font-medium">Plan dates</th>
                   </tr>
@@ -2960,7 +2985,7 @@ function ImportSummaryPanel({
                         <td className="px-1.5 py-1">{r.provider_name ?? <span className="text-muted-foreground/60">—</span>}</td>
                         <td className={`px-1.5 py-1 ${statusCls}`}>{statusLabel}</td>
                         <td className="px-1.5 py-1">{r.unit_type ?? "—"}</td>
-                        <td className="px-1.5 py-1 text-right">{r.rate ?? "—"}</td>
+                        <td className="px-1.5 py-1 text-right">{r.rate == null ? "—" : `$${r.rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</td>
                         <td className="px-1.5 py-1 text-right">{r.max_units ?? r.monthly_max_units ?? "—"}</td>
                         <td className="px-1.5 py-1">{r.plan_start ?? "—"} – {r.plan_end ?? "—"}</td>
                       </tr>

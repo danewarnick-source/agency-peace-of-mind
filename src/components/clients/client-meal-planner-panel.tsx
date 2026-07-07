@@ -162,14 +162,15 @@ export function ClientMealPlannerPanel({
   const [weekStart, setWeekStart] = useState<Date>(mondayOf(new Date()));
   const weekISO = fmtISO(weekStart);
 
-  // Client dietary fields + needs_shopping_help toggle
+  // Client dietary fields (needs_shopping_help no longer read — activation
+  // now lives in client_meal_support, gated by MealSupportGate above.)
   const clientQ = useQuery({
     enabled: !!clientId,
     queryKey: ["mp-client-diet", clientId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("first_name, last_name, dietary_needs, allergies, needs_shopping_help, meal_actuals_assignee, team_id")
+        .select("first_name, last_name, dietary_needs, allergies, meal_actuals_assignee, team_id")
         .eq("id", clientId)
         .maybeSingle();
       if (error) throw error;
@@ -178,17 +179,16 @@ export function ClientMealPlannerPanel({
         last_name: string | null;
         dietary_needs: string | null;
         allergies: string[] | null;
-        needs_shopping_help: boolean | null;
         meal_actuals_assignee: string | null;
         team_id: string | null;
       } | null;
     },
   });
-  const needsHelp = !!clientQ.data?.needs_shopping_help;
   const clientName = useMemo(() => {
     const c = clientQ.data;
     return [c?.first_name, c?.last_name].filter(Boolean).join(" ").trim() || "Client";
   }, [clientQ.data]);
+
 
   // Org branding logo — loaded once and reused for PDF headers.
   const { data: branding } = useOrgBranding(orgId);

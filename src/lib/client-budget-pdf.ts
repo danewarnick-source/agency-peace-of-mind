@@ -281,7 +281,7 @@ export async function renderClientBudgetPdf(p: BudgetPdfPayload): Promise<Uint8A
     const sub = sectionTotal(rows);
     const bandH = 22;
     const bandBottom = y - bandH;
-    const bandBottom = y - bandH;
+
     page.drawRectangle({
       x: MARGIN_X, y: bandBottom,
       width: CONTENT_W, height: bandH, color: C.ink,

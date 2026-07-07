@@ -195,7 +195,7 @@ export function TimesheetsImportWizard() {
   const [parsed, setParsed] = useState<ParsedFile | null>(null);
   const [mapping, setMapping] = useState<Mapping | null>(null);
   const [rows, setRows] = useState<ReviewRow[]>([]);
-  const [committed, setCommitted] = useState<{ inserted: number } | null>(null);
+  const [committed, setCommitted] = useState<{ inserted: number; staffCount: number } | null>(null);
 
   const createJob = useServerFn(createTimesheetImportJob);
   const commitRows = useServerFn(importHistoricalTimesheets);
@@ -439,9 +439,9 @@ export function TimesheetsImportWizard() {
       return res;
     },
     onSuccess: (res) => {
-      setCommitted({ inserted: res.inserted });
+      setCommitted({ inserted: res.inserted, staffCount: res.staffCount ?? 0 });
       setStep(4);
-      toast.success(`Imported ${res.inserted} historical timesheet${res.inserted === 1 ? "" : "s"}.`);
+      toast.success(`Submitted ${res.inserted} historical timesheet${res.inserted === 1 ? "" : "s"} to staff for confirmation.`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -455,9 +455,11 @@ export function TimesheetsImportWizard() {
           <div>
             <div className="font-semibold text-amber-800">Historical timesheets — imported from another platform</div>
             <p className="mt-1 text-muted-foreground">
-              Bring in past clock-in/clock-out records from whatever platform you used before HIVE.
-              Rows are permanently marked as historical imports so nobody mistakes them for live clock punches.
-              This flow never creates new staff or clients — every row must match someone who already exists.
+              This import runs in four explicit stages: <strong>upload &amp; parse</strong>, <strong>admin review</strong>,
+              <strong> submit to staff</strong>, and <strong>staff confirmation</strong>. Nothing moves forward without a
+              deliberate action. Rows are permanently marked as historical imports so nobody mistakes them for live clock
+              punches, and staff never see anything until you (the admin) explicitly submit it to them. This flow never
+              creates new staff or clients — every row must match someone who already exists.
             </p>
           </div>
         </div>
@@ -505,6 +507,7 @@ export function TimesheetsImportWizard() {
       {step === 4 && committed && (
         <DoneStep
           inserted={committed.inserted}
+          staffCount={committed.staffCount}
           onAnother={() => {
             setStep(1); setFile(null); setParsed(null); setMapping(null); setRows([]); setCommitted(null);
           }}
@@ -517,11 +520,15 @@ export function TimesheetsImportWizard() {
 
 // ─── Stepper ───────────────────────────────────────────────────────────────
 function Stepper({ step }: { step: 1 | 2 | 3 | 4 }) {
+  // Wizard steps map onto the four workflow stages:
+  //   Upload + Map columns  = Stage 1 (upload & parse / match)
+  //   Match & review        = Stage 2 (admin review; nothing is written yet)
+  //   Submitted             = Stage 3 landed; staff now own Stage 4 (confirmation)
   const items = [
     { n: 1, label: "Upload" },
     { n: 2, label: "Map columns" },
-    { n: 3, label: "Match & review" },
-    { n: 4, label: "Done" },
+    { n: 3, label: "Admin review" },
+    { n: 4, label: "Submitted to staff" },
   ];
   return (
     <ol className="flex items-center gap-2 text-sm">
@@ -808,12 +815,18 @@ function ReviewStep({
         </TabsContent>
       </Tabs>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col items-stretch gap-2 md:flex-row md:items-center md:justify-between">
         <Button variant="ghost" onClick={onBack}><ArrowLeft className="mr-1.5 h-4 w-4" /> Back to mapping</Button>
-        <Button onClick={onCommit} disabled={committing || ready.length === 0}>
-          {committing && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-          Import {ready.length} historical timesheet{ready.length === 1 ? "" : "s"}
-        </Button>
+        <div className="flex flex-col items-end gap-1">
+          <Button onClick={onCommit} disabled={committing || ready.length === 0}>
+            {committing && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+            Submit {ready.length} entr{ready.length === 1 ? "y" : "ies"} to staff for confirmation
+          </Button>
+          <p className="text-[11px] text-muted-foreground max-w-md text-right">
+            This is Stage 3 of the import. Nothing has been written to the database yet. Clicking submit releases these
+            entries into each staff member's own confirmation queue — staff never see them before this click.
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -1009,22 +1022,28 @@ function UnmatchedRow({
 
 // ─── Step 4 ────────────────────────────────────────────────────────────────
 function DoneStep({
-  inserted, onAnother, onArchive,
+  inserted, staffCount, onAnother, onArchive,
 }: {
   inserted: number;
+  staffCount: number;
   onAnother: () => void;
   onArchive: () => void;
 }) {
   return (
     <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/5 p-6 text-center">
       <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600" />
-      <div className="mt-2 font-semibold">Imported {inserted} historical timesheet{inserted === 1 ? "" : "s"}</div>
+      <div className="mt-2 font-semibold">
+        Submitted {inserted} historical entr{inserted === 1 ? "y" : "ies"} to{" "}
+        {staffCount} staff member{staffCount === 1 ? "" : "s"} for confirmation
+      </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        Every imported row is permanently marked as a historical import. It will never be confused with a live clock punch.
+        Each staff member will see only their own entries on their "Historical Timesheets to Confirm" page. They can add
+        a missing shift note, flag anything that looks wrong, and must confirm before an entry is finalized. Every entry
+        stays permanently marked as a historical import — it will never be confused with a live clock punch.
       </p>
-      <div className="mt-4 flex justify-center gap-2">
+      <div className="mt-4 flex flex-wrap justify-center gap-2">
         <Button variant="outline" onClick={onAnother}>Import another spreadsheet</Button>
-        <Button onClick={onArchive}>View EVV archive</Button>
+        <Button variant="outline" onClick={onArchive}>View EVV archive</Button>
       </div>
     </div>
   );

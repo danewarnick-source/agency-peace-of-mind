@@ -121,7 +121,11 @@ export const importHistoricalTimesheets = createServerFn({ method: "POST" })
         gps_validated: false,
         is_out_of_bounds: false,
         shift_entry_type: "Historical_Import",
-        status: "Approved",
+        // Stage 3 releases entries into the staff member's confirmation queue.
+        // Nothing from the historical import path lands as 'Approved' directly —
+        // staff have to attest before the entry is finalized (stage 4).
+        status: "Pending_Staff_Confirmation",
+        staff_flagged: false,
         shift_note_text: r.notes || null,
         import_source: "historical_import",
         import_job_id: data.job_id,
@@ -154,14 +158,22 @@ export const importHistoricalTimesheets = createServerFn({ method: "POST" })
       inserted += count ?? chunk.length;
     }
 
+    // Job stays open (status='submitted_to_staff') until every released
+    // entry is confirmed or flagged. It is NOT 'committed' here — that used
+    // to imply the timesheets were live/approved, which no longer matches
+    // reality under the four-stage flow.
     await supabase
       .from("import_jobs")
       .update({
-        status: "committed",
-        committed_at: new Date().toISOString(),
-        committed_by: userId,
+        status: "submitted_to_staff",
+        submitted_at: new Date().toISOString(),
+        submitted_by: userId,
       })
       .eq("id", data.job_id);
 
-    return { inserted, rejected };
+    // Count distinct staff so the wizard's Done screen can show
+    // "submitted to N staff members" without a second round-trip.
+    const staffCount = new Set(inserts.map((i) => i.staff_id as string)).size;
+
+    return { inserted, rejected, staffCount };
   });

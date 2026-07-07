@@ -12,7 +12,7 @@ import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings, Hexagon,
 
-  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink, Sparkles, MapPin, TrendingUp, HandCoins, Scale, FileText, Inbox, Search, AlarmClock,
+  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink, Sparkles, MapPin, TrendingUp, HandCoins, Scale, FileText, Inbox, Search, AlarmClock, Archive,
 } from "lucide-react";
 import { useIsHiveExecutive } from "@/hooks/use-hive-executive";
 import { EXEC_NAV, EXEC_DOMAINS, COMMAND_CENTER_ITEM } from "@/lib/exec-nav";
@@ -133,6 +133,7 @@ const STAFF_NAV: NavItem[] = [
   { to: "/dashboard", label: "My Caseload", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/schedule", label: "Schedule", icon: CalendarDays, feature: "evv_timesheets" },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
+  { to: "/dashboard/my-historical-timesheets", label: "Historical Timesheets", icon: Archive, feature: "evv_timesheets" },
   { to: "/dashboard/ask-nectar", label: "Ask NECTAR", icon: Sparkles, feature: "nectar" },
   { to: "/dashboard/courses", label: "My Trainings", icon: GraduationCap, feature: "staff_onboarding" },
   { to: "/dashboard/hive-training", label: "HIVE Training", icon: GraduationCap, feature: "hive_training" },

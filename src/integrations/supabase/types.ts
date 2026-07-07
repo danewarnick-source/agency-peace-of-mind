@@ -2040,6 +2040,44 @@ export type Database = {
           },
         ]
       }
+      chore_daily_items: {
+        Row: {
+          created_at: string
+          detail: string | null
+          id: string
+          label: string
+          sort_order: number
+          space_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          detail?: string | null
+          id?: string
+          label: string
+          sort_order?: number
+          space_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          detail?: string | null
+          id?: string
+          label?: string
+          sort_order?: number
+          space_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chore_daily_items_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "chore_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chore_definitions: {
         Row: {
           chore_name: string

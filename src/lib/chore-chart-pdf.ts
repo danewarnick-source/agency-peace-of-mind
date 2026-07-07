@@ -26,6 +26,7 @@ export type ChoreShiftRow = {
   timeRange: string | null; // e.g. "11p – 7a"
 };
 export type ChoreClient = { id: string; name: string };
+export type ChoreDailyItem = { label: string; detail: string | null };
 
 export type ChoreChartPdfPayload = {
   orgName: string;
@@ -36,6 +37,8 @@ export type ChoreChartPdfPayload = {
   clientCells: ChoreClientCell[];
   shiftRows: ChoreShiftRow[];
   shiftCells: ChoreShiftCell[];
+  /** Chores every client does every day (personal hygiene, beds, hamper, etc). */
+  dailyItems?: ChoreDailyItem[];
   /** ISO date (YYYY-MM-DD) of the Monday that anchors this chart's week. */
   weekStartISO?: string;
 };
@@ -194,6 +197,45 @@ export async function renderChoreChartPdf(p: ChoreChartPdfPayload): Promise<Uint
     });
   }
   y -= 14;
+
+  // ── Every-day chores band ───────────────────────────────
+  const dailyList = p.dailyItems ?? [];
+  if (dailyList.length > 0) {
+    if (y - 40 < MARGIN + 20) newPage();
+    page.drawRectangle({ x: MARGIN, y: y - 18, width: CONTENT_W, height: 18, color: C.band });
+    drawText(page, "EVERY DAY  ·  all clients, every day", MARGIN + 8, y - 13, {
+      font: bold, size: 9, color: C.bandText,
+    });
+    y -= 22;
+    // Two-column layout of labels + optional detail lines
+    const colW = CONTENT_W;
+    const innerX = MARGIN + 8;
+    const wrapW = colW - 16;
+    for (const item of dailyList) {
+      const detailLines = item.detail ? wrap(font, item.detail, 8.5, wrapW - 130) : [];
+      const rowH = Math.max(14, detailLines.length * 10 + 4);
+      if (y - rowH < MARGIN + 40) newPage();
+      page.drawLine({
+        start: { x: MARGIN, y }, end: { x: MARGIN + CONTENT_W, y },
+        color: C.ruleSoft, thickness: 0.4,
+      });
+      // Checkbox for the physical posted chart
+      page.drawRectangle({
+        x: innerX, y: y - 12, width: 8, height: 8,
+        borderColor: C.rule, borderWidth: 0.6,
+      });
+      drawText(page, item.label, innerX + 14, y - 11, { font: bold, size: 9, color: C.ink });
+      detailLines.forEach((ln, i) => {
+        drawText(page, ln, innerX + 130, y - 11 - i * 10, { font, size: 8.5, color: C.text });
+      });
+      y -= rowH;
+    }
+    page.drawLine({
+      start: { x: MARGIN, y }, end: { x: MARGIN + CONTENT_W, y },
+      color: C.rule, thickness: 0.5,
+    });
+    y -= 14;
+  }
 
   // ── Client rotation grid ───────────────────────────────
   const drawGrid = (

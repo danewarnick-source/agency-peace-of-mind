@@ -483,7 +483,39 @@ export function DailyNotesImportWizard() {
   };
 
   const skipRow = (idx: number) => setRows((r) => r.map((row) => row.idx === idx ? { ...row, skipped: true } : row));
-  const unskipRow = (idx: number) => setRows((r) => r.map((row) => row.idx === idx ? { ...row, skipped: false } : row));
+  const unskipRow = (idx: number) => setRows((r) => r.map((row) => row.idx === idx ? { ...row, skipped: false, duplicateOfId: null, duplicateReason: null } : row));
+
+  // Bulk-fix: resolve every row sharing the same raw label at once.
+  const bulkResolve = useCallback((kind: "staff" | "client", rawLabel: string, id: string) => {
+    setRows((rs) => {
+      let touched = 0;
+      const out = rs.map((row) => {
+        const label = kind === "staff" ? row.staffLabel : row.clientLabel;
+        if (label.trim().toLowerCase() !== rawLabel.trim().toLowerCase()) return row;
+        if (kind === "staff" && row.staffId) return row;
+        if (kind === "client" && row.clientId) return row;
+        touched++;
+        const next = { ...row, ...(kind === "staff" ? { staffId: id } : { clientId: id }) };
+        return recompute(next);
+      });
+      if (touched > 0) toast.success(`Applied to ${touched} row${touched === 1 ? "" : "s"} sharing "${rawLabel}".`);
+      return out;
+    });
+  }, []);
+
+  const repeatedIssues = useMemo(() => {
+    const staffMap = new Map<string, number>();
+    const clientMap = new Map<string, number>();
+    for (const r of rows) {
+      if (r.skipped) continue;
+      if (!r.staffId && r.staffLabel) staffMap.set(r.staffLabel, (staffMap.get(r.staffLabel) ?? 0) + 1);
+      if (!r.clientId && r.clientLabel) clientMap.set(r.clientLabel, (clientMap.get(r.clientLabel) ?? 0) + 1);
+    }
+    return {
+      staffIssues: Array.from(staffMap.entries()).filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]),
+      clientIssues: Array.from(clientMap.entries()).filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]),
+    };
+  }, [rows]);
 
   const readyRows = useMemo(
     () => rows.filter((r) => !r.skipped && r.status === "matched" && r.staffId && r.clientId && r.logDateIso && r.narrative),

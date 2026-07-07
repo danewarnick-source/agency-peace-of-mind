@@ -103,30 +103,51 @@ export function ClientMealPlannerPanel({
   clientId: string;
   readOnly?: boolean;
 }) {
+  const { session } = useAuth();
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
   const canEdit =
     !forcedReadOnly &&
     (org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin");
+  // Staff (any org member) may record daily actuals even in read-only-plan mode.
+  const canRecordActuals = !!org?.role;
   const qc = useQueryClient();
 
   const [weekStart, setWeekStart] = useState<Date>(mondayOf(new Date()));
   const weekISO = fmtISO(weekStart);
 
-  // Client dietary fields for the preferences/allergies section.
+  // Client dietary fields + needs_shopping_help toggle
   const clientQ = useQuery({
     enabled: !!clientId,
     queryKey: ["mp-client-diet", clientId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("dietary_needs, allergies")
+        .select("dietary_needs, allergies, needs_shopping_help")
         .eq("id", clientId)
         .maybeSingle();
       if (error) throw error;
-      return data;
+      return data as {
+        dietary_needs: string | null;
+        allergies: string[] | null;
+        needs_shopping_help: boolean | null;
+      } | null;
     },
   });
+  const needsHelp = !!clientQ.data?.needs_shopping_help;
+
+  const toggleNeedsHelp = useMutation({
+    mutationFn: async (v: boolean) => {
+      const { error } = await supabase
+        .from("clients")
+        .update({ needs_shopping_help: v })
+        .eq("id", clientId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["mp-client-diet", clientId] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
 
   // Nutrition config
   const cfgQ = useQuery({

@@ -2985,7 +2985,7 @@ function ImportSummaryPanel({
                         <td className="px-1.5 py-1">{r.provider_name ?? <span className="text-muted-foreground/60">—</span>}</td>
                         <td className={`px-1.5 py-1 ${statusCls}`}>{statusLabel}</td>
                         <td className="px-1.5 py-1">{r.unit_type ?? "—"}</td>
-                        <td className="px-1.5 py-1 text-right">{r.rate ?? "—"}</td>
+                        <td className="px-1.5 py-1 text-right">{r.rate == null ? "—" : `$${r.rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</td>
                         <td className="px-1.5 py-1 text-right">{r.max_units ?? r.monthly_max_units ?? "—"}</td>
                         <td className="px-1.5 py-1">{r.plan_start ?? "—"} – {r.plan_end ?? "—"}</td>
                       </tr>

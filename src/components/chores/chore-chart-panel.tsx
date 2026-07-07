@@ -460,6 +460,7 @@ export function ChoreChartPanel({
       spaceName: space?.name ?? "",
       spaceType: space?.space_type ?? "",
       clients: clients.map((c) => ({ id: c.id, name: clientName(c) })),
+      dailyItems: dailyItems.map((d) => ({ label: d.label, detail: d.detail })),
       definitions: defs.map((d) => ({
         id: d.id, chore_name: d.chore_name, task_list: d.task_list,
       })),

@@ -343,8 +343,9 @@ export async function renderMealPlanPdf(p: MealPlanPdfPayload): Promise<Uint8Arr
       start: { x: gridX, y: rowBottom }, end: { x: gridX + CONTENT_W, y: rowBottom },
       thickness: 0.5, color: C.rule,
     });
-    page1.drawText(`Daily ${p.nutritionLabel}`, {
-      x: gridX + 6, y: rowTop - 14, size: 8, font: bold, color: C.muted,
+    // Label sits ABOVE the totals row so it never collides with the day-0 total.
+    page1.drawText(`Daily ${p.nutritionLabel} (${p.nutritionUnit})`, {
+      x: gridX, y: rowTop + 4, size: 8, font: bold, color: C.muted,
     });
     DAY_NAMES.forEach((_, i) => {
       const cx = gridX + i * dayColW;

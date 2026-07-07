@@ -877,7 +877,7 @@ export function WhiteboardPlanningBoard() {
                   <RhsHomeContainer
                     key={h.id}
                     home={h}
-                    clients={cIds.map((id) => rhsClientById.get(id)).filter(Boolean) as RhsClient[]}
+                    clients={cIds.map((id) => rhsClientById.get(id) ?? wbClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
                     staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
                     score={scoreByHome.get(h.id) ?? null}
                     canDrag={canDrag}

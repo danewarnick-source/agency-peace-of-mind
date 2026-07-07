@@ -13,7 +13,10 @@ import {
   type ClientDraft,
   type ValidationIssue,
 } from "@/lib/import-validation";
-import { fetchTenantIdentity } from "@/lib/service-classification";
+import { fetchTenantIdentity, partitionCodeRows } from "@/lib/service-classification";
+import { isClockableServiceCode } from "@/lib/service-billing";
+import { isEvvLockedCode, evvServiceLabel } from "@/lib/evv-codes";
+
 
 
 const JobId = z.object({ jobId: z.string().uuid() });

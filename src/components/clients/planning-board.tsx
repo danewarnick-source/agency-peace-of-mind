@@ -1319,6 +1319,7 @@ export function WhiteboardPlanningBoard() {
                       host={h}
                       clients={cIds.map((id) => wbClientById.get(id) ?? rhsClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
                       staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
+                      score={scoreByHhs.get(h.id) ?? null}
                       canDrag={canDrag}
                     />
                   );

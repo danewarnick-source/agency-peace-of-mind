@@ -139,7 +139,7 @@ export const suggestImportColumnMapping = createServerFn({ method: "POST" })
     if (memRes.error) throw new Error(memRes.error.message);
     if (clientsRes.error) throw new Error(clientsRes.error.message);
 
-    const memberIds = (memRes.data ?? []).map((m) => m.user_id).filter(Boolean) as string[];
+    const memberIds = (memRes.data ?? []).map((m: { user_id: string | null }) => m.user_id).filter(Boolean) as string[];
     let staff: Person[] = [];
     if (memberIds.length > 0) {
       const profRes = await supabase

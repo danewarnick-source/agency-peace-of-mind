@@ -524,8 +524,13 @@ export function HomesTeamsBoard() {
                         })
                       }
                     >
-                      <button className="inline-flex items-center gap-1 rounded-md border border-dashed border-border bg-card px-2 py-1 text-xs hover:border-primary hover:bg-primary/5">
-                        <UserRound className="h-3 w-3 text-primary" />
+                      <button className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-border bg-card px-2 py-1 text-xs hover:border-primary hover:bg-primary/5">
+                        <PersonAvatar
+                          bucket="staff-photos"
+                          path={s.photo_path}
+                          name={s.name}
+                          className="h-5 w-5 text-[9px] border"
+                        />
                         {s.name}
                       </button>
                     </AddStaffToHomePopover>

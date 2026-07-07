@@ -14,8 +14,9 @@ import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import {
   Upload, X, Loader2, ArrowRight, ArrowLeft, Download,
-  CheckCircle2, AlertTriangle, HelpCircle, Archive, FileText,
+  CheckCircle2, AlertTriangle, HelpCircle, Archive, FileText, Wrench,
 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

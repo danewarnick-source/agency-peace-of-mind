@@ -41,6 +41,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   AlertTriangle,
+  CheckCircle2,
   GripVertical,
   Info,
   Plus,
@@ -72,10 +73,17 @@ import {
   type BoardStaff,
 } from "@/lib/whiteboard-board.functions";
 import {
-  scoreComposition,
   type MoveLight,
-  type MoveScore,
 } from "@/lib/rhs-board-scoring";
+import {
+  buildBoardReference,
+  scoreRhsContainer,
+  scoreHhsContainer,
+  scoreDsContainer,
+  type ContainerScore,
+  type ScoreFactor,
+} from "@/lib/whiteboard-scoring";
+import { getBoardScoringInputs } from "@/lib/whiteboard-scoring.functions";
 import { NotesPopover } from "./notes-popover";
 import { getWhiteboardNoteCounts } from "@/lib/whiteboard-notes.functions";
 
@@ -136,6 +144,56 @@ function lightDot(l: MoveLight): string {
     default: return "bg-muted-foreground/40";
   }
 }
+/** Glow inline style — green→yellow→red with intensity-driven alpha. */
+function glowStyle(score: ContainerScore | null): React.CSSProperties {
+  if (!score || score.light === "gray") return {};
+  const hue = score.light === "green" ? 152 : score.light === "yellow" ? 42 : 350;
+  const alpha = 0.35 + 0.5 * score.intensity;
+  return {
+    boxShadow: `0 0 0 2px hsla(${hue}, 84%, 48%, ${alpha}), 0 0 18px hsla(${hue}, 84%, 55%, ${alpha * 0.9})`,
+  };
+}
+
+/** Reasoning strip beneath a container — factors + honest unscored list. */
+function ScoreReasoning({ score }: { score: ContainerScore | null }) {
+  if (!score) return null;
+  if (score.factors.length === 0 && score.unscored.length === 0) return null;
+  return (
+    <div className="mt-2 space-y-1 border-t border-border/60 pt-2 text-[10px]">
+      {score.factors.map((f, i) => (
+        <FactorRow key={`${f.source}:${f.text}:${i}`} factor={f} />
+      ))}
+      {score.unscored.length > 0 && (
+        <div className="rounded bg-muted/50 px-1.5 py-1 text-muted-foreground">
+          <Info className="mr-1 inline h-2.5 w-2.5" />
+          <span className="font-semibold">NECTAR could not evaluate:</span>{" "}
+          {score.unscored.join(" · ")}
+        </div>
+      )}
+    </div>
+  );
+}
+function FactorRow({ factor }: { factor: ScoreFactor }) {
+  const tone =
+    factor.kind === "block"
+      ? "bg-rose-100 text-rose-900"
+      : factor.kind === "risk"
+        ? "bg-amber-100/80 text-amber-900"
+        : "bg-emerald-100/70 text-emerald-900";
+  const Icon =
+    factor.kind === "positive" ? CheckCircle2 : AlertTriangle;
+  return (
+    <div className={`flex items-start gap-1 rounded px-1.5 py-1 ${tone}`}>
+      <Icon className="mt-0.5 h-2.5 w-2.5 shrink-0" />
+      <span className="flex-1">
+        <span className="mr-1 rounded bg-black/10 px-1 text-[8px] font-semibold uppercase tracking-wide">
+          {factor.source}
+        </span>
+        {factor.text}
+      </span>
+    </div>
+  );
+}
 
 // ---------- Shape frames ----------------------------------------------------
 
@@ -151,7 +209,7 @@ function HouseFrame({
   title: string;
   subtitle?: string;
   badge?: React.ReactNode;
-  score?: MoveScore | null;
+  score?: ContainerScore | null;
   toneClass?: string;
   children: React.ReactNode;
 }) {
@@ -393,11 +451,12 @@ function RhsHomeContainer({
   home: RhsHome;
   clients: Array<RhsClient | WhiteboardClient>;
   staff: BoardStaff[];
-  score: MoveScore | null;
+  score: ContainerScore | null;
   canDrag: boolean;
 }) {
   return (
     <Droppable id={`rhs-home:${home.id}`} className="min-h-[240px]">
+      <div style={glowStyle(score)} className="rounded-lg">
       <HouseFrame
         title={home.team_name}
         subtitle={`RHS · ${home.address ?? "No address"}`}
@@ -437,23 +496,9 @@ function RhsHomeContainer({
             )}
           </div>
         </div>
-        {score && (
-          <div className="mt-2 space-y-1 border-t border-border/60 pt-2 text-[10px]">
-            {score.hard_blocks.map((b) => (
-              <div key={b} className="flex items-start gap-1 rounded bg-rose-100 px-1.5 py-1 text-rose-900">
-                <AlertTriangle className="mt-0.5 h-2.5 w-2.5 shrink-0" />
-                <span>{b}</span>
-              </div>
-            ))}
-            {score.risks.map((r) => (
-              <div key={r} className="flex items-start gap-1 rounded bg-amber-100/70 px-1.5 py-1 text-amber-900">
-                <Info className="mt-0.5 h-2.5 w-2.5 shrink-0" />
-                <span>{r}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        <ScoreReasoning score={score} />
       </HouseFrame>
+      </div>
     </Droppable>
   );
 }
@@ -462,19 +507,23 @@ function HhsHostContainer({
   host,
   clients,
   staff,
+  score,
   canDrag,
 }: {
   host: WhiteboardHost;
   clients: Array<RhsClient | WhiteboardClient>;
   staff: BoardStaff[];
+  score: ContainerScore | null;
   canDrag: boolean;
 }) {
   return (
     <Droppable id={`hhs-host:${host.id}`} className="min-h-[220px]">
+      <div style={glowStyle(score)} className="rounded-lg">
       <HouseFrame
         title={host.name}
         subtitle={`HHS host · ${[host.location_city, host.location_county].filter(Boolean).join(", ") || "Location unspecified"}`}
-        toneClass="bg-amber-50/40"
+        toneClass={score ? lightClasses(score.light) : "bg-amber-50/40"}
+        score={score}
         badge={
           <Badge variant="outline" className="shrink-0 text-[10px]">
             {clients.length} · {staff.length} staff
@@ -513,7 +562,9 @@ function HhsHostContainer({
             )}
           </div>
         </div>
+        <ScoreReasoning score={score} />
       </HouseFrame>
+      </div>
     </Droppable>
   );
 }
@@ -521,14 +572,17 @@ function HhsHostContainer({
 function DirectSupportContainer({
   client,
   staff,
+  score,
   canDrag,
 }: {
   client: WhiteboardClient;
   staff: BoardStaff[];
+  score: ContainerScore | null;
   canDrag: boolean;
 }) {
   return (
     <Droppable id={`ds-client:${client.id}`} className="min-h-[160px]">
+      <div style={glowStyle(score)} className="rounded-2xl">
       <HumanFrame
         title={`${client.first_name} ${client.last_name}`}
         subtitle={`Direct support · ${client.authorized_dspd_codes.slice(0, 4).join("/") || "no codes"}`}
@@ -549,7 +603,9 @@ function DirectSupportContainer({
             ))
           )}
         </div>
+        <ScoreReasoning score={score} />
       </HumanFrame>
+      </div>
     </Droppable>
   );
 }
@@ -560,6 +616,7 @@ function DsSlotContainer({
   name,
   clients,
   staff,
+  score,
   canDrag,
   onRename,
   onRemove,
@@ -568,12 +625,14 @@ function DsSlotContainer({
   name: string;
   clients: Array<RhsClient | WhiteboardClient>;
   staff: BoardStaff[];
+  score: ContainerScore | null;
   canDrag: boolean;
   onRename: (v: string) => void;
   onRemove: () => void;
 }) {
   return (
     <Droppable id={`ds-slot:${slotId}`} className="min-h-[180px]">
+      <div style={glowStyle(score)} className="rounded-2xl">
       <HumanFrame
         title={name}
         subtitle="Direct support · scenario slot"
@@ -620,7 +679,9 @@ function DsSlotContainer({
             ))
           )}
         </div>
+        <ScoreReasoning score={score} />
       </HumanFrame>
+      </div>
     </Droppable>
   );
 }
@@ -703,6 +764,12 @@ export function WhiteboardPlanningBoard() {
   const staffQ = useQuery({
     queryKey: ["whiteboard-board-staff", orgId],
     queryFn: () => staffFn({ data: { organization_id: orgId! } }),
+    enabled: !!orgId,
+  });
+  const scoringFn = useServerFn(getBoardScoringInputs);
+  const scoringQ = useQuery({
+    queryKey: ["whiteboard-scoring-inputs", orgId],
+    queryFn: () => scoringFn({ data: { organization_id: orgId! } }),
     enabled: !!orgId,
   });
 
@@ -818,26 +885,98 @@ export function WhiteboardPlanningBoard() {
     return [...real, ...scen];
   }, [rhs, scenarios.rhsHomes]);
 
+  const boardRef = useMemo(() => {
+    const inputs = scoringQ.data ?? {
+      pcsp: [],
+      billing_codes: [],
+      staff_credentials: [],
+      notes: [],
+    };
+    return buildBoardReference(inputs);
+  }, [scoringQ.data]);
+
   const scoreByHome = useMemo(() => {
-    const m = new Map<string, MoveScore>();
+    const m = new Map<string, ContainerScore>();
     if (!rhs) return m;
     for (const home of allRhsHomes) {
-      const ids = clientsByContainer.get(`rhs-home:${home.id}`) ?? [];
-      const rhsRoster = ids.map((id) => rhsClientById.get(id)).filter(Boolean) as RhsClient[];
-      const base = scoreComposition(home, rhsRoster, rhs.unscored_signals);
-      const mismatchRisks: string[] = [];
-      for (const id of ids) {
-        if (rhsClientById.has(id)) continue;
-        const wbC = wbClientById.get(id);
-        if (!wbC) continue;
-        mismatchRisks.push(
-          `${wbC.first_name} ${wbC.last_name} is not currently authorized for RHS (${wbC.inferred_category.toUpperCase()}) — planning only.`,
-        );
-      }
-      m.set(home.id, { ...base, risks: [...base.risks, ...mismatchRisks] });
+      const cIds = clientsByContainer.get(`rhs-home:${home.id}`) ?? [];
+      const sIds = staffByContainer.get(`rhs-home:${home.id}`) ?? [];
+      const clients = cIds
+        .map((id) => rhsClientById.get(id) ?? wbClientById.get(id))
+        .filter(Boolean) as Array<RhsClient | WhiteboardClient>;
+      const staffArr = sIds
+        .map((id) => staffById.get(id))
+        .filter(Boolean) as BoardStaff[];
+      m.set(
+        home.id,
+        scoreRhsContainer({
+          home,
+          clients,
+          staff: staffArr,
+          ref: boardRef,
+          storedUnscored: rhs.unscored_signals,
+        }),
+      );
     }
     return m;
-  }, [rhs, allRhsHomes, clientsByContainer, rhsClientById, wbClientById]);
+  }, [rhs, allRhsHomes, clientsByContainer, staffByContainer, rhsClientById, wbClientById, staffById, boardRef]);
+
+  const scoreByHhs = useMemo(() => {
+    const m = new Map<string, ContainerScore>();
+    if (!wb) return m;
+    const synthetics = new Map<string, WhiteboardHost>();
+    for (const sh of scenarios.hhsHosts) {
+      synthetics.set(sh.id, {
+        id: sh.id,
+        name: sh.name,
+        location_city: null,
+        location_county: null,
+        independence_levels_accepted: [],
+        medical_comfort: [],
+        behavioral_comfort: null,
+        wheelchair_accessible: false,
+        sign_language: false,
+        status: "onboarding",
+      });
+    }
+    const all: WhiteboardHost[] = [...wb.hosts, ...Array.from(synthetics.values())];
+    for (const host of all) {
+      const cIds = clientsByContainer.get(`hhs-host:${host.id}`) ?? [];
+      const sIds = staffByContainer.get(`hhs-host:${host.id}`) ?? [];
+      const clients = cIds
+        .map((id) => wbClientById.get(id) ?? rhsClientById.get(id))
+        .filter(Boolean) as Array<RhsClient | WhiteboardClient>;
+      const staffArr = sIds
+        .map((id) => staffById.get(id))
+        .filter(Boolean) as BoardStaff[];
+      m.set(host.id, scoreHhsContainer({ host, clients, staff: staffArr, ref: boardRef }));
+    }
+    return m;
+  }, [wb, scenarios.hhsHosts, clientsByContainer, staffByContainer, wbClientById, rhsClientById, staffById, boardRef]);
+
+  const scoreByDs = useMemo(() => {
+    const m = new Map<string, ContainerScore>();
+    if (!wb) return m;
+    for (const c of wb.clients.filter((x) => x.inferred_category === "direct_support")) {
+      const sIds = staffByContainer.get(`ds-client:${c.id}`) ?? [];
+      const staffArr = sIds
+        .map((id) => staffById.get(id))
+        .filter(Boolean) as BoardStaff[];
+      m.set(`ds-client:${c.id}`, scoreDsContainer({ clients: [c], staff: staffArr, ref: boardRef }));
+    }
+    for (const sl of scenarios.dsSlots) {
+      const cIds = clientsByContainer.get(`ds-slot:${sl.id}`) ?? [];
+      const sIds = staffByContainer.get(`ds-slot:${sl.id}`) ?? [];
+      const clients = cIds
+        .map((id) => rhsClientById.get(id) ?? wbClientById.get(id))
+        .filter(Boolean) as Array<RhsClient | WhiteboardClient>;
+      const staffArr = sIds
+        .map((id) => staffById.get(id))
+        .filter(Boolean) as BoardStaff[];
+      m.set(`ds-slot:${sl.id}`, scoreDsContainer({ clients, staff: staffArr, ref: boardRef }));
+    }
+    return m;
+  }, [wb, scenarios.dsSlots, clientsByContainer, staffByContainer, wbClientById, rhsClientById, staffById, boardRef]);
 
   // --- Actions -----------------------------------------------------------
 
@@ -1180,6 +1319,7 @@ export function WhiteboardPlanningBoard() {
                       host={h}
                       clients={cIds.map((id) => wbClientById.get(id) ?? rhsClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
                       staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
+                      score={scoreByHhs.get(h.id) ?? null}
                       canDrag={canDrag}
                     />
                   );
@@ -1210,6 +1350,7 @@ export function WhiteboardPlanningBoard() {
                         host={synth}
                         clients={cIds.map((id) => wbClientById.get(id) ?? rhsClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
                         staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
+                        score={scoreByHhs.get(sh.id) ?? null}
                         canDrag={canDrag}
                       />
                     </ScenarioChrome>
@@ -1246,6 +1387,7 @@ export function WhiteboardPlanningBoard() {
                       key={c.id}
                       client={c}
                       staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
+                      score={scoreByDs.get(`ds-client:${c.id}`) ?? null}
                       canDrag={canDrag}
                     />
                   );
@@ -1260,6 +1402,7 @@ export function WhiteboardPlanningBoard() {
                       name={sl.name}
                       clients={cIds.map((id) => rhsClientById.get(id) ?? wbClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
                       staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
+                      score={scoreByDs.get(`ds-slot:${sl.id}`) ?? null}
                       canDrag={canDrag}
                       onRename={(v) => renameScenario("dsSlots", sl.id, v)}
                       onRemove={() => removeScenario("dsSlots", sl.id)}
@@ -1274,10 +1417,13 @@ export function WhiteboardPlanningBoard() {
 
         <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
           <Info className="mr-1 inline h-3 w-3" />
-          NECTAR scores RHS home composition from stored signals only —
-          capacity, age range, medication load. It explicitly does NOT
-          score: {rhs.unscored_signals.join(" · ")}. HHS and Direct-Support
-          scoring will be wired in a later pass.
+          NECTAR scores every container (RHS, HHS, Direct Support) from
+          placement notes, PCSP fields, staff credentials, active
+          authorized codes, and stored composition signals. Factors driving
+          each color are listed beneath the container; signals NECTAR could
+          not evaluate are surfaced honestly instead of guessed. Out-of-code
+          placements are flagged as risks, never blocked. Stored composition
+          unscored: {rhs.unscored_signals.join(" · ")}.
         </div>
       </div>
       <DragOverlay dropAnimation={null}>

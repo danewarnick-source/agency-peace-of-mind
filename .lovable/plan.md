@@ -1,167 +1,108 @@
-## Scope
+# Extend NECTAR fit-scoring across all whiteboard containers
 
-Three connected features on the org/PHI seam:
+## Goals
 
-1. **Org logo upload** (platform-wide branding)
-2. **Client & staff photos** at intake / on file
-3. **Client Face Sheet** printable emergency PDF
+- Widen `scoreComposition` to consume **notes**, **PCSP fields**, and **staff qualifications**, in addition to the current stored signals (capacity/age/med load).
+- Score all three container shapes: **RHS**, **HHS host homes**, **Direct-Support slots** (real + scenario).
+- Render a **green→red glow gradient** driven by fit, with a reasoning strip beneath every container: driving factors + honest "unscored" list.
+- Preserve the no-fabrication rule: no signal → say so, don't guess.
+- Out-of-code placements remain drops-allowed and flagged as risk (already implemented).
 
-All storage in existing private, org-scoped buckets. All rendered fields either come from real records or literally say **"Not on file"** — no fabrication.
+## Deliverables
 
----
+### 1. New shared scorer module — `src/lib/whiteboard-scoring.ts`
 
-## 1. Org Logo
+Pure functions, no I/O. Reuses and extends the existing `scoreComposition` output shape (`{ light, hard_blocks, risks, ... }`) with:
 
-### Schema (migration)
+```ts
+type ScoreFactor = { kind: "positive" | "risk" | "block"; text: string; source: "stored" | "notes" | "pcsp" | "staff-qual" | "coverage" | "code-match" };
+type ContainerScore = {
+  light: "green" | "yellow" | "red" | "neutral";
+  intensity: number;         // 0..1 → glow strength (drives gradient)
+  factors: ScoreFactor[];    // reasoning shown beneath container
+  unscored: string[];        // honest "couldn't evaluate" list
+};
 ```
-public.organization_branding
-  organization_id  uuid PK -> organizations.id
-  logo_path        text        -- storage key in bucket 'org-branding'
-  logo_uploaded_at timestamptz
-  updated_by       uuid
-  updated_at       timestamptz
+
+Exports:
+- `scoreRhsContainer({ home, clients, staff, notesByKey, staffQuals, unscoredBase })`
+- `scoreHhsContainer({ host, clients, staff, notesByKey, staffQuals, billingCodesByClient })`
+- `scoreDsContainer({ client, staff, notesByKey, staffQuals, billingCodesByClient })`
+
+Shared sub-scorers, each returns `ScoreFactor[]` + `unscored[]`:
+- `scoreNotes(notesByKey, subjects)` — token-match conflict/friction/preference patterns on note text; flags:
+  - client-client conflict: "doesn't work with", "conflict with", "avoid" + another placed client's first/last name
+  - client-staff friction: "dislikes X" on client + "X" appears in staff note (smells/cologne/loud/etc.), symmetric scan
+  - positive: "gets along with", "prefers", "responds well to" naming a placed peer
+  - insufficient: subject has zero notes → add to unscored as `"No notes for <name>"`
+- `scorePcsp(clients)` — for each placed client, check `pcsp_goals`, `special_directions`, `pertinent_health_notes`, `preferred_living`, `preferred_activities`; if all null/empty, unscored; otherwise surface as positive/risk factors where clear tokens match container type (e.g. `preferred_living: 'host home'` in an RHS = risk).
+- `scoreStaffQuals(clients, staff, staffQuals, billingCodesByClient)` — for each placed client's authorized codes, check if any placed staff has the qualification. Missing = risk factor; present = positive. No qual data for a staffer → unscored.
+- `scoreCoverage(clients, staff, billingCodesByClient)` — HHS + DS only: sum authorized weekly hours per client; naive check that at least 1 staff present per client with authorized time > 0. Deep hours-vs-availability check is out of scope (unscored: "Weekly hour coverage math (staff schedules not modeled in sandbox)").
+- `scoreCodeMatch(clients, containerKind)` — the existing out-of-code check (HHS client in RHS, etc.).
+
+Light + intensity derivation: `blocks` present → red@1.0; else weight = risks*0.3 - positives*0.2, clamp to [-1,1]; map: `<= -0.4` green (strong), `-0.4..0.2` yellow, `> 0.2` red; intensity = |weight|. If factor list is empty AND unscored covers all axes → neutral, intensity 0 ("insufficient signal").
+
+Keep `scoreComposition` (rhs-board-scoring.ts) intact and call it inside `scoreRhsContainer` for the stored-signal portion; merge its output into `factors`/`unscored`.
+
+### 2. New server fn — `src/lib/whiteboard-scoring.functions.ts`
+
+- `getBoardScoringInputs({ organization_id })` → returns:
+  - `pcspByClient: Record<clientId, { pcsp_goals, special_directions, pertinent_health_notes, preferred_living, preferred_activities }>` for all org clients
+  - `staffQualsByStaff: Record<staffId, { code: string; qualified: boolean }[]>` — reuse existing `getStaffQualifications` shape if it exists, else read from staff_types/certifications join. Investigate before writing.
+  - `billingCodesByClient: Record<clientId, { code, weekly_units, unit_type, active }[]>` from `client_billing_codes` where active.
+- `getAllNotesForBoard({ organization_id })` → all `whiteboard_notes` rows for the org (subject_type, subject_id, note_text). One query keyed for client-side grouping. This avoids N popovers of `listWhiteboardNotes` for scoring.
+
+Both are `.middleware([requireSupabaseAuth])` and RLS-scoped by org membership.
+
+### 3. Wire into `planning-board.tsx`
+
+- Add two `useQuery` calls for the new fns; add both to `useMemo` inputs.
+- Replace the local `scoreByHome` with a general `scoresByContainer: Map<containerId, ContainerScore>` computed for every RHS home (real + scenario), every HHS host (real + scenario), and every DS container (real + scenario slot).
+- Existing `RhsHomeContainer` already takes a `MoveScore`; adapt the shape or extend the prop to accept `ContainerScore`. Simplest: give each container component a `score: ContainerScore | null` prop and render:
+  - Gradient border/background driven by `light` + `intensity` (e.g. inline style with `hsl` interpolation between emerald→amber→rose, alpha = intensity).
+  - **Reasoning strip** beneath the container body listing factors grouped by kind (blocks → risks → positives) with a source badge, followed by a muted "Unscored" list.
+- Update `HhsHostContainer` and `DirectSupportContainer` / `DsSlotContainer` to render the same reasoning strip.
+
+### 4. Reasoning UI component — inside `planning-board.tsx`
+
+Small `ScoreReasoning` component:
+
+```tsx
+<div className="mt-2 space-y-1 border-t border-border/60 pt-2 text-[10px]">
+  {factors.map(f => <FactorRow ... />)}
+  {unscored.length > 0 && (
+    <div className="rounded bg-muted/40 px-1.5 py-1 text-muted-foreground">
+      <Info /> NECTAR could not evaluate: {unscored.join(" · ")}
+    </div>
+  )}
+</div>
 ```
-RLS: members read; admin/manager write via `is_org_admin_or_manager`. Standard GRANTs.
 
-### Storage
-New private bucket `org-branding`. Path convention: `{organization_id}/logo.{ext}`. RLS on `storage.objects` restricts read/write to org members / admins.
+Icon per kind: block = AlertTriangle rose; risk = AlertTriangle amber; positive = CheckCircle emerald.
 
-### Server fns (`src/lib/org-branding.functions.ts`)
-- `getOrgBranding({ organizationId })` → `{ logoPath, signedUrl | null }` (signed URL, 1h)
-- `setOrgBrandingLogo({ organizationId, logoPath })` (admin/manager only)
-- `clearOrgBrandingLogo({ organizationId })`
+### 5. Investigation before build
 
-### UI
-- New card in `dashboard.settings` area (Company/Branding section): upload → preview → save.
-- Fallback rule (documented in one shared `<OrgLogo>` component): if no logo, render org name in large title font. Never a broken img.
+Small look-ups (no writes):
+- Confirm `getStaffQualifications` exists and its return shape.
+- Confirm `clients.pcsp_goals` etc. column names & types.
+- Confirm `client_billing_codes` columns for weekly hours / unit type / active flag.
+- Confirm `whiteboard_notes` list-all-for-org fetcher — reuse if present, else write it.
 
----
+## Technical notes
 
-## 2. Client & Staff Photos
+- Note-text parsing stays intentionally simple (token/regex on lowercased text). It is heuristic and every match is surfaced as a factor with the quoted note snippet so the admin sees why NECTAR flagged it.
+- Scenario containers (synthetic RHS/HHS/DS) score exactly like real ones — inputs are placed-subject IDs, not container source.
+- All new logic is client-side computed from server-fetched inputs; no server-side scoring.
+- No DB migrations required.
 
-### Client photo
-Table `clients` already has `client_photo_url` and `profile_photo_url`. Repurpose `client_photo_url` as the storage path; add `client_photo_taken_at date` (face sheet needs "date of photo") via migration.
+## Out of scope (explicitly)
 
-### Staff photo
-`profiles` has no photo. Migration: `profiles.photo_path text`, `profiles.photo_updated_at timestamptz`.
+- Real schedule/availability math for coverage (surfaced as unscored).
+- LLM-assisted note interpretation.
+- Persisting scoring output.
 
-### Storage
-Reuse `client-photos` bucket (already private, org-scoped). New bucket `staff-photos` (private, org-scoped) for staff. Path: `{organization_id}/{userId}/photo.{ext}`.
+## Report at end
 
-### Server fns
-- `setClientPhoto({ clientId, path, takenOn })` — admin/manager or assigned staff
-- `setStaffPhoto({ staffId, path })` — self or admin
-- `getSignedPhotoUrl({ kind, id })` — 1h signed URL
-
-### UI
-- Client intake form + client profile page: photo upload block with take-date picker; falls back to initials avatar.
-- Staff/profile edit page: photo upload; falls back to initials avatar.
-- Shared `<PersonAvatar>` component (client + staff) — initials fallback with existing pill/name layout preserved.
-
----
-
-## 3. Client Face Sheet PDF
-
-### Button
-On `dashboard.workspace.$clientId` (client profile), add "Client Face Sheet" button in the header. Click → opens new tab to `/api/public/client-face-sheet/:clientId?token=...` — actually **authenticated route**: use a server function that streams the PDF, opened in new window via a signed short-lived download URL, OR simpler: server route under `src/routes/api/client-face-sheet.$clientId.ts` gated by `requireSupabaseAuth` (bearer via attached middleware). Server routes don't run through function middleware, so we'll pass a short-lived signed token minted by a server fn and verified by the route (single-use JWT with clientId + userId + exp 60s).
-
-Route path (private, not `/api/public/`): `src/routes/api/client-face-sheet.$clientId.ts`. Verifies token → loads data → returns `application/pdf`.
-
-Wait — server routes not under `/api/public/` **are** auth-gated at the platform level in this stack? Simpler and safer: **generate PDF via `createServerFn`** returning a base64 blob, and open it client-side via `URL.createObjectURL(new Blob(...))` in a new tab. No token dance, no public route. This is the chosen approach.
-
-### PDF library
-`pdf-lib` (pure JS, Worker-safe, ~200KB, works in Cloudflare workerd). Already a project pattern-fit vs reportlab/puppeteer. Install: `bun add pdf-lib`.
-
-### Server fn `generateClientFaceSheet({ clientId })`
-Returns `{ pdfBase64, filename }`. Loads via `requireSupabaseAuth`:
-- clients row (all identity/address/insurance columns)
-- org row + `organization_branding` (fetch signed logo URL, download bytes for embed)
-- `client_emergency_contacts` (2 rows: primary/secondary)
-- guardian columns on clients OR `client_external_services` (physician/dentist/psych/day-program/residential/support-coordinator)
-- `support_coordinators` (phone/email)
-- client photo bytes (if any)
-
-Renderer builds a single letter-size page with the mandated layout. **Every field that resolves to null/empty/undefined renders as the string "Not on file"** — enforced by a single helper `field(v)` used for every value.
-
-### Face sheet fields — data source per field
-
-| Field | Source | Migration needed? |
-|---|---|---|
-| Org logo | organization_branding.logo_path | new |
-| Org address, phone | organizations columns (existing) | no |
-| Intake date | clients.created_at or intake_completed_at | no |
-| Client name | clients.first/last_name | no |
-| Client photo + date | clients.client_photo_url + client_photo_taken_at | add taken_at |
-| PCSP date | clients.pcsp_expiration_date (or new pcsp_signed_date) | add pcsp_signed_date |
-| PID# | clients.external_id or new client_pid | add client_pid if not present |
-| Address, phone, DOB | existing | no |
-| Place of birth | new clients.place_of_birth | add |
-| SSN | existing (masked last-4 only on face sheet) | no |
-| Ethnic origin, religion | new clients.ethnic_origin, clients.religion | add |
-| Medicaid case #, Medicaid #, Medicare #, private insurance | clients.medicaid_id + new medicaid_case_number, medicare_number, private_insurance | add missing |
-| Utah ID / exp | new clients.state_id_number, state_id_expires_on | add |
-| Payment / income sources | new clients.payment_sources text[], income_sources text[] | add |
-| Legal guardian(s) | existing clients.guardian_name/phone or client_emergency_contacts flagged is_guardian | check + add flag if needed |
-| Emergency contacts | client_emergency_contacts | no |
-| Support coordinator | support_coordinators | no |
-| Residential / day program | client_external_services (service_type filter) | no |
-| Physician / dentist / psychiatrist | client_external_services | no |
-| Pertinent health, allergies, dietary | new clients.pertinent_health_notes, allergies, dietary_needs | add |
-| Height, weight, hair, eyes | new clients.height, weight, hair_color, eye_color | add |
-| Places frequented | new clients.places_frequented text | add |
-
-Migration will add exactly the missing columns after inspecting the current `clients` schema (94 columns — some may already exist; migration will be `ADD COLUMN IF NOT EXISTS`).
-
-### Fabrication guard
-Central `field(v)` helper: `String(v ?? '').trim() || 'Not on file'`. Every value drawn through it. Arrays render items or "Not on file" if empty. No AI/NECTAR inference on the face sheet — only literal DB values.
-
----
-
-## Verification report
-
-After build:
-- List migrations shipped (new tables/columns/buckets)
-- Confirm logo fallback: `<OrgLogo>` renders org name text when path is null
-- Confirm avatar fallback on client + staff files
-- Confirm face-sheet "Not on file" for every unpopulated field
-- Confirm no field is autofilled from any inferred source
-
----
-
-## Files to add/edit
-
-**Migrations** (one file):
-- `organization_branding` table + policies + GRANTs
-- Missing `clients` columns (`ADD COLUMN IF NOT EXISTS`)
-- `profiles.photo_path`, `photo_updated_at`
-
-**Storage tool calls**:
-- create bucket `org-branding` (private)
-- create bucket `staff-photos` (private)
-- RLS on `storage.objects` for both
-
-**New code**:
-- `src/lib/org-branding.functions.ts`
-- `src/lib/person-photos.functions.ts`
-- `src/lib/client-face-sheet.functions.ts` (server fn: builds PDF via `pdf-lib`)
-- `src/components/branding/org-logo.tsx` (with text fallback)
-- `src/components/person/person-avatar.tsx` (initials fallback)
-- `src/components/settings/org-branding-card.tsx`
-- `src/components/clients/client-photo-upload.tsx`
-- `src/components/clients/face-sheet-button.tsx`
-
-**Edits**:
-- Settings route: mount `OrgBrandingCard`
-- Client profile route (`dashboard.workspace.$clientId`): mount photo upload + face-sheet button
-- Client intake surface: mount photo upload
-- Staff/profile edit: mount photo upload + avatar
-
-**Deps**: `bun add pdf-lib`
-
----
-
-## Explicit non-goals
-
-- No public share links for the face sheet (auth-only, in-app render)
-- No AI-assisted field guessing on the face sheet
-- No changes to real-client cutover: intake data + PCSP fields are the source, matching existing seam
+- Signals now scored per container type.
+- Confirm reasoning strip renders (color + factors + unscored) beneath all 3 shapes.
+- Confirm out-of-code placements flag as risk without blocking.

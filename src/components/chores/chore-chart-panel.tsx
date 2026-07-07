@@ -369,20 +369,6 @@ export function ChoreChartPanel({
         isFreeDay: r.is_free_day,
         note: r.note,
       })),
-      shiftRows: shiftRows.map((r) => ({
-        id: r.id, label: r.label, timeRange: fmtTimeRange(r),
-      })),
-      shiftCells: shiftCells.map((c) => ({
-        shiftRowId: c.shift_row_id,
-        day: c.day_of_week,
-        taskText: c.task_text,
-        helpsClientName: (() => {
-          const h = clients.find((x) => x.id === c.helps_client_id);
-          return h ? clientName(h) : null;
-        })(),
-        definitionName:
-          defs.find((d) => d.id === c.definition_id)?.chore_name ?? null,
-      })),
     };
     return renderChoreChartPdf(payload);
   };

@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   Info,
   Brain,
+  Utensils,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";

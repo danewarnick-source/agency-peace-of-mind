@@ -395,6 +395,7 @@ export function ChoreChartPanel({
 
   const buildPdf = async (): Promise<Uint8Array> => {
     const payload: ChoreChartPdfPayload = {
+      weekStartISO,
       orgName: (org as { organization_name?: string } | undefined)?.organization_name ?? "",
       spaceName: space?.name ?? "",
       spaceType: space?.space_type ?? "",

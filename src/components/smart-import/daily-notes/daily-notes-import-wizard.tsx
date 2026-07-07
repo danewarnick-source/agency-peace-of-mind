@@ -430,10 +430,11 @@ export function DailyNotesImportWizard() {
     onSuccess: (res) => {
       setCommitted({ inserted: res.inserted });
       setStep(4);
-      toast.success(`Imported ${res.inserted} historical daily note${res.inserted === 1 ? "" : "s"}.`);
+      toast.success(`Submitted ${res.inserted} note${res.inserted === 1 ? "" : "s"} to staff for attestation.`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   return (
     <div className="space-y-6">

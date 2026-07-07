@@ -239,7 +239,7 @@ export function ClientBudgetPanel({ clientId }: { clientId: string }) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-function BudgetEditor({ budget, lines, canEdit }: { budget: Budget; lines: BudgetLine[]; canEdit: boolean }) {
+function BudgetEditor({ budget, lines, canEdit, clientName }: { budget: Budget; lines: BudgetLine[]; canEdit: boolean; clientName: string }) {
   const qc = useQueryClient();
 
   // Local draft state so keystrokes don't fire a request per character.

@@ -701,22 +701,9 @@ export function ClientMealPlannerPanel({
           </div>
         </div>
 
-        {/* Needs-shopping-help toggle (manager-editable). When off, the planner
-            is still available but not foregrounded in staff view. */}
-        <div className="flex items-center justify-between rounded-md border bg-muted/20 p-3">
-          <div>
-            <div className="text-sm font-semibold">Client needs help with meals & shopping</div>
-            <div className="text-xs text-muted-foreground">
-              When on, the planner is highlighted for staff (typical for RHS / HHS support).
-              When off, it stays available but not foregrounded.
-            </div>
-          </div>
-          <Switch
-            checked={needsHelp}
-            disabled={!canEdit || toggleNeedsHelp.isPending}
-            onCheckedChange={(v) => toggleNeedsHelp.mutate(v)}
-          />
-        </div>
+        {/* Legacy "needs shopping help" toggle removed — meal support is now
+            gated by the per-client activation model (client_meal_support). */}
+
 
         {/* Weekly grid — drag meal pills between cells (manager only) */}
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>

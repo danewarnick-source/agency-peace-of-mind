@@ -723,6 +723,11 @@ export function ClientMealPlannerPanel({
 
         {/* Shopping list */}
         <div className="rounded-md border">
+          <datalist id={`shop-lib-${orgId ?? "none"}`}>
+            {(shopLibQ.data ?? []).map((it) => (
+              <option key={it} value={it} />
+            ))}
+          </datalist>
           <div className="flex items-center justify-between border-b bg-muted/40 px-3 py-2">
             <h4 className="text-sm font-semibold">Shopping List</h4>
             {canEdit && (
@@ -757,12 +762,16 @@ export function ClientMealPlannerPanel({
                 <Input
                   defaultValue={s.item}
                   disabled={!canEdit}
+                  list={`shop-lib-${orgId ?? "none"}`}
                   className={`h-8 ${s.checked ? "line-through text-muted-foreground" : ""}`}
                   onBlur={(e) => {
-                    if (e.target.value !== s.item)
+                    if (e.target.value !== s.item) {
                       updateShop.mutate({ id: s.id, item: e.target.value });
+                      if (orgId) recordShoppingItemUse(orgId, e.target.value);
+                    }
                   }}
                 />
+
                 <Input
                   defaultValue={s.quantity ?? ""}
                   disabled={!canEdit}

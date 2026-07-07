@@ -25,15 +25,25 @@ import {
   createTimesheetImportJob,
   importHistoricalTimesheets,
 } from "@/lib/smart-import-timesheets.functions";
+import { suggestImportColumnMapping } from "@/lib/smart-import-nectar-mapping.functions";
 
 type ParsedFile = { headers: string[]; rows: Record<string, string>[]; fileName: string };
 
 type FieldKey = "staff" | "client" | "date" | "clock_in" | "clock_out" | "notes" | "service_code";
 
 type Mapping = Record<FieldKey, string | null> & {
-  singleDateTimeIn: boolean;   // clock_in column already has date+time
-  singleDateTimeOut: boolean;  // clock_out column already has date+time
+  singleDateTimeIn: boolean;
+  singleDateTimeOut: boolean;
 };
+
+type WholeFile = { staffId: string | null; clientId: string | null };
+type FieldSuggestion = {
+  column: string | null;
+  confidence: "high" | "medium" | "low";
+  reason: string;
+  whole_file_needed: boolean;
+};
+
 
 type Person = { id: string; label: string; norms: string[] };
 

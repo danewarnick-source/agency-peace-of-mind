@@ -87,6 +87,8 @@ function ReviewPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [discardOpen, setDiscardOpen] = useState(false);
   const navigate = useNavigate();
+  const mode = (job.data?.job?.mode ?? "client") as "employee" | "client";
+  const commitCtx = useCompleteSetup({ jobId, mode, onSelectSubject: setSelectedId });
 
   // Auto-select first unfinished subject
   useEffect(() => {

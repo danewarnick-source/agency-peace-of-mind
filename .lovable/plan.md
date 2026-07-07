@@ -1,17 +1,20 @@
-Widen the Rate and Provider columns in the Smart Import billing-codes table so full dollar amounts and full provider names are visible, while keeping the table fitting the page.
+## Status: prior changes are already applied
 
-### What we'll change
-- In `src/routes/dashboard.smart-import.$jobId.review.tsx`:
-  - **Rate column**: increase from `w-[80px]` to `w-[110px]` (or `min-w-[110px]`) so `$XXX.XX` is fully visible.
-  - **Provider column**: add `min-w-[180px]` (and possibly `w-[25%]` or `w-[200px]`) so longer provider names are not clipped.
-  - **Row inputs**: ensure the provider `<Input>` and rate input use the full column width (`w-full`).
-  - **Table fit**: review surrounding column widths (Code, Ownership, Unit, Annual, Monthly, Term, Status, actions) and trim or allow flex widths so the overall table still fits the container without excessive horizontal scroll on common viewport widths. The table is already wrapped in `overflow-x-auto`, but the goal is to minimize scrolling.
+The Smart Import billing codes column-width edits from the previous turn are already saved in `src/routes/dashboard.smart-import.$jobId.review.tsx`:
 
-### Out of scope
-- No changes to data model, extraction logic, server functions, or commit behavior.
-- No changes to the rate/annual/monthly semantics already implemented.
+- Provider header: added `min-w-[180px]`
+- Rate header: `min-w-[100px]` (was 80px)
+- Ownership: `w-[130px]` (was 150px)
+- Term: `w-[120px]` (was 150px)
+- Annual units: `w-[90px]`
+- Monthly max units: `w-[110px]` (was 120px)
 
-### Acceptance
-- Full provider name is readable without truncation.
-- Rate displays as `$XXX.XX` without clipping.
-- Table still fits within the review page card on a typical desktop viewport (≤1280px) without a horizontal scrollbar, or with only a small one.
+`npm run build` completed successfully (dist output generated, no errors). The dev server is healthy — only the "completed" chat message from that turn didn't render.
+
+## Plan on approval
+
+1. Flush the HMR gate so the running preview picks up the buffered changes.
+2. Reload the Smart Import review page and confirm the Rate column shows full `$XXX.XX` values and Provider names render without truncation.
+3. If anything still looks off in the preview, patch column widths further; otherwise no further code changes.
+
+No new file edits are required unless step 2 reveals a visible issue.

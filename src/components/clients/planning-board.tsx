@@ -451,7 +451,7 @@ function HhsHostContainer({
   canDrag,
 }: {
   host: WhiteboardHost;
-  clients: WhiteboardClient[];
+  clients: Array<RhsClient | WhiteboardClient>;
   staff: BoardStaff[];
   canDrag: boolean;
 }) {

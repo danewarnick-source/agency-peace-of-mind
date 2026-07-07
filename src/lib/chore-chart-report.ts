@@ -11,9 +11,11 @@ import { fetchOrgName } from "./client-report-shared";
 export type ChoreChartReportArgs = {
   spaceId: string;
   supabaseClient?: SupabaseClient;
-  /** Optional ISO Monday for the week this chart covers. */
+  /** Optional ISO Monday for the week this chart covers. When provided the
+   *  report also includes per-outcome tallies for that Mon–Sun window. */
   weekStartISO?: string;
 };
+
 
 export type ChoreChartReportResult = {
   bytes: Uint8Array;
@@ -58,7 +60,19 @@ export async function generateChoreChartReport(
 
   const orgName = await fetchOrgName(sb, space.organization_id);
 
-  const [linksRes, defsRes, rotRes, dailyRes] = await Promise.all([
+  // Compute Mon–Sun window for outcome tallies when weekStartISO given.
+  let compRange: { fromISO: string; toISO: string } | null = null;
+  if (args.weekStartISO && /^\d{4}-\d{2}-\d{2}$/.test(args.weekStartISO)) {
+    const start = new Date(args.weekStartISO + "T12:00:00");
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    compRange = {
+      fromISO: args.weekStartISO,
+      toISO: end.toISOString().slice(0, 10),
+    };
+  }
+
+  const [linksRes, defsRes, rotRes, dailyRes, compsRes] = await Promise.all([
     sb.from("chore_space_clients").select("client_id").eq("space_id", space.id),
     sb
       .from("chore_definitions")
@@ -74,21 +88,39 @@ export async function generateChoreChartReport(
       .select("label, detail, sort_order")
       .eq("space_id", space.id)
       .order("sort_order"),
+    compRange
+      ? sb
+          .from("chore_completions")
+          .select("outcome, client_id, completion_date, source")
+          .eq("space_id", space.id)
+          .gte("completion_date", compRange.fromISO)
+          .lte("completion_date", compRange.toISO)
+      : Promise.resolve({ data: [] as Array<{ outcome: string; client_id: string | null }> }),
   ]);
+
+
 
   const linkedClientIds = ((linksRes.data ?? []) as Array<{ client_id: string }>).map(
     (x) => x.client_id,
   );
-  const clients = linkedClientIds.length
-    ? (((await sb
-        .from("clients")
-        .select("id, first_name, last_name")
-        .in("id", linkedClientIds)).data ?? []) as Array<{
-        id: string;
-        first_name: string;
-        last_name: string;
-      }>)
-    : [];
+
+  const [clientsRes, supportRes] = await Promise.all([
+    linkedClientIds.length
+      ? sb.from("clients").select("id, first_name, last_name").in("id", linkedClientIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; first_name: string; last_name: string }> }),
+    linkedClientIds.length
+      ? sb
+          .from("client_chore_support")
+          .select("client_id, status, reason, goal_note")
+          .in("client_id", linkedClientIds)
+      : Promise.resolve({ data: [] as Array<{ client_id: string; status: string; reason: string | null; goal_note: string | null }> }),
+  ]);
+
+  const clients = (clientsRes.data ?? []) as Array<{
+    id: string;
+    first_name: string;
+    last_name: string;
+  }>;
 
   const defs = ((defsRes.data ?? []) as Array<{
     id: string;
@@ -96,20 +128,48 @@ export async function generateChoreChartReport(
     task_list: string;
   }>);
   const defNameById = new Map(defs.map((d) => [d.id, d.chore_name] as const));
-  const nameOf = (id: string) => {
-    const c = clients.find((x) => x.id === id);
-    return c ? `${c.first_name} ${c.last_name}`.trim() : "";
-  };
+
+  const OUTCOMES = ["completed", "completed_with_support", "offered_declined", "not_addressed"] as const;
+  type Outcome = typeof OUTCOMES[number];
+  const zero = (): Record<Outcome, number> =>
+    ({ completed: 0, completed_with_support: 0, offered_declined: 0, not_addressed: 0 });
+  const totalOutcomes = zero();
+  const perClientOutcomes = new Map<string, Record<Outcome, number>>();
+  for (const c of ((compsRes.data ?? []) as Array<{ outcome: string; client_id: string | null }>)) {
+    const o = c.outcome as Outcome;
+    if (!(OUTCOMES as readonly string[]).includes(o)) continue;
+    totalOutcomes[o] += 1;
+    if (c.client_id) {
+      const bucket = perClientOutcomes.get(c.client_id) ?? zero();
+      bucket[o] += 1;
+      perClientOutcomes.set(c.client_id, bucket);
+    }
+  }
+
+  const supportByClient = new Map(
+    ((supportRes.data ?? []) as Array<{
+      client_id: string; status: string; reason: string | null; goal_note: string | null;
+    }>).map((r) => [r.client_id, r]),
+  );
+
 
   const payload: ChoreChartPdfPayload = {
     weekStartISO: args.weekStartISO,
     orgName,
     spaceName: space.name,
     spaceType: space.space_type,
-    clients: clients.map((c) => ({
-      id: c.id,
-      name: `${c.first_name} ${c.last_name}`.trim(),
-    })),
+    clients: clients.map((c) => {
+      const sup = supportByClient.get(c.id);
+      const outcomes = perClientOutcomes.get(c.id) ?? null;
+      return {
+        id: c.id,
+        name: `${c.first_name} ${c.last_name}`.trim(),
+        supportReason: (sup?.status === "active" ? sup.reason : null) as
+          | "pcsp_goal" | "intake_need" | "manual" | null,
+        supportNote: sup?.status === "active" ? sup.goal_note ?? null : null,
+        outcomes,
+      };
+    }),
     dailyItems: ((dailyRes.data ?? []) as Array<{ label: string; detail: string | null }>).map(
       (d) => ({ label: d.label, detail: d.detail }),
     ),
@@ -131,7 +191,16 @@ export async function generateChoreChartReport(
       isFreeDay: r.is_free_day,
       note: r.note,
     })),
+    weeklyOutcomeTotals: compRange
+      ? {
+          completed: totalOutcomes.completed,
+          completed_with_support: totalOutcomes.completed_with_support,
+          offered_declined: totalOutcomes.offered_declined,
+          not_addressed: totalOutcomes.not_addressed,
+        }
+      : null,
   };
+
 
   const bytes = await renderChoreChartPdf(payload);
   const today = new Date();

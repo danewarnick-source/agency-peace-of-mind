@@ -13,7 +13,21 @@ export type ChoreClientCell = {
   isFreeDay: boolean;
   note: string | null;
 };
-export type ChoreClient = { id: string; name: string };
+export type ChoreOutcomeTotals = {
+  completed: number;
+  completed_with_support: number;
+  offered_declined: number;
+  not_addressed: number;
+};
+export type ChoreClient = {
+  id: string;
+  name: string;
+  /** When populated, activation reason for this client's chore tracking. */
+  supportReason?: "pcsp_goal" | "intake_need" | "manual" | null;
+  supportNote?: string | null;
+  /** Optional per-client outcome tallies for the week covered by weekStartISO. */
+  outcomes?: ChoreOutcomeTotals | null;
+};
 export type ChoreDailyItem = { label: string; detail: string | null };
 
 export type ChoreChartPdfPayload = {
@@ -27,7 +41,10 @@ export type ChoreChartPdfPayload = {
   dailyItems?: ChoreDailyItem[];
   /** ISO date (YYYY-MM-DD) of the Monday that anchors this chart's week. */
   weekStartISO?: string;
+  /** Space-wide outcome tallies for the week (from chore_completions). */
+  weeklyOutcomeTotals?: ChoreOutcomeTotals | null;
 };
+
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const PAGE_W = 792; // landscape US Letter
@@ -330,7 +347,14 @@ export async function renderChoreChartPdf(p: ChoreChartPdfPayload): Promise<Uint
 
   drawGrid(
     "CLIENT ROTATION",
-    p.clients.map((c) => ({ key: c.id, label: c.name, sub: null })),
+    p.clients.map((c) => {
+      const reasonTag =
+        c.supportReason === "pcsp_goal" ? "PCSP-linked · required tracking"
+        : c.supportReason === "intake_need" ? "Intake-identified need"
+        : c.supportReason === "manual" ? "Manager-activated"
+        : null;
+      return { key: c.id, label: c.name, sub: reasonTag };
+    }),
     (rowKey, day) => {
       const cell = p.clientCells.find((c) => c.clientId === rowKey && c.day === day);
       if (!cell) return { text: "—", sub: null, isFree: false };
@@ -338,6 +362,36 @@ export async function renderChoreChartPdf(p: ChoreChartPdfPayload): Promise<Uint
       return { text: cell.definitionName ?? "—", sub: cell.note, isFree: false };
     },
   );
+
+  // ── Weekly outcomes summary ─────────────────────────────
+  const totals = p.weeklyOutcomeTotals;
+  if (totals) {
+    if (y - 80 < MARGIN + 20) newPage();
+    page.drawRectangle({ x: MARGIN, y: y - 18, width: CONTENT_W, height: 18, color: C.band });
+    drawText(page, "WEEKLY OUTCOMES  ·  proof of support provided", MARGIN + 8, y - 13, {
+      font: bold, size: 9, color: C.bandText,
+    });
+    y -= 22;
+    const rows: [string, number][] = [
+      ["Completed", totals.completed],
+      ["Completed with support", totals.completed_with_support],
+      ["Offered — client declined", totals.offered_declined],
+      ["Not addressed", totals.not_addressed],
+    ];
+    rows.forEach(([label, n]) => {
+      drawText(page, label, MARGIN + 8, y - 11, { font: bold, size: 9, color: C.ink });
+      drawText(page, String(n), MARGIN + 260, y - 11, { font, size: 9, color: C.text });
+      y -= 14;
+    });
+    drawText(
+      page,
+      "In ID/DD services, documentation reflects support offered by the provider; \u201Coffered/declined\u201D is a valid, documented outcome.",
+      MARGIN + 8, y - 11, { font, size: 7.5, color: C.muted },
+    );
+    y -= 18;
+  }
+
+
 
 
 

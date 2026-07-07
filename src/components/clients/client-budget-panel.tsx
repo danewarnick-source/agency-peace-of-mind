@@ -36,6 +36,7 @@ interface BudgetLine {
   non_variable: number;
   variable: number;
   notes: string | null;
+  day_of_month: number | null;
 }
 
 interface Budget {

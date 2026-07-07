@@ -40,6 +40,7 @@ import {
 } from "@/lib/nectar-documents.functions";
 import { attachClientDocument } from "@/lib/import-checklist.functions";
 import { NectarDocumentActionsDialog } from "@/components/nectar/document-actions-dialog";
+import { DocumentPreviewDialog } from "./document-preview-dialog";
 
 const CLIENT_DOC_TYPES = [
   { value: "pcsp", label: "PCSP" },

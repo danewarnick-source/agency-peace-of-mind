@@ -99,7 +99,10 @@ export async function generateMealMenuReport(
     const [mRes, sRes] = await Promise.all([
       sb
         .from("client_meals")
-        .select("day_of_week, meal_slot, label, description, nutrition_value, estimated_cost")
+        .select(
+          "day_of_week, meal_slot, label, description, nutrition_value, estimated_cost, " +
+            "calories, protein_g, carbs_g, fat_g, extra_value, nutrition_estimated",
+        )
         .eq("meal_plan_id", plan.id),
       sb
         .from("client_shopping_items")
@@ -114,6 +117,12 @@ export async function generateMealMenuReport(
       description: string | null;
       nutrition_value: number | null;
       estimated_cost: number | null;
+      calories: number | null;
+      protein_g: number | null;
+      carbs_g: number | null;
+      fat_g: number | null;
+      extra_value: number | null;
+      nutrition_estimated: Record<string, boolean> | null;
     }>).map((m) => ({
       day_of_week: m.day_of_week,
       meal_slot: m.meal_slot,
@@ -121,6 +130,12 @@ export async function generateMealMenuReport(
       description: m.description,
       nutrition_value: m.nutrition_value,
       estimated_cost: m.estimated_cost,
+      calories: m.calories,
+      protein_g: m.protein_g,
+      carbs_g: m.carbs_g,
+      fat_g: m.fat_g,
+      extra_value: m.extra_value,
+      nutrition_estimated: m.nutrition_estimated,
     }));
     shopping = ((sRes.data ?? []) as Array<{
       item: string;

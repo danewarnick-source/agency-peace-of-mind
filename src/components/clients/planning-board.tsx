@@ -697,9 +697,24 @@ export function WhiteboardPlanningBoard() {
   // Scoring — RHS only, using the planned RHS-client roster. Non-RHS clients
   // are ALLOWED to be dropped in but surfaced as risks (flag, never block).
   const scoreByHome = useMemo(() => {
+  // Combined RHS homes = real + scenario. Scenario homes get synthetic RhsHome
+  // shape so scoreComposition can flag mismatches consistently.
+  const allRhsHomes = useMemo<RhsHome[]>(() => {
+    const real = rhs?.homes ?? [];
+    const scen: RhsHome[] = scenarios.rhsHomes.map((h) => ({
+      id: h.id,
+      team_name: h.name,
+      setting: "residential_host",
+      capacity: null,
+      address: null,
+    }));
+    return [...real, ...scen];
+  }, [rhs, scenarios.rhsHomes]);
+
+  const scoreByHome = useMemo(() => {
     const m = new Map<string, MoveScore>();
     if (!rhs) return m;
-    for (const home of rhs.homes) {
+    for (const home of allRhsHomes) {
       const ids = clientsByContainer.get(`rhs-home:${home.id}`) ?? [];
       const rhsRoster = ids.map((id) => rhsClientById.get(id)).filter(Boolean) as RhsClient[];
       const base = scoreComposition(home, rhsRoster, rhs.unscored_signals);
@@ -715,7 +730,7 @@ export function WhiteboardPlanningBoard() {
       m.set(home.id, { ...base, risks: [...base.risks, ...mismatchRisks] });
     }
     return m;
-  }, [rhs, clientsByContainer, rhsClientById, wbClientById]);
+  }, [rhs, allRhsHomes, clientsByContainer, rhsClientById, wbClientById]);
 
   // --- Actions -----------------------------------------------------------
 

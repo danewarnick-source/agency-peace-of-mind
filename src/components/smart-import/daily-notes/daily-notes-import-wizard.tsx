@@ -30,6 +30,7 @@ import {
   importHistoricalDailyNotes,
 } from "@/lib/smart-import-daily-notes.functions";
 import { suggestImportColumnMapping } from "@/lib/smart-import-nectar-mapping.functions";
+import { checkImportDuplicates } from "@/lib/smart-import-duplicate-check.functions";
 
 
 type ParsedFile = { headers: string[]; rows: Record<string, string>[]; fileName: string };

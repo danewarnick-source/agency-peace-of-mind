@@ -2790,6 +2790,53 @@ export type Database = {
           },
         ]
       }
+      client_meal_actuals: {
+        Row: {
+          actual_date: string
+          confirmed_at: string
+          confirmed_by: string | null
+          created_at: string
+          id: string
+          meal_plan_id: string
+          meal_slot: string
+          note: string | null
+          outcome: string
+          updated_at: string
+        }
+        Insert: {
+          actual_date: string
+          confirmed_at?: string
+          confirmed_by?: string | null
+          created_at?: string
+          id?: string
+          meal_plan_id: string
+          meal_slot: string
+          note?: string | null
+          outcome: string
+          updated_at?: string
+        }
+        Update: {
+          actual_date?: string
+          confirmed_at?: string
+          confirmed_by?: string | null
+          created_at?: string
+          id?: string
+          meal_plan_id?: string
+          meal_slot?: string
+          note?: string | null
+          outcome?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_meal_actuals_meal_plan_id_fkey"
+            columns: ["meal_plan_id"]
+            isOneToOne: false
+            referencedRelation: "client_meal_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_meal_plans: {
         Row: {
           client_id: string
@@ -3531,6 +3578,7 @@ export type Database = {
           medicaid_id: string | null
           medical_insurance: string | null
           medicare_number: string | null
+          needs_shopping_help: boolean
           neurologist_name: string | null
           neurologist_phone: string | null
           organization_id: string
@@ -3661,6 +3709,7 @@ export type Database = {
           medicaid_id?: string | null
           medical_insurance?: string | null
           medicare_number?: string | null
+          needs_shopping_help?: boolean
           neurologist_name?: string | null
           neurologist_phone?: string | null
           organization_id: string
@@ -3791,6 +3840,7 @@ export type Database = {
           medicaid_id?: string | null
           medical_insurance?: string | null
           medicare_number?: string | null
+          needs_shopping_help?: boolean
           neurologist_name?: string | null
           neurologist_phone?: string | null
           organization_id?: string
@@ -16572,6 +16622,7 @@ export type Database = {
           medicaid_id: string | null
           medical_insurance: string | null
           medicare_number: string | null
+          needs_shopping_help: boolean
           neurologist_name: string | null
           neurologist_phone: string | null
           organization_id: string

@@ -502,6 +502,13 @@ function SectionBlock({
   onPatch: (id: string, changes: Partial<BudgetLine>) => void;
 }) {
   const subtotal = lines.reduce((a, l) => a + Number(l.non_variable) + Number(l.variable), 0);
+  const sorted = [...lines].sort((a, b) => {
+    const ad = a.day_of_month ?? 99;
+    const bd = b.day_of_month ?? 99;
+    if (ad !== bd) return ad - bd;
+    return a.sort_order - b.sort_order;
+  });
+  const colCount = canEdit ? 7 : 6;
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
@@ -521,26 +528,42 @@ function SectionBlock({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-              <th className="w-[28%] py-1 pr-2">Label</th>
-              <th className="w-[14%] py-1 pr-2 text-right">Non-variable</th>
-              <th className="w-[14%] py-1 pr-2 text-right">Variable</th>
-              <th className="w-[12%] py-1 pr-2 text-right">Total</th>
-              <th className="w-[28%] py-1 pr-2">Notes</th>
+              <th className="w-[8%] py-1 pr-2 text-center">Day</th>
+              <th className="w-[24%] py-1 pr-2">Label</th>
+              <th className="w-[13%] py-1 pr-2 text-right">Non-variable</th>
+              <th className="w-[13%] py-1 pr-2 text-right">Variable</th>
+              <th className="w-[11%] py-1 pr-2 text-right">Total</th>
+              <th className="w-[27%] py-1 pr-2">Notes</th>
               {canEdit && <th className="w-[4%] py-1" />}
             </tr>
           </thead>
           <tbody>
-            {lines.length === 0 && (
+            {sorted.length === 0 && (
               <tr>
-                <td colSpan={canEdit ? 6 : 5} className="py-3 text-center text-xs text-muted-foreground">
+                <td colSpan={colCount} className="py-3 text-center text-xs text-muted-foreground">
                   No {section} lines yet.
                 </td>
               </tr>
             )}
-            {lines.map((l) => {
+            {sorted.map((l) => {
               const total = Number(l.non_variable) + Number(l.variable);
               return (
                 <tr key={l.id} className="border-b last:border-b-0">
+                  <td className="py-2 pr-2">
+                    <Input
+                      type="number" min="1" max="31" step="1" inputMode="numeric"
+                      value={l.day_of_month ?? ""}
+                      onChange={(e) => {
+                        const raw = e.target.value.trim();
+                        if (raw === "") { onPatch(l.id, { day_of_month: null }); return; }
+                        const n = Math.max(1, Math.min(31, Math.floor(Number(raw))));
+                        onPatch(l.id, { day_of_month: Number.isFinite(n) ? n : null });
+                      }}
+                      disabled={!canEdit}
+                      placeholder="—"
+                      className="text-center"
+                    />
+                  </td>
                   <td className="py-2 pr-2">
                     <Input
                       value={l.label}

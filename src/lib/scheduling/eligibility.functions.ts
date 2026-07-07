@@ -2,6 +2,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { rankEligibility, type EligibilityResult } from "./eligibility";
+import {
+  resolveRequiredQualsForCodes,
+  loadStaffQualsBulk,
+} from "./required-qualifications.functions";
 
 /**
  * Rank candidate staff for a (client + service code + time window) slot.

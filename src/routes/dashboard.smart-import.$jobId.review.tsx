@@ -2161,8 +2161,13 @@ function BillingRowEditor({
   const pending = isPending(row);
   const allCodes = EVV_SERVICE_CODES.map((c) => c.code);
   const notOurs = row.ownership_ack === "not_ours";
+  const fmtMoney = (v: number | null | undefined) =>
+    v == null || !Number.isFinite(v) ? null : `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const ro = (v: string | number | null | undefined) =>
     v == null || v === "" ? <span className="text-muted-foreground/60">—</span> : <span>{v}</span>;
+  const [rateText, setRateText] = useState<string>(row.rate == null ? "" : String(row.rate));
+  useEffect(() => { setRateText(row.rate == null ? "" : String(row.rate)); }, [row.rate]);
+
 
   return (
     <tr className={`border-b border-border/60 align-middle ${notOurs ? "bg-muted/30 text-muted-foreground" : ""}`}>

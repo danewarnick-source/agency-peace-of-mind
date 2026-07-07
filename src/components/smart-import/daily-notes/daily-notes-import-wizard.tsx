@@ -1011,7 +1011,8 @@ function SamplePreview({ parsed, mapping }: { parsed: ParsedFile; mapping: Mappi
 // ─── Step 3 ────────────────────────────────────────────────────────────────
 function ReviewStep({
   rows, ready, ambiguous, incomplete, skipped, people,
-  onChooseStaff, onChooseClient, onLink, onSetNarrative, onSetDate,
+  repeatedIssues, dupeChecking,
+  onChooseStaff, onChooseClient, onLink, onBulkResolve, onSetNarrative, onSetDate,
   onSkip, onUnskip, onDownloadSkipped, onBack, onCommit, committing,
 }: {
   rows: ReviewRow[];
@@ -1020,9 +1021,12 @@ function ReviewStep({
   incomplete: ReviewRow[];
   skipped: ReviewRow[];
   people: { staff: Person[]; clients: Person[] };
+  repeatedIssues: { staffIssues: Array<[string, number]>; clientIssues: Array<[string, number]> };
+  dupeChecking: boolean;
   onChooseStaff: (idx: number, id: string) => void;
   onChooseClient: (idx: number, id: string) => void;
   onLink: (idx: number, kind: "staff" | "client", id: string) => void;
+  onBulkResolve: (kind: "staff" | "client", rawLabel: string, id: string) => void;
   onSetNarrative: (idx: number, text: string) => void;
   onSetDate: (idx: number, isoDate: string) => void;
   onSkip: (idx: number) => void;
@@ -1032,6 +1036,7 @@ function ReviewStep({
   onCommit: () => void;
   committing: boolean;
 }) {
+  const duplicateCount = rows.filter((r) => r.duplicateOfId).length;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1041,6 +1046,10 @@ function ReviewStep({
           <span className="text-amber-700 font-medium">{ambiguous.length} needs a choice</span> ·{" "}
           <span className="text-destructive font-medium">{incomplete.length} incomplete</span> ·{" "}
           <span className="text-muted-foreground">{skipped.length} skipped</span>
+          {duplicateCount > 0 && (
+            <> · <span className="text-orange-700 font-medium">{duplicateCount} likely duplicate{duplicateCount === 1 ? "" : "s"}</span></>
+          )}
+          {dupeChecking && <> · <Loader2 className="inline h-3 w-3 animate-spin" /> checking duplicates…</>}
         </div>
         <Button variant="outline" size="sm" onClick={onDownloadSkipped}>
           <Download className="mr-1.5 h-3.5 w-3.5" /> Download unresolved rows
@@ -1055,13 +1064,16 @@ function ReviewStep({
         staff member who wrote the note will get the chance to expand it during their own attestation review.
       </div>
 
+      <BulkFixPanel repeatedIssues={repeatedIssues} people={people} onBulkResolve={onBulkResolve} />
+
       <Tabs defaultValue={incomplete.length > 0 ? "incomplete" : "ready"}>
         <TabsList>
           <TabsTrigger value="ready">Ready ({ready.length})</TabsTrigger>
           <TabsTrigger value="ambiguous">Needs a choice ({ambiguous.length})</TabsTrigger>
           <TabsTrigger value="incomplete">Incomplete ({incomplete.length})</TabsTrigger>
-          <TabsTrigger value="skipped">Skipped ({skipped.length})</TabsTrigger>
+          <TabsTrigger value="skipped">Skipped ({skipped.length}{duplicateCount > 0 ? `, incl. ${duplicateCount} dup` : ""})</TabsTrigger>
         </TabsList>
+
 
         <TabsContent value="ready" className="mt-3">
           <ReadyTable rows={ready} onSkip={onSkip} />

@@ -68,6 +68,12 @@ type Space = {
   space_type: string;
   notes: string | null;
 };
+type DailyItem = {
+  id: string;
+  label: string;
+  detail: string | null;
+  sort_order: number;
+};
 type Def = {
   id: string;
   chore_name: string;

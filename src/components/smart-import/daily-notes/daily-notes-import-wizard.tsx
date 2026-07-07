@@ -1075,9 +1075,13 @@ function DoneStep({
   return (
     <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/5 p-6 text-center">
       <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600" />
-      <div className="mt-2 font-semibold">Imported {inserted} historical daily note{inserted === 1 ? "" : "s"}</div>
+      <div className="mt-2 font-semibold">
+        Submitted {inserted} note{inserted === 1 ? "" : "s"} to staff for attestation
+      </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        Every imported note is permanently marked as a historical import and stored on the client's record.
+        Each staff member will see only their own notes and sign them one at a time. Notes remain
+        permanently marked as historical imports. If someone who wrote a note no longer works here,
+        an admin can attest on their behalf.
       </p>
       <div className="mt-4 flex justify-center gap-2">
         <Button variant="outline" onClick={onAnother}>
@@ -1087,3 +1091,4 @@ function DoneStep({
     </div>
   );
 }
+

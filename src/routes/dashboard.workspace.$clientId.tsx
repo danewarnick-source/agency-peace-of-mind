@@ -186,7 +186,7 @@ function ClientWorkspace() {
   // Chore-chart space IDs for this client: any chore_space linked directly
   // (chore_space_clients) plus any chart attached to the client's home team.
   const { data: choreSpaceIds } = useQuery({
-    queryKey: ["workspace-chore-spaces", client?.id ?? null, client?.team_id ?? null],
+    queryKey: ["workspace-chore-spaces", client?.id ?? null],
     enabled: !!client?.id,
     queryFn: async () => {
       const ids = new Set<string>();
@@ -195,11 +195,17 @@ function ClientWorkspace() {
         .select("space_id")
         .eq("client_id", client!.id);
       (links ?? []).forEach((l) => ids.add(l.space_id));
-      if (client!.team_id) {
+      const { data: c } = await supabase
+        .from("clients")
+        .select("team_id")
+        .eq("id", client!.id)
+        .maybeSingle();
+      const teamId = (c as { team_id: string | null } | null)?.team_id ?? null;
+      if (teamId) {
         const { data: teamSpaces } = await supabase
           .from("chore_spaces")
           .select("id")
-          .eq("team_id", client!.team_id);
+          .eq("team_id", teamId);
         (teamSpaces ?? []).forEach((s) => ids.add(s.id));
       }
       return Array.from(ids);

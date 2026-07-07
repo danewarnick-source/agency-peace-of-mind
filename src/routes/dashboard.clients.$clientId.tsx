@@ -171,6 +171,7 @@ function ClientProfileHub() {
             {isHostHome ? <Badge variant="secondary">Host home</Badge> : null}
             {disabilityCategory === "ABI" && <Badge className="bg-amber-100 text-amber-800 border border-amber-200">ABI</Badge>}
             {disabilityCategory === "ID-RC" && <Badge variant="outline">ID/RC</Badge>}
+            <FaceSheetButton clientId={clientId} variant="pill" />
           </div>
         </div>
       </div>

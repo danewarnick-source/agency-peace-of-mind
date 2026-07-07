@@ -2001,36 +2001,49 @@ export type Database = {
       }
       chore_completions: {
         Row: {
+          client_id: string | null
           completed_at: string
           completed_by: string | null
           completion_date: string
           id: string
           note: string | null
+          outcome: string
           source: string
           source_id: string
           space_id: string
         }
         Insert: {
+          client_id?: string | null
           completed_at?: string
           completed_by?: string | null
           completion_date: string
           id?: string
           note?: string | null
+          outcome?: string
           source: string
           source_id: string
           space_id: string
         }
         Update: {
+          client_id?: string | null
           completed_at?: string
           completed_by?: string | null
           completion_date?: string
           id?: string
           note?: string | null
+          outcome?: string
           source?: string
           source_id?: string
           space_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "chore_completions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "chore_completions_space_id_fkey"
             columns: ["space_id"]
@@ -2592,6 +2605,60 @@ export type Database = {
           },
           {
             foreignKeyName: "client_budgets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_chore_support: {
+        Row: {
+          activated_at: string | null
+          activated_by: string | null
+          client_id: string
+          created_at: string
+          goal_note: string | null
+          id: string
+          organization_id: string
+          reason: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          activated_at?: string | null
+          activated_by?: string | null
+          client_id: string
+          created_at?: string
+          goal_note?: string | null
+          id?: string
+          organization_id: string
+          reason?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          activated_at?: string | null
+          activated_by?: string | null
+          client_id?: string
+          created_at?: string
+          goal_note?: string | null
+          id?: string
+          organization_id?: string
+          reason?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_chore_support_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_chore_support_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"

@@ -180,7 +180,18 @@ function ReviewPage() {
         <WhiteGloveBanner job={job.data.job} onChanged={() => job.refetch()} />
       )}
 
-      <RosterSummary mode={mode} total={total} ready={ready} needReview={needReview} jobId={jobId} whiteGlove={job.data.job.source === "white_glove"} signedOff={!!job.data.job.provider_signoff_at} />
+      <RosterSummary
+        mode={mode}
+        total={total}
+        ready={ready}
+        needReview={needReview}
+        whiteGlove={job.data.job.source === "white_glove"}
+        signedOff={!!job.data.job.provider_signoff_at}
+        commit={commitCtx.commit}
+        commitPending={commitCtx.isPending}
+        partial={commitCtx.partial}
+        onSelectSubject={setSelectedId}
+      />
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         <SubjectQueue mode={mode} queue={queue} selectedId={selectedId} onSelect={onQueueSelect} />
@@ -193,6 +204,10 @@ function ReviewPage() {
               subjects={subjects}
               assignments={job.data.assignments ?? []}
               onChanged={() => { job.refetch(); orgPending.refetch(); }}
+              commit={commitCtx.commit}
+              commitPending={commitCtx.isPending}
+              commitDisabled={commitCtx.isPending || ready === 0 || (job.data.job.source === "white_glove" && !job.data.job.provider_signoff_at)}
+              commitReason={job.data.job.source === "white_glove" && !job.data.job.provider_signoff_at ? "Waiting for provider sign-off" : undefined}
             />
           ) : (
             <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground shadow-[var(--shadow-card)]">

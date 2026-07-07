@@ -537,12 +537,18 @@ export function TimesheetsImportWizard() {
           parsed={parsed}
           mapping={mapping}
           onChange={setMapping}
-          onBack={() => { setStep(1); setParsed(null); setMapping(null); setFile(null); }}
+          wholeFile={wholeFile}
+          onWholeFileChange={setWholeFile}
+          suggestions={suggestions}
+          suggesting={suggesting}
+          people={peopleQ.data ?? { staff: [], clients: [] }}
+          onBack={() => { setStep(1); setParsed(null); setMapping(null); setFile(null); setWholeFile({ staffId: null, clientId: null }); setSuggestions(null); }}
           onNext={buildReviewRows}
           peopleReady={!!peopleQ.data}
           fileName={file?.name ?? ""}
         />
       )}
+
 
       {step === 3 && peopleQ.data && (
         <ReviewStep

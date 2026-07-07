@@ -199,6 +199,9 @@ export function FaceSheetInfoCard({ clientId }: { clientId: string }) {
             <Field label="Primary — address" k="emergency_contact_address" multiline form={form} set={set} editing={editing} full />
             <Field label="Secondary — relationship" k="emergency_contact_2_relationship" form={form} set={set} editing={editing} />
             <Field label="Secondary — address" k="emergency_contact_2_address" multiline form={form} set={set} editing={editing} full />
+          </Section>
+
+
 
 
           <Section title="Insurance & Payment">

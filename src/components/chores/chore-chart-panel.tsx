@@ -414,7 +414,7 @@ export function ChoreChartPanel({
   });
   const updateDailyItem = useMutation({
     mutationFn: async (v: { id: string; label?: string; detail?: string | null }) => {
-      const patch: Record<string, unknown> = {};
+      const patch: { label?: string; detail?: string | null } = {};
       if (v.label !== undefined) patch.label = v.label;
       if (v.detail !== undefined) patch.detail = v.detail;
       const { error } = await supabase.from("chore_daily_items").update(patch).eq("id", v.id);

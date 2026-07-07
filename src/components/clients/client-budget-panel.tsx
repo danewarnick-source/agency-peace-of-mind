@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2, Save, Sparkles, FileText, Printer, Send, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, Save, Sparkles, FileText, Printer, Send, CheckCircle2, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useOrgBranding } from "@/components/branding/org-logo";
@@ -30,6 +30,8 @@ import {
   type BudgetPdfPayload,
   type BudgetPdfLogo,
 } from "@/lib/client-budget-pdf";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+
 
 type Section = "income" | "expense" | "other";
 
@@ -427,7 +429,28 @@ function BudgetEditor({
     };
   };
 
-  const [pdfBusy, setPdfBusy] = useState<null | "download" | "print" | "ship">(null);
+  const [pdfBusy, setPdfBusy] = useState<null | "download" | "print" | "ship" | "preview">(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const openPreview = async () => {
+    setPdfBusy("preview");
+    try {
+      const bytes = await renderClientBudgetPdf(buildPayload());
+      const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
+      // Revoke any previous URL before replacing.
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(URL.createObjectURL(blob));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not generate preview");
+    } finally {
+      setPdfBusy(null);
+    }
+  };
+  const closePreview = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+  };
+
 
   const openPdf = async (mode: "download" | "print") => {
     setPdfBusy(mode);
@@ -522,6 +545,11 @@ function BudgetEditor({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="outline" onClick={openPreview} disabled={pdfBusy !== null}>
+            <Eye className="mr-2 h-4 w-4" />
+            {pdfBusy === "preview" ? "Building…" : "Preview"}
+          </Button>
+
           <Button size="sm" variant="outline" onClick={() => openPdf("download")} disabled={pdfBusy !== null}>
             <FileText className="mr-2 h-4 w-4" />
             {pdfBusy === "download" ? "Building…" : "Download PDF"}
@@ -612,9 +640,44 @@ function BudgetEditor({
           placeholder="E.g., banks at Zion's, uses Smith's credit card for groceries, Horizon card for food stamps…"
         />
       </div>
+
+      {/* PDF preview modal — renders the same bytes as Download / Print / Ship */}
+      <Dialog open={previewUrl !== null} onOpenChange={(o) => { if (!o) closePreview(); }}>
+        <DialogContent className="max-w-5xl w-[95vw] h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-4 py-3 border-b">
+            <DialogTitle className="text-base">
+              Budget preview — {clientName} · {periodLabel}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 bg-muted">
+            {previewUrl && (
+              <iframe
+                src={previewUrl}
+                title="Budget PDF preview"
+                className="w-full h-full border-0"
+              />
+            )}
+          </div>
+          <DialogFooter className="px-4 py-3 border-t gap-2 sm:justify-between">
+            <div className="text-xs text-muted-foreground">
+              Preview only — no file has been saved. Use Download, Print, or Ship to commit.
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => openPdf("download")} disabled={pdfBusy !== null}>
+                <FileText className="mr-2 h-4 w-4" /> Download
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => openPdf("print")} disabled={pdfBusy !== null}>
+                <Printer className="mr-2 h-4 w-4" /> Print
+              </Button>
+              <Button size="sm" variant="secondary" onClick={closePreview}>Close</Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 

@@ -222,30 +222,40 @@ function ClientPillDraggable({
   if ("choking_risk" in client && client.choking_risk) tags.push("choking-risk");
   if ("controlled_med" in client && client.controlled_med) tags.push("controlled-meds");
   if ("med_count" in client && client.med_count > 0) tags.push(`${client.med_count} meds`);
+  const notesCtx = useContext(NotesBoardContext);
+  const label = `${client.first_name} ${("last_name" in client ? client.last_name : "") || ""}`.trim();
   return (
     <div
       ref={setNodeRef}
-      {...listeners}
-      {...attributes}
       className={`flex items-start gap-1.5 rounded-md border border-border bg-background px-2 py-1.5 text-xs shadow-sm ${
         canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed opacity-90"
       } ${isDragging ? "opacity-50" : ""}`}
     >
-      {canDrag && <GripVertical className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />}
-      <div className="min-w-0 flex-1">
-        <div className="truncate font-medium">
-          {client.first_name} {("last_name" in client ? client.last_name : "") || ""}
+      <div {...listeners} {...attributes} className="flex min-w-0 flex-1 items-start gap-1.5">
+        {canDrag && <GripVertical className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />}
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-medium">{label || "Client"}</div>
+          {tags.length > 0 && (
+            <div className="mt-0.5 flex flex-wrap gap-1">
+              {tags.map((t) => (
+                <span key={t} className="rounded bg-muted px-1 py-0 text-[9px] text-muted-foreground">
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
-        {tags.length > 0 && (
-          <div className="mt-0.5 flex flex-wrap gap-1">
-            {tags.map((t) => (
-              <span key={t} className="rounded bg-muted px-1 py-0 text-[9px] text-muted-foreground">
-                {t}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
+      {notesCtx.organizationId && (
+        <NotesPopover
+          organizationId={notesCtx.organizationId}
+          subjectType="client"
+          subjectId={client.id}
+          subjectLabel={label || "Client"}
+          canWrite={notesCtx.canWrite}
+          initialCount={notesCtx.countsByKey.get(notesKey("client", client.id)) ?? 0}
+        />
+      )}
     </div>
   );
 }

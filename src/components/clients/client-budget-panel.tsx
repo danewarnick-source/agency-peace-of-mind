@@ -111,6 +111,7 @@ export function ClientBudgetPanel({ clientId }: { clientId: string }) {
         .select("*")
         .eq("budget_id", budgetQ.data!.id)
         .order("section")
+        .order("day_of_month", { ascending: true, nullsFirst: false })
         .order("sort_order");
       if (error) throw error;
       return (data ?? []) as BudgetLine[];

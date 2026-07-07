@@ -26,12 +26,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import {
@@ -315,6 +317,34 @@ function StaffPillDraggable({
   );
 }
 
+// ---------- Overlay pills (presentational, no drag wiring) -----------------
+
+function ClientPillOverlay({ client }: { client: RhsClient | WhiteboardClient }) {
+  const label = `${client.first_name} ${("last_name" in client ? client.last_name : "") || ""}`.trim();
+  return (
+    <div className="flex items-start gap-1.5 rounded-md border border-primary bg-background px-2 py-1.5 text-xs shadow-lg ring-2 ring-primary/40 cursor-grabbing">
+      <GripVertical className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-medium">{label || "Client"}</div>
+      </div>
+    </div>
+  );
+}
+
+function StaffPillOverlay({ staff }: { staff: BoardStaff }) {
+  return (
+    <div className="flex items-center gap-1 rounded-full border border-primary bg-background px-1 py-1 pr-1.5 text-xs shadow-lg ring-2 ring-primary/40 cursor-grabbing">
+      <PersonAvatar
+        bucket="staff-photos"
+        path={staff.photo_path}
+        name={staff.full_name}
+        className="h-6 w-6 text-[10px] border"
+      />
+      <span className="truncate max-w-[110px] font-medium">{staff.full_name}</span>
+    </div>
+  );
+}
+
 // ---------- Droppable containers -------------------------------------------
 
 function Droppable({
@@ -330,7 +360,9 @@ function Droppable({
   return (
     <div
       ref={setNodeRef}
-      className={`${className ?? ""} ${isOver ? "ring-2 ring-primary/50 rounded-lg" : ""}`}
+      className={`${className ?? ""} rounded-lg transition-shadow ${
+        isOver ? "ring-2 ring-primary ring-offset-2 bg-primary/5" : ""
+      }`}
     >
       {children}
     </div>
@@ -345,7 +377,7 @@ function RhsHomeContainer({
   canDrag,
 }: {
   home: RhsHome;
-  clients: RhsClient[];
+  clients: Array<RhsClient | WhiteboardClient>;
   staff: BoardStaff[];
   score: MoveScore | null;
   canDrag: boolean;
@@ -419,7 +451,7 @@ function HhsHostContainer({
   canDrag,
 }: {
   host: WhiteboardHost;
-  clients: WhiteboardClient[];
+  clients: Array<RhsClient | WhiteboardClient>;
   staff: BoardStaff[];
   canDrag: boolean;
 }) {
@@ -574,6 +606,7 @@ export function WhiteboardPlanningBoard() {
   const staff = staffQ.data;
 
   const [plan, setPlan] = useState<Plan>({ clients: {}, staff: {} });
+  const [activeId, setActiveId] = useState<string | null>(null);
   const startingRef = useRef<Plan | null>(null);
   const historyRef = useRef<Plan[]>([]);
 
@@ -650,8 +683,17 @@ export function WhiteboardPlanningBoard() {
 
   // --- Actions -----------------------------------------------------------
 
+  function handleDragStart(e: DragStartEvent) {
+    setActiveId(String(e.active.id));
+  }
+  function handleDragCancel() {
+    setActiveId(null);
+  }
+
   function handleDragEnd(e: DragEndEvent) {
+    setActiveId(null);
     const dest = e.over?.id ? String(e.over.id) : null;
+    // No valid drop target → return-to-source (do nothing).
     if (!dest) return;
     const parsed = parseDraggable(String(e.active.id));
     if (!parsed) return;
@@ -659,14 +701,12 @@ export function WhiteboardPlanningBoard() {
     setPlan((prev) => {
       const next: Plan = { clients: { ...prev.clients }, staff: { ...prev.staff } };
       if (parsed.kind === "client") {
-        // Clients can only land in client-accepting containers (rhs-home / hhs-host / POOL_CLIENTS).
         if (!(dest.startsWith("rhs-home:") || dest.startsWith("hhs-host:") || dest === POOL_CLIENTS)) {
           return prev;
         }
         if (prev.clients[parsed.id] === dest) return prev;
         next.clients[parsed.id] = dest;
       } else {
-        // Staff can go anywhere (rhs-home / hhs-host / ds-client / POOL_STAFF).
         if (
           !(
             dest.startsWith("rhs-home:") ||
@@ -732,7 +772,12 @@ export function WhiteboardPlanningBoard() {
 
   return (
     <NotesBoardContext.Provider value={notesCtxValue}>
-    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
       <div className="space-y-4">
         {/* Planning banner + controls */}
         <div className="flex flex-wrap items-start justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -832,7 +877,7 @@ export function WhiteboardPlanningBoard() {
                   <RhsHomeContainer
                     key={h.id}
                     home={h}
-                    clients={cIds.map((id) => rhsClientById.get(id)).filter(Boolean) as RhsClient[]}
+                    clients={cIds.map((id) => rhsClientById.get(id) ?? wbClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
                     staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
                     score={scoreByHome.get(h.id) ?? null}
                     canDrag={canDrag}
@@ -861,7 +906,7 @@ export function WhiteboardPlanningBoard() {
                   <HhsHostContainer
                     key={h.id}
                     host={h}
-                    clients={cIds.map((id) => wbClientById.get(id)).filter(Boolean) as WhiteboardClient[]}
+                    clients={cIds.map((id) => wbClientById.get(id) ?? rhsClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
                     staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
                     canDrag={canDrag}
                   />
@@ -905,6 +950,19 @@ export function WhiteboardPlanningBoard() {
           scoring will be wired in a later pass.
         </div>
       </div>
+      <DragOverlay dropAnimation={null}>
+        {(() => {
+          if (!activeId) return null;
+          const parsed = parseDraggable(activeId);
+          if (!parsed) return null;
+          if (parsed.kind === "client") {
+            const c = rhsClientById.get(parsed.id) ?? wbClientById.get(parsed.id);
+            return c ? <ClientPillOverlay client={c} /> : null;
+          }
+          const s = staffById.get(parsed.id);
+          return s ? <StaffPillOverlay staff={s} /> : null;
+        })()}
+      </DragOverlay>
     </DndContext>
     </NotesBoardContext.Provider>
   );

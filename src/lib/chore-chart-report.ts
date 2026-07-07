@@ -40,13 +40,6 @@ function slug(s: string) {
       .replace(/^-+|-+$/g, "") || "space"
   );
 }
-function fmtTime(t: string | null) {
-  return t ? t.slice(0, 5) : "?";
-}
-function fmtRange(s: string | null, e: string | null) {
-  if (!s && !e) return null;
-  return `${fmtTime(s)} – ${fmtTime(e)}`;
-}
 
 export async function generateChoreChartReport(
   args: ChoreChartReportArgs,

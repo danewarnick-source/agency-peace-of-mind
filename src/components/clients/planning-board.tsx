@@ -43,10 +43,13 @@ import {
   AlertTriangle,
   GripVertical,
   Info,
+  Plus,
   RotateCcw,
   Undo2,
   UserRound,
+  X,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PersonAvatar } from "@/components/person/person-avatar";
@@ -103,11 +106,19 @@ function parseDraggable(id: string): { kind: "client" | "staff"; id: string } | 
 
 /** Placement maps — the entire session-scoped plan state. */
 type Plan = {
-  // client_id → containerId (rhs-home:<id>, hhs-host:<id>, or POOL_CLIENTS)
+  // client_id → containerId (rhs-home:<id>, hhs-host:<id>, ds-slot:<id>, POOL_CLIENTS)
   clients: Record<string, string>;
-  // staff_id → containerId (rhs-home / hhs-host / ds-client / POOL_STAFF)
+  // staff_id → containerId (rhs-home / hhs-host / ds-client / ds-slot / POOL_STAFF)
   staff: Record<string, string>;
 };
+
+/** Session-only hypothetical containers layered on top of the real snapshot. */
+type Scenarios = {
+  rhsHomes: Array<{ id: string; name: string }>;
+  hhsHosts: Array<{ id: string; name: string }>;
+  dsSlots: Array<{ id: string; name: string }>;
+};
+const emptyScenarios: Scenarios = { rhsHomes: [], hhsHosts: [], dsSlots: [] };
 
 function lightClasses(l: MoveLight): string {
   switch (l) {
@@ -543,6 +554,111 @@ function DirectSupportContainer({
   );
 }
 
+/** Session-only Direct-Support slot — accepts a client + staff. */
+function DsSlotContainer({
+  slotId,
+  name,
+  clients,
+  staff,
+  canDrag,
+  onRename,
+  onRemove,
+}: {
+  slotId: string;
+  name: string;
+  clients: Array<RhsClient | WhiteboardClient>;
+  staff: BoardStaff[];
+  canDrag: boolean;
+  onRename: (v: string) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <Droppable id={`ds-slot:${slotId}`} className="min-h-[180px]">
+      <HumanFrame
+        title={name}
+        subtitle="Direct support · scenario slot"
+        badge={
+          <div className="flex items-center gap-1">
+            <Badge variant="outline" className="shrink-0 text-[10px]">
+              {clients.length} · {staff.length} staff
+            </Badge>
+            <button
+              type="button"
+              onClick={onRemove}
+              className="rounded p-0.5 text-muted-foreground hover:bg-muted"
+              title="Remove scenario slot"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        }
+      >
+        <Input
+          value={name}
+          onChange={(e) => onRename(e.target.value)}
+          className="mb-2 h-6 text-xs"
+        />
+        <div className="mb-2 space-y-1.5">
+          {clients.length === 0 ? (
+            <p className="rounded border border-dashed border-border bg-background/60 px-2 py-2 text-center text-[10px] text-muted-foreground">
+              Drop a client here.
+            </p>
+          ) : (
+            clients.map((c) => (
+              <ClientPillDraggable key={c.id} client={c} canDrag={canDrag} />
+            ))
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {staff.length === 0 ? (
+            <span className="text-[10px] italic text-muted-foreground">
+              Drop staff here.
+            </span>
+          ) : (
+            staff.map((s) => (
+              <StaffPillDraggable key={s.id} staff={s} canDrag={canDrag} />
+            ))
+          )}
+        </div>
+      </HumanFrame>
+    </Droppable>
+  );
+}
+
+/** Rename + remove chrome overlaid on RHS/HHS scenario containers. */
+function ScenarioChrome({
+  name,
+  onRename,
+  onRemove,
+  children,
+}: {
+  name: string;
+  onRename: (v: string) => void;
+  onRemove: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative">
+      <div className="absolute right-1 top-1 z-10 flex items-center gap-1">
+        <button
+          type="button"
+          onClick={onRemove}
+          className="rounded bg-background/80 p-0.5 text-muted-foreground shadow-sm hover:bg-muted"
+          title="Remove scenario"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+      {children}
+      <Input
+        value={name}
+        onChange={(e) => onRename(e.target.value)}
+        className="mt-1 h-6 text-xs"
+      />
+    </div>
+  );
+}
+
 // ---------- Board ----------------------------------------------------------
 
 function buildStartingPlan(
@@ -609,6 +725,7 @@ export function WhiteboardPlanningBoard() {
   const staff = staffQ.data;
 
   const [plan, setPlan] = useState<Plan>({ clients: {}, staff: {} });
+  const [scenarios, setScenarios] = useState<Scenarios>(emptyScenarios);
   const [activeId, setActiveId] = useState<string | null>(null);
   const startingRef = useRef<Plan | null>(null);
   const historyRef = useRef<Plan[]>([]);
@@ -687,10 +804,24 @@ export function WhiteboardPlanningBoard() {
 
   // Scoring — RHS only, using the planned RHS-client roster. Non-RHS clients
   // are ALLOWED to be dropped in but surfaced as risks (flag, never block).
+  // Combined RHS homes = real + scenario. Scenario homes get synthetic RhsHome
+  // shape so scoreComposition can flag mismatches consistently.
+  const allRhsHomes = useMemo<RhsHome[]>(() => {
+    const real = rhs?.homes ?? [];
+    const scen: RhsHome[] = scenarios.rhsHomes.map((h) => ({
+      id: h.id,
+      team_name: h.name,
+      setting: "residential_host",
+      capacity: null,
+      address: null,
+    }));
+    return [...real, ...scen];
+  }, [rhs, scenarios.rhsHomes]);
+
   const scoreByHome = useMemo(() => {
     const m = new Map<string, MoveScore>();
     if (!rhs) return m;
-    for (const home of rhs.homes) {
+    for (const home of allRhsHomes) {
       const ids = clientsByContainer.get(`rhs-home:${home.id}`) ?? [];
       const rhsRoster = ids.map((id) => rhsClientById.get(id)).filter(Boolean) as RhsClient[];
       const base = scoreComposition(home, rhsRoster, rhs.unscored_signals);
@@ -706,7 +837,7 @@ export function WhiteboardPlanningBoard() {
       m.set(home.id, { ...base, risks: [...base.risks, ...mismatchRisks] });
     }
     return m;
-  }, [rhs, clientsByContainer, rhsClientById, wbClientById]);
+  }, [rhs, allRhsHomes, clientsByContainer, rhsClientById, wbClientById]);
 
   // --- Actions -----------------------------------------------------------
 
@@ -728,7 +859,14 @@ export function WhiteboardPlanningBoard() {
     setPlan((prev) => {
       const next: Plan = { clients: { ...prev.clients }, staff: { ...prev.staff } };
       if (parsed.kind === "client") {
-        if (!(dest.startsWith("rhs-home:") || dest.startsWith("hhs-host:") || dest === POOL_CLIENTS)) {
+        if (
+          !(
+            dest.startsWith("rhs-home:") ||
+            dest.startsWith("hhs-host:") ||
+            dest.startsWith("ds-slot:") ||
+            dest === POOL_CLIENTS
+          )
+        ) {
           return prev;
         }
         if (prev.clients[parsed.id] === dest) return prev;
@@ -739,6 +877,7 @@ export function WhiteboardPlanningBoard() {
             dest.startsWith("rhs-home:") ||
             dest.startsWith("hhs-host:") ||
             dest.startsWith("ds-client:") ||
+            dest.startsWith("ds-slot:") ||
             dest === POOL_STAFF
           )
         ) {
@@ -763,6 +902,67 @@ export function WhiteboardPlanningBoard() {
     if (!startingRef.current) return;
     historyRef.current = [];
     setPlan(startingRef.current);
+    setScenarios(emptyScenarios);
+  }
+
+  // Scenario creation — session only. IDs are prefixed so they never collide
+  // with real snapshot IDs.
+  function nextName(existing: Array<{ name: string }>, prefix: string): string {
+    let n = existing.length + 1;
+    const taken = new Set(existing.map((e) => e.name));
+    while (taken.has(`${prefix} ${n}`)) n++;
+    return `${prefix} ${n}`;
+  }
+  function addRhsHome() {
+    setScenarios((s) => ({
+      ...s,
+      rhsHomes: [
+        ...s.rhsHomes,
+        { id: `scenario-rhs-${crypto.randomUUID()}`, name: nextName(s.rhsHomes, "New Home") },
+      ],
+    }));
+  }
+  function addHhsHost() {
+    setScenarios((s) => ({
+      ...s,
+      hhsHosts: [
+        ...s.hhsHosts,
+        { id: `scenario-hhs-${crypto.randomUUID()}`, name: nextName(s.hhsHosts, "New Host Home") },
+      ],
+    }));
+  }
+  function addDsSlot() {
+    setScenarios((s) => ({
+      ...s,
+      dsSlots: [
+        ...s.dsSlots,
+        { id: `scenario-ds-${crypto.randomUUID()}`, name: nextName(s.dsSlots, "New 1:1 Support") },
+      ],
+    }));
+  }
+  function renameScenario(kind: keyof Scenarios, id: string, name: string) {
+    setScenarios((s) => ({
+      ...s,
+      [kind]: s[kind].map((x) => (x.id === id ? { ...x, name } : x)),
+    }));
+  }
+  function removeScenario(kind: keyof Scenarios, id: string) {
+    // Also unplace anything that was inside the removed container.
+    const containerPrefix =
+      kind === "rhsHomes" ? "rhs-home:" : kind === "hhsHosts" ? "hhs-host:" : "ds-slot:";
+    const containerId = `${containerPrefix}${id}`;
+    setPlan((prev) => {
+      const clients = { ...prev.clients };
+      const staff = { ...prev.staff };
+      for (const [cid, dest] of Object.entries(clients)) {
+        if (dest === containerId) clients[cid] = POOL_CLIENTS;
+      }
+      for (const [sid, dest] of Object.entries(staff)) {
+        if (dest === containerId) staff[sid] = POOL_STAFF;
+      }
+      return { clients, staff };
+    });
+    setScenarios((s) => ({ ...s, [kind]: s[kind].filter((x) => x.id !== id) }));
   }
 
   // --- Render ------------------------------------------------------------
@@ -889,86 +1089,188 @@ export function WhiteboardPlanningBoard() {
 
         {/* RHS Residential lane */}
         <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            RHS — Residential homes
-          </h3>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              RHS — Residential homes
+            </h3>
+            {canDrag && (
+              <Button size="sm" variant="outline" onClick={addRhsHome}>
+                <Plus className="mr-1 h-3 w-3" /> Add home
+              </Button>
+            )}
+          </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {rhs.homes.length === 0 ? (
+            {rhs.homes.length === 0 && scenarios.rhsHomes.length === 0 ? (
               <p className="col-span-full rounded-md border border-dashed border-border bg-muted/20 px-3 py-6 text-center text-[11px] text-muted-foreground">
-                No residential homes configured.
+                No residential homes configured. Use "Add home" to model a hypothetical.
               </p>
             ) : (
-              rhs.homes.map((h) => {
-                const cIds = clientsByContainer.get(`rhs-home:${h.id}`) ?? [];
-                const sIds = staffByContainer.get(`rhs-home:${h.id}`) ?? [];
-                return (
-                  <RhsHomeContainer
-                    key={h.id}
-                    home={h}
-                    clients={cIds.map((id) => rhsClientById.get(id) ?? wbClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
-                    staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
-                    score={scoreByHome.get(h.id) ?? null}
-                    canDrag={canDrag}
-                  />
-                );
-              })
+              <>
+                {rhs.homes.map((h) => {
+                  const cIds = clientsByContainer.get(`rhs-home:${h.id}`) ?? [];
+                  const sIds = staffByContainer.get(`rhs-home:${h.id}`) ?? [];
+                  return (
+                    <RhsHomeContainer
+                      key={h.id}
+                      home={h}
+                      clients={cIds.map((id) => rhsClientById.get(id) ?? wbClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
+                      staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
+                      score={scoreByHome.get(h.id) ?? null}
+                      canDrag={canDrag}
+                    />
+                  );
+                })}
+                {scenarios.rhsHomes.map((sh) => {
+                  const synth: RhsHome = {
+                    id: sh.id,
+                    team_name: sh.name,
+                    setting: "residential_host",
+                    capacity: null,
+                    address: null,
+                  };
+                  const cIds = clientsByContainer.get(`rhs-home:${sh.id}`) ?? [];
+                  const sIds = staffByContainer.get(`rhs-home:${sh.id}`) ?? [];
+                  return (
+                    <ScenarioChrome
+                      key={sh.id}
+                      name={sh.name}
+                      onRename={(v) => renameScenario("rhsHomes", sh.id, v)}
+                      onRemove={() => removeScenario("rhsHomes", sh.id)}
+                    >
+                      <RhsHomeContainer
+                        home={synth}
+                        clients={cIds.map((id) => rhsClientById.get(id) ?? wbClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
+                        staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
+                        score={scoreByHome.get(sh.id) ?? null}
+                        canDrag={canDrag}
+                      />
+                    </ScenarioChrome>
+                  );
+                })}
+              </>
             )}
           </div>
         </section>
 
         {/* HHS Host Home lane */}
         <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            HHS — Host homes
-          </h3>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              HHS — Host homes
+            </h3>
+            {canDrag && (
+              <Button size="sm" variant="outline" onClick={addHhsHost}>
+                <Plus className="mr-1 h-3 w-3" /> Add host home
+              </Button>
+            )}
+          </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {wb.hosts.length === 0 ? (
+            {wb.hosts.length === 0 && scenarios.hhsHosts.length === 0 ? (
               <p className="col-span-full rounded-md border border-dashed border-border bg-muted/20 px-3 py-6 text-center text-[11px] text-muted-foreground">
-                No host homes on file.
+                No host homes on file. Use "Add host home" to model a hypothetical.
               </p>
             ) : (
-              wb.hosts.map((h) => {
-                const cIds = clientsByContainer.get(`hhs-host:${h.id}`) ?? [];
-                const sIds = staffByContainer.get(`hhs-host:${h.id}`) ?? [];
-                return (
-                  <HhsHostContainer
-                    key={h.id}
-                    host={h}
-                    clients={cIds.map((id) => wbClientById.get(id) ?? rhsClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
-                    staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
-                    canDrag={canDrag}
-                  />
-                );
-              })
+              <>
+                {wb.hosts.map((h) => {
+                  const cIds = clientsByContainer.get(`hhs-host:${h.id}`) ?? [];
+                  const sIds = staffByContainer.get(`hhs-host:${h.id}`) ?? [];
+                  return (
+                    <HhsHostContainer
+                      key={h.id}
+                      host={h}
+                      clients={cIds.map((id) => wbClientById.get(id) ?? rhsClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
+                      staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
+                      canDrag={canDrag}
+                    />
+                  );
+                })}
+                {scenarios.hhsHosts.map((sh) => {
+                  const synth: WhiteboardHost = {
+                    id: sh.id,
+                    name: sh.name,
+                    location_city: null,
+                    location_county: null,
+                    independence_levels_accepted: [],
+                    medical_comfort: [],
+                    behavioral_comfort: null,
+                    wheelchair_accessible: false,
+                    sign_language: false,
+                    status: "onboarding",
+                  };
+                  const cIds = clientsByContainer.get(`hhs-host:${sh.id}`) ?? [];
+                  const sIds = staffByContainer.get(`hhs-host:${sh.id}`) ?? [];
+                  return (
+                    <ScenarioChrome
+                      key={sh.id}
+                      name={sh.name}
+                      onRename={(v) => renameScenario("hhsHosts", sh.id, v)}
+                      onRemove={() => removeScenario("hhsHosts", sh.id)}
+                    >
+                      <HhsHostContainer
+                        host={synth}
+                        clients={cIds.map((id) => wbClientById.get(id) ?? rhsClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
+                        staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
+                        canDrag={canDrag}
+                      />
+                    </ScenarioChrome>
+                  );
+                })}
+              </>
             )}
           </div>
         </section>
 
         {/* Direct Support lane */}
         <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Direct Support — 1:1 supports
-          </h3>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Direct Support — 1:1 supports
+            </h3>
+            {canDrag && (
+              <Button size="sm" variant="outline" onClick={addDsSlot}>
+                <Plus className="mr-1 h-3 w-3" /> Add 1:1 support
+              </Button>
+            )}
+          </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-            {dsClients.length === 0 ? (
+            {dsClients.length === 0 && scenarios.dsSlots.length === 0 ? (
               <p className="col-span-full rounded-md border border-dashed border-border bg-muted/20 px-3 py-6 text-center text-[11px] text-muted-foreground">
-                No active direct-support clients.
+                No active direct-support clients. Use "Add 1:1 support" to model a hypothetical.
               </p>
             ) : (
-              dsClients.map((c) => {
-                const sIds = staffByContainer.get(`ds-client:${c.id}`) ?? [];
-                return (
-                  <DirectSupportContainer
-                    key={c.id}
-                    client={c}
-                    staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
-                    canDrag={canDrag}
-                  />
-                );
-              })
+              <>
+                {dsClients.map((c) => {
+                  const sIds = staffByContainer.get(`ds-client:${c.id}`) ?? [];
+                  return (
+                    <DirectSupportContainer
+                      key={c.id}
+                      client={c}
+                      staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
+                      canDrag={canDrag}
+                    />
+                  );
+                })}
+                {scenarios.dsSlots.map((sl) => {
+                  const cIds = clientsByContainer.get(`ds-slot:${sl.id}`) ?? [];
+                  const sIds = staffByContainer.get(`ds-slot:${sl.id}`) ?? [];
+                  return (
+                    <DsSlotContainer
+                      key={sl.id}
+                      slotId={sl.id}
+                      name={sl.name}
+                      clients={cIds.map((id) => rhsClientById.get(id) ?? wbClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
+                      staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
+                      canDrag={canDrag}
+                      onRename={(v) => renameScenario("dsSlots", sl.id, v)}
+                      onRemove={() => removeScenario("dsSlots", sl.id)}
+                    />
+                  );
+                })}
+              </>
             )}
           </div>
         </section>
+
 
         <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
           <Info className="mr-1 inline h-3 w-3" />

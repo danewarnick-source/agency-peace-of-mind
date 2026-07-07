@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/table";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { ClientBudgetPanel } from "@/components/clients/client-budget-panel";
+import { ClientMealPlannerPanel } from "@/components/clients/client-meal-planner-panel";
 import { PcspTab } from "@/components/clients/pcsp-tab";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { ClientProfileTab } from "@/components/clients/profile-tab";

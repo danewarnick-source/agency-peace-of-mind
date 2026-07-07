@@ -221,33 +221,50 @@ function AttributionBar() {
   );
 }
 
-// ---------------------------- RosterSummary ----------------------------
-function RosterSummary({
-  mode, total, ready, needReview, jobId, whiteGlove, signedOff,
-}: { mode: "employee" | "client"; total: number; ready: number; needReview: number; jobId: string; whiteGlove?: boolean; signedOff?: boolean }) {
+// ---------------------------- Shared commit hook ----------------------------
+type CommitResultRow = {
+  subjectId?: string;
+  display_name?: string;
+  committed: boolean;
+  record_id?: string | null;
+  subject_type?: string;
+  gaps?: string[];
+  error?: string;
+};
+
+function useCompleteSetup({
+  jobId, mode, onSelectSubject,
+}: {
+  jobId: string;
+  mode: "employee" | "client";
+  onSelectSubject?: (id: string) => void;
+}) {
   const submit = useServerFn(submitForSetup);
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const [partial, setPartial] = useState<CommitResultRow[]>([]);
   const m = useMutation({
     mutationFn: () => submit({ data: { jobId } }),
-    onSuccess: (res: { ok: boolean; committed?: boolean; results?: Array<{ committed: boolean; record_id?: string | null; subject_type?: string }> }) => {
+    onSuccess: (res: { ok: boolean; committed?: boolean; results?: CommitResultRow[] }) => {
       qc.invalidateQueries({ queryKey: ["smart-import-review", jobId] });
       qc.invalidateQueries({ queryKey: ["clients"] });
       qc.invalidateQueries({ queryKey: ["clients-uncommitted-imports"] });
       qc.invalidateQueries({ queryKey: ["pending-client-subjects"] });
       const results = res.results ?? [];
       const committedRows = results.filter((r) => r.committed && r.record_id);
-      const partial = results.length > 0 && committedRows.length < results.length;
+      const failedRows = results.filter((r) => !r.committed);
+      const isPartial = results.length > 0 && committedRows.length < results.length;
 
-      // White-glove path: no commit happens yet — fall back to the done page,
-      // which renders the awaiting-signoff state.
+      // White-glove path: no commit happens yet — fall back to the done page.
       if (results.length === 0) {
+        setPartial([]);
         navigate({ to: "/dashboard/smart-import/$jobId/done", params: { jobId } });
         return;
       }
 
-      if (!partial && committedRows.length > 0) {
-        toast.success(`Client setup complete — ${committedRows.length === 1 ? "added to directory" : `${committedRows.length} clients added`}.`);
+      if (!isPartial && committedRows.length > 0) {
+        setPartial([]);
+        toast.success(`${mode === "client" ? "Client" : "Staff"} setup complete — ${committedRows.length === 1 ? "added to directory" : `${committedRows.length} added`}.`);
         if (committedRows.length === 1 && mode === "client" && committedRows[0].record_id) {
           navigate({ to: "/dashboard/clients/$clientId", params: { clientId: committedRows[0].record_id! } }).catch(() => navigate({ to: "/dashboard/clients" }));
         } else if (mode === "client") {
@@ -258,26 +275,93 @@ function RosterSummary({
         return;
       }
 
-      // Partial — stay on the review page; per-subject errors render inline.
-      toast.warning(`${committedRows.length} of ${results.length} saved — review the remaining ${results.length - committedRows.length} below.`);
+      // Partial — stay on the review page; the roster banner now lists the reasons.
+      setPartial(failedRows);
+      const solo = failedRows.length === 1 ? failedRows[0] : null;
+      toast.warning(
+        solo?.display_name
+          ? `${solo.display_name} wasn't saved — see the reason above.`
+          : `${committedRows.length} of ${results.length} saved — review the remaining ${failedRows.length} above.`,
+      );
+      const firstWithId = failedRows.find((r) => r.subjectId);
+      if (firstWithId?.subjectId && onSelectSubject) onSelectSubject(firstWithId.subjectId);
     },
     onError: (e: Error) => toast.error(e.message),
   });
+  return {
+    commit: () => m.mutate(),
+    isPending: m.isPending,
+    partial,
+    clearPartial: () => setPartial([]),
+  };
+}
+
+// ---------------------------- RosterSummary ----------------------------
+function RosterSummary({
+  mode, total, ready, needReview, whiteGlove, signedOff,
+  commit, commitPending, partial, onSelectSubject,
+}: {
+  mode: "employee" | "client";
+  total: number; ready: number; needReview: number;
+  whiteGlove?: boolean; signedOff?: boolean;
+  commit: () => void;
+  commitPending: boolean;
+  partial: CommitResultRow[];
+  onSelectSubject: (id: string) => void;
+}) {
   const noun = mode === "client" ? "client" : "staff";
-  const commitDisabled = m.isPending || ready === 0 || (whiteGlove && !signedOff);
+  const commitDisabled = commitPending || ready === 0 || (whiteGlove && !signedOff);
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)] sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">Job roster ({mode})</div>
-        <div className="mt-1 text-base font-semibold">
-          {total} {noun}{total === 1 ? "" : "s"} · <span className="text-emerald-600">{ready} ready</span> · <span className="text-amber-600">{needReview} need review</span>
+    <div className="space-y-2">
+      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)] sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Job roster ({mode})</div>
+          <div className="mt-1 text-base font-semibold">
+            {total} {noun}{total === 1 ? "" : "s"} · <span className="text-emerald-600">{ready} ready</span> · <span className="text-amber-600">{needReview} need review</span>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">Advisory throughout — flags surface to act on, never block.</p>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">Advisory throughout — flags surface to act on, never block.</p>
+        <Button onClick={commit} disabled={commitDisabled} size="lg" title={whiteGlove && !signedOff ? "Waiting for provider sign-off" : undefined}>
+          {commitPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Send className="mr-2 h-4 w-4" /> Complete {noun} setup
+        </Button>
       </div>
-      <Button onClick={() => m.mutate()} disabled={commitDisabled} size="lg" title={whiteGlove && !signedOff ? "Waiting for provider sign-off" : undefined}>
-        {m.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        <Send className="mr-2 h-4 w-4" /> Complete {mode === "client" ? "client" : "staff"} setup
-      </Button>
+      {partial.length > 0 && (
+        <div className="rounded-2xl border border-amber-300/60 bg-amber-50/40 p-3 shadow-[var(--shadow-card)] dark:bg-amber-950/20">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-600" />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                {partial.length} {noun}{partial.length === 1 ? "" : "s"} still need attention
+              </div>
+              <div className="mt-0.5 text-[11px] text-amber-800/80 dark:text-amber-200/80">
+                Click a row to open it and fix the issue, then run Complete {noun} setup again.
+              </div>
+              <ul className="mt-2 space-y-1">
+                {partial.map((r, i) => {
+                  const reason = r.error ?? r.gaps?.[0] ?? "open this record to see what's needed";
+                  return (
+                    <li key={r.subjectId ?? `${r.display_name ?? "row"}-${i}`}>
+                      <button
+                        type="button"
+                        onClick={() => r.subjectId && onSelectSubject(r.subjectId)}
+                        disabled={!r.subjectId}
+                        className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-amber-100/70 disabled:opacity-60 dark:hover:bg-amber-900/30"
+                      >
+                        <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700 dark:text-amber-300" />
+                        <span className="min-w-0 flex-1">
+                          <span className="font-medium">{r.display_name ?? "Unnamed subject"}</span>
+                          <span className="text-muted-foreground"> — {reason}</span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

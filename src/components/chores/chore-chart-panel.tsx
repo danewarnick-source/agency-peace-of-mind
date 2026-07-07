@@ -832,7 +832,7 @@ function DefEditorDialog({
 }) {
   const [name, setName] = useState("");
   const [tasks, setTasks] = useState("");
-  useMemo(() => {
+  useEffect(() => {
     setName(initial?.chore_name ?? "");
     setTasks(initial?.task_list ?? "");
   }, [initial, open]);

@@ -147,7 +147,7 @@ export const suggestImportColumnMapping = createServerFn({ method: "POST" })
         .select("id, first_name, last_name, full_name")
         .in("id", memberIds);
       if (profRes.error) throw new Error(profRes.error.message);
-      staff = (profRes.data ?? []).map((p) => ({
+      staff = (profRes.data ?? []).map((p: { id: string; first_name: string | null; last_name: string | null; full_name: string | null }) => ({
         id: p.id,
         label: (p.full_name?.trim()) || [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || "Staff",
         norms: personNorms(p.first_name ?? "", p.last_name ?? "", p.full_name),

@@ -1242,9 +1242,11 @@ type FieldRow = {
 };
 function PlacementLineup({
   fields, targetFields, matched, decision, subjectId, tenant, onChanged, showBilling = false,
+  allowedTargetFields,
 }: {
   fields: FieldRow[]; targetFields: string[]; matched: Record<string, string | null> | null;
   decision: SubjectRow["review_decision"]; subjectId: string; tenant: TenantIdentity; onChanged: () => void; showBilling?: boolean;
+  allowedTargetFields?: string[];
 }) {
   // Prompt 18: peel billing-code rows out of the generic field list so we can
   // show them as a proper editable table. The remaining placement lineup keeps
@@ -1257,6 +1259,12 @@ function PlacementLineup({
   const required = new Set(targetFields);
   const core = rest.filter((f) => !f.is_custom_attribute && required.has(f.target_field));
   const custom = rest.filter((f) => f.is_custom_attribute);
+  // When a step scopes itself (e.g. Services), only offer fields that will
+  // actually render in this section from the "+ Add a field" popover — so
+  // anything the user adds shows up right where they added it.
+  const popoverTargets = allowedTargetFields && allowedTargetFields.length > 0
+    ? targetFields.filter((f) => allowedTargetFields.includes(f))
+    : targetFields;
   return (
     <div className="space-y-4">
       {showBilling && <BillingCodesEditor subjectId={subjectId} rows={billing} tenant={tenant} onChanged={onChanged} />}
@@ -1270,7 +1278,7 @@ function PlacementLineup({
           </div>
           <AddMissingFieldPopover
             subjectId={subjectId}
-            targetFields={targetFields}
+            targetFields={popoverTargets}
             presentFields={core.map((f) => f.target_field)}
             onChanged={onChanged}
           />

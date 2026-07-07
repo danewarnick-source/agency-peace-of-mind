@@ -3173,6 +3173,7 @@ export type Database = {
           bsp_status: string | null
           chronic_conditions: string[] | null
           client_photo_url: string | null
+          clinical_alert: string | null
           court_orders: string[] | null
           created_at: string
           date_of_birth: string | null
@@ -3268,6 +3269,7 @@ export type Database = {
           bsp_status?: string | null
           chronic_conditions?: string[] | null
           client_photo_url?: string | null
+          clinical_alert?: string | null
           court_orders?: string[] | null
           created_at?: string
           date_of_birth?: string | null
@@ -3363,6 +3365,7 @@ export type Database = {
           bsp_status?: string | null
           chronic_conditions?: string[] | null
           client_photo_url?: string | null
+          clinical_alert?: string | null
           court_orders?: string[] | null
           created_at?: string
           date_of_birth?: string | null
@@ -15976,6 +15979,7 @@ export type Database = {
           bsp_status: string | null
           chronic_conditions: string[] | null
           client_photo_url: string | null
+          clinical_alert: string | null
           court_orders: string[] | null
           created_at: string
           date_of_birth: string | null

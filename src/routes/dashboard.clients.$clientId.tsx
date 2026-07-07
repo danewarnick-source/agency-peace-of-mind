@@ -204,7 +204,7 @@ function ClientProfileHub() {
           </CollapsibleSimpleCard>
           <PersonCenteredProfilePanel clientId={clientId} orgId={orgId} />
           <CaseloadEditor clientId={clientId} />
-          <ClientMealPlannerPanel clientId={clientId} />
+          <ClientMealPlannerMount clientId={clientId} />
           <ChoreChartForClient clientId={clientId} />
         </TabsContent>
 

@@ -40,6 +40,7 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { syncTeamToLocation } from "@/lib/scheduling/locations.functions";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PersonAvatar } from "@/components/person/person-avatar";
 
 // ============================================================================
 // Types

@@ -16,13 +16,14 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Plus, Trash2, Sparkles, FileDown, Printer, ClipboardList, Users, Clock,
+  Plus, Trash2, Sparkles, FileDown, Printer, ClipboardList, Users, Clock, Send, CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   renderChoreChartPdf,
   type ChoreChartPdfPayload,
 } from "@/lib/chore-chart-pdf";
+import { shipChoreChartReport } from "@/lib/chore-chart-report";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 const FREE_DAY_VALUE = "__free__";

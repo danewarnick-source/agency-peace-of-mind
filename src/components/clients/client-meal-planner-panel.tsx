@@ -649,6 +649,14 @@ export function ClientMealPlannerPanel({
         </div>
         </DndContext>
 
+        {/* Budget fit — pulls from client_budgets food/grocery lines */}
+        <BudgetFitCard
+          clientId={clientId}
+          weekStart={weekStart}
+          plannedTotal={plannedCostTotal}
+        />
+
+
         {/* Staff "what did they actually eat" — current day */}
         {planId && canRecordActuals && (
           <ActualsToday

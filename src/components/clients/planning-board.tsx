@@ -1417,10 +1417,13 @@ export function WhiteboardPlanningBoard() {
 
         <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
           <Info className="mr-1 inline h-3 w-3" />
-          NECTAR scores RHS home composition from stored signals only —
-          capacity, age range, medication load. It explicitly does NOT
-          score: {rhs.unscored_signals.join(" · ")}. HHS and Direct-Support
-          scoring will be wired in a later pass.
+          NECTAR scores every container (RHS, HHS, Direct Support) from
+          placement notes, PCSP fields, staff credentials, active
+          authorized codes, and stored composition signals. Factors driving
+          each color are listed beneath the container; signals NECTAR could
+          not evaluate are surfaced honestly instead of guessed. Out-of-code
+          placements are flagged as risks, never blocked. Stored composition
+          unscored: {rhs.unscored_signals.join(" · ")}.
         </div>
       </div>
       <DragOverlay dropAnimation={null}>

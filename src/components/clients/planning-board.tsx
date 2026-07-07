@@ -885,26 +885,98 @@ export function WhiteboardPlanningBoard() {
     return [...real, ...scen];
   }, [rhs, scenarios.rhsHomes]);
 
+  const boardRef = useMemo(() => {
+    const inputs = scoringQ.data ?? {
+      pcsp: [],
+      billing_codes: [],
+      staff_credentials: [],
+      notes: [],
+    };
+    return buildBoardReference(inputs);
+  }, [scoringQ.data]);
+
   const scoreByHome = useMemo(() => {
-    const m = new Map<string, MoveScore>();
+    const m = new Map<string, ContainerScore>();
     if (!rhs) return m;
     for (const home of allRhsHomes) {
-      const ids = clientsByContainer.get(`rhs-home:${home.id}`) ?? [];
-      const rhsRoster = ids.map((id) => rhsClientById.get(id)).filter(Boolean) as RhsClient[];
-      const base = scoreComposition(home, rhsRoster, rhs.unscored_signals);
-      const mismatchRisks: string[] = [];
-      for (const id of ids) {
-        if (rhsClientById.has(id)) continue;
-        const wbC = wbClientById.get(id);
-        if (!wbC) continue;
-        mismatchRisks.push(
-          `${wbC.first_name} ${wbC.last_name} is not currently authorized for RHS (${wbC.inferred_category.toUpperCase()}) — planning only.`,
-        );
-      }
-      m.set(home.id, { ...base, risks: [...base.risks, ...mismatchRisks] });
+      const cIds = clientsByContainer.get(`rhs-home:${home.id}`) ?? [];
+      const sIds = staffByContainer.get(`rhs-home:${home.id}`) ?? [];
+      const clients = cIds
+        .map((id) => rhsClientById.get(id) ?? wbClientById.get(id))
+        .filter(Boolean) as Array<RhsClient | WhiteboardClient>;
+      const staffArr = sIds
+        .map((id) => staffById.get(id))
+        .filter(Boolean) as BoardStaff[];
+      m.set(
+        home.id,
+        scoreRhsContainer({
+          home,
+          clients,
+          staff: staffArr,
+          ref: boardRef,
+          storedUnscored: rhs.unscored_signals,
+        }),
+      );
     }
     return m;
-  }, [rhs, allRhsHomes, clientsByContainer, rhsClientById, wbClientById]);
+  }, [rhs, allRhsHomes, clientsByContainer, staffByContainer, rhsClientById, wbClientById, staffById, boardRef]);
+
+  const scoreByHhs = useMemo(() => {
+    const m = new Map<string, ContainerScore>();
+    if (!wb) return m;
+    const synthetics = new Map<string, WhiteboardHost>();
+    for (const sh of scenarios.hhsHosts) {
+      synthetics.set(sh.id, {
+        id: sh.id,
+        name: sh.name,
+        location_city: null,
+        location_county: null,
+        independence_levels_accepted: [],
+        medical_comfort: [],
+        behavioral_comfort: null,
+        wheelchair_accessible: false,
+        sign_language: false,
+        status: "onboarding",
+      });
+    }
+    const all: WhiteboardHost[] = [...wb.hosts, ...Array.from(synthetics.values())];
+    for (const host of all) {
+      const cIds = clientsByContainer.get(`hhs-host:${host.id}`) ?? [];
+      const sIds = staffByContainer.get(`hhs-host:${host.id}`) ?? [];
+      const clients = cIds
+        .map((id) => wbClientById.get(id) ?? rhsClientById.get(id))
+        .filter(Boolean) as Array<RhsClient | WhiteboardClient>;
+      const staffArr = sIds
+        .map((id) => staffById.get(id))
+        .filter(Boolean) as BoardStaff[];
+      m.set(host.id, scoreHhsContainer({ host, clients, staff: staffArr, ref: boardRef }));
+    }
+    return m;
+  }, [wb, scenarios.hhsHosts, clientsByContainer, staffByContainer, wbClientById, rhsClientById, staffById, boardRef]);
+
+  const scoreByDs = useMemo(() => {
+    const m = new Map<string, ContainerScore>();
+    if (!wb) return m;
+    for (const c of wb.clients.filter((x) => x.inferred_category === "direct_support")) {
+      const sIds = staffByContainer.get(`ds-client:${c.id}`) ?? [];
+      const staffArr = sIds
+        .map((id) => staffById.get(id))
+        .filter(Boolean) as BoardStaff[];
+      m.set(`ds-client:${c.id}`, scoreDsContainer({ clients: [c], staff: staffArr, ref: boardRef }));
+    }
+    for (const sl of scenarios.dsSlots) {
+      const cIds = clientsByContainer.get(`ds-slot:${sl.id}`) ?? [];
+      const sIds = staffByContainer.get(`ds-slot:${sl.id}`) ?? [];
+      const clients = cIds
+        .map((id) => rhsClientById.get(id) ?? wbClientById.get(id))
+        .filter(Boolean) as Array<RhsClient | WhiteboardClient>;
+      const staffArr = sIds
+        .map((id) => staffById.get(id))
+        .filter(Boolean) as BoardStaff[];
+      m.set(`ds-slot:${sl.id}`, scoreDsContainer({ clients, staff: staffArr, ref: boardRef }));
+    }
+    return m;
+  }, [wb, scenarios.dsSlots, clientsByContainer, staffByContainer, wbClientById, rhsClientById, staffById, boardRef]);
 
   // --- Actions -----------------------------------------------------------
 

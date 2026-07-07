@@ -77,6 +77,10 @@ type ReviewRow = {
   // Incomplete panel only surfaces inputs for the actual gaps. Filled in
   // manually by the human — nothing is ever auto-generated.
   missing: { staff: boolean; client: boolean; date: boolean; narrative: boolean };
+  // Set by the duplicate-check server fn once the row is fully resolved.
+  // Auto-skips the row and shows a "Likely duplicate" badge.
+  duplicateOfId: string | null;
+  duplicateReason: string | null;
 };
 
 const ALLOWED_EXT = [".csv", ".xlsx", ".xls"];

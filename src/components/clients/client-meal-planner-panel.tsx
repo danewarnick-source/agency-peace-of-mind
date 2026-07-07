@@ -983,7 +983,7 @@ function MealCell({
   day,
   slot,
   entries,
-  unit,
+  cfg,
   canEdit,
   orgId,
   clientId,
@@ -995,7 +995,7 @@ function MealCell({
   day: number;
   slot: Slot;
   entries: MealRow[];
-  unit: string;
+  cfg: NutritionCfg;
   canEdit: boolean;
   orgId: string;
   clientId: string;
@@ -1016,7 +1016,7 @@ function MealCell({
         <MealPill
           key={m.id}
           meal={m}
-          unit={unit}
+          cfg={cfg}
           canEdit={canEdit}
           onChange={(patch) => onChange(m.id, patch)}
           onDelete={() => onDelete(m.id)}
@@ -1041,20 +1041,84 @@ function MealCell({
   );
 }
 
+function fmtNum(n: number | null | undefined, digits = 0): string {
+  if (n === null || n === undefined || Number.isNaN(Number(n))) return "—";
+  return Number(n).toLocaleString(undefined, { maximumFractionDigits: digits });
+}
+
+function MacroInput({
+  field,
+  label,
+  unit,
+  meal,
+  canEdit,
+  onChange,
+  step = "0.1",
+}: {
+  field: MacroField;
+  label: string;
+  unit: string;
+  meal: MealRow;
+  canEdit: boolean;
+  onChange: (patch: Partial<MealRow>) => void;
+  step?: string;
+}) {
+  const val = meal[field] as number | null;
+  const est = !!meal.nutrition_estimated?.[field];
+  return (
+    <div className="flex flex-col">
+      <label className="mb-0.5 flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+        {label}
+        {est && val !== null && (
+          <span className="rounded bg-amber-100 px-1 text-[9px] font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+            est
+          </span>
+        )}
+      </label>
+      <div className="flex items-center gap-1">
+        <Input
+          type="number"
+          step={step}
+          defaultValue={val ?? ""}
+          disabled={!canEdit}
+          placeholder="—"
+          className={`h-7 w-20 px-1 text-xs tabular-nums ${
+            est && val !== null ? "italic text-muted-foreground" : ""
+          }`}
+          onBlur={(e) => {
+            const v = e.target.value === "" ? null : Number(e.target.value);
+            if (v !== val) {
+              // Manager-entered → mark as verified (drop the estimate flag).
+              const nextEst = { ...(meal.nutrition_estimated ?? {}) };
+              delete nextEst[field];
+              onChange({
+                [field]: v,
+                nutrition_estimated: nextEst,
+              } as Partial<MealRow>);
+            }
+          }}
+        />
+        <span className="text-[10px] text-muted-foreground">{unit}</span>
+      </div>
+    </div>
+  );
+}
+
 function MealPill({
   meal,
-  unit,
+  cfg,
   canEdit,
   onChange,
   onDelete,
 }: {
   meal: MealRow;
-  unit: string;
+  cfg: NutritionCfg;
   canEdit: boolean;
   onChange: (patch: Partial<MealRow>) => void;
   onDelete: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [estimating, setEstimating] = useState(false);
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: meal.id,
     disabled: !canEdit,
@@ -1062,6 +1126,63 @@ function MealPill({
   const style = transform
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 50 }
     : undefined;
+
+  const anyEstimate = MACRO_FIELDS.some((f) => meal.nutrition_estimated?.[f]);
+  const summary = (() => {
+    const parts: string[] = [];
+    if (meal.calories !== null) parts.push(`${fmtNum(meal.calories)} kcal`);
+    if (meal.protein_g !== null || meal.carbs_g !== null || meal.fat_g !== null) {
+      parts.push(
+        `P${fmtNum(meal.protein_g)}/C${fmtNum(meal.carbs_g)}/F${fmtNum(meal.fat_g)}`,
+      );
+    }
+    return parts.join(" · ");
+  })();
+
+  const runEstimate = async () => {
+    if (!canEdit || estimating) return;
+    if (!meal.label && !meal.description) {
+      toast.info("Add a meal name first so NECTAR can estimate.");
+      return;
+    }
+    setEstimating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("estimate-meal-nutrition", {
+        body: {
+          label: meal.label,
+          description: meal.description ?? "",
+        },
+      });
+      if (error) throw error;
+      const est = (data as { estimates?: Partial<Record<MacroField, number | null>> })
+        ?.estimates ?? {};
+      const patch: Partial<MealRow> = {};
+      const nextEst: EstimatedMap = { ...(meal.nutrition_estimated ?? {}) };
+      (["calories", "protein_g", "carbs_g", "fat_g"] as MacroField[]).forEach((f) => {
+        // Only fill fields that are currently blank OR already flagged estimate;
+        // never overwrite a manager-verified value.
+        const currentVerified =
+          (meal[f] as number | null) !== null && !meal.nutrition_estimated?.[f];
+        const v = est[f];
+        if (currentVerified) return;
+        if (v === null || v === undefined) return;
+        patch[f] = Number(v);
+        nextEst[f] = true;
+      });
+      if (Object.keys(patch).length === 0) {
+        toast.info("NECTAR couldn't confidently estimate — leaving values blank.");
+      } else {
+        patch.nutrition_estimated = nextEst;
+        onChange(patch);
+        toast.success("NECTAR estimate applied (marked as estimate).");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Estimate unavailable");
+    } finally {
+      setEstimating(false);
+    }
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -1090,7 +1211,6 @@ function MealPill({
           onBlur={(e) => {
             if (e.target.value !== meal.label) onChange({ label: e.target.value });
           }}
-          onFocus={() => setExpanded(true)}
         />
         {canEdit && (
           <Button
@@ -1104,53 +1224,271 @@ function MealPill({
           </Button>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-1 px-1">
-        <Input
-          type="number"
-          step="0.1"
-          defaultValue={meal.nutrition_value ?? ""}
-          disabled={!canEdit}
-          placeholder="0"
-          className="h-6 w-16 px-1 text-xs tabular-nums"
-          onBlur={(e) => {
-            const v = e.target.value === "" ? null : Number(e.target.value);
-            if (v !== meal.nutrition_value) onChange({ nutrition_value: v });
-          }}
-        />
-        <span className="text-[10px] text-muted-foreground">{unit}</span>
-        <span className="text-[10px] text-muted-foreground">·</span>
-        <span className="text-[10px] text-muted-foreground">$</span>
-        <Input
-          type="number"
-          step="0.01"
-          defaultValue={meal.estimated_cost ?? ""}
-          disabled={!canEdit}
-          placeholder="cost"
-          className="h-6 w-16 px-1 text-xs tabular-nums"
-          onBlur={(e) => {
-            const v = e.target.value === "" ? null : Number(e.target.value);
-            if (v !== meal.estimated_cost) onChange({ estimated_cost: v });
-          }}
-        />
+
+      {/* Compact one-line macro summary + cost */}
+      <button
+        type="button"
+        onClick={() => setExpanded((x) => !x)}
+        className="mt-0.5 flex w-full flex-wrap items-center gap-1 px-1 text-left text-[10px] text-muted-foreground hover:text-foreground"
+      >
+        <span className="truncate">
+          {summary || <span className="italic">No macros yet</span>}
+        </span>
+        {anyEstimate && (
+          <span className="rounded bg-amber-100 px-1 text-[9px] font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+            est
+          </span>
+        )}
+        {meal.estimated_cost !== null && meal.estimated_cost !== undefined && (
+          <span className="ml-auto">${Number(meal.estimated_cost).toFixed(2)}</span>
+        )}
         {meal.recipe_id && (
-          <span title="From recipe" className="ml-auto inline-flex items-center gap-0.5 text-[10px] text-primary">
+          <span title="From recipe" className="inline-flex items-center gap-0.5 text-primary">
             <BookOpen className="h-2.5 w-2.5" />
           </span>
         )}
-      </div>
-      {(expanded || meal.description) && (
-        <Textarea
-          defaultValue={meal.description ?? ""}
-          disabled={!canEdit}
-          placeholder="Notes / description"
-          rows={2}
-          className="mt-1 min-h-0 text-xs"
-          onBlur={(e) => {
-            if (e.target.value !== (meal.description ?? ""))
-              onChange({ description: e.target.value });
-          }}
-        />
+      </button>
+
+      {expanded && (
+        <div className="mt-1 space-y-2 rounded-md border bg-muted/20 p-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <MacroInput field="calories" label="Calories" unit="kcal" meal={meal} canEdit={canEdit} onChange={onChange} step="1" />
+            <MacroInput field="protein_g" label="Protein" unit="g" meal={meal} canEdit={canEdit} onChange={onChange} />
+            <MacroInput field="carbs_g" label="Carbs" unit="g" meal={meal} canEdit={canEdit} onChange={onChange} />
+            <MacroInput field="fat_g" label="Fat" unit="g" meal={meal} canEdit={canEdit} onChange={onChange} />
+          </div>
+          {cfg.use_extra_field && cfg.extra_label && (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <MacroInput
+                field="extra_value"
+                label={cfg.extra_label}
+                unit={cfg.extra_unit ?? ""}
+                meal={meal}
+                canEdit={canEdit}
+                onChange={onChange}
+              />
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] text-muted-foreground">Est. cost</span>
+            <span className="text-[10px] text-muted-foreground">$</span>
+            <Input
+              type="number"
+              step="0.01"
+              defaultValue={meal.estimated_cost ?? ""}
+              disabled={!canEdit}
+              placeholder="cost"
+              className="h-7 w-20 px-1 text-xs tabular-nums"
+              onBlur={(e) => {
+                const v = e.target.value === "" ? null : Number(e.target.value);
+                if (v !== meal.estimated_cost) onChange({ estimated_cost: v });
+              }}
+            />
+            {canEdit && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-auto h-7 text-xs"
+                onClick={runEstimate}
+                disabled={estimating}
+                title="NECTAR estimates fill blank fields only; verified values are never overwritten."
+              >
+                {estimating ? "Estimating…" : "Estimate with NECTAR"}
+              </Button>
+            )}
+          </div>
+          <Textarea
+            defaultValue={meal.description ?? ""}
+            disabled={!canEdit}
+            placeholder="Notes / description — informs NECTAR estimates"
+            rows={2}
+            className="min-h-0 text-xs"
+            onBlur={(e) => {
+              if (e.target.value !== (meal.description ?? ""))
+                onChange({ description: e.target.value });
+            }}
+          />
+          <p className="text-[10px] italic text-muted-foreground">
+            NECTAR values are estimates, not verified. Type over any number to mark it as manager-entered.
+          </p>
+        </div>
       )}
+    </div>
+  );
+}
+
+function DayTotalsCell({
+  totals,
+  cfg,
+}: {
+  totals: {
+    calories: number; protein_g: number; carbs_g: number; fat_g: number; extra_value: number;
+    estCalories: boolean; estMacros: boolean; estExtra: boolean;
+  };
+  cfg: NutritionCfg;
+}) {
+  const pct = (n: number, target: number | null) =>
+    target && target > 0 ? Math.round((n / target) * 100) : null;
+  const calPct = pct(totals.calories, cfg.calorie_target);
+  return (
+    <div className="flex flex-col items-end gap-0.5 text-xs tabular-nums">
+      <div className="flex items-center gap-1">
+        <span className="font-semibold">{fmtNum(totals.calories)}</span>
+        <span className="text-[10px] font-normal text-muted-foreground">kcal</span>
+        {cfg.calorie_target ? (
+          <span className="text-[10px] text-muted-foreground">/ {cfg.calorie_target}{calPct !== null ? ` (${calPct}%)` : ""}</span>
+        ) : null}
+        {totals.estCalories && (
+          <span className="rounded bg-amber-100 px-1 text-[9px] font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">est</span>
+        )}
+      </div>
+      <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+        <span>P {fmtNum(totals.protein_g)}g</span>
+        <span>·</span>
+        <span>C {fmtNum(totals.carbs_g)}g</span>
+        <span>·</span>
+        <span>F {fmtNum(totals.fat_g)}g</span>
+        {totals.estMacros && (
+          <span className="rounded bg-amber-100 px-1 text-[9px] font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">est</span>
+        )}
+      </div>
+      {cfg.use_extra_field && cfg.extra_label && (
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+          <span>{cfg.extra_label}: {fmtNum(totals.extra_value, 1)}{cfg.extra_unit ? ` ${cfg.extra_unit}` : ""}</span>
+          {cfg.extra_target ? <span>/ {cfg.extra_target}</span> : null}
+          {totals.estExtra && (
+            <span className="rounded bg-amber-100 px-1 text-[9px] font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">est</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NutritionConfigCard({
+  cfg,
+  canEdit,
+  onSave,
+}: {
+  cfg: NutritionCfg;
+  canEdit: boolean;
+  onSave: (patch: Partial<NutritionCfg>) => void;
+}) {
+  return (
+    <div className="rounded-md border bg-muted/30 p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <Settings2 className="h-4 w-4 text-muted-foreground" />
+        <h4 className="text-sm font-semibold">Nutrition tracking</h4>
+        <span className="text-[10px] text-muted-foreground">
+          Calories + protein/carbs/fat are always tracked. Add one custom metric per client.
+        </span>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-4">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Calorie target (kcal/day)</label>
+          <Input
+            type="number"
+            defaultValue={cfg.calorie_target ?? ""}
+            disabled={!canEdit}
+            placeholder="optional"
+            onBlur={(e) => {
+              const v = e.target.value === "" ? null : Number(e.target.value);
+              if (v !== cfg.calorie_target) onSave({ calorie_target: v });
+            }}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Protein target (g)</label>
+          <Input
+            type="number"
+            defaultValue={cfg.protein_target_g ?? ""}
+            disabled={!canEdit}
+            placeholder="optional"
+            onBlur={(e) => {
+              const v = e.target.value === "" ? null : Number(e.target.value);
+              if (v !== cfg.protein_target_g) onSave({ protein_target_g: v });
+            }}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Carbs target (g)</label>
+          <Input
+            type="number"
+            defaultValue={cfg.carbs_target_g ?? ""}
+            disabled={!canEdit}
+            placeholder="optional"
+            onBlur={(e) => {
+              const v = e.target.value === "" ? null : Number(e.target.value);
+              if (v !== cfg.carbs_target_g) onSave({ carbs_target_g: v });
+            }}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Fat target (g)</label>
+          <Input
+            type="number"
+            defaultValue={cfg.fat_target_g ?? ""}
+            disabled={!canEdit}
+            placeholder="optional"
+            onBlur={(e) => {
+              const v = e.target.value === "" ? null : Number(e.target.value);
+              if (v !== cfg.fat_target_g) onSave({ fat_target_g: v });
+            }}
+          />
+        </div>
+      </div>
+      <div className="mt-3 rounded border bg-background p-2">
+        <label className="flex items-center gap-2 text-xs font-medium">
+          <input
+            type="checkbox"
+            disabled={!canEdit}
+            checked={cfg.use_extra_field}
+            onChange={(e) => onSave({ use_extra_field: e.target.checked })}
+          />
+          Track a custom metric for this client (e.g. Blood Sugar, Sodium, Fiber)
+        </label>
+        {cfg.use_extra_field && (
+          <div className="mt-2 grid gap-2 sm:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground">Label</label>
+              <Input
+                defaultValue={cfg.extra_label ?? ""}
+                disabled={!canEdit}
+                placeholder="e.g. Blood Sugar"
+                onBlur={(e) => {
+                  const v = e.target.value.trim() || null;
+                  if (v !== cfg.extra_label) onSave({ extra_label: v });
+                }}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground">Unit</label>
+              <Input
+                defaultValue={cfg.extra_unit ?? ""}
+                disabled={!canEdit}
+                placeholder="mg/dL, mg, g…"
+                onBlur={(e) => {
+                  const v = e.target.value.trim() || null;
+                  if (v !== cfg.extra_unit) onSave({ extra_unit: v });
+                }}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground">Daily target (optional)</label>
+              <Input
+                type="number"
+                defaultValue={cfg.extra_target ?? ""}
+                disabled={!canEdit}
+                placeholder="optional"
+                onBlur={(e) => {
+                  const v = e.target.value === "" ? null : Number(e.target.value);
+                  if (v !== cfg.extra_target) onSave({ extra_target: v });
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

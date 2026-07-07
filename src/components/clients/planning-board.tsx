@@ -554,6 +554,111 @@ function DirectSupportContainer({
   );
 }
 
+/** Session-only Direct-Support slot — accepts a client + staff. */
+function DsSlotContainer({
+  slotId,
+  name,
+  clients,
+  staff,
+  canDrag,
+  onRename,
+  onRemove,
+}: {
+  slotId: string;
+  name: string;
+  clients: Array<RhsClient | WhiteboardClient>;
+  staff: BoardStaff[];
+  canDrag: boolean;
+  onRename: (v: string) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <Droppable id={`ds-slot:${slotId}`} className="min-h-[180px]">
+      <HumanFrame
+        title={name}
+        subtitle="Direct support · scenario slot"
+        badge={
+          <div className="flex items-center gap-1">
+            <Badge variant="outline" className="shrink-0 text-[10px]">
+              {clients.length} · {staff.length} staff
+            </Badge>
+            <button
+              type="button"
+              onClick={onRemove}
+              className="rounded p-0.5 text-muted-foreground hover:bg-muted"
+              title="Remove scenario slot"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        }
+      >
+        <Input
+          value={name}
+          onChange={(e) => onRename(e.target.value)}
+          className="mb-2 h-6 text-xs"
+        />
+        <div className="mb-2 space-y-1.5">
+          {clients.length === 0 ? (
+            <p className="rounded border border-dashed border-border bg-background/60 px-2 py-2 text-center text-[10px] text-muted-foreground">
+              Drop a client here.
+            </p>
+          ) : (
+            clients.map((c) => (
+              <ClientPillDraggable key={c.id} client={c} canDrag={canDrag} />
+            ))
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {staff.length === 0 ? (
+            <span className="text-[10px] italic text-muted-foreground">
+              Drop staff here.
+            </span>
+          ) : (
+            staff.map((s) => (
+              <StaffPillDraggable key={s.id} staff={s} canDrag={canDrag} />
+            ))
+          )}
+        </div>
+      </HumanFrame>
+    </Droppable>
+  );
+}
+
+/** Rename + remove chrome overlaid on RHS/HHS scenario containers. */
+function ScenarioChrome({
+  name,
+  onRename,
+  onRemove,
+  children,
+}: {
+  name: string;
+  onRename: (v: string) => void;
+  onRemove: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative">
+      <div className="absolute right-1 top-1 z-10 flex items-center gap-1">
+        <button
+          type="button"
+          onClick={onRemove}
+          className="rounded bg-background/80 p-0.5 text-muted-foreground shadow-sm hover:bg-muted"
+          title="Remove scenario"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+      {children}
+      <Input
+        value={name}
+        onChange={(e) => onRename(e.target.value)}
+        className="mt-1 h-6 text-xs"
+      />
+    </div>
+  );
+}
+
 // ---------- Board ----------------------------------------------------------
 
 function buildStartingPlan(

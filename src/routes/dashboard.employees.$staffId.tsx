@@ -421,6 +421,9 @@ function ContactCard({
     department: "",
     worker_type: "w2_employee",
     hire_date: "",
+    emergency_contact_name: "",
+    emergency_contact_relationship: "",
+    emergency_contact_phone: "",
   });
 
   const startEdit = () => {
@@ -430,6 +433,9 @@ function ContactCard({
       department: p?.department ?? "",
       worker_type: p?.worker_type ?? "w2_employee",
       hire_date: p?.hire_date ?? "",
+      emergency_contact_name: p?.emergency_contact_name ?? "",
+      emergency_contact_relationship: p?.emergency_contact_relationship ?? "",
+      emergency_contact_phone: p?.emergency_contact_phone ?? "",
     });
     setEditing(true);
   };
@@ -445,6 +451,9 @@ function ContactCard({
           department: draft.department || null,
           worker_type: draft.worker_type || null,
           hire_date: draft.hire_date || null,
+          emergency_contact_name: draft.emergency_contact_name || null,
+          emergency_contact_relationship: draft.emergency_contact_relationship || null,
+          emergency_contact_phone: draft.emergency_contact_phone || null,
         } as any)
         .eq("id", staffId);
       if (error) throw new Error(error.message);

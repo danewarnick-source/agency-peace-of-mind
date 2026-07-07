@@ -12044,6 +12044,9 @@ export type Database = {
           date_of_birth: string | null
           department: string | null
           email: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          emergency_contact_relationship: string | null
           employee_id: string | null
           end_date: string | null
           evv_consent_timestamp: string | null
@@ -12058,6 +12061,7 @@ export type Database = {
           is_active: boolean
           last_name: string | null
           must_change_password: boolean
+          phone: string | null
           photo_path: string | null
           photo_updated_at: string | null
           position: string | null
@@ -12083,6 +12087,9 @@ export type Database = {
           date_of_birth?: string | null
           department?: string | null
           email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
           employee_id?: string | null
           end_date?: string | null
           evv_consent_timestamp?: string | null
@@ -12097,6 +12104,7 @@ export type Database = {
           is_active?: boolean
           last_name?: string | null
           must_change_password?: boolean
+          phone?: string | null
           photo_path?: string | null
           photo_updated_at?: string | null
           position?: string | null
@@ -12122,6 +12130,9 @@ export type Database = {
           date_of_birth?: string | null
           department?: string | null
           email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
           employee_id?: string | null
           end_date?: string | null
           evv_consent_timestamp?: string | null
@@ -12136,6 +12147,7 @@ export type Database = {
           is_active?: boolean
           last_name?: string | null
           must_change_password?: boolean
+          phone?: string | null
           photo_path?: string | null
           photo_updated_at?: string | null
           position?: string | null

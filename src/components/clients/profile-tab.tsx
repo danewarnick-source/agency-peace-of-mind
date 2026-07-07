@@ -27,18 +27,19 @@ type DocRow = { id: string; document_type: string | null; file_name: string | nu
 // Required SOW §1.10 record types surfaced in the completeness bar.
 type RecKey =
   | "pcsp" | "photograph" | "grievance_acknowledgment" | "guardian" | "hrc_approval" | "dnr"
-  | "human_rights" | "grievance_policy" | "individualized_plan";
+  | "grievance_policy" | "individualized_plan";
 const RECORD_LABELS: Record<RecKey, { title: string; sub: string }> = {
   pcsp: { title: "Person-Centered Plan", sub: "Annual; renews each year" },
   photograph: { title: "Photograph", sub: "Current likeness on file" },
   grievance_acknowledgment: { title: "Grievance acknowledgment", sub: "Signed by client / guardian" },
   guardian: { title: "Guardianship docs", sub: "Letter or court order" },
-  hrc_approval: { title: "HRC / rights restriction", sub: "Required when rights are restricted" },
+  hrc_approval: { title: "Human Rights / HRC restriction", sub: "Required when rights are restricted or Human Rights applies" },
   dnr: { title: "DNR order", sub: "Required when DNR is on file" },
-  human_rights: { title: "Human Rights documentation", sub: "Required when Human Rights applies" },
   grievance_policy: { title: "Grievance policy", sub: "A signed copy on file" },
   individualized_plan: { title: "Individualized plans", sub: "Behavior support / IEP / similar" },
 };
+
+const HRR_FILENAME_RE = /hrr|hrc|human[\s_-]*rights|rights[\s_-]*restriction/i;
 
 export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; onOpenFiles: () => void }) {
   const navigate = useNavigate();
@@ -235,10 +236,19 @@ function RecordCompletenessBar({
 
   type RecState = "ok" | "missing" | "na";
   function stateFor(key: RecKey): { state: RecState; doc?: DocRow } {
+    if (key === "hrc_approval") {
+      const hrrDoc = docs.find(
+        (d) =>
+          d.document_type === "hrc_approval" ||
+          d.document_type === "human_rights" ||
+          (d.file_name ? HRR_FILENAME_RE.test(d.file_name) : false),
+      );
+      const applicable = hasRightsRestrictions || hrApplicable || !!hrrDoc;
+      if (!applicable) return { state: "na" };
+      return hrrDoc ? { state: "ok", doc: hrrDoc } : { state: "missing" };
+    }
     const doc = docs.find((d) => d.document_type === key);
     if (key === "guardian" && isOwnGuardian) return { state: "na" };
-    if (key === "hrc_approval" && !hasRightsRestrictions) return { state: "na" };
-    if (key === "human_rights" && !hrApplicable) return { state: "na" };
     if (key === "dnr") {
       if (doc) return { state: "ok", doc };
       if (dnrApplicable) return { state: "missing" };
@@ -248,7 +258,7 @@ function RecordCompletenessBar({
     return doc ? { state: "ok", doc } : { state: "missing" };
   }
 
-  const keys: RecKey[] = ["pcsp", "photograph", "grievance_acknowledgment", "grievance_policy", "individualized_plan", "human_rights", "guardian", "hrc_approval", "dnr"];
+  const keys: RecKey[] = ["pcsp", "photograph", "grievance_acknowledgment", "grievance_policy", "individualized_plan", "guardian", "hrc_approval", "dnr"];
   const states = keys.map((k) => ({ key: k, ...stateFor(k) }));
   const applicable = states.filter((s) => s.state !== "na");
   const completed = applicable.filter((s) => s.state === "ok").length;

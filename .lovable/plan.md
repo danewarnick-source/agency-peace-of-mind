@@ -1,30 +1,51 @@
 ## Problem
 
-Completing the client setup fails with:
-> `clients insert: Could not find the 'clinical_alert' column of clients in the schema cache`
+On Justin's profile the "Records & documents" bar shows two separate rows that the user considers the same thing:
 
-Root cause: `smart-import-commit.functions.ts` maps the extracted PCSP field `clinical_alert` → column `clients.clinical_alert`, but that column doesn't exist on the `clients` table. Every other mapped column (`special_directions`, `bsp_status`, `dnr_status`, `neurologist_name`, etc.) does exist — only `clinical_alert` is missing. When a PCSP has any clinical-alert text, the insert throws and the whole commit is aborted.
+- **Human Rights documentation** — listed as **N/A**
+- **HRC / Rights Restriction** — shows an **Upload** button
 
-Answer to your question: **no, a missing clinical alert should not block anything** — it's an optional field. Two fixes together:
+Meanwhile an HRR (Human Rights Restriction) file is already sitting in the client's Files → Client Documents. Nothing lights up because:
 
-## Fix
+1. **The upload dropdown has no HRR/HRC option.** `client-documents-card.tsx` only offers PCSP, 1056, referral, intake, assessment, guardian, consent, or "Other". So the HRR was saved with `document_type = 'other'` (or similar). The profile checklist matches by exact `document_type` (`hrc_approval`, `human_rights`), so it never finds the file.
+2. **Two rows for one concept.** `hrc_approval` and `human_rights` are surfaced as separate items in `RECORD_LABELS`. Product-wise they are the same DSPD artifact — an HRC approval covering a Human Rights restriction.
+3. **N/A logic is too narrow.** `human_rights` shows N/A unless `hr_applicable === true`; `hrc_approval` shows N/A unless `rights_restrictions` has entries. Uploading an HRR document alone doesn't flip either flag, so the row stays greyed out.
 
-### 1. Add the missing column (migration)
+## Plan
 
-Add `clinical_alert text NULL` to `public.clients`. This is a real domain field pulled from the PCSP Clinical Alerts section, so it belongs on the table. Nullable, no default — clients without alerts stay blank.
+Frontend-only, no schema changes.
 
-### 2. Defensive commit (`src/lib/smart-import-commit.functions.ts`)
+### 1. `src/components/clients/client-documents-card.tsx`
 
-Wrap the client insert/update so that if PostgREST ever returns a "Could not find the 'X' column" error again (from any future extractor field), the commit strips that column and retries — and logs a warning row to `import_audit` — instead of aborting the whole client creation. This prevents one stray field from ever blocking a setup again.
+Add a Human Rights option to `CLIENT_DOC_TYPES` so the file can be tagged correctly at upload time:
 
-No changes to the wizard, review UI, or the columns list. No data migration for existing rows.
+- `{ value: "hrc_approval", label: "HRR / HRC / Rights Restriction" }`
+
+(Uses the existing `hrc_approval` document_type that the setup checklist and profile bar already look for — no new type to migrate.)
+
+### 2. `src/components/clients/profile-tab.tsx`
+
+Collapse the two rows into one and make the matcher tolerant:
+
+- Remove the standalone `human_rights` entry from `RECORD_LABELS` and from the `keys` list.
+- Rename the `hrc_approval` row to **"Human Rights / HRC restriction"** with sub-copy "Required when rights are restricted or Human Rights applies".
+- In `stateFor('hrc_approval')`:
+  - Consider a match if `document_type` is `hrc_approval` **or** `human_rights` **or** a file whose `file_name` matches `/hrr|hrc|human[\s_-]*rights|rights[\s_-]*restriction/i` (covers files uploaded before the dropdown existed).
+  - **Applicability:** the row is applicable when ANY of: `hr_applicable === true`, `rights_restrictions` has entries, OR a matching document already exists on file. Otherwise N/A.
+  - If applicable and no matching doc → `missing`; if matching doc → `ok` with a View button opening the file.
+
+### 3. Keep the Flags card unchanged
+
+The "Human Rights documentation applicable" switch on the Identity card stays — it's still the way to declare applicability when no doc is on file yet.
 
 ## Verification
 
-- Re-run "Complete client setup" on this job — insert succeeds; `clients.clinical_alert` populated from the PCSP.
-- Manually simulate an unknown column value in an import → commit still succeeds; `import_audit` shows a `skipped_unknown_column` note.
+On Justin's profile:
+- With the existing HRR file (currently stored as `other`): after re-uploading via the new dropdown option as "HRR / HRC / Rights Restriction", or immediately via the filename-match fallback, the single **Human Rights / HRC restriction** row flips to green with a **View** button.
+- Only ONE row appears for this concept — no more N/A + Upload duplicate.
+- A client with no HRR file and `hr_applicable = false` and no `rights_restrictions` still shows N/A (unchanged).
 
 ## Out of scope
 
-- No changes to `swallowing_alerts` (separate array field) or the health-step UI copy.
-- No renaming or refactoring of other client columns.
+- No changes to `client_documents` rows already in the DB (the filename fallback handles legacy uploads).
+- No changes to setup checklist HRC review flow, PCSP tab, or backend schema.

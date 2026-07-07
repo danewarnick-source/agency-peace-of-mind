@@ -47,6 +47,7 @@ const CLIENT_DOC_TYPES = [
   { value: "intake", label: "Intake form" },
   { value: "assessment", label: "Assessment" },
   { value: "contract", label: "Guardian / legal papers" },
+  { value: "hrc_approval", label: "HRR / HRC / Rights Restriction" },
   { value: "certification", label: "Consent" },
   { value: "other", label: "Other" },
 ];

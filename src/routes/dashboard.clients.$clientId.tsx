@@ -199,47 +199,42 @@ function ClientProfileHub() {
           <TrainingSetupBadge clientId={clientId} />
 
           {/* Group 1 — PCSP-derived planning */}
-          <div className="space-y-6">
-            <CareGroupHeading
-              label="Plan & supports"
-              hint="Built from the client's PCSP"
-            />
-            <CareSection icon={Target} title="PCSP goals" accent="indigo">
+          <CareGroup
+            label="Plan & supports"
+            hint="Built from the client's PCSP"
+          >
+            <CareSection icon={Target} accent="indigo">
               <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
             </CareSection>
-            <CareSection icon={ShieldCheck} title="Authorized DSPD codes" accent="emerald">
-              {/* AuthorizedCodes is rendered inside PlanGoalsPanel? no — it's a separate card in the file; keep original order */}
-              {null}
-            </CareSection>
-            <CareSection icon={ListChecks} title="Support strategies" accent="violet">
+            <CareSection icon={ListChecks} accent="violet">
               <SupportStrategiesPanel client={client} clientId={clientId} orgId={orgId} />
             </CareSection>
-            <CareSection icon={GraduationCap} title="Client-specific training" accent="amber">
+            <CareSection icon={GraduationCap} accent="amber">
               <CollapsibleSimpleCard title="Client-specific training">
                 <ClientSpecificTrainingCard clientId={clientId} />
               </CollapsibleSimpleCard>
             </CareSection>
-            <CareSection icon={HeartHandshake} title="Person-Centered Thinking" accent="rose">
+            <CareSection icon={HeartHandshake} accent="rose">
               <PersonCenteredProfilePanel clientId={clientId} orgId={orgId} />
             </CareSection>
-          </div>
+          </CareGroup>
 
           {/* Group 2 — Operational tools */}
-          <div className="space-y-6 pt-4 border-t border-border/60">
-            <CareGroupHeading
-              label="Operational tools"
-              hint="Day-to-day care coordination"
-            />
-            <CareSection icon={Users} title="Caseload" accent="sky">
+          <CareGroup
+            label="Operational tools"
+            hint="Day-to-day care coordination"
+            divider
+          >
+            <CareSection icon={Users} accent="sky">
               <CaseloadEditor clientId={clientId} />
             </CareSection>
-            <CareSection icon={UtensilsCrossed} title="Meal Planner" accent="orange">
+            <CareSection icon={UtensilsCrossed} accent="orange">
               <ClientMealPlannerMount clientId={clientId} />
             </CareSection>
-            <CareSection icon={Sparkles} title="Chore chart" accent="teal">
+            <CareSection icon={Sparkles} accent="teal">
               <ChoreChartForClient clientId={clientId} />
             </CareSection>
-          </div>
+          </CareGroup>
         </TabsContent>
 
         <TabsContent value="activity" className="space-y-4">

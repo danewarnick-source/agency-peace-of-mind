@@ -617,6 +617,7 @@ export function WhiteboardPlanningBoard() {
   const staff = staffQ.data;
 
   const [plan, setPlan] = useState<Plan>({ clients: {}, staff: {} });
+  const [scenarios, setScenarios] = useState<Scenarios>(emptyScenarios);
   const [activeId, setActiveId] = useState<string | null>(null);
   const startingRef = useRef<Plan | null>(null);
   const historyRef = useRef<Plan[]>([]);

@@ -816,6 +816,17 @@ function MealPill({
       }`}
     >
       <div className="flex items-start gap-1">
+        {canEdit && (
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            className="mt-1 cursor-grab touch-none rounded p-0.5 text-muted-foreground hover:bg-muted active:cursor-grabbing"
+            aria-label="Drag meal"
+          >
+            <GripVertical className="h-3 w-3" />
+          </button>
+        )}
         <Input
           defaultValue={meal.label}
           disabled={!canEdit}

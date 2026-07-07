@@ -60,6 +60,10 @@ function firstOfMonth(iso: string): string {
   const m = iso.slice(0, 7);
   return `${m}-01`;
 }
+function periodMonthTag(iso: string): string {
+  // "YYYY-MM" tag used in stored filenames + shipped-lookup pattern.
+  return iso.slice(0, 7);
+}
 function currentMonthValue(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;

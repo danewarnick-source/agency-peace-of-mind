@@ -640,9 +640,44 @@ function BudgetEditor({
           placeholder="E.g., banks at Zion's, uses Smith's credit card for groceries, Horizon card for food stamps…"
         />
       </div>
+
+      {/* PDF preview modal — renders the same bytes as Download / Print / Ship */}
+      <Dialog open={previewUrl !== null} onOpenChange={(o) => { if (!o) closePreview(); }}>
+        <DialogContent className="max-w-5xl w-[95vw] h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-4 py-3 border-b">
+            <DialogTitle className="text-base">
+              Budget preview — {clientName} · {periodLabel}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 bg-muted">
+            {previewUrl && (
+              <iframe
+                src={previewUrl}
+                title="Budget PDF preview"
+                className="w-full h-full border-0"
+              />
+            )}
+          </div>
+          <DialogFooter className="px-4 py-3 border-t gap-2 sm:justify-between">
+            <div className="text-xs text-muted-foreground">
+              Preview only — no file has been saved. Use Download, Print, or Ship to commit.
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => openPdf("download")} disabled={pdfBusy !== null}>
+                <FileText className="mr-2 h-4 w-4" /> Download
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => openPdf("print")} disabled={pdfBusy !== null}>
+                <Printer className="mr-2 h-4 w-4" /> Print
+              </Button>
+              <Button size="sm" variant="secondary" onClick={closePreview}>Close</Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 

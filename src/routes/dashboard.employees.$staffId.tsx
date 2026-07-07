@@ -107,7 +107,7 @@ function StaffProfilePage() {
       const { data: p, error: pErr } = await supabase
         .from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, employee_id, position, positions, department, hire_date, account_status, worker_type, team_id, photo_path, photo_updated_at" as any)
+        .select("id, full_name, email, username, employee_id, position, positions, department, hire_date, account_status, worker_type, team_id, photo_path, photo_updated_at, phone, emergency_contact_name, emergency_contact_relationship, emergency_contact_phone" as any)
         .eq("id", staffId)
         .maybeSingle();
       if (pErr) throw pErr;

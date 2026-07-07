@@ -560,28 +560,16 @@ export function ClientMealPlannerPanel({
                     const entries = cellMeals(i, slot);
                     return (
                       <td key={slot} className="border-b px-2 py-2">
-                        <div className="flex flex-col gap-1.5">
-                          {entries.map((m) => (
-                            <MealPill
-                              key={m.id}
-                              meal={m}
-                              unit={cfg.nutrition_unit}
-                              canEdit={canEdit}
-                              onChange={(patch) => updateMeal.mutate({ id: m.id, ...patch })}
-                              onDelete={() => deleteMeal.mutate(m.id)}
-                            />
-                          ))}
-                          {canEdit && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 justify-start px-2 text-xs text-muted-foreground"
-                              onClick={() => addMeal.mutate({ day: i, slot })}
-                            >
-                              <Plus className="mr-1 h-3 w-3" /> Add
-                            </Button>
-                          )}
-                        </div>
+                        <MealCell
+                          day={i}
+                          slot={slot}
+                          entries={entries}
+                          unit={cfg.nutrition_unit}
+                          canEdit={canEdit}
+                          onAdd={() => addMeal.mutate({ day: i, slot })}
+                          onChange={(id, patch) => updateMeal.mutate({ id, ...patch })}
+                          onDelete={(id) => deleteMeal.mutate(id)}
+                        />
                       </td>
                     );
                   })}
@@ -596,6 +584,20 @@ export function ClientMealPlannerPanel({
             </tbody>
           </table>
         </div>
+        </DndContext>
+
+        {/* Staff "what did they actually eat" — current day */}
+        {planId && canRecordActuals && (
+          <ActualsToday
+            planId={planId}
+            actuals={actualsQ.data ?? []}
+            meals={meals}
+            onSet={(slot, outcome, note) =>
+              setActual.mutate({ date: fmtISO(new Date()), slot, outcome, note })
+            }
+          />
+        )}
+
 
         {/* Food preferences & allergies */}
         <div className="grid gap-4 md:grid-cols-2">

@@ -130,10 +130,18 @@ export async function generateChoreChartReport(
     orgName,
     spaceName: space.name,
     spaceType: space.space_type,
-    clients: clients.map((c) => ({
-      id: c.id,
-      name: `${c.first_name} ${c.last_name}`.trim(),
-    })),
+    clients: clients.map((c) => {
+      const sup = supportByClient.get(c.id);
+      const outcomes = perClientOutcomes.get(c.id) ?? null;
+      return {
+        id: c.id,
+        name: `${c.first_name} ${c.last_name}`.trim(),
+        supportReason: (sup?.status === "active" ? sup.reason : null) as
+          | "pcsp_goal" | "intake_need" | "manual" | null,
+        supportNote: sup?.status === "active" ? sup.goal_note ?? null : null,
+        outcomes,
+      };
+    }),
     dailyItems: ((dailyRes.data ?? []) as Array<{ label: string; detail: string | null }>).map(
       (d) => ({ label: d.label, detail: d.detail }),
     ),
@@ -155,7 +163,16 @@ export async function generateChoreChartReport(
       isFreeDay: r.is_free_day,
       note: r.note,
     })),
+    weeklyOutcomeTotals: compRange
+      ? {
+          completed: totalOutcomes.completed,
+          completed_with_support: totalOutcomes.completed_with_support,
+          offered_declined: totalOutcomes.offered_declined,
+          not_addressed: totalOutcomes.not_addressed,
+        }
+      : null,
   };
+
 
   const bytes = await renderChoreChartPdf(payload);
   const today = new Date();

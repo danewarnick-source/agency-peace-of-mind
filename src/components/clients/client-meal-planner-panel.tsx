@@ -1618,6 +1618,8 @@ function MealPlanOutputCard({
   shopping,
   nutritionLabel,
   nutritionUnit,
+  extraLabel,
+  extraUnit,
   foodLikes,
   foodsToAvoid,
   allergies,
@@ -1634,6 +1636,8 @@ function MealPlanOutputCard({
   shopping: ShoppingItem[];
   nutritionLabel: string;
   nutritionUnit: string;
+  extraLabel: string | null;
+  extraUnit: string | null;
   foodLikes: string | null;
   foodsToAvoid: string | null;
   allergies: string[] | null;
@@ -1663,10 +1667,17 @@ function MealPlanOutputCard({
     return await renderMealPlanPdf({
       orgName, logo, clientName, weekLabel,
       nutritionLabel, nutritionUnit,
+      extraLabel, extraUnit,
       meals: meals.map((m) => ({
         day_of_week: m.day_of_week, meal_slot: m.meal_slot,
         label: m.label, description: m.description,
         nutrition_value: m.nutrition_value, estimated_cost: m.estimated_cost,
+        calories: m.calories,
+        protein_g: m.protein_g,
+        carbs_g: m.carbs_g,
+        fat_g: m.fat_g,
+        extra_value: m.extra_value,
+        nutrition_estimated: m.nutrition_estimated,
       })),
       shopping: shopping.map((s) => ({
         item: s.item, quantity: s.quantity, checked: !!s.checked,

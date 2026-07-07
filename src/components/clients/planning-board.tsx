@@ -43,6 +43,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   GripVertical,
+  Home,
   Info,
   Plus,
   RotateCcw,

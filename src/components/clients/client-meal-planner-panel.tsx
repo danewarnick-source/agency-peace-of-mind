@@ -79,6 +79,11 @@ const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 const SLOTS = ["breakfast", "lunch", "dinner", "snack"] as const;
 type Slot = typeof SLOTS[number];
 
+export type MacroField = "calories" | "protein_g" | "carbs_g" | "fat_g" | "extra_value";
+export const MACRO_FIELDS: MacroField[] = ["calories", "protein_g", "carbs_g", "fat_g", "extra_value"];
+
+type EstimatedMap = Partial<Record<MacroField, boolean>>;
+
 type MealRow = {
   id: string;
   meal_plan_id: string;
@@ -86,11 +91,17 @@ type MealRow = {
   meal_slot: Slot;
   label: string;
   description: string | null;
-  nutrition_value: number | null;
+  nutrition_value: number | null; // legacy — no longer written
   notes: string | null;
   sort_order: number;
   recipe_id: string | null;
   estimated_cost: number | null;
+  calories: number | null;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
+  extra_value: number | null;
+  nutrition_estimated: EstimatedMap | null;
 };
 
 type ShoppingItem = {
@@ -102,7 +113,19 @@ type ShoppingItem = {
   checked: boolean;
 };
 
-type NutritionCfg = { id: string; nutrition_label: string; nutrition_unit: string };
+type NutritionCfg = {
+  id: string;
+  nutrition_label: string; // legacy — used only for backfill compatibility
+  nutrition_unit: string;
+  extra_label: string | null;
+  extra_unit: string | null;
+  use_extra_field: boolean;
+  calorie_target: number | null;
+  protein_target_g: number | null;
+  carbs_target_g: number | null;
+  fat_target_g: number | null;
+  extra_target: number | null;
+};
 
 const OUTCOMES = [
   { v: "ate_as_planned", label: "Ate as planned" },

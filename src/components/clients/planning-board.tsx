@@ -794,6 +794,67 @@ export function WhiteboardPlanningBoard() {
     if (!startingRef.current) return;
     historyRef.current = [];
     setPlan(startingRef.current);
+    setScenarios(emptyScenarios);
+  }
+
+  // Scenario creation — session only. IDs are prefixed so they never collide
+  // with real snapshot IDs.
+  function nextName(existing: Array<{ name: string }>, prefix: string): string {
+    let n = existing.length + 1;
+    const taken = new Set(existing.map((e) => e.name));
+    while (taken.has(`${prefix} ${n}`)) n++;
+    return `${prefix} ${n}`;
+  }
+  function addRhsHome() {
+    setScenarios((s) => ({
+      ...s,
+      rhsHomes: [
+        ...s.rhsHomes,
+        { id: `scenario-rhs-${crypto.randomUUID()}`, name: nextName(s.rhsHomes, "New Home") },
+      ],
+    }));
+  }
+  function addHhsHost() {
+    setScenarios((s) => ({
+      ...s,
+      hhsHosts: [
+        ...s.hhsHosts,
+        { id: `scenario-hhs-${crypto.randomUUID()}`, name: nextName(s.hhsHosts, "New Host Home") },
+      ],
+    }));
+  }
+  function addDsSlot() {
+    setScenarios((s) => ({
+      ...s,
+      dsSlots: [
+        ...s.dsSlots,
+        { id: `scenario-ds-${crypto.randomUUID()}`, name: nextName(s.dsSlots, "New 1:1 Support") },
+      ],
+    }));
+  }
+  function renameScenario(kind: keyof Scenarios, id: string, name: string) {
+    setScenarios((s) => ({
+      ...s,
+      [kind]: s[kind].map((x) => (x.id === id ? { ...x, name } : x)),
+    }));
+  }
+  function removeScenario(kind: keyof Scenarios, id: string) {
+    // Also unplace anything that was inside the removed container.
+    const containerPrefix =
+      kind === "rhsHomes" ? "rhs-home:" : kind === "hhsHosts" ? "hhs-host:" : "ds-slot:";
+    const containerId = `${containerPrefix}${id}`;
+    setPlan((prev) => {
+      const clients = { ...prev.clients };
+      const staff = { ...prev.staff };
+      for (const [cid, dest] of Object.entries(clients)) {
+        if (dest === containerId) clients[cid] = POOL_CLIENTS;
+      }
+      for (const [sid, dest] of Object.entries(staff)) {
+        if (dest === containerId) staff[sid] = POOL_STAFF;
+      }
+      return { clients, staff };
+    });
+    setScenarios((s) => ({ ...s, [kind]: s[kind].filter((x) => x.id !== id) }));
   }
 
   // --- Render ------------------------------------------------------------

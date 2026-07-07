@@ -775,7 +775,10 @@ function MealCell({
   entries,
   unit,
   canEdit,
+  orgId,
+  clientId,
   onAdd,
+  onAddFromRecipe,
   onChange,
   onDelete,
 }: {
@@ -784,7 +787,10 @@ function MealCell({
   entries: MealRow[];
   unit: string;
   canEdit: boolean;
+  orgId: string;
+  clientId: string;
   onAdd: () => void;
+  onAddFromRecipe: (r: Recipe) => void;
   onChange: (id: string, patch: Partial<MealRow>) => void;
   onDelete: (id: string) => void;
 }) {
@@ -807,14 +813,19 @@ function MealCell({
         />
       ))}
       {canEdit && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 justify-start px-2 text-xs text-muted-foreground"
-          onClick={onAdd}
-        >
-          <Plus className="mr-1 h-3 w-3" /> Add
-        </Button>
+        <div className="flex flex-col gap-0.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 justify-start px-2 text-xs text-muted-foreground"
+            onClick={onAdd}
+          >
+            <Plus className="mr-1 h-3 w-3" /> Add
+          </Button>
+          {orgId && (
+            <PickRecipeMenu orgId={orgId} clientId={clientId} onPick={onAddFromRecipe} />
+          )}
+        </div>
       )}
     </div>
   );

@@ -144,6 +144,56 @@ function lightDot(l: MoveLight): string {
     default: return "bg-muted-foreground/40";
   }
 }
+/** Glow inline style — green→yellow→red with intensity-driven alpha. */
+function glowStyle(score: ContainerScore | null): React.CSSProperties {
+  if (!score || score.light === "gray") return {};
+  const hue = score.light === "green" ? 152 : score.light === "yellow" ? 42 : 350;
+  const alpha = 0.35 + 0.5 * score.intensity;
+  return {
+    boxShadow: `0 0 0 2px hsla(${hue}, 84%, 48%, ${alpha}), 0 0 18px hsla(${hue}, 84%, 55%, ${alpha * 0.9})`,
+  };
+}
+
+/** Reasoning strip beneath a container — factors + honest unscored list. */
+function ScoreReasoning({ score }: { score: ContainerScore | null }) {
+  if (!score) return null;
+  if (score.factors.length === 0 && score.unscored.length === 0) return null;
+  return (
+    <div className="mt-2 space-y-1 border-t border-border/60 pt-2 text-[10px]">
+      {score.factors.map((f, i) => (
+        <FactorRow key={`${f.source}:${f.text}:${i}`} factor={f} />
+      ))}
+      {score.unscored.length > 0 && (
+        <div className="rounded bg-muted/50 px-1.5 py-1 text-muted-foreground">
+          <Info className="mr-1 inline h-2.5 w-2.5" />
+          <span className="font-semibold">NECTAR could not evaluate:</span>{" "}
+          {score.unscored.join(" · ")}
+        </div>
+      )}
+    </div>
+  );
+}
+function FactorRow({ factor }: { factor: ScoreFactor }) {
+  const tone =
+    factor.kind === "block"
+      ? "bg-rose-100 text-rose-900"
+      : factor.kind === "risk"
+        ? "bg-amber-100/80 text-amber-900"
+        : "bg-emerald-100/70 text-emerald-900";
+  const Icon =
+    factor.kind === "positive" ? CheckCircle2 : AlertTriangle;
+  return (
+    <div className={`flex items-start gap-1 rounded px-1.5 py-1 ${tone}`}>
+      <Icon className="mt-0.5 h-2.5 w-2.5 shrink-0" />
+      <span className="flex-1">
+        <span className="mr-1 rounded bg-black/10 px-1 text-[8px] font-semibold uppercase tracking-wide">
+          {factor.source}
+        </span>
+        {factor.text}
+      </span>
+    </div>
+  );
+}
 
 // ---------- Shape frames ----------------------------------------------------
 

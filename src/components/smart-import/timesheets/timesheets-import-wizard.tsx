@@ -455,9 +455,11 @@ export function TimesheetsImportWizard() {
           <div>
             <div className="font-semibold text-amber-800">Historical timesheets — imported from another platform</div>
             <p className="mt-1 text-muted-foreground">
-              Bring in past clock-in/clock-out records from whatever platform you used before HIVE.
-              Rows are permanently marked as historical imports so nobody mistakes them for live clock punches.
-              This flow never creates new staff or clients — every row must match someone who already exists.
+              This import runs in four explicit stages: <strong>upload &amp; parse</strong>, <strong>admin review</strong>,
+              <strong> submit to staff</strong>, and <strong>staff confirmation</strong>. Nothing moves forward without a
+              deliberate action. Rows are permanently marked as historical imports so nobody mistakes them for live clock
+              punches, and staff never see anything until you (the admin) explicitly submit it to them. This flow never
+              creates new staff or clients — every row must match someone who already exists.
             </p>
           </div>
         </div>

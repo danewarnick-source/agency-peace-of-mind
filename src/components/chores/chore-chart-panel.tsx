@@ -84,7 +84,7 @@ export function ChoreChartPanel({
   spaceId: string;
   readOnly?: boolean;
 }) {
-  const { session } = useAuth();
+  
   const { data: org } = useCurrentOrg();
   const canEdit =
     !forcedReadOnly &&

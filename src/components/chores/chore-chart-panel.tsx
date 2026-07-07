@@ -721,6 +721,110 @@ export function ChoreChartPanel({
 
         <div className="border-t" />
 
+        {/* Every-day chores */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <ClipboardList className="h-4 w-4 text-muted-foreground" />
+            <h3 className="text-sm font-semibold">Every day — all clients, every day</h3>
+            <span className="text-xs text-muted-foreground">
+              (personal hygiene, making beds, dirty-clothes hamper, etc.)
+            </span>
+          </div>
+          {dailyItems.length === 0 && !canEdit ? (
+            <p className="text-sm italic text-muted-foreground">No daily chores set.</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {dailyItems.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex flex-col gap-2 rounded border bg-muted/30 px-3 py-2 sm:flex-row sm:items-start"
+                >
+                  {canEdit ? (
+                    <>
+                      <Input
+                        value={item.label}
+                        onChange={(e) =>
+                          updateDailyItem.mutate({ id: item.id, label: e.target.value })
+                        }
+                        className="h-8 text-sm font-medium sm:w-52"
+                      />
+                      <Input
+                        value={item.detail ?? ""}
+                        placeholder="Optional detail (e.g. teeth, shower, dressed)"
+                        onChange={(e) =>
+                          updateDailyItem.mutate({
+                            id: item.id,
+                            detail: e.target.value.trim() ? e.target.value : null,
+                          })
+                        }
+                        className="h-8 flex-1 text-sm"
+                      />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 px-2 text-muted-foreground hover:text-destructive"
+                        onClick={() => {
+                          if (confirm(`Remove "${item.label}" from daily chores?`)) {
+                            deleteDailyItem.mutate(item.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="flex flex-1 flex-col">
+                      <span className="text-sm font-medium">{item.label}</span>
+                      {item.detail && (
+                        <span className="text-xs text-muted-foreground">{item.detail}</span>
+                      )}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {canEdit && (
+            <div className="flex flex-col gap-2 rounded border border-dashed p-2 sm:flex-row">
+              <Input
+                value={newDailyLabel}
+                onChange={(e) => setNewDailyLabel(e.target.value)}
+                placeholder="Chore name (e.g. Personal hygiene)"
+                className="h-8 text-sm sm:w-52"
+              />
+              <Input
+                value={newDailyDetail}
+                onChange={(e) => setNewDailyDetail(e.target.value)}
+                placeholder="Optional detail"
+                className="h-8 flex-1 text-sm"
+              />
+              <Button
+                size="sm"
+                disabled={!newDailyLabel.trim()}
+                onClick={() =>
+                  addDailyItem.mutate(
+                    {
+                      label: newDailyLabel.trim(),
+                      detail: newDailyDetail.trim() ? newDailyDetail.trim() : null,
+                    },
+                    {
+                      onSuccess: () => {
+                        setNewDailyLabel("");
+                        setNewDailyDetail("");
+                      },
+                    },
+                  )
+                }
+                className="gap-1"
+              >
+                <Plus className="h-4 w-4" /> Add
+              </Button>
+            </div>
+          )}
+        </section>
+
+        <div className="border-t" />
+
         {/* Client rotation grid */}
         <section className="space-y-3">
           <div className="flex items-center gap-2">

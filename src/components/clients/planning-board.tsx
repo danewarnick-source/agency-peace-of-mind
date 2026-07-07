@@ -317,6 +317,34 @@ function StaffPillDraggable({
   );
 }
 
+// ---------- Overlay pills (presentational, no drag wiring) -----------------
+
+function ClientPillOverlay({ client }: { client: RhsClient | WhiteboardClient }) {
+  const label = `${client.first_name} ${("last_name" in client ? client.last_name : "") || ""}`.trim();
+  return (
+    <div className="flex items-start gap-1.5 rounded-md border border-primary bg-background px-2 py-1.5 text-xs shadow-lg ring-2 ring-primary/40 cursor-grabbing">
+      <GripVertical className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-medium">{label || "Client"}</div>
+      </div>
+    </div>
+  );
+}
+
+function StaffPillOverlay({ staff }: { staff: BoardStaff }) {
+  return (
+    <div className="flex items-center gap-1 rounded-full border border-primary bg-background px-1 py-1 pr-1.5 text-xs shadow-lg ring-2 ring-primary/40 cursor-grabbing">
+      <PersonAvatar
+        bucket="staff-photos"
+        path={staff.photo_path}
+        name={staff.full_name}
+        className="h-6 w-6 text-[10px] border"
+      />
+      <span className="truncate max-w-[110px] font-medium">{staff.full_name}</span>
+    </div>
+  );
+}
+
 // ---------- Droppable containers -------------------------------------------
 
 function Droppable({
@@ -332,7 +360,9 @@ function Droppable({
   return (
     <div
       ref={setNodeRef}
-      className={`${className ?? ""} ${isOver ? "ring-2 ring-primary/50 rounded-lg" : ""}`}
+      className={`${className ?? ""} rounded-lg transition-shadow ${
+        isOver ? "ring-2 ring-primary ring-offset-2 bg-primary/5" : ""
+      }`}
     >
       {children}
     </div>

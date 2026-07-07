@@ -735,6 +735,57 @@ export function ClientMealPlannerPanel({
   );
 }
 
+function MealCell({
+  day,
+  slot,
+  entries,
+  unit,
+  canEdit,
+  onAdd,
+  onChange,
+  onDelete,
+}: {
+  day: number;
+  slot: Slot;
+  entries: MealRow[];
+  unit: string;
+  canEdit: boolean;
+  onAdd: () => void;
+  onChange: (id: string, patch: Partial<MealRow>) => void;
+  onDelete: (id: string) => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `cell:${day}:${slot}` });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex min-h-[60px] flex-col gap-1.5 rounded-md p-1 transition-colors ${
+        isOver ? "bg-primary/10 ring-2 ring-primary/40" : ""
+      }`}
+    >
+      {entries.map((m) => (
+        <MealPill
+          key={m.id}
+          meal={m}
+          unit={unit}
+          canEdit={canEdit}
+          onChange={(patch) => onChange(m.id, patch)}
+          onDelete={() => onDelete(m.id)}
+        />
+      ))}
+      {canEdit && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 justify-start px-2 text-xs text-muted-foreground"
+          onClick={onAdd}
+        >
+          <Plus className="mr-1 h-3 w-3" /> Add
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function MealPill({
   meal,
   unit,
@@ -749,8 +800,21 @@ function MealPill({
   onDelete: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: meal.id,
+    disabled: !canEdit,
+  });
+  const style = transform
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 50 }
+    : undefined;
   return (
-    <div className="group rounded-md border bg-card p-1.5 shadow-sm">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`group rounded-md border bg-card p-1.5 shadow-sm ${
+        isDragging ? "opacity-60 ring-2 ring-primary" : ""
+      }`}
+    >
       <div className="flex items-start gap-1">
         <Input
           defaultValue={meal.label}

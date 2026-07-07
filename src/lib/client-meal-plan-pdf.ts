@@ -319,9 +319,17 @@ export async function renderMealPlanPdf(p: MealPlanPdfPayload): Promise<Uint8Arr
       } else {
         for (const m of cellMeals) {
           const label = m.label?.trim() || "(unnamed)";
-          const nut = (m.nutrition_value != null && !Number.isNaN(m.nutrition_value))
-            ? `  ${m.nutrition_value}${p.nutritionUnit}`
-            : "";
+          const cal = m.calories;
+          const anyEst =
+            !!m.nutrition_estimated &&
+            (m.nutrition_estimated.calories ||
+              m.nutrition_estimated.protein_g ||
+              m.nutrition_estimated.carbs_g ||
+              m.nutrition_estimated.fat_g);
+          const nut =
+            cal != null && !Number.isNaN(cal)
+              ? `  ${Math.round(cal)}kcal${anyEst ? " est" : ""}`
+              : "";
           const lines = wrapHard(bold, label, 8.5, textMaxW - bold.widthOfTextAtSize(nut, 7.5));
           lines.forEach((ln, k) => {
             if (ty - 9 < rowBottom + 4) return;
@@ -334,6 +342,16 @@ export async function renderMealPlanPdf(p: MealPlanPdfPayload): Promise<Uint8Arr
             }
             ty -= 10;
           });
+          const macroParts: string[] = [];
+          if (m.protein_g != null) macroParts.push(`P${Math.round(Number(m.protein_g))}`);
+          if (m.carbs_g != null) macroParts.push(`C${Math.round(Number(m.carbs_g))}`);
+          if (m.fat_g != null) macroParts.push(`F${Math.round(Number(m.fat_g))}`);
+          if (macroParts.length && ty - 8 >= rowBottom + 4) {
+            page1.drawText(macroParts.join("/") + "g", {
+              x: textLeft, y: ty, size: 7, font, color: C.muted,
+            });
+            ty -= 8;
+          }
           if (m.description) {
             const dLines = wrapHard(font, m.description, 7.5, textMaxW);
             for (const dl of dLines) {

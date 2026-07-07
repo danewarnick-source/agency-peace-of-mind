@@ -58,6 +58,8 @@ type MealRow = {
   nutrition_value: number | null;
   notes: string | null;
   sort_order: number;
+  recipe_id: string | null;
+  estimated_cost: number | null;
 };
 
 type ShoppingItem = {

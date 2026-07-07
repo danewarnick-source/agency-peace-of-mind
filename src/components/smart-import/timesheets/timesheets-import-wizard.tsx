@@ -204,11 +204,16 @@ export function TimesheetsImportWizard() {
   const [file, setFile] = useState<File | null>(null);
   const [parsed, setParsed] = useState<ParsedFile | null>(null);
   const [mapping, setMapping] = useState<Mapping | null>(null);
+  const [wholeFile, setWholeFile] = useState<WholeFile>({ staffId: null, clientId: null });
+  const [suggestions, setSuggestions] = useState<Record<FieldKey, FieldSuggestion> | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [committed, setCommitted] = useState<{ inserted: number; staffCount: number } | null>(null);
 
   const createJob = useServerFn(createTimesheetImportJob);
   const commitRows = useServerFn(importHistoricalTimesheets);
+  const suggestMap = useServerFn(suggestImportColumnMapping);
+
 
   // Load staff + clients for this org (cached)
   const peopleQ = useQuery({

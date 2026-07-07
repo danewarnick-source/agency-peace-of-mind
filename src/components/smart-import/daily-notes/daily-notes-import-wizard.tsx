@@ -341,43 +341,37 @@ export function DailyNotesImportWizard() {
     return { ...row, status: "incomplete" };
   };
 
-  const updateRow = (idx: number, patch: Partial<ReviewRow>) => {
-    setRows((r) => r.map((row) => (row.idx === idx ? { ...row, ...patch } : row)));
+  const patchAndRecompute = (idx: number, patch: Partial<ReviewRow>) => {
+    setRows((r) => r.map((row) => (row.idx === idx ? recompute({ ...row, ...patch }) : row)));
   };
 
-  const chooseStaff = (idx: number, id: string) => {
-    const row = rows.find((r) => r.idx === idx);
-    if (!row) return;
-    const patch: Partial<ReviewRow> = { staffId: id };
-    if (row.clientId && row.logDateIso) { patch.status = "matched"; patch.reason = null; }
-    updateRow(idx, patch);
+  const chooseStaff = (idx: number, id: string) => patchAndRecompute(idx, { staffId: id });
+  const chooseClient = (idx: number, id: string) => patchAndRecompute(idx, { clientId: id });
+  const linkManually = (idx: number, kind: "staff" | "client", id: string) =>
+    patchAndRecompute(idx, kind === "staff" ? { staffId: id } : { clientId: id });
+
+  // Manual fill-ins for structural gaps. Only invoked from the Incomplete
+  // panel; nothing here is inferred — the human types the value.
+  const setNarrative = (idx: number, text: string) =>
+    patchAndRecompute(idx, { narrative: text });
+  const setDate = (idx: number, isoDate: string) => {
+    // isoDate arrives from <input type="date"> as YYYY-MM-DD, or "" when cleared.
+    patchAndRecompute(idx, {
+      logDateIso: isoDate || null,
+      dateStr: isoDate || "",
+    });
   };
-  const chooseClient = (idx: number, id: string) => {
-    const row = rows.find((r) => r.idx === idx);
-    if (!row) return;
-    const patch: Partial<ReviewRow> = { clientId: id };
-    if (row.staffId && row.logDateIso) { patch.status = "matched"; patch.reason = null; }
-    updateRow(idx, patch);
-  };
-  const linkManually = (idx: number, kind: "staff" | "client", id: string) => {
-    const row = rows.find((r) => r.idx === idx);
-    if (!row) return;
-    const patch: Partial<ReviewRow> = kind === "staff" ? { staffId: id } : { clientId: id };
-    const nextStaffId = kind === "staff" ? id : row.staffId;
-    const nextClientId = kind === "client" ? id : row.clientId;
-    if (nextStaffId && nextClientId && row.logDateIso) { patch.status = "matched"; patch.reason = null; }
-    updateRow(idx, patch);
-  };
-  const skipRow = (idx: number) => updateRow(idx, { skipped: true });
-  const unskipRow = (idx: number) => updateRow(idx, { skipped: false });
+
+  const skipRow = (idx: number) => setRows((r) => r.map((row) => row.idx === idx ? { ...row, skipped: true } : row));
+  const unskipRow = (idx: number) => setRows((r) => r.map((row) => row.idx === idx ? { ...row, skipped: false } : row));
 
   const readyRows = useMemo(
     () => rows.filter((r) => !r.skipped && r.status === "matched" && r.staffId && r.clientId && r.logDateIso && r.narrative),
     [rows],
   );
   const ambiguousRows = useMemo(() => rows.filter((r) => !r.skipped && r.status === "ambiguous"), [rows]);
-  const unmatchedRows = useMemo(
-    () => rows.filter((r) => !r.skipped && (r.status === "no_match" || r.status === "invalid")),
+  const incompleteRows = useMemo(
+    () => rows.filter((r) => !r.skipped && r.status === "incomplete"),
     [rows],
   );
   const skippedRows = useMemo(() => rows.filter((r) => r.skipped), [rows]);

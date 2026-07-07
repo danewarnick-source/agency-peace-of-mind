@@ -174,26 +174,26 @@ function tryParseDateTime(dateStr: string, timeStr: string | null, singleField: 
 }
 
 // ─── auto-suggest mapping ──────────────────────────────────────────────────
-function suggest(headers: string[]): Mapping {
-  const find = (patterns: RegExp[]): string | null => {
-    for (const h of headers) {
-      const n = h.toLowerCase().trim();
-      if (patterns.some((p) => p.test(n))) return h;
+// Sample-value builder for the NECTAR mapping call. Cap to 12 distinct
+// non-empty samples per column so the prompt is small and one call per file
+// is enough no matter the row count.
+function sampleColumns(parsed: ParsedFile): Array<{ header: string; samples: string[] }> {
+  return parsed.headers.map((h) => {
+    const seen = new Set<string>();
+    const samples: string[] = [];
+    for (const r of parsed.rows) {
+      const v = (r[h] ?? "").trim();
+      if (!v) continue;
+      const key = v.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      samples.push(v.slice(0, 200));
+      if (samples.length >= 12) break;
     }
-    return null;
-  };
-  return {
-    staff: find([/\b(staff|employee|worker|caregiver|dsp|provider)\b/]),
-    client: find([/\b(client|member|consumer|recipient|individual|participant)\b/]),
-    date: find([/\bdate\b/, /\bshift\s*date\b/]),
-    clock_in: find([/\b(clock[\s_-]?in|time[\s_-]?in|start|begin)\b/]),
-    clock_out: find([/\b(clock[\s_-]?out|time[\s_-]?out|end|finish|stop)\b/]),
-    notes: find([/\b(note|comment|memo|description)\b/]),
-    service_code: find([/\b(service|code|billing)\b/]),
-    singleDateTimeIn: false,
-    singleDateTimeOut: false,
-  };
+    return { header: h, samples };
+  });
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 

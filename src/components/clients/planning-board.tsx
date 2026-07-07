@@ -451,7 +451,7 @@ function RhsHomeContainer({
   home: RhsHome;
   clients: Array<RhsClient | WhiteboardClient>;
   staff: BoardStaff[];
-  score: MoveScore | null;
+  score: ContainerScore | null;
   canDrag: boolean;
 }) {
   return (

@@ -183,6 +183,30 @@ function ClientWorkspace() {
   });
   const showBehaviorTab = hasBehaviorCode && !!bsTab?.show;
 
+  // Chore-chart space IDs for this client: any chore_space linked directly
+  // (chore_space_clients) plus any chart attached to the client's home team.
+  const { data: choreSpaceIds } = useQuery({
+    queryKey: ["workspace-chore-spaces", client?.id ?? null, client?.team_id ?? null],
+    enabled: !!client?.id,
+    queryFn: async () => {
+      const ids = new Set<string>();
+      const { data: links } = await supabase
+        .from("chore_space_clients")
+        .select("space_id")
+        .eq("client_id", client!.id);
+      (links ?? []).forEach((l) => ids.add(l.space_id));
+      if (client!.team_id) {
+        const { data: teamSpaces } = await supabase
+          .from("chore_spaces")
+          .select("id")
+          .eq("team_id", client!.team_id);
+        (teamSpaces ?? []).forEach((s) => ids.add(s.id));
+      }
+      return Array.from(ids);
+    },
+  });
+  const hasChores = (choreSpaceIds?.length ?? 0) > 0;
+
 
   if (isLoading || !client) {
     return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;

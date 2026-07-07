@@ -2484,7 +2484,7 @@ function UnfiledPanel({
   items, onChanged,
 }: { items: Array<{ id: string; text: string; filed_to: string | null }>; onChanged: () => void }) {
   if (items.length === 0) {
-    return <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-[var(--shadow-card)]">Nothing leftover — every scrap has a home.</div>;
+    return <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-[var(--shadow-card)]">NECTAR filed every note from your uploads into a section. Nothing here needs your attention.</div>;
   }
   return (
     <div className="space-y-2">

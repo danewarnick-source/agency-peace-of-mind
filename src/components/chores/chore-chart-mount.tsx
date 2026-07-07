@@ -156,6 +156,28 @@ export function ChoreChartForClient({
     },
   });
 
+  // Default-on determination: RHS/HHS clients (by authorized DSPD codes)
+  // never see the activation gate — chore support is inherent to that setting.
+  // Only DSI/SLH/SLN-only clients require manual activation.
+  const codesQ = useQuery({
+    enabled: !!clientId,
+    queryKey: ["client-authorized-codes-for-chore", clientId],
+    queryFn: async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data, error } = await supabase
+        .from("client_billing_codes")
+        .select("service_code, service_end_date")
+        .eq("client_id", clientId);
+      if (error) throw error;
+      return (data ?? [])
+        .filter((r) => !r.service_end_date || r.service_end_date >= today)
+        .map((r) => (r.service_code || "").toUpperCase());
+    },
+  });
+  const authorizedCodes = codesQ.data ?? [];
+  const hasResidentialCode = authorizedCodes.some((c) => c === "HHS" || c === "RHS");
+
+
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState("slh");
 
@@ -243,6 +265,13 @@ export function ChoreChartForClient({
     </Card>
   );
 
+  const ownedContent =
+    clientOwnedSpaces.length === 0
+      ? createBlock
+      : clientOwnedSpaces.map((s) => (
+          <ChoreChartPanel key={s.id} spaceId={s.id} readOnly={readOnly} />
+        ));
+
   return (
     <div className="space-y-4">
       {/* RHS/HHS: ON by default — show home-linked charts directly. */}
@@ -250,14 +279,12 @@ export function ChoreChartForClient({
         <ChoreChartPanel key={s.id} spaceId={s.id} readOnly={readOnly} />
       ))}
 
-      {/* DSI/SLH/SLN/other: gated by per-client activation. */}
-      <ChoreSupportGate clientId={clientId}>
-        {clientOwnedSpaces.length === 0
-          ? createBlock
-          : clientOwnedSpaces.map((s) => (
-              <ChoreChartPanel key={s.id} spaceId={s.id} readOnly={readOnly} />
-            ))}
-      </ChoreSupportGate>
+      {/* HHS/RHS clients (by authorized code) skip the activation gate even if
+          they don't yet have a linked home chart — chore support is inherent. */}
+      {hasResidentialCode ? ownedContent : (
+        <ChoreSupportGate clientId={clientId}>{ownedContent}</ChoreSupportGate>
+      )}
     </div>
   );
 }
+

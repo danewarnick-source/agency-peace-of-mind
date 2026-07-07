@@ -3172,27 +3172,38 @@ export type Database = {
           authorized_dspd_codes: string[]
           bsp_status: string | null
           chronic_conditions: string[] | null
+          client_photo_taken_on: string | null
           client_photo_url: string | null
+          client_pid: string | null
           clinical_alert: string | null
           court_orders: string[] | null
           created_at: string
           date_of_birth: string | null
+          day_program_provider: string | null
+          dentist_address: string | null
           dentist_name: string | null
           dentist_phone: string | null
           diagnoses: string[] | null
+          dietary_needs: string | null
           disability_category: string | null
           discharge_date: string | null
           dnr_applicable: boolean
           dnr_location: string | null
           dnr_status: string | null
           dysphagia: boolean
+          emergency_contact_2_address: string | null
           emergency_contact_2_instructions: string | null
           emergency_contact_2_name: string | null
           emergency_contact_2_phone: string | null
+          emergency_contact_2_relationship: string | null
+          emergency_contact_address: string | null
           emergency_contact_instructions: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
+          emergency_contact_relationship: string | null
           emergency_medical_treatment_authorization: boolean | null
+          ethnic_origin: string | null
+          eye_color: string | null
           feature_config: Json | null
           field_confirmations: Json
           first_name: string
@@ -3206,7 +3217,9 @@ export type Database = {
           guardian_name: string | null
           guardian_phone: string | null
           guardian_relationship: string | null
+          hair_color: string | null
           has_abi: boolean
+          height_inches: number | null
           hhs_monthly_support_hours: number | null
           home_latitude: number | null
           home_longitude: number | null
@@ -3215,6 +3228,8 @@ export type Database = {
           hr_applicable: boolean
           id: string
           immunizations: string[] | null
+          income_sources: string[] | null
+          intake_date: string | null
           intake_status: string
           is_own_guardian: boolean
           job_code: string[]
@@ -3223,19 +3238,27 @@ export type Database = {
           mailing_address: string | null
           med_prescriber_name: string | null
           med_prescriber_phone: string | null
+          medicaid_case_number: string | null
           medicaid_id: string | null
           medical_insurance: string | null
+          medicare_number: string | null
           neurologist_name: string | null
           neurologist_phone: string | null
           organization_id: string
           palliative_care_status: string | null
+          payment_sources: string[] | null
           pcp_name: string | null
           pcp_phone: string | null
           pcsp_expiration_date: string | null
           pcsp_goals: string[]
+          pcsp_signed_date: string | null
           personal_belongings_inventory: string[] | null
+          pertinent_health_notes: string | null
           phone_number: string | null
           physical_address: string | null
+          physician_address: string | null
+          place_of_birth: string | null
+          places_frequented: string | null
           plan_year: string | null
           polst_status: string | null
           preferred_activities: string[] | null
@@ -3244,20 +3267,30 @@ export type Database = {
           prescriber_phone: string | null
           primary_care_name: string | null
           primary_care_phone: string | null
+          private_insurance: string | null
           profile_photo_url: string | null
+          psychiatrist_address: string | null
+          psychiatrist_name: string | null
+          psychiatrist_phone: string | null
+          religion: string | null
+          residential_provider: string | null
           rights_restrictions: string[] | null
           roommates: string[] | null
           self_admin_med_support: boolean
           special_directions: string | null
           specialist_name: string | null
           specialist_phone: string | null
+          ssn_last4: string | null
           staff_ratio: string | null
+          state_id_expires_on: string | null
+          state_id_number: string | null
           support_coordinator_company: string | null
           support_coordinator_email: string | null
           support_coordinator_name: string | null
           support_coordinator_phone: string | null
           swallowing_alerts: string[]
           team_id: string | null
+          weight_pounds: number | null
         }
         Insert: {
           account_status?: string
@@ -3268,27 +3301,38 @@ export type Database = {
           authorized_dspd_codes?: string[]
           bsp_status?: string | null
           chronic_conditions?: string[] | null
+          client_photo_taken_on?: string | null
           client_photo_url?: string | null
+          client_pid?: string | null
           clinical_alert?: string | null
           court_orders?: string[] | null
           created_at?: string
           date_of_birth?: string | null
+          day_program_provider?: string | null
+          dentist_address?: string | null
           dentist_name?: string | null
           dentist_phone?: string | null
           diagnoses?: string[] | null
+          dietary_needs?: string | null
           disability_category?: string | null
           discharge_date?: string | null
           dnr_applicable?: boolean
           dnr_location?: string | null
           dnr_status?: string | null
           dysphagia?: boolean
+          emergency_contact_2_address?: string | null
           emergency_contact_2_instructions?: string | null
           emergency_contact_2_name?: string | null
           emergency_contact_2_phone?: string | null
+          emergency_contact_2_relationship?: string | null
+          emergency_contact_address?: string | null
           emergency_contact_instructions?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
           emergency_medical_treatment_authorization?: boolean | null
+          ethnic_origin?: string | null
+          eye_color?: string | null
           feature_config?: Json | null
           field_confirmations?: Json
           first_name: string
@@ -3302,7 +3346,9 @@ export type Database = {
           guardian_name?: string | null
           guardian_phone?: string | null
           guardian_relationship?: string | null
+          hair_color?: string | null
           has_abi?: boolean
+          height_inches?: number | null
           hhs_monthly_support_hours?: number | null
           home_latitude?: number | null
           home_longitude?: number | null
@@ -3311,6 +3357,8 @@ export type Database = {
           hr_applicable?: boolean
           id?: string
           immunizations?: string[] | null
+          income_sources?: string[] | null
+          intake_date?: string | null
           intake_status?: string
           is_own_guardian?: boolean
           job_code?: string[]
@@ -3319,19 +3367,27 @@ export type Database = {
           mailing_address?: string | null
           med_prescriber_name?: string | null
           med_prescriber_phone?: string | null
+          medicaid_case_number?: string | null
           medicaid_id?: string | null
           medical_insurance?: string | null
+          medicare_number?: string | null
           neurologist_name?: string | null
           neurologist_phone?: string | null
           organization_id: string
           palliative_care_status?: string | null
+          payment_sources?: string[] | null
           pcp_name?: string | null
           pcp_phone?: string | null
           pcsp_expiration_date?: string | null
           pcsp_goals?: string[]
+          pcsp_signed_date?: string | null
           personal_belongings_inventory?: string[] | null
+          pertinent_health_notes?: string | null
           phone_number?: string | null
           physical_address?: string | null
+          physician_address?: string | null
+          place_of_birth?: string | null
+          places_frequented?: string | null
           plan_year?: string | null
           polst_status?: string | null
           preferred_activities?: string[] | null
@@ -3340,20 +3396,30 @@ export type Database = {
           prescriber_phone?: string | null
           primary_care_name?: string | null
           primary_care_phone?: string | null
+          private_insurance?: string | null
           profile_photo_url?: string | null
+          psychiatrist_address?: string | null
+          psychiatrist_name?: string | null
+          psychiatrist_phone?: string | null
+          religion?: string | null
+          residential_provider?: string | null
           rights_restrictions?: string[] | null
           roommates?: string[] | null
           self_admin_med_support?: boolean
           special_directions?: string | null
           specialist_name?: string | null
           specialist_phone?: string | null
+          ssn_last4?: string | null
           staff_ratio?: string | null
+          state_id_expires_on?: string | null
+          state_id_number?: string | null
           support_coordinator_company?: string | null
           support_coordinator_email?: string | null
           support_coordinator_name?: string | null
           support_coordinator_phone?: string | null
           swallowing_alerts?: string[]
           team_id?: string | null
+          weight_pounds?: number | null
         }
         Update: {
           account_status?: string
@@ -3364,27 +3430,38 @@ export type Database = {
           authorized_dspd_codes?: string[]
           bsp_status?: string | null
           chronic_conditions?: string[] | null
+          client_photo_taken_on?: string | null
           client_photo_url?: string | null
+          client_pid?: string | null
           clinical_alert?: string | null
           court_orders?: string[] | null
           created_at?: string
           date_of_birth?: string | null
+          day_program_provider?: string | null
+          dentist_address?: string | null
           dentist_name?: string | null
           dentist_phone?: string | null
           diagnoses?: string[] | null
+          dietary_needs?: string | null
           disability_category?: string | null
           discharge_date?: string | null
           dnr_applicable?: boolean
           dnr_location?: string | null
           dnr_status?: string | null
           dysphagia?: boolean
+          emergency_contact_2_address?: string | null
           emergency_contact_2_instructions?: string | null
           emergency_contact_2_name?: string | null
           emergency_contact_2_phone?: string | null
+          emergency_contact_2_relationship?: string | null
+          emergency_contact_address?: string | null
           emergency_contact_instructions?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
           emergency_medical_treatment_authorization?: boolean | null
+          ethnic_origin?: string | null
+          eye_color?: string | null
           feature_config?: Json | null
           field_confirmations?: Json
           first_name?: string
@@ -3398,7 +3475,9 @@ export type Database = {
           guardian_name?: string | null
           guardian_phone?: string | null
           guardian_relationship?: string | null
+          hair_color?: string | null
           has_abi?: boolean
+          height_inches?: number | null
           hhs_monthly_support_hours?: number | null
           home_latitude?: number | null
           home_longitude?: number | null
@@ -3407,6 +3486,8 @@ export type Database = {
           hr_applicable?: boolean
           id?: string
           immunizations?: string[] | null
+          income_sources?: string[] | null
+          intake_date?: string | null
           intake_status?: string
           is_own_guardian?: boolean
           job_code?: string[]
@@ -3415,19 +3496,27 @@ export type Database = {
           mailing_address?: string | null
           med_prescriber_name?: string | null
           med_prescriber_phone?: string | null
+          medicaid_case_number?: string | null
           medicaid_id?: string | null
           medical_insurance?: string | null
+          medicare_number?: string | null
           neurologist_name?: string | null
           neurologist_phone?: string | null
           organization_id?: string
           palliative_care_status?: string | null
+          payment_sources?: string[] | null
           pcp_name?: string | null
           pcp_phone?: string | null
           pcsp_expiration_date?: string | null
           pcsp_goals?: string[]
+          pcsp_signed_date?: string | null
           personal_belongings_inventory?: string[] | null
+          pertinent_health_notes?: string | null
           phone_number?: string | null
           physical_address?: string | null
+          physician_address?: string | null
+          place_of_birth?: string | null
+          places_frequented?: string | null
           plan_year?: string | null
           polst_status?: string | null
           preferred_activities?: string[] | null
@@ -3436,20 +3525,30 @@ export type Database = {
           prescriber_phone?: string | null
           primary_care_name?: string | null
           primary_care_phone?: string | null
+          private_insurance?: string | null
           profile_photo_url?: string | null
+          psychiatrist_address?: string | null
+          psychiatrist_name?: string | null
+          psychiatrist_phone?: string | null
+          religion?: string | null
+          residential_provider?: string | null
           rights_restrictions?: string[] | null
           roommates?: string[] | null
           self_admin_med_support?: boolean
           special_directions?: string | null
           specialist_name?: string | null
           specialist_phone?: string | null
+          ssn_last4?: string | null
           staff_ratio?: string | null
+          state_id_expires_on?: string | null
+          state_id_number?: string | null
           support_coordinator_company?: string | null
           support_coordinator_email?: string | null
           support_coordinator_name?: string | null
           support_coordinator_phone?: string | null
           swallowing_alerts?: string[]
           team_id?: string | null
+          weight_pounds?: number | null
         }
         Relationships: [
           {
@@ -11492,6 +11591,44 @@ export type Database = {
           },
         ]
       }
+      organization_branding: {
+        Row: {
+          logo_path: string | null
+          logo_uploaded_at: string | null
+          org_address: string | null
+          org_phone: string | null
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          logo_path?: string | null
+          logo_uploaded_at?: string | null
+          org_address?: string | null
+          org_phone?: string | null
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          logo_path?: string | null
+          logo_uploaded_at?: string | null
+          org_address?: string | null
+          org_phone?: string | null
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_branding_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_features: {
         Row: {
           created_at: string
@@ -11918,6 +12055,8 @@ export type Database = {
           is_active: boolean
           last_name: string | null
           must_change_password: boolean
+          photo_path: string | null
+          photo_updated_at: string | null
           position: string | null
           positions: string[]
           requires_abi: boolean
@@ -11955,6 +12094,8 @@ export type Database = {
           is_active?: boolean
           last_name?: string | null
           must_change_password?: boolean
+          photo_path?: string | null
+          photo_updated_at?: string | null
           position?: string | null
           positions?: string[]
           requires_abi?: boolean
@@ -11992,6 +12133,8 @@ export type Database = {
           is_active?: boolean
           last_name?: string | null
           must_change_password?: boolean
+          photo_path?: string | null
+          photo_updated_at?: string | null
           position?: string | null
           positions?: string[]
           requires_abi?: boolean
@@ -16014,27 +16157,38 @@ export type Database = {
           authorized_dspd_codes: string[]
           bsp_status: string | null
           chronic_conditions: string[] | null
+          client_photo_taken_on: string | null
           client_photo_url: string | null
+          client_pid: string | null
           clinical_alert: string | null
           court_orders: string[] | null
           created_at: string
           date_of_birth: string | null
+          day_program_provider: string | null
+          dentist_address: string | null
           dentist_name: string | null
           dentist_phone: string | null
           diagnoses: string[] | null
+          dietary_needs: string | null
           disability_category: string | null
           discharge_date: string | null
           dnr_applicable: boolean
           dnr_location: string | null
           dnr_status: string | null
           dysphagia: boolean
+          emergency_contact_2_address: string | null
           emergency_contact_2_instructions: string | null
           emergency_contact_2_name: string | null
           emergency_contact_2_phone: string | null
+          emergency_contact_2_relationship: string | null
+          emergency_contact_address: string | null
           emergency_contact_instructions: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
+          emergency_contact_relationship: string | null
           emergency_medical_treatment_authorization: boolean | null
+          ethnic_origin: string | null
+          eye_color: string | null
           feature_config: Json | null
           field_confirmations: Json
           first_name: string
@@ -16048,7 +16202,9 @@ export type Database = {
           guardian_name: string | null
           guardian_phone: string | null
           guardian_relationship: string | null
+          hair_color: string | null
           has_abi: boolean
+          height_inches: number | null
           hhs_monthly_support_hours: number | null
           home_latitude: number | null
           home_longitude: number | null
@@ -16057,6 +16213,8 @@ export type Database = {
           hr_applicable: boolean
           id: string
           immunizations: string[] | null
+          income_sources: string[] | null
+          intake_date: string | null
           intake_status: string
           is_own_guardian: boolean
           job_code: string[]
@@ -16065,19 +16223,27 @@ export type Database = {
           mailing_address: string | null
           med_prescriber_name: string | null
           med_prescriber_phone: string | null
+          medicaid_case_number: string | null
           medicaid_id: string | null
           medical_insurance: string | null
+          medicare_number: string | null
           neurologist_name: string | null
           neurologist_phone: string | null
           organization_id: string
           palliative_care_status: string | null
+          payment_sources: string[] | null
           pcp_name: string | null
           pcp_phone: string | null
           pcsp_expiration_date: string | null
           pcsp_goals: string[]
+          pcsp_signed_date: string | null
           personal_belongings_inventory: string[] | null
+          pertinent_health_notes: string | null
           phone_number: string | null
           physical_address: string | null
+          physician_address: string | null
+          place_of_birth: string | null
+          places_frequented: string | null
           plan_year: string | null
           polst_status: string | null
           preferred_activities: string[] | null
@@ -16086,20 +16252,30 @@ export type Database = {
           prescriber_phone: string | null
           primary_care_name: string | null
           primary_care_phone: string | null
+          private_insurance: string | null
           profile_photo_url: string | null
+          psychiatrist_address: string | null
+          psychiatrist_name: string | null
+          psychiatrist_phone: string | null
+          religion: string | null
+          residential_provider: string | null
           rights_restrictions: string[] | null
           roommates: string[] | null
           self_admin_med_support: boolean
           special_directions: string | null
           specialist_name: string | null
           specialist_phone: string | null
+          ssn_last4: string | null
           staff_ratio: string | null
+          state_id_expires_on: string | null
+          state_id_number: string | null
           support_coordinator_company: string | null
           support_coordinator_email: string | null
           support_coordinator_name: string | null
           support_coordinator_phone: string | null
           swallowing_alerts: string[]
           team_id: string | null
+          weight_pounds: number | null
         }[]
         SetofOptions: {
           from: "*"

@@ -21,7 +21,7 @@
  * HHS / Direct Support glow is deliberately NOT wired yet — a later pass
  * extends scoring across container types and adds placement notes.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {

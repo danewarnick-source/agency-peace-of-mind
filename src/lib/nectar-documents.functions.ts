@@ -27,6 +27,7 @@ const DOC_TYPES = [
   "timesheet",
   "incident_report",
   "billing_record",
+  "hrc_approval",
   "other",
 ] as const;
 

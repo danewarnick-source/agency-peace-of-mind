@@ -429,7 +429,28 @@ function BudgetEditor({
     };
   };
 
-  const [pdfBusy, setPdfBusy] = useState<null | "download" | "print" | "ship">(null);
+  const [pdfBusy, setPdfBusy] = useState<null | "download" | "print" | "ship" | "preview">(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const openPreview = async () => {
+    setPdfBusy("preview");
+    try {
+      const bytes = await renderClientBudgetPdf(buildPayload());
+      const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
+      // Revoke any previous URL before replacing.
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(URL.createObjectURL(blob));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not generate preview");
+    } finally {
+      setPdfBusy(null);
+    }
+  };
+  const closePreview = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+  };
+
 
   const openPdf = async (mode: "download" | "print") => {
     setPdfBusy(mode);

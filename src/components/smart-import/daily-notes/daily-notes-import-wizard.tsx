@@ -30,6 +30,7 @@ import {
   importHistoricalDailyNotes,
 } from "@/lib/smart-import-daily-notes.functions";
 import { suggestImportColumnMapping } from "@/lib/smart-import-nectar-mapping.functions";
+import { checkImportDuplicates } from "@/lib/smart-import-duplicate-check.functions";
 
 
 type ParsedFile = { headers: string[]; rows: Record<string, string>[]; fileName: string };
@@ -77,6 +78,10 @@ type ReviewRow = {
   // Incomplete panel only surfaces inputs for the actual gaps. Filled in
   // manually by the human — nothing is ever auto-generated.
   missing: { staff: boolean; client: boolean; date: boolean; narrative: boolean };
+  // Set by the duplicate-check server fn once the row is fully resolved.
+  // Auto-skips the row and shows a "Likely duplicate" badge.
+  duplicateOfId: string | null;
+  duplicateReason: string | null;
 };
 
 const ALLOWED_EXT = [".csv", ".xlsx", ".xls"];
@@ -184,23 +189,33 @@ function splitGoals(raw: string): string[] {
     .map((s) => s.slice(0, 500));
 }
 
-// Sample-value builder for the NECTAR mapping call. Cap to 12 distinct
-// non-empty samples per column so the prompt stays small and one call per
-// file is enough regardless of row count.
-function sampleColumns(parsed: ParsedFile): Array<{ header: string; samples: string[] }> {
+// Deep, stratified sample per column: pull up to 60 non-empty values evenly
+// spaced across up to the first 2,000 rows of the file, plus the actual
+// fill rate so a well-labeled but empty column gets downgraded server-side.
+function sampleColumns(parsed: ParsedFile): Array<{ header: string; samples: string[]; fill_rate: number; sample_size: number }> {
+  const MAX_ROWS = 2000;
+  const MAX_SAMPLES = 60;
+  const scan = parsed.rows.slice(0, MAX_ROWS);
+  const step = Math.max(1, Math.floor(scan.length / (MAX_SAMPLES * 2)));
   return parsed.headers.map((h) => {
+    let nonEmpty = 0;
     const seen = new Set<string>();
     const samples: string[] = [];
-    for (const r of parsed.rows) {
-      const v = (r[h] ?? "").trim();
+    for (let i = 0; i < scan.length; i += step) {
+      const v = (scan[i][h] ?? "").trim();
       if (!v) continue;
       const key = v.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      samples.push(v.slice(0, 200));
-      if (samples.length >= 12) break;
+      if (!seen.has(key) && samples.length < MAX_SAMPLES) {
+        seen.add(key);
+        samples.push(v.slice(0, 200));
+      }
     }
-    return { header: h, samples };
+    for (const r of scan) {
+      const v = (r[h] ?? "").trim();
+      if (v) nonEmpty++;
+    }
+    const fill_rate = scan.length > 0 ? nonEmpty / scan.length : 0;
+    return { header: h, samples, fill_rate, sample_size: scan.length };
   });
 }
 
@@ -222,6 +237,8 @@ export function DailyNotesImportWizard() {
   const createJob = useServerFn(createDailyNotesImportJob);
   const commitRows = useServerFn(importHistoricalDailyNotes);
   const suggestMap = useServerFn(suggestImportColumnMapping);
+  const checkDupes = useServerFn(checkImportDuplicates);
+  const [dupeChecking, setDupeChecking] = useState(false);
 
 
   const peopleQ = useQuery({
@@ -394,11 +411,44 @@ export function DailyNotesImportWizard() {
         status, reason,
         skipped: false,
         missing,
+        duplicateOfId: null,
+        duplicateReason: null,
       };
     });
     setRows(result);
     setStep(3);
-  }, [parsed, mapping, peopleQ.data, wholeFile]);
+
+    // Duplicate check for every fully-resolved row (staff + client + date).
+    const resolved = result.filter((r) => r.staffId && r.clientId && r.logDateIso);
+    if (resolved.length > 0 && org?.organization_id) {
+      setDupeChecking(true);
+      checkDupes({
+        data: {
+          mode: "daily_notes" as const,
+          organization_id: org.organization_id,
+          rows: resolved.map((r) => ({
+            index: r.idx,
+            staff_id: r.staffId!,
+            client_id: r.clientId!,
+            log_date_iso: r.logDateIso!,
+          })),
+        },
+      })
+        .then((res: { duplicates: Array<{ index: number; existing_id: string; reason: string }> }) => {
+          if (!res.duplicates?.length) return;
+          setRows((rs) =>
+            rs.map((r) => {
+              const hit = res.duplicates.find((d) => d.index === r.idx);
+              if (!hit) return r;
+              return { ...r, skipped: true, duplicateOfId: hit.existing_id, duplicateReason: hit.reason };
+            }),
+          );
+          toast.info(`${res.duplicates.length} note${res.duplicates.length === 1 ? "" : "s"} look like duplicates of existing entries — auto-skipped.`);
+        })
+        .catch((e: unknown) => console.warn("Duplicate check failed:", e))
+        .finally(() => setDupeChecking(false));
+    }
+  }, [parsed, mapping, peopleQ.data, wholeFile, org?.organization_id]);
 
 
   // Recompute status after any manual edit. A row becomes 'matched' only when
@@ -433,7 +483,39 @@ export function DailyNotesImportWizard() {
   };
 
   const skipRow = (idx: number) => setRows((r) => r.map((row) => row.idx === idx ? { ...row, skipped: true } : row));
-  const unskipRow = (idx: number) => setRows((r) => r.map((row) => row.idx === idx ? { ...row, skipped: false } : row));
+  const unskipRow = (idx: number) => setRows((r) => r.map((row) => row.idx === idx ? { ...row, skipped: false, duplicateOfId: null, duplicateReason: null } : row));
+
+  // Bulk-fix: resolve every row sharing the same raw label at once.
+  const bulkResolve = useCallback((kind: "staff" | "client", rawLabel: string, id: string) => {
+    setRows((rs) => {
+      let touched = 0;
+      const out = rs.map((row) => {
+        const label = kind === "staff" ? row.staffLabel : row.clientLabel;
+        if (label.trim().toLowerCase() !== rawLabel.trim().toLowerCase()) return row;
+        if (kind === "staff" && row.staffId) return row;
+        if (kind === "client" && row.clientId) return row;
+        touched++;
+        const next = { ...row, ...(kind === "staff" ? { staffId: id } : { clientId: id }) };
+        return recompute(next);
+      });
+      if (touched > 0) toast.success(`Applied to ${touched} row${touched === 1 ? "" : "s"} sharing "${rawLabel}".`);
+      return out;
+    });
+  }, []);
+
+  const repeatedIssues = useMemo(() => {
+    const staffMap = new Map<string, number>();
+    const clientMap = new Map<string, number>();
+    for (const r of rows) {
+      if (r.skipped) continue;
+      if (!r.staffId && r.staffLabel) staffMap.set(r.staffLabel, (staffMap.get(r.staffLabel) ?? 0) + 1);
+      if (!r.clientId && r.clientLabel) clientMap.set(r.clientLabel, (clientMap.get(r.clientLabel) ?? 0) + 1);
+    }
+    return {
+      staffIssues: Array.from(staffMap.entries()).filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]),
+      clientIssues: Array.from(clientMap.entries()).filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]),
+    };
+  }, [rows]);
 
   const readyRows = useMemo(
     () => rows.filter((r) => !r.skipped && r.status === "matched" && r.staffId && r.clientId && r.logDateIso && r.narrative),
@@ -555,9 +637,12 @@ export function DailyNotesImportWizard() {
           incomplete={incompleteRows}
           skipped={skippedRows}
           people={peopleQ.data}
+          repeatedIssues={repeatedIssues}
+          dupeChecking={dupeChecking}
           onChooseStaff={chooseStaff}
           onChooseClient={chooseClient}
           onLink={linkManually}
+          onBulkResolve={bulkResolve}
           onSetNarrative={setNarrative}
           onSetDate={setDate}
           onSkip={skipRow}
@@ -926,7 +1011,8 @@ function SamplePreview({ parsed, mapping }: { parsed: ParsedFile; mapping: Mappi
 // ─── Step 3 ────────────────────────────────────────────────────────────────
 function ReviewStep({
   rows, ready, ambiguous, incomplete, skipped, people,
-  onChooseStaff, onChooseClient, onLink, onSetNarrative, onSetDate,
+  repeatedIssues, dupeChecking,
+  onChooseStaff, onChooseClient, onLink, onBulkResolve, onSetNarrative, onSetDate,
   onSkip, onUnskip, onDownloadSkipped, onBack, onCommit, committing,
 }: {
   rows: ReviewRow[];
@@ -935,9 +1021,12 @@ function ReviewStep({
   incomplete: ReviewRow[];
   skipped: ReviewRow[];
   people: { staff: Person[]; clients: Person[] };
+  repeatedIssues: { staffIssues: Array<[string, number]>; clientIssues: Array<[string, number]> };
+  dupeChecking: boolean;
   onChooseStaff: (idx: number, id: string) => void;
   onChooseClient: (idx: number, id: string) => void;
   onLink: (idx: number, kind: "staff" | "client", id: string) => void;
+  onBulkResolve: (kind: "staff" | "client", rawLabel: string, id: string) => void;
   onSetNarrative: (idx: number, text: string) => void;
   onSetDate: (idx: number, isoDate: string) => void;
   onSkip: (idx: number) => void;
@@ -947,6 +1036,7 @@ function ReviewStep({
   onCommit: () => void;
   committing: boolean;
 }) {
+  const duplicateCount = rows.filter((r) => r.duplicateOfId).length;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -956,6 +1046,10 @@ function ReviewStep({
           <span className="text-amber-700 font-medium">{ambiguous.length} needs a choice</span> ·{" "}
           <span className="text-destructive font-medium">{incomplete.length} incomplete</span> ·{" "}
           <span className="text-muted-foreground">{skipped.length} skipped</span>
+          {duplicateCount > 0 && (
+            <> · <span className="text-orange-700 font-medium">{duplicateCount} likely duplicate{duplicateCount === 1 ? "" : "s"}</span></>
+          )}
+          {dupeChecking && <> · <Loader2 className="inline h-3 w-3 animate-spin" /> checking duplicates…</>}
         </div>
         <Button variant="outline" size="sm" onClick={onDownloadSkipped}>
           <Download className="mr-1.5 h-3.5 w-3.5" /> Download unresolved rows
@@ -970,13 +1064,16 @@ function ReviewStep({
         staff member who wrote the note will get the chance to expand it during their own attestation review.
       </div>
 
+      <BulkFixPanel repeatedIssues={repeatedIssues} people={people} onBulkResolve={onBulkResolve} />
+
       <Tabs defaultValue={incomplete.length > 0 ? "incomplete" : "ready"}>
         <TabsList>
           <TabsTrigger value="ready">Ready ({ready.length})</TabsTrigger>
           <TabsTrigger value="ambiguous">Needs a choice ({ambiguous.length})</TabsTrigger>
           <TabsTrigger value="incomplete">Incomplete ({incomplete.length})</TabsTrigger>
-          <TabsTrigger value="skipped">Skipped ({skipped.length})</TabsTrigger>
+          <TabsTrigger value="skipped">Skipped ({skipped.length}{duplicateCount > 0 ? `, incl. ${duplicateCount} dup` : ""})</TabsTrigger>
         </TabsList>
+
 
         <TabsContent value="ready" className="mt-3">
           <ReadyTable rows={ready} onSkip={onSkip} />
@@ -1315,3 +1412,76 @@ function DoneStep({
   );
 }
 
+
+// ─── Bulk-fix panel ────────────────────────────────────────────────────────
+// If the same unresolved raw label appears on many rows, admin picks the
+// right person once and every row sharing that label is updated.
+function BulkFixPanel({
+  repeatedIssues, people, onBulkResolve,
+}: {
+  repeatedIssues: { staffIssues: Array<[string, number]>; clientIssues: Array<[string, number]> };
+  people: { staff: Person[]; clients: Person[] };
+  onBulkResolve: (kind: "staff" | "client", rawLabel: string, id: string) => void;
+}) {
+  const { staffIssues, clientIssues } = repeatedIssues;
+  if (staffIssues.length === 0 && clientIssues.length === 0) return null;
+  return (
+    <div className="rounded-2xl border border-amber-400/50 bg-amber-500/5 p-4">
+      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-800">
+        <AlertTriangle className="h-4 w-4" /> Repeated issues — fix once, apply to every matching row
+      </div>
+      <p className="mb-3 text-xs text-muted-foreground">
+        These raw values appear on multiple rows and aren't resolved yet. Pick the correct person once and every
+        row sharing that value will update.
+      </p>
+      <div className="grid gap-3 md:grid-cols-2">
+        {staffIssues.length > 0 && (
+          <div>
+            <div className="mb-1 text-xs font-medium">Unresolved staff labels</div>
+            <div className="space-y-1.5">
+              {staffIssues.slice(0, 20).map(([label, n]) => (
+                <div key={label} className="flex items-center gap-2 rounded-md border border-border/60 bg-card p-2 text-xs">
+                  <div className="min-w-0 flex-1 truncate">
+                    <span className="font-medium">"{label}"</span>{" "}
+                    <span className="text-muted-foreground">· {n} rows</span>
+                  </div>
+                  <Select onValueChange={(id) => id && onBulkResolve("staff", label, id)}>
+                    <SelectTrigger className="h-7 w-48 text-xs"><SelectValue placeholder="Pick staff member" /></SelectTrigger>
+                    <SelectContent>
+                      {people.staff.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {clientIssues.length > 0 && (
+          <div>
+            <div className="mb-1 text-xs font-medium">Unresolved client labels</div>
+            <div className="space-y-1.5">
+              {clientIssues.slice(0, 20).map(([label, n]) => (
+                <div key={label} className="flex items-center gap-2 rounded-md border border-border/60 bg-card p-2 text-xs">
+                  <div className="min-w-0 flex-1 truncate">
+                    <span className="font-medium">"{label}"</span>{" "}
+                    <span className="text-muted-foreground">· {n} rows</span>
+                  </div>
+                  <Select onValueChange={(id) => id && onBulkResolve("client", label, id)}>
+                    <SelectTrigger className="h-7 w-48 text-xs"><SelectValue placeholder="Pick client" /></SelectTrigger>
+                    <SelectContent>
+                      {people.clients.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

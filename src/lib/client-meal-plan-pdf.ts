@@ -517,12 +517,12 @@ export async function renderPlanVsActualPdf(p: PlanVsActualPdfPayload): Promise<
 
   // Column layout
   const cols = {
-    day: 78,
-    slot: 60,
-    planned: 130,
-    outcome: 90,
-    note: 100,
-    who: CONTENT_W - (78 + 60 + 130 + 90 + 100),
+    day: 72,
+    slot: 54,
+    planned: 120,
+    outcome: 80,
+    note: 88,
+    who: CONTENT_W - (72 + 54 + 120 + 80 + 88),
   };
   const xs = {
     day: MARGIN_X,

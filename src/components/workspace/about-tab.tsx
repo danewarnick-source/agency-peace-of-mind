@@ -10,6 +10,7 @@ import {
   User,
 } from "lucide-react";
 import type { CaseloadClient } from "@/hooks/use-caseload";
+import { FaceSheetInfoCard } from "@/components/clients/face-sheet-info-card";
 
 export function AboutTab({ client }: { client: CaseloadClient }) {
   const goals = client.pcsp_goals ?? [];

@@ -3272,46 +3272,64 @@ export type Database = {
       }
       client_meals: {
         Row: {
+          calories: number | null
+          carbs_g: number | null
           created_at: string
           day_of_week: number
           description: string | null
           estimated_cost: number | null
+          extra_value: number | null
+          fat_g: number | null
           id: string
           label: string
           meal_plan_id: string
           meal_slot: string
           notes: string | null
+          nutrition_estimated: Json
           nutrition_value: number | null
+          protein_g: number | null
           recipe_id: string | null
           sort_order: number
           updated_at: string
         }
         Insert: {
+          calories?: number | null
+          carbs_g?: number | null
           created_at?: string
           day_of_week: number
           description?: string | null
           estimated_cost?: number | null
+          extra_value?: number | null
+          fat_g?: number | null
           id?: string
           label?: string
           meal_plan_id: string
           meal_slot: string
           notes?: string | null
+          nutrition_estimated?: Json
           nutrition_value?: number | null
+          protein_g?: number | null
           recipe_id?: string | null
           sort_order?: number
           updated_at?: string
         }
         Update: {
+          calories?: number | null
+          carbs_g?: number | null
           created_at?: string
           day_of_week?: number
           description?: string | null
           estimated_cost?: number | null
+          extra_value?: number | null
+          fat_g?: number | null
           id?: string
           label?: string
           meal_plan_id?: string
           meal_slot?: string
           notes?: string | null
+          nutrition_estimated?: Json
           nutrition_value?: number | null
+          protein_g?: number | null
           recipe_id?: string | null
           sort_order?: number
           updated_at?: string
@@ -3473,31 +3491,55 @@ export type Database = {
       }
       client_nutrition_config: {
         Row: {
+          calorie_target: number | null
+          carbs_target_g: number | null
           client_id: string
           created_at: string
+          extra_label: string | null
+          extra_target: number | null
+          extra_unit: string | null
+          fat_target_g: number | null
           id: string
           nutrition_label: string
           nutrition_unit: string
           organization_id: string
+          protein_target_g: number | null
           updated_at: string
+          use_extra_field: boolean
         }
         Insert: {
+          calorie_target?: number | null
+          carbs_target_g?: number | null
           client_id: string
           created_at?: string
+          extra_label?: string | null
+          extra_target?: number | null
+          extra_unit?: string | null
+          fat_target_g?: number | null
           id?: string
           nutrition_label?: string
           nutrition_unit?: string
           organization_id: string
+          protein_target_g?: number | null
           updated_at?: string
+          use_extra_field?: boolean
         }
         Update: {
+          calorie_target?: number | null
+          carbs_target_g?: number | null
           client_id?: string
           created_at?: string
+          extra_label?: string | null
+          extra_target?: number | null
+          extra_unit?: string | null
+          fat_target_g?: number | null
           id?: string
           nutrition_label?: string
           nutrition_unit?: string
           organization_id?: string
+          protein_target_g?: number | null
           updated_at?: string
+          use_extra_field?: boolean
         }
         Relationships: [
           {

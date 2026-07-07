@@ -21,8 +21,17 @@ export type MealPdfMeal = {
   meal_slot: MealSlot;
   label: string;
   description?: string | null;
-  nutrition_value?: number | null;
+  nutrition_value?: number | null; // legacy; unused when macros are present
   estimated_cost?: number | null;
+  calories?: number | null;
+  protein_g?: number | null;
+  carbs_g?: number | null;
+  fat_g?: number | null;
+  extra_value?: number | null;
+  nutrition_estimated?: Partial<Record<
+    "calories" | "protein_g" | "carbs_g" | "fat_g" | "extra_value",
+    boolean
+  >> | null;
 };
 
 export type MealPdfShoppingItem = {
@@ -36,8 +45,10 @@ export type MealPlanPdfPayload = {
   logo?: MealPlanLogo | null;
   clientName: string;
   weekLabel: string;                // e.g. "Jul 6 – Jul 12, 2026"
-  nutritionLabel: string;           // e.g. "Fat Grams"
-  nutritionUnit: string;            // e.g. "g"
+  nutritionLabel: string;           // legacy — kept for backward compat
+  nutritionUnit: string;            // legacy
+  extraLabel?: string | null;       // custom per-client metric, when configured
+  extraUnit?: string | null;
   meals: MealPdfMeal[];
   shopping: MealPdfShoppingItem[];
   foodLikes?: string | null;
@@ -217,9 +228,15 @@ export async function renderMealPlanPdf(p: MealPlanPdfPayload): Promise<Uint8Arr
     generatedAt, pageW: PAGE_W, marginX: MARGIN_X, marginTop: MARGIN_TOP,
   });
 
-  // Sub-subtitle strip: tracked-nutrition label
+  // Sub-subtitle strip: nutrition tracking summary
   let y = p1Bottom - 20;
-  page1.drawText(`Tracked nutrition: ${p.nutritionLabel} (${p.nutritionUnit})`, {
+  const extraLabel = p.extraLabel ?? null;
+  const extraUnit = p.extraUnit ?? "";
+  const trackSummary =
+    `Tracking: calories, protein, carbs, fat` +
+    (extraLabel ? ` + ${extraLabel}${extraUnit ? ` (${extraUnit})` : ""}` : "") +
+    `. "est" = NECTAR estimate (not verified).`;
+  page1.drawText(trackSummary, {
     x: MARGIN_X, y, size: 9, font, color: C.muted,
   });
   y -= 12;
@@ -302,9 +319,17 @@ export async function renderMealPlanPdf(p: MealPlanPdfPayload): Promise<Uint8Arr
       } else {
         for (const m of cellMeals) {
           const label = m.label?.trim() || "(unnamed)";
-          const nut = (m.nutrition_value != null && !Number.isNaN(m.nutrition_value))
-            ? `  ${m.nutrition_value}${p.nutritionUnit}`
-            : "";
+          const cal = m.calories;
+          const anyEst =
+            !!m.nutrition_estimated &&
+            (m.nutrition_estimated.calories ||
+              m.nutrition_estimated.protein_g ||
+              m.nutrition_estimated.carbs_g ||
+              m.nutrition_estimated.fat_g);
+          const nut =
+            cal != null && !Number.isNaN(cal)
+              ? `  ${Math.round(cal)}kcal${anyEst ? " est" : ""}`
+              : "";
           const lines = wrapHard(bold, label, 8.5, textMaxW - bold.widthOfTextAtSize(nut, 7.5));
           lines.forEach((ln, k) => {
             if (ty - 9 < rowBottom + 4) return;
@@ -317,6 +342,16 @@ export async function renderMealPlanPdf(p: MealPlanPdfPayload): Promise<Uint8Arr
             }
             ty -= 10;
           });
+          const macroParts: string[] = [];
+          if (m.protein_g != null) macroParts.push(`P${Math.round(Number(m.protein_g))}`);
+          if (m.carbs_g != null) macroParts.push(`C${Math.round(Number(m.carbs_g))}`);
+          if (m.fat_g != null) macroParts.push(`F${Math.round(Number(m.fat_g))}`);
+          if (macroParts.length && ty - 8 >= rowBottom + 4) {
+            page1.drawText(macroParts.join("/") + "g", {
+              x: textLeft, y: ty, size: 7, font, color: C.muted,
+            });
+            ty -= 8;
+          }
           if (m.description) {
             const dLines = wrapHard(font, m.description, 7.5, textMaxW);
             for (const dl of dLines) {
@@ -344,7 +379,7 @@ export async function renderMealPlanPdf(p: MealPlanPdfPayload): Promise<Uint8Arr
       thickness: 0.5, color: C.rule,
     });
     // Label sits ABOVE the totals row so it never collides with the day-0 total.
-    page1.drawText(`Daily ${p.nutritionLabel} (${p.nutritionUnit})`, {
+    page1.drawText(`Daily totals — kcal · P/C/F (g)`, {
       x: gridX, y: rowTop + 4, size: 8, font: bold, color: C.muted,
     });
     DAY_NAMES.forEach((_, i) => {
@@ -355,15 +390,28 @@ export async function renderMealPlanPdf(p: MealPlanPdfPayload): Promise<Uint8Arr
           thickness: 0.4, color: C.rule,
         });
       }
-      const total = p.meals
-        .filter((m) => m.day_of_week === i)
-        .reduce((s, m) => s + (m.nutrition_value ?? 0), 0);
-      const txt = total > 0 ? `${total.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${p.nutritionUnit}` : "—";
-      const size = 10;
-      const w = bold.widthOfTextAtSize(txt, size);
-      page1.drawText(txt, {
-        x: cx + (dayColW - w) / 2, y: rowTop - 15, size, font: bold, color: C.ink,
+      const dayMeals = p.meals.filter((m) => m.day_of_week === i);
+      const sum = (f: "calories" | "protein_g" | "carbs_g" | "fat_g") =>
+        dayMeals.reduce((s, m) => s + (Number(m[f]) || 0), 0);
+      const cal = sum("calories");
+      const pg = sum("protein_g");
+      const cg = sum("carbs_g");
+      const fg = sum("fat_g");
+      const line1 = cal > 0 ? `${Math.round(cal)} kcal` : "—";
+      const line2 =
+        pg + cg + fg > 0
+          ? `${Math.round(pg)}/${Math.round(cg)}/${Math.round(fg)}g`
+          : "";
+      const w1 = bold.widthOfTextAtSize(line1, 9.5);
+      page1.drawText(line1, {
+        x: cx + (dayColW - w1) / 2, y: rowTop - 12, size: 9.5, font: bold, color: C.ink,
       });
+      if (line2) {
+        const w2 = font.widthOfTextAtSize(line2, 7.5);
+        page1.drawText(line2, {
+          x: cx + (dayColW - w2) / 2, y: rowTop - 22, size: 7.5, font, color: C.muted,
+        });
+      }
     });
   }
 

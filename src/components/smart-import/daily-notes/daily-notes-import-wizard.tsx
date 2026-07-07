@@ -700,19 +700,21 @@ function SamplePreview({ parsed, mapping }: { parsed: ParsedFile; mapping: Mappi
 
 // ─── Step 3 ────────────────────────────────────────────────────────────────
 function ReviewStep({
-  rows, ready, ambiguous, unmatched, skipped, people,
-  onChooseStaff, onChooseClient, onLink, onSkip, onUnskip,
-  onDownloadSkipped, onBack, onCommit, committing,
+  rows, ready, ambiguous, incomplete, skipped, people,
+  onChooseStaff, onChooseClient, onLink, onSetNarrative, onSetDate,
+  onSkip, onUnskip, onDownloadSkipped, onBack, onCommit, committing,
 }: {
   rows: ReviewRow[];
   ready: ReviewRow[];
   ambiguous: ReviewRow[];
-  unmatched: ReviewRow[];
+  incomplete: ReviewRow[];
   skipped: ReviewRow[];
   people: { staff: Person[]; clients: Person[] };
   onChooseStaff: (idx: number, id: string) => void;
   onChooseClient: (idx: number, id: string) => void;
   onLink: (idx: number, kind: "staff" | "client", id: string) => void;
+  onSetNarrative: (idx: number, text: string) => void;
+  onSetDate: (idx: number, isoDate: string) => void;
   onSkip: (idx: number) => void;
   onUnskip: (idx: number) => void;
   onDownloadSkipped: () => void;
@@ -727,19 +729,27 @@ function ReviewStep({
           {rows.length} row{rows.length === 1 ? "" : "s"} parsed ·{" "}
           <span className="text-emerald-700 font-medium">{ready.length} ready</span> ·{" "}
           <span className="text-amber-700 font-medium">{ambiguous.length} needs a choice</span> ·{" "}
-          <span className="text-destructive font-medium">{unmatched.length} not matched</span> ·{" "}
+          <span className="text-destructive font-medium">{incomplete.length} incomplete</span> ·{" "}
           <span className="text-muted-foreground">{skipped.length} skipped</span>
         </div>
         <Button variant="outline" size="sm" onClick={onDownloadSkipped}>
-          <Download className="mr-1.5 h-3.5 w-3.5" /> Download skipped rows
+          <Download className="mr-1.5 h-3.5 w-3.5" /> Download unresolved rows
         </Button>
       </div>
 
-      <Tabs defaultValue="ready">
+      <div className="rounded-md border border-border bg-muted/30 p-3 text-[11px] text-muted-foreground">
+        <span className="font-medium text-foreground">About the Incomplete group:</span> rows land here when
+        something structural is missing — no date, no matchable staff/client, or no written narrative. You can
+        fill in a missing piece manually if you actually know it, or skip the row. Nothing is ever auto-filled
+        or auto-generated. Rows that <em>do</em> import but read as thin or short aren't flagged here — the
+        staff member who wrote the note will get the chance to expand it during their own attestation review.
+      </div>
+
+      <Tabs defaultValue={incomplete.length > 0 ? "incomplete" : "ready"}>
         <TabsList>
           <TabsTrigger value="ready">Ready ({ready.length})</TabsTrigger>
           <TabsTrigger value="ambiguous">Needs a choice ({ambiguous.length})</TabsTrigger>
-          <TabsTrigger value="unmatched">Not matched ({unmatched.length})</TabsTrigger>
+          <TabsTrigger value="incomplete">Incomplete ({incomplete.length})</TabsTrigger>
           <TabsTrigger value="skipped">Skipped ({skipped.length})</TabsTrigger>
         </TabsList>
 
@@ -754,10 +764,18 @@ function ReviewStep({
           ))}
         </TabsContent>
 
-        <TabsContent value="unmatched" className="mt-3 space-y-2">
-          {unmatched.length === 0 && <EmptyMsg text="Everything matched or was resolved." />}
-          {unmatched.map((r) => (
-            <UnmatchedRow key={r.idx} row={r} people={people} onLink={onLink} onSkip={onSkip} />
+        <TabsContent value="incomplete" className="mt-3 space-y-2">
+          {incomplete.length === 0 && <EmptyMsg text="No incomplete rows — every parsed row has staff, client, date, and a narrative." />}
+          {incomplete.map((r) => (
+            <IncompleteRow
+              key={r.idx}
+              row={r}
+              people={people}
+              onLink={onLink}
+              onSetNarrative={onSetNarrative}
+              onSetDate={onSetDate}
+              onSkip={onSkip}
+            />
           ))}
         </TabsContent>
 

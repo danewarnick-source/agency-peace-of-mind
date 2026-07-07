@@ -801,6 +801,13 @@ export function WhiteboardPlanningBoard() {
     enabled: !!orgId,
   });
 
+  const currentStaffFn = useServerFn(getCurrentStaffPlacements);
+  const currentStaffQ = useQuery({
+    queryKey: ["whiteboard-current-staff", orgId],
+    queryFn: () => currentStaffFn({ data: { organization_id: orgId! } }),
+    enabled: !!orgId,
+  });
+
   const notesCountsFn = useServerFn(getWhiteboardNoteCounts);
   const notesCountsQ = useQuery({
     queryKey: ["whiteboard-note-counts", orgId],
@@ -818,25 +825,30 @@ export function WhiteboardPlanningBoard() {
   const rhs = rhsQ.data;
   const wb = wbQ.data;
   const staff = staffQ.data;
+  const currentStaffPlacements = currentStaffQ.data;
 
   const [plan, setPlan] = useState<Plan>({ clients: {}, staff: {} });
   const [scenarios, setScenarios] = useState<Scenarios>(emptyScenarios);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [mode, setMode] = useState<"current" | "blank">("current");
+  const [dirty, setDirty] = useState(false);
   const startingRef = useRef<Plan | null>(null);
   const historyRef = useRef<Plan[]>([]);
 
   useEffect(() => {
-    if (rhs && wb) {
-      const start = buildStartingPlan(rhs, wb);
+    if (rhs && wb && currentStaffPlacements) {
+      const start = buildCurrentPlan(rhs, wb, currentStaffPlacements);
       startingRef.current = start;
-      historyRef.current = [];
-      // Only reset if empty — avoid clobbering user's in-progress plan on refetch.
+      // Only seed on first load — don't clobber a plan the user is editing.
       if (Object.keys(plan.clients).length === 0 && Object.keys(plan.staff).length === 0) {
         setPlan(start);
+        setMode("current");
+        setDirty(false);
+        historyRef.current = [];
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rhs, wb]);
+  }, [rhs, wb, currentStaffPlacements]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),

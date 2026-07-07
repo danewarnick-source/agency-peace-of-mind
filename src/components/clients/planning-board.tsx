@@ -456,6 +456,7 @@ function RhsHomeContainer({
 }) {
   return (
     <Droppable id={`rhs-home:${home.id}`} className="min-h-[240px]">
+      <div style={glowStyle(score)} className="rounded-lg">
       <HouseFrame
         title={home.team_name}
         subtitle={`RHS · ${home.address ?? "No address"}`}
@@ -495,23 +496,9 @@ function RhsHomeContainer({
             )}
           </div>
         </div>
-        {score && (
-          <div className="mt-2 space-y-1 border-t border-border/60 pt-2 text-[10px]">
-            {score.hard_blocks.map((b) => (
-              <div key={b} className="flex items-start gap-1 rounded bg-rose-100 px-1.5 py-1 text-rose-900">
-                <AlertTriangle className="mt-0.5 h-2.5 w-2.5 shrink-0" />
-                <span>{b}</span>
-              </div>
-            ))}
-            {score.risks.map((r) => (
-              <div key={r} className="flex items-start gap-1 rounded bg-amber-100/70 px-1.5 py-1 text-amber-900">
-                <Info className="mt-0.5 h-2.5 w-2.5 shrink-0" />
-                <span>{r}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        <ScoreReasoning score={score} />
       </HouseFrame>
+      </div>
     </Droppable>
   );
 }

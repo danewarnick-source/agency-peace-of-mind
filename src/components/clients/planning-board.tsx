@@ -1218,7 +1218,31 @@ export function WhiteboardPlanningBoard() {
               )}
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {!dirty && (
+              <span
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+                  mode === "current"
+                    ? "border-sky-300 bg-sky-50 text-sky-800"
+                    : "border-slate-300 bg-slate-50 text-slate-700"
+                }`}
+                title={
+                  mode === "current"
+                    ? "Board mirrors the org's real structure — edits stay in this session."
+                    : "Blank sandbox — plan from scratch. Edits stay in this session."
+                }
+              >
+                {mode === "current" ? (
+                  <>
+                    <Home className="h-3 w-3" /> Loaded from current structure
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="h-3 w-3" /> Blank sandbox
+                  </>
+                )}
+              </span>
+            )}
             <Button
               size="sm"
               variant="outline"
@@ -1231,6 +1255,10 @@ export function WhiteboardPlanningBoard() {
             <Button size="sm" variant="outline" onClick={reset}>
               <RotateCcw className="mr-1 h-3 w-3" />
               Reset
+            </Button>
+            <Button size="sm" variant="outline" onClick={loadCurrent}>
+              <Home className="mr-1 h-3 w-3" />
+              Current
             </Button>
           </div>
         </div>

@@ -2790,6 +2790,110 @@ export type Database = {
           },
         ]
       }
+      client_meal_plans: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          food_likes: string | null
+          foods_to_avoid: string | null
+          id: string
+          notes: string | null
+          organization_id: string
+          updated_at: string
+          week_start_date: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          food_likes?: string | null
+          foods_to_avoid?: string | null
+          id?: string
+          notes?: string | null
+          organization_id: string
+          updated_at?: string
+          week_start_date: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          food_likes?: string | null
+          foods_to_avoid?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          updated_at?: string
+          week_start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_meal_plans_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_meal_plans_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_meals: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          description: string | null
+          id: string
+          label: string
+          meal_plan_id: string
+          meal_slot: string
+          notes: string | null
+          nutrition_value: number | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          description?: string | null
+          id?: string
+          label?: string
+          meal_plan_id: string
+          meal_slot: string
+          notes?: string | null
+          nutrition_value?: number | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          description?: string | null
+          id?: string
+          label?: string
+          meal_plan_id?: string
+          meal_slot?: string
+          notes?: string | null
+          nutrition_value?: number | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_meals_meal_plan_id_fkey"
+            columns: ["meal_plan_id"]
+            isOneToOne: false
+            referencedRelation: "client_meal_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_medications: {
         Row: {
           adverse_effects: string | null
@@ -2927,6 +3031,51 @@ export type Database = {
           support_level?: string | null
         }
         Relationships: []
+      }
+      client_nutrition_config: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          nutrition_label: string
+          nutrition_unit: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          nutrition_label?: string
+          nutrition_unit?: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          nutrition_label?: string
+          nutrition_unit?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_nutrition_config_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_nutrition_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       client_progress_summaries: {
         Row: {
@@ -3086,6 +3235,47 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_shopping_items: {
+        Row: {
+          checked: boolean
+          created_at: string
+          id: string
+          item: string
+          meal_plan_id: string
+          quantity: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          checked?: boolean
+          created_at?: string
+          id?: string
+          item?: string
+          meal_plan_id: string
+          quantity?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          checked?: boolean
+          created_at?: string
+          id?: string
+          item?: string
+          meal_plan_id?: string
+          quantity?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_shopping_items_meal_plan_id_fkey"
+            columns: ["meal_plan_id"]
+            isOneToOne: false
+            referencedRelation: "client_meal_plans"
             referencedColumns: ["id"]
           },
         ]

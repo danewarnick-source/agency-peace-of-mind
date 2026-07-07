@@ -414,6 +414,53 @@ export function ChoreChartPanel({
     }
   };
 
+  // ── Ship to client file(s) — finalized point-in-time snapshot to each
+  // client linked to this space. Same pattern as budget / meal-plan.
+  const [shipping, setShipping] = useState(false);
+  const shippedQ = useQuery({
+    enabled: !!spaceId,
+    queryKey: ["chore-chart-shipped", spaceId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_documents")
+        .select("id, uploaded_at, storage_path, client_id")
+        .eq("document_type", "chore_chart")
+        .ilike("storage_path", `%/chore-charts/chore-chart-%`)
+        .order("uploaded_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      // Filter to snapshots for THIS space (path includes the space slug + date).
+      const spaceSlug = (space?.name ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      return (data ?? []).filter((r) =>
+        typeof r.storage_path === "string" &&
+        spaceSlug &&
+        r.storage_path.includes(`/chore-charts/chore-chart-${spaceSlug}-`),
+      );
+    },
+  });
+  const shippedRows = shippedQ.data ?? [];
+  const latestShipped = shippedRows[0] ?? null;
+
+  const shipToFile = async () => {
+    if (!clients.length) { toast.error("Add at least one client to this space before shipping"); return; }
+    setShipping(true);
+    try {
+      const result = await shipChoreChartReport({ spaceId });
+      toast.success(
+        `Shipped chore chart to ${result.snapshots.length} client file${result.snapshots.length === 1 ? "" : "s"} — ${result.dateLabel}`,
+      );
+      qc.invalidateQueries({ queryKey: ["chore-chart-shipped", spaceId] });
+      for (const s of result.snapshots) {
+        qc.invalidateQueries({ queryKey: ["client-documents", s.clientId] });
+      }
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setShipping(false);
+    }
+  };
+
+
   if (spaceQ.isLoading) {
     return <p className="py-8 text-center text-sm text-muted-foreground">Loading chore chart…</p>;
   }

@@ -726,8 +726,8 @@ export function ClientMealPlannerPanel({
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Pass 1: grid + per-cell CRUD + manual shopping list. Pass 2 will add drag-drop between
-          cells and a staff "what did they actually eat" confirmation. Pass 3 will add recipe
+          Managers: drag meal pills between cells to reschedule (shopping list is unchanged).
+          Staff: confirm what the client actually ate each day below. Pass 3 will add recipe
           scanning, auto-populated shopping list, and budget-fit checks.
         </p>
       </CardContent>

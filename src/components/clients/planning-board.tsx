@@ -43,6 +43,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   GripVertical,
+  Home,
   Info,
   Plus,
   RotateCcw,
@@ -70,7 +71,9 @@ import {
 } from "@/lib/whiteboard.functions";
 import {
   getBoardStaff,
+  getCurrentStaffPlacements,
   type BoardStaff,
+  type CurrentStaffPlacement,
 } from "@/lib/whiteboard-board.functions";
 import {
   type MoveLight,
@@ -722,22 +725,47 @@ function ScenarioChrome({
 
 // ---------- Board ----------------------------------------------------------
 
-function buildStartingPlan(
+/**
+ * "Current" starting state: mirror the org's REAL structure into the sandbox.
+ * - RHS clients drop into their real team_id (if it resolves to an RHS home).
+ * - Other clients start in Unplaced (HHS host→client mapping isn't stored).
+ * - Staff drop into their real home_staff_designations team (if RHS).
+ * Anything without a real assignment stays in the pool.
+ */
+function buildCurrentPlan(
   rhs: RhsBoardSnapshot,
   wb: WhiteboardSnapshot,
+  staffPlacements: CurrentStaffPlacement[],
 ): Plan {
+  const rhsHomeIds = new Set(rhs.homes.map((h) => h.id));
   const clients: Record<string, string> = {};
-  // RHS clients start at their real home (or unplaced pool).
   for (const c of rhs.clients) {
-    clients[c.id] = c.team_id ? `rhs-home:${c.team_id}` : POOL_CLIENTS;
+    clients[c.id] =
+      c.team_id && rhsHomeIds.has(c.team_id)
+        ? `rhs-home:${c.team_id}`
+        : POOL_CLIENTS;
   }
-  // Every wb client (any category) starts in the pool unless already seeded.
-  // Planning is a sandbox — any client must be draggable anywhere, regardless
-  // of category/authorization.
   for (const c of wb.clients) {
-    if (!(c.id in clients)) clients[c.id] = POOL_CLIENTS;
+    if (c.id in clients) continue;
+    clients[c.id] =
+      c.team_id && rhsHomeIds.has(c.team_id)
+        ? `rhs-home:${c.team_id}`
+        : POOL_CLIENTS;
   }
-  // Staff always start in the pool.
+  const staff: Record<string, string> = {};
+  for (const sp of staffPlacements) {
+    if (rhsHomeIds.has(sp.team_id)) {
+      staff[sp.staff_id] = `rhs-home:${sp.team_id}`;
+    }
+  }
+  return { clients, staff };
+}
+
+/** "Blank" starting state: everyone in the pools, plan from scratch. */
+function buildBlankPlan(rhs: RhsBoardSnapshot, wb: WhiteboardSnapshot): Plan {
+  const clients: Record<string, string> = {};
+  for (const c of rhs.clients) clients[c.id] = POOL_CLIENTS;
+  for (const c of wb.clients) if (!(c.id in clients)) clients[c.id] = POOL_CLIENTS;
   return { clients, staff: {} };
 }
 
@@ -773,6 +801,13 @@ export function WhiteboardPlanningBoard() {
     enabled: !!orgId,
   });
 
+  const currentStaffFn = useServerFn(getCurrentStaffPlacements);
+  const currentStaffQ = useQuery({
+    queryKey: ["whiteboard-current-staff", orgId],
+    queryFn: () => currentStaffFn({ data: { organization_id: orgId! } }),
+    enabled: !!orgId,
+  });
+
   const notesCountsFn = useServerFn(getWhiteboardNoteCounts);
   const notesCountsQ = useQuery({
     queryKey: ["whiteboard-note-counts", orgId],
@@ -790,25 +825,30 @@ export function WhiteboardPlanningBoard() {
   const rhs = rhsQ.data;
   const wb = wbQ.data;
   const staff = staffQ.data;
+  const currentStaffPlacements = currentStaffQ.data;
 
   const [plan, setPlan] = useState<Plan>({ clients: {}, staff: {} });
   const [scenarios, setScenarios] = useState<Scenarios>(emptyScenarios);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [mode, setMode] = useState<"current" | "blank">("current");
+  const [dirty, setDirty] = useState(false);
   const startingRef = useRef<Plan | null>(null);
   const historyRef = useRef<Plan[]>([]);
 
   useEffect(() => {
-    if (rhs && wb) {
-      const start = buildStartingPlan(rhs, wb);
+    if (rhs && wb && currentStaffPlacements) {
+      const start = buildCurrentPlan(rhs, wb, currentStaffPlacements);
       startingRef.current = start;
-      historyRef.current = [];
-      // Only reset if empty — avoid clobbering user's in-progress plan on refetch.
+      // Only seed on first load — don't clobber a plan the user is editing.
       if (Object.keys(plan.clients).length === 0 && Object.keys(plan.staff).length === 0) {
         setPlan(start);
+        setMode("current");
+        setDirty(false);
+        historyRef.current = [];
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rhs, wb]);
+  }, [rhs, wb, currentStaffPlacements]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -1026,8 +1066,21 @@ export function WhiteboardPlanningBoard() {
         next.staff[parsed.id] = dest;
       }
       historyRef.current.push(prev);
+      setDirty(true);
       return next;
     });
+  }
+
+  /** Load the org's REAL structure into the sandbox as the starting arrangement. */
+  function loadCurrent() {
+    if (!rhs || !wb || !currentStaffPlacements) return;
+    const start = buildCurrentPlan(rhs, wb, currentStaffPlacements);
+    startingRef.current = start;
+    historyRef.current = [];
+    setPlan(start);
+    setScenarios(emptyScenarios);
+    setMode("current");
+    setDirty(false);
   }
 
   function undo() {
@@ -1037,11 +1090,16 @@ export function WhiteboardPlanningBoard() {
     setPlan(prev);
   }
 
+  /** Reset = blank slate. Everyone in pools, plan from scratch. */
   function reset() {
-    if (!startingRef.current) return;
+    if (!rhs || !wb) return;
+    const blank = buildBlankPlan(rhs, wb);
+    startingRef.current = blank;
     historyRef.current = [];
-    setPlan(startingRef.current);
+    setPlan(blank);
     setScenarios(emptyScenarios);
+    setMode("blank");
+    setDirty(false);
   }
 
   // Scenario creation — session only. IDs are prefixed so they never collide
@@ -1113,14 +1171,14 @@ export function WhiteboardPlanningBoard() {
       </p>
     );
   }
-  if (rhsQ.isLoading || wbQ.isLoading || staffQ.isLoading) {
+  if (rhsQ.isLoading || wbQ.isLoading || staffQ.isLoading || currentStaffQ.isLoading) {
     return (
       <p className="rounded-md border border-border bg-muted/20 px-3 py-6 text-center text-sm text-muted-foreground">
         Loading planning board…
       </p>
     );
   }
-  const err = rhsQ.error || wbQ.error || staffQ.error;
+  const err = rhsQ.error || wbQ.error || staffQ.error || currentStaffQ.error;
   if (err) {
     return (
       <p className="rounded-md border border-rose-300 bg-rose-50 px-3 py-3 text-sm text-rose-900">
@@ -1128,7 +1186,7 @@ export function WhiteboardPlanningBoard() {
       </p>
     );
   }
-  if (!rhs || !wb || !staff) return null;
+  if (!rhs || !wb || !staff || !currentStaffPlacements) return null;
 
   // Pool contents.
   const poolClientIds = clientsByContainer.get(POOL_CLIENTS) ?? [];
@@ -1160,7 +1218,31 @@ export function WhiteboardPlanningBoard() {
               )}
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {!dirty && (
+              <span
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+                  mode === "current"
+                    ? "border-sky-300 bg-sky-50 text-sky-800"
+                    : "border-slate-300 bg-slate-50 text-slate-700"
+                }`}
+                title={
+                  mode === "current"
+                    ? "Board mirrors the org's real structure — edits stay in this session."
+                    : "Blank sandbox — plan from scratch. Edits stay in this session."
+                }
+              >
+                {mode === "current" ? (
+                  <>
+                    <Home className="h-3 w-3" /> Loaded from current structure
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="h-3 w-3" /> Blank sandbox
+                  </>
+                )}
+              </span>
+            )}
             <Button
               size="sm"
               variant="outline"
@@ -1173,6 +1255,10 @@ export function WhiteboardPlanningBoard() {
             <Button size="sm" variant="outline" onClick={reset}>
               <RotateCcw className="mr-1 h-3 w-3" />
               Reset
+            </Button>
+            <Button size="sm" variant="outline" onClick={loadCurrent}>
+              <Home className="mr-1 h-3 w-3" />
+              Current
             </Button>
           </div>
         </div>

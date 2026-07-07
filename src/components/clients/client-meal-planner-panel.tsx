@@ -64,6 +64,13 @@ import {
   type MealPlanLogo,
   type PlanActualRow,
 } from "@/lib/client-meal-plan-pdf";
+import {
+  generatePlanVsActualReport,
+  shipPlanVsActualReport,
+  rangeLabelOf,
+  rangeTagOf,
+} from "@/lib/meal-plan-vs-actual-report";
+
 
 
 
@@ -792,18 +799,14 @@ export function ClientMealPlannerPanel({
               staff={staffQ.data ?? []}
               onChange={(id) => setAssignee.mutate(id)}
             />
-            <PlanVsActualReportCard
-              clientName={clientName}
-              weekStart={weekStart}
-              weekLabel={weekLabel}
-              meals={meals}
-              actuals={actualsQ.data ?? []}
-              staff={staffQ.data ?? []}
-              orgName={org?.organization_name ?? ""}
-              logo={logoState}
+            <PlanVsActualReportsSection
               clientId={clientId}
               organizationId={orgId ?? ""}
+              clientName={clientName}
+              currentWeekStart={weekStart}
+              logo={logoState}
             />
+
           </>
         )}
         {planId && !canEdit && canRecordActuals && (
@@ -1465,95 +1468,66 @@ function MealPlanOutputCard({
 // Plan vs. Actual report card — Preview / Download / Print / Ship
 // Manager-only. Reads actuals + planned meals for the current week.
 // ═══════════════════════════════════════════════════════════════════════════
-function PlanVsActualReportCard({
+function PlanVsActualReportsSection({
   clientId,
   organizationId,
   clientName,
-  weekStart,
-  weekLabel,
-  meals,
-  actuals,
-  staff,
-  orgName,
+  currentWeekStart,
   logo,
 }: {
   clientId: string;
   organizationId: string;
   clientName: string;
-  weekStart: Date;
-  weekLabel: string;
-  meals: MealRow[];
-  actuals: ActualRow[];
-  staff: { id: string; name: string }[];
-  orgName: string;
+  currentWeekStart: Date;
   logo: MealPlanLogo | null;
 }) {
   const qc = useQueryClient();
+  const [pickedWeek, setPickedWeek] = useState<Date>(currentWeekStart);
+  const [weeksCount, setWeeksCount] = useState<number>(1);
   const [busy, setBusy] = useState<null | "preview" | "download" | "print" | "ship">(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
+  const rangeLabel = rangeLabelOf(pickedWeek, weeksCount);
+  const rangeTag = rangeTagOf(pickedWeek, weeksCount);
+
   const shippedQ = useQuery({
     enabled: !!organizationId && !!clientId,
-    queryKey: ["mp-pva-shipped", clientId, weekTag(weekStart)],
+    queryKey: ["mp-pva-shipped", clientId, rangeTag],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("client_documents")
         .select("id, file_name, uploaded_at, storage_path")
         .eq("client_id", clientId)
         .eq("document_type", "meal_plan_plan_vs_actual")
-        .ilike("storage_path", `%/plan-vs-actual-${weekTag(weekStart)}-%`)
+        .ilike("storage_path", `%/plan-vs-actual-${rangeTag}-%`)
         .order("uploaded_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
   });
 
-  const buildRows = (): PlanActualRow[] => {
-    const staffName = (id: string | null) =>
-      (id && staff.find((s) => s.id === id)?.name) || (id ? "Staff" : null);
-    const outcomeLabel = (v: Outcome) => OUTCOMES.find((o) => o.v === v)?.label ?? v;
-    const rows: PlanActualRow[] = [];
-    for (let dow = 0; dow < 7; dow++) {
-      const d = addDays(weekStart, dow);
-      const iso = fmtISO(d);
-      for (const slot of SLOTS) {
-        const planned =
-          meals
-            .filter((m) => m.day_of_week === dow && m.meal_slot === slot)
-            .map((m) => m.label || "(unnamed)")
-            .join(", ") || "—";
-        const a = actuals.find((x) => x.actual_date === iso && x.meal_slot === slot);
-        rows.push({
-          day_of_week: dow,
-          meal_slot: slot,
-          date_iso: iso,
-          planned,
-          outcome: a ? outcomeLabel(a.outcome) : null,
-          note: a?.note ?? null,
-          confirmed_by_name: a ? staffName(a.confirmed_by) : null,
-          confirmed_at: a?.confirmed_at ?? null,
-        });
-      }
-    }
-    return rows;
-  };
-
   const buildBytes = async () => {
-    return await renderPlanVsActualPdf({
-      orgName, logo, clientName, weekLabel, rows: buildRows(),
+    const r = await generatePlanVsActualReport({
+      clientId,
+      weekStart: pickedWeek,
+      weeksCount,
+      logo,
     });
+    return r;
   };
 
   const openPreview = async () => {
     setBusy("preview");
     try {
-      const bytes = await buildBytes();
-      const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
+      const r = await buildBytes();
+      const blob = new Blob([new Uint8Array(r.bytes)], { type: "application/pdf" });
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(URL.createObjectURL(blob));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not build preview");
-    } finally { setBusy(null); }
+    } finally {
+      setBusy(null);
+    }
   };
   const closePreview = () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -1562,67 +1536,64 @@ function PlanVsActualReportCard({
   const openPdf = async (mode: "download" | "print") => {
     setBusy(mode);
     try {
-      const bytes = await buildBytes();
-      const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
+      const r = await buildBytes();
+      const blob = new Blob([new Uint8Array(r.bytes)], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
-      const filename = planVsActualPdfFilename(clientName, weekLabel);
       const win = window.open(url, "_blank", "noopener,noreferrer");
       if (!win) {
         const a = document.createElement("a");
-        a.href = url; a.download = filename;
-        document.body.appendChild(a); a.click(); a.remove();
+        a.href = url;
+        a.download = r.filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
       } else if (mode === "print") {
-        win.addEventListener("load", () => { try { win.focus(); win.print(); } catch { /* noop */ } });
+        win.addEventListener("load", () => {
+          try {
+            win.focus();
+            win.print();
+          } catch {
+            /* noop */
+          }
+        });
       }
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not build PDF");
-    } finally { setBusy(null); }
+    } finally {
+      setBusy(null);
+    }
   };
   const shipToFile = async () => {
     setBusy("ship");
     try {
-      const bytes = await buildBytes();
-      const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
-      const stampSlug = new Date().toISOString().replace(/[:.]/g, "-");
-      const storagePath =
-        `${organizationId}/${clientId}/meal-plans/plan-vs-actual-${weekTag(weekStart)}-${stampSlug}.pdf`;
-      const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
-      const { error: upErr } = await supabase.storage
-        .from("client-documents")
-        .upload(storagePath, blob, { upsert: false, contentType: "application/pdf" });
-      if (upErr) throw upErr;
-      const fileName = `Meal Plan — Plan vs. Actual ${weekLabel}.pdf`;
-      const { error: insErr } = await supabase
-        .from("client_documents")
-        .insert({
-          client_id: clientId,
-          organization_id: organizationId,
-          file_name: fileName,
-          document_type: "meal_plan_plan_vs_actual",
-          file_url: `storage://client-documents/${storagePath}`,
-          storage_path: storagePath,
-          file_size_bytes: bytes.byteLength,
-          uploaded_by: uid,
-        });
-      if (insErr) throw insErr;
-      toast.success(`Shipped to client file (${weekLabel})`);
-      qc.invalidateQueries({ queryKey: ["mp-pva-shipped", clientId, weekTag(weekStart)] });
+      const r = await shipPlanVsActualReport({
+        clientId,
+        weekStart: pickedWeek,
+        weeksCount,
+        logo,
+      });
+      toast.success(`Shipped to client file (${r.rangeLabel})`);
+      qc.invalidateQueries({ queryKey: ["mp-pva-shipped", clientId, rangeTag] });
       qc.invalidateQueries({ queryKey: ["client-documents", clientId] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not ship report");
-    } finally { setBusy(null); }
+    } finally {
+      setBusy(null);
+    }
   };
 
   const shipped = shippedQ.data ?? [];
   const latestShipped = shipped[0] ?? null;
-  const confirmedCount = actuals.filter((a) => {
-    const iso = a.actual_date;
-    const d = new Date(`${iso}T00:00:00`);
-    const start = new Date(weekStart); start.setHours(0, 0, 0, 0);
-    const end = addDays(start, 7);
-    return d >= start && d < end;
-  }).length;
+  const weekInputISO = pickedWeek.toISOString().slice(0, 10);
+  const setPickedByISO = (iso: string) => {
+    if (!iso) return;
+    const [y, m, d] = iso.split("-").map((s) => Number(s));
+    if (!y || !m || !d) return;
+    const dt = new Date(y, m - 1, d);
+    setPickedWeek(mondayOf(dt));
+  };
+  const shiftWeeks = (n: number) => setPickedWeek(addDays(pickedWeek, n * 7));
 
   return (
     <div className="rounded-md border bg-muted/10 p-3">
@@ -1630,45 +1601,118 @@ function PlanVsActualReportCard({
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <ClipboardCheck className="h-4 w-4 text-primary" />
-            Plan vs. Actual report
-            <Badge variant="outline" className="text-[10px]">
-              {confirmedCount} confirmed
-            </Badge>
+            Plan vs. Actual reports
           </div>
           <div className="text-xs text-muted-foreground">
-            {latestShipped ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/60 bg-emerald-50 px-2 py-0.5 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
-                <CheckCircle2 className="h-3 w-3" />
-                Shipped {new Date(latestShipped.uploaded_at).toLocaleDateString()} — {weekLabel}
-                {shipped.length > 1 ? ` (${shipped.length} snapshots)` : ""}
-              </span>
-            ) : (
-              <>Point-in-time snapshot of planned vs. recorded meals for {weekLabel}. Staff record actuals in their view.</>
-            )}
+            Generate an audit-ready PDF for any past week (or range). Staff record actuals in their view.
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="outline" onClick={openPreview} disabled={busy !== null}>
-            <Eye className="mr-2 h-4 w-4" />{busy === "preview" ? "Building…" : "Preview"}
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => openPdf("download")} disabled={busy !== null}>
-            <FileText className="mr-2 h-4 w-4" />{busy === "download" ? "Building…" : "Download PDF"}
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => openPdf("print")} disabled={busy !== null}>
-            <Printer className="mr-2 h-4 w-4" />{busy === "print" ? "Building…" : "Print"}
-          </Button>
-          <Button size="sm" variant="secondary" onClick={shipToFile} disabled={busy !== null}
-            title="Save a finalized snapshot to the client's Files">
-            <Send className="mr-2 h-4 w-4" />{busy === "ship" ? "Shipping…" : "Ship to client file"}
-          </Button>
+      </div>
+
+      {/* Picker row: week + weeks-count */}
+      <div className="mt-3 flex flex-wrap items-end gap-2">
+        <div className="flex flex-col">
+          <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Week of (Mon)
+          </label>
+          <div className="mt-1 flex items-center gap-1">
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              onClick={() => shiftWeeks(-1)}
+              aria-label="Previous week"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Input
+              type="date"
+              value={weekInputISO}
+              onChange={(e) => setPickedByISO(e.target.value)}
+              className="h-8 w-40"
+            />
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              onClick={() => shiftWeeks(1)}
+              aria-label="Next week"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8"
+              onClick={() => setPickedWeek(currentWeekStart)}
+            >
+              This week
+            </Button>
+          </div>
         </div>
+        <div className="flex flex-col">
+          <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Weeks
+          </label>
+          <select
+            value={weeksCount}
+            onChange={(e) => setWeeksCount(Math.max(1, Math.min(12, Number(e.target.value) || 1)))}
+            className="mt-1 h-8 rounded-md border bg-background px-2 text-sm"
+          >
+            {[1, 2, 3, 4, 6, 8, 12].map((n) => (
+              <option key={n} value={n}>
+                {n === 1 ? "1 week" : `${n} weeks`}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="text-xs text-muted-foreground">
+          Range: <span className="font-medium text-foreground">{rangeLabel}</span>
+        </div>
+      </div>
+
+      {/* Shipped indicator (scoped to picked range) */}
+      {latestShipped && (
+        <div className="mt-2 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/60 bg-emerald-50 px-2 py-0.5 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+            <CheckCircle2 className="h-3 w-3" />
+            Shipped {new Date(latestShipped.uploaded_at).toLocaleDateString()} — {rangeLabel}
+            {shipped.length > 1 ? ` (${shipped.length} snapshots)` : ""}
+          </span>
+        </div>
+      )}
+
+      {/* Action row */}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" onClick={openPreview} disabled={busy !== null}>
+          <Eye className="mr-2 h-4 w-4" />
+          {busy === "preview" ? "Building…" : "Preview"}
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => openPdf("download")} disabled={busy !== null}>
+          <FileText className="mr-2 h-4 w-4" />
+          {busy === "download" ? "Building…" : "Download PDF"}
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => openPdf("print")} disabled={busy !== null}>
+          <Printer className="mr-2 h-4 w-4" />
+          {busy === "print" ? "Building…" : "Print"}
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={shipToFile}
+          disabled={busy !== null}
+          title="Save a finalized snapshot to the client's Files"
+        >
+          <Send className="mr-2 h-4 w-4" />
+          {busy === "ship" ? "Shipping…" : "Ship to client file"}
+        </Button>
       </div>
 
       <Dialog open={previewUrl !== null} onOpenChange={(o) => { if (!o) closePreview(); }}>
         <DialogContent className="max-w-5xl w-[95vw] h-[90vh] flex flex-col p-0 gap-0">
           <DialogHeader className="px-4 py-3 border-b">
             <DialogTitle className="text-base">
-              Plan vs. Actual preview — {clientName} · {weekLabel}
+              Plan vs. Actual preview — {clientName} · {rangeLabel}
             </DialogTitle>
           </DialogHeader>
           <div className="flex-1 min-h-0 bg-muted">
@@ -1695,3 +1739,4 @@ function PlanVsActualReportCard({
     </div>
   );
 }
+

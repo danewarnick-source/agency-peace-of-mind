@@ -30,6 +30,8 @@ import {
   type BudgetPdfPayload,
   type BudgetPdfLogo,
 } from "@/lib/client-budget-pdf";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+
 
 type Section = "income" | "expense" | "other";
 

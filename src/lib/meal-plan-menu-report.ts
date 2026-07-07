@@ -60,15 +60,27 @@ export async function generateMealMenuReport(
 
   const orgName = await fetchOrgName(sb, organizationId);
 
-  // Nutrition config
+  // Nutrition config (macros + optional configurable extra metric)
   const { data: cfgRow } = await sb
     .from("client_nutrition_config")
-    .select("nutrition_label, nutrition_unit")
+    .select("nutrition_label, nutrition_unit, extra_label, extra_unit, use_extra_field")
     .eq("client_id", args.clientId)
     .maybeSingle();
   const cfg = (cfgRow as
-    | { nutrition_label: string | null; nutrition_unit: string | null }
-    | null) ?? { nutrition_label: "Fat Grams", nutrition_unit: "g" };
+    | {
+        nutrition_label: string | null;
+        nutrition_unit: string | null;
+        extra_label: string | null;
+        extra_unit: string | null;
+        use_extra_field: boolean | null;
+      }
+    | null) ?? {
+      nutrition_label: "Fat Grams",
+      nutrition_unit: "g",
+      extra_label: null,
+      extra_unit: null,
+      use_extra_field: false,
+    };
 
   // Plan + children
   const { data: planRow } = await sb

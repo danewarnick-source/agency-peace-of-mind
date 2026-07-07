@@ -486,7 +486,7 @@ export function ChoreChartPanel({
     if (!clients.length) { toast.error("Add at least one client to this space before shipping"); return; }
     setShipping(true);
     try {
-      const result = await shipChoreChartReport({ spaceId });
+      const result = await shipChoreChartReport({ spaceId, weekStartISO });
       toast.success(
         `Shipped chore chart to ${result.snapshots.length} client file${result.snapshots.length === 1 ? "" : "s"} — ${result.dateLabel}`,
       );

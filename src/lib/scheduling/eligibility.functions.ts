@@ -181,36 +181,22 @@ export const rankStaffForShift = createServerFn({ method: "POST" })
       .eq("status", "published");
     const requiredClientTrainings = (clientTrainings ?? []).map((c: any) => c.id as string);
 
-    // 6) certifications currency — service code → required cert type keys
-    const SERVICE_CODE_REQUIRED_CERTS: Record<string, string[]> = {
-      HHS: ["cpr-fa", "abuse-neglect"],
-      SLH: ["cpr-fa", "abuse-neglect"],
-      SLN: ["cpr-fa", "abuse-neglect"],
-      RHS: ["cpr-fa", "abuse-neglect"],
-      DSI: ["cpr-fa"],
-      SEI: ["cpr-fa"],
-      CMP: ["cpr-fa"],
-      CMS: ["cpr-fa"],
-    };
-    const requiredCertKeys = SERVICE_CODE_REQUIRED_CERTS[data.serviceCode.toUpperCase()] ?? [];
-
-    // active external certs per staff (approved and not expired)
+    // 6) Required qualifications for this code — one source of truth:
+    // confirmed staff_prerequisite rules via resolver. Codes without a
+    // confirmed rule fall back to the hardcoded map (resolver logs a warning).
     const nowIso = new Date().toISOString();
-    const activeCertsByStaff = new Map<string, Set<string>>();
-    if (staffIds.length) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: certRows } = await (supabase as any)
-        .from("external_certifications")
-        .select("user_id, cert_type, expires_at")
-        .in("user_id", staffIds)
-        .eq("status", "approved");
-      for (const c of (certRows ?? []) as Array<{ user_id: string; cert_type: string; expires_at: string | null }>) {
-        if (c.expires_at && c.expires_at < nowIso) continue;
-        const set = activeCertsByStaff.get(c.user_id) ?? new Set<string>();
-        set.add(c.cert_type);
-        activeCertsByStaff.set(c.user_id, set);
-      }
-    }
+    const { perCode: requiredByCode } = await resolveRequiredQualsForCodes(
+      supabase,
+      orgId,
+      [data.serviceCode],
+    );
+    const requiredQuals = requiredByCode.get(data.serviceCode.toUpperCase()) ?? [];
+    const requiredCertKeys = requiredQuals.map((q) => q.nsKey);
+
+    // Bulk-load namespaced qualifications (external_cert / baseline_training /
+    // hive_course / client_specific_training) per staff — matches rule kinds.
+    const qualsByStaff = await loadStaffQualsBulk(supabase, orgId, staffIds, nowIso);
+
 
     // completed client-specific trainings per staff
     const completedTrainingsByStaff = new Map<string, Set<string>>();

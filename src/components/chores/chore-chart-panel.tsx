@@ -399,6 +399,41 @@ export function ChoreChartPanel({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const addDailyItem = useMutation({
+    mutationFn: async (v: { label: string; detail: string | null }) => {
+      const { error } = await supabase.from("chore_daily_items").insert({
+        space_id: spaceId,
+        label: v.label,
+        detail: v.detail,
+        sort_order: dailyItems.length,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chore-daily-items", spaceId] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const updateDailyItem = useMutation({
+    mutationFn: async (v: { id: string; label?: string; detail?: string | null }) => {
+      const patch: Record<string, unknown> = {};
+      if (v.label !== undefined) patch.label = v.label;
+      if (v.detail !== undefined) patch.detail = v.detail;
+      const { error } = await supabase.from("chore_daily_items").update(patch).eq("id", v.id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chore-daily-items", spaceId] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const deleteDailyItem = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("chore_daily_items").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chore-daily-items", spaceId] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+
+
   const [defEditorOpen, setDefEditorOpen] = useState(false);
   const [editDef, setEditDef] = useState<Def | null>(null);
   const [newShiftLabel, setNewShiftLabel] = useState("");

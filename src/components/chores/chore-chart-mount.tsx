@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sparkles, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { ChoreChartPanel } from "./chore-chart-panel";
+import { ChoreSupportGate } from "./chore-support-activation";
 
 const TYPES = [
   { v: "rhs", label: "RHS — staffed home" },
@@ -189,53 +190,74 @@ export function ChoreChartForClient({
   if (spacesQ.isLoading) return null;
   const spaces = spacesQ.data ?? [];
 
+  // If the client is already linked to a home's chart (RHS/HHS path), show
+  // it directly — chore support is inherent to that home setting.
+  const homeLinkedSpaces = spaces.filter(
+    (s) => s.space_type === "rhs" || s.space_type === "hhs",
+  );
+  const clientOwnedSpaces = spaces.filter(
+    (s) => s.space_type !== "rhs" && s.space_type !== "hhs",
+  );
+
+  const createBlock = (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Sparkles className="h-4 w-4 text-primary" /> Chore chart
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {canEdit ? (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              No chore chart yet for this client. Create one for their setting
+              (SLH/SLN/DSI/family).
+            </p>
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="flex-1 min-w-[180px]">
+                <Label>Chart name</Label>
+                <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Jamie's apartment" />
+              </div>
+              <div className="w-48">
+                <Label>Setting</Label>
+                <Select value={newType} onValueChange={setNewType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TYPES.map((t) => <SelectItem key={t.v} value={t.v}>{t.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                disabled={!newName.trim() || createFor.isPending}
+                onClick={() => createFor.mutate({ name: newName.trim(), type: newType })}
+                className="gap-1"
+              >
+                <Plus className="h-4 w-4" /> Create
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm italic text-muted-foreground">No chore chart yet.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="space-y-4">
-      {spaces.length === 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Sparkles className="h-4 w-4 text-primary" /> Chore chart
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {canEdit ? (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  This client isn't linked to a chore chart yet. If they live in an SLH/SLN or family setting, create a chart just for them; if they live in a home you manage, link the home's chart on the home page.
-                </p>
-                <div className="flex flex-wrap items-end gap-2">
-                  <div className="flex-1 min-w-[180px]">
-                    <Label>Chart name</Label>
-                    <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Jamie's apartment" />
-                  </div>
-                  <div className="w-48">
-                    <Label>Setting</Label>
-                    <Select value={newType} onValueChange={setNewType}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {TYPES.map((t) => <SelectItem key={t.v} value={t.v}>{t.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button
-                    disabled={!newName.trim() || createFor.isPending}
-                    onClick={() => createFor.mutate({ name: newName.trim(), type: newType })}
-                    className="gap-1"
-                  >
-                    <Plus className="h-4 w-4" /> Create
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm italic text-muted-foreground">No chore chart yet.</p>
-            )}
-          </CardContent>
-        </Card>
-      )}
-      {spaces.map((s) => (
+      {/* RHS/HHS: ON by default — show home-linked charts directly. */}
+      {homeLinkedSpaces.map((s) => (
         <ChoreChartPanel key={s.id} spaceId={s.id} readOnly={readOnly} />
       ))}
+
+      {/* DSI/SLH/SLN/other: gated by per-client activation. */}
+      <ChoreSupportGate clientId={clientId}>
+        {clientOwnedSpaces.length === 0
+          ? createBlock
+          : clientOwnedSpaces.map((s) => (
+              <ChoreChartPanel key={s.id} spaceId={s.id} readOnly={readOnly} />
+            ))}
+      </ChoreSupportGate>
     </div>
   );
 }

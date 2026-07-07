@@ -288,19 +288,34 @@ export function ClientMealPlannerPanel({
   });
 
 
-  // Nutrition config
+  // Nutrition config — full macro model + optional configurable extra field
   const cfgQ = useQuery({
     enabled: !!clientId && !!orgId,
     queryKey: ["mp-nutrition-cfg", clientId],
     queryFn: async (): Promise<NutritionCfg> => {
       const { data, error } = await supabase
         .from("client_nutrition_config")
-        .select("id, nutrition_label, nutrition_unit")
+        .select(
+          "id, nutrition_label, nutrition_unit, extra_label, extra_unit, use_extra_field, " +
+            "calorie_target, protein_target_g, carbs_target_g, fat_target_g, extra_target",
+        )
         .eq("client_id", clientId)
         .maybeSingle();
       if (error) throw error;
       return (
-        data ?? { id: "", nutrition_label: "Fat Grams", nutrition_unit: "g" }
+        (data as NutritionCfg | null) ?? {
+          id: "",
+          nutrition_label: "Fat Grams",
+          nutrition_unit: "g",
+          extra_label: null,
+          extra_unit: null,
+          use_extra_field: false,
+          calorie_target: null,
+          protein_target_g: null,
+          carbs_target_g: null,
+          fat_target_g: null,
+          extra_target: null,
+        }
       );
     },
   });

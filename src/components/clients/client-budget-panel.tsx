@@ -387,10 +387,10 @@ function BudgetEditor({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("client_documents")
-        .select("id, file_name, uploaded_at, uploaded_by_name")
+        .select("id, file_name, uploaded_at, uploaded_by_name, storage_path")
         .eq("client_id", clientId)
         .eq("document_type", "financial_support_budget")
-        .ilike("file_name", `%${periodMonthTag(budget.period_month)}%`)
+        .ilike("storage_path", `%/financial-support-${periodMonthTag(budget.period_month)}-%`)
         .order("uploaded_at", { ascending: false });
       if (error) throw error;
       return data ?? [];

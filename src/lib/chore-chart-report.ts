@@ -103,16 +103,24 @@ export async function generateChoreChartReport(
   const linkedClientIds = ((linksRes.data ?? []) as Array<{ client_id: string }>).map(
     (x) => x.client_id,
   );
-  const clients = linkedClientIds.length
-    ? (((await sb
-        .from("clients")
-        .select("id, first_name, last_name")
-        .in("id", linkedClientIds)).data ?? []) as Array<{
-        id: string;
-        first_name: string;
-        last_name: string;
-      }>)
-    : [];
+
+  const [clientsRes, supportRes] = await Promise.all([
+    linkedClientIds.length
+      ? sb.from("clients").select("id, first_name, last_name").in("id", linkedClientIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; first_name: string; last_name: string }> }),
+    linkedClientIds.length
+      ? sb
+          .from("client_chore_support")
+          .select("client_id, status, reason, goal_note")
+          .in("client_id", linkedClientIds)
+      : Promise.resolve({ data: [] as Array<{ client_id: string; status: string; reason: string | null; goal_note: string | null }> }),
+  ]);
+
+  const clients = (clientsRes.data ?? []) as Array<{
+    id: string;
+    first_name: string;
+    last_name: string;
+  }>;
 
   const defs = ((defsRes.data ?? []) as Array<{
     id: string;
@@ -120,10 +128,30 @@ export async function generateChoreChartReport(
     task_list: string;
   }>);
   const defNameById = new Map(defs.map((d) => [d.id, d.chore_name] as const));
-  const nameOf = (id: string) => {
-    const c = clients.find((x) => x.id === id);
-    return c ? `${c.first_name} ${c.last_name}`.trim() : "";
-  };
+
+  const OUTCOMES = ["completed", "completed_with_support", "offered_declined", "not_addressed"] as const;
+  type Outcome = typeof OUTCOMES[number];
+  const zero = (): Record<Outcome, number> =>
+    ({ completed: 0, completed_with_support: 0, offered_declined: 0, not_addressed: 0 });
+  const totalOutcomes = zero();
+  const perClientOutcomes = new Map<string, Record<Outcome, number>>();
+  for (const c of ((compsRes.data ?? []) as Array<{ outcome: string; client_id: string | null }>)) {
+    const o = c.outcome as Outcome;
+    if (!(OUTCOMES as readonly string[]).includes(o)) continue;
+    totalOutcomes[o] += 1;
+    if (c.client_id) {
+      const bucket = perClientOutcomes.get(c.client_id) ?? zero();
+      bucket[o] += 1;
+      perClientOutcomes.set(c.client_id, bucket);
+    }
+  }
+
+  const supportByClient = new Map(
+    ((supportRes.data ?? []) as Array<{
+      client_id: string; status: string; reason: string | null; goal_note: string | null;
+    }>).map((r) => [r.client_id, r]),
+  );
+
 
   const payload: ChoreChartPdfPayload = {
     weekStartISO: args.weekStartISO,

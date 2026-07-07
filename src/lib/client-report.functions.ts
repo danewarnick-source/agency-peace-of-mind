@@ -163,7 +163,7 @@ export const pullClientReport = createServerFn({ method: "POST" })
       spaceId: out.spaceId,
       spaceName: out.spaceName,
       attachClientIds: out.attachClientIds,
-      snapshots: "snapshots" in out ? out.snapshots : [],
+      snapshots: "snapshots" in out ? (out.snapshots as PullClientReportOutput["snapshots"]) : [],
       shipped: !!data.ship,
     };
   });

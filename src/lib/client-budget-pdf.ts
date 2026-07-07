@@ -11,6 +11,7 @@ export type BudgetPdfLine = {
   non_variable: number;
   variable: number;
   notes: string | null;
+  day_of_month: number | null;
 };
 
 export type BudgetPdfPayload = {
@@ -29,11 +30,12 @@ const CONTENT_W = PAGE_W - MARGIN * 2;
 
 // Column widths (sum = CONTENT_W = 516)
 const COL = {
-  label: 180,
-  nonVar: 70,
-  variable: 70,
-  total: 70,
-  notes: 126,
+  day: 36,
+  label: 150,
+  nonVar: 66,
+  variable: 66,
+  total: 66,
+  notes: 132,
 };
 
 const COLORS = {

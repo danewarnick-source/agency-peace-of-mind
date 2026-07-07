@@ -453,7 +453,7 @@ function SubjectReview({
         { id: "medications", label: "Medications / MAR" },
         { id: "goals", label: "PCSP goals" },
         { id: "services", label: "Services" },
-        { id: "plan", label: "Plan & documents", badge: extraCount || undefined },
+        { id: "plan", label: "Unmatched notes", badge: extraCount || undefined },
         { id: "staff", label: "Staff & training" },
         { id: "review", label: "Review", badge: (askCount + issueCount) || undefined },
       ]
@@ -604,7 +604,7 @@ function SubjectWizard({
       {step === "plan" && (
         <div className="space-y-3">
           <div className="rounded-xl border border-border bg-card p-2.5 text-[11px] leading-snug text-muted-foreground shadow-[var(--shadow-card)]">
-            PCSP and supporting documents (Human Rights, grievance policy, individualized plans, DNR) — additional uploads land here.
+            Notes NECTAR pulled from your uploads but couldn't confidently file into a section (Health, Behavioral, Preferences, etc.). Uploaded files themselves — PCSP, MAR, and any supporting docs — are stored with this import and don't need to be re-attached here. File each note under an existing section, create a new one, or leave it for later.
           </div>
           <UnfiledPanel items={unfiled} onChanged={onChanged} />
         </div>
@@ -2484,7 +2484,7 @@ function UnfiledPanel({
   items, onChanged,
 }: { items: Array<{ id: string; text: string; filed_to: string | null }>; onChanged: () => void }) {
   if (items.length === 0) {
-    return <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-[var(--shadow-card)]">Nothing leftover — every scrap has a home.</div>;
+    return <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-[var(--shadow-card)]">NECTAR filed every note from your uploads into a section. Nothing here needs your attention.</div>;
   }
   return (
     <div className="space-y-2">
@@ -2843,9 +2843,9 @@ function ImportSummaryPanel({
 
         {/* Plan & documents */}
         <div className={cardCls}>
-          <SectionHeader title="Plan & documents" step="plan" count={`${docs.length} supporting doc${docs.length === 1 ? "" : "s"}`} />
+          <SectionHeader title="Unmatched notes" step="plan" count={`${docs.length} note${docs.length === 1 ? "" : "s"} still to file`} />
           {docs.length === 0 ? (
-            <div className="text-[11px] text-muted-foreground italic">— no additional supporting documents —</div>
+            <div className="text-[11px] text-muted-foreground italic">— every note from your uploads was filed automatically —</div>
           ) : (
             <ul className="space-y-0.5 text-[11px]">
               {docs.slice(0, 8).map((d) => (

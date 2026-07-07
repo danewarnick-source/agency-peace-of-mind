@@ -132,8 +132,9 @@ export function DayTimelineDrawer({
   const lanes = useMemo(() => {
     const ids = [...new Set((shiftsQ.data ?? []).map((s) => s.staff_id).filter((v): v is string => !!v))];
     ids.sort((a, b) => staffName(a).localeCompare(staffName(b)));
-    const out: Array<{ id: string | null; label: string }> = ids.map((id) => ({ id, label: staffName(id) }));
-    if ((shiftsQ.data ?? []).some((s) => !s.staff_id)) out.push({ id: null, label: "Open / unassigned" });
+    const out: Array<{ id: string | null; label: string; photo_path: string | null }> =
+      ids.map((id) => ({ id, label: staffName(id), photo_path: staffPhoto(id) }));
+    if ((shiftsQ.data ?? []).some((s) => !s.staff_id)) out.push({ id: null, label: "Open / unassigned", photo_path: null });
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shiftsQ.data, staffNamesQ.data]);

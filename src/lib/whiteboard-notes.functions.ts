@@ -145,7 +145,7 @@ export const deleteWhiteboardNote = createServerFn({ method: "POST" })
   });
 
 async function hydrateAuthorNames(
-  supabase: NonNullable<Parameters<typeof requireSupabaseAuth>[0]> extends never ? any : any,
+  supabase: any,
   notes: WhiteboardNote[],
 ): Promise<WhiteboardNote[]> {
   const ids = Array.from(new Set(notes.map((n) => n.created_by)));

@@ -880,3 +880,79 @@ function MealPill({
     </div>
   );
 }
+
+function ActualsToday({
+  actuals,
+  meals,
+  onSet,
+}: {
+  planId: string;
+  actuals: ActualRow[];
+  meals: MealRow[];
+  onSet: (slot: Slot, outcome: Outcome, note: string | null) => void;
+}) {
+  const today = new Date();
+  const todayISO = fmtISO(today);
+  const dow = (today.getDay() + 6) % 7; // 0=Mon
+  const plannedFor = (slot: Slot) =>
+    meals.filter((m) => m.day_of_week === dow && m.meal_slot === slot);
+  const actualFor = (slot: Slot) =>
+    actuals.find((a) => a.actual_date === todayISO && a.meal_slot === slot);
+
+  return (
+    <div className="rounded-md border">
+      <div className="flex items-center justify-between border-b bg-muted/40 px-3 py-2">
+        <h4 className="text-sm font-semibold">
+          What did they actually eat? — {today.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
+        </h4>
+        <Badge variant="outline" className="text-[10px]">Staff confirmation</Badge>
+      </div>
+      <div className="divide-y">
+        {SLOTS.map((slot) => {
+          const planned = plannedFor(slot);
+          const actual = actualFor(slot);
+          return (
+            <div key={slot} className="grid grid-cols-1 gap-2 px-3 py-2 md:grid-cols-[120px_1fr_1fr_1.2fr]">
+              <div className="text-sm font-semibold capitalize">{slot}</div>
+              <div className="text-xs text-muted-foreground">
+                <div className="font-medium text-foreground">Planned</div>
+                {planned.length === 0 ? (
+                  <span>—</span>
+                ) : (
+                  planned.map((p) => p.label || "(unnamed)").join(", ")
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {OUTCOMES.map((o) => {
+                  const active = actual?.outcome === o.v;
+                  return (
+                    <Button
+                      key={o.v}
+                      size="sm"
+                      variant={active ? "default" : "outline"}
+                      className="h-7 text-xs"
+                      onClick={() => onSet(slot, o.v, actual?.note ?? null)}
+                    >
+                      {o.label}
+                    </Button>
+                  );
+                })}
+              </div>
+              <Input
+                defaultValue={actual?.note ?? ""}
+                placeholder='Note (e.g. "swapped Tuesday\'s lunch", "went to McDonald\'s")'
+                className="h-8 text-xs"
+                onBlur={(e) => {
+                  const note = e.target.value;
+                  if (note !== (actual?.note ?? "")) {
+                    onSet(slot, actual?.outcome ?? "ate_as_planned", note || null);
+                  }
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

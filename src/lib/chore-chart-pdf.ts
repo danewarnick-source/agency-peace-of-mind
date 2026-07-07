@@ -26,6 +26,7 @@ export type ChoreShiftRow = {
   timeRange: string | null; // e.g. "11p – 7a"
 };
 export type ChoreClient = { id: string; name: string };
+export type ChoreDailyItem = { label: string; detail: string | null };
 
 export type ChoreChartPdfPayload = {
   orgName: string;
@@ -36,6 +37,8 @@ export type ChoreChartPdfPayload = {
   clientCells: ChoreClientCell[];
   shiftRows: ChoreShiftRow[];
   shiftCells: ChoreShiftCell[];
+  /** Chores every client does every day (personal hygiene, beds, hamper, etc). */
+  dailyItems?: ChoreDailyItem[];
   /** ISO date (YYYY-MM-DD) of the Monday that anchors this chart's week. */
   weekStartISO?: string;
 };

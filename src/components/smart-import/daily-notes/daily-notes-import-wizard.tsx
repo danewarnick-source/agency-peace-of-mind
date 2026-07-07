@@ -14,8 +14,9 @@ import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import {
   Upload, X, Loader2, ArrowRight, ArrowLeft, Download,
-  CheckCircle2, AlertTriangle, HelpCircle, Archive, FileText,
+  CheckCircle2, AlertTriangle, HelpCircle, Archive, FileText, Wrench,
 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,7 +38,7 @@ type Mapping = Record<FieldKey, string | null>;
 
 type Person = { id: string; label: string; norms: string[] };
 
-type MatchStatus = "matched" | "ambiguous" | "no_match" | "invalid";
+type MatchStatus = "matched" | "ambiguous" | "incomplete";
 
 type ReviewRow = {
   idx: number;
@@ -55,6 +56,10 @@ type ReviewRow = {
   status: MatchStatus;
   reason: string | null;
   skipped: boolean;
+  // Track which pieces were originally missing / unresolvable so the
+  // Incomplete panel only surfaces inputs for the actual gaps. Filled in
+  // manually by the human — nothing is ever auto-generated.
+  missing: { staff: boolean; client: boolean; date: boolean; narrative: boolean };
 };
 
 const ALLOWED_EXT = [".csv", ".xlsx", ".xls"];
@@ -273,28 +278,37 @@ export function DailyNotesImportWizard() {
       const clientCandidates = findCandidates(clients, clientLabel);
       const d = tryParseDate(dateStr);
 
+      const missing = {
+        staff: !staffLabel || staffCandidates.length === 0,
+        client: !clientLabel || clientCandidates.length === 0,
+        date: !dateStr || !d,
+        narrative: !narrative,
+      };
+
       let status: MatchStatus;
       let reason: string | null = null;
       let staffId: string | null = null;
       let clientId: string | null = null;
 
-      if (!staffLabel || !clientLabel || !dateStr || !narrative) {
-        status = "invalid";
-        reason = !narrative ? "narrative is empty" : "missing required cells";
-      } else if (!d) {
-        status = "invalid";
-        reason = "unreadable date";
-      } else if (staffCandidates.length === 0 || clientCandidates.length === 0) {
-        status = "no_match";
-        reason =
-          staffCandidates.length === 0 && clientCandidates.length === 0
-            ? "no staff or client match"
-            : staffCandidates.length === 0
-              ? "no staff match"
-              : "no client match";
+      const structuralGap =
+        missing.staff || missing.client || missing.date || missing.narrative;
+
+      if (structuralGap) {
+        status = "incomplete";
+        const parts: string[] = [];
+        if (missing.date) parts.push(dateStr ? "unreadable date" : "missing date");
+        if (missing.staff) parts.push(staffLabel ? "no staff match" : "missing staff");
+        if (missing.client) parts.push(clientLabel ? "no client match" : "missing client");
+        if (missing.narrative) parts.push("blank narrative");
+        reason = parts.join(" · ");
+        // Pre-fill unambiguous single candidates so the human only fills real gaps.
+        if (staffCandidates.length === 1) staffId = staffCandidates[0].id;
+        if (clientCandidates.length === 1) clientId = clientCandidates[0].id;
       } else if (staffCandidates.length > 1 || clientCandidates.length > 1) {
         status = "ambiguous";
         reason = "multiple possible matches";
+        if (staffCandidates.length === 1) staffId = staffCandidates[0].id;
+        if (clientCandidates.length === 1) clientId = clientCandidates[0].id;
       } else {
         status = "matched";
         staffId = staffCandidates[0].id;
@@ -310,56 +324,61 @@ export function DailyNotesImportWizard() {
         logDateIso: d ? d.toISOString().slice(0, 10) : null,
         status, reason,
         skipped: false,
+        missing,
       };
     });
     setRows(result);
     setStep(3);
   }, [parsed, mapping, peopleQ.data]);
 
-  const updateRow = (idx: number, patch: Partial<ReviewRow>) => {
-    setRows((r) => r.map((row) => (row.idx === idx ? { ...row, ...patch } : row)));
+  // Recompute status after any manual edit. A row becomes 'matched' only when
+  // staff, client, date, and narrative are all present. Nothing here fills in
+  // missing content — that's always a human decision on the review screen.
+  const recompute = (row: ReviewRow): ReviewRow => {
+    const hasAll = !!row.staffId && !!row.clientId && !!row.logDateIso && !!row.narrative.trim();
+    if (hasAll) return { ...row, status: "matched", reason: null };
+    if (row.status === "ambiguous") return row;
+    return { ...row, status: "incomplete" };
   };
 
-  const chooseStaff = (idx: number, id: string) => {
-    const row = rows.find((r) => r.idx === idx);
-    if (!row) return;
-    const patch: Partial<ReviewRow> = { staffId: id };
-    if (row.clientId && row.logDateIso) { patch.status = "matched"; patch.reason = null; }
-    updateRow(idx, patch);
+  const patchAndRecompute = (idx: number, patch: Partial<ReviewRow>) => {
+    setRows((r) => r.map((row) => (row.idx === idx ? recompute({ ...row, ...patch }) : row)));
   };
-  const chooseClient = (idx: number, id: string) => {
-    const row = rows.find((r) => r.idx === idx);
-    if (!row) return;
-    const patch: Partial<ReviewRow> = { clientId: id };
-    if (row.staffId && row.logDateIso) { patch.status = "matched"; patch.reason = null; }
-    updateRow(idx, patch);
+
+  const chooseStaff = (idx: number, id: string) => patchAndRecompute(idx, { staffId: id });
+  const chooseClient = (idx: number, id: string) => patchAndRecompute(idx, { clientId: id });
+  const linkManually = (idx: number, kind: "staff" | "client", id: string) =>
+    patchAndRecompute(idx, kind === "staff" ? { staffId: id } : { clientId: id });
+
+  // Manual fill-ins for structural gaps. Only invoked from the Incomplete
+  // panel; nothing here is inferred — the human types the value.
+  const setNarrative = (idx: number, text: string) =>
+    patchAndRecompute(idx, { narrative: text });
+  const setDate = (idx: number, isoDate: string) => {
+    // isoDate arrives from <input type="date"> as YYYY-MM-DD, or "" when cleared.
+    patchAndRecompute(idx, {
+      logDateIso: isoDate || null,
+      dateStr: isoDate || "",
+    });
   };
-  const linkManually = (idx: number, kind: "staff" | "client", id: string) => {
-    const row = rows.find((r) => r.idx === idx);
-    if (!row) return;
-    const patch: Partial<ReviewRow> = kind === "staff" ? { staffId: id } : { clientId: id };
-    const nextStaffId = kind === "staff" ? id : row.staffId;
-    const nextClientId = kind === "client" ? id : row.clientId;
-    if (nextStaffId && nextClientId && row.logDateIso) { patch.status = "matched"; patch.reason = null; }
-    updateRow(idx, patch);
-  };
-  const skipRow = (idx: number) => updateRow(idx, { skipped: true });
-  const unskipRow = (idx: number) => updateRow(idx, { skipped: false });
+
+  const skipRow = (idx: number) => setRows((r) => r.map((row) => row.idx === idx ? { ...row, skipped: true } : row));
+  const unskipRow = (idx: number) => setRows((r) => r.map((row) => row.idx === idx ? { ...row, skipped: false } : row));
 
   const readyRows = useMemo(
     () => rows.filter((r) => !r.skipped && r.status === "matched" && r.staffId && r.clientId && r.logDateIso && r.narrative),
     [rows],
   );
   const ambiguousRows = useMemo(() => rows.filter((r) => !r.skipped && r.status === "ambiguous"), [rows]);
-  const unmatchedRows = useMemo(
-    () => rows.filter((r) => !r.skipped && (r.status === "no_match" || r.status === "invalid")),
+  const incompleteRows = useMemo(
+    () => rows.filter((r) => !r.skipped && r.status === "incomplete"),
     [rows],
   );
   const skippedRows = useMemo(() => rows.filter((r) => r.skipped), [rows]);
 
   const downloadSkipped = () => {
     if (!parsed) return;
-    const bucket = [...skippedRows, ...ambiguousRows, ...unmatchedRows];
+    const bucket = [...skippedRows, ...ambiguousRows, ...incompleteRows];
     if (bucket.length === 0) {
       toast.info("Nothing to export — every row is ready to import.");
       return;
@@ -456,12 +475,14 @@ export function DailyNotesImportWizard() {
           rows={rows}
           ready={readyRows}
           ambiguous={ambiguousRows}
-          unmatched={unmatchedRows}
+          incomplete={incompleteRows}
           skipped={skippedRows}
           people={peopleQ.data}
           onChooseStaff={chooseStaff}
           onChooseClient={chooseClient}
           onLink={linkManually}
+          onSetNarrative={setNarrative}
+          onSetDate={setDate}
           onSkip={skipRow}
           onUnskip={unskipRow}
           onDownloadSkipped={downloadSkipped}
@@ -679,19 +700,21 @@ function SamplePreview({ parsed, mapping }: { parsed: ParsedFile; mapping: Mappi
 
 // ─── Step 3 ────────────────────────────────────────────────────────────────
 function ReviewStep({
-  rows, ready, ambiguous, unmatched, skipped, people,
-  onChooseStaff, onChooseClient, onLink, onSkip, onUnskip,
-  onDownloadSkipped, onBack, onCommit, committing,
+  rows, ready, ambiguous, incomplete, skipped, people,
+  onChooseStaff, onChooseClient, onLink, onSetNarrative, onSetDate,
+  onSkip, onUnskip, onDownloadSkipped, onBack, onCommit, committing,
 }: {
   rows: ReviewRow[];
   ready: ReviewRow[];
   ambiguous: ReviewRow[];
-  unmatched: ReviewRow[];
+  incomplete: ReviewRow[];
   skipped: ReviewRow[];
   people: { staff: Person[]; clients: Person[] };
   onChooseStaff: (idx: number, id: string) => void;
   onChooseClient: (idx: number, id: string) => void;
   onLink: (idx: number, kind: "staff" | "client", id: string) => void;
+  onSetNarrative: (idx: number, text: string) => void;
+  onSetDate: (idx: number, isoDate: string) => void;
   onSkip: (idx: number) => void;
   onUnskip: (idx: number) => void;
   onDownloadSkipped: () => void;
@@ -706,19 +729,27 @@ function ReviewStep({
           {rows.length} row{rows.length === 1 ? "" : "s"} parsed ·{" "}
           <span className="text-emerald-700 font-medium">{ready.length} ready</span> ·{" "}
           <span className="text-amber-700 font-medium">{ambiguous.length} needs a choice</span> ·{" "}
-          <span className="text-destructive font-medium">{unmatched.length} not matched</span> ·{" "}
+          <span className="text-destructive font-medium">{incomplete.length} incomplete</span> ·{" "}
           <span className="text-muted-foreground">{skipped.length} skipped</span>
         </div>
         <Button variant="outline" size="sm" onClick={onDownloadSkipped}>
-          <Download className="mr-1.5 h-3.5 w-3.5" /> Download skipped rows
+          <Download className="mr-1.5 h-3.5 w-3.5" /> Download unresolved rows
         </Button>
       </div>
 
-      <Tabs defaultValue="ready">
+      <div className="rounded-md border border-border bg-muted/30 p-3 text-[11px] text-muted-foreground">
+        <span className="font-medium text-foreground">About the Incomplete group:</span> rows land here when
+        something structural is missing — no date, no matchable staff/client, or no written narrative. You can
+        fill in a missing piece manually if you actually know it, or skip the row. Nothing is ever auto-filled
+        or auto-generated. Rows that <em>do</em> import but read as thin or short aren't flagged here — the
+        staff member who wrote the note will get the chance to expand it during their own attestation review.
+      </div>
+
+      <Tabs defaultValue={incomplete.length > 0 ? "incomplete" : "ready"}>
         <TabsList>
           <TabsTrigger value="ready">Ready ({ready.length})</TabsTrigger>
           <TabsTrigger value="ambiguous">Needs a choice ({ambiguous.length})</TabsTrigger>
-          <TabsTrigger value="unmatched">Not matched ({unmatched.length})</TabsTrigger>
+          <TabsTrigger value="incomplete">Incomplete ({incomplete.length})</TabsTrigger>
           <TabsTrigger value="skipped">Skipped ({skipped.length})</TabsTrigger>
         </TabsList>
 
@@ -733,10 +764,18 @@ function ReviewStep({
           ))}
         </TabsContent>
 
-        <TabsContent value="unmatched" className="mt-3 space-y-2">
-          {unmatched.length === 0 && <EmptyMsg text="Everything matched or was resolved." />}
-          {unmatched.map((r) => (
-            <UnmatchedRow key={r.idx} row={r} people={people} onLink={onLink} onSkip={onSkip} />
+        <TabsContent value="incomplete" className="mt-3 space-y-2">
+          {incomplete.length === 0 && <EmptyMsg text="No incomplete rows — every parsed row has staff, client, date, and a narrative." />}
+          {incomplete.map((r) => (
+            <IncompleteRow
+              key={r.idx}
+              row={r}
+              people={people}
+              onLink={onLink}
+              onSetNarrative={onSetNarrative}
+              onSetDate={onSetDate}
+              onSkip={onSkip}
+            />
           ))}
         </TabsContent>
 
@@ -867,12 +906,14 @@ function AmbiguousRow({
   );
 }
 
-function UnmatchedRow({
-  row, people, onLink, onSkip,
+function IncompleteRow({
+  row, people, onLink, onSetNarrative, onSetDate, onSkip,
 }: {
   row: ReviewRow;
   people: { staff: Person[]; clients: Person[] };
   onLink: (idx: number, kind: "staff" | "client", id: string) => void;
+  onSetNarrative: (idx: number, text: string) => void;
+  onSetDate: (idx: number, isoDate: string) => void;
   onSkip: (idx: number) => void;
 }) {
   const [staffQ, setStaffQ] = useState("");
@@ -886,24 +927,31 @@ function UnmatchedRow({
   const staffLabel = row.staffId ? people.staff.find((p) => p.id === row.staffId)?.label : null;
   const clientLabel = row.clientId ? people.clients.find((p) => p.id === row.clientId)?.label : null;
 
+  const needsStaff = !row.staffId;
+  const needsClient = !row.clientId;
+  const needsDate = !row.logDateIso;
+  const needsNarrative = !row.narrative.trim();
+
   return (
     <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs">
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
           <Badge variant="outline" className="border-destructive/40 text-destructive">
-            <AlertTriangle className="mr-1 h-3 w-3" />
-            {row.status === "invalid" ? "Invalid" : "Not matched"}
+            <Wrench className="mr-1 h-3 w-3" />
+            Incomplete
           </Badge>
-          <span className="ml-2 text-muted-foreground">
-            {row.reason} · {row.dateStr}
-          </span>
+          <span className="ml-2 text-muted-foreground">{row.reason}</span>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => onSkip(row.idx)}>Skip</Button>
+        <Button variant="ghost" size="sm" onClick={() => onSkip(row.idx)}>Skip row</Button>
       </div>
+
       <div className="grid gap-3 md:grid-cols-2">
+        {/* Staff */}
         <div>
-          <div className="mb-1 text-muted-foreground">Staff — "{row.staffLabel || "(missing)"}"</div>
-          {staffLabel ? (
+          <div className="mb-1 text-muted-foreground">
+            Staff — {row.staffLabel ? `"${row.staffLabel}"` : <span className="italic">(blank in file)</span>}
+          </div>
+          {!needsStaff && staffLabel ? (
             <div className="text-emerald-700">✓ Linked to {staffLabel}</div>
           ) : (
             <>
@@ -926,9 +974,13 @@ function UnmatchedRow({
             </>
           )}
         </div>
+
+        {/* Client */}
         <div>
-          <div className="mb-1 text-muted-foreground">Client — "{row.clientLabel || "(missing)"}"</div>
-          {clientLabel ? (
+          <div className="mb-1 text-muted-foreground">
+            Client — {row.clientLabel ? `"${row.clientLabel}"` : <span className="italic">(blank in file)</span>}
+          </div>
+          {!needsClient && clientLabel ? (
             <div className="text-emerald-700">✓ Linked to {clientLabel}</div>
           ) : (
             <>
@@ -951,10 +1003,52 @@ function UnmatchedRow({
             </>
           )}
         </div>
+
+        {/* Date */}
+        <div>
+          <div className="mb-1 text-muted-foreground">
+            Date — {row.dateStr ? <>original value: <span className="italic">"{row.dateStr}"</span></> : <span className="italic">(blank in file)</span>}
+          </div>
+          {!needsDate ? (
+            <div className="text-emerald-700">✓ {row.logDateIso}</div>
+          ) : (
+            <Input
+              type="date"
+              value=""
+              onChange={(e) => onSetDate(row.idx, e.target.value)}
+              className="h-8 text-xs"
+            />
+          )}
+          {needsDate && (
+            <div className="mt-1 text-[10px] text-muted-foreground">
+              Only fill this in if you actually know the date the note was written. Don't guess.
+            </div>
+          )}
+        </div>
+
+        {/* Narrative */}
+        <div>
+          <div className="mb-1 text-muted-foreground">
+            Narrative — {needsNarrative ? <span className="italic">(blank in file)</span> : "provided"}
+          </div>
+          {!needsNarrative ? (
+            <div className="rounded border border-border bg-background p-2 text-muted-foreground line-clamp-3">
+              {row.narrative}
+            </div>
+          ) : (
+            <Textarea
+              value={row.narrative}
+              onChange={(e) => onSetNarrative(row.idx, e.target.value)}
+              placeholder="Type the note here only if you know what was written that day. Otherwise skip the row."
+              className="min-h-[72px] text-xs"
+            />
+          )}
+        </div>
       </div>
+
       <div className="mt-2 text-[11px] text-muted-foreground">
-        This flow never creates new staff or clients. If the person truly doesn't exist yet, skip the row, add them
-        through the regular Client or Employee Smart Import, then re-import the leftover rows.
+        This flow never creates new staff or clients and never invents dates or note content. If a piece of information
+        genuinely isn't known, skip the row instead of guessing.
       </div>
     </div>
   );

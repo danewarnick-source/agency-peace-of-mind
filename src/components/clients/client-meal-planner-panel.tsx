@@ -726,38 +726,8 @@ export function ClientMealPlannerPanel({
           </div>
         )}
 
-        {/* Nutrition metric config */}
-        <div className="flex flex-col gap-2 rounded-md border bg-muted/30 p-3 sm:flex-row sm:items-end">
-          <Settings2 className="mt-2 h-4 w-4 text-muted-foreground sm:mt-0 sm:mb-2" />
-          <div className="flex-1">
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">
-              Tracked nutrition metric
-            </label>
-            <Input
-              defaultValue={cfg.nutrition_label}
-              disabled={!canEdit}
-              onBlur={(e) => {
-                const v = e.target.value.trim() || "Fat Grams";
-                if (v !== cfg.nutrition_label)
-                  saveCfg.mutate({ nutrition_label: v, nutrition_unit: cfg.nutrition_unit });
-              }}
-              placeholder="e.g. Fat Grams, Blood Sugar, Carbs"
-            />
-          </div>
-          <div className="w-full sm:w-32">
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">Unit</label>
-            <Input
-              defaultValue={cfg.nutrition_unit}
-              disabled={!canEdit}
-              onBlur={(e) => {
-                const v = e.target.value.trim() || "g";
-                if (v !== cfg.nutrition_unit)
-                  saveCfg.mutate({ nutrition_label: cfg.nutrition_label, nutrition_unit: v });
-              }}
-              placeholder="g, mg/dL, kcal"
-            />
-          </div>
-        </div>
+        {/* Nutrition config — extra custom metric + optional daily targets */}
+        <NutritionConfigCard cfg={cfg} canEdit={canEdit} onSave={(patch) => saveCfg.mutate(patch)} />
 
         {/* Legacy "needs shopping help" toggle removed — meal support is now
             gated by the per-client activation model (client_meal_support). */}
@@ -781,7 +751,7 @@ export function ClientMealPlannerPanel({
                   </th>
                 ))}
                 <th className="border-b bg-background px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {cfg.nutrition_label}
+                  Daily nutrition
                 </th>
               </tr>
             </thead>

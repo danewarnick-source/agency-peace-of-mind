@@ -289,6 +289,7 @@ function BudgetEditor({ budget, lines, canEdit, clientName }: { budget: Budget; 
           .from("client_budget_lines")
           .update({
             label: l.label, non_variable: l.non_variable, variable: l.variable, notes: l.notes,
+            day_of_month: l.day_of_month,
           })
           .eq("id", l.id);
         if (error) throw error;

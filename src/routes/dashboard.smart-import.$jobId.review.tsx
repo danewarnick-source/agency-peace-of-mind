@@ -782,9 +782,16 @@ function SubjectWizard({
           <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Back
         </Button>
         <div className="text-xs text-muted-foreground">Step {idx + 1} of {steps.length}</div>
-        <Button size="sm" onClick={() => setStep(steps[Math.min(steps.length - 1, idx + 1)].id)} disabled={idx === steps.length - 1}>
-          Next <ChevronRight className="ml-1 h-3.5 w-3.5" />
-        </Button>
+        {idx === steps.length - 1 ? (
+          <Button size="sm" onClick={commit} disabled={commitDisabled} title={commitReason}>
+            {commitPending && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
+            <Send className="mr-1 h-3.5 w-3.5" /> Complete {jobMode === "client" ? "client" : "staff"} setup
+          </Button>
+        ) : (
+          <Button size="sm" onClick={() => setStep(steps[Math.min(steps.length - 1, idx + 1)].id)}>
+            Next <ChevronRight className="ml-1 h-3.5 w-3.5" />
+          </Button>
+        )}
       </div>
     </div>
   );

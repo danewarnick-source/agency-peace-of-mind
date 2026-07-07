@@ -333,7 +333,7 @@ export function ChoreChartPanel({
 
   const [defEditorOpen, setDefEditorOpen] = useState(false);
   const [editDef, setEditDef] = useState<Def | null>(null);
-  const [newShiftLabel, setNewShiftLabel] = useState("");
+  
   const [pickClient, setPickClient] = useState("");
   const [newDailyLabel, setNewDailyLabel] = useState("");
   const [newDailyDetail, setNewDailyDetail] = useState("");

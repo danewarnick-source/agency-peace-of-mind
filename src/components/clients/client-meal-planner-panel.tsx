@@ -689,6 +689,8 @@ export function ClientMealPlannerPanel({
             shopping={shopQ.data ?? []}
             nutritionLabel={cfg.nutrition_label}
             nutritionUnit={cfg.nutrition_unit}
+            extraLabel={cfg.use_extra_field ? cfg.extra_label : null}
+            extraUnit={cfg.use_extra_field ? cfg.extra_unit : null}
             foodLikes={planQ.data?.food_likes ?? null}
             foodsToAvoid={planQ.data?.foods_to_avoid ?? null}
             allergies={clientQ.data?.allergies ?? null}

@@ -801,6 +801,7 @@ export function WhiteboardPlanningBoard() {
     <NotesBoardContext.Provider value={notesCtxValue}>
     <DndContext
       sensors={sensors}
+      collisionDetection={collisionDetection}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}

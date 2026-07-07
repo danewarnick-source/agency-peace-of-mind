@@ -1,14 +1,22 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { useOrgBranding } from "@/components/branding/org-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Plus,
   Trash2,
@@ -20,6 +28,12 @@ import {
   GripVertical,
   ShoppingCart,
   BookOpen,
+  Eye,
+  FileText,
+  Printer,
+  Send,
+  CheckCircle2,
+  ClipboardCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -41,6 +55,16 @@ import {
   recordShoppingItemUse,
   type Recipe,
 } from "./client-meal-recipes";
+import {
+  renderMealPlanPdf,
+  renderPlanVsActualPdf,
+  mealPlanPdfFilename,
+  planVsActualPdfFilename,
+  weekTag,
+  type MealPlanLogo,
+  type PlanActualRow,
+} from "@/lib/client-meal-plan-pdf";
+
 
 
 /** 0=Mon..6=Sun (matches the reference sheet). */
@@ -138,11 +162,13 @@ export function ClientMealPlannerPanel({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("dietary_needs, allergies, needs_shopping_help, meal_actuals_assignee, team_id")
+        .select("first_name, last_name, dietary_needs, allergies, needs_shopping_help, meal_actuals_assignee, team_id")
         .eq("id", clientId)
         .maybeSingle();
       if (error) throw error;
       return data as {
+        first_name: string | null;
+        last_name: string | null;
         dietary_needs: string | null;
         allergies: string[] | null;
         needs_shopping_help: boolean | null;
@@ -152,6 +178,36 @@ export function ClientMealPlannerPanel({
     },
   });
   const needsHelp = !!clientQ.data?.needs_shopping_help;
+  const clientName = useMemo(() => {
+    const c = clientQ.data;
+    return [c?.first_name, c?.last_name].filter(Boolean).join(" ").trim() || "Client";
+  }, [clientQ.data]);
+
+  // Org branding logo — loaded once and reused for PDF headers.
+  const { data: branding } = useOrgBranding(orgId);
+  const [logoState, setLogoState] = useState<MealPlanLogo | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const path = branding?.logo_path;
+    if (!path) { setLogoState(null); return; }
+    (async () => {
+      try {
+        const { data, error } = await supabase.storage
+          .from("org-branding")
+          .createSignedUrl(path, 60 * 10);
+        if (error || !data?.signedUrl) throw error ?? new Error("no signed url");
+        const resp = await fetch(data.signedUrl);
+        if (!resp.ok) throw new Error("logo fetch failed");
+        const mime = resp.headers.get("content-type") || (path.endsWith(".png") ? "image/png" : "image/jpeg");
+        const buf = new Uint8Array(await resp.arrayBuffer());
+        if (!cancelled) setLogoState({ bytes: buf, mime });
+      } catch {
+        if (!cancelled) setLogoState(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [branding?.logo_path]);
+
 
   // Staff pool for the standing meal-actuals assignee selector (manager only).
   const staffQ = useQuery({
@@ -554,7 +610,29 @@ export function ClientMealPlannerPanel({
       </CardHeader>
 
       <CardContent className="space-y-6">
+        {/* Meal Plan output actions — Preview / Download / Print / Ship to file */}
+        {canEdit && orgId && (
+          <MealPlanOutputCard
+            clientId={clientId}
+            organizationId={orgId}
+            clientName={clientName}
+            weekStart={weekStart}
+            weekLabel={weekLabel}
+            orgName={org?.organization_name ?? ""}
+            logo={logoState}
+            meals={meals}
+            shopping={shopQ.data ?? []}
+            nutritionLabel={cfg.nutrition_label}
+            nutritionUnit={cfg.nutrition_unit}
+            foodLikes={planQ.data?.food_likes ?? null}
+            foodsToAvoid={planQ.data?.foods_to_avoid ?? null}
+            allergies={clientQ.data?.allergies ?? null}
+            dietaryNeeds={clientQ.data?.dietary_needs ?? null}
+          />
+        )}
+
         {/* Pass 3 toolbar: recipes, auto-shopping, budget-fit, NECTAR suggestions */}
+
         {canEdit && orgId && (
           <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 p-2">
             <AddRecipeDialog orgId={orgId} clientId={clientId} />
@@ -705,7 +783,8 @@ export function ClientMealPlannerPanel({
         />
 
 
-        {/* Actuals — staff record; manager sees read-only plan-vs-actual */}
+        {/* Actuals — staff record on their view; manager sees the standing assignee
+            selector + generates a Plan vs. Actual report (moved out of the panel). */}
         {planId && canEdit && (
           <>
             <ActualsAssigneeCard
@@ -713,11 +792,17 @@ export function ClientMealPlannerPanel({
               staff={staffQ.data ?? []}
               onChange={(id) => setAssignee.mutate(id)}
             />
-            <ActualsReadOnly
+            <PlanVsActualReportCard
+              clientName={clientName}
               weekStart={weekStart}
-              actuals={actualsQ.data ?? []}
+              weekLabel={weekLabel}
               meals={meals}
+              actuals={actualsQ.data ?? []}
               staff={staffQ.data ?? []}
+              orgName={org?.organization_name ?? ""}
+              logo={logoState}
+              clientId={clientId}
+              organizationId={orgId ?? ""}
             />
           </>
         )}
@@ -1164,75 +1249,449 @@ function ActualsAssigneeCard({
   );
 }
 
-function ActualsReadOnly({
+// ═══════════════════════════════════════════════════════════════════════════
+// Meal Plan output card — Preview / Download / Print / Ship to file
+// (weekly menu PDF). Manager-only. Matches budget/chore-chart pattern.
+// ═══════════════════════════════════════════════════════════════════════════
+function MealPlanOutputCard({
+  clientId,
+  organizationId,
+  clientName,
   weekStart,
-  actuals,
+  weekLabel,
+  orgName,
+  logo,
   meals,
-  staff,
+  shopping,
+  nutritionLabel,
+  nutritionUnit,
+  foodLikes,
+  foodsToAvoid,
+  allergies,
+  dietaryNeeds,
 }: {
+  clientId: string;
+  organizationId: string;
+  clientName: string;
   weekStart: Date;
-  actuals: ActualRow[];
+  weekLabel: string;
+  orgName: string;
+  logo: MealPlanLogo | null;
   meals: MealRow[];
-  staff: { id: string; name: string }[];
+  shopping: ShoppingItem[];
+  nutritionLabel: string;
+  nutritionUnit: string;
+  foodLikes: string | null;
+  foodsToAvoid: string | null;
+  allergies: string[] | null;
+  dietaryNeeds: string | null;
 }) {
-  const staffName = (id: string | null) =>
-    (id && staff.find((s) => s.id === id)?.name) || (id ? "Staff" : "—");
-  const outcomeLabel = (v: Outcome) => OUTCOMES.find((o) => o.v === v)?.label ?? v;
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  const plannedFor = (dow: number, slot: Slot) =>
-    meals.filter((m) => m.day_of_week === dow && m.meal_slot === slot)
-      .map((m) => m.label || "(unnamed)").join(", ") || "—";
-  const actualFor = (dateISO: string, slot: Slot) =>
-    actuals.find((a) => a.actual_date === dateISO && a.meal_slot === slot);
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState<null | "preview" | "download" | "print" | "ship">(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const shippedQ = useQuery({
+    enabled: !!organizationId && !!clientId,
+    queryKey: ["mp-menu-shipped", clientId, weekTag(weekStart)],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_documents")
+        .select("id, file_name, uploaded_at, storage_path")
+        .eq("client_id", clientId)
+        .eq("document_type", "meal_plan_menu")
+        .ilike("storage_path", `%/meal-plan-menu-${weekTag(weekStart)}-%`)
+        .order("uploaded_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const buildBytes = async () => {
+    return await renderMealPlanPdf({
+      orgName, logo, clientName, weekLabel,
+      nutritionLabel, nutritionUnit,
+      meals: meals.map((m) => ({
+        day_of_week: m.day_of_week, meal_slot: m.meal_slot,
+        label: m.label, description: m.description,
+        nutrition_value: m.nutrition_value, estimated_cost: m.estimated_cost,
+      })),
+      shopping: shopping.map((s) => ({
+        item: s.item, quantity: s.quantity, checked: !!s.checked,
+      })),
+      foodLikes, foodsToAvoid, allergies, dietaryNeeds,
+    });
+  };
+
+  const openPreview = async () => {
+    setBusy("preview");
+    try {
+      const bytes = await buildBytes();
+      const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(URL.createObjectURL(blob));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not build preview");
+    } finally { setBusy(null); }
+  };
+  const closePreview = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+  };
+  const openPdf = async (mode: "download" | "print") => {
+    setBusy(mode);
+    try {
+      const bytes = await buildBytes();
+      const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const filename = mealPlanPdfFilename(clientName, weekLabel);
+      const win = window.open(url, "_blank", "noopener,noreferrer");
+      if (!win) {
+        const a = document.createElement("a");
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+      } else if (mode === "print") {
+        win.addEventListener("load", () => { try { win.focus(); win.print(); } catch { /* noop */ } });
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not build PDF");
+    } finally { setBusy(null); }
+  };
+  const shipToFile = async () => {
+    setBusy("ship");
+    try {
+      const bytes = await buildBytes();
+      const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+      const stampSlug = new Date().toISOString().replace(/[:.]/g, "-");
+      const storagePath =
+        `${organizationId}/${clientId}/meal-plans/meal-plan-menu-${weekTag(weekStart)}-${stampSlug}.pdf`;
+      const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
+      const { error: upErr } = await supabase.storage
+        .from("client-documents")
+        .upload(storagePath, blob, { upsert: false, contentType: "application/pdf" });
+      if (upErr) throw upErr;
+      const fileName = `Meal Plan — Weekly Menu ${weekLabel}.pdf`;
+      const { error: insErr } = await supabase
+        .from("client_documents")
+        .insert({
+          client_id: clientId,
+          organization_id: organizationId,
+          file_name: fileName,
+          document_type: "meal_plan_menu",
+          file_url: `storage://client-documents/${storagePath}`,
+          storage_path: storagePath,
+          file_size_bytes: bytes.byteLength,
+          uploaded_by: uid,
+        });
+      if (insErr) throw insErr;
+      toast.success(`Shipped to client file (${weekLabel})`);
+      qc.invalidateQueries({ queryKey: ["mp-menu-shipped", clientId, weekTag(weekStart)] });
+      qc.invalidateQueries({ queryKey: ["client-documents", clientId] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not ship menu");
+    } finally { setBusy(null); }
+  };
+
+  const shipped = shippedQ.data ?? [];
+  const latestShipped = shipped[0] ?? null;
+
   return (
-    <div className="rounded-md border">
-      <div className="flex items-center justify-between border-b bg-muted/40 px-3 py-2">
-        <h4 className="text-sm font-semibold">Plan vs. actual — this week</h4>
-        <Badge variant="outline" className="text-[10px]">Read-only — staff records</Badge>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead className="bg-muted/30 text-left">
-            <tr>
-              <th className="px-2 py-1 font-semibold">Day</th>
-              <th className="px-2 py-1 font-semibold">Slot</th>
-              <th className="px-2 py-1 font-semibold">Planned</th>
-              <th className="px-2 py-1 font-semibold">Outcome</th>
-              <th className="px-2 py-1 font-semibold">Note</th>
-              <th className="px-2 py-1 font-semibold">Confirmed by</th>
-            </tr>
-          </thead>
-          <tbody>
-            {days.flatMap((d, i) =>
-              SLOTS.map((slot) => {
-                const iso = fmtISO(d);
-                const a = actualFor(iso, slot);
-                return (
-                  <tr key={`${iso}-${slot}`} className="border-t">
-                    <td className="px-2 py-1 whitespace-nowrap">
-                      {DAYS[i].slice(0, 3)} {shortDate(d)}
-                    </td>
-                    <td className="px-2 py-1 capitalize">{slot}</td>
-                    <td className="px-2 py-1 text-muted-foreground">{plannedFor(i, slot)}</td>
-                    <td className="px-2 py-1">
-                      {a ? outcomeLabel(a.outcome) : <span className="text-muted-foreground">—</span>}
-                    </td>
-                    <td className="px-2 py-1 text-muted-foreground">{a?.note ?? ""}</td>
-                    <td className="px-2 py-1 whitespace-nowrap text-muted-foreground">
-                      {a ? (
-                        <>
-                          {staffName(a.confirmed_by)}
-                          {a.confirmed_at ? ` · ${new Date(a.confirmed_at).toLocaleDateString()}` : ""}
-                        </>
-                      ) : ""}
-                    </td>
-                  </tr>
-                );
-              })
+    <div className="rounded-md border bg-muted/10 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold">Weekly menu — output</div>
+          <div className="text-xs text-muted-foreground">
+            {latestShipped ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/60 bg-emerald-50 px-2 py-0.5 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+                <CheckCircle2 className="h-3 w-3" />
+                Shipped {new Date(latestShipped.uploaded_at).toLocaleDateString()} — {weekLabel}
+                {shipped.length > 1 ? ` (${shipped.length} snapshots)` : ""}
+              </span>
+            ) : (
+              <>Not yet shipped to client file for {weekLabel}</>
             )}
-          </tbody>
-        </table>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="outline" onClick={openPreview} disabled={busy !== null}>
+            <Eye className="mr-2 h-4 w-4" />{busy === "preview" ? "Building…" : "Preview"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => openPdf("download")} disabled={busy !== null}>
+            <FileText className="mr-2 h-4 w-4" />{busy === "download" ? "Building…" : "Download PDF"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => openPdf("print")} disabled={busy !== null}>
+            <Printer className="mr-2 h-4 w-4" />{busy === "print" ? "Building…" : "Print"}
+          </Button>
+          <Button size="sm" variant="secondary" onClick={shipToFile} disabled={busy !== null}
+            title="Save a finalized snapshot to the client's Files">
+            <Send className="mr-2 h-4 w-4" />{busy === "ship" ? "Shipping…" : "Ship to client file"}
+          </Button>
+        </div>
       </div>
+
+      <Dialog open={previewUrl !== null} onOpenChange={(o) => { if (!o) closePreview(); }}>
+        <DialogContent className="max-w-5xl w-[95vw] h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-4 py-3 border-b">
+            <DialogTitle className="text-base">
+              Weekly menu preview — {clientName} · {weekLabel}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 bg-muted">
+            {previewUrl && (
+              <iframe src={previewUrl} title="Menu PDF preview" className="w-full h-full border-0" />
+            )}
+          </div>
+          <DialogFooter className="px-4 py-3 border-t gap-2 sm:justify-between">
+            <div className="text-xs text-muted-foreground">
+              Preview only — nothing has been saved. Use Download, Print, or Ship to commit.
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => openPdf("download")} disabled={busy !== null}>
+                <FileText className="mr-2 h-4 w-4" /> Download
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => openPdf("print")} disabled={busy !== null}>
+                <Printer className="mr-2 h-4 w-4" /> Print
+              </Button>
+              <Button size="sm" variant="secondary" onClick={closePreview}>Close</Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Plan vs. Actual report card — Preview / Download / Print / Ship
+// Manager-only. Reads actuals + planned meals for the current week.
+// ═══════════════════════════════════════════════════════════════════════════
+function PlanVsActualReportCard({
+  clientId,
+  organizationId,
+  clientName,
+  weekStart,
+  weekLabel,
+  meals,
+  actuals,
+  staff,
+  orgName,
+  logo,
+}: {
+  clientId: string;
+  organizationId: string;
+  clientName: string;
+  weekStart: Date;
+  weekLabel: string;
+  meals: MealRow[];
+  actuals: ActualRow[];
+  staff: { id: string; name: string }[];
+  orgName: string;
+  logo: MealPlanLogo | null;
+}) {
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState<null | "preview" | "download" | "print" | "ship">(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const shippedQ = useQuery({
+    enabled: !!organizationId && !!clientId,
+    queryKey: ["mp-pva-shipped", clientId, weekTag(weekStart)],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_documents")
+        .select("id, file_name, uploaded_at, storage_path")
+        .eq("client_id", clientId)
+        .eq("document_type", "meal_plan_plan_vs_actual")
+        .ilike("storage_path", `%/plan-vs-actual-${weekTag(weekStart)}-%`)
+        .order("uploaded_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const buildRows = (): PlanActualRow[] => {
+    const staffName = (id: string | null) =>
+      (id && staff.find((s) => s.id === id)?.name) || (id ? "Staff" : null);
+    const outcomeLabel = (v: Outcome) => OUTCOMES.find((o) => o.v === v)?.label ?? v;
+    const rows: PlanActualRow[] = [];
+    for (let dow = 0; dow < 7; dow++) {
+      const d = addDays(weekStart, dow);
+      const iso = fmtISO(d);
+      for (const slot of SLOTS) {
+        const planned =
+          meals
+            .filter((m) => m.day_of_week === dow && m.meal_slot === slot)
+            .map((m) => m.label || "(unnamed)")
+            .join(", ") || "—";
+        const a = actuals.find((x) => x.actual_date === iso && x.meal_slot === slot);
+        rows.push({
+          day_of_week: dow,
+          meal_slot: slot,
+          date_iso: iso,
+          planned,
+          outcome: a ? outcomeLabel(a.outcome) : null,
+          note: a?.note ?? null,
+          confirmed_by_name: a ? staffName(a.confirmed_by) : null,
+          confirmed_at: a?.confirmed_at ?? null,
+        });
+      }
+    }
+    return rows;
+  };
+
+  const buildBytes = async () => {
+    return await renderPlanVsActualPdf({
+      orgName, logo, clientName, weekLabel, rows: buildRows(),
+    });
+  };
+
+  const openPreview = async () => {
+    setBusy("preview");
+    try {
+      const bytes = await buildBytes();
+      const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(URL.createObjectURL(blob));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not build preview");
+    } finally { setBusy(null); }
+  };
+  const closePreview = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+  };
+  const openPdf = async (mode: "download" | "print") => {
+    setBusy(mode);
+    try {
+      const bytes = await buildBytes();
+      const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const filename = planVsActualPdfFilename(clientName, weekLabel);
+      const win = window.open(url, "_blank", "noopener,noreferrer");
+      if (!win) {
+        const a = document.createElement("a");
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+      } else if (mode === "print") {
+        win.addEventListener("load", () => { try { win.focus(); win.print(); } catch { /* noop */ } });
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not build PDF");
+    } finally { setBusy(null); }
+  };
+  const shipToFile = async () => {
+    setBusy("ship");
+    try {
+      const bytes = await buildBytes();
+      const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+      const stampSlug = new Date().toISOString().replace(/[:.]/g, "-");
+      const storagePath =
+        `${organizationId}/${clientId}/meal-plans/plan-vs-actual-${weekTag(weekStart)}-${stampSlug}.pdf`;
+      const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
+      const { error: upErr } = await supabase.storage
+        .from("client-documents")
+        .upload(storagePath, blob, { upsert: false, contentType: "application/pdf" });
+      if (upErr) throw upErr;
+      const fileName = `Meal Plan — Plan vs. Actual ${weekLabel}.pdf`;
+      const { error: insErr } = await supabase
+        .from("client_documents")
+        .insert({
+          client_id: clientId,
+          organization_id: organizationId,
+          file_name: fileName,
+          document_type: "meal_plan_plan_vs_actual",
+          file_url: `storage://client-documents/${storagePath}`,
+          storage_path: storagePath,
+          file_size_bytes: bytes.byteLength,
+          uploaded_by: uid,
+        });
+      if (insErr) throw insErr;
+      toast.success(`Shipped to client file (${weekLabel})`);
+      qc.invalidateQueries({ queryKey: ["mp-pva-shipped", clientId, weekTag(weekStart)] });
+      qc.invalidateQueries({ queryKey: ["client-documents", clientId] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not ship report");
+    } finally { setBusy(null); }
+  };
+
+  const shipped = shippedQ.data ?? [];
+  const latestShipped = shipped[0] ?? null;
+  const confirmedCount = actuals.filter((a) => {
+    const iso = a.actual_date;
+    const d = new Date(`${iso}T00:00:00`);
+    const start = new Date(weekStart); start.setHours(0, 0, 0, 0);
+    const end = addDays(start, 7);
+    return d >= start && d < end;
+  }).length;
+
+  return (
+    <div className="rounded-md border bg-muted/10 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <ClipboardCheck className="h-4 w-4 text-primary" />
+            Plan vs. Actual report
+            <Badge variant="outline" className="text-[10px]">
+              {confirmedCount} confirmed
+            </Badge>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {latestShipped ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/60 bg-emerald-50 px-2 py-0.5 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+                <CheckCircle2 className="h-3 w-3" />
+                Shipped {new Date(latestShipped.uploaded_at).toLocaleDateString()} — {weekLabel}
+                {shipped.length > 1 ? ` (${shipped.length} snapshots)` : ""}
+              </span>
+            ) : (
+              <>Point-in-time snapshot of planned vs. recorded meals for {weekLabel}. Staff record actuals in their view.</>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="outline" onClick={openPreview} disabled={busy !== null}>
+            <Eye className="mr-2 h-4 w-4" />{busy === "preview" ? "Building…" : "Preview"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => openPdf("download")} disabled={busy !== null}>
+            <FileText className="mr-2 h-4 w-4" />{busy === "download" ? "Building…" : "Download PDF"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => openPdf("print")} disabled={busy !== null}>
+            <Printer className="mr-2 h-4 w-4" />{busy === "print" ? "Building…" : "Print"}
+          </Button>
+          <Button size="sm" variant="secondary" onClick={shipToFile} disabled={busy !== null}
+            title="Save a finalized snapshot to the client's Files">
+            <Send className="mr-2 h-4 w-4" />{busy === "ship" ? "Shipping…" : "Ship to client file"}
+          </Button>
+        </div>
+      </div>
+
+      <Dialog open={previewUrl !== null} onOpenChange={(o) => { if (!o) closePreview(); }}>
+        <DialogContent className="max-w-5xl w-[95vw] h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-4 py-3 border-b">
+            <DialogTitle className="text-base">
+              Plan vs. Actual preview — {clientName} · {weekLabel}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 bg-muted">
+            {previewUrl && (
+              <iframe src={previewUrl} title="Plan vs. Actual preview" className="w-full h-full border-0" />
+            )}
+          </div>
+          <DialogFooter className="px-4 py-3 border-t gap-2 sm:justify-between">
+            <div className="text-xs text-muted-foreground">
+              Preview only — nothing has been saved. Use Download, Print, or Ship to commit.
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => openPdf("download")} disabled={busy !== null}>
+                <FileText className="mr-2 h-4 w-4" /> Download
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => openPdf("print")} disabled={busy !== null}>
+                <Printer className="mr-2 h-4 w-4" /> Print
+              </Button>
+              <Button size="sm" variant="secondary" onClick={closePreview}>Close</Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

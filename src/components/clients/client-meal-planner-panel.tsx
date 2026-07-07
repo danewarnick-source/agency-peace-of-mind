@@ -1,14 +1,36 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, ChevronLeft, ChevronRight, Utensils, Settings2, Check } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import {
+  Plus,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  Utensils,
+  Settings2,
+  Check,
+  GripVertical,
+  ShoppingCart,
+} from "lucide-react";
 import { toast } from "sonner";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDraggable,
+  useDroppable,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+
 
 /** 0=Mon..6=Sun (matches the reference sheet). */
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
@@ -38,6 +60,23 @@ type ShoppingItem = {
 
 type NutritionCfg = { id: string; nutrition_label: string; nutrition_unit: string };
 
+const OUTCOMES = [
+  { v: "ate_as_planned", label: "Ate as planned" },
+  { v: "swapped_from_another_day", label: "Swapped from another day" },
+  { v: "ate_out", label: "Ate out" },
+  { v: "changed_entirely", label: "Changed entirely" },
+] as const;
+type Outcome = typeof OUTCOMES[number]["v"];
+
+type ActualRow = {
+  id: string;
+  meal_plan_id: string;
+  actual_date: string;
+  meal_slot: Slot;
+  outcome: Outcome;
+  note: string | null;
+};
+
 function mondayOf(d: Date): Date {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
@@ -64,30 +103,51 @@ export function ClientMealPlannerPanel({
   clientId: string;
   readOnly?: boolean;
 }) {
+  const { session } = useAuth();
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
   const canEdit =
     !forcedReadOnly &&
     (org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin");
+  // Staff (any org member) may record daily actuals even in read-only-plan mode.
+  const canRecordActuals = !!org?.role;
   const qc = useQueryClient();
 
   const [weekStart, setWeekStart] = useState<Date>(mondayOf(new Date()));
   const weekISO = fmtISO(weekStart);
 
-  // Client dietary fields for the preferences/allergies section.
+  // Client dietary fields + needs_shopping_help toggle
   const clientQ = useQuery({
     enabled: !!clientId,
     queryKey: ["mp-client-diet", clientId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("dietary_needs, allergies")
+        .select("dietary_needs, allergies, needs_shopping_help")
         .eq("id", clientId)
         .maybeSingle();
       if (error) throw error;
-      return data;
+      return data as {
+        dietary_needs: string | null;
+        allergies: string[] | null;
+        needs_shopping_help: boolean | null;
+      } | null;
     },
   });
+  const needsHelp = !!clientQ.data?.needs_shopping_help;
+
+  const toggleNeedsHelp = useMutation({
+    mutationFn: async (v: boolean) => {
+      const { error } = await supabase
+        .from("clients")
+        .update({ needs_shopping_help: v })
+        .eq("id", clientId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["mp-client-diet", clientId] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
 
   // Nutrition config
   const cfgQ = useQuery({
@@ -281,6 +341,91 @@ export function ClientMealPlannerPanel({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Actuals (staff daily confirmation)
+  const actualsQ = useQuery({
+    enabled: !!planId,
+    queryKey: ["mp-actuals", planId],
+    queryFn: async (): Promise<ActualRow[]> => {
+      const { data, error } = await supabase
+        .from("client_meal_actuals")
+        .select("id, meal_plan_id, actual_date, meal_slot, outcome, note")
+        .eq("meal_plan_id", planId!);
+      if (error) throw error;
+      return (data ?? []) as ActualRow[];
+    },
+  });
+
+  const setActual = useMutation({
+    mutationFn: async (args: { date: string; slot: Slot; outcome: Outcome; note?: string | null }) => {
+      let pid = planId;
+      if (!pid) {
+        const created = await createPlan.mutateAsync();
+        pid = created.id;
+      }
+      const existing = (actualsQ.data ?? []).find(
+        (a) => a.actual_date === args.date && a.meal_slot === args.slot,
+      );
+      if (existing) {
+        const { error } = await supabase
+          .from("client_meal_actuals")
+          .update({
+            outcome: args.outcome,
+            note: args.note ?? existing.note,
+            confirmed_by: session?.user?.id ?? null,
+            confirmed_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("client_meal_actuals").insert({
+          meal_plan_id: pid,
+          actual_date: args.date,
+          meal_slot: args.slot,
+          outcome: args.outcome,
+          note: args.note ?? null,
+          confirmed_by: session?.user?.id ?? null,
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["mp-actuals", planId] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Drag-drop: reassign meal's day_of_week + meal_slot. Shopping list is untouched.
+  const moveMeal = useMutation({
+    mutationFn: async (args: { id: string; day: number; slot: Slot }) => {
+      const existing = (mealsQ.data ?? []).filter(
+        (m) => m.day_of_week === args.day && m.meal_slot === args.slot,
+      );
+      const { error } = await supabase
+        .from("client_meals")
+        .update({
+          day_of_week: args.day,
+          meal_slot: args.slot,
+          sort_order: existing.length,
+        })
+        .eq("id", args.id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["mp-meals", planId] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const handleDragEnd = (e: DragEndEvent) => {
+    if (!e.over || !canEdit) return;
+    const mealId = String(e.active.id);
+    const overId = String(e.over.id);
+    const m = /^cell:(\d+):(breakfast|lunch|dinner|snack)$/.exec(overId);
+    if (!m) return;
+    const day = Number(m[1]);
+    const slot = m[2] as Slot;
+    const src = (mealsQ.data ?? []).find((x) => x.id === mealId);
+    if (!src || (src.day_of_week === day && src.meal_slot === slot)) return;
+    moveMeal.mutate({ id: mealId, day, slot });
+  };
+
   const cfg = cfgQ.data ?? { id: "", nutrition_label: "Fat Grams", nutrition_unit: "g" };
   const meals = mealsQ.data ?? [];
   const cellMeals = (day: number, slot: Slot) =>
@@ -295,10 +440,15 @@ export function ClientMealPlannerPanel({
   return (
     <Card>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Utensils className="h-5 w-5 text-primary" />
           <CardTitle>Meal Planner</CardTitle>
           {!canEdit && <Badge variant="secondary">Read only</Badge>}
+          {needsHelp && (
+            <Badge className="gap-1 bg-amber-500 text-white hover:bg-amber-500">
+              <ShoppingCart className="h-3 w-3" /> Shopping help needed
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -358,7 +508,25 @@ export function ClientMealPlannerPanel({
           </div>
         </div>
 
-        {/* Weekly grid */}
+        {/* Needs-shopping-help toggle (manager-editable). When off, the planner
+            is still available but not foregrounded in staff view. */}
+        <div className="flex items-center justify-between rounded-md border bg-muted/20 p-3">
+          <div>
+            <div className="text-sm font-semibold">Client needs help with meals & shopping</div>
+            <div className="text-xs text-muted-foreground">
+              When on, the planner is highlighted for staff (typical for RHS / HHS support).
+              When off, it stays available but not foregrounded.
+            </div>
+          </div>
+          <Switch
+            checked={needsHelp}
+            disabled={!canEdit || toggleNeedsHelp.isPending}
+            onCheckedChange={(v) => toggleNeedsHelp.mutate(v)}
+          />
+        </div>
+
+        {/* Weekly grid — drag meal pills between cells (manager only) */}
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] border-separate border-spacing-0 text-sm">
             <thead>
@@ -392,28 +560,16 @@ export function ClientMealPlannerPanel({
                     const entries = cellMeals(i, slot);
                     return (
                       <td key={slot} className="border-b px-2 py-2">
-                        <div className="flex flex-col gap-1.5">
-                          {entries.map((m) => (
-                            <MealPill
-                              key={m.id}
-                              meal={m}
-                              unit={cfg.nutrition_unit}
-                              canEdit={canEdit}
-                              onChange={(patch) => updateMeal.mutate({ id: m.id, ...patch })}
-                              onDelete={() => deleteMeal.mutate(m.id)}
-                            />
-                          ))}
-                          {canEdit && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 justify-start px-2 text-xs text-muted-foreground"
-                              onClick={() => addMeal.mutate({ day: i, slot })}
-                            >
-                              <Plus className="mr-1 h-3 w-3" /> Add
-                            </Button>
-                          )}
-                        </div>
+                        <MealCell
+                          day={i}
+                          slot={slot}
+                          entries={entries}
+                          unit={cfg.nutrition_unit}
+                          canEdit={canEdit}
+                          onAdd={() => addMeal.mutate({ day: i, slot })}
+                          onChange={(id, patch) => updateMeal.mutate({ id, ...patch })}
+                          onDelete={(id) => deleteMeal.mutate(id)}
+                        />
                       </td>
                     );
                   })}
@@ -428,6 +584,20 @@ export function ClientMealPlannerPanel({
             </tbody>
           </table>
         </div>
+        </DndContext>
+
+        {/* Staff "what did they actually eat" — current day */}
+        {planId && canRecordActuals && (
+          <ActualsToday
+            planId={planId}
+            actuals={actualsQ.data ?? []}
+            meals={meals}
+            onSet={(slot, outcome, note) =>
+              setActual.mutate({ date: fmtISO(new Date()), slot, outcome, note })
+            }
+          />
+        )}
+
 
         {/* Food preferences & allergies */}
         <div className="grid gap-4 md:grid-cols-2">
@@ -556,12 +726,63 @@ export function ClientMealPlannerPanel({
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Pass 1: grid + per-cell CRUD + manual shopping list. Pass 2 will add drag-drop between
-          cells and a staff "what did they actually eat" confirmation. Pass 3 will add recipe
+          Managers: drag meal pills between cells to reschedule (shopping list is unchanged).
+          Staff: confirm what the client actually ate each day below. Pass 3 will add recipe
           scanning, auto-populated shopping list, and budget-fit checks.
         </p>
       </CardContent>
     </Card>
+  );
+}
+
+function MealCell({
+  day,
+  slot,
+  entries,
+  unit,
+  canEdit,
+  onAdd,
+  onChange,
+  onDelete,
+}: {
+  day: number;
+  slot: Slot;
+  entries: MealRow[];
+  unit: string;
+  canEdit: boolean;
+  onAdd: () => void;
+  onChange: (id: string, patch: Partial<MealRow>) => void;
+  onDelete: (id: string) => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `cell:${day}:${slot}` });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex min-h-[60px] flex-col gap-1.5 rounded-md p-1 transition-colors ${
+        isOver ? "bg-primary/10 ring-2 ring-primary/40" : ""
+      }`}
+    >
+      {entries.map((m) => (
+        <MealPill
+          key={m.id}
+          meal={m}
+          unit={unit}
+          canEdit={canEdit}
+          onChange={(patch) => onChange(m.id, patch)}
+          onDelete={() => onDelete(m.id)}
+        />
+      ))}
+      {canEdit && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 justify-start px-2 text-xs text-muted-foreground"
+          onClick={onAdd}
+        >
+          <Plus className="mr-1 h-3 w-3" /> Add
+        </Button>
+      )}
+    </div>
   );
 }
 
@@ -579,9 +800,33 @@ function MealPill({
   onDelete: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: meal.id,
+    disabled: !canEdit,
+  });
+  const style = transform
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 50 }
+    : undefined;
   return (
-    <div className="group rounded-md border bg-card p-1.5 shadow-sm">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`group rounded-md border bg-card p-1.5 shadow-sm ${
+        isDragging ? "opacity-60 ring-2 ring-primary" : ""
+      }`}
+    >
       <div className="flex items-start gap-1">
+        {canEdit && (
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            className="mt-1 cursor-grab touch-none rounded p-0.5 text-muted-foreground hover:bg-muted active:cursor-grabbing"
+            aria-label="Drag meal"
+          >
+            <GripVertical className="h-3 w-3" />
+          </button>
+        )}
         <Input
           defaultValue={meal.label}
           disabled={!canEdit}
@@ -632,6 +877,82 @@ function MealPill({
           }}
         />
       )}
+    </div>
+  );
+}
+
+function ActualsToday({
+  actuals,
+  meals,
+  onSet,
+}: {
+  planId: string;
+  actuals: ActualRow[];
+  meals: MealRow[];
+  onSet: (slot: Slot, outcome: Outcome, note: string | null) => void;
+}) {
+  const today = new Date();
+  const todayISO = fmtISO(today);
+  const dow = (today.getDay() + 6) % 7; // 0=Mon
+  const plannedFor = (slot: Slot) =>
+    meals.filter((m) => m.day_of_week === dow && m.meal_slot === slot);
+  const actualFor = (slot: Slot) =>
+    actuals.find((a) => a.actual_date === todayISO && a.meal_slot === slot);
+
+  return (
+    <div className="rounded-md border">
+      <div className="flex items-center justify-between border-b bg-muted/40 px-3 py-2">
+        <h4 className="text-sm font-semibold">
+          What did they actually eat? — {today.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
+        </h4>
+        <Badge variant="outline" className="text-[10px]">Staff confirmation</Badge>
+      </div>
+      <div className="divide-y">
+        {SLOTS.map((slot) => {
+          const planned = plannedFor(slot);
+          const actual = actualFor(slot);
+          return (
+            <div key={slot} className="grid grid-cols-1 gap-2 px-3 py-2 md:grid-cols-[120px_1fr_1fr_1.2fr]">
+              <div className="text-sm font-semibold capitalize">{slot}</div>
+              <div className="text-xs text-muted-foreground">
+                <div className="font-medium text-foreground">Planned</div>
+                {planned.length === 0 ? (
+                  <span>—</span>
+                ) : (
+                  planned.map((p) => p.label || "(unnamed)").join(", ")
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {OUTCOMES.map((o) => {
+                  const active = actual?.outcome === o.v;
+                  return (
+                    <Button
+                      key={o.v}
+                      size="sm"
+                      variant={active ? "default" : "outline"}
+                      className="h-7 text-xs"
+                      onClick={() => onSet(slot, o.v, actual?.note ?? null)}
+                    >
+                      {o.label}
+                    </Button>
+                  );
+                })}
+              </div>
+              <Input
+                defaultValue={actual?.note ?? ""}
+                placeholder="Note (e.g. swapped Tuesdays lunch, went to McDonalds)"
+                className="h-8 text-xs"
+                onBlur={(e) => {
+                  const note = e.target.value;
+                  if (note !== (actual?.note ?? "")) {
+                    onSet(slot, actual?.outcome ?? "ate_as_planned", note || null);
+                  }
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -264,7 +264,7 @@ function BudgetEditor({ budget, lines, canEdit, clientName }: { budget: Budget; 
       const nextOrder = Math.max(-1, ...draft.filter((l) => l.section === section).map((l) => l.sort_order)) + 1;
       const { error } = await supabase.from("client_budget_lines").insert({
         budget_id: budget.id, section, sort_order: nextOrder,
-        label: "", non_variable: 0, variable: 0, notes: null,
+        label: "", non_variable: 0, variable: 0, notes: null, day_of_month: null,
       });
       if (error) throw error;
     },

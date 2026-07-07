@@ -401,12 +401,8 @@ export function EmployeesPage() {
                 const needsReset = m.profile?.must_change_password;
                 const position = (m.profile?.position ?? "") as Position | "";
                 const startDate = (m.profile?.start_date ?? m.profile?.hire_date ?? null) as string | null;
-                const initials = (name || "—")
-                  .split(/\s+/)
-                  .filter(Boolean)
-                  .slice(0, 2)
-                  .map((p: string) => p[0]?.toUpperCase() ?? "")
-                  .join("") || "—";
+                // Roster avatar now uses <PersonAvatar>, which handles the
+                // initials fallback itself when photo_path is null.
                 const openProfile = () => {
                   window.location.href = `/dashboard/employees/${m.user_id}`;
                 };

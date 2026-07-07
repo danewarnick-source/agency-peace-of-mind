@@ -21,7 +21,7 @@
  * HHS / Direct Support glow is deliberately NOT wired yet — a later pass
  * extends scoring across container types and adds placement notes.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -67,6 +67,21 @@ import {
   type MoveLight,
   type MoveScore,
 } from "@/lib/rhs-board-scoring";
+import { NotesPopover } from "./notes-popover";
+import { getWhiteboardNoteCounts } from "@/lib/whiteboard-notes.functions";
+
+/** Board-wide context so pills can render the notes popover without prop-drilling. */
+type NotesCtx = {
+  organizationId: string | null;
+  canWrite: boolean;
+  countsByKey: Map<string, number>;
+};
+const NotesBoardContext = createContext<NotesCtx>({
+  organizationId: null,
+  canWrite: false,
+  countsByKey: new Map(),
+});
+const notesKey = (t: "client" | "staff", id: string) => `${t}:${id}`;
 
 /** Reserved container ids. */
 const POOL_CLIENTS = "pool:clients";
@@ -207,30 +222,40 @@ function ClientPillDraggable({
   if ("choking_risk" in client && client.choking_risk) tags.push("choking-risk");
   if ("controlled_med" in client && client.controlled_med) tags.push("controlled-meds");
   if ("med_count" in client && client.med_count > 0) tags.push(`${client.med_count} meds`);
+  const notesCtx = useContext(NotesBoardContext);
+  const label = `${client.first_name} ${("last_name" in client ? client.last_name : "") || ""}`.trim();
   return (
     <div
       ref={setNodeRef}
-      {...listeners}
-      {...attributes}
       className={`flex items-start gap-1.5 rounded-md border border-border bg-background px-2 py-1.5 text-xs shadow-sm ${
         canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed opacity-90"
       } ${isDragging ? "opacity-50" : ""}`}
     >
-      {canDrag && <GripVertical className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />}
-      <div className="min-w-0 flex-1">
-        <div className="truncate font-medium">
-          {client.first_name} {("last_name" in client ? client.last_name : "") || ""}
+      <div {...listeners} {...attributes} className="flex min-w-0 flex-1 items-start gap-1.5">
+        {canDrag && <GripVertical className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />}
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-medium">{label || "Client"}</div>
+          {tags.length > 0 && (
+            <div className="mt-0.5 flex flex-wrap gap-1">
+              {tags.map((t) => (
+                <span key={t} className="rounded bg-muted px-1 py-0 text-[9px] text-muted-foreground">
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
-        {tags.length > 0 && (
-          <div className="mt-0.5 flex flex-wrap gap-1">
-            {tags.map((t) => (
-              <span key={t} className="rounded bg-muted px-1 py-0 text-[9px] text-muted-foreground">
-                {t}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
+      {notesCtx.organizationId && (
+        <NotesPopover
+          organizationId={notesCtx.organizationId}
+          subjectType="client"
+          subjectId={client.id}
+          subjectLabel={label || "Client"}
+          canWrite={notesCtx.canWrite}
+          initialCount={notesCtx.countsByKey.get(notesKey("client", client.id)) ?? 0}
+        />
+      )}
     </div>
   );
 }
@@ -247,23 +272,34 @@ function StaffPillDraggable({
     id: dragId,
     disabled: !canDrag,
   });
+  const notesCtx = useContext(NotesBoardContext);
   return (
     <div
       ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      className={`flex items-center gap-1.5 rounded-full border border-border bg-background px-1 py-1 pr-2 text-xs shadow-sm ${
+      className={`flex items-center gap-1 rounded-full border border-border bg-background px-1 py-1 pr-1.5 text-xs shadow-sm ${
         canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed opacity-90"
       } ${isDragging ? "opacity-50" : ""}`}
       title={staff.position ?? undefined}
     >
-      <PersonAvatar
-        bucket="staff-photos"
-        path={staff.photo_path}
-        name={staff.full_name}
-        className="h-6 w-6 text-[10px] border"
-      />
-      <span className="truncate max-w-[110px] font-medium">{staff.full_name}</span>
+      <div {...listeners} {...attributes} className="flex items-center gap-1.5 min-w-0">
+        <PersonAvatar
+          bucket="staff-photos"
+          path={staff.photo_path}
+          name={staff.full_name}
+          className="h-6 w-6 text-[10px] border"
+        />
+        <span className="truncate max-w-[110px] font-medium">{staff.full_name}</span>
+      </div>
+      {notesCtx.organizationId && (
+        <NotesPopover
+          organizationId={notesCtx.organizationId}
+          subjectType="staff"
+          subjectId={staff.id}
+          subjectLabel={staff.full_name}
+          canWrite={notesCtx.canWrite}
+          initialCount={notesCtx.countsByKey.get(notesKey("staff", staff.id)) ?? 0}
+        />
+      )}
     </div>
   );
 }
@@ -508,6 +544,20 @@ export function WhiteboardPlanningBoard() {
     enabled: !!orgId,
   });
 
+  const notesCountsFn = useServerFn(getWhiteboardNoteCounts);
+  const notesCountsQ = useQuery({
+    queryKey: ["whiteboard-note-counts", orgId],
+    queryFn: () => notesCountsFn({ data: { organization_id: orgId! } }),
+    enabled: !!orgId,
+  });
+  const notesCtxValue = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of notesCountsQ.data ?? []) {
+      m.set(notesKey(r.subject_type, r.subject_id), r.count);
+    }
+    return { organizationId: orgId ?? null, canWrite: canDrag, countsByKey: m };
+  }, [notesCountsQ.data, orgId, canDrag]);
+
   const rhs = rhsQ.data;
   const wb = wbQ.data;
   const staff = staffQ.data;
@@ -670,6 +720,7 @@ export function WhiteboardPlanningBoard() {
     .filter((id) => (plan.staff[id] ?? POOL_STAFF) === POOL_STAFF);
 
   return (
+    <NotesBoardContext.Provider value={notesCtxValue}>
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="space-y-4">
         {/* Planning banner + controls */}
@@ -844,5 +895,6 @@ export function WhiteboardPlanningBoard() {
         </div>
       </div>
     </DndContext>
+    </NotesBoardContext.Provider>
   );
 }

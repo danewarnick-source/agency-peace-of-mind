@@ -697,6 +697,7 @@ function SubjectWizard({
         <PlacementLineup
           fields={servicesFields} targetFields={targetFields} matched={matched}
           decision={decision} subjectId={subjectId} tenant={tenant} onChanged={onChanged} showBilling
+          allowedTargetFields={Array.from(SERVICES_FIELDS_SET).filter((f) => f !== "billing_code_row")}
         />
       )}
       {step === "health" && (

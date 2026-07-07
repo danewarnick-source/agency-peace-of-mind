@@ -2247,6 +2247,7 @@ export type Database = {
         Row: {
           budget_id: string
           created_at: string
+          day_of_month: number | null
           id: string
           label: string
           non_variable: number
@@ -2259,6 +2260,7 @@ export type Database = {
         Insert: {
           budget_id: string
           created_at?: string
+          day_of_month?: number | null
           id?: string
           label?: string
           non_variable?: number
@@ -2271,6 +2273,7 @@ export type Database = {
         Update: {
           budget_id?: string
           created_at?: string
+          day_of_month?: number | null
           id?: string
           label?: string
           non_variable?: number

@@ -2965,7 +2965,7 @@ function ImportSummaryPanel({
                     <th className="px-1.5 py-1 font-medium">Provider</th>
                     <th className="px-1.5 py-1 font-medium">Status</th>
                     <th className="px-1.5 py-1 font-medium">Unit</th>
-                    <th className="px-1.5 py-1 text-right font-medium">Rate</th>
+                    <th className="px-1.5 py-1 text-right font-medium">Rate ($)</th>
                     <th className="px-1.5 py-1 text-right font-medium">Cap</th>
                     <th className="px-1.5 py-1 font-medium">Plan dates</th>
                   </tr>

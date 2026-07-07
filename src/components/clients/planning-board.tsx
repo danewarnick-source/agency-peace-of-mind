@@ -736,7 +736,14 @@ export function WhiteboardPlanningBoard() {
     setPlan((prev) => {
       const next: Plan = { clients: { ...prev.clients }, staff: { ...prev.staff } };
       if (parsed.kind === "client") {
-        if (!(dest.startsWith("rhs-home:") || dest.startsWith("hhs-host:") || dest === POOL_CLIENTS)) {
+        if (
+          !(
+            dest.startsWith("rhs-home:") ||
+            dest.startsWith("hhs-host:") ||
+            dest.startsWith("ds-slot:") ||
+            dest === POOL_CLIENTS
+          )
+        ) {
           return prev;
         }
         if (prev.clients[parsed.id] === dest) return prev;
@@ -747,6 +754,7 @@ export function WhiteboardPlanningBoard() {
             dest.startsWith("rhs-home:") ||
             dest.startsWith("hhs-host:") ||
             dest.startsWith("ds-client:") ||
+            dest.startsWith("ds-slot:") ||
             dest === POOL_STAFF
           )
         ) {

@@ -421,37 +421,36 @@ export function ChoreChartPanel({
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Sparkles className="h-4 w-4 text-primary" /> {space.name} — Chore Chart
-              <Badge variant="outline" className="ml-1 uppercase">{space.space_type}</Badge>
-            </CardTitle>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Post this chart so anyone in the home knows what to clean and when. Staff check off completed items each shift for inspection readiness.
-            </p>
+    <Card>
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            <CardTitle>{space.name} — Chore Chart</CardTitle>
+            <Badge variant="outline" className="uppercase">{space.space_type}</Badge>
+            {!canEdit && <Badge variant="secondary">Read only</Badge>}
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={preview} className="gap-1">
-              <Printer className="h-4 w-4" /> Preview
-            </Button>
-            <Button variant="outline" size="sm" onClick={download} className="gap-1">
-              <FileDown className="h-4 w-4" /> Download PDF
-            </Button>
-          </div>
-        </CardHeader>
-      </Card>
+          <p className="text-xs text-muted-foreground">
+            Post this chart so anyone in the home knows what to clean and when. Staff check off completed items each shift for inspection readiness.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={preview} className="gap-1">
+            <Printer className="h-4 w-4" /> Preview
+          </Button>
+          <Button variant="outline" size="sm" onClick={download} className="gap-1">
+            <FileDown className="h-4 w-4" /> Download PDF
+          </Button>
+        </div>
+      </CardHeader>
 
-      {/* Clients in this space */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Users className="h-4 w-4" /> Clients in this space · {clients.length}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <CardContent className="space-y-6">
+        {/* Clients in this space */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <h3 className="text-sm font-semibold">Clients in this space · {clients.length}</h3>
+          </div>
           {clients.length === 0 ? (
             <p className="text-sm italic text-muted-foreground">No clients linked yet.</p>
           ) : (
@@ -494,22 +493,23 @@ export function ChoreChartPanel({
               </Button>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </section>
 
-      {/* Task definition key */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <ClipboardList className="h-4 w-4" /> Task key — what each chore includes
-          </CardTitle>
-          {canEdit && (
-            <Button size="sm" variant="outline" onClick={() => { setEditDef(null); setDefEditorOpen(true); }} className="gap-1">
-              <Plus className="h-4 w-4" /> Add chore
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent>
+        <div className="border-t" />
+
+        {/* Task definition key */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-muted-foreground" />
+              <h3 className="text-sm font-semibold">Task key — what each chore includes</h3>
+            </div>
+            {canEdit && (
+              <Button size="sm" variant="outline" onClick={() => { setEditDef(null); setDefEditorOpen(true); }} className="gap-1">
+                <Plus className="h-4 w-4" /> Add chore
+              </Button>
+            )}
+          </div>
           {defs.length === 0 ? (
             <p className="text-sm italic text-muted-foreground">No chore definitions yet. Add "Kitchen/Dining Room", "Deep Clean Room", etc.</p>
           ) : (
@@ -530,17 +530,16 @@ export function ChoreChartPanel({
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </section>
 
-      {/* Client rotation grid */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Users className="h-4 w-4" /> Client rotation
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+        <div className="border-t" />
+
+        {/* Client rotation grid */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <h3 className="text-sm font-semibold">Client rotation</h3>
+          </div>
           {clients.length === 0 ? (
             <p className="text-sm italic text-muted-foreground">Add at least one client to build the rotation.</p>
           ) : (
@@ -602,35 +601,36 @@ export function ChoreChartPanel({
               </table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </section>
 
-      {/* Staff-shift grid */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Clock className="h-4 w-4" /> Staff-shift chart
-          </CardTitle>
-          {canEdit && (
-            <div className="flex gap-2">
-              <Input
-                placeholder="Shift label (e.g. Grave)"
-                value={newShiftLabel}
-                onChange={(e) => setNewShiftLabel(e.target.value)}
-                className="h-8 w-40"
-              />
-              <Button
-                size="sm"
-                disabled={!newShiftLabel.trim()}
-                onClick={() => addShiftRow.mutate(newShiftLabel.trim(), { onSuccess: () => setNewShiftLabel("") })}
-                className="gap-1"
-              >
-                <Plus className="h-4 w-4" /> Shift
-              </Button>
+        <div className="border-t" />
+
+        {/* Staff-shift grid */}
+        <section className="space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <h3 className="text-sm font-semibold">Staff-shift chart</h3>
             </div>
-          )}
-        </CardHeader>
-        <CardContent>
+            {canEdit && (
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Shift label (e.g. Grave)"
+                  value={newShiftLabel}
+                  onChange={(e) => setNewShiftLabel(e.target.value)}
+                  className="h-8 w-40"
+                />
+                <Button
+                  size="sm"
+                  disabled={!newShiftLabel.trim()}
+                  onClick={() => addShiftRow.mutate(newShiftLabel.trim(), { onSuccess: () => setNewShiftLabel("") })}
+                  className="gap-1"
+                >
+                  <Plus className="h-4 w-4" /> Shift
+                </Button>
+              </div>
+            )}
+          </div>
           {shiftRows.length === 0 ? (
             <p className="text-sm italic text-muted-foreground">Add shifts (Grave, Morning, Afternoon, Evening) with time ranges.</p>
           ) : (
@@ -728,8 +728,8 @@ export function ChoreChartPanel({
               </table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </section>
+      </CardContent>
 
       <DefEditorDialog
         open={defEditorOpen}
@@ -752,7 +752,7 @@ export function ChoreChartPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </Card>
   );
 }
 

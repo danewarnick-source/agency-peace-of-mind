@@ -16,7 +16,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Plus, Trash2, Sparkles, FileDown, Printer, ClipboardList, Users, Clock, Send, CheckCircle2,
+  Plus, Trash2, Sparkles, FileDown, Printer, ClipboardList, Users, Send, CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -90,29 +90,8 @@ type RotationCell = {
   is_free_day: boolean;
   note: string | null;
 };
-type ShiftRow = {
-  id: string;
-  label: string;
-  start_time: string | null;
-  end_time: string | null;
-  sort_order: number;
-};
-type ShiftCell = {
-  id: string;
-  shift_row_id: string;
-  day_of_week: number;
-  task_text: string;
-  helps_client_id: string | null;
-  definition_id: string | null;
-};
-
 function clientName(c: ClientLite) {
   return `${c.first_name} ${c.last_name}`.trim();
-}
-function fmtTimeRange(r: ShiftRow): string | null {
-  if (!r.start_time && !r.end_time) return null;
-  const f = (t: string | null) => (t ? t.slice(0, 5) : "?");
-  return `${f(r.start_time)} – ${f(r.end_time)}`;
 }
 
 export function ChoreChartPanel({
@@ -213,35 +192,6 @@ export function ChoreChartPanel({
   });
   const rotation = rotationQ.data ?? [];
 
-  const shiftRowsQ = useQuery({
-    enabled: !!spaceId,
-    queryKey: ["chore-shift-rows", spaceId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("chore_shift_rows")
-        .select("id, label, start_time, end_time, sort_order")
-        .eq("space_id", spaceId)
-        .order("sort_order");
-      if (error) throw error;
-      return (data ?? []) as ShiftRow[];
-    },
-  });
-  const shiftRows = shiftRowsQ.data ?? [];
-
-  const shiftCellsQ = useQuery({
-    enabled: !!spaceId,
-    queryKey: ["chore-shift-cells", spaceId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("chore_shift_assignments")
-        .select("id, shift_row_id, day_of_week, task_text, helps_client_id, definition_id")
-        .eq("space_id", spaceId);
-      if (error) throw error;
-      return (data ?? []) as ShiftCell[];
-    },
-  });
-  const shiftCells = shiftCellsQ.data ?? [];
-
   const dailyItemsQ = useQuery({
     enabled: !!spaceId,
     queryKey: ["chore-daily-items", spaceId],
@@ -261,8 +211,6 @@ export function ChoreChartPanel({
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["chore-defs", spaceId] });
     qc.invalidateQueries({ queryKey: ["chore-rotation", spaceId] });
-    qc.invalidateQueries({ queryKey: ["chore-shift-rows", spaceId] });
-    qc.invalidateQueries({ queryKey: ["chore-shift-cells", spaceId] });
     qc.invalidateQueries({ queryKey: ["chore-space-clients", spaceId] });
     qc.invalidateQueries({ queryKey: ["chore-daily-items", spaceId] });
   };
@@ -347,57 +295,6 @@ export function ChoreChartPanel({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const addShiftRow = useMutation({
-    mutationFn: async (label: string) => {
-      const { error } = await supabase.from("chore_shift_rows").insert({
-        space_id: spaceId,
-        label,
-        sort_order: shiftRows.length,
-      });
-      if (error) throw error;
-    },
-    onSuccess: invalidate,
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const updateShiftRow = useMutation({
-    mutationFn: async (v: Partial<ShiftRow> & { id: string }) => {
-      const { error } = await supabase
-        .from("chore_shift_rows")
-        .update(v)
-        .eq("id", v.id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["chore-shift-rows", spaceId] }),
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const deleteShiftRow = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("chore_shift_rows").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: invalidate,
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const upsertShiftCell = useMutation({
-    mutationFn: async (v: {
-      shift_row_id: string;
-      day_of_week: number;
-      task_text: string;
-      helps_client_id: string | null;
-      definition_id: string | null;
-    }) => {
-      const { error } = await supabase
-        .from("chore_shift_assignments")
-        .upsert(
-          { space_id: spaceId, ...v },
-          { onConflict: "space_id,shift_row_id,day_of_week" },
-        );
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["chore-shift-cells", spaceId] }),
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   const addDailyItem = useMutation({
     mutationFn: async (v: { label: string; detail: string | null }) => {
@@ -436,7 +333,7 @@ export function ChoreChartPanel({
 
   const [defEditorOpen, setDefEditorOpen] = useState(false);
   const [editDef, setEditDef] = useState<Def | null>(null);
-  const [newShiftLabel, setNewShiftLabel] = useState("");
+  
   const [pickClient, setPickClient] = useState("");
   const [newDailyLabel, setNewDailyLabel] = useState("");
   const [newDailyDetail, setNewDailyDetail] = useState("");
@@ -471,20 +368,6 @@ export function ChoreChartPanel({
           defs.find((d) => d.id === r.definition_id)?.chore_name ?? null,
         isFreeDay: r.is_free_day,
         note: r.note,
-      })),
-      shiftRows: shiftRows.map((r) => ({
-        id: r.id, label: r.label, timeRange: fmtTimeRange(r),
-      })),
-      shiftCells: shiftCells.map((c) => ({
-        shiftRowId: c.shift_row_id,
-        day: c.day_of_week,
-        taskText: c.task_text,
-        helpsClientName: (() => {
-          const h = clients.find((x) => x.id === c.helps_client_id);
-          return h ? clientName(h) : null;
-        })(),
-        definitionName:
-          defs.find((d) => d.id === c.definition_id)?.chore_name ?? null,
       })),
     };
     return renderChoreChartPdf(payload);
@@ -897,135 +780,6 @@ export function ChoreChartPanel({
           )}
         </section>
 
-        <div className="border-t" />
-
-        {/* Staff-shift grid */}
-        <section className="space-y-3">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <h3 className="text-sm font-semibold">Staff-shift chart</h3>
-            </div>
-            {canEdit && (
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Shift label (e.g. Grave)"
-                  value={newShiftLabel}
-                  onChange={(e) => setNewShiftLabel(e.target.value)}
-                  className="h-8 w-40"
-                />
-                <Button
-                  size="sm"
-                  disabled={!newShiftLabel.trim()}
-                  onClick={() => addShiftRow.mutate(newShiftLabel.trim(), { onSuccess: () => setNewShiftLabel("") })}
-                  className="gap-1"
-                >
-                  <Plus className="h-4 w-4" /> Shift
-                </Button>
-              </div>
-            )}
-          </div>
-          {shiftRows.length === 0 ? (
-            <p className="text-sm italic text-muted-foreground">Add shifts (Grave, Morning, Afternoon, Evening) with time ranges.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="p-2 text-left font-semibold w-44">Shift</th>
-                    {DAYS.map((d, i) => (
-                      <th key={d} className="p-2 text-left font-semibold text-muted-foreground">
-                        <div>{d}</div>
-                        <div className="text-[10px] font-normal">{dayDates[i]}</div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {shiftRows.map((row) => (
-                    <tr key={row.id} className="border-b align-top">
-                      <td className="p-2 space-y-1">
-                        {canEdit ? (
-                          <>
-                            <Input
-                              value={row.label}
-                              onChange={(e) => updateShiftRow.mutate({ id: row.id, label: e.target.value })}
-                              className="h-7 text-xs font-semibold"
-                            />
-                            <div className="flex gap-1">
-                              <Input
-                                type="time"
-                                value={row.start_time ?? ""}
-                                onChange={(e) => updateShiftRow.mutate({ id: row.id, start_time: e.target.value || null })}
-                                className="h-7 text-xs w-24"
-                              />
-                              <Input
-                                type="time"
-                                value={row.end_time ?? ""}
-                                onChange={(e) => updateShiftRow.mutate({ id: row.id, end_time: e.target.value || null })}
-                                className="h-7 text-xs w-24"
-                              />
-                            </div>
-                            <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-muted-foreground"
-                              onClick={() => { if (confirm(`Delete shift "${row.label}"?`)) deleteShiftRow.mutate(row.id); }}
-                            >
-                              Remove
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <div className="font-semibold">{row.label}</div>
-                            {fmtTimeRange(row) && (
-                              <div className="text-xs text-muted-foreground">{fmtTimeRange(row)}</div>
-                            )}
-                          </>
-                        )}
-                      </td>
-                      {[0, 1, 2, 3, 4, 5, 6].map((day) => {
-                        const cell = shiftCells.find((c) => c.shift_row_id === row.id && c.day_of_week === day) ?? {
-                          id: "",
-                          shift_row_id: row.id,
-                          day_of_week: day,
-                          task_text: "",
-                          helps_client_id: null,
-                          definition_id: null,
-                        };
-                        return (
-                          <td key={day} className="p-1 min-w-[150px]">
-                            {canEdit ? (
-                              <ShiftCellEditor
-                                cell={cell}
-                                clients={clients}
-                                defs={defs}
-                                onChange={(v) =>
-                                  upsertShiftCell.mutate({
-                                    shift_row_id: row.id,
-                                    day_of_week: day,
-                                    task_text: v.task_text,
-                                    helps_client_id: v.helps_client_id,
-                                    definition_id: v.definition_id,
-                                  })
-                                }
-                              />
-                            ) : (
-                              <div className="rounded bg-muted px-2 py-1 text-xs whitespace-pre-wrap">
-                                {[
-                                  cell.helps_client_id && `Help ${clientName(clients.find((c) => c.id === cell.helps_client_id) ?? { id: "", first_name: "?", last_name: "" })}`,
-                                  defs.find((d) => d.id === cell.definition_id)?.chore_name,
-                                  cell.task_text,
-                                ].filter(Boolean).join(" · ") || "—"}
-                              </div>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
       </CardContent>
 
       <DefEditorDialog
@@ -1053,71 +807,6 @@ export function ChoreChartPanel({
   );
 }
 
-function ShiftCellEditor({
-  cell, clients, defs, onChange,
-}: {
-  cell: {
-    task_text: string;
-    helps_client_id: string | null;
-    definition_id: string | null;
-  };
-  clients: ClientLite[];
-  defs: Def[];
-  onChange: (v: {
-    task_text: string;
-    helps_client_id: string | null;
-    definition_id: string | null;
-  }) => void;
-}) {
-  const [text, setText] = useState(cell.task_text);
-  const [helps, setHelps] = useState<string | null>(cell.helps_client_id);
-  const [defId, setDefId] = useState<string | null>(cell.definition_id);
-  return (
-    <div className="space-y-1">
-      <div className="flex gap-1">
-        <Select
-          value={helps ?? NONE_VALUE}
-          onValueChange={(v) => {
-            const nv = v === NONE_VALUE ? null : v;
-            setHelps(nv);
-            onChange({ task_text: text, helps_client_id: nv, definition_id: defId });
-          }}
-        >
-          <SelectTrigger className="h-7 flex-1 text-xs"><SelectValue placeholder="Help…" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE_VALUE}>— no helper —</SelectItem>
-            {clients.map((c) => (
-              <SelectItem key={c.id} value={c.id}>Help {clientName(c)}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={defId ?? NONE_VALUE}
-          onValueChange={(v) => {
-            const nv = v === NONE_VALUE ? null : v;
-            setDefId(nv);
-            onChange({ task_text: text, helps_client_id: helps, definition_id: nv });
-          }}
-        >
-          <SelectTrigger className="h-7 flex-1 text-xs"><SelectValue placeholder="Chore…" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE_VALUE}>— none —</SelectItem>
-            {defs.map((d) => (
-              <SelectItem key={d.id} value={d.id}>{d.chore_name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <Input
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={() => onChange({ task_text: text, helps_client_id: helps, definition_id: defId })}
-        placeholder="Task…"
-        className="h-7 text-xs"
-      />
-    </div>
-  );
-}
 
 function DefEditorDialog({
   open, onOpenChange, initial, onSave,

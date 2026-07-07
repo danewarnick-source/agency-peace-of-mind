@@ -1,0 +1,2 @@
+ALTER TABLE public.chore_completions DROP CONSTRAINT IF EXISTS chore_completions_source_check;
+ALTER TABLE public.chore_completions ADD CONSTRAINT chore_completions_source_check CHECK (source = ANY (ARRAY['rotation'::text, 'daily'::text]));

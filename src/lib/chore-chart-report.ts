@@ -40,13 +40,6 @@ function slug(s: string) {
       .replace(/^-+|-+$/g, "") || "space"
   );
 }
-function fmtTime(t: string | null) {
-  return t ? t.slice(0, 5) : "?";
-}
-function fmtRange(s: string | null, e: string | null) {
-  if (!s && !e) return null;
-  return `${fmtTime(s)} – ${fmtTime(e)}`;
-}
 
 export async function generateChoreChartReport(
   args: ChoreChartReportArgs,
@@ -65,7 +58,7 @@ export async function generateChoreChartReport(
 
   const orgName = await fetchOrgName(sb, space.organization_id);
 
-  const [linksRes, defsRes, rotRes, rowsRes, cellsRes, dailyRes] = await Promise.all([
+  const [linksRes, defsRes, rotRes, dailyRes] = await Promise.all([
     sb.from("chore_space_clients").select("client_id").eq("space_id", space.id),
     sb
       .from("chore_definitions")
@@ -75,15 +68,6 @@ export async function generateChoreChartReport(
     sb
       .from("chore_client_rotation")
       .select("client_id, day_of_week, definition_id, is_free_day, note")
-      .eq("space_id", space.id),
-    sb
-      .from("chore_shift_rows")
-      .select("id, label, start_time, end_time, sort_order")
-      .eq("space_id", space.id)
-      .order("sort_order"),
-    sb
-      .from("chore_shift_assignments")
-      .select("shift_row_id, day_of_week, task_text, helps_client_id, definition_id")
       .eq("space_id", space.id),
     sb
       .from("chore_daily_items")
@@ -146,29 +130,6 @@ export async function generateChoreChartReport(
       definitionName: r.definition_id ? defNameById.get(r.definition_id) ?? null : null,
       isFreeDay: r.is_free_day,
       note: r.note,
-    })),
-    shiftRows: ((rowsRes.data ?? []) as Array<{
-      id: string;
-      label: string;
-      start_time: string | null;
-      end_time: string | null;
-    }>).map((r) => ({
-      id: r.id,
-      label: r.label,
-      timeRange: fmtRange(r.start_time, r.end_time),
-    })),
-    shiftCells: ((cellsRes.data ?? []) as Array<{
-      shift_row_id: string;
-      day_of_week: number;
-      task_text: string;
-      helps_client_id: string | null;
-      definition_id: string | null;
-    }>).map((c) => ({
-      shiftRowId: c.shift_row_id,
-      day: c.day_of_week,
-      taskText: c.task_text,
-      helpsClientName: c.helps_client_id ? nameOf(c.helps_client_id) || null : null,
-      definitionName: c.definition_id ? defNameById.get(c.definition_id) ?? null : null,
     })),
   };
 

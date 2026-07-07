@@ -1,7 +1,8 @@
-// Staff daily checklist — surfaces today's chores (from client rotation +
-// staff-shift chart) for the space(s) tied to a client or team. Any org
-// member can check items off; managers see completions. Read-only for
-// non-editors otherwise.
+// Staff daily checklist — surfaces today's chores (client rotation +
+// every-day items) for the space(s) tied to a client or team. Driven by
+// whichever spaces the caller passes in; there is no separate staff-shift
+// chart. Staff supporting a client in a home see that home's chores here.
+// Any org member can check items off; managers see completions.
 
 import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -23,18 +24,15 @@ type RotationCell = {
   definition_id: string | null;
   is_free_day: boolean;
 };
-type ShiftRow = { id: string; label: string; sort_order: number };
-type ShiftCell = {
+type DailyItem = {
   id: string;
-  shift_row_id: string;
-  day_of_week: number;
-  task_text: string;
-  helps_client_id: string | null;
-  definition_id: string | null;
+  label: string;
+  detail: string | null;
+  sort_order: number;
 };
 type Completion = {
   id: string;
-  source: "rotation" | "shift";
+  source: "rotation" | "daily";
   source_id: string;
   completion_date: string;
 };
@@ -100,31 +98,17 @@ export function ChoreDailyChecklist({
     },
   });
 
-  const shiftRowsQ = useQuery({
+  const dailyItemsQ = useQuery({
     enabled,
-    queryKey: ["chore-cl-shiftrows", spaceIds],
+    queryKey: ["chore-cl-daily-items", spaceIds],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("chore_shift_rows")
-        .select("id, label, sort_order, space_id")
+        .from("chore_daily_items")
+        .select("id, label, detail, sort_order, space_id")
         .in("space_id", spaceIds)
         .order("sort_order");
       if (error) throw error;
-      return (data ?? []) as (ShiftRow & { space_id: string })[];
-    },
-  });
-
-  const shiftCellsQ = useQuery({
-    enabled,
-    queryKey: ["chore-cl-shiftcells", spaceIds, dow],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("chore_shift_assignments")
-        .select("id, space_id, shift_row_id, day_of_week, task_text, helps_client_id, definition_id")
-        .in("space_id", spaceIds)
-        .eq("day_of_week", dow);
-      if (error) throw error;
-      return (data ?? []) as (ShiftCell & { space_id: string })[];
+      return (data ?? []) as (DailyItem & { space_id: string })[];
     },
   });
 
@@ -163,7 +147,7 @@ export function ChoreDailyChecklist({
   });
 
   const toggle = useMutation({
-    mutationFn: async (v: { source: "rotation" | "shift"; source_id: string; space_id: string; on: boolean }) => {
+    mutationFn: async (v: { source: "rotation" | "daily"; source_id: string; space_id: string; on: boolean }) => {
       if (v.on) {
         const { error } = await supabase.from("chore_completions").insert({
           space_id: v.space_id,
@@ -192,12 +176,11 @@ export function ChoreDailyChecklist({
   const spaces = spacesQ.data ?? [];
   const defs = defsQ.data ?? [];
   const rotation = rotationQ.data ?? [];
-  const shiftRows = shiftRowsQ.data ?? [];
-  const shiftCells = shiftCellsQ.data ?? [];
+  const dailyItems = dailyItemsQ.data ?? [];
   const clients = clientsQ.data ?? [];
   const completions = completionsQ.data ?? [];
 
-  const isDone = (source: "rotation" | "shift", id: string) =>
+  const isDone = (source: "rotation" | "daily", id: string) =>
     completions.some((c) => c.source === source && c.source_id === id);
 
   const defName = (id: string | null) => defs.find((d) => d.id === id)?.chore_name ?? null;
@@ -207,8 +190,7 @@ export function ChoreDailyChecklist({
   };
 
   const totalItems =
-    rotation.filter((r) => !r.is_free_day && (r.definition_id || false)).length +
-    shiftCells.filter((c) => c.definition_id || c.task_text || c.helps_client_id).length;
+    rotation.filter((r) => !r.is_free_day && r.definition_id).length + dailyItems.length;
   const doneItems = completions.length;
 
   return (
@@ -224,11 +206,8 @@ export function ChoreDailyChecklist({
       <CardContent className="space-y-5">
         {spaces.map((sp) => {
           const spRot = rotation.filter((r) => r.space_id === sp.id);
-          const spShiftRows = shiftRows.filter((r) => r.space_id === sp.id);
-          const spShiftCells = shiftCells.filter((c) => c.space_id === sp.id);
-
-          const nothing =
-            spRot.length === 0 && spShiftCells.length === 0;
+          const spDaily = dailyItems.filter((d) => d.space_id === sp.id);
+          const nothing = spRot.length === 0 && spDaily.length === 0;
 
           return (
             <div key={sp.id} className="space-y-3">
@@ -239,6 +218,33 @@ export function ChoreDailyChecklist({
 
               {nothing && (
                 <p className="text-xs italic text-muted-foreground">No chores scheduled for today.</p>
+              )}
+
+              {spDaily.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold text-muted-foreground uppercase mb-1">Every day</div>
+                  <div className="divide-y rounded border">
+                    {spDaily.map((d) => {
+                      const done = isDone("daily", d.id);
+                      return (
+                        <label key={d.id} className="flex items-start gap-2 p-2 cursor-pointer">
+                          <Checkbox
+                            checked={done}
+                            onCheckedChange={(v) =>
+                              toggle.mutate({ source: "daily", source_id: d.id, space_id: sp.id, on: !!v })
+                            }
+                          />
+                          <div className="flex-1">
+                            <div className={`text-sm ${done ? "line-through text-muted-foreground" : ""}`}>{d.label}</div>
+                            {d.detail && (
+                              <div className="text-xs text-muted-foreground">{d.detail}</div>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
 
               {spRot.length > 0 && (
@@ -268,47 +274,6 @@ export function ChoreDailyChecklist({
                           </div>
                         </label>
                       );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {spShiftRows.length > 0 && spShiftCells.length > 0 && (
-                <div>
-                  <div className="text-xs font-semibold text-muted-foreground uppercase mb-1">Shift tasks</div>
-                  <div className="divide-y rounded border">
-                    {spShiftRows.map((sr) => {
-                      const cells = spShiftCells.filter((c) => c.shift_row_id === sr.id);
-                      if (cells.length === 0) return null;
-                      return cells.map((c) => {
-                        const parts = [
-                          c.helps_client_id ? `Help ${clientName(c.helps_client_id)}` : null,
-                          defName(c.definition_id),
-                          c.task_text || null,
-                        ].filter(Boolean);
-                        if (parts.length === 0) return null;
-                        const done = isDone("shift", c.id);
-                        const detail =
-                          c.definition_id && defs.find((d) => d.id === c.definition_id)?.task_list;
-                        return (
-                          <label key={c.id} className="flex items-start gap-2 p-2 cursor-pointer">
-                            <Checkbox
-                              checked={done}
-                              onCheckedChange={(v) =>
-                                toggle.mutate({ source: "shift", source_id: c.id, space_id: sp.id, on: !!v })
-                              }
-                            />
-                            <div className="flex-1">
-                              <div className={`text-sm ${done ? "line-through text-muted-foreground" : ""}`}>
-                                <span className="font-semibold">{sr.label}:</span> {parts.join(" · ")}
-                              </div>
-                              {detail && (
-                                <div className="text-xs text-muted-foreground">{detail}</div>
-                              )}
-                            </div>
-                          </label>
-                        );
-                      });
                     })}
                   </div>
                 </div>

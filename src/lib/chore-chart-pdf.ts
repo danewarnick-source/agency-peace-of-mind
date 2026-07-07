@@ -1,6 +1,6 @@
 // Chore-chart printable PDF. pdf-lib (Worker-safe). Renders the physical
-// chart providers post in the home: task-definition key + client rotation
-// grid + staff-shift grid. Reads only literal values passed in — never
+// chart providers post in the home: task-definition key + every-day chores
+// + client rotation grid. Reads only literal values passed in — never
 // fabricates.
 
 import { PDFDocument, StandardFonts, rgb, PDFPage, PDFFont } from "pdf-lib";
@@ -13,18 +13,6 @@ export type ChoreClientCell = {
   isFreeDay: boolean;
   note: string | null;
 };
-export type ChoreShiftCell = {
-  shiftRowId: string;
-  day: number;
-  taskText: string;
-  helpsClientName: string | null;
-  definitionName: string | null;
-};
-export type ChoreShiftRow = {
-  id: string;
-  label: string;
-  timeRange: string | null; // e.g. "11p – 7a"
-};
 export type ChoreClient = { id: string; name: string };
 export type ChoreDailyItem = { label: string; detail: string | null };
 
@@ -35,8 +23,6 @@ export type ChoreChartPdfPayload = {
   clients: ChoreClient[];
   definitions: ChoreDef[];
   clientCells: ChoreClientCell[];
-  shiftRows: ChoreShiftRow[];
-  shiftCells: ChoreShiftCell[];
   /** Chores every client does every day (personal hygiene, beds, hamper, etc). */
   dailyItems?: ChoreDailyItem[];
   /** ISO date (YYYY-MM-DD) of the Monday that anchors this chart's week. */
@@ -353,20 +339,8 @@ export async function renderChoreChartPdf(p: ChoreChartPdfPayload): Promise<Uint
     },
   );
 
-  drawGrid(
-    "STAFF-SHIFT CHART",
-    p.shiftRows.map((r) => ({ key: r.id, label: r.label, sub: r.timeRange })),
-    (rowKey, day) => {
-      const cell = p.shiftCells.find((c) => c.shiftRowId === rowKey && c.day === day);
-      if (!cell) return { text: "—", sub: null, isFree: false };
-      const parts: string[] = [];
-      if (cell.helpsClientName) parts.push(`Help ${cell.helpsClientName}`);
-      if (cell.definitionName) parts.push(cell.definitionName);
-      if (cell.taskText) parts.push(cell.taskText);
-      const text = parts.length ? parts.join(" · ") : "—";
-      return { text, sub: null, isFree: false };
-    },
-  );
+
+
 
   // Footer page numbers
   const pageCount = pdf.getPageCount();

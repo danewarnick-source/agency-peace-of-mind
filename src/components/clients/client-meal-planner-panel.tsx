@@ -483,7 +483,7 @@ export function ClientMealPlannerPanel({
   });
 
   const saveCfg = useMutation({
-    mutationFn: async (patch: { nutrition_label: string; nutrition_unit: string }) => {
+    mutationFn: async (patch: Partial<NutritionCfg>) => {
       if (!orgId) throw new Error("No organization");
       if (cfgQ.data?.id) {
         const { error } = await supabase
@@ -495,6 +495,8 @@ export function ClientMealPlannerPanel({
         const { error } = await supabase.from("client_nutrition_config").insert({
           organization_id: orgId,
           client_id: clientId,
+          nutrition_label: "Fat Grams",
+          nutrition_unit: "g",
           ...patch,
         });
         if (error) throw error;

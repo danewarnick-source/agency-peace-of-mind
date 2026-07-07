@@ -772,7 +772,7 @@ export function ClientMealPlannerPanel({
                           day={i}
                           slot={slot}
                           entries={entries}
-                          unit={cfg.nutrition_unit}
+                          cfg={cfg}
                           canEdit={canEdit}
                           orgId={orgId ?? ""}
                           clientId={clientId}
@@ -784,11 +784,8 @@ export function ClientMealPlannerPanel({
                       </td>
                     );
                   })}
-                  <td className="border-b px-3 py-2 text-right text-sm font-semibold tabular-nums">
-                    {dayTotal(i).toLocaleString(undefined, { maximumFractionDigits: 1 })}{" "}
-                    <span className="text-xs font-normal text-muted-foreground">
-                      {cfg.nutrition_unit}
-                    </span>
+                  <td className="border-b px-3 py-2 text-right align-top">
+                    <DayTotalsCell totals={dayTotals(i)} cfg={cfg} />
                   </td>
                 </tr>
               ))}

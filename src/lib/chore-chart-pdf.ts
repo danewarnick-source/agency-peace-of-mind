@@ -13,7 +13,21 @@ export type ChoreClientCell = {
   isFreeDay: boolean;
   note: string | null;
 };
-export type ChoreClient = { id: string; name: string };
+export type ChoreOutcomeTotals = {
+  completed: number;
+  completed_with_support: number;
+  offered_declined: number;
+  not_addressed: number;
+};
+export type ChoreClient = {
+  id: string;
+  name: string;
+  /** When populated, activation reason for this client's chore tracking. */
+  supportReason?: "pcsp_goal" | "intake_need" | "manual" | null;
+  supportNote?: string | null;
+  /** Optional per-client outcome tallies for the week covered by weekStartISO. */
+  outcomes?: ChoreOutcomeTotals | null;
+};
 export type ChoreDailyItem = { label: string; detail: string | null };
 
 export type ChoreChartPdfPayload = {
@@ -27,7 +41,10 @@ export type ChoreChartPdfPayload = {
   dailyItems?: ChoreDailyItem[];
   /** ISO date (YYYY-MM-DD) of the Monday that anchors this chart's week. */
   weekStartISO?: string;
+  /** Space-wide outcome tallies for the week (from chore_completions). */
+  weeklyOutcomeTotals?: ChoreOutcomeTotals | null;
 };
+
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const PAGE_W = 792; // landscape US Letter

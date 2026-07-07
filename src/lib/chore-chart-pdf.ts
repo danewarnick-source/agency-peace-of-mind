@@ -141,9 +141,18 @@ export async function renderChoreChartPdf(p: ChoreChartPdfPayload): Promise<Uint
   };
 
   // Header
+  const weekRange = p.weekStartISO ? formatWeekRange(p.weekStartISO) : null;
+  const dateLabels = dayDateLabels(p.weekStartISO);
   drawText(page, p.orgName || "Organization", MARGIN, y - 12, { font: bold, size: 10, color: C.muted });
   drawText(page, `Cleaning Chart — ${p.spaceName}`, MARGIN, y - 30, { font: bold, size: 18, color: C.ink });
-  drawText(page, p.spaceType.toUpperCase(), MARGIN, y - 46, { font, size: 9, color: C.muted });
+  const typeLabel = p.spaceType.toUpperCase();
+  drawText(page, typeLabel, MARGIN, y - 46, { font, size: 9, color: C.muted });
+  if (weekRange) {
+    const typeW = font.widthOfTextAtSize(typeLabel, 9);
+    drawText(page, `  ·  ${weekRange}`, MARGIN + typeW, y - 46, {
+      font: bold, size: 9, color: C.ink,
+    });
+  }
   const today = new Date().toLocaleDateString();
   const todayW = font.widthOfTextAtSize(today, 9);
   drawText(page, today, PAGE_W - MARGIN - todayW, y - 12, { font, size: 9, color: C.muted });

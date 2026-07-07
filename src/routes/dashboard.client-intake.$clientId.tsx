@@ -188,9 +188,13 @@ function IntakeRunner() {
           )}
         </CardContent>
       </Card>
+
+      <ClientPhotoCard clientId={clientId} />
+      <FaceSheetInfoCard clientId={clientId} />
     </div>
   );
 }
+
 
 function IntakeFormRow({
   form,

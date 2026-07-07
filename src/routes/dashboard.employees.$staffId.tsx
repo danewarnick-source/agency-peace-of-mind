@@ -267,6 +267,10 @@ function StaffProfilePage() {
         <TabsContent value="profile" className="mt-4">
           <div className="grid gap-4 lg:grid-cols-2">
 
+            {/* Card 0 — Photo */}
+            <StaffPhotoCard orgId={orgId} staffId={staffId} name={name} />
+
+
             {/* Card 1 — Contact & Position */}
             <ContactCard
               orgId={orgId}

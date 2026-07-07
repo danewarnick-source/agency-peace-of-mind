@@ -36,6 +36,7 @@ import { ClientMealPlannerMount } from "@/components/clients/client-meal-planner
 import { ChoreChartForClient } from "@/components/chores/chore-chart-mount";
 import { PcspTab } from "@/components/clients/pcsp-tab";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
+import { CareSection, CareGroup } from "@/components/clients/care-section";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
 import { FaceSheetButton } from "@/components/clients/face-sheet-button";
 import { SectionsView, ClientSpecificTrainingCard, GoalsEditor, PublishConfirmDialog } from "@/components/clients/client-specific-training-card";

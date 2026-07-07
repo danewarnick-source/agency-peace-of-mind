@@ -225,8 +225,8 @@ function SettingsPage() {
             <div className="flex items-start gap-4">
               <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary"><BookOpenCheck className="h-5 w-5" /></div>
               <div>
-                <h2 className="text-base font-semibold">Service Code Registry</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Read-only reference for every service code — EVV mandate, rate source, default rate, summary cadence, daily/weekly caps, and overnight (asleep) billability — grouped by category.</p>
+                <h2 className="text-base font-semibold">Service codes</h2>
+                <p className="mt-1 text-sm text-muted-foreground">One place for every code. <strong>Reference</strong> shows read-only regulatory data (EVV, rates, cadence, caps). <strong>Configuration</strong> is the editable scheduling/billing catalog the scheduler and billing engine read from.</p>
               </div>
             </div>
             <ArrowRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />
@@ -234,20 +234,6 @@ function SettingsPage() {
         </Link>
       )}
 
-      {(org?.role === "admin" || org?.role === "super_admin") && (
-        <Link to="/dashboard/settings/service-catalog" className="group lg:col-span-2">
-          <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition hover:border-primary/40 hover:bg-accent/30">
-            <div className="flex items-start gap-4">
-              <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary"><ListChecks className="h-5 w-5" /></div>
-              <div>
-                <h2 className="text-base font-semibold">Service Catalog</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Edit scheduling and billing attributes for every service code your agency uses — category, scheduling behavior, EVV/schedule/carve-out flags, and unit. The scheduler and billing engine read from here.</p>
-              </div>
-            </div>
-            <ArrowRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />
-          </div>
-        </Link>
-      )}
 
       {(org?.role === "admin" || org?.role === "super_admin") && (
         <Link to="/dashboard/settings/subscription" className="group lg:col-span-2">

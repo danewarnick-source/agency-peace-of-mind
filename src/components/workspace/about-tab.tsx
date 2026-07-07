@@ -110,6 +110,9 @@ export function AboutTab({ client }: { client: CaseloadClient }) {
 
       {/* Face Sheet Info — backs every field on the printable Client Face Sheet */}
       <div className="md:col-span-2">
+        <ClientPhotoCard clientId={client.id} />
+      </div>
+      <div className="md:col-span-2">
         <FaceSheetInfoCard clientId={client.id} />
       </div>
     </div>

@@ -427,13 +427,55 @@ async function commitClient(
     });
   };
 
+  // Resilient writer: PostgREST rejects the whole payload if any key is
+  // unknown to its schema cache. Strip unknown columns and retry so a
+  // stray extractor field never blocks completing a client setup.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const insertClient = async (payload: Record<string, any>): Promise<{ id: string }> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let p: Record<string, any> = { ...payload };
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const { data: row, error } = await sb.from("clients").insert(p).select("id").single();
+      if (!error && row) return row;
+      const msg = error?.message ?? "unknown";
+      const m = msg.match(/Could not find the '([^']+)' column/);
+      if (m && m[1] in p) {
+        const stripped = m[1];
+        delete p[stripped];
+        await audit(sb, jobId, orgId, subj.id, `Skipped unknown column on clients: ${stripped}`, "admin_override", userId, "skipped_unknown_column");
+        continue;
+      }
+      throw new Error(`clients insert: ${msg}`);
+    }
+    throw new Error(`clients insert: too many unknown columns`);
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updateClient = async (id: string, payload: Record<string, any>): Promise<void> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let p: Record<string, any> = { ...payload };
+    for (let attempt = 0; attempt < 8; attempt++) {
+      if (Object.keys(p).length === 0) return;
+      const { error } = await sb.from("clients").update(p).eq("id", id).eq("organization_id", orgId);
+      if (!error) return;
+      const msg = error.message ?? "unknown";
+      const m = msg.match(/Could not find the '([^']+)' column/);
+      if (m && m[1] in p) {
+        const stripped = m[1];
+        delete p[stripped];
+        await audit(sb, jobId, orgId, subj.id, `Skipped unknown column on clients: ${stripped}`, "admin_override", userId, "skipped_unknown_column");
+        continue;
+      }
+      throw new Error(`clients update: ${msg}`);
+    }
+    throw new Error(`clients update: too many unknown columns`);
+  };
+
   let recordId: string;
   if (subj.matched_record_id && subj.review_decision === "update") {
     recordId = subj.matched_record_id;
     if (Object.keys(mapped).length > 0) {
       normalize(mapped, false);
-      const { error } = await sb.from("clients").update(mapped).eq("id", recordId).eq("organization_id", orgId);
-      if (error) throw new Error(`clients update: ${error.message}`);
+      await updateClient(recordId, mapped);
     }
     await audit(sb, jobId, orgId, subj.id, `Updated existing client (${Object.keys(mapped).length} fields)`, "admin_override", userId, "update_client");
   } else {
@@ -448,11 +490,11 @@ async function commitClient(
     mapped.organization_id = orgId;
     mapped.account_status = "active";
     mapped.intake_status = "pending";
-    const { data: row, error } = await sb.from("clients").insert(mapped).select("id").single();
-    if (error || !row) throw new Error(`clients insert: ${error?.message ?? "unknown"}`);
+    const row = await insertClient(mapped);
     recordId = row.id;
     await audit(sb, jobId, orgId, subj.id, "Created new client", "source", userId, "create_client");
   }
+
 
 
   // Provenance rows for each core field

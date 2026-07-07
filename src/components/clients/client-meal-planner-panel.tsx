@@ -454,6 +454,15 @@ export function ClientMealPlannerPanel({
     meals.filter((m) => m.day_of_week === day && m.meal_slot === slot);
   const dayTotal = (day: number) =>
     meals.filter((m) => m.day_of_week === day).reduce((s, m) => s + (m.nutrition_value ?? 0), 0);
+  const plannedCostTotal = useMemo(
+    () => meals.reduce((s, m) => s + (Number(m.estimated_cost) || 0), 0),
+    [meals],
+  );
+  const recipeIdsInPlan = useMemo(
+    () => Array.from(new Set(meals.map((m) => m.recipe_id).filter((x): x is string => !!x))),
+    [meals],
+  );
+  const shopLibQ = useShoppingLibrary(orgId);
   const weekLabel = useMemo(() => {
     const end = addDays(weekStart, 6);
     return `${shortDate(weekStart)} – ${shortDate(end)}, ${end.getFullYear()}`;

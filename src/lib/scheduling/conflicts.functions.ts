@@ -115,17 +115,14 @@ export const evaluateRange = createServerFn({ method: "POST" })
     const clientIds = Array.from(new Set(shiftRows.map(s => s.client_id)));
     const serviceCodes = Array.from(new Set(shiftRows.map(s => (s.service_code ?? "").toUpperCase()).filter(Boolean)));
 
-    // service code → required cert keys (DHHS91172 minimums)
-    const SERVICE_CODE_REQUIRED_CERTS: Record<string, string[]> = {
-      HHS: ["cpr-fa", "abuse-neglect"],
-      SLH: ["cpr-fa", "abuse-neglect"],
-      SLN: ["cpr-fa", "abuse-neglect"],
-      RHS: ["cpr-fa", "abuse-neglect"],
-      DSI: ["cpr-fa"],
-      SEI: ["cpr-fa"],
-      CMP: ["cpr-fa"],
-      CMS: ["cpr-fa"],
-    };
+    // Required qualifications per service code — resolved from confirmed
+    // staff_prerequisite rules, with the legacy hardcoded map as fallback
+    // for any code that has no confirmed rule yet (resolver logs a warning).
+    const { perCode: requiredByCode } = await resolveRequiredQualsForCodes(
+      supabase,
+      data.organizationId,
+      serviceCodes,
+    );
 
     const staffCtx: ConflictContext["staff"] = {};
     if (staffIds.length) {
@@ -142,35 +139,31 @@ export const evaluateRange = createServerFn({ method: "POST" })
         (profs ?? []).map((p: any) => [p.id as string, (p.date_of_birth ?? null) as string | null]),
       );
 
-      // active external certs per staff (approved and not expired)
+      // Bulk-load namespaced qualifications per staff (external_cert /
+      // baseline_training / hive_course / client_specific_training) — matches
+      // the kinds expressed in staff_prerequisite rule_definitions.
       const nowIso = new Date().toISOString();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: activeCerts } = await (supabase as any)
-        .from("external_certifications")
-        .select("user_id, cert_type, expires_at")
-        .in("user_id", staffIds)
-        .eq("status", "approved");
-      const activeCertsByStaff = new Map<string, Set<string>>();
-      for (const c of (activeCerts ?? []) as Array<{ user_id: string; cert_type: string; expires_at: string | null }>) {
-        if (c.expires_at && c.expires_at < nowIso) continue; // expired
-        const set = activeCertsByStaff.get(c.user_id) ?? new Set<string>();
-        set.add(c.cert_type);
-        activeCertsByStaff.set(c.user_id, set);
-      }
+      const qualsByStaff = await loadStaffQualsBulk(
+        supabase,
+        data.organizationId,
+        staffIds,
+        nowIso,
+      );
 
-      // compute expiredCertCodes: service codes where a required cert is missing/expired
+      // compute expiredCertCodes: service codes where a required qualification is missing/expired
       const expiredCertCodesByStaff = new Map<string, string[]>();
       for (const staffId of staffIds) {
-        const staffCerts = activeCertsByStaff.get(staffId) ?? new Set<string>();
+        const held = qualsByStaff.get(staffId) ?? new Set<string>();
         const missingCodes: string[] = [];
         for (const code of serviceCodes) {
-          const required = SERVICE_CODE_REQUIRED_CERTS[code] ?? [];
-          if (required.some(k => !staffCerts.has(k))) {
+          const required = requiredByCode.get(code) ?? [];
+          if (required.length && required.some((q) => !held.has(q.nsKey))) {
             missingCodes.push(code);
           }
         }
         if (missingCodes.length) expiredCertCodesByStaff.set(staffId, missingCodes);
       }
+
 
       // client-specific training gaps per staff
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

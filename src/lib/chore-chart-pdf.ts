@@ -204,18 +204,31 @@ export async function renderChoreChartPdf(p: ChoreChartPdfPayload): Promise<Uint
     if (y - 60 < MARGIN + 20) newPage();
     page.drawRectangle({ x: MARGIN, y: y - 18, width: CONTENT_W, height: 18, color: C.band });
     drawText(page, title, MARGIN + 8, y - 13, { font: bold, size: 9, color: C.bandText });
+    if (weekRange) {
+      const wrW = font.widthOfTextAtSize(weekRange, 8.5);
+      drawText(page, weekRange, MARGIN + CONTENT_W - 8 - wrW, y - 13, {
+        font: bold, size: 8.5, color: C.bandText,
+      });
+    }
     y -= 22;
 
     const labelColW = 120;
     const dayColW = (CONTENT_W - labelColW) / 7;
-    // Header row
-    drawText(page, "", MARGIN + 4, y - 10, { font, size: 8 });
+    const hasDates = dateLabels.some((d) => d !== null);
+    const headerH = hasDates ? 24 : 14;
+    // Header row (weekday + optional date)
     DAYS.forEach((d, i) => {
       drawText(page, d, MARGIN + labelColW + i * dayColW + 6, y - 10, {
         font: bold, size: 8.5, color: C.muted,
       });
+      const dl = dateLabels[i];
+      if (dl) {
+        drawText(page, dl, MARGIN + labelColW + i * dayColW + 6, y - 20, {
+          font, size: 7.5, color: C.muted,
+        });
+      }
     });
-    y -= 14;
+    y -= headerH;
     page.drawLine({
       start: { x: MARGIN, y }, end: { x: MARGIN + CONTENT_W, y },
       color: C.rule, thickness: 0.5,

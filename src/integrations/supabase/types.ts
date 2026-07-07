@@ -2243,6 +2243,101 @@ export type Database = {
           },
         ]
       }
+      client_budget_lines: {
+        Row: {
+          budget_id: string
+          created_at: string
+          id: string
+          label: string
+          non_variable: number
+          notes: string | null
+          section: string
+          sort_order: number
+          updated_at: string
+          variable: number
+        }
+        Insert: {
+          budget_id: string
+          created_at?: string
+          id?: string
+          label?: string
+          non_variable?: number
+          notes?: string | null
+          section: string
+          sort_order?: number
+          updated_at?: string
+          variable?: number
+        }
+        Update: {
+          budget_id?: string
+          created_at?: string
+          id?: string
+          label?: string
+          non_variable?: number
+          notes?: string | null
+          section?: string
+          sort_order?: number
+          updated_at?: string
+          variable?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_budget_lines_budget_id_fkey"
+            columns: ["budget_id"]
+            isOneToOne: false
+            referencedRelation: "client_budgets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_budgets: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          details: string | null
+          id: string
+          organization_id: string
+          period_month: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          details?: string | null
+          id?: string
+          organization_id: string
+          period_month: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          details?: string | null
+          id?: string
+          organization_id?: string
+          period_month?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_budgets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_budgets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_discharges: {
         Row: {
           additional_notes: string | null

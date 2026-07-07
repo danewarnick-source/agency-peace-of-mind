@@ -40,6 +40,7 @@ import { ClientSpendingShiftPanel } from "@/components/staff-mobile/client-spend
 import { useActiveShift } from "@/hooks/use-active-shift";
 import { useTodayShifts } from "@/hooks/use-today-shifts";
 import { ClientPhoto } from "@/components/client-photo";
+import { FaceSheetButton } from "@/components/clients/face-sheet-button";
 import { useClientFeature, clientFeatureVisible } from "@/lib/client-features";
 
 function ActiveShiftReimbursementSlot({ clientId }: { clientId: string }) {
@@ -211,18 +212,21 @@ function ClientWorkspace() {
                 <h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight">
                   {client.first_name} {client.last_name}
                 </h1>
-                <ClientQuickInfoSheet
-                  client={client}
-                  trigger={
-                    <button
-                      type="button"
-                      aria-label="Open quick info"
-                      className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-border bg-background px-3 text-xs font-semibold text-foreground transition hover:border-[color:var(--amber-600,#f59324)]/60 hover:text-[color:var(--amber-700,#d97a1c)] active:scale-[0.97]"
-                    >
-                      <Info className="h-3.5 w-3.5" /> Info
-                    </button>
-                  }
-                />
+                <div className="flex shrink-0 items-center gap-2">
+                  <FaceSheetButton clientId={client.id} />
+                  <ClientQuickInfoSheet
+                    client={client}
+                    trigger={
+                      <button
+                        type="button"
+                        aria-label="Open quick info"
+                        className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-border bg-background px-3 text-xs font-semibold text-foreground transition hover:border-[color:var(--amber-600,#f59324)]/60 hover:text-[color:var(--amber-700,#d97a1c)] active:scale-[0.97]"
+                      >
+                        <Info className="h-3.5 w-3.5" /> Info
+                      </button>
+                    }
+                  />
+                </div>
               </div>
               <div className="mt-1 flex flex-wrap gap-1.5">
                 {codes.length ? (

@@ -434,18 +434,18 @@ export function DailyNotesImportWizard() {
           })),
         },
       })
-        .then((res) => {
+        .then((res: { duplicates: Array<{ index: number; existing_id: string; reason: string }> }) => {
           if (!res.duplicates?.length) return;
           setRows((rs) =>
             rs.map((r) => {
-              const hit = res.duplicates.find((d: { index: number }) => d.index === r.idx);
+              const hit = res.duplicates.find((d) => d.index === r.idx);
               if (!hit) return r;
               return { ...r, skipped: true, duplicateOfId: hit.existing_id, duplicateReason: hit.reason };
             }),
           );
           toast.info(`${res.duplicates.length} note${res.duplicates.length === 1 ? "" : "s"} look like duplicates of existing entries — auto-skipped.`);
         })
-        .catch((e) => console.warn("Duplicate check failed:", e))
+        .catch((e: unknown) => console.warn("Duplicate check failed:", e))
         .finally(() => setDupeChecking(false));
     }
   }, [parsed, mapping, peopleQ.data, wholeFile, org?.organization_id]);

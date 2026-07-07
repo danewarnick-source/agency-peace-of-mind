@@ -16,13 +16,14 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Plus, Trash2, Sparkles, FileDown, Printer, ClipboardList, Users, Clock,
+  Plus, Trash2, Sparkles, FileDown, Printer, ClipboardList, Users, Clock, Send, CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   renderChoreChartPdf,
   type ChoreChartPdfPayload,
 } from "@/lib/chore-chart-pdf";
+import { shipChoreChartReport } from "@/lib/chore-chart-report";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 const FREE_DAY_VALUE = "__free__";
@@ -413,6 +414,53 @@ export function ChoreChartPanel({
     }
   };
 
+  // ── Ship to client file(s) — finalized point-in-time snapshot to each
+  // client linked to this space. Same pattern as budget / meal-plan.
+  const [shipping, setShipping] = useState(false);
+  const shippedQ = useQuery({
+    enabled: !!spaceId,
+    queryKey: ["chore-chart-shipped", spaceId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_documents")
+        .select("id, uploaded_at, storage_path, client_id")
+        .eq("document_type", "chore_chart")
+        .ilike("storage_path", `%/chore-charts/chore-chart-%`)
+        .order("uploaded_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      // Filter to snapshots for THIS space (path includes the space slug + date).
+      const spaceSlug = (space?.name ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      return (data ?? []).filter((r) =>
+        typeof r.storage_path === "string" &&
+        spaceSlug &&
+        r.storage_path.includes(`/chore-charts/chore-chart-${spaceSlug}-`),
+      );
+    },
+  });
+  const shippedRows = shippedQ.data ?? [];
+  const latestShipped = shippedRows[0] ?? null;
+
+  const shipToFile = async () => {
+    if (!clients.length) { toast.error("Add at least one client to this space before shipping"); return; }
+    setShipping(true);
+    try {
+      const result = await shipChoreChartReport({ spaceId });
+      toast.success(
+        `Shipped chore chart to ${result.snapshots.length} client file${result.snapshots.length === 1 ? "" : "s"} — ${result.dateLabel}`,
+      );
+      qc.invalidateQueries({ queryKey: ["chore-chart-shipped", spaceId] });
+      for (const s of result.snapshots) {
+        qc.invalidateQueries({ queryKey: ["client-documents", s.clientId] });
+      }
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setShipping(false);
+    }
+  };
+
+
   if (spaceQ.isLoading) {
     return <p className="py-8 text-center text-sm text-muted-foreground">Loading chore chart…</p>;
   }
@@ -433,6 +481,17 @@ export function ChoreChartPanel({
           <p className="text-xs text-muted-foreground">
             Post this chart so anyone in the home knows what to clean and when. Staff check off completed items each shift for inspection readiness.
           </p>
+          <div className="text-xs text-muted-foreground">
+            {latestShipped ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/60 bg-emerald-50 px-2 py-0.5 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+                <CheckCircle2 className="h-3 w-3" />
+                Shipped {new Date(latestShipped.uploaded_at).toLocaleDateString()}
+                {shippedRows.length > 1 ? ` (${shippedRows.length} snapshots on file)` : ""}
+              </span>
+            ) : (
+              <span>Not yet shipped to client file for this space</span>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={preview} className="gap-1">
@@ -441,8 +500,22 @@ export function ChoreChartPanel({
           <Button variant="outline" size="sm" onClick={download} className="gap-1">
             <FileDown className="h-4 w-4" /> Download PDF
           </Button>
+          {canEdit && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={shipToFile}
+              disabled={shipping || clients.length === 0}
+              title={clients.length === 0 ? "Add a client to this space first" : "Save a finalized snapshot to each linked client's Files"}
+              className="gap-1"
+            >
+              <Send className="h-4 w-4" />
+              {shipping ? "Shipping…" : "Ship to client file"}
+            </Button>
+          )}
         </div>
       </CardHeader>
+
 
       <CardContent className="space-y-6">
         {/* Clients in this space */}

@@ -223,7 +223,14 @@ export function ClientBudgetPanel({ clientId }: { clientId: string }) {
             )}
           </div>
         ) : (
-          <BudgetEditor budget={budget} lines={lines} canEdit={canEdit} />
+          <BudgetEditor
+            budget={budget}
+            lines={lines}
+            canEdit={canEdit}
+            clientName={
+              [clientQ.data?.first_name, clientQ.data?.last_name].filter(Boolean).join(" ") || "Client"
+            }
+          />
         )}
       </CardContent>
     </Card>

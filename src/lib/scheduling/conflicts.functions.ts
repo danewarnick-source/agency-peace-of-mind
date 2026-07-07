@@ -8,6 +8,10 @@ import {
   type RuleMode,
   type PolicyRuleCode,
 } from "./conflicts";
+import {
+  resolveRequiredQualsForCodes,
+  loadStaffQualsBulk,
+} from "./required-qualifications.functions";
 
 // ---------- Rule settings (per-org) ----------
 

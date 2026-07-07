@@ -586,11 +586,9 @@ export function ClientMealPlannerPanel({
           <Utensils className="h-5 w-5 text-primary" />
           <CardTitle>Meal Planner</CardTitle>
           {!canEdit && <Badge variant="secondary">Read only</Badge>}
-          {needsHelp && (
-            <Badge className="gap-1 bg-amber-500 text-white hover:bg-amber-500">
-              <ShoppingCart className="h-3 w-3" /> Shopping help needed
-            </Badge>
-          )}
+          {/* Legacy shopping-help badge removed; activation status is shown
+              by the MealSupportGate banner above the panel (when applicable). */}
+
         </div>
         <div className="flex items-center gap-2">
           <Button

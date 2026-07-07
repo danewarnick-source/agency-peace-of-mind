@@ -20,3 +20,9 @@ verify_jwt = true
 
 [functions.auto-renew-trainings]
 verify_jwt = false
+
+[functions.parse-recipe-doc]
+verify_jwt = true
+
+[functions.suggest-meal-swaps]
+verify_jwt = true

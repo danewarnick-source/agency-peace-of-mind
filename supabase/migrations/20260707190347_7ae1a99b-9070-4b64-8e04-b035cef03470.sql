@@ -1,0 +1,1 @@
+ALTER TABLE public.client_budget_lines ADD COLUMN day_of_month integer NULL CHECK (day_of_month IS NULL OR (day_of_month BETWEEN 1 AND 31));

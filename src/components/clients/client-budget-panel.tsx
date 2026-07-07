@@ -36,6 +36,7 @@ interface BudgetLine {
   non_variable: number;
   variable: number;
   notes: string | null;
+  day_of_month: number | null;
 }
 
 interface Budget {
@@ -110,6 +111,7 @@ export function ClientBudgetPanel({ clientId }: { clientId: string }) {
         .select("*")
         .eq("budget_id", budgetQ.data!.id)
         .order("section")
+        .order("day_of_month", { ascending: true, nullsFirst: false })
         .order("sort_order");
       if (error) throw error;
       return (data ?? []) as BudgetLine[];
@@ -146,6 +148,7 @@ export function ClientBudgetPanel({ clientId }: { clientId: string }) {
           non_variable: 0,
           variable: 0,
           notes: null,
+          day_of_month: null,
         }));
       if (seedRows.length) {
         const { error: eIns } = await supabase.from("client_budget_lines").insert(seedRows);
@@ -261,7 +264,7 @@ function BudgetEditor({ budget, lines, canEdit, clientName }: { budget: Budget; 
       const nextOrder = Math.max(-1, ...draft.filter((l) => l.section === section).map((l) => l.sort_order)) + 1;
       const { error } = await supabase.from("client_budget_lines").insert({
         budget_id: budget.id, section, sort_order: nextOrder,
-        label: "", non_variable: 0, variable: 0, notes: null,
+        label: "", non_variable: 0, variable: 0, notes: null, day_of_month: null,
       });
       if (error) throw error;
     },
@@ -286,6 +289,7 @@ function BudgetEditor({ budget, lines, canEdit, clientName }: { budget: Budget; 
           .from("client_budget_lines")
           .update({
             label: l.label, non_variable: l.non_variable, variable: l.variable, notes: l.notes,
+            day_of_month: l.day_of_month,
           })
           .eq("id", l.id);
         if (error) throw error;
@@ -330,11 +334,19 @@ function BudgetEditor({ budget, lines, canEdit, clientName }: { budget: Budget; 
     const toLines = (section: Section) =>
       draft
         .filter((l) => l.section === section)
+        .slice()
+        .sort((a, b) => {
+          const ad = a.day_of_month ?? 99;
+          const bd = b.day_of_month ?? 99;
+          if (ad !== bd) return ad - bd;
+          return a.sort_order - b.sort_order;
+        })
         .map((l) => ({
           label: l.label ?? "",
           non_variable: Number(l.non_variable) || 0,
           variable: Number(l.variable) || 0,
           notes: l.notes,
+          day_of_month: l.day_of_month,
         }));
     return {
       clientName,
@@ -490,6 +502,13 @@ function SectionBlock({
   onPatch: (id: string, changes: Partial<BudgetLine>) => void;
 }) {
   const subtotal = lines.reduce((a, l) => a + Number(l.non_variable) + Number(l.variable), 0);
+  const sorted = [...lines].sort((a, b) => {
+    const ad = a.day_of_month ?? 99;
+    const bd = b.day_of_month ?? 99;
+    if (ad !== bd) return ad - bd;
+    return a.sort_order - b.sort_order;
+  });
+  const colCount = canEdit ? 7 : 6;
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
@@ -509,26 +528,42 @@ function SectionBlock({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-              <th className="w-[28%] py-1 pr-2">Label</th>
-              <th className="w-[14%] py-1 pr-2 text-right">Non-variable</th>
-              <th className="w-[14%] py-1 pr-2 text-right">Variable</th>
-              <th className="w-[12%] py-1 pr-2 text-right">Total</th>
-              <th className="w-[28%] py-1 pr-2">Notes</th>
+              <th className="w-[8%] py-1 pr-2 text-center">Day</th>
+              <th className="w-[24%] py-1 pr-2">Label</th>
+              <th className="w-[13%] py-1 pr-2 text-right">Non-variable</th>
+              <th className="w-[13%] py-1 pr-2 text-right">Variable</th>
+              <th className="w-[11%] py-1 pr-2 text-right">Total</th>
+              <th className="w-[27%] py-1 pr-2">Notes</th>
               {canEdit && <th className="w-[4%] py-1" />}
             </tr>
           </thead>
           <tbody>
-            {lines.length === 0 && (
+            {sorted.length === 0 && (
               <tr>
-                <td colSpan={canEdit ? 6 : 5} className="py-3 text-center text-xs text-muted-foreground">
+                <td colSpan={colCount} className="py-3 text-center text-xs text-muted-foreground">
                   No {section} lines yet.
                 </td>
               </tr>
             )}
-            {lines.map((l) => {
+            {sorted.map((l) => {
               const total = Number(l.non_variable) + Number(l.variable);
               return (
                 <tr key={l.id} className="border-b last:border-b-0">
+                  <td className="py-2 pr-2">
+                    <Input
+                      type="number" min="1" max="31" step="1" inputMode="numeric"
+                      value={l.day_of_month ?? ""}
+                      onChange={(e) => {
+                        const raw = e.target.value.trim();
+                        if (raw === "") { onPatch(l.id, { day_of_month: null }); return; }
+                        const n = Math.max(1, Math.min(31, Math.floor(Number(raw))));
+                        onPatch(l.id, { day_of_month: Number.isFinite(n) ? n : null });
+                      }}
+                      disabled={!canEdit}
+                      placeholder="—"
+                      className="text-center"
+                    />
+                  </td>
                   <td className="py-2 pr-2">
                     <Input
                       value={l.label}

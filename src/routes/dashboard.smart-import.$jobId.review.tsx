@@ -608,6 +608,10 @@ function SubjectReview({
         setStep={setStep}
         steps={steps}
         onChanged={refresh}
+        commit={commit}
+        commitPending={commitPending}
+        commitDisabled={commitDisabled}
+        commitReason={commitReason}
       />
 
 

@@ -510,6 +510,7 @@ function StatusDot({ status }: { status: string }) {
 // ---------------------------- SubjectReview ----------------------------
 function SubjectReview({
   subjectId, jobMode, jobId, subjects, assignments, onChanged,
+  commit, commitPending, commitDisabled, commitReason,
 }: {
   subjectId: string;
   jobMode: "employee" | "client";
@@ -517,6 +518,10 @@ function SubjectReview({
   subjects: SubjectRow[];
   assignments: Array<{ id: string; relation_type: string; staff_subject_id: string | null; client_subject_id: string | null; status: string; inference_reason: string | null }>;
   onChanged: () => void;
+  commit: () => void;
+  commitPending: boolean;
+  commitDisabled: boolean;
+  commitReason?: string;
 }) {
   const getSubj = useServerFn(getReviewSubject);
   const qc = useQueryClient();

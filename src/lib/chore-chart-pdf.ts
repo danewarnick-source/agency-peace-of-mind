@@ -339,20 +339,8 @@ export async function renderChoreChartPdf(p: ChoreChartPdfPayload): Promise<Uint
     },
   );
 
-  drawGrid(
-    "STAFF-SHIFT CHART",
-    p.shiftRows.map((r) => ({ key: r.id, label: r.label, sub: r.timeRange })),
-    (rowKey, day) => {
-      const cell = p.shiftCells.find((c) => c.shiftRowId === rowKey && c.day === day);
-      if (!cell) return { text: "—", sub: null, isFree: false };
-      const parts: string[] = [];
-      if (cell.helpsClientName) parts.push(`Help ${cell.helpsClientName}`);
-      if (cell.definitionName) parts.push(cell.definitionName);
-      if (cell.taskText) parts.push(cell.taskText);
-      const text = parts.length ? parts.join(" · ") : "—";
-      return { text, sub: null, isFree: false };
-    },
-  );
+
+
 
   // Footer page numbers
   const pageCount = pdf.getPageCount();

@@ -215,6 +215,7 @@ function ClientProfileHub() {
 
         <TabsContent value="funds" className="space-y-4">
           <BillingCodesPanel clientId={clientId} />
+          <ClientBudgetPanel clientId={clientId} />
         </TabsContent>
 
         <TabsContent value="files" className="space-y-4">

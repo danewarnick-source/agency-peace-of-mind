@@ -25,6 +25,7 @@ import {
   Info,
   Brain,
   Utensils,
+  Sparkles,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,6 +45,8 @@ import { ClientPhoto } from "@/components/client-photo";
 import { FaceSheetButton } from "@/components/clients/face-sheet-button";
 import { useClientFeature, clientFeatureVisible } from "@/lib/client-features";
 import { ClientMealPlannerPanel } from "@/components/clients/client-meal-planner-panel";
+import { ChoreDailyChecklist } from "@/components/chores/chore-daily-checklist";
+import { ChoreChartForClient } from "@/components/chores/chore-chart-mount";
 
 function ActiveShiftReimbursementSlot({ clientId }: { clientId: string }) {
   const { data: active } = useActiveShift();

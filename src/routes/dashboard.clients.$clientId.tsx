@@ -33,6 +33,7 @@ import {
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { ClientBudgetPanel } from "@/components/clients/client-budget-panel";
 import { ClientMealPlannerPanel } from "@/components/clients/client-meal-planner-panel";
+import { ChoreChartForClient } from "@/components/chores/chore-chart-mount";
 import { PcspTab } from "@/components/clients/pcsp-tab";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
@@ -204,6 +205,7 @@ function ClientProfileHub() {
           <PersonCenteredProfilePanel clientId={clientId} orgId={orgId} />
           <CaseloadEditor clientId={clientId} />
           <ClientMealPlannerPanel clientId={clientId} />
+          <ChoreChartForClient clientId={clientId} />
         </TabsContent>
 
         <TabsContent value="activity" className="space-y-4">

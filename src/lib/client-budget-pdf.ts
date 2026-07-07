@@ -279,21 +279,26 @@ export async function renderClientBudgetPdf(p: BudgetPdfPayload): Promise<Uint8A
     // current y; then we drop y by band height plus an explicit gap so
     // the column-header row cannot collide with the band.
     const sub = sectionTotal(rows);
-    const bandH = 22;
+    const bandFontSize = 10.5;
+    const bandH = 24;
     const bandBottom = y - bandH;
+    // Vertically center the text within the band using the font's true
+    // glyph height (pdf-lib's y is the baseline).
+    const glyphH = bold.heightAtSize(bandFontSize);
+    const bandTextY = bandBottom + (bandH - glyphH) / 2 + 1;
 
     page.drawRectangle({
       x: MARGIN_X, y: bandBottom,
       width: CONTENT_W, height: bandH, color: C.ink,
     });
-    const bandTextY = bandBottom + 7;
-    drawText(title.toUpperCase(), MARGIN_X + 10, bandTextY, {
-      size: 10, font: bold, color: rgb(1, 1, 1),
+    drawText(title.toUpperCase(), MARGIN_X + 12, bandTextY, {
+      size: bandFontSize, font: bold, color: rgb(1, 1, 1),
     });
-    drawRight(`Subtotal  ${fmt$(sub)}`, PAGE_W - MARGIN_X - 10, bandTextY, {
-      size: 10, font: bold, color: rgb(1, 1, 1),
+    drawRight(`Subtotal  ${fmt$(sub)}`, PAGE_W - MARGIN_X - 12, bandTextY, {
+      size: bandFontSize, font: bold, color: rgb(1, 1, 1),
     });
     y = bandBottom - 8; // clean gap between band and column-header row
+
 
     drawColumnHeaders();
 

@@ -648,6 +648,7 @@ type WizardStepId = "person" | "health" | "medications" | "goals" | "services" |
 function SubjectWizard({
   subjectId, jobMode, fields, targetFields, matched, decision, tenant,
   certs, questions, unfiled, jobId, subjects, assignments, step, setStep, steps, onChanged,
+  commit, commitPending, commitDisabled, commitReason,
 }: {
   subjectId: string;
   jobMode: "employee" | "client";
@@ -666,6 +667,10 @@ function SubjectWizard({
   setStep: (s: WizardStepId) => void;
   steps: Array<{ id: WizardStepId; label: string; badge?: number }>;
   onChanged: () => void;
+  commit: () => void;
+  commitPending: boolean;
+  commitDisabled: boolean;
+  commitReason?: string;
 }) {
   const personFields = fields.filter((f) => PERSON_FIELDS_SET.has(f.target_field));
   const healthFields = fields.filter((f) => HEALTH_FIELDS_SET.has(f.target_field));

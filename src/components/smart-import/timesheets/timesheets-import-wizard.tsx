@@ -507,6 +507,7 @@ export function TimesheetsImportWizard() {
       {step === 4 && committed && (
         <DoneStep
           inserted={committed.inserted}
+          staffCount={committed.staffCount}
           onAnother={() => {
             setStep(1); setFile(null); setParsed(null); setMapping(null); setRows([]); setCommitted(null);
           }}

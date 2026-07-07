@@ -17,11 +17,11 @@ import { requireAnyPermission } from "@/lib/require-permission";
 
 export type PcspRow = {
   client_id: string;
-  pcsp_goals: string | null;
+  pcsp_goals: string[] | null;
   special_directions: string | null;
   pertinent_health_notes: string | null;
   preferred_living: string | null;
-  preferred_activities: string | null;
+  preferred_activities: string[] | null;
 };
 
 export type BillingCodeRow = {

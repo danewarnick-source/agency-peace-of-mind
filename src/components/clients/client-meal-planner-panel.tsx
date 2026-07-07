@@ -610,7 +610,29 @@ export function ClientMealPlannerPanel({
       </CardHeader>
 
       <CardContent className="space-y-6">
+        {/* Meal Plan output actions — Preview / Download / Print / Ship to file */}
+        {canEdit && orgId && (
+          <MealPlanOutputCard
+            clientId={clientId}
+            organizationId={orgId}
+            clientName={clientName}
+            weekStart={weekStart}
+            weekLabel={weekLabel}
+            orgName={org?.organization_name ?? ""}
+            logo={logoState}
+            meals={meals}
+            shopping={shopQ.data ?? []}
+            nutritionLabel={cfg.nutrition_label}
+            nutritionUnit={cfg.nutrition_unit}
+            foodLikes={planQ.data?.food_likes ?? null}
+            foodsToAvoid={planQ.data?.foods_to_avoid ?? null}
+            allergies={clientQ.data?.allergies ?? null}
+            dietaryNeeds={clientQ.data?.dietary_needs ?? null}
+          />
+        )}
+
         {/* Pass 3 toolbar: recipes, auto-shopping, budget-fit, NECTAR suggestions */}
+
         {canEdit && orgId && (
           <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 p-2">
             <AddRecipeDialog orgId={orgId} clientId={clientId} />

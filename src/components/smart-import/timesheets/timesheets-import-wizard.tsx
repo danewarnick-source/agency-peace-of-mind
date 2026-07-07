@@ -814,12 +814,18 @@ function ReviewStep({
         </TabsContent>
       </Tabs>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col items-stretch gap-2 md:flex-row md:items-center md:justify-between">
         <Button variant="ghost" onClick={onBack}><ArrowLeft className="mr-1.5 h-4 w-4" /> Back to mapping</Button>
-        <Button onClick={onCommit} disabled={committing || ready.length === 0}>
-          {committing && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-          Import {ready.length} historical timesheet{ready.length === 1 ? "" : "s"}
-        </Button>
+        <div className="flex flex-col items-end gap-1">
+          <Button onClick={onCommit} disabled={committing || ready.length === 0}>
+            {committing && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+            Submit {ready.length} entr{ready.length === 1 ? "y" : "ies"} to staff for confirmation
+          </Button>
+          <p className="text-[11px] text-muted-foreground max-w-md text-right">
+            This is Stage 3 of the import. Nothing has been written to the database yet. Clicking submit releases these
+            entries into each staff member's own confirmation queue — staff never see them before this click.
+          </p>
+        </div>
       </div>
     </div>
   );

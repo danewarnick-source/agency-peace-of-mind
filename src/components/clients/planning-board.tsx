@@ -209,7 +209,7 @@ function HouseFrame({
   title: string;
   subtitle?: string;
   badge?: React.ReactNode;
-  score?: MoveScore | null;
+  score?: ContainerScore | null;
   toneClass?: string;
   children: React.ReactNode;
 }) {

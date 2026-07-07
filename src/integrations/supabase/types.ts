@@ -5114,6 +5114,10 @@ export type Database = {
           service_type_code: string
           shift_entry_type: string
           shift_note_text: string | null
+          staff_confirmed_at: string | null
+          staff_confirmed_by: string | null
+          staff_flag_reason: string | null
+          staff_flagged: boolean
           staff_id: string
           status: string
           submitted_late: boolean
@@ -5186,6 +5190,10 @@ export type Database = {
           service_type_code: string
           shift_entry_type: string
           shift_note_text?: string | null
+          staff_confirmed_at?: string | null
+          staff_confirmed_by?: string | null
+          staff_flag_reason?: string | null
+          staff_flagged?: boolean
           staff_id: string
           status?: string
           submitted_late?: boolean
@@ -5258,6 +5266,10 @@ export type Database = {
           service_type_code?: string
           shift_entry_type?: string
           shift_note_text?: string | null
+          staff_confirmed_at?: string | null
+          staff_confirmed_by?: string | null
+          staff_flag_reason?: string | null
+          staff_flagged?: boolean
           staff_id?: string
           status?: string
           submitted_late?: boolean

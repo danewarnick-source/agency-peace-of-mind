@@ -1,47 +1,30 @@
 ## Problem
 
-On Step 8, "Provisioning forecast" only lists **DSI** for time clock, even though the client's PCSP also has **SEI** and **HHS** owned by TNS (plus BC2, PBA, PN2, etc. from external providers).
+Completing the client setup fails with:
+> `clients insert: Could not find the 'clinical_alert' column of clients in the schema cache`
 
-Root cause: the forecast comes only from `provisioning_rules`. The org has exactly one time-clock rule (`service_code = DSI → time_clock`), so only DSI matches. Nothing derives clock provisioning from the client's actual billing codes, and nothing distinguishes EVV vs non-EVV.
+Root cause: `smart-import-commit.functions.ts` maps the extracted PCSP field `clinical_alert` → column `clients.clinical_alert`, but that column doesn't exist on the `clients` table. Every other mapped column (`special_directions`, `bsp_status`, `dnr_status`, `neurologist_name`, etc.) does exist — only `clinical_alert` is missing. When a PCSP has any clinical-alert text, the insert throws and the whole commit is aborted.
+
+Answer to your question: **no, a missing clinical alert should not block anything** — it's an optional field. Two fixes together:
 
 ## Fix
 
-Auto-derive time-clock entries from the client's OWNED (TNS) billing codes and split them into EVV vs non-EVV — in addition to keeping the existing automation-rule engine.
+### 1. Add the missing column (migration)
 
-### `src/lib/smart-import-review.functions.ts` — `computeProvisioningForecast`
+Add `clinical_alert text NULL` to `public.clients`. This is a real domain field pulled from the PCSP Clinical Alerts section, so it belongs on the table. Nullable, no default — clients without alerts stay blank.
 
-For each `client` subject, after computing rule matches:
+### 2. Defensive commit (`src/lib/smart-import-commit.functions.ts`)
 
-1. Read all `extracted_fields` rows where `target_field = 'billing_code_row'` for the subject.
-2. Parse with existing `parseBillingRowLoose`, then run `partitionCodeRows(rows, tenant)` (both from `service-classification.ts`) — using `fetchTenantIdentity(sb, subj.org_id)`.
-3. From `part.ours`, collect unique `service_code` values that are `isClockableServiceCode(code)` (from `service-billing.ts`) — this excludes HHS/PPS/MTP which never produce staff punches.
-4. For each such code, synthesize one forecast entry:
-   - `target_module`: `time_clock_evv` if `isEvvLockedCode(code)`, else `time_clock_non_evv`
-   - `planned_action`: `enable_feature`
-   - `state`: `will_create`
-   - `reason`: `evvServiceLabel(code)` (e.g. `"SEI — Supported Employment for an Individual"`) + a suffix `(EVV — geofence + UEVV)` or `(non-EVV — payroll/evidence)`
-   - `rule_id`: `null`
-5. Dedupe against rule-matched entries so DSI isn't listed twice: if a rule already produced a `time_clock*` entry whose reason references the same code, skip the synthesized copy.
-6. Insert alongside rule-matched rows into `provisioning_plan` (unchanged shape; `rule_id` nullable — already allowed).
+Wrap the client insert/update so that if PostgREST ever returns a "Could not find the 'X' column" error again (from any future extractor field), the commit strips that column and retries — and logs a warning row to `import_audit` — instead of aborting the whole client creation. This prevents one stray field from ever blocking a setup again.
 
-Rows honoring `ownership_ack = 'not_ours'` are already excluded via `partitionCodeRows`. Coordination-only external codes never appear.
-
-### `src/routes/dashboard.smart-import.$jobId.review.tsx` — `ProvisioningPanel`
-
-- Group entries by category: **Time clock — EVV**, **Time clock — non-EVV**, **Other**.
-- Prettify labels: map `time_clock_evv` → "Time clock (EVV)", `time_clock_non_evv` → "Time clock (non-EVV)"; render each group under a small header so the differentiation is visible at a glance.
-- Existing per-row Select (`will_create` / `draft` / `added_by_admin` / `na`) stays the same.
+No changes to the wizard, review UI, or the columns list. No data migration for existing rows.
 
 ## Verification
 
-After the change, this client (TNS-owned codes DSI, SEI, HHS) should show:
-- **Time clock (non-EVV)**: DSI, SEI (HHS is filtered out — non-clockable host code)
-- Other rule-matched modules (daily_logs, med_mgmt, incident_reporting, behavior_plan) unchanged.
-
-A client with e.g. SLH or CMP owned by TNS would additionally show those under **Time clock (EVV)**.
+- Re-run "Complete client setup" on this job — insert succeeds; `clients.clinical_alert` populated from the PCSP.
+- Manually simulate an unknown column value in an import → commit still succeeds; `import_audit` shows a `skipped_unknown_column` note.
 
 ## Out of scope
 
-- No changes to `provisioning_rules` schema, seeded rules, commit flow, or `togglePlanItem`.
-- No new migration.
-- No changes to billing-codes table, column widths, or the wizard nav.
+- No changes to `swallowing_alerts` (separate array field) or the health-step UI copy.
+- No renaming or refactoring of other client columns.

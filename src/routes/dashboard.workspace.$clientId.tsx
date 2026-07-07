@@ -384,6 +384,13 @@ function ClientWorkspace() {
             <ClientMealPlannerPanel clientId={client.id} readOnly />
           </TabsContent>
 
+          {hasChores && (
+            <TabsContent value="chores" className="mt-5 space-y-5">
+              <ChoreDailyChecklist spaceIds={choreSpaceIds ?? []} />
+              <ChoreChartForClient clientId={client.id} readOnly />
+            </TabsContent>
+          )}
+
           {showBehaviorTab && bsTab?.organizationId && (
             <TabsContent value="behavior-data" className="mt-5">
               <StaffBehaviorDataTab

@@ -604,7 +604,7 @@ function SubjectWizard({
       {step === "plan" && (
         <div className="space-y-3">
           <div className="rounded-xl border border-border bg-card p-2.5 text-[11px] leading-snug text-muted-foreground shadow-[var(--shadow-card)]">
-            PCSP and supporting documents (Human Rights, grievance policy, individualized plans, DNR) — additional uploads land here.
+            Notes NECTAR pulled from your uploads but couldn't confidently file into a section (Health, Behavioral, Preferences, etc.). Uploaded files themselves — PCSP, MAR, and any supporting docs — are stored with this import and don't need to be re-attached here. File each note under an existing section, create a new one, or leave it for later.
           </div>
           <UnfiledPanel items={unfiled} onChanged={onChanged} />
         </div>

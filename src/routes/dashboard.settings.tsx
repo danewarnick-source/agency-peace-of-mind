@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Landmark, ArrowRight, ShieldCheck, Wand2, ListChecks, BookOpenCheck, CreditCard, Mail, Inbox } from "lucide-react";
+import { Landmark, ArrowRight, ShieldCheck, Wand2, ListChecks, BookOpenCheck, CreditCard, Mail, Inbox, UserCircle2, Building2, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { CompanyOverviewSettings } from "@/components/company-overview-settings";
 import { CelebrationSettings } from "@/components/celebrations/celebration-settings";

@@ -1941,6 +1941,332 @@ export type Database = {
           },
         ]
       }
+      chore_client_rotation: {
+        Row: {
+          client_id: string
+          created_at: string
+          day_of_week: number
+          definition_id: string | null
+          id: string
+          is_free_day: boolean
+          note: string | null
+          space_id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          day_of_week: number
+          definition_id?: string | null
+          id?: string
+          is_free_day?: boolean
+          note?: string | null
+          space_id: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          day_of_week?: number
+          definition_id?: string | null
+          id?: string
+          is_free_day?: boolean
+          note?: string | null
+          space_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chore_client_rotation_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chore_client_rotation_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "chore_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chore_client_rotation_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "chore_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chore_completions: {
+        Row: {
+          completed_at: string
+          completed_by: string | null
+          completion_date: string
+          id: string
+          note: string | null
+          source: string
+          source_id: string
+          space_id: string
+        }
+        Insert: {
+          completed_at?: string
+          completed_by?: string | null
+          completion_date: string
+          id?: string
+          note?: string | null
+          source: string
+          source_id: string
+          space_id: string
+        }
+        Update: {
+          completed_at?: string
+          completed_by?: string | null
+          completion_date?: string
+          id?: string
+          note?: string | null
+          source?: string
+          source_id?: string
+          space_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chore_completions_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "chore_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chore_definitions: {
+        Row: {
+          chore_name: string
+          created_at: string
+          id: string
+          organization_id: string
+          sort_order: number
+          space_id: string | null
+          task_list: string
+          updated_at: string
+        }
+        Insert: {
+          chore_name: string
+          created_at?: string
+          id?: string
+          organization_id: string
+          sort_order?: number
+          space_id?: string | null
+          task_list?: string
+          updated_at?: string
+        }
+        Update: {
+          chore_name?: string
+          created_at?: string
+          id?: string
+          organization_id?: string
+          sort_order?: number
+          space_id?: string | null
+          task_list?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chore_definitions_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "chore_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chore_shift_assignments: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          definition_id: string | null
+          helps_client_id: string | null
+          id: string
+          shift_row_id: string
+          space_id: string
+          task_text: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          definition_id?: string | null
+          helps_client_id?: string | null
+          id?: string
+          shift_row_id: string
+          space_id: string
+          task_text?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          definition_id?: string | null
+          helps_client_id?: string | null
+          id?: string
+          shift_row_id?: string
+          space_id?: string
+          task_text?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chore_shift_assignments_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "chore_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chore_shift_assignments_helps_client_id_fkey"
+            columns: ["helps_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chore_shift_assignments_shift_row_id_fkey"
+            columns: ["shift_row_id"]
+            isOneToOne: false
+            referencedRelation: "chore_shift_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chore_shift_assignments_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "chore_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chore_shift_rows: {
+        Row: {
+          created_at: string
+          end_time: string | null
+          id: string
+          label: string
+          sort_order: number
+          space_id: string
+          start_time: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          label: string
+          sort_order?: number
+          space_id: string
+          start_time?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          label?: string
+          sort_order?: number
+          space_id?: string
+          start_time?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chore_shift_rows_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "chore_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chore_space_clients: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          space_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          space_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          space_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chore_space_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chore_space_clients_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "chore_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chore_spaces: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          notes: string | null
+          organization_id: string
+          space_type: string
+          team_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          organization_id: string
+          space_type?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          organization_id?: string
+          space_type?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chore_spaces_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_approved_location_audit: {
         Row: {
           action: string

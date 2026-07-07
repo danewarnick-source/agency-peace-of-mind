@@ -28,6 +28,7 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ChoreChartForTeam } from "@/components/chores/chore-chart-mount";
 
 export const Route = createFileRoute("/dashboard/homes/$teamId")({
   head: () => ({ meta: [{ title: "Home details — HIVE" }] }),
@@ -667,6 +668,13 @@ function HomeDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Chore chart for this home */}
+      <ChoreChartForTeam
+        teamId={teamId}
+        teamName={team.team_name}
+        teamSetting={team.setting}
+      />
 
       {/* Danger zone */}
       <Card>

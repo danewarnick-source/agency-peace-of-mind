@@ -275,12 +275,50 @@ export function TimesheetsImportWizard() {
       }
       setFile(f);
       setParsed(p);
-      setMapping(suggest(p.headers));
+      setMapping({
+        staff: null, client: null, date: null, clock_in: null, clock_out: null,
+        notes: null, service_code: null, singleDateTimeIn: false, singleDateTimeOut: false,
+      });
+      setWholeFile({ staffId: null, clientId: null });
+      setSuggestions(null);
       setStep(2);
+      if (org?.organization_id) {
+        setSuggesting(true);
+        try {
+          const res = await suggestMap({
+            data: {
+              organization_id: org.organization_id,
+              mode: "timesheets",
+              file_name: p.fileName,
+              columns: sampleColumns(p),
+            },
+          });
+          const s = res.mapping as Record<FieldKey, FieldSuggestion>;
+          setSuggestions(s);
+          setMapping((prev) => ({
+            ...(prev ?? {
+              staff: null, client: null, date: null, clock_in: null, clock_out: null,
+              notes: null, service_code: null, singleDateTimeIn: false, singleDateTimeOut: false,
+            }),
+            staff: s.staff?.column ?? null,
+            client: s.client?.column ?? null,
+            date: s.date?.column ?? null,
+            clock_in: s.clock_in?.column ?? null,
+            clock_out: s.clock_out?.column ?? null,
+            notes: s.notes?.column ?? null,
+            service_code: s.service_code?.column ?? null,
+          }));
+        } catch (err) {
+          toast.error(`NECTAR couldn't suggest a mapping: ${(err as Error).message}. You can map columns manually.`);
+        } finally {
+          setSuggesting(false);
+        }
+      }
     } catch (e) {
       toast.error(`Couldn't read ${f.name}: ${(e as Error).message}`);
     }
-  }, []);
+  }, [org?.organization_id, suggestMap]);
+
 
   // ── Step 3 build ──
   const buildReviewRows = useCallback(() => {

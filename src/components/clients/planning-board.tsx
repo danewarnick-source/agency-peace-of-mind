@@ -43,10 +43,13 @@ import {
   AlertTriangle,
   GripVertical,
   Info,
+  Plus,
   RotateCcw,
   Undo2,
   UserRound,
+  X,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PersonAvatar } from "@/components/person/person-avatar";

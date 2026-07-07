@@ -99,12 +99,18 @@ function StaffProfilePage() {
         .maybeSingle();
       if (mErr) throw mErr;
       if (!m) return null;
-      const { data: p } = await supabase
+      // NOTE: `phone` is NOT a column on profiles yet. Selecting it here
+      // caused PostgREST to reject the whole request and left the profile
+      // page blank ("Name not set") even for staff with populated roster
+      // data. Keep this select in sync with the actual profiles schema; add
+      // a phone column via migration before re-adding it here.
+      const { data: p, error: pErr } = await supabase
         .from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, employee_id, position, positions, department, hire_date, account_status, worker_type, team_id, phone" as any)
+        .select("id, full_name, email, username, employee_id, position, positions, department, hire_date, account_status, worker_type, team_id, photo_path, photo_updated_at" as any)
         .eq("id", staffId)
         .maybeSingle();
+      if (pErr) throw pErr;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return { member: m, profile: (p ?? null) as any };
     },

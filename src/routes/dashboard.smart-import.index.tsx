@@ -418,7 +418,7 @@ function SmartImportPage() {
 
       {mode === "timesheets" && !jobId && <TimesheetsImportWizard />}
 
-      {!jobId && (
+      {!jobId && mode !== "timesheets" && (
         <>
           {/* Drop zone */}
           <div

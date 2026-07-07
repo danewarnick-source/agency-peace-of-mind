@@ -34,7 +34,7 @@ export const Route = createFileRoute("/dashboard/smart-import/")({
   ),
 });
 
-type Mode = "employee" | "client" | "timesheets";
+type Mode = "employee" | "client" | "timesheets" | "daily_notes";
 type FileChip = {
   id: string;
   file: File;

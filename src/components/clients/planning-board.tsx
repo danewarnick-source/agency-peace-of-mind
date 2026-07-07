@@ -507,19 +507,23 @@ function HhsHostContainer({
   host,
   clients,
   staff,
+  score,
   canDrag,
 }: {
   host: WhiteboardHost;
   clients: Array<RhsClient | WhiteboardClient>;
   staff: BoardStaff[];
+  score: ContainerScore | null;
   canDrag: boolean;
 }) {
   return (
     <Droppable id={`hhs-host:${host.id}`} className="min-h-[220px]">
+      <div style={glowStyle(score)} className="rounded-lg">
       <HouseFrame
         title={host.name}
         subtitle={`HHS host · ${[host.location_city, host.location_county].filter(Boolean).join(", ") || "Location unspecified"}`}
-        toneClass="bg-amber-50/40"
+        toneClass={score ? lightClasses(score.light) : "bg-amber-50/40"}
+        score={score}
         badge={
           <Badge variant="outline" className="shrink-0 text-[10px]">
             {clients.length} · {staff.length} staff
@@ -558,7 +562,9 @@ function HhsHostContainer({
             )}
           </div>
         </div>
+        <ScoreReasoning score={score} />
       </HouseFrame>
+      </div>
     </Droppable>
   );
 }

@@ -507,11 +507,12 @@ export function DailyNotesImportWizard() {
 // ─── Stepper ───────────────────────────────────────────────────────────────
 function Stepper({ step }: { step: 1 | 2 | 3 | 4 }) {
   const items = [
-    { n: 1, label: "Upload" },
+    { n: 1, label: "Upload & parse" },
     { n: 2, label: "Map columns" },
-    { n: 3, label: "Match & review" },
-    { n: 4, label: "Done" },
+    { n: 3, label: "Admin review" },
+    { n: 4, label: "Submit to staff" },
   ];
+
   return (
     <ol className="flex items-center gap-2 text-sm">
       {items.map((it, i) => (

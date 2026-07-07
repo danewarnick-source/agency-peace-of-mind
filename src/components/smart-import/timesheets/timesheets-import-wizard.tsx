@@ -25,15 +25,25 @@ import {
   createTimesheetImportJob,
   importHistoricalTimesheets,
 } from "@/lib/smart-import-timesheets.functions";
+import { suggestImportColumnMapping } from "@/lib/smart-import-nectar-mapping.functions";
 
 type ParsedFile = { headers: string[]; rows: Record<string, string>[]; fileName: string };
 
 type FieldKey = "staff" | "client" | "date" | "clock_in" | "clock_out" | "notes" | "service_code";
 
 type Mapping = Record<FieldKey, string | null> & {
-  singleDateTimeIn: boolean;   // clock_in column already has date+time
-  singleDateTimeOut: boolean;  // clock_out column already has date+time
+  singleDateTimeIn: boolean;
+  singleDateTimeOut: boolean;
 };
+
+type WholeFile = { staffId: string | null; clientId: string | null };
+type FieldSuggestion = {
+  column: string | null;
+  confidence: "high" | "medium" | "low";
+  reason: string;
+  whole_file_needed: boolean;
+};
+
 
 type Person = { id: string; label: string; norms: string[] };
 
@@ -164,26 +174,26 @@ function tryParseDateTime(dateStr: string, timeStr: string | null, singleField: 
 }
 
 // ─── auto-suggest mapping ──────────────────────────────────────────────────
-function suggest(headers: string[]): Mapping {
-  const find = (patterns: RegExp[]): string | null => {
-    for (const h of headers) {
-      const n = h.toLowerCase().trim();
-      if (patterns.some((p) => p.test(n))) return h;
+// Sample-value builder for the NECTAR mapping call. Cap to 12 distinct
+// non-empty samples per column so the prompt is small and one call per file
+// is enough no matter the row count.
+function sampleColumns(parsed: ParsedFile): Array<{ header: string; samples: string[] }> {
+  return parsed.headers.map((h) => {
+    const seen = new Set<string>();
+    const samples: string[] = [];
+    for (const r of parsed.rows) {
+      const v = (r[h] ?? "").trim();
+      if (!v) continue;
+      const key = v.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      samples.push(v.slice(0, 200));
+      if (samples.length >= 12) break;
     }
-    return null;
-  };
-  return {
-    staff: find([/\b(staff|employee|worker|caregiver|dsp|provider)\b/]),
-    client: find([/\b(client|member|consumer|recipient|individual|participant)\b/]),
-    date: find([/\bdate\b/, /\bshift\s*date\b/]),
-    clock_in: find([/\b(clock[\s_-]?in|time[\s_-]?in|start|begin)\b/]),
-    clock_out: find([/\b(clock[\s_-]?out|time[\s_-]?out|end|finish|stop)\b/]),
-    notes: find([/\b(note|comment|memo|description)\b/]),
-    service_code: find([/\b(service|code|billing)\b/]),
-    singleDateTimeIn: false,
-    singleDateTimeOut: false,
-  };
+    return { header: h, samples };
+  });
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -194,11 +204,16 @@ export function TimesheetsImportWizard() {
   const [file, setFile] = useState<File | null>(null);
   const [parsed, setParsed] = useState<ParsedFile | null>(null);
   const [mapping, setMapping] = useState<Mapping | null>(null);
+  const [wholeFile, setWholeFile] = useState<WholeFile>({ staffId: null, clientId: null });
+  const [suggestions, setSuggestions] = useState<Record<FieldKey, FieldSuggestion> | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [committed, setCommitted] = useState<{ inserted: number; staffCount: number } | null>(null);
 
   const createJob = useServerFn(createTimesheetImportJob);
   const commitRows = useServerFn(importHistoricalTimesheets);
+  const suggestMap = useServerFn(suggestImportColumnMapping);
+
 
   // Load staff + clients for this org (cached)
   const peopleQ = useQuery({
@@ -260,36 +275,78 @@ export function TimesheetsImportWizard() {
       }
       setFile(f);
       setParsed(p);
-      setMapping(suggest(p.headers));
+      setMapping({
+        staff: null, client: null, date: null, clock_in: null, clock_out: null,
+        notes: null, service_code: null, singleDateTimeIn: false, singleDateTimeOut: false,
+      });
+      setWholeFile({ staffId: null, clientId: null });
+      setSuggestions(null);
       setStep(2);
+      if (org?.organization_id) {
+        setSuggesting(true);
+        try {
+          const res = await suggestMap({
+            data: {
+              organization_id: org.organization_id,
+              mode: "timesheets",
+              file_name: p.fileName,
+              columns: sampleColumns(p),
+            },
+          });
+          const s = res.mapping as Record<FieldKey, FieldSuggestion>;
+          setSuggestions(s);
+          setMapping((prev) => ({
+            ...(prev ?? {
+              staff: null, client: null, date: null, clock_in: null, clock_out: null,
+              notes: null, service_code: null, singleDateTimeIn: false, singleDateTimeOut: false,
+            }),
+            staff: s.staff?.column ?? null,
+            client: s.client?.column ?? null,
+            date: s.date?.column ?? null,
+            clock_in: s.clock_in?.column ?? null,
+            clock_out: s.clock_out?.column ?? null,
+            notes: s.notes?.column ?? null,
+            service_code: s.service_code?.column ?? null,
+          }));
+        } catch (err) {
+          toast.error(`NECTAR couldn't suggest a mapping: ${(err as Error).message}. You can map columns manually.`);
+        } finally {
+          setSuggesting(false);
+        }
+      }
     } catch (e) {
       toast.error(`Couldn't read ${f.name}: ${(e as Error).message}`);
     }
-  }, []);
+  }, [org?.organization_id, suggestMap]);
+
 
   // ── Step 3 build ──
   const buildReviewRows = useCallback(() => {
     if (!parsed || !mapping || !peopleQ.data) return;
     const { staff, clients } = peopleQ.data;
+
+    const wholeStaff = wholeFile.staffId ? staff.find((s) => s.id === wholeFile.staffId) ?? null : null;
+    const wholeClient = wholeFile.clientId ? clients.find((c) => c.id === wholeFile.clientId) ?? null : null;
+
     const result: ReviewRow[] = parsed.rows.map((raw, idx) => {
-      const staffLabel = mapping.staff ? raw[mapping.staff] ?? "" : "";
-      const clientLabel = mapping.client ? raw[mapping.client] ?? "" : "";
+      const staffLabel = wholeStaff ? wholeStaff.label : (mapping.staff ? raw[mapping.staff] ?? "" : "");
+      const clientLabel = wholeClient ? wholeClient.label : (mapping.client ? raw[mapping.client] ?? "" : "");
       const dateStr = mapping.date ? raw[mapping.date] ?? "" : "";
       const clockInStr = mapping.clock_in ? raw[mapping.clock_in] ?? "" : "";
       const clockOutStr = mapping.clock_out ? raw[mapping.clock_out] ?? "" : "";
       const notes = mapping.notes ? raw[mapping.notes] ?? "" : "";
       const serviceCode = mapping.service_code ? (raw[mapping.service_code] ?? "").toUpperCase() : "";
 
-      const staffCandidates = findCandidates(staff, staffLabel);
-      const clientCandidates = findCandidates(clients, clientLabel);
+      const staffCandidates = wholeStaff ? [wholeStaff] : findCandidates(staff, staffLabel);
+      const clientCandidates = wholeClient ? [wholeClient] : findCandidates(clients, clientLabel);
 
       const inDate = tryParseDateTime(mapping.singleDateTimeIn ? clockInStr : dateStr, clockInStr, mapping.singleDateTimeIn);
       const outDate = tryParseDateTime(mapping.singleDateTimeOut ? clockOutStr : dateStr, clockOutStr, mapping.singleDateTimeOut);
 
       let status: MatchStatus;
       let reason: string | null = null;
-      let staffId: string | null = null;
-      let clientId: string | null = null;
+      let staffId: string | null = wholeStaff?.id ?? null;
+      let clientId: string | null = wholeClient?.id ?? null;
 
       if (!staffLabel || !clientLabel || !dateStr || !clockInStr || !clockOutStr) {
         status = "invalid";
@@ -311,10 +368,12 @@ export function TimesheetsImportWizard() {
       } else if (staffCandidates.length > 1 || clientCandidates.length > 1) {
         status = "ambiguous";
         reason = "multiple possible matches";
+        if (!staffId && staffCandidates.length === 1) staffId = staffCandidates[0].id;
+        if (!clientId && clientCandidates.length === 1) clientId = clientCandidates[0].id;
       } else {
         status = "matched";
-        staffId = staffCandidates[0].id;
-        clientId = clientCandidates[0].id;
+        staffId = staffId ?? staffCandidates[0].id;
+        clientId = clientId ?? clientCandidates[0].id;
       }
 
       return {
@@ -331,7 +390,8 @@ export function TimesheetsImportWizard() {
     });
     setRows(result);
     setStep(3);
-  }, [parsed, mapping, peopleQ.data]);
+  }, [parsed, mapping, peopleQ.data, wholeFile]);
+
 
   // Actions on review rows
   const updateRow = (idx: number, patch: Partial<ReviewRow>) => {
@@ -477,12 +537,18 @@ export function TimesheetsImportWizard() {
           parsed={parsed}
           mapping={mapping}
           onChange={setMapping}
-          onBack={() => { setStep(1); setParsed(null); setMapping(null); setFile(null); }}
+          wholeFile={wholeFile}
+          onWholeFileChange={setWholeFile}
+          suggestions={suggestions}
+          suggesting={suggesting}
+          people={peopleQ.data ?? { staff: [], clients: [] }}
+          onBack={() => { setStep(1); setParsed(null); setMapping(null); setFile(null); setWholeFile({ staffId: null, clientId: null }); setSuggestions(null); }}
           onNext={buildReviewRows}
           peopleReady={!!peopleQ.data}
           fileName={file?.name ?? ""}
         />
       )}
+
 
       {step === 3 && peopleQ.data && (
         <ReviewStep
@@ -600,18 +666,31 @@ const FIELD_LABELS: Record<FieldKey, { label: string; required: boolean; hint: s
 };
 
 function MapStep({
-  parsed, mapping, onChange, onBack, onNext, peopleReady, fileName,
+  parsed, mapping, onChange,
+  wholeFile, onWholeFileChange, suggestions, suggesting, people,
+  onBack, onNext, peopleReady, fileName,
 }: {
   parsed: ParsedFile;
   mapping: Mapping;
   onChange: (m: Mapping) => void;
+  wholeFile: WholeFile;
+  onWholeFileChange: (w: WholeFile) => void;
+  suggestions: Record<FieldKey, FieldSuggestion> | null;
+  suggesting: boolean;
+  people: { staff: Person[]; clients: Person[] };
   onBack: () => void;
   onNext: () => void;
   peopleReady: boolean;
   fileName: string;
 }) {
-  const canNext = mapping.staff && mapping.client && mapping.clock_in && mapping.clock_out &&
+  const staffOk = !!mapping.staff || !!wholeFile.staffId;
+  const clientOk = !!mapping.client || !!wholeFile.clientId;
+  const canNext = staffOk && clientOk && mapping.clock_in && mapping.clock_out &&
     (mapping.singleDateTimeIn || mapping.date);
+
+  const needsWholeStaff = suggestions?.staff?.whole_file_needed === true;
+  const needsWholeClient = suggestions?.client?.whole_file_needed === true;
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-border bg-card p-4">
@@ -622,11 +701,30 @@ function MapStep({
               File: {fileName} · {parsed.rows.length} row{parsed.rows.length === 1 ? "" : "s"} · {parsed.headers.length} columns detected
             </div>
           </div>
+          <div className="text-[11px] text-muted-foreground">
+            {suggesting
+              ? <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> NECTAR is reading your columns…</span>
+              : suggestions
+                ? <span>NECTAR suggested this mapping. Review and correct before continuing.</span>
+                : <span>Automatic mapping unavailable — map manually.</span>}
+          </div>
         </div>
-        <div className="grid gap-3 md:grid-cols-2">
+
+        <WholeFileConstants
+          people={people}
+          wholeFile={wholeFile}
+          onChange={onWholeFileChange}
+          needsWholeStaff={needsWholeStaff}
+          needsWholeClient={needsWholeClient}
+        />
+
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
           {(Object.keys(FIELD_LABELS) as FieldKey[]).map((k) => {
             const meta = FIELD_LABELS[k];
             if (k === "date" && mapping.singleDateTimeIn) return null;
+            const s = suggestions?.[k];
+            const disabledForWhole =
+              (k === "staff" && !!wholeFile.staffId) || (k === "client" && !!wholeFile.clientId);
             return (
               <div key={k} className="space-y-1">
                 <div className="flex items-center gap-1 text-xs font-medium">
@@ -635,10 +733,14 @@ function MapStep({
                   <span className="text-muted-foreground" title={meta.hint}>
                     <HelpCircle className="h-3 w-3" />
                   </span>
+                  {disabledForWhole && (
+                    <Badge variant="outline" className="ml-1 text-[10px]">Using whole-file value</Badge>
+                  )}
                 </div>
                 <Select
                   value={mapping[k] ?? "__none__"}
                   onValueChange={(v) => onChange({ ...mapping, [k]: v === "__none__" ? null : v })}
+                  disabled={disabledForWhole}
                 >
                   <SelectTrigger className="h-9"><SelectValue placeholder="Not mapped" /></SelectTrigger>
                   <SelectContent>
@@ -648,6 +750,7 @@ function MapStep({
                     ))}
                   </SelectContent>
                 </Select>
+                {s && !disabledForWhole && <SuggestionHint suggestion={s} />}
               </div>
             );
           })}
@@ -679,14 +782,118 @@ function MapStep({
 
       <div className="flex justify-between">
         <Button variant="ghost" onClick={onBack}><ArrowLeft className="mr-1.5 h-4 w-4" /> Back</Button>
-        <Button onClick={onNext} disabled={!canNext || !peopleReady}>
-          {!peopleReady && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+        <Button onClick={onNext} disabled={!canNext || !peopleReady || suggesting}>
+          {(!peopleReady || suggesting) && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
           Match & review <ArrowRight className="ml-1.5 h-4 w-4" />
         </Button>
       </div>
     </div>
   );
 }
+
+function SuggestionHint({ suggestion }: { suggestion: FieldSuggestion }) {
+  const color =
+    suggestion.confidence === "high" ? "text-emerald-700"
+      : suggestion.confidence === "medium" ? "text-amber-700"
+        : "text-muted-foreground";
+  if (suggestion.whole_file_needed) {
+    return (
+      <div className="text-[11px] text-destructive">
+        NECTAR: no column in this file contains this value — use the whole-file setting above.
+      </div>
+    );
+  }
+  if (!suggestion.column) {
+    return <div className="text-[11px] text-muted-foreground">NECTAR: no confident match — pick manually if applicable.</div>;
+  }
+  return (
+    <div className={`text-[11px] ${color}`}>
+      NECTAR ({suggestion.confidence}): {suggestion.reason}
+    </div>
+  );
+}
+
+function WholeFileConstants({
+  people, wholeFile, onChange, needsWholeStaff, needsWholeClient,
+}: {
+  people: { staff: Person[]; clients: Person[] };
+  wholeFile: WholeFile;
+  onChange: (w: WholeFile) => void;
+  needsWholeStaff: boolean;
+  needsWholeClient: boolean;
+}) {
+  const [staffOpen, setStaffOpen] = useState(needsWholeStaff);
+  const [clientOpen, setClientOpen] = useState(needsWholeClient);
+  return (
+    <div className="rounded-md border border-border bg-muted/30 p-3">
+      <div className="text-xs font-medium">This whole file is for one person?</div>
+      <p className="text-[11px] text-muted-foreground">
+        Some exports don't have a staff or client column at all — the whole sheet belongs to one person by
+        context. If that's the case here, pick the person below and the column mapping for that field will be
+        skipped for every row.
+      </p>
+      <div className="mt-2 grid gap-2 md:grid-cols-2">
+        <div>
+          <label className="flex items-center gap-1 text-[11px] font-medium">
+            <input
+              type="checkbox"
+              checked={staffOpen || !!wholeFile.staffId}
+              onChange={(e) => {
+                const on = e.target.checked;
+                setStaffOpen(on);
+                if (!on) onChange({ ...wholeFile, staffId: null });
+              }}
+            />
+            Entire file is for one staff member
+            {needsWholeStaff && <Badge variant="outline" className="ml-1 border-destructive/40 text-destructive text-[10px]">Required</Badge>}
+          </label>
+          {(staffOpen || wholeFile.staffId) && (
+            <Select
+              value={wholeFile.staffId ?? ""}
+              onValueChange={(v) => onChange({ ...wholeFile, staffId: v || null })}
+            >
+              <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue placeholder="Pick a staff member" /></SelectTrigger>
+              <SelectContent>
+                {people.staff.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+        <div>
+          <label className="flex items-center gap-1 text-[11px] font-medium">
+            <input
+              type="checkbox"
+              checked={clientOpen || !!wholeFile.clientId}
+              onChange={(e) => {
+                const on = e.target.checked;
+                setClientOpen(on);
+                if (!on) onChange({ ...wholeFile, clientId: null });
+              }}
+            />
+            Entire file is about one client
+            {needsWholeClient && <Badge variant="outline" className="ml-1 border-destructive/40 text-destructive text-[10px]">Required</Badge>}
+          </label>
+          {(clientOpen || wholeFile.clientId) && (
+            <Select
+              value={wholeFile.clientId ?? ""}
+              onValueChange={(v) => onChange({ ...wholeFile, clientId: v || null })}
+            >
+              <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue placeholder="Pick a client" /></SelectTrigger>
+              <SelectContent>
+                {people.clients.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function SamplePreview({ parsed, mapping }: { parsed: ParsedFile; mapping: Mapping }) {
   const sample = parsed.rows.slice(0, 3);

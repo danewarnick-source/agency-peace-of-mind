@@ -41,7 +41,6 @@ import {
 } from "@/components/ui/select";
 import { StaffPhotoCard } from "@/components/staff/staff-photo-card";
 import { PersonAvatar } from "@/components/person/person-avatar";
-} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { RequirePermission } from "@/components/rbac-guard";

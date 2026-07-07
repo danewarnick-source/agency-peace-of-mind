@@ -597,7 +597,10 @@ export function ClientMealPlannerPanel({
                           entries={entries}
                           unit={cfg.nutrition_unit}
                           canEdit={canEdit}
+                          orgId={orgId ?? ""}
+                          clientId={clientId}
                           onAdd={() => addMeal.mutate({ day: i, slot })}
+                          onAddFromRecipe={(r) => addMeal.mutate({ day: i, slot, recipe: r })}
                           onChange={(id, patch) => updateMeal.mutate({ id, ...patch })}
                           onDelete={(id) => deleteMeal.mutate(id)}
                         />

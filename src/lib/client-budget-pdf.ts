@@ -249,45 +249,54 @@ export async function renderClientBudgetPdf(p: BudgetPdfPayload): Promise<Uint8A
   const ROW_LINE_H = 12;
 
   const drawColumnHeaders = () => {
-    page.drawRectangle({ x: MARGIN_X, y: y - 4, width: CONTENT_W, height: HEADER_ROW_H, color: C.band });
+    // Draw the header row strictly BELOW the current y cursor so it can
+    // never overlap whatever was drawn just above (e.g. the section band).
+    const top = y;
+    const bottom = y - HEADER_ROW_H;
+    const textY = bottom + 5;
+    page.drawRectangle({ x: MARGIN_X, y: bottom, width: CONTENT_W, height: HEADER_ROW_H, color: C.band });
     page.drawLine({
-      start: { x: MARGIN_X, y: y - 4 },
-      end: { x: PAGE_W - MARGIN_X, y: y - 4 },
+      start: { x: MARGIN_X, y: top }, end: { x: PAGE_W - MARGIN_X, y: top },
       thickness: 0.5, color: C.rule,
     });
     page.drawLine({
-      start: { x: MARGIN_X, y: y - 4 + HEADER_ROW_H },
-      end: { x: PAGE_W - MARGIN_X, y: y - 4 + HEADER_ROW_H },
+      start: { x: MARGIN_X, y: bottom }, end: { x: PAGE_W - MARGIN_X, y: bottom },
       thickness: 0.5, color: C.rule,
     });
-    drawCentered("DAY", xs.day, COL.day, y + 1, { size: 8, font: bold, color: C.muted });
-    drawText("DESCRIPTION", xs.label + 4, y + 1, { size: 8, font: bold, color: C.muted });
-    drawRight("NON-VAR", xs.nonVar + COL.nonVar - 4, y + 1, { size: 8, font: bold, color: C.muted });
-    drawRight("VARIABLE", xs.variable + COL.variable - 4, y + 1, { size: 8, font: bold, color: C.muted });
-    drawRight("TOTAL", xs.total + COL.total - 4, y + 1, { size: 8, font: bold, color: C.muted });
-    drawText("NOTES", xs.notes + 4, y + 1, { size: 8, font: bold, color: C.muted });
-    y -= HEADER_ROW_H;
+    drawCentered("DAY", xs.day, COL.day, textY, { size: 8, font: bold, color: C.muted });
+    drawText("DESCRIPTION", xs.label + 4, textY, { size: 8, font: bold, color: C.muted });
+    drawRight("NON-VAR", xs.nonVar + COL.nonVar - 4, textY, { size: 8, font: bold, color: C.muted });
+    drawRight("VARIABLE", xs.variable + COL.variable - 4, textY, { size: 8, font: bold, color: C.muted });
+    drawRight("TOTAL", xs.total + COL.total - 4, textY, { size: 8, font: bold, color: C.muted });
+    drawText("NOTES", xs.notes + 4, textY, { size: 8, font: bold, color: C.muted });
+    y = bottom;
   };
 
   const drawSection = (title: string, rows: BudgetPdfLine[]) => {
-    ensure(HEADER_ROW_H + 32);
+    ensure(HEADER_ROW_H + 40);
 
-    // Section title band with subtotal on the right
+    // Section title band with subtotal on the right. Band sits BELOW the
+    // current y; then we drop y by band height plus an explicit gap so
+    // the column-header row cannot collide with the band.
     const sub = sectionTotal(rows);
-    const bandH = 20;
+    const bandH = 22;
+    const bandTop = y;
+    const bandBottom = y - bandH;
     page.drawRectangle({
-      x: MARGIN_X, y: y - bandH + 4,
+      x: MARGIN_X, y: bandBottom,
       width: CONTENT_W, height: bandH, color: C.ink,
     });
-    drawText(title.toUpperCase(), MARGIN_X + 10, y - 9, {
+    const bandTextY = bandBottom + 7;
+    drawText(title.toUpperCase(), MARGIN_X + 10, bandTextY, {
       size: 10, font: bold, color: rgb(1, 1, 1),
     });
-    drawRight(`Subtotal  ${fmt$(sub)}`, PAGE_W - MARGIN_X - 10, y - 9, {
+    drawRight(`Subtotal  ${fmt$(sub)}`, PAGE_W - MARGIN_X - 10, bandTextY, {
       size: 10, font: bold, color: rgb(1, 1, 1),
     });
-    y -= bandH;
+    y = bandBottom - 8; // clean gap between band and column-header row
 
     drawColumnHeaders();
+
 
     const sortedRows = [...rows].sort((a, b) => {
       const ad = a.day_of_month ?? 99;

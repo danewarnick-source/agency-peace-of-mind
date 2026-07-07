@@ -720,6 +720,7 @@ export function WhiteboardPlanningBoard() {
     .filter((id) => (plan.staff[id] ?? POOL_STAFF) === POOL_STAFF);
 
   return (
+    <NotesBoardContext.Provider value={notesCtxValue}>
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="space-y-4">
         {/* Planning banner + controls */}

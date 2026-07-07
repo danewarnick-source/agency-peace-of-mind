@@ -1022,22 +1022,28 @@ function UnmatchedRow({
 
 // ─── Step 4 ────────────────────────────────────────────────────────────────
 function DoneStep({
-  inserted, onAnother, onArchive,
+  inserted, staffCount, onAnother, onArchive,
 }: {
   inserted: number;
+  staffCount: number;
   onAnother: () => void;
   onArchive: () => void;
 }) {
   return (
     <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/5 p-6 text-center">
       <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600" />
-      <div className="mt-2 font-semibold">Imported {inserted} historical timesheet{inserted === 1 ? "" : "s"}</div>
+      <div className="mt-2 font-semibold">
+        Submitted {inserted} historical entr{inserted === 1 ? "y" : "ies"} to{" "}
+        {staffCount} staff member{staffCount === 1 ? "" : "s"} for confirmation
+      </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        Every imported row is permanently marked as a historical import. It will never be confused with a live clock punch.
+        Each staff member will see only their own entries on their "Historical Timesheets to Confirm" page. They can add
+        a missing shift note, flag anything that looks wrong, and must confirm before an entry is finalized. Every entry
+        stays permanently marked as a historical import — it will never be confused with a live clock punch.
       </p>
-      <div className="mt-4 flex justify-center gap-2">
+      <div className="mt-4 flex flex-wrap justify-center gap-2">
         <Button variant="outline" onClick={onAnother}>Import another spreadsheet</Button>
-        <Button onClick={onArchive}>View EVV archive</Button>
+        <Button variant="outline" onClick={onArchive}>View EVV archive</Button>
       </div>
     </div>
   );

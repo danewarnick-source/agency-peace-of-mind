@@ -19,6 +19,7 @@ import {
   Check,
   GripVertical,
   ShoppingCart,
+  BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -30,6 +31,16 @@ import {
   useDroppable,
   type DragEndEvent,
 } from "@dnd-kit/core";
+import {
+  AddRecipeDialog,
+  PickRecipeMenu,
+  AutoShoppingDialog,
+  BudgetFitCard,
+  SuggestionsDialog,
+  useShoppingLibrary,
+  recordShoppingItemUse,
+  type Recipe,
+} from "./client-meal-recipes";
 
 
 /** 0=Mon..6=Sun (matches the reference sheet). */

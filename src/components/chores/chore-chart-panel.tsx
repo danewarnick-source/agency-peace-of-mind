@@ -90,29 +90,8 @@ type RotationCell = {
   is_free_day: boolean;
   note: string | null;
 };
-type ShiftRow = {
-  id: string;
-  label: string;
-  start_time: string | null;
-  end_time: string | null;
-  sort_order: number;
-};
-type ShiftCell = {
-  id: string;
-  shift_row_id: string;
-  day_of_week: number;
-  task_text: string;
-  helps_client_id: string | null;
-  definition_id: string | null;
-};
-
 function clientName(c: ClientLite) {
   return `${c.first_name} ${c.last_name}`.trim();
-}
-function fmtTimeRange(r: ShiftRow): string | null {
-  if (!r.start_time && !r.end_time) return null;
-  const f = (t: string | null) => (t ? t.slice(0, 5) : "?");
-  return `${f(r.start_time)} – ${f(r.end_time)}`;
 }
 
 export function ChoreChartPanel({

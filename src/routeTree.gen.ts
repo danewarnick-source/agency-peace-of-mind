@@ -64,6 +64,7 @@ import { Route as DashboardHrAdminRouteImport } from './routes/dashboard.hr-admi
 import { Route as DashboardHostHomeControlRouteImport } from './routes/dashboard.host-home-control'
 import { Route as DashboardHomesRouteImport } from './routes/dashboard.homes'
 import { Route as DashboardHiveExecRouteImport } from './routes/dashboard.hive-exec'
+import { Route as DashboardHistoricalDailyNotesFormerStaffRouteImport } from './routes/dashboard.historical-daily-notes-former-staff'
 import { Route as DashboardHelpRouteImport } from './routes/dashboard.help'
 import { Route as DashboardFormsRouteImport } from './routes/dashboard.forms'
 import { Route as DashboardFinancialRouteImport } from './routes/dashboard.financial'
@@ -485,6 +486,12 @@ const DashboardHiveExecRoute = DashboardHiveExecRouteImport.update({
   path: '/hive-exec',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardHistoricalDailyNotesFormerStaffRoute =
+  DashboardHistoricalDailyNotesFormerStaffRouteImport.update({
+    id: '/historical-daily-notes-former-staff',
+    path: '/historical-daily-notes-former-staff',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardHelpRoute = DashboardHelpRouteImport.update({
   id: '/help',
   path: '/help',
@@ -1305,6 +1312,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/financial': typeof DashboardFinancialRouteWithChildren
   '/dashboard/forms': typeof DashboardFormsRouteWithChildren
   '/dashboard/help': typeof DashboardHelpRoute
+  '/dashboard/historical-daily-notes-former-staff': typeof DashboardHistoricalDailyNotesFormerStaffRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
   '/dashboard/homes': typeof DashboardHomesRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
@@ -1496,6 +1504,7 @@ export interface FileRoutesByTo {
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
   '/dashboard/help': typeof DashboardHelpRoute
+  '/dashboard/historical-daily-notes-former-staff': typeof DashboardHistoricalDailyNotesFormerStaffRoute
   '/dashboard/homes': typeof DashboardHomesRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
   '/dashboard/hr-admin': typeof DashboardHrAdminRouteWithChildren
@@ -1691,6 +1700,7 @@ export interface FileRoutesById {
   '/dashboard/financial': typeof DashboardFinancialRouteWithChildren
   '/dashboard/forms': typeof DashboardFormsRouteWithChildren
   '/dashboard/help': typeof DashboardHelpRoute
+  '/dashboard/historical-daily-notes-former-staff': typeof DashboardHistoricalDailyNotesFormerStaffRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
   '/dashboard/homes': typeof DashboardHomesRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
@@ -1889,6 +1899,7 @@ export interface FileRouteTypes {
     | '/dashboard/financial'
     | '/dashboard/forms'
     | '/dashboard/help'
+    | '/dashboard/historical-daily-notes-former-staff'
     | '/dashboard/hive-exec'
     | '/dashboard/homes'
     | '/dashboard/host-home-control'
@@ -2080,6 +2091,7 @@ export interface FileRouteTypes {
     | '/dashboard/external-certifications'
     | '/dashboard/external-compliance'
     | '/dashboard/help'
+    | '/dashboard/historical-daily-notes-former-staff'
     | '/dashboard/homes'
     | '/dashboard/host-home-control'
     | '/dashboard/hr-admin'
@@ -2274,6 +2286,7 @@ export interface FileRouteTypes {
     | '/dashboard/financial'
     | '/dashboard/forms'
     | '/dashboard/help'
+    | '/dashboard/historical-daily-notes-former-staff'
     | '/dashboard/hive-exec'
     | '/dashboard/homes'
     | '/dashboard/host-home-control'
@@ -2847,6 +2860,13 @@ declare module '@tanstack/react-router' {
       path: '/hive-exec'
       fullPath: '/dashboard/hive-exec'
       preLoaderRoute: typeof DashboardHiveExecRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/historical-daily-notes-former-staff': {
+      id: '/dashboard/historical-daily-notes-former-staff'
+      path: '/historical-daily-notes-former-staff'
+      fullPath: '/dashboard/historical-daily-notes-former-staff'
+      preLoaderRoute: typeof DashboardHistoricalDailyNotesFormerStaffRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/help': {
@@ -4152,6 +4172,7 @@ interface DashboardRouteChildren {
   DashboardFinancialRoute: typeof DashboardFinancialRouteWithChildren
   DashboardFormsRoute: typeof DashboardFormsRouteWithChildren
   DashboardHelpRoute: typeof DashboardHelpRoute
+  DashboardHistoricalDailyNotesFormerStaffRoute: typeof DashboardHistoricalDailyNotesFormerStaffRoute
   DashboardHiveExecRoute: typeof DashboardHiveExecRouteWithChildren
   DashboardHomesRoute: typeof DashboardHomesRouteWithChildren
   DashboardHostHomeControlRoute: typeof DashboardHostHomeControlRoute
@@ -4241,6 +4262,8 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardFinancialRoute: DashboardFinancialRouteWithChildren,
   DashboardFormsRoute: DashboardFormsRouteWithChildren,
   DashboardHelpRoute: DashboardHelpRoute,
+  DashboardHistoricalDailyNotesFormerStaffRoute:
+    DashboardHistoricalDailyNotesFormerStaffRoute,
   DashboardHiveExecRoute: DashboardHiveExecRouteWithChildren,
   DashboardHomesRoute: DashboardHomesRouteWithChildren,
   DashboardHostHomeControlRoute: DashboardHostHomeControlRoute,

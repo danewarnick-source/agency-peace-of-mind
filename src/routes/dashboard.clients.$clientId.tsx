@@ -31,6 +31,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
+import { ClientBudgetPanel } from "@/components/clients/client-budget-panel";
 import { PcspTab } from "@/components/clients/pcsp-tab";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
@@ -214,6 +215,7 @@ function ClientProfileHub() {
 
         <TabsContent value="funds" className="space-y-4">
           <BillingCodesPanel clientId={clientId} />
+          <ClientBudgetPanel clientId={clientId} />
         </TabsContent>
 
         <TabsContent value="files" className="space-y-4">

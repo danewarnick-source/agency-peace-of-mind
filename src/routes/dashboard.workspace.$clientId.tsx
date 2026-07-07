@@ -44,7 +44,7 @@ import { useTodayShifts } from "@/hooks/use-today-shifts";
 import { ClientPhoto } from "@/components/client-photo";
 import { FaceSheetButton } from "@/components/clients/face-sheet-button";
 import { useClientFeature, clientFeatureVisible } from "@/lib/client-features";
-import { ClientMealPlannerPanel } from "@/components/clients/client-meal-planner-panel";
+import { ClientMealPlannerMount } from "@/components/clients/client-meal-planner-mount";
 import { ChoreDailyChecklist } from "@/components/chores/chore-daily-checklist";
 import { ChoreChartForClient } from "@/components/chores/chore-chart-mount";
 

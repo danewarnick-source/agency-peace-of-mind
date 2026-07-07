@@ -21,11 +21,42 @@ import {
 import { toast } from "sonner";
 import {
   renderChoreChartPdf,
+  formatWeekRange,
   type ChoreChartPdfPayload,
 } from "@/lib/chore-chart-pdf";
 import { shipChoreChartReport } from "@/lib/chore-chart-report";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"] as const;
+
+/** Monday of the week containing `d` (local time). */
+function mondayOf(d: Date): Date {
+  const c = new Date(d);
+  c.setHours(12, 0, 0, 0);
+  const dow = c.getDay(); // 0=Sun..6=Sat
+  const diff = dow === 0 ? -6 : 1 - dow;
+  c.setDate(c.getDate() + diff);
+  return c;
+}
+function toISODate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function parseISODateLocal(iso: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return mondayOf(new Date());
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0, 0);
+}
+function addDays(d: Date, n: number): Date {
+  const c = new Date(d);
+  c.setDate(c.getDate() + n);
+  return c;
+}
+function shortDate(d: Date): string {
+  return `${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}`;
+}
 const FREE_DAY_VALUE = "__free__";
 const NONE_VALUE = "__none__";
 

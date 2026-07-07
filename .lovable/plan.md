@@ -1,32 +1,17 @@
-## Scope
-Small UI/formatting change to the billing-codes table on the Smart Import review page (`src/routes/dashboard.smart-import.$jobId.review.tsx`). Field names in the DB already match — the fix is presentation only.
+Widen the Rate and Provider columns in the Smart Import billing-codes table so full dollar amounts and full provider names are visible, while keeping the table fitting the page.
 
-## Changes
+### What we'll change
+- In `src/routes/dashboard.smart-import.$jobId.review.tsx`:
+  - **Rate column**: increase from `w-[80px]` to `w-[110px]` (or `min-w-[110px]`) so `$XXX.XX` is fully visible.
+  - **Provider column**: add `min-w-[180px]` (and possibly `w-[25%]` or `w-[200px]`) so longer provider names are not clipped.
+  - **Row inputs**: ensure the provider `<Input>` and rate input use the full column width (`w-full`).
+  - **Table fit**: review surrounding column widths (Code, Ownership, Unit, Annual, Monthly, Term, Status, actions) and trim or allow flex widths so the overall table still fits the container without excessive horizontal scroll on common viewport widths. The table is already wrapped in `overflow-x-auto`, but the goal is to minimize scrolling.
 
-### 1. Rate column → dollars with cents
-In `BillingRowEditor` (~line 2307):
-- Editable input: prefix a `$` adornment; keep `inputMode="decimal"`; on blur, format the stored value to 2 decimals (e.g. `41.50`). Accept `.`, `,`, and up to 2 decimal places. Store as a number (no change to schema).
-- Read-only cell (`notOurs` branch, ~line 2309): render as `$41.50` via `.toFixed(2)` with thousands separators; show `—` when null.
-- Also apply the `$` formatting to the read-only Rate cell in the Review-tab summary table (~line 2943 area).
+### Out of scope
+- No changes to data model, extraction logic, server functions, or commit behavior.
+- No changes to the rate/annual/monthly semantics already implemented.
 
-### 2. Column headers match PCSP wording
-Rename the column headers (~lines 2018–2020) so they mirror the PCSP the user is copying from:
-- `Rate` → `Rate ($)`
-- `Annual` → `Annual units` (unchanged binding — still `max_units`, which is the PCSP "Units" column)
-- `Mo` → `Monthly max units` (unchanged binding — still `monthly_max_units`, the PCSP "Monthly max billable units" value)
-
-Adjust the column widths slightly so the longer headers fit (`Annual` col ~92px, `Mo` col ~110px). No layout change beyond widths.
-
-### 3. No changes to
-- Data model, extraction, server functions, or commit logic
-- Field mappings (`rate` → `rate_per_unit`, `max_units` → `annual_unit_authorization`, `monthly_max_units` → `monthly_max_units`) — already correct
-- Approval-request / "Not my org" flows
-
-## Files
-- `src/routes/dashboard.smart-import.$jobId.review.tsx` only.
-
-## Verification
-- Type a rate like `41.5` → blur shows `$41.50`; a rate like `41.505` clamps to `$41.51`.
-- Empty rate shows `—` (not `$0.00`).
-- Column headers read "Rate ($) / Annual units / Monthly max units" and align with PCSP terminology.
-- Build passes.
+### Acceptance
+- Full provider name is readable without truncation.
+- Rate displays as `$XXX.XX` without clipping.
+- Table still fits within the review page card on a typical desktop viewport (≤1280px) without a horizontal scrollbar, or with only a small one.

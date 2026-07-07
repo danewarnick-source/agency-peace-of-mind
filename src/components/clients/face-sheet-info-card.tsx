@@ -133,7 +133,8 @@ export function FaceSheetInfoCard({ clientId }: { clientId: string }) {
         psychiatrist_phone: form.psychiatrist_phone || null,
         psychiatrist_address: form.psychiatrist_address || null,
       };
-      const { error } = await supabase.from("clients").update(patch).eq("id", clientId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await supabase.from("clients").update(patch as any).eq("id", clientId);
       if (error) throw error;
     },
     onSuccess: () => {

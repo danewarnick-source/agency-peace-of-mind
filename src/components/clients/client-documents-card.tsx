@@ -60,6 +60,7 @@ type DocRow = {
   version: number;
   fiscal_year: string | null;
   file_name: string;
+  mime_type?: string | null;
   parse_status: string;
   uploaded_by_name: string | null;
   created_at: string;

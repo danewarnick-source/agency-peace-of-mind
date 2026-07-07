@@ -34,6 +34,7 @@ import { ClientDocumentsCard } from "@/components/clients/client-documents-card"
 import { PcspTab } from "@/components/clients/pcsp-tab";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
+import { FaceSheetButton } from "@/components/clients/face-sheet-button";
 import { SectionsView, ClientSpecificTrainingCard, GoalsEditor, PublishConfirmDialog } from "@/components/clients/client-specific-training-card";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, RefreshCw, Sparkles, Trash2, Upload, UserCircle2 } from "lucide-react";
 import { clientFeatureVisible } from "@/lib/client-features";
@@ -170,6 +171,7 @@ function ClientProfileHub() {
             {isHostHome ? <Badge variant="secondary">Host home</Badge> : null}
             {disabilityCategory === "ABI" && <Badge className="bg-amber-100 text-amber-800 border border-amber-200">ABI</Badge>}
             {disabilityCategory === "ID-RC" && <Badge variant="outline">ID/RC</Badge>}
+            <FaceSheetButton clientId={clientId} variant="pill" />
           </div>
         </div>
       </div>

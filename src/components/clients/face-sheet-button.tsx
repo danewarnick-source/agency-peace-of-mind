@@ -5,7 +5,14 @@ import { Button } from "@/components/ui/button";
 import { FileText } from "lucide-react";
 import { toast } from "sonner";
 
-export function FaceSheetButton({ clientId }: { clientId: string }) {
+export function FaceSheetButton({
+  clientId,
+  variant = "default",
+}: {
+  clientId: string;
+  /** "default" = outline sm button; "pill" = tiny chip matching identity-row pills. */
+  variant?: "default" | "pill";
+}) {
   const gen = useServerFn(generateClientFaceSheet);
   const [busy, setBusy] = useState(false);
 
@@ -35,6 +42,21 @@ export function FaceSheetButton({ clientId }: { clientId: string }) {
       setBusy(false);
     }
   };
+
+  if (variant === "pill") {
+    return (
+      <button
+        type="button"
+        onClick={openSheet}
+        disabled={busy}
+        title="Generate Client Face Sheet PDF"
+        className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition hover:border-primary/40 hover:text-foreground disabled:opacity-60"
+      >
+        <FileText className="h-3 w-3" />
+        {busy ? "Building…" : "Face Sheet"}
+      </button>
+    );
+  }
 
   return (
     <Button

@@ -494,6 +494,12 @@ function ContactCard({
             <Row label="Status" value={m.active ? "Active" : "Deactivated"} />
             <Row label="Department" value={p?.department ?? "—"} />
             <Row label="Hire date" value={p?.hire_date ?? "—"} />
+            <div className="pt-2 mt-2 border-t border-border/60">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Emergency contact</div>
+              <Row label="Name" value={p?.emergency_contact_name ?? "—"} />
+              <Row label="Relationship" value={p?.emergency_contact_relationship ?? "—"} />
+              <Row label="Phone" value={p?.emergency_contact_phone ?? "—"} />
+            </div>
           </div>
         ) : (
           <div className="space-y-3">

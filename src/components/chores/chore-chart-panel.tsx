@@ -522,6 +522,18 @@ export function ChoreChartPanel({
           <p className="text-xs text-muted-foreground">
             Post this chart so anyone in the home knows what to clean and when. Staff check off completed items each shift for inspection readiness.
           </p>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <Label htmlFor="chore-week-start" className="text-xs text-muted-foreground">Week of</Label>
+            <Input
+              id="chore-week-start"
+              type="date"
+              value={weekStartISO}
+              onChange={(e) => setWeekStartFromInput(e.target.value)}
+              className="h-7 w-36 text-xs"
+              disabled={!canEdit}
+            />
+            <Badge variant="outline" className="font-medium">{weekRangeLabel}</Badge>
+          </div>
           <div className="text-xs text-muted-foreground">
             {latestShipped ? (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/60 bg-emerald-50 px-2 py-0.5 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">

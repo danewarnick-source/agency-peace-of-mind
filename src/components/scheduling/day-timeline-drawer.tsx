@@ -11,6 +11,7 @@ import { listShiftsInRange, updateShift } from "@/lib/scheduling/shifts.function
 import { listCoverageRequirements, listLocations } from "@/lib/scheduling/locations.functions";
 import { coverageCountMinutes, requiredMinutes, uncoveredBands } from "@/lib/scheduling/coverage-count";
 import { AddSegmentDialog, type ParentShiftInfo } from "@/components/scheduling/add-segment-dialog";
+import { PersonAvatar } from "@/components/person/person-avatar";
 
 interface Props {
   open: boolean;
@@ -108,20 +109,22 @@ export function DayTimelineDrawer({
     queryFn: async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("id, first_name, last_name, full_name")
+        .select("id, first_name, last_name, full_name, photo_path")
         .in("id", staffIds);
-      const m = new Map<string, string>();
+      const m = new Map<string, { name: string; photo_path: string | null }>();
       for (const p of data ?? []) {
         const name = (p.full_name && p.full_name.trim())
           || [p.first_name, p.last_name].filter(Boolean).join(" ").trim()
           || "Staff";
-        m.set(p.id, name);
+        m.set(p.id, { name, photo_path: (p.photo_path as string | null) ?? null });
       }
       return m;
     },
   });
   const staffName = (id: string | null) =>
-    id ? (staffNamesQ.data?.get(id) ?? "Staff") : "Open";
+    id ? (staffNamesQ.data?.get(id)?.name ?? "Staff") : "Open";
+  const staffPhoto = (id: string | null) =>
+    id ? (staffNamesQ.data?.get(id)?.photo_path ?? null) : null;
 
   const dayStartMs = day ? new Date(day).setHours(0, 0, 0, 0) : 0;
   const dow = day ? day.getDay() : -1;
@@ -130,8 +133,9 @@ export function DayTimelineDrawer({
   const lanes = useMemo(() => {
     const ids = [...new Set((shiftsQ.data ?? []).map((s) => s.staff_id).filter((v): v is string => !!v))];
     ids.sort((a, b) => staffName(a).localeCompare(staffName(b)));
-    const out: Array<{ id: string | null; label: string }> = ids.map((id) => ({ id, label: staffName(id) }));
-    if ((shiftsQ.data ?? []).some((s) => !s.staff_id)) out.push({ id: null, label: "Open / unassigned" });
+    const out: Array<{ id: string | null; label: string; photo_path: string | null }> =
+      ids.map((id) => ({ id, label: staffName(id), photo_path: staffPhoto(id) }));
+    if ((shiftsQ.data ?? []).some((s) => !s.staff_id)) out.push({ id: null, label: "Open / unassigned", photo_path: null });
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shiftsQ.data, staffNamesQ.data]);
@@ -338,8 +342,16 @@ export function DayTimelineDrawer({
                 const laneShifts = (shiftsQ.data ?? []).filter((s) => s.staff_id === lane.id);
                 return (
                   <div key={lane.id ?? "__open__"} className="flex border-b border-border/70 last:border-b-0">
-                    <div className="w-28 shrink-0 border-r border-border px-2 py-2 text-xs font-semibold sticky left-0 bg-background z-10 truncate">
-                      {lane.label}
+                    <div className="w-28 shrink-0 border-r border-border px-2 py-2 text-xs font-semibold sticky left-0 bg-background z-10 truncate flex items-center gap-1.5">
+                      {lane.id && (
+                        <PersonAvatar
+                          bucket="staff-photos"
+                          path={lane.photo_path}
+                          name={lane.label}
+                          className="h-5 w-5 text-[9px] border shrink-0"
+                        />
+                      )}
+                      <span className="truncate">{lane.label}</span>
                     </div>
                     <div className="relative h-12 flex-1">
                       {/* 3-hour gridlines */}

@@ -107,7 +107,7 @@ function StaffProfilePage() {
       const { data: p, error: pErr } = await supabase
         .from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, employee_id, position, positions, department, hire_date, account_status, worker_type, team_id, photo_path, photo_updated_at" as any)
+        .select("id, full_name, email, username, employee_id, position, positions, department, hire_date, account_status, worker_type, team_id, photo_path, photo_updated_at, phone, emergency_contact_name, emergency_contact_relationship, emergency_contact_phone" as any)
         .eq("id", staffId)
         .maybeSingle();
       if (pErr) throw pErr;
@@ -421,6 +421,9 @@ function ContactCard({
     department: "",
     worker_type: "w2_employee",
     hire_date: "",
+    emergency_contact_name: "",
+    emergency_contact_relationship: "",
+    emergency_contact_phone: "",
   });
 
   const startEdit = () => {
@@ -430,6 +433,9 @@ function ContactCard({
       department: p?.department ?? "",
       worker_type: p?.worker_type ?? "w2_employee",
       hire_date: p?.hire_date ?? "",
+      emergency_contact_name: p?.emergency_contact_name ?? "",
+      emergency_contact_relationship: p?.emergency_contact_relationship ?? "",
+      emergency_contact_phone: p?.emergency_contact_phone ?? "",
     });
     setEditing(true);
   };
@@ -445,6 +451,9 @@ function ContactCard({
           department: draft.department || null,
           worker_type: draft.worker_type || null,
           hire_date: draft.hire_date || null,
+          emergency_contact_name: draft.emergency_contact_name || null,
+          emergency_contact_relationship: draft.emergency_contact_relationship || null,
+          emergency_contact_phone: draft.emergency_contact_phone || null,
         } as any)
         .eq("id", staffId);
       if (error) throw new Error(error.message);
@@ -485,6 +494,12 @@ function ContactCard({
             <Row label="Status" value={m.active ? "Active" : "Deactivated"} />
             <Row label="Department" value={p?.department ?? "—"} />
             <Row label="Hire date" value={p?.hire_date ?? "—"} />
+            <div className="pt-2 mt-2 border-t border-border/60">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Emergency contact</div>
+              <Row label="Name" value={p?.emergency_contact_name ?? "—"} />
+              <Row label="Relationship" value={p?.emergency_contact_relationship ?? "—"} />
+              <Row label="Phone" value={p?.emergency_contact_phone ?? "—"} />
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
@@ -541,6 +556,39 @@ function ContactCard({
                 onChange={(e) => setDraft({ ...draft, hire_date: e.target.value })}
                 className="text-sm"
               />
+            </div>
+            <div className="pt-2 mt-2 border-t border-border/60 space-y-3">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Emergency contact</div>
+              <div className="space-y-1">
+                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Name</Label>
+                <Input
+                  type="text"
+                  value={draft.emergency_contact_name}
+                  onChange={(e) => setDraft({ ...draft, emergency_contact_name: e.target.value })}
+                  placeholder="Full name"
+                  className="text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Relationship</Label>
+                <Input
+                  type="text"
+                  value={draft.emergency_contact_relationship}
+                  onChange={(e) => setDraft({ ...draft, emergency_contact_relationship: e.target.value })}
+                  placeholder="Spouse, parent, sibling…"
+                  className="text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Phone</Label>
+                <Input
+                  type="tel"
+                  value={draft.emergency_contact_phone}
+                  onChange={(e) => setDraft({ ...draft, emergency_contact_phone: e.target.value })}
+                  placeholder="(801) 555-0100"
+                  className="text-sm"
+                />
+              </div>
             </div>
             <div className="flex gap-2 pt-1">
               <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>

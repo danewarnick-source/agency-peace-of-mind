@@ -40,6 +40,7 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { syncTeamToLocation } from "@/lib/scheduling/locations.functions";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PersonAvatar } from "@/components/person/person-avatar";
 
 // ============================================================================
 // Types
@@ -51,7 +52,7 @@ type TeamRow = {
   organization_id: string | null;
   setting: string | null;
 };
-type StaffRow = { id: string; name: string; team_id: string | null };
+type StaffRow = { id: string; name: string; team_id: string | null; photo_path: string | null };
 type ClientRow = {
   id: string;
   first_name: string;
@@ -152,13 +153,14 @@ export function HomesTeamsBoard() {
       if (!ids.length) return [];
       const { data: profs } = await supabase
         .from("profiles")
-        .select("id, full_name, email, team_id")
+        .select("id, full_name, email, team_id, photo_path")
         .in("id", ids);
       return (profs ?? [])
         .map((p) => ({
           id: p.id as string,
           name: (p.full_name as string) || (p.email as string) || "—",
           team_id: (p.team_id as string | null) ?? null,
+          photo_path: (p.photo_path as string | null) ?? null,
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
     },
@@ -522,8 +524,13 @@ export function HomesTeamsBoard() {
                         })
                       }
                     >
-                      <button className="inline-flex items-center gap-1 rounded-md border border-dashed border-border bg-card px-2 py-1 text-xs hover:border-primary hover:bg-primary/5">
-                        <UserRound className="h-3 w-3 text-primary" />
+                      <button className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-border bg-card px-2 py-1 text-xs hover:border-primary hover:bg-primary/5">
+                        <PersonAvatar
+                          bucket="staff-photos"
+                          path={s.photo_path}
+                          name={s.name}
+                          className="h-5 w-5 text-[9px] border"
+                        />
                         {s.name}
                       </button>
                     </AddStaffToHomePopover>
@@ -693,10 +700,14 @@ export function HomesTeamsBoard() {
                                 }
                                 className="group flex items-center gap-2 rounded-md border border-transparent bg-card px-2 py-1.5 text-left text-xs hover:border-border hover:bg-muted/50"
                               >
-                                {isMgr ? (
+                                <PersonAvatar
+                                  bucket="staff-photos"
+                                  path={s!.photo_path}
+                                  name={s!.name}
+                                  className="h-6 w-6 text-[10px] border"
+                                />
+                                {isMgr && (
                                   <Star className="h-3.5 w-3.5 shrink-0 fill-warning text-warning-foreground" />
-                                ) : (
-                                  <UserRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                                 )}
                                 <span className="flex-1 truncate font-medium">
                                   {s!.name}

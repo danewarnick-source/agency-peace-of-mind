@@ -3216,6 +3216,60 @@ export type Database = {
           },
         ]
       }
+      client_meal_support: {
+        Row: {
+          activated_at: string | null
+          activated_by: string | null
+          client_id: string
+          created_at: string
+          goal_note: string | null
+          id: string
+          organization_id: string
+          reason: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          activated_at?: string | null
+          activated_by?: string | null
+          client_id: string
+          created_at?: string
+          goal_note?: string | null
+          id?: string
+          organization_id: string
+          reason?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          activated_at?: string | null
+          activated_by?: string | null
+          client_id?: string
+          created_at?: string
+          goal_note?: string | null
+          id?: string
+          organization_id?: string
+          reason?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_meal_support_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_meal_support_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_meals: {
         Row: {
           created_at: string

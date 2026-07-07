@@ -542,7 +542,9 @@ function drawFaceSheet(page: PDFPage, helv: PDFFont, helvB: PDFFont, ctx: Ctx): 
     `Eyes: ${field(client.eye_color)}`,
   ].join("   ");
   ySFR = drawKV(page, "Physical description", desc, M + s2 + 16, ySFR, s2, helv, helvB);
+  ySFR = drawKV(page, "Identifying marks / scars / tattoos", field(client.identifying_marks), M + s2 + 16, ySFR, s2, helv, helvB);
   ySFR = drawKV(page, "Places frequented", field(client.places_frequented), M + s2 + 16, ySFR, s2, helv, helvB);
+
 
   y = Math.min(ySF, ySFR) - 4;
 

@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { RequirePermission } from "@/components/rbac-guard";
 import { listIntakeFormsForClient, seedIntakeForms } from "@/lib/forms.functions";
+import { ClientPhotoCard } from "@/components/clients/client-photo-card";
+import { FaceSheetInfoCard } from "@/components/clients/face-sheet-info-card";
 
 export const Route = createFileRoute("/dashboard/client-intake/$clientId")({
   head: () => ({ meta: [{ title: "New Client Intake — HIVE" }] }),

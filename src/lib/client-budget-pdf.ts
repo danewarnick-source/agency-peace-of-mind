@@ -274,12 +274,13 @@ export async function renderClientBudgetPdf(p: BudgetPdfPayload): Promise<Uint8A
 
 function colXs() {
   const x0 = MARGIN;
-  const label = x0;
+  const day = x0;
+  const label = day + COL.day;
   const nonVar = label + COL.label;
   const variable = nonVar + COL.nonVar;
   const total = variable + COL.variable;
   const notes = total + COL.total;
-  return { label, nonVar, variable, total, notes };
+  return { day, label, nonVar, variable, total, notes };
 }
 
 function drawFooter(page: PDFPage, font: PDFFont) {

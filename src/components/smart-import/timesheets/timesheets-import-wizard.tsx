@@ -436,11 +436,11 @@ export function TimesheetsImportWizard() {
           })),
         },
       })
-        .then((res) => {
+        .then((res: { duplicates: Array<{ index: number; existing_id: string; reason: string }> }) => {
           if (!res.duplicates?.length) return;
           setRows((rs) =>
             rs.map((r) => {
-              const hit = res.duplicates.find((d: { index: number }) => d.index === r.idx);
+              const hit = res.duplicates.find((d) => d.index === r.idx);
               if (!hit) return r;
               return {
                 ...r,
@@ -452,7 +452,7 @@ export function TimesheetsImportWizard() {
           );
           toast.info(`${res.duplicates.length} row${res.duplicates.length === 1 ? "" : "s"} look like duplicates of existing entries — auto-skipped. Un-skip individually if you disagree.`);
         })
-        .catch((e) => {
+        .catch((e: unknown) => {
           console.warn("Duplicate check failed:", e);
         })
         .finally(() => setDupeChecking(false));

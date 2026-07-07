@@ -38,7 +38,7 @@ type Mapping = Record<FieldKey, string | null>;
 
 type Person = { id: string; label: string; norms: string[] };
 
-type MatchStatus = "matched" | "ambiguous" | "no_match" | "invalid";
+type MatchStatus = "matched" | "ambiguous" | "incomplete";
 
 type ReviewRow = {
   idx: number;
@@ -56,6 +56,10 @@ type ReviewRow = {
   status: MatchStatus;
   reason: string | null;
   skipped: boolean;
+  // Track which pieces were originally missing / unresolvable so the
+  // Incomplete panel only surfaces inputs for the actual gaps. Filled in
+  // manually by the human — nothing is ever auto-generated.
+  missing: { staff: boolean; client: boolean; date: boolean; narrative: boolean };
 };
 
 const ALLOWED_EXT = [".csv", ".xlsx", ".xls"];

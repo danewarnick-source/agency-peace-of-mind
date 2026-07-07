@@ -906,12 +906,14 @@ function AmbiguousRow({
   );
 }
 
-function UnmatchedRow({
-  row, people, onLink, onSkip,
+function IncompleteRow({
+  row, people, onLink, onSetNarrative, onSetDate, onSkip,
 }: {
   row: ReviewRow;
   people: { staff: Person[]; clients: Person[] };
   onLink: (idx: number, kind: "staff" | "client", id: string) => void;
+  onSetNarrative: (idx: number, text: string) => void;
+  onSetDate: (idx: number, isoDate: string) => void;
   onSkip: (idx: number) => void;
 }) {
   const [staffQ, setStaffQ] = useState("");
@@ -925,24 +927,31 @@ function UnmatchedRow({
   const staffLabel = row.staffId ? people.staff.find((p) => p.id === row.staffId)?.label : null;
   const clientLabel = row.clientId ? people.clients.find((p) => p.id === row.clientId)?.label : null;
 
+  const needsStaff = !row.staffId;
+  const needsClient = !row.clientId;
+  const needsDate = !row.logDateIso;
+  const needsNarrative = !row.narrative.trim();
+
   return (
     <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs">
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
           <Badge variant="outline" className="border-destructive/40 text-destructive">
-            <AlertTriangle className="mr-1 h-3 w-3" />
-            {row.status === "invalid" ? "Invalid" : "Not matched"}
+            <Wrench className="mr-1 h-3 w-3" />
+            Incomplete
           </Badge>
-          <span className="ml-2 text-muted-foreground">
-            {row.reason} · {row.dateStr}
-          </span>
+          <span className="ml-2 text-muted-foreground">{row.reason}</span>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => onSkip(row.idx)}>Skip</Button>
+        <Button variant="ghost" size="sm" onClick={() => onSkip(row.idx)}>Skip row</Button>
       </div>
+
       <div className="grid gap-3 md:grid-cols-2">
+        {/* Staff */}
         <div>
-          <div className="mb-1 text-muted-foreground">Staff — "{row.staffLabel || "(missing)"}"</div>
-          {staffLabel ? (
+          <div className="mb-1 text-muted-foreground">
+            Staff — {row.staffLabel ? `"${row.staffLabel}"` : <span className="italic">(blank in file)</span>}
+          </div>
+          {!needsStaff && staffLabel ? (
             <div className="text-emerald-700">✓ Linked to {staffLabel}</div>
           ) : (
             <>
@@ -965,9 +974,13 @@ function UnmatchedRow({
             </>
           )}
         </div>
+
+        {/* Client */}
         <div>
-          <div className="mb-1 text-muted-foreground">Client — "{row.clientLabel || "(missing)"}"</div>
-          {clientLabel ? (
+          <div className="mb-1 text-muted-foreground">
+            Client — {row.clientLabel ? `"${row.clientLabel}"` : <span className="italic">(blank in file)</span>}
+          </div>
+          {!needsClient && clientLabel ? (
             <div className="text-emerald-700">✓ Linked to {clientLabel}</div>
           ) : (
             <>
@@ -990,10 +1003,52 @@ function UnmatchedRow({
             </>
           )}
         </div>
+
+        {/* Date */}
+        <div>
+          <div className="mb-1 text-muted-foreground">
+            Date — {row.dateStr ? <>original value: <span className="italic">"{row.dateStr}"</span></> : <span className="italic">(blank in file)</span>}
+          </div>
+          {!needsDate ? (
+            <div className="text-emerald-700">✓ {row.logDateIso}</div>
+          ) : (
+            <Input
+              type="date"
+              value=""
+              onChange={(e) => onSetDate(row.idx, e.target.value)}
+              className="h-8 text-xs"
+            />
+          )}
+          {needsDate && (
+            <div className="mt-1 text-[10px] text-muted-foreground">
+              Only fill this in if you actually know the date the note was written. Don't guess.
+            </div>
+          )}
+        </div>
+
+        {/* Narrative */}
+        <div>
+          <div className="mb-1 text-muted-foreground">
+            Narrative — {needsNarrative ? <span className="italic">(blank in file)</span> : "provided"}
+          </div>
+          {!needsNarrative ? (
+            <div className="rounded border border-border bg-background p-2 text-muted-foreground line-clamp-3">
+              {row.narrative}
+            </div>
+          ) : (
+            <Textarea
+              value={row.narrative}
+              onChange={(e) => onSetNarrative(row.idx, e.target.value)}
+              placeholder="Type the note here only if you know what was written that day. Otherwise skip the row."
+              className="min-h-[72px] text-xs"
+            />
+          )}
+        </div>
       </div>
+
       <div className="mt-2 text-[11px] text-muted-foreground">
-        This flow never creates new staff or clients. If the person truly doesn't exist yet, skip the row, add them
-        through the regular Client or Employee Smart Import, then re-import the leftover rows.
+        This flow never creates new staff or clients and never invents dates or note content. If a piece of information
+        genuinely isn't known, skip the row instead of guessing.
       </div>
     </div>
   );

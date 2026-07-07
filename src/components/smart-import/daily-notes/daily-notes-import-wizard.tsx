@@ -475,7 +475,7 @@ export function DailyNotesImportWizard() {
           rows={rows}
           ready={readyRows}
           ambiguous={ambiguousRows}
-          unmatched={unmatchedRows}
+          incomplete={incompleteRows}
           skipped={skippedRows}
           people={peopleQ.data}
           onChooseStaff={chooseStaff}

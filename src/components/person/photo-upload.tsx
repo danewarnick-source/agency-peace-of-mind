@@ -25,6 +25,7 @@ export function PhotoUpload({
   onUploaded,
   onCleared,
   label = "Upload photo",
+  avatarClassName = "h-16 w-16",
 }: {
   bucket: Bucket;
   organizationId: string;
@@ -34,6 +35,7 @@ export function PhotoUpload({
   onUploaded: (path: string) => Promise<void> | void;
   onCleared?: () => Promise<void> | void;
   label?: string;
+  avatarClassName?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -72,7 +74,7 @@ export function PhotoUpload({
           bucket={displayBucket}
           path={currentPath ?? null}
           name={personName ?? null}
-          className="h-16 w-16"
+          className={avatarClassName}
         />
       )}
       <div className="flex flex-wrap items-center gap-2">

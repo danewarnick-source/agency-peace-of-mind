@@ -799,18 +799,14 @@ export function ClientMealPlannerPanel({
               staff={staffQ.data ?? []}
               onChange={(id) => setAssignee.mutate(id)}
             />
-            <PlanVsActualReportCard
-              clientName={clientName}
-              weekStart={weekStart}
-              weekLabel={weekLabel}
-              meals={meals}
-              actuals={actualsQ.data ?? []}
-              staff={staffQ.data ?? []}
-              orgName={org?.organization_name ?? ""}
-              logo={logoState}
+            <PlanVsActualReportsSection
               clientId={clientId}
               organizationId={orgId ?? ""}
+              clientName={clientName}
+              currentWeekStart={weekStart}
+              logo={logoState}
             />
+
           </>
         )}
         {planId && !canEdit && canRecordActuals && (

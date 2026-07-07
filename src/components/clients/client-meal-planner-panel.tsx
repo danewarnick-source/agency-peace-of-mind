@@ -940,7 +940,7 @@ function ActualsToday({
               </div>
               <Input
                 defaultValue={actual?.note ?? ""}
-                placeholder='Note (e.g. "swapped Tuesday\'s lunch", "went to McDonald\'s")'
+                placeholder="Note (e.g. swapped Tuesdays lunch, went to McDonalds)"
                 className="h-8 text-xs"
                 onBlur={(e) => {
                   const note = e.target.value;

@@ -768,8 +768,11 @@ export function ChoreChartPanel({
                 <thead>
                   <tr className="border-b">
                     <th className="p-2 text-left font-semibold w-44">Shift</th>
-                    {DAYS.map((d) => (
-                      <th key={d} className="p-2 text-left font-semibold text-muted-foreground">{d}</th>
+                    {DAYS.map((d, i) => (
+                      <th key={d} className="p-2 text-left font-semibold text-muted-foreground">
+                        <div>{d}</div>
+                        <div className="text-[10px] font-normal">{dayDates[i]}</div>
+                      </th>
                     ))}
                   </tr>
                 </thead>

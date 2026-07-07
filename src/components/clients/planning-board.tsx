@@ -725,22 +725,47 @@ function ScenarioChrome({
 
 // ---------- Board ----------------------------------------------------------
 
-function buildStartingPlan(
+/**
+ * "Current" starting state: mirror the org's REAL structure into the sandbox.
+ * - RHS clients drop into their real team_id (if it resolves to an RHS home).
+ * - Other clients start in Unplaced (HHS host→client mapping isn't stored).
+ * - Staff drop into their real home_staff_designations team (if RHS).
+ * Anything without a real assignment stays in the pool.
+ */
+function buildCurrentPlan(
   rhs: RhsBoardSnapshot,
   wb: WhiteboardSnapshot,
+  staffPlacements: CurrentStaffPlacement[],
 ): Plan {
+  const rhsHomeIds = new Set(rhs.homes.map((h) => h.id));
   const clients: Record<string, string> = {};
-  // RHS clients start at their real home (or unplaced pool).
   for (const c of rhs.clients) {
-    clients[c.id] = c.team_id ? `rhs-home:${c.team_id}` : POOL_CLIENTS;
+    clients[c.id] =
+      c.team_id && rhsHomeIds.has(c.team_id)
+        ? `rhs-home:${c.team_id}`
+        : POOL_CLIENTS;
   }
-  // Every wb client (any category) starts in the pool unless already seeded.
-  // Planning is a sandbox — any client must be draggable anywhere, regardless
-  // of category/authorization.
   for (const c of wb.clients) {
-    if (!(c.id in clients)) clients[c.id] = POOL_CLIENTS;
+    if (c.id in clients) continue;
+    clients[c.id] =
+      c.team_id && rhsHomeIds.has(c.team_id)
+        ? `rhs-home:${c.team_id}`
+        : POOL_CLIENTS;
   }
-  // Staff always start in the pool.
+  const staff: Record<string, string> = {};
+  for (const sp of staffPlacements) {
+    if (rhsHomeIds.has(sp.team_id)) {
+      staff[sp.staff_id] = `rhs-home:${sp.team_id}`;
+    }
+  }
+  return { clients, staff };
+}
+
+/** "Blank" starting state: everyone in the pools, plan from scratch. */
+function buildBlankPlan(rhs: RhsBoardSnapshot, wb: WhiteboardSnapshot): Plan {
+  const clients: Record<string, string> = {};
+  for (const c of rhs.clients) clients[c.id] = POOL_CLIENTS;
+  for (const c of wb.clients) if (!(c.id in clients)) clients[c.id] = POOL_CLIENTS;
   return { clients, staff: {} };
 }
 

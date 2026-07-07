@@ -545,6 +545,11 @@ function BudgetEditor({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="outline" onClick={openPreview} disabled={pdfBusy !== null}>
+            <Eye className="mr-2 h-4 w-4" />
+            {pdfBusy === "preview" ? "Building…" : "Preview"}
+          </Button>
+
           <Button size="sm" variant="outline" onClick={() => openPdf("download")} disabled={pdfBusy !== null}>
             <FileText className="mr-2 h-4 w-4" />
             {pdfBusy === "download" ? "Building…" : "Download PDF"}

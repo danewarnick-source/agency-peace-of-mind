@@ -28,6 +28,7 @@ import { CustomAttributesSection } from "@/components/custom-attributes-section"
 import { LifecyclePanel } from "@/components/lifecycle-panel";
 import { SuggestedTopicsInput } from "@/components/ce/suggested-topics-input";
 import { getRosterTrainingStatus } from "@/lib/hive-training-roster.functions";
+import { PersonAvatar } from "@/components/person/person-avatar";
 import { useEntitlements } from "@/hooks/use-entitlements";
 import { StaffTrainingStrip, type StaffTrainingStatus } from "@/components/training/staff-training-strip";
 

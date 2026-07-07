@@ -672,17 +672,28 @@ export function WhiteboardPlanningBoard() {
     [wb],
   );
 
-  // Scoring — RHS only, using the planned RHS-client roster.
+  // Scoring — RHS only, using the planned RHS-client roster. Non-RHS clients
+  // are ALLOWED to be dropped in but surfaced as risks (flag, never block).
   const scoreByHome = useMemo(() => {
     const m = new Map<string, MoveScore>();
     if (!rhs) return m;
     for (const home of rhs.homes) {
       const ids = clientsByContainer.get(`rhs-home:${home.id}`) ?? [];
-      const roster = ids.map((id) => rhsClientById.get(id)).filter(Boolean) as RhsClient[];
-      m.set(home.id, scoreComposition(home, roster, rhs.unscored_signals));
+      const rhsRoster = ids.map((id) => rhsClientById.get(id)).filter(Boolean) as RhsClient[];
+      const base = scoreComposition(home, rhsRoster, rhs.unscored_signals);
+      const mismatchRisks: string[] = [];
+      for (const id of ids) {
+        if (rhsClientById.has(id)) continue;
+        const wbC = wbClientById.get(id);
+        if (!wbC) continue;
+        mismatchRisks.push(
+          `${wbC.first_name} ${wbC.last_name} is not currently authorized for RHS (${wbC.inferred_category.toUpperCase()}) — planning only.`,
+        );
+      }
+      m.set(home.id, { ...base, risks: [...base.risks, ...mismatchRisks] });
     }
     return m;
-  }, [rhs, clientsByContainer, rhsClientById]);
+  }, [rhs, clientsByContainer, rhsClientById, wbClientById]);
 
   // --- Actions -----------------------------------------------------------
 

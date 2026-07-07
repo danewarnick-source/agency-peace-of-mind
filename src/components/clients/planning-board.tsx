@@ -1089,86 +1089,188 @@ export function WhiteboardPlanningBoard() {
 
         {/* RHS Residential lane */}
         <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            RHS — Residential homes
-          </h3>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              RHS — Residential homes
+            </h3>
+            {canDrag && (
+              <Button size="sm" variant="outline" onClick={addRhsHome}>
+                <Plus className="mr-1 h-3 w-3" /> Add home
+              </Button>
+            )}
+          </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {rhs.homes.length === 0 ? (
+            {rhs.homes.length === 0 && scenarios.rhsHomes.length === 0 ? (
               <p className="col-span-full rounded-md border border-dashed border-border bg-muted/20 px-3 py-6 text-center text-[11px] text-muted-foreground">
-                No residential homes configured.
+                No residential homes configured. Use "Add home" to model a hypothetical.
               </p>
             ) : (
-              rhs.homes.map((h) => {
-                const cIds = clientsByContainer.get(`rhs-home:${h.id}`) ?? [];
-                const sIds = staffByContainer.get(`rhs-home:${h.id}`) ?? [];
-                return (
-                  <RhsHomeContainer
-                    key={h.id}
-                    home={h}
-                    clients={cIds.map((id) => rhsClientById.get(id) ?? wbClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
-                    staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
-                    score={scoreByHome.get(h.id) ?? null}
-                    canDrag={canDrag}
-                  />
-                );
-              })
+              <>
+                {rhs.homes.map((h) => {
+                  const cIds = clientsByContainer.get(`rhs-home:${h.id}`) ?? [];
+                  const sIds = staffByContainer.get(`rhs-home:${h.id}`) ?? [];
+                  return (
+                    <RhsHomeContainer
+                      key={h.id}
+                      home={h}
+                      clients={cIds.map((id) => rhsClientById.get(id) ?? wbClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
+                      staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
+                      score={scoreByHome.get(h.id) ?? null}
+                      canDrag={canDrag}
+                    />
+                  );
+                })}
+                {scenarios.rhsHomes.map((sh) => {
+                  const synth: RhsHome = {
+                    id: sh.id,
+                    team_name: sh.name,
+                    setting: "residential_host",
+                    capacity: null,
+                    address: null,
+                  };
+                  const cIds = clientsByContainer.get(`rhs-home:${sh.id}`) ?? [];
+                  const sIds = staffByContainer.get(`rhs-home:${sh.id}`) ?? [];
+                  return (
+                    <ScenarioChrome
+                      key={sh.id}
+                      name={sh.name}
+                      onRename={(v) => renameScenario("rhsHomes", sh.id, v)}
+                      onRemove={() => removeScenario("rhsHomes", sh.id)}
+                    >
+                      <RhsHomeContainer
+                        home={synth}
+                        clients={cIds.map((id) => rhsClientById.get(id) ?? wbClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
+                        staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
+                        score={scoreByHome.get(sh.id) ?? null}
+                        canDrag={canDrag}
+                      />
+                    </ScenarioChrome>
+                  );
+                })}
+              </>
             )}
           </div>
         </section>
 
         {/* HHS Host Home lane */}
         <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            HHS — Host homes
-          </h3>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              HHS — Host homes
+            </h3>
+            {canDrag && (
+              <Button size="sm" variant="outline" onClick={addHhsHost}>
+                <Plus className="mr-1 h-3 w-3" /> Add host home
+              </Button>
+            )}
+          </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {wb.hosts.length === 0 ? (
+            {wb.hosts.length === 0 && scenarios.hhsHosts.length === 0 ? (
               <p className="col-span-full rounded-md border border-dashed border-border bg-muted/20 px-3 py-6 text-center text-[11px] text-muted-foreground">
-                No host homes on file.
+                No host homes on file. Use "Add host home" to model a hypothetical.
               </p>
             ) : (
-              wb.hosts.map((h) => {
-                const cIds = clientsByContainer.get(`hhs-host:${h.id}`) ?? [];
-                const sIds = staffByContainer.get(`hhs-host:${h.id}`) ?? [];
-                return (
-                  <HhsHostContainer
-                    key={h.id}
-                    host={h}
-                    clients={cIds.map((id) => wbClientById.get(id) ?? rhsClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
-                    staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
-                    canDrag={canDrag}
-                  />
-                );
-              })
+              <>
+                {wb.hosts.map((h) => {
+                  const cIds = clientsByContainer.get(`hhs-host:${h.id}`) ?? [];
+                  const sIds = staffByContainer.get(`hhs-host:${h.id}`) ?? [];
+                  return (
+                    <HhsHostContainer
+                      key={h.id}
+                      host={h}
+                      clients={cIds.map((id) => wbClientById.get(id) ?? rhsClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
+                      staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
+                      canDrag={canDrag}
+                    />
+                  );
+                })}
+                {scenarios.hhsHosts.map((sh) => {
+                  const synth: WhiteboardHost = {
+                    id: sh.id,
+                    name: sh.name,
+                    location_city: null,
+                    location_county: null,
+                    independence_levels_accepted: [],
+                    medical_comfort: [],
+                    behavioral_comfort: null,
+                    wheelchair_accessible: false,
+                    sign_language: false,
+                    status: "onboarding",
+                  };
+                  const cIds = clientsByContainer.get(`hhs-host:${sh.id}`) ?? [];
+                  const sIds = staffByContainer.get(`hhs-host:${sh.id}`) ?? [];
+                  return (
+                    <ScenarioChrome
+                      key={sh.id}
+                      name={sh.name}
+                      onRename={(v) => renameScenario("hhsHosts", sh.id, v)}
+                      onRemove={() => removeScenario("hhsHosts", sh.id)}
+                    >
+                      <HhsHostContainer
+                        host={synth}
+                        clients={cIds.map((id) => wbClientById.get(id) ?? rhsClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
+                        staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
+                        canDrag={canDrag}
+                      />
+                    </ScenarioChrome>
+                  );
+                })}
+              </>
             )}
           </div>
         </section>
 
         {/* Direct Support lane */}
         <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Direct Support — 1:1 supports
-          </h3>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Direct Support — 1:1 supports
+            </h3>
+            {canDrag && (
+              <Button size="sm" variant="outline" onClick={addDsSlot}>
+                <Plus className="mr-1 h-3 w-3" /> Add 1:1 support
+              </Button>
+            )}
+          </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-            {dsClients.length === 0 ? (
+            {dsClients.length === 0 && scenarios.dsSlots.length === 0 ? (
               <p className="col-span-full rounded-md border border-dashed border-border bg-muted/20 px-3 py-6 text-center text-[11px] text-muted-foreground">
-                No active direct-support clients.
+                No active direct-support clients. Use "Add 1:1 support" to model a hypothetical.
               </p>
             ) : (
-              dsClients.map((c) => {
-                const sIds = staffByContainer.get(`ds-client:${c.id}`) ?? [];
-                return (
-                  <DirectSupportContainer
-                    key={c.id}
-                    client={c}
-                    staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
-                    canDrag={canDrag}
-                  />
-                );
-              })
+              <>
+                {dsClients.map((c) => {
+                  const sIds = staffByContainer.get(`ds-client:${c.id}`) ?? [];
+                  return (
+                    <DirectSupportContainer
+                      key={c.id}
+                      client={c}
+                      staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
+                      canDrag={canDrag}
+                    />
+                  );
+                })}
+                {scenarios.dsSlots.map((sl) => {
+                  const cIds = clientsByContainer.get(`ds-slot:${sl.id}`) ?? [];
+                  const sIds = staffByContainer.get(`ds-slot:${sl.id}`) ?? [];
+                  return (
+                    <DsSlotContainer
+                      key={sl.id}
+                      slotId={sl.id}
+                      name={sl.name}
+                      clients={cIds.map((id) => rhsClientById.get(id) ?? wbClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
+                      staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
+                      canDrag={canDrag}
+                      onRename={(v) => renameScenario("dsSlots", sl.id, v)}
+                      onRemove={() => removeScenario("dsSlots", sl.id)}
+                    />
+                  );
+                })}
+              </>
             )}
           </div>
         </section>
+
 
         <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
           <Info className="mr-1 inline h-3 w-3" />

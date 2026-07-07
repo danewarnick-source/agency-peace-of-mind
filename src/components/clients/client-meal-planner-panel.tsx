@@ -940,7 +940,7 @@ function MealPill({
           </Button>
         )}
       </div>
-      <div className="flex items-center gap-1 px-1">
+      <div className="flex flex-wrap items-center gap-1 px-1">
         <Input
           type="number"
           step="0.1"
@@ -954,6 +954,25 @@ function MealPill({
           }}
         />
         <span className="text-[10px] text-muted-foreground">{unit}</span>
+        <span className="text-[10px] text-muted-foreground">·</span>
+        <span className="text-[10px] text-muted-foreground">$</span>
+        <Input
+          type="number"
+          step="0.01"
+          defaultValue={meal.estimated_cost ?? ""}
+          disabled={!canEdit}
+          placeholder="cost"
+          className="h-6 w-16 px-1 text-xs tabular-nums"
+          onBlur={(e) => {
+            const v = e.target.value === "" ? null : Number(e.target.value);
+            if (v !== meal.estimated_cost) onChange({ estimated_cost: v });
+          }}
+        />
+        {meal.recipe_id && (
+          <span title="From recipe" className="ml-auto inline-flex items-center gap-0.5 text-[10px] text-primary">
+            <BookOpen className="h-2.5 w-2.5" />
+          </span>
+        )}
       </div>
       {(expanded || meal.description) && (
         <Textarea

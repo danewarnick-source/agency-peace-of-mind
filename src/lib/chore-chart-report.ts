@@ -60,7 +60,19 @@ export async function generateChoreChartReport(
 
   const orgName = await fetchOrgName(sb, space.organization_id);
 
-  const [linksRes, defsRes, rotRes, dailyRes] = await Promise.all([
+  // Compute Mon–Sun window for outcome tallies when weekStartISO given.
+  let compRange: { fromISO: string; toISO: string } | null = null;
+  if (args.weekStartISO && /^\d{4}-\d{2}-\d{2}$/.test(args.weekStartISO)) {
+    const start = new Date(args.weekStartISO + "T12:00:00");
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    compRange = {
+      fromISO: args.weekStartISO,
+      toISO: end.toISOString().slice(0, 10),
+    };
+  }
+
+  const [linksRes, defsRes, rotRes, dailyRes, compsRes, supportRes] = await Promise.all([
     sb.from("chore_space_clients").select("client_id").eq("space_id", space.id),
     sb
       .from("chore_definitions")
@@ -76,7 +88,20 @@ export async function generateChoreChartReport(
       .select("label, detail, sort_order")
       .eq("space_id", space.id)
       .order("sort_order"),
+    compRange
+      ? sb
+          .from("chore_completions")
+          .select("outcome, client_id, completion_date, source")
+          .eq("space_id", space.id)
+          .gte("completion_date", compRange.fromISO)
+          .lte("completion_date", compRange.toISO)
+      : Promise.resolve({ data: [] as Array<{ outcome: string; client_id: string | null }> }),
+    sb
+      .from("client_chore_support")
+      .select("client_id, status, reason, goal_note")
+      .eq("organization_id", ""),  // placeholder — replaced below by post-filter
   ]);
+
 
   const linkedClientIds = ((linksRes.data ?? []) as Array<{ client_id: string }>).map(
     (x) => x.client_id,

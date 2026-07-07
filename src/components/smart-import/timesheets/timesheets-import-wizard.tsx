@@ -195,7 +195,7 @@ export function TimesheetsImportWizard() {
   const [parsed, setParsed] = useState<ParsedFile | null>(null);
   const [mapping, setMapping] = useState<Mapping | null>(null);
   const [rows, setRows] = useState<ReviewRow[]>([]);
-  const [committed, setCommitted] = useState<{ inserted: number } | null>(null);
+  const [committed, setCommitted] = useState<{ inserted: number; staffCount: number } | null>(null);
 
   const createJob = useServerFn(createTimesheetImportJob);
   const commitRows = useServerFn(importHistoricalTimesheets);

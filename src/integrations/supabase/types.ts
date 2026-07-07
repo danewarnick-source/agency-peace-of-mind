@@ -3877,6 +3877,10 @@ export type Database = {
           ai_trigger_reasons: string[] | null
           approved_at: string | null
           approved_by: string | null
+          attested_on_behalf: boolean
+          attested_on_behalf_by: string | null
+          attested_on_behalf_of_staff_id: string | null
+          attested_on_behalf_reason: string | null
           backdated: boolean
           client_id: string
           created_at: string
@@ -3895,6 +3899,8 @@ export type Database = {
           pcsp_goals_addressed: string[]
           requires_followup_form: boolean
           signature_data_url: string | null
+          staff_attested_at: string | null
+          staff_attested_by: string | null
           status: string
           submitted_at: string
           submitted_late: boolean
@@ -3908,6 +3914,10 @@ export type Database = {
           ai_trigger_reasons?: string[] | null
           approved_at?: string | null
           approved_by?: string | null
+          attested_on_behalf?: boolean
+          attested_on_behalf_by?: string | null
+          attested_on_behalf_of_staff_id?: string | null
+          attested_on_behalf_reason?: string | null
           backdated?: boolean
           client_id: string
           created_at?: string
@@ -3926,6 +3936,8 @@ export type Database = {
           pcsp_goals_addressed?: string[]
           requires_followup_form?: boolean
           signature_data_url?: string | null
+          staff_attested_at?: string | null
+          staff_attested_by?: string | null
           status?: string
           submitted_at?: string
           submitted_late?: boolean
@@ -3939,6 +3951,10 @@ export type Database = {
           ai_trigger_reasons?: string[] | null
           approved_at?: string | null
           approved_by?: string | null
+          attested_on_behalf?: boolean
+          attested_on_behalf_by?: string | null
+          attested_on_behalf_of_staff_id?: string | null
+          attested_on_behalf_reason?: string | null
           backdated?: boolean
           client_id?: string
           created_at?: string
@@ -3957,6 +3973,8 @@ export type Database = {
           pcsp_goals_addressed?: string[]
           requires_followup_form?: boolean
           signature_data_url?: string | null
+          staff_attested_at?: string | null
+          staff_attested_by?: string | null
           status?: string
           submitted_at?: string
           submitted_late?: boolean

@@ -54,6 +54,7 @@ import { Route as DashboardPbaLedgerRouteImport } from './routes/dashboard.pba-l
 import { Route as DashboardNectarDocsRouteImport } from './routes/dashboard.nectar-docs'
 import { Route as DashboardNectarCompanyProfileRouteImport } from './routes/dashboard.nectar-company-profile'
 import { Route as DashboardMyHistoricalTimesheetsRouteImport } from './routes/dashboard.my-historical-timesheets'
+import { Route as DashboardMyHistoricalDailyNotesRouteImport } from './routes/dashboard.my-historical-daily-notes'
 import { Route as DashboardMyClientTrainingsRouteImport } from './routes/dashboard.my-client-trainings'
 import { Route as DashboardInvitationsRouteImport } from './routes/dashboard.invitations'
 import { Route as DashboardInternalAuditRouteImport } from './routes/dashboard.internal-audit'
@@ -63,6 +64,7 @@ import { Route as DashboardHrAdminRouteImport } from './routes/dashboard.hr-admi
 import { Route as DashboardHostHomeControlRouteImport } from './routes/dashboard.host-home-control'
 import { Route as DashboardHomesRouteImport } from './routes/dashboard.homes'
 import { Route as DashboardHiveExecRouteImport } from './routes/dashboard.hive-exec'
+import { Route as DashboardHistoricalDailyNotesFormerStaffRouteImport } from './routes/dashboard.historical-daily-notes-former-staff'
 import { Route as DashboardHelpRouteImport } from './routes/dashboard.help'
 import { Route as DashboardFormsRouteImport } from './routes/dashboard.forms'
 import { Route as DashboardFinancialRouteImport } from './routes/dashboard.financial'
@@ -431,6 +433,12 @@ const DashboardMyHistoricalTimesheetsRoute =
     path: '/my-historical-timesheets',
     getParentRoute: () => DashboardRoute,
   } as any)
+const DashboardMyHistoricalDailyNotesRoute =
+  DashboardMyHistoricalDailyNotesRouteImport.update({
+    id: '/my-historical-daily-notes',
+    path: '/my-historical-daily-notes',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardMyClientTrainingsRoute =
   DashboardMyClientTrainingsRouteImport.update({
     id: '/my-client-trainings',
@@ -478,6 +486,12 @@ const DashboardHiveExecRoute = DashboardHiveExecRouteImport.update({
   path: '/hive-exec',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardHistoricalDailyNotesFormerStaffRoute =
+  DashboardHistoricalDailyNotesFormerStaffRouteImport.update({
+    id: '/historical-daily-notes-former-staff',
+    path: '/historical-daily-notes-former-staff',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardHelpRoute = DashboardHelpRouteImport.update({
   id: '/help',
   path: '/help',
@@ -1298,6 +1312,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/financial': typeof DashboardFinancialRouteWithChildren
   '/dashboard/forms': typeof DashboardFormsRouteWithChildren
   '/dashboard/help': typeof DashboardHelpRoute
+  '/dashboard/historical-daily-notes-former-staff': typeof DashboardHistoricalDailyNotesFormerStaffRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
   '/dashboard/homes': typeof DashboardHomesRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
@@ -1307,6 +1322,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/internal-audit': typeof DashboardInternalAuditRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/my-client-trainings': typeof DashboardMyClientTrainingsRoute
+  '/dashboard/my-historical-daily-notes': typeof DashboardMyHistoricalDailyNotesRoute
   '/dashboard/my-historical-timesheets': typeof DashboardMyHistoricalTimesheetsRoute
   '/dashboard/nectar-company-profile': typeof DashboardNectarCompanyProfileRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
@@ -1488,6 +1504,7 @@ export interface FileRoutesByTo {
   '/dashboard/external-certifications': typeof DashboardExternalCertificationsRoute
   '/dashboard/external-compliance': typeof DashboardExternalComplianceRoute
   '/dashboard/help': typeof DashboardHelpRoute
+  '/dashboard/historical-daily-notes-former-staff': typeof DashboardHistoricalDailyNotesFormerStaffRoute
   '/dashboard/homes': typeof DashboardHomesRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
   '/dashboard/hr-admin': typeof DashboardHrAdminRouteWithChildren
@@ -1496,6 +1513,7 @@ export interface FileRoutesByTo {
   '/dashboard/internal-audit': typeof DashboardInternalAuditRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/my-client-trainings': typeof DashboardMyClientTrainingsRoute
+  '/dashboard/my-historical-daily-notes': typeof DashboardMyHistoricalDailyNotesRoute
   '/dashboard/my-historical-timesheets': typeof DashboardMyHistoricalTimesheetsRoute
   '/dashboard/nectar-company-profile': typeof DashboardNectarCompanyProfileRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
@@ -1682,6 +1700,7 @@ export interface FileRoutesById {
   '/dashboard/financial': typeof DashboardFinancialRouteWithChildren
   '/dashboard/forms': typeof DashboardFormsRouteWithChildren
   '/dashboard/help': typeof DashboardHelpRoute
+  '/dashboard/historical-daily-notes-former-staff': typeof DashboardHistoricalDailyNotesFormerStaffRoute
   '/dashboard/hive-exec': typeof DashboardHiveExecRouteWithChildren
   '/dashboard/homes': typeof DashboardHomesRouteWithChildren
   '/dashboard/host-home-control': typeof DashboardHostHomeControlRoute
@@ -1691,6 +1710,7 @@ export interface FileRoutesById {
   '/dashboard/internal-audit': typeof DashboardInternalAuditRoute
   '/dashboard/invitations': typeof DashboardInvitationsRoute
   '/dashboard/my-client-trainings': typeof DashboardMyClientTrainingsRoute
+  '/dashboard/my-historical-daily-notes': typeof DashboardMyHistoricalDailyNotesRoute
   '/dashboard/my-historical-timesheets': typeof DashboardMyHistoricalTimesheetsRoute
   '/dashboard/nectar-company-profile': typeof DashboardNectarCompanyProfileRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
@@ -1879,6 +1899,7 @@ export interface FileRouteTypes {
     | '/dashboard/financial'
     | '/dashboard/forms'
     | '/dashboard/help'
+    | '/dashboard/historical-daily-notes-former-staff'
     | '/dashboard/hive-exec'
     | '/dashboard/homes'
     | '/dashboard/host-home-control'
@@ -1888,6 +1909,7 @@ export interface FileRouteTypes {
     | '/dashboard/internal-audit'
     | '/dashboard/invitations'
     | '/dashboard/my-client-trainings'
+    | '/dashboard/my-historical-daily-notes'
     | '/dashboard/my-historical-timesheets'
     | '/dashboard/nectar-company-profile'
     | '/dashboard/nectar-docs'
@@ -2069,6 +2091,7 @@ export interface FileRouteTypes {
     | '/dashboard/external-certifications'
     | '/dashboard/external-compliance'
     | '/dashboard/help'
+    | '/dashboard/historical-daily-notes-former-staff'
     | '/dashboard/homes'
     | '/dashboard/host-home-control'
     | '/dashboard/hr-admin'
@@ -2077,6 +2100,7 @@ export interface FileRouteTypes {
     | '/dashboard/internal-audit'
     | '/dashboard/invitations'
     | '/dashboard/my-client-trainings'
+    | '/dashboard/my-historical-daily-notes'
     | '/dashboard/my-historical-timesheets'
     | '/dashboard/nectar-company-profile'
     | '/dashboard/nectar-docs'
@@ -2262,6 +2286,7 @@ export interface FileRouteTypes {
     | '/dashboard/financial'
     | '/dashboard/forms'
     | '/dashboard/help'
+    | '/dashboard/historical-daily-notes-former-staff'
     | '/dashboard/hive-exec'
     | '/dashboard/homes'
     | '/dashboard/host-home-control'
@@ -2271,6 +2296,7 @@ export interface FileRouteTypes {
     | '/dashboard/internal-audit'
     | '/dashboard/invitations'
     | '/dashboard/my-client-trainings'
+    | '/dashboard/my-historical-daily-notes'
     | '/dashboard/my-historical-timesheets'
     | '/dashboard/nectar-company-profile'
     | '/dashboard/nectar-docs'
@@ -2766,6 +2792,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardMyHistoricalTimesheetsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/my-historical-daily-notes': {
+      id: '/dashboard/my-historical-daily-notes'
+      path: '/my-historical-daily-notes'
+      fullPath: '/dashboard/my-historical-daily-notes'
+      preLoaderRoute: typeof DashboardMyHistoricalDailyNotesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/my-client-trainings': {
       id: '/dashboard/my-client-trainings'
       path: '/my-client-trainings'
@@ -2827,6 +2860,13 @@ declare module '@tanstack/react-router' {
       path: '/hive-exec'
       fullPath: '/dashboard/hive-exec'
       preLoaderRoute: typeof DashboardHiveExecRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/historical-daily-notes-former-staff': {
+      id: '/dashboard/historical-daily-notes-former-staff'
+      path: '/historical-daily-notes-former-staff'
+      fullPath: '/dashboard/historical-daily-notes-former-staff'
+      preLoaderRoute: typeof DashboardHistoricalDailyNotesFormerStaffRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/help': {
@@ -4132,6 +4172,7 @@ interface DashboardRouteChildren {
   DashboardFinancialRoute: typeof DashboardFinancialRouteWithChildren
   DashboardFormsRoute: typeof DashboardFormsRouteWithChildren
   DashboardHelpRoute: typeof DashboardHelpRoute
+  DashboardHistoricalDailyNotesFormerStaffRoute: typeof DashboardHistoricalDailyNotesFormerStaffRoute
   DashboardHiveExecRoute: typeof DashboardHiveExecRouteWithChildren
   DashboardHomesRoute: typeof DashboardHomesRouteWithChildren
   DashboardHostHomeControlRoute: typeof DashboardHostHomeControlRoute
@@ -4141,6 +4182,7 @@ interface DashboardRouteChildren {
   DashboardInternalAuditRoute: typeof DashboardInternalAuditRoute
   DashboardInvitationsRoute: typeof DashboardInvitationsRoute
   DashboardMyClientTrainingsRoute: typeof DashboardMyClientTrainingsRoute
+  DashboardMyHistoricalDailyNotesRoute: typeof DashboardMyHistoricalDailyNotesRoute
   DashboardMyHistoricalTimesheetsRoute: typeof DashboardMyHistoricalTimesheetsRoute
   DashboardNectarCompanyProfileRoute: typeof DashboardNectarCompanyProfileRoute
   DashboardNectarDocsRoute: typeof DashboardNectarDocsRoute
@@ -4220,6 +4262,8 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardFinancialRoute: DashboardFinancialRouteWithChildren,
   DashboardFormsRoute: DashboardFormsRouteWithChildren,
   DashboardHelpRoute: DashboardHelpRoute,
+  DashboardHistoricalDailyNotesFormerStaffRoute:
+    DashboardHistoricalDailyNotesFormerStaffRoute,
   DashboardHiveExecRoute: DashboardHiveExecRouteWithChildren,
   DashboardHomesRoute: DashboardHomesRouteWithChildren,
   DashboardHostHomeControlRoute: DashboardHostHomeControlRoute,
@@ -4229,6 +4273,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardInternalAuditRoute: DashboardInternalAuditRoute,
   DashboardInvitationsRoute: DashboardInvitationsRoute,
   DashboardMyClientTrainingsRoute: DashboardMyClientTrainingsRoute,
+  DashboardMyHistoricalDailyNotesRoute: DashboardMyHistoricalDailyNotesRoute,
   DashboardMyHistoricalTimesheetsRoute: DashboardMyHistoricalTimesheetsRoute,
   DashboardNectarCompanyProfileRoute: DashboardNectarCompanyProfileRoute,
   DashboardNectarDocsRoute: DashboardNectarDocsRoute,

@@ -430,10 +430,11 @@ export function DailyNotesImportWizard() {
     onSuccess: (res) => {
       setCommitted({ inserted: res.inserted });
       setStep(4);
-      toast.success(`Imported ${res.inserted} historical daily note${res.inserted === 1 ? "" : "s"}.`);
+      toast.success(`Submitted ${res.inserted} note${res.inserted === 1 ? "" : "s"} to staff for attestation.`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   return (
     <div className="space-y-6">
@@ -507,11 +508,12 @@ export function DailyNotesImportWizard() {
 // ─── Stepper ───────────────────────────────────────────────────────────────
 function Stepper({ step }: { step: 1 | 2 | 3 | 4 }) {
   const items = [
-    { n: 1, label: "Upload" },
+    { n: 1, label: "Upload & parse" },
     { n: 2, label: "Map columns" },
-    { n: 3, label: "Match & review" },
-    { n: 4, label: "Done" },
+    { n: 3, label: "Admin review" },
+    { n: 4, label: "Submit to staff" },
   ];
+
   return (
     <ol className="flex items-center gap-2 text-sm">
       {items.map((it, i) => (
@@ -797,16 +799,25 @@ function ReviewStep({
         </TabsContent>
       </Tabs>
 
+      <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-[11px] text-muted-foreground">
+        <span className="font-medium text-foreground">Next step is Submit to staff.</span> Nothing is released
+        to staff members until you click submit below. Once submitted, each staff member sees only their own
+        notes and signs them one at a time — they are not approved evidence until then. If a staff member
+        no longer works here and has no platform access, an admin can attest on their behalf from the
+        "Attest on behalf of former staff" screen, permanently labeled as such.
+      </div>
+
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={onBack}><ArrowLeft className="mr-1.5 h-4 w-4" /> Back to mapping</Button>
         <Button onClick={onCommit} disabled={committing || ready.length === 0}>
           {committing && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-          Import {ready.length} historical daily note{ready.length === 1 ? "" : "s"}
+          Submit {ready.length} note{ready.length === 1 ? "" : "s"} to staff for attestation
         </Button>
       </div>
     </div>
   );
 }
+
 
 function EmptyMsg({ text }: { text: string }) {
   return <div className="rounded-md border border-dashed border-border p-6 text-center text-xs text-muted-foreground">{text}</div>;
@@ -1064,9 +1075,13 @@ function DoneStep({
   return (
     <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/5 p-6 text-center">
       <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600" />
-      <div className="mt-2 font-semibold">Imported {inserted} historical daily note{inserted === 1 ? "" : "s"}</div>
+      <div className="mt-2 font-semibold">
+        Submitted {inserted} note{inserted === 1 ? "" : "s"} to staff for attestation
+      </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        Every imported note is permanently marked as a historical import and stored on the client's record.
+        Each staff member will see only their own notes and sign them one at a time. Notes remain
+        permanently marked as historical imports. If someone who wrote a note no longer works here,
+        an admin can attest on their behalf.
       </p>
       <div className="mt-4 flex justify-center gap-2">
         <Button variant="outline" onClick={onAnother}>
@@ -1076,3 +1091,4 @@ function DoneStep({
     </div>
   );
 }
+

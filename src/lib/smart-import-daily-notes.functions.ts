@@ -107,12 +107,11 @@ export const importHistoricalDailyNotes = createServerFn({ method: "POST" })
         log_date: iso,
         narrative: r.narrative,
         pcsp_goals_addressed: r.pcsp_goals_addressed ?? [],
-        // Historical notes are already-completed evidence, not pending
-        // moderation. Mark them approved so they file into the record as
-        // historical evidence but stay clearly labeled as such.
-        status: "approved",
-        approved_at: nowIso,
-        approved_by: userId,
+        // Stage 3 lands rows in a "submitted to staff" bucket. They are NOT
+        // approved evidence until the original staff member individually
+        // signs each one in stage 4 (or an admin attests on behalf of a
+        // former staff member with no platform access).
+        status: "pending_staff_attestation",
         backdated: true,
         submitted_late: false,
         import_source: "historical_import",
@@ -138,7 +137,7 @@ export const importHistoricalDailyNotes = createServerFn({ method: "POST" })
     await supabase
       .from("import_jobs")
       .update({
-        status: "committed",
+        status: "submitted_to_staff",
         committed_at: new Date().toISOString(),
         committed_by: userId,
       })
@@ -146,3 +145,4 @@ export const importHistoricalDailyNotes = createServerFn({ method: "POST" })
 
     return { inserted, rejected };
   });
+

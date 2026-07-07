@@ -1,14 +1,36 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, ChevronLeft, ChevronRight, Utensils, Settings2, Check } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import {
+  Plus,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  Utensils,
+  Settings2,
+  Check,
+  GripVertical,
+  ShoppingCart,
+} from "lucide-react";
 import { toast } from "sonner";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDraggable,
+  useDroppable,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+
 
 /** 0=Mon..6=Sun (matches the reference sheet). */
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;

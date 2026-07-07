@@ -41,6 +41,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   AlertTriangle,
+  CheckCircle2,
   GripVertical,
   Info,
   Plus,
@@ -72,10 +73,17 @@ import {
   type BoardStaff,
 } from "@/lib/whiteboard-board.functions";
 import {
-  scoreComposition,
   type MoveLight,
-  type MoveScore,
 } from "@/lib/rhs-board-scoring";
+import {
+  buildBoardReference,
+  scoreRhsContainer,
+  scoreHhsContainer,
+  scoreDsContainer,
+  type ContainerScore,
+  type ScoreFactor,
+} from "@/lib/whiteboard-scoring";
+import { getBoardScoringInputs } from "@/lib/whiteboard-scoring.functions";
 import { NotesPopover } from "./notes-popover";
 import { getWhiteboardNoteCounts } from "@/lib/whiteboard-notes.functions";
 

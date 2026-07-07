@@ -72,7 +72,7 @@ export async function generateChoreChartReport(
     };
   }
 
-  const [linksRes, defsRes, rotRes, dailyRes, compsRes, supportRes] = await Promise.all([
+  const [linksRes, defsRes, rotRes, dailyRes, compsRes] = await Promise.all([
     sb.from("chore_space_clients").select("client_id").eq("space_id", space.id),
     sb
       .from("chore_definitions")
@@ -96,11 +96,8 @@ export async function generateChoreChartReport(
           .gte("completion_date", compRange.fromISO)
           .lte("completion_date", compRange.toISO)
       : Promise.resolve({ data: [] as Array<{ outcome: string; client_id: string | null }> }),
-    sb
-      .from("client_chore_support")
-      .select("client_id, status, reason, goal_note")
-      .eq("organization_id", ""),  // placeholder — replaced below by post-filter
   ]);
+
 
 
   const linkedClientIds = ((linksRes.data ?? []) as Array<{ client_id: string }>).map(

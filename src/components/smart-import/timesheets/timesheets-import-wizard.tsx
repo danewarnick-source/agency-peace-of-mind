@@ -519,11 +519,15 @@ export function TimesheetsImportWizard() {
 
 // ─── Stepper ───────────────────────────────────────────────────────────────
 function Stepper({ step }: { step: 1 | 2 | 3 | 4 }) {
+  // Wizard steps map onto the four workflow stages:
+  //   Upload + Map columns  = Stage 1 (upload & parse / match)
+  //   Match & review        = Stage 2 (admin review; nothing is written yet)
+  //   Submitted             = Stage 3 landed; staff now own Stage 4 (confirmation)
   const items = [
-    { n: 1, label: "1. Upload & parse" },
-    { n: 2, label: "2. Admin review" },
-    { n: 3, label: "3. Submit to staff" },
-    { n: 4, label: "4. Awaiting staff confirmation" },
+    { n: 1, label: "Upload" },
+    { n: 2, label: "Map columns" },
+    { n: 3, label: "Admin review" },
+    { n: 4, label: "Submitted to staff" },
   ];
   return (
     <ol className="flex items-center gap-2 text-sm">

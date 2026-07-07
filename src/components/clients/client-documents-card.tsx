@@ -36,6 +36,7 @@ import {
   ingestDocument,
   queryDocuments,
   deleteDocument,
+  getDocument,
 } from "@/lib/nectar-documents.functions";
 import { attachClientDocument } from "@/lib/import-checklist.functions";
 import { NectarDocumentActionsDialog } from "@/components/nectar/document-actions-dialog";
@@ -89,6 +90,7 @@ export function ClientDocumentsCard({
   const qc = useQueryClient();
   const queryFn = useServerFn(queryDocuments);
   const delFn = useServerFn(deleteDocument);
+  const getDocFn = useServerFn(getDocument);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [offerDocId, setOfferDocId] = useState<string | null>(null);
 
@@ -255,9 +257,17 @@ export function ClientDocumentsCard({
                       .from("client-documents")
                       .createSignedUrl(d.storage_path, 300);
                     if (signed?.signedUrl) window.open(signed.signedUrl, "_blank");
+                    else toast.error("Could not generate a link for this file.");
                     return;
                   }
-                  window.open(`/dashboard/nectar-docs?doc=${d.id}`, "_blank");
+                  try {
+                    const res = await getDocFn({ data: { documentId: d.id } });
+                    const url = (res as { signedUrl?: string | null })?.signedUrl;
+                    if (url) window.open(url, "_blank");
+                    else toast.error("Could not generate a link for this file.");
+                  } catch (e) {
+                    toast.error((e as Error).message);
+                  }
                 }}
               >
                 <ExternalLink className="h-3 w-3" /> Open

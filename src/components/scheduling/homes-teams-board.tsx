@@ -152,13 +152,14 @@ export function HomesTeamsBoard() {
       if (!ids.length) return [];
       const { data: profs } = await supabase
         .from("profiles")
-        .select("id, full_name, email, team_id")
+        .select("id, full_name, email, team_id, photo_path")
         .in("id", ids);
       return (profs ?? [])
         .map((p) => ({
           id: p.id as string,
           name: (p.full_name as string) || (p.email as string) || "—",
           team_id: (p.team_id as string | null) ?? null,
+          photo_path: (p.photo_path as string | null) ?? null,
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
     },

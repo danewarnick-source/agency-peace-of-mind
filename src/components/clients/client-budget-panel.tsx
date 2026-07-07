@@ -321,10 +321,85 @@ function BudgetEditor({ budget, lines, canEdit, clientName }: { budget: Budget; 
 
   const dirty = dirtyIds.size > 0 || detailsDirty;
 
+  const periodLabel = new Date(`${budget.period_month}T00:00:00`).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
+  const buildPayload = (): BudgetPdfPayload => {
+    const toLines = (section: Section) =>
+      draft
+        .filter((l) => l.section === section)
+        .map((l) => ({
+          label: l.label ?? "",
+          non_variable: Number(l.non_variable) || 0,
+          variable: Number(l.variable) || 0,
+          notes: l.notes,
+        }));
+    return {
+      clientName,
+      periodLabel,
+      details,
+      income: toLines("income"),
+      expense: toLines("expense"),
+      other: toLines("other"),
+    };
+  };
+
+  const [pdfBusy, setPdfBusy] = useState<null | "download" | "print">(null);
+
+  const openPdf = async (mode: "download" | "print") => {
+    setPdfBusy(mode);
+    try {
+      const bytes = await renderClientBudgetPdf(buildPayload());
+      // Uint8Array → Blob (avoid ArrayBufferLike TS complaint)
+      const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const filename = budgetPdfFilename(clientName, periodLabel);
+      const win = window.open(url, "_blank", "noopener,noreferrer");
+      if (!win) {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } else if (mode === "print") {
+        // Trigger print once loaded (browser PDF viewer honors afterprint via user).
+        win.addEventListener("load", () => {
+          try { win.focus(); win.print(); } catch { /* noop */ }
+        });
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not generate PDF");
+    } finally {
+      setPdfBusy(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {canEdit && (
-        <div className="flex items-center justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => openPdf("download")}
+          disabled={pdfBusy !== null}
+        >
+          <FileText className="mr-2 h-4 w-4" />
+          {pdfBusy === "download" ? "Building…" : "Download PDF"}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => openPdf("print")}
+          disabled={pdfBusy !== null}
+        >
+          <Printer className="mr-2 h-4 w-4" />
+          {pdfBusy === "print" ? "Building…" : "Print"}
+        </Button>
+        {canEdit && (
           <Button
             size="sm"
             onClick={() => saveAll.mutate()}
@@ -333,8 +408,9 @@ function BudgetEditor({ budget, lines, canEdit, clientName }: { budget: Budget; 
             <Save className="mr-2 h-4 w-4" />
             {saveAll.isPending ? "Saving…" : dirty ? "Save changes" : "Saved"}
           </Button>
-        </div>
-      )}
+        )}
+      </div>
+
 
       <SectionBlock
         title="Income"

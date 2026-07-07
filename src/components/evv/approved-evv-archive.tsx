@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { CheckboxMultiSelect } from "@/components/ui/checkbox-multi-select";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
 import { downloadCsv } from "@/lib/utah-evv-export";
+import { HistoricalTimesheetBadge } from "@/components/smart-import/timesheets/historical-timesheet-badge";
 import { toast } from "sonner";
 
 const searchSchema = z.object({
@@ -444,7 +445,12 @@ export function EvvArchivePage() {
                     )}
                   </td>
                   <td className="px-3 py-2 font-mono text-xs">{r.service_type_code}</td>
-                  <td className="px-3 py-2">{fmtDate(r.clock_in_timestamp)}</td>
+                  <td className="px-3 py-2">
+                    {fmtDate(r.clock_in_timestamp)}
+                    {r.import_source === "historical_import" && (
+                      <div className="mt-0.5"><HistoricalTimesheetBadge /></div>
+                    )}
+                  </td>
                   <td className="px-3 py-2">
                     {fmtTs(inTs)} → {fmtTs(outTs)}
                     {r.is_edited_by_admin && (

@@ -453,7 +453,7 @@ function SubjectReview({
         { id: "medications", label: "Medications / MAR" },
         { id: "goals", label: "PCSP goals" },
         { id: "services", label: "Services" },
-        { id: "plan", label: "Plan & documents", badge: extraCount || undefined },
+        { id: "plan", label: "Unmatched notes", badge: extraCount || undefined },
         { id: "staff", label: "Staff & training" },
         { id: "review", label: "Review", badge: (askCount + issueCount) || undefined },
       ]

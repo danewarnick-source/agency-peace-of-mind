@@ -1066,7 +1066,21 @@ export function WhiteboardPlanningBoard() {
         next.staff[parsed.id] = dest;
       }
       historyRef.current.push(prev);
+      setDirty(true);
       return next;
+    });
+  }
+
+  /** Load the org's REAL structure into the sandbox as the starting arrangement. */
+  function loadCurrent() {
+    if (!rhs || !wb || !currentStaffPlacements) return;
+    const start = buildCurrentPlan(rhs, wb, currentStaffPlacements);
+    startingRef.current = start;
+    historyRef.current = [];
+    setPlan(start);
+    setScenarios(emptyScenarios);
+    setMode("current");
+    setDirty(false);
     });
   }
 

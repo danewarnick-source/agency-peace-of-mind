@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type { CaseloadClient } from "@/hooks/use-caseload";
 import { FaceSheetInfoCard } from "@/components/clients/face-sheet-info-card";
+import { ClientPhotoCard } from "@/components/clients/client-photo-card";
 
 export function AboutTab({ client }: { client: CaseloadClient }) {
   const goals = client.pcsp_goals ?? [];

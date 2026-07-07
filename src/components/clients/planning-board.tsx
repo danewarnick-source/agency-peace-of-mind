@@ -950,6 +950,19 @@ export function WhiteboardPlanningBoard() {
           scoring will be wired in a later pass.
         </div>
       </div>
+      <DragOverlay dropAnimation={null}>
+        {(() => {
+          if (!activeId) return null;
+          const parsed = parseDraggable(activeId);
+          if (!parsed) return null;
+          if (parsed.kind === "client") {
+            const c = rhsClientById.get(parsed.id) ?? wbClientById.get(parsed.id);
+            return c ? <ClientPillOverlay client={c} /> : null;
+          }
+          const s = staffById.get(parsed.id);
+          return s ? <StaffPillOverlay staff={s} /> : null;
+        })()}
+      </DragOverlay>
     </DndContext>
     </NotesBoardContext.Provider>
   );

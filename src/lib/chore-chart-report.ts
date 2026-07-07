@@ -126,6 +126,9 @@ export async function generateChoreChartReport(
       id: c.id,
       name: `${c.first_name} ${c.last_name}`.trim(),
     })),
+    dailyItems: ((dailyRes.data ?? []) as Array<{ label: string; detail: string | null }>).map(
+      (d) => ({ label: d.label, detail: d.detail }),
+    ),
     definitions: defs.map((d) => ({
       id: d.id,
       chore_name: d.chore_name,

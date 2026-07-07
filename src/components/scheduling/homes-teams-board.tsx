@@ -694,10 +694,14 @@ export function HomesTeamsBoard() {
                                 }
                                 className="group flex items-center gap-2 rounded-md border border-transparent bg-card px-2 py-1.5 text-left text-xs hover:border-border hover:bg-muted/50"
                               >
-                                {isMgr ? (
+                                <PersonAvatar
+                                  bucket="staff-photos"
+                                  path={s!.photo_path}
+                                  name={s!.name}
+                                  className="h-6 w-6 text-[10px] border"
+                                />
+                                {isMgr && (
                                   <Star className="h-3.5 w-3.5 shrink-0 fill-warning text-warning-foreground" />
-                                ) : (
-                                  <UserRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                                 )}
                                 <span className="flex-1 truncate font-medium">
                                   {s!.name}

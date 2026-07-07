@@ -236,6 +236,9 @@ export function ClientBudgetPanel({ clientId }: { clientId: string }) {
             budget={budget}
             lines={lines}
             canEdit={canEdit}
+            clientId={clientId}
+            organizationId={orgId ?? ""}
+            orgName={org?.organization_name ?? "Organization"}
             clientName={
               [clientQ.data?.first_name, clientQ.data?.last_name].filter(Boolean).join(" ") || "Client"
             }

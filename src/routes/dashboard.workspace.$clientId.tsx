@@ -311,14 +311,17 @@ function ClientWorkspace() {
               { v: "emar", label: "MAR", Icon: Pill, show: emarEnabled },
               { v: "forms", label: "Forms", Icon: FileText, show: true },
               { v: "meals", label: "Meals", Icon: Utensils, show: true },
+              { v: "chores", label: "Chores", Icon: Sparkles, show: hasChores },
               { v: "behavior-data", label: "Behavior Data", Icon: Brain, show: showBehaviorTab },
             ].filter((t) => t.show);
             const gridCls =
-              tabDefs.length === 4
+              tabDefs.length <= 4
                 ? "grid-cols-4"
                 : tabDefs.length === 5
                   ? "grid-cols-5"
-                  : "grid-cols-6";
+                  : tabDefs.length === 6
+                    ? "grid-cols-6"
+                    : "grid-cols-7";
             return (
               <TabsList
                 className={`grid h-auto w-full ${gridCls} gap-1 border-b border-border bg-transparent p-0 text-foreground`}

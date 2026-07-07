@@ -13,7 +13,10 @@ import {
   type ClientDraft,
   type ValidationIssue,
 } from "@/lib/import-validation";
-import { fetchTenantIdentity } from "@/lib/service-classification";
+import { fetchTenantIdentity, partitionCodeRows } from "@/lib/service-classification";
+import { isClockableServiceCode } from "@/lib/service-billing";
+import { isEvvLockedCode, evvServiceLabel } from "@/lib/evv-codes";
+
 
 
 const JobId = z.object({ jobId: z.string().uuid() });
@@ -727,9 +730,12 @@ export const computeProvisioningForecast = createServerFn({ method: "POST" })
       .select("id, trigger_type, trigger_value, action_type, target_module, default_state, applies_to, is_active, notes")
       .eq("org_id", subj.org_id).eq("is_active", true);
 
-    const matchedRules: Array<{ rule_id: string; target_module: string; planned_action: string; state: string; reason: string }> = [];
+    const matchedRules: Array<{ rule_id: string | null; target_module: string; planned_action: string; state: string; reason: string }> = [];
     for (const r of rules ?? []) {
       if (r.applies_to !== "both" && r.applies_to !== subj.subject_type) continue;
+      // Skip generic time_clock rules — clock provisioning is now derived
+      // per-code from the client's OWNED billing codes below (EVV vs non-EVV).
+      if (r.target_module === "time_clock") continue;
       let match = false;
       let reason = "";
       if (r.trigger_type === "data_present") {
@@ -762,6 +768,36 @@ export const computeProvisioningForecast = createServerFn({ method: "POST" })
         });
       }
     }
+
+    // Derive time-clock provisioning per OWNED billing code so every
+    // clockable code the tenant will bill for shows up on Step 8, split
+    // into EVV-mandated vs non-EVV (payroll/evidence) capture.
+    if (subj.subject_type === "client") {
+      const tenant = await fetchTenantIdentity(sb, subj.org_id);
+      const rowsRaw = ((fields ?? []) as Array<{ target_field: string; value: string }>)
+        .filter((f) => f.target_field === "billing_code_row");
+      const parsedRows: Array<{ service_code: string; provider_name: string | null }> = [];
+      for (const r of rowsRaw) {
+        try {
+          const p = parseBillingRowLoose(JSON.parse(r.value));
+          if (p) parsedRows.push(p);
+        } catch { /* skip malformed */ }
+      }
+      const part = partitionCodeRows(parsedRows, tenant, {});
+      const ourCodes = Array.from(new Set(part.ours.map((r) => r.service_code)));
+      for (const code of ourCodes) {
+        if (!isClockableServiceCode(code)) continue; // filters HHS/PPS/MTP
+        const evv = isEvvLockedCode(code);
+        matchedRules.push({
+          rule_id: null,
+          target_module: evv ? "time_clock_evv" : "time_clock_non_evv",
+          planned_action: "enable_feature",
+          state: "will_create",
+          reason: `${evvServiceLabel(code)} — ${evv ? "EVV (geofence + UEVV)" : "non-EVV (payroll / service evidence)"}`,
+        });
+      }
+    }
+
 
     // Replace existing forecast rows for this subject (forecast only — no real records)
     await sb.from("provisioning_plan").delete().eq("subject_id", data.subjectId).eq("attributed_to_admin", false);
@@ -851,7 +887,7 @@ export const confirmAssignment = createServerFn({ method: "POST" })
 // rows with `relation_type='caseload'`, `staff_record_id=<real staff id>`,
 // `status='confirmed'`. Real `staff_assignments` rows are written by
 // `applyAssignmentMap` on commit (so failed commits don't leak).
-import { partitionCodeRows } from "@/lib/service-classification";
+
 
 function parseBillingRowLoose(v: unknown): { service_code: string; provider_name: string | null } | null {
   if (!v || typeof v !== "object") return null;

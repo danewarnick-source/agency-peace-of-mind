@@ -3056,42 +3056,67 @@ function ProvisioningPanel({ subjectId, onChanged }: { subjectId: string; onChan
   });
 
   if (q.isLoading) return <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">Computing forecast…</div>;
-  const plan = q.data?.plan ?? [];
+  type PlanRow = { id: string; target_module: string; planned_action: string; state: string; reason: string | null };
+  const plan: PlanRow[] = q.data?.plan ?? [];
+
+  const prettifyModule = (m: string) => {
+    if (m === "time_clock_evv") return "Time clock (EVV — geofence + UEVV)";
+    if (m === "time_clock_non_evv") return "Time clock (non-EVV — payroll / evidence)";
+    if (m === "time_clock") return "Time clock";
+    return m.replace(/_/g, " ");
+  };
+  const groupOrder: Array<{ key: string; label: string; match: (m: string) => boolean }> = [
+    { key: "evv", label: "Time clock — EVV mandated", match: (m) => m === "time_clock_evv" },
+    { key: "nonevv", label: "Time clock — non-EVV (payroll / evidence)", match: (m) => m === "time_clock_non_evv" || m === "time_clock" },
+    { key: "other", label: "Other modules", match: (m) => !m.startsWith("time_clock") },
+  ];
+  const grouped = groupOrder
+    .map((g) => ({ ...g, items: plan.filter((p) => g.match(p.target_module)) }))
+    .filter((g) => g.items.length > 0);
+
+  const renderRow = (p: PlanRow) => (
+    <div key={p.id} className="flex flex-col gap-2 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <div className="text-sm font-medium">{prettifyModule(p.target_module)} · <span className="text-xs uppercase tracking-wide text-muted-foreground">{p.planned_action.replace(/_/g, " ")}</span></div>
+        {p.reason && <div className="mt-0.5 text-xs text-muted-foreground">{p.reason}</div>}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="outline" className="capitalize">{p.state.replace(/_/g, " ")}</Badge>
+        <Select value={p.state} onValueChange={(v) => m.mutate({ planId: p.id, state: v as "will_create" | "draft" | "added_by_admin" | "na" })}>
+          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="will_create">Will create</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="added_by_admin">Added by admin</SelectItem>
+            <SelectItem value="na">N/A (skip)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+
   return (
     <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="flex items-start gap-2 text-sm">
         <Info className="mt-0.5 h-4 w-4 text-primary" />
         <div>
           <div className="font-semibold">Provisioning forecast</div>
-          <p className="text-xs text-muted-foreground">Preview only — nothing is created here. Based on active automation rules for this person.</p>
+          <p className="text-xs text-muted-foreground">Preview only — nothing is created here. Time-clock entries are derived from this client's owned billing codes and split by EVV vs non-EVV. Other modules come from your automation rules.</p>
         </div>
       </div>
-      <div className="mt-3 space-y-2">
-        {plan.length === 0 && <div className="text-sm text-muted-foreground">No automation rules matched.</div>}
-        {plan.map((p: { id: string; target_module: string; planned_action: string; state: string; reason: string | null }) => (
-          <div key={p.id} className="flex flex-col gap-2 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-sm font-medium">{p.target_module.replace(/_/g, " ")} · <span className="text-xs uppercase tracking-wide text-muted-foreground">{p.planned_action.replace(/_/g, " ")}</span></div>
-              {p.reason && <div className="mt-0.5 text-xs text-muted-foreground">{p.reason}</div>}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="outline" className="capitalize">{p.state.replace(/_/g, " ")}</Badge>
-              <Select value={p.state} onValueChange={(v) => m.mutate({ planId: p.id, state: v as "will_create" | "draft" | "added_by_admin" | "na" })}>
-                <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="will_create">Will create</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="added_by_admin">Added by admin</SelectItem>
-                  <SelectItem value="na">N/A (skip)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      <div className="mt-3 space-y-4">
+        {plan.length === 0 && <div className="text-sm text-muted-foreground">No provisioning items — no owned billing codes and no automation rules matched.</div>}
+        {grouped.map((g) => (
+          <div key={g.key} className="space-y-2">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{g.label}</div>
+            {g.items.map(renderRow)}
           </div>
         ))}
       </div>
     </div>
   );
 }
+
 
 // ---------------------------- AssignmentMapPanel ----------------------------
 // Prompt 17: interactive per-client staff assigner. PCSPs don't name staff, so

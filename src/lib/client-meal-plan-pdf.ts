@@ -21,8 +21,17 @@ export type MealPdfMeal = {
   meal_slot: MealSlot;
   label: string;
   description?: string | null;
-  nutrition_value?: number | null;
+  nutrition_value?: number | null; // legacy; unused when macros are present
   estimated_cost?: number | null;
+  calories?: number | null;
+  protein_g?: number | null;
+  carbs_g?: number | null;
+  fat_g?: number | null;
+  extra_value?: number | null;
+  nutrition_estimated?: Partial<Record<
+    "calories" | "protein_g" | "carbs_g" | "fat_g" | "extra_value",
+    boolean
+  >> | null;
 };
 
 export type MealPdfShoppingItem = {
@@ -36,8 +45,10 @@ export type MealPlanPdfPayload = {
   logo?: MealPlanLogo | null;
   clientName: string;
   weekLabel: string;                // e.g. "Jul 6 – Jul 12, 2026"
-  nutritionLabel: string;           // e.g. "Fat Grams"
-  nutritionUnit: string;            // e.g. "g"
+  nutritionLabel: string;           // legacy — kept for backward compat
+  nutritionUnit: string;            // legacy
+  extraLabel?: string | null;       // custom per-client metric, when configured
+  extraUnit?: string | null;
   meals: MealPdfMeal[];
   shopping: MealPdfShoppingItem[];
   foodLikes?: string | null;

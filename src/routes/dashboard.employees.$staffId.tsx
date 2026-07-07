@@ -233,6 +233,12 @@ function StaffProfilePage() {
           <Button variant="ghost" size="sm" onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/hub/employees" })}>
             <ArrowLeft className="mr-1 h-4 w-4" /> Employees
           </Button>
+          <PersonAvatar
+            bucket="staff-photos"
+            path={(p?.photo_path as string | null) ?? null}
+            name={name}
+            className="h-11 w-11"
+          />
           <div>
             <h1 className="text-xl font-semibold">{name}</h1>
             <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">

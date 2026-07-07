@@ -36,10 +36,11 @@ import { ClientMealPlannerMount } from "@/components/clients/client-meal-planner
 import { ChoreChartForClient } from "@/components/chores/chore-chart-mount";
 import { PcspTab } from "@/components/clients/pcsp-tab";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
+import { CareSection, CareGroup } from "@/components/clients/care-section";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
 import { FaceSheetButton } from "@/components/clients/face-sheet-button";
 import { SectionsView, ClientSpecificTrainingCard, GoalsEditor, PublishConfirmDialog } from "@/components/clients/client-specific-training-card";
-import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, RefreshCw, Sparkles, Trash2, Upload, UserCircle2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, RefreshCw, Sparkles, Trash2, Upload, UserCircle2, Target, ShieldCheck, GraduationCap, HeartHandshake, Users, UtensilsCrossed, ListChecks } from "lucide-react";
 import { clientFeatureVisible } from "@/lib/client-features";
 import {
   getClientSpecificTraining,
@@ -195,17 +196,46 @@ function ClientProfileHub() {
           <ClientProfileTab clientId={clientId} onOpenFiles={() => setTab("files")} />
         </TabsContent>
 
-        <TabsContent value="care" className="space-y-4">
+        <TabsContent value="care" className="space-y-10">
           <TrainingSetupBadge clientId={clientId} />
-          <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
-          <SupportStrategiesPanel client={client} clientId={clientId} orgId={orgId} />
-          <CollapsibleSimpleCard title="Client-specific training">
-            <ClientSpecificTrainingCard clientId={clientId} />
-          </CollapsibleSimpleCard>
-          <PersonCenteredProfilePanel clientId={clientId} orgId={orgId} />
-          <CaseloadEditor clientId={clientId} />
-          <ClientMealPlannerMount clientId={clientId} />
-          <ChoreChartForClient clientId={clientId} />
+
+          {/* Group 1 — PCSP-derived planning */}
+          <CareGroup
+            label="Plan & supports"
+            hint="Built from the client's PCSP"
+          >
+            <CareSection icon={Target} accent="indigo">
+              <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
+            </CareSection>
+            <CareSection icon={ListChecks} accent="violet">
+              <SupportStrategiesPanel client={client} clientId={clientId} orgId={orgId} />
+            </CareSection>
+            <CareSection icon={GraduationCap} accent="amber">
+              <CollapsibleSimpleCard title="Client-specific training">
+                <ClientSpecificTrainingCard clientId={clientId} />
+              </CollapsibleSimpleCard>
+            </CareSection>
+            <CareSection icon={HeartHandshake} accent="rose">
+              <PersonCenteredProfilePanel clientId={clientId} orgId={orgId} />
+            </CareSection>
+          </CareGroup>
+
+          {/* Group 2 — Operational tools */}
+          <CareGroup
+            label="Operational tools"
+            hint="Day-to-day care coordination"
+            divider
+          >
+            <CareSection icon={Users} accent="sky">
+              <CaseloadEditor clientId={clientId} />
+            </CareSection>
+            <CareSection icon={UtensilsCrossed} accent="orange">
+              <ClientMealPlannerMount clientId={clientId} />
+            </CareSection>
+            <CareSection icon={Sparkles} accent="teal">
+              <ChoreChartForClient clientId={clientId} />
+            </CareSection>
+          </CareGroup>
         </TabsContent>
 
         <TabsContent value="activity" className="space-y-4">

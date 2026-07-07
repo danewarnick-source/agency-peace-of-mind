@@ -377,7 +377,7 @@ function RhsHomeContainer({
   canDrag,
 }: {
   home: RhsHome;
-  clients: RhsClient[];
+  clients: Array<RhsClient | WhiteboardClient>;
   staff: BoardStaff[];
   score: MoveScore | null;
   canDrag: boolean;

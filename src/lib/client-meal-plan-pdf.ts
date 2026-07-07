@@ -228,9 +228,15 @@ export async function renderMealPlanPdf(p: MealPlanPdfPayload): Promise<Uint8Arr
     generatedAt, pageW: PAGE_W, marginX: MARGIN_X, marginTop: MARGIN_TOP,
   });
 
-  // Sub-subtitle strip: tracked-nutrition label
+  // Sub-subtitle strip: nutrition tracking summary
   let y = p1Bottom - 20;
-  page1.drawText(`Tracked nutrition: ${p.nutritionLabel} (${p.nutritionUnit})`, {
+  const extraLabel = p.extraLabel ?? null;
+  const extraUnit = p.extraUnit ?? "";
+  const trackSummary =
+    `Tracking: calories, protein, carbs, fat` +
+    (extraLabel ? ` + ${extraLabel}${extraUnit ? ` (${extraUnit})` : ""}` : "") +
+    `. "est" = NECTAR estimate (not verified).`;
+  page1.drawText(trackSummary, {
     x: MARGIN_X, y, size: 9, font, color: C.muted,
   });
   y -= 12;

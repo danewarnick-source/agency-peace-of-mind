@@ -183,6 +183,32 @@ export function ClientMealPlannerPanel({
     return [c?.first_name, c?.last_name].filter(Boolean).join(" ").trim() || "Client";
   }, [clientQ.data]);
 
+  // Org branding logo — loaded once and reused for PDF headers.
+  const { data: branding } = useOrgBranding(orgId);
+  const [logoState, setLogoState] = useState<MealPlanLogo | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const path = branding?.logo_path;
+    if (!path) { setLogoState(null); return; }
+    (async () => {
+      try {
+        const { data, error } = await supabase.storage
+          .from("org-branding")
+          .createSignedUrl(path, 60 * 10);
+        if (error || !data?.signedUrl) throw error ?? new Error("no signed url");
+        const resp = await fetch(data.signedUrl);
+        if (!resp.ok) throw new Error("logo fetch failed");
+        const mime = resp.headers.get("content-type") || (path.endsWith(".png") ? "image/png" : "image/jpeg");
+        const buf = new Uint8Array(await resp.arrayBuffer());
+        if (!cancelled) setLogoState({ bytes: buf, mime });
+      } catch {
+        if (!cancelled) setLogoState(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [branding?.logo_path]);
+
+
   // Staff pool for the standing meal-actuals assignee selector (manager only).
   const staffQ = useQuery({
     enabled: !!orgId && canEdit,

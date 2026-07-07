@@ -2012,14 +2012,13 @@ function BillingCodesEditor({
             <thead className="text-muted-foreground">
               <tr className="border-b border-border">
                 <th className="py-1.5 px-1.5 font-medium w-[56px]">Code</th>
-                <th className="py-1.5 px-1.5 font-medium">Provider</th>
-                <th className="py-1.5 px-1.5 font-medium w-[150px]">Ownership</th>
+                <th className="py-1.5 px-1.5 font-medium min-w-[180px]">Provider</th>
+                <th className="py-1.5 px-1.5 font-medium w-[130px]">Ownership</th>
                 <th className="py-1.5 px-1.5 font-medium w-[70px]">Unit</th>
-                <th className="py-1.5 px-1.5 font-medium w-[80px] text-right">Rate ($)</th>
-                <th className="py-1.5 px-1.5 font-medium w-[96px] text-right">Annual units</th>
-                <th className="py-1.5 px-1.5 font-medium w-[120px] text-right">Monthly max units</th>
-
-                <th className="py-1.5 px-1.5 font-medium w-[150px]">Term</th>
+                <th className="py-1.5 px-1.5 font-medium min-w-[100px] text-right">Rate ($)</th>
+                <th className="py-1.5 px-1.5 font-medium w-[90px] text-right">Annual units</th>
+                <th className="py-1.5 px-1.5 font-medium w-[110px] text-right">Monthly max units</th>
+                <th className="py-1.5 px-1.5 font-medium w-[120px]">Term</th>
                 <th className="py-1.5 px-1.5 font-medium w-[70px]">Status</th>
                 <th className="py-1.5 px-1.5 w-[36px]" />
               </tr>

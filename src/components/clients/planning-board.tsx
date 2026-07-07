@@ -766,6 +766,12 @@ export function WhiteboardPlanningBoard() {
     queryFn: () => staffFn({ data: { organization_id: orgId! } }),
     enabled: !!orgId,
   });
+  const scoringFn = useServerFn(getBoardScoringInputs);
+  const scoringQ = useQuery({
+    queryKey: ["whiteboard-scoring-inputs", orgId],
+    queryFn: () => scoringFn({ data: { organization_id: orgId! } }),
+    enabled: !!orgId,
+  });
 
   const notesCountsFn = useServerFn(getWhiteboardNoteCounts);
   const notesCountsQ = useQuery({

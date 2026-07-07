@@ -301,7 +301,7 @@ function SettingsPage() {
   );
 }
 
-function AccountContactCard({ organizationId }: { organizationId: string }) {
+function BillingContactSection({ organizationId }: { organizationId: string }) {
   const qc = useQueryClient();
   const getFn = useServerFn(getAccountContact);
   const saveFn = useServerFn(updateAccountContact);
@@ -336,7 +336,7 @@ function AccountContactCard({ organizationId }: { organizationId: string }) {
         },
       }),
     onSuccess: () => {
-      toast.success("Account contact updated");
+      toast.success("Billing contact updated");
       qc.invalidateQueries({ queryKey: ["account-contact", organizationId] });
       qc.invalidateQueries({ queryKey: ["hive-exec-company", organizationId] });
     },
@@ -349,14 +349,15 @@ function AccountContactCard({ organizationId }: { organizationId: string }) {
         e.preventDefault();
         save.mutate();
       }}
-      className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
     >
-      <h2 className="text-base font-semibold">Account contact</h2>
-      <p className="text-sm text-muted-foreground">
+      <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+        <Receipt className="h-4 w-4 text-muted-foreground" /> Billing contact
+      </h3>
+      <p className="mt-1 text-xs text-muted-foreground">
         Who Hive should contact for urgent billing or account issues. Changes here are visible to the
         Hive operations team and stay in sync with their records.
       </p>
-      <div className="mt-5 grid gap-4">
+      <div className="mt-3 grid gap-4 md:grid-cols-2">
         <div className="grid gap-2">
           <Label htmlFor="ac_name">Main contact</Label>
           <Input id="ac_name" value={name} onChange={(e) => setName(e.target.value)} maxLength={200} />
@@ -365,7 +366,7 @@ function AccountContactCard({ organizationId }: { organizationId: string }) {
           <Label htmlFor="ac_email">Email</Label>
           <Input id="ac_email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={320} />
         </div>
-        <div className="grid gap-2">
+        <div className="grid gap-2 md:col-span-2">
           <Label htmlFor="ac_phone">Mobile phone</Label>
           <Input
             id="ac_phone"
@@ -378,10 +379,13 @@ function AccountContactCard({ organizationId }: { organizationId: string }) {
             Used for urgent billing SMS only. Never used for marketing.
           </p>
         </div>
+      </div>
+      <div className="mt-3">
         <Button type="submit" disabled={save.isPending || q.isLoading}>
-          {save.isPending ? "Saving…" : "Save account contact"}
+          {save.isPending ? "Saving…" : "Save billing contact"}
         </Button>
       </div>
     </form>
   );
 }
+

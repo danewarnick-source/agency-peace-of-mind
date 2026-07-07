@@ -105,7 +105,7 @@ function ReviewPage() {
   const total = subjects.length;
   const ready = subjects.filter((s) => s.review_status === "ready").length;
   const needReview = total - ready;
-  const mode = job.data.job.mode as "employee" | "client";
+  // `mode` is declared above; keep the const above for hook wiring.
 
   // Build merged org-wide queue for client-mode jobs. Current job's subjects
   // come first (so nothing about the current experience changes), then any

@@ -378,7 +378,7 @@ export function DailyNotesImportWizard() {
 
   const downloadSkipped = () => {
     if (!parsed) return;
-    const bucket = [...skippedRows, ...ambiguousRows, ...unmatchedRows];
+    const bucket = [...skippedRows, ...ambiguousRows, ...incompleteRows];
     if (bucket.length === 0) {
       toast.info("Nothing to export — every row is ready to import.");
       return;

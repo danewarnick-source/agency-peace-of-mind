@@ -666,18 +666,31 @@ const FIELD_LABELS: Record<FieldKey, { label: string; required: boolean; hint: s
 };
 
 function MapStep({
-  parsed, mapping, onChange, onBack, onNext, peopleReady, fileName,
+  parsed, mapping, onChange,
+  wholeFile, onWholeFileChange, suggestions, suggesting, people,
+  onBack, onNext, peopleReady, fileName,
 }: {
   parsed: ParsedFile;
   mapping: Mapping;
   onChange: (m: Mapping) => void;
+  wholeFile: WholeFile;
+  onWholeFileChange: (w: WholeFile) => void;
+  suggestions: Record<FieldKey, FieldSuggestion> | null;
+  suggesting: boolean;
+  people: { staff: Person[]; clients: Person[] };
   onBack: () => void;
   onNext: () => void;
   peopleReady: boolean;
   fileName: string;
 }) {
-  const canNext = mapping.staff && mapping.client && mapping.clock_in && mapping.clock_out &&
+  const staffOk = !!mapping.staff || !!wholeFile.staffId;
+  const clientOk = !!mapping.client || !!wholeFile.clientId;
+  const canNext = staffOk && clientOk && mapping.clock_in && mapping.clock_out &&
     (mapping.singleDateTimeIn || mapping.date);
+
+  const needsWholeStaff = suggestions?.staff?.whole_file_needed === true;
+  const needsWholeClient = suggestions?.client?.whole_file_needed === true;
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-border bg-card p-4">
@@ -688,11 +701,30 @@ function MapStep({
               File: {fileName} · {parsed.rows.length} row{parsed.rows.length === 1 ? "" : "s"} · {parsed.headers.length} columns detected
             </div>
           </div>
+          <div className="text-[11px] text-muted-foreground">
+            {suggesting
+              ? <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> NECTAR is reading your columns…</span>
+              : suggestions
+                ? <span>NECTAR suggested this mapping. Review and correct before continuing.</span>
+                : <span>Automatic mapping unavailable — map manually.</span>}
+          </div>
         </div>
-        <div className="grid gap-3 md:grid-cols-2">
+
+        <WholeFileConstants
+          people={people}
+          wholeFile={wholeFile}
+          onChange={onWholeFileChange}
+          needsWholeStaff={needsWholeStaff}
+          needsWholeClient={needsWholeClient}
+        />
+
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
           {(Object.keys(FIELD_LABELS) as FieldKey[]).map((k) => {
             const meta = FIELD_LABELS[k];
             if (k === "date" && mapping.singleDateTimeIn) return null;
+            const s = suggestions?.[k];
+            const disabledForWhole =
+              (k === "staff" && !!wholeFile.staffId) || (k === "client" && !!wholeFile.clientId);
             return (
               <div key={k} className="space-y-1">
                 <div className="flex items-center gap-1 text-xs font-medium">
@@ -701,10 +733,14 @@ function MapStep({
                   <span className="text-muted-foreground" title={meta.hint}>
                     <HelpCircle className="h-3 w-3" />
                   </span>
+                  {disabledForWhole && (
+                    <Badge variant="outline" className="ml-1 text-[10px]">Using whole-file value</Badge>
+                  )}
                 </div>
                 <Select
                   value={mapping[k] ?? "__none__"}
                   onValueChange={(v) => onChange({ ...mapping, [k]: v === "__none__" ? null : v })}
+                  disabled={disabledForWhole}
                 >
                   <SelectTrigger className="h-9"><SelectValue placeholder="Not mapped" /></SelectTrigger>
                   <SelectContent>
@@ -714,6 +750,7 @@ function MapStep({
                     ))}
                   </SelectContent>
                 </Select>
+                {s && !disabledForWhole && <SuggestionHint suggestion={s} />}
               </div>
             );
           })}
@@ -745,14 +782,118 @@ function MapStep({
 
       <div className="flex justify-between">
         <Button variant="ghost" onClick={onBack}><ArrowLeft className="mr-1.5 h-4 w-4" /> Back</Button>
-        <Button onClick={onNext} disabled={!canNext || !peopleReady}>
-          {!peopleReady && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+        <Button onClick={onNext} disabled={!canNext || !peopleReady || suggesting}>
+          {(!peopleReady || suggesting) && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
           Match & review <ArrowRight className="ml-1.5 h-4 w-4" />
         </Button>
       </div>
     </div>
   );
 }
+
+function SuggestionHint({ suggestion }: { suggestion: FieldSuggestion }) {
+  const color =
+    suggestion.confidence === "high" ? "text-emerald-700"
+      : suggestion.confidence === "medium" ? "text-amber-700"
+        : "text-muted-foreground";
+  if (suggestion.whole_file_needed) {
+    return (
+      <div className="text-[11px] text-destructive">
+        NECTAR: no column in this file contains this value — use the whole-file setting above.
+      </div>
+    );
+  }
+  if (!suggestion.column) {
+    return <div className="text-[11px] text-muted-foreground">NECTAR: no confident match — pick manually if applicable.</div>;
+  }
+  return (
+    <div className={`text-[11px] ${color}`}>
+      NECTAR ({suggestion.confidence}): {suggestion.reason}
+    </div>
+  );
+}
+
+function WholeFileConstants({
+  people, wholeFile, onChange, needsWholeStaff, needsWholeClient,
+}: {
+  people: { staff: Person[]; clients: Person[] };
+  wholeFile: WholeFile;
+  onChange: (w: WholeFile) => void;
+  needsWholeStaff: boolean;
+  needsWholeClient: boolean;
+}) {
+  const [staffOpen, setStaffOpen] = useState(needsWholeStaff);
+  const [clientOpen, setClientOpen] = useState(needsWholeClient);
+  return (
+    <div className="rounded-md border border-border bg-muted/30 p-3">
+      <div className="text-xs font-medium">This whole file is for one person?</div>
+      <p className="text-[11px] text-muted-foreground">
+        Some exports don't have a staff or client column at all — the whole sheet belongs to one person by
+        context. If that's the case here, pick the person below and the column mapping for that field will be
+        skipped for every row.
+      </p>
+      <div className="mt-2 grid gap-2 md:grid-cols-2">
+        <div>
+          <label className="flex items-center gap-1 text-[11px] font-medium">
+            <input
+              type="checkbox"
+              checked={staffOpen || !!wholeFile.staffId}
+              onChange={(e) => {
+                const on = e.target.checked;
+                setStaffOpen(on);
+                if (!on) onChange({ ...wholeFile, staffId: null });
+              }}
+            />
+            Entire file is for one staff member
+            {needsWholeStaff && <Badge variant="outline" className="ml-1 border-destructive/40 text-destructive text-[10px]">Required</Badge>}
+          </label>
+          {(staffOpen || wholeFile.staffId) && (
+            <Select
+              value={wholeFile.staffId ?? ""}
+              onValueChange={(v) => onChange({ ...wholeFile, staffId: v || null })}
+            >
+              <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue placeholder="Pick a staff member" /></SelectTrigger>
+              <SelectContent>
+                {people.staff.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+        <div>
+          <label className="flex items-center gap-1 text-[11px] font-medium">
+            <input
+              type="checkbox"
+              checked={clientOpen || !!wholeFile.clientId}
+              onChange={(e) => {
+                const on = e.target.checked;
+                setClientOpen(on);
+                if (!on) onChange({ ...wholeFile, clientId: null });
+              }}
+            />
+            Entire file is about one client
+            {needsWholeClient && <Badge variant="outline" className="ml-1 border-destructive/40 text-destructive text-[10px]">Required</Badge>}
+          </label>
+          {(clientOpen || wholeFile.clientId) && (
+            <Select
+              value={wholeFile.clientId ?? ""}
+              onValueChange={(v) => onChange({ ...wholeFile, clientId: v || null })}
+            >
+              <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue placeholder="Pick a client" /></SelectTrigger>
+              <SelectContent>
+                {people.clients.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function SamplePreview({ parsed, mapping }: { parsed: ParsedFile; mapping: Mapping }) {
   const sample = parsed.rows.slice(0, 3);

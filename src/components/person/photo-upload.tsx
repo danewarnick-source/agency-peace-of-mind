@@ -74,7 +74,7 @@ export function PhotoUpload({
           bucket={displayBucket}
           path={currentPath ?? null}
           name={personName ?? null}
-          className="h-16 w-16"
+          className={avatarClassName}
         />
       )}
       <div className="flex flex-wrap items-center gap-2">

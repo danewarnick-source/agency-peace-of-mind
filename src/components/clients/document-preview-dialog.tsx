@@ -168,7 +168,9 @@ function DocxPreview({ url }: { url: string }) {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const buf = await res.arrayBuffer();
-        const mammoth = await import("mammoth/mammoth.browser");
+        const mammoth = (await import("mammoth/mammoth.browser" as string)) as {
+          convertToHtml: (input: { arrayBuffer: ArrayBuffer }) => Promise<{ value: string }>;
+        };
         const result = await mammoth.convertToHtml({ arrayBuffer: buf });
         if (alive) setState({ loading: false, html: result.value, error: null });
       } catch (e) {

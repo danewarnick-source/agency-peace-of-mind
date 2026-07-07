@@ -381,7 +381,7 @@ function ClientWorkspace() {
           </TabsContent>
 
           <TabsContent value="meals" className="mt-5">
-            <ClientMealPlannerPanel clientId={client.id} readOnly />
+            <ClientMealPlannerMount clientId={client.id} readOnly />
           </TabsContent>
 
           {hasChores && (

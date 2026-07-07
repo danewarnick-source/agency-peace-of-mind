@@ -236,10 +236,19 @@ function RecordCompletenessBar({
 
   type RecState = "ok" | "missing" | "na";
   function stateFor(key: RecKey): { state: RecState; doc?: DocRow } {
+    if (key === "hrc_approval") {
+      const hrrDoc = docs.find(
+        (d) =>
+          d.document_type === "hrc_approval" ||
+          d.document_type === "human_rights" ||
+          (d.file_name ? HRR_FILENAME_RE.test(d.file_name) : false),
+      );
+      const applicable = hasRightsRestrictions || hrApplicable || !!hrrDoc;
+      if (!applicable) return { state: "na" };
+      return hrrDoc ? { state: "ok", doc: hrrDoc } : { state: "missing" };
+    }
     const doc = docs.find((d) => d.document_type === key);
     if (key === "guardian" && isOwnGuardian) return { state: "na" };
-    if (key === "hrc_approval" && !hasRightsRestrictions) return { state: "na" };
-    if (key === "human_rights" && !hrApplicable) return { state: "na" };
     if (key === "dnr") {
       if (doc) return { state: "ok", doc };
       if (dnrApplicable) return { state: "missing" };
@@ -249,7 +258,7 @@ function RecordCompletenessBar({
     return doc ? { state: "ok", doc } : { state: "missing" };
   }
 
-  const keys: RecKey[] = ["pcsp", "photograph", "grievance_acknowledgment", "grievance_policy", "individualized_plan", "human_rights", "guardian", "hrc_approval", "dnr"];
+  const keys: RecKey[] = ["pcsp", "photograph", "grievance_acknowledgment", "grievance_policy", "individualized_plan", "guardian", "hrc_approval", "dnr"];
   const states = keys.map((k) => ({ key: k, ...stateFor(k) }));
   const applicable = states.filter((s) => s.state !== "na");
   const completed = applicable.filter((s) => s.state === "ok").length;

@@ -192,35 +192,6 @@ export function ChoreChartPanel({
   });
   const rotation = rotationQ.data ?? [];
 
-  const shiftRowsQ = useQuery({
-    enabled: !!spaceId,
-    queryKey: ["chore-shift-rows", spaceId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("chore_shift_rows")
-        .select("id, label, start_time, end_time, sort_order")
-        .eq("space_id", spaceId)
-        .order("sort_order");
-      if (error) throw error;
-      return (data ?? []) as ShiftRow[];
-    },
-  });
-  const shiftRows = shiftRowsQ.data ?? [];
-
-  const shiftCellsQ = useQuery({
-    enabled: !!spaceId,
-    queryKey: ["chore-shift-cells", spaceId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("chore_shift_assignments")
-        .select("id, shift_row_id, day_of_week, task_text, helps_client_id, definition_id")
-        .eq("space_id", spaceId);
-      if (error) throw error;
-      return (data ?? []) as ShiftCell[];
-    },
-  });
-  const shiftCells = shiftCellsQ.data ?? [];
-
   const dailyItemsQ = useQuery({
     enabled: !!spaceId,
     queryKey: ["chore-daily-items", spaceId],
@@ -240,8 +211,6 @@ export function ChoreChartPanel({
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["chore-defs", spaceId] });
     qc.invalidateQueries({ queryKey: ["chore-rotation", spaceId] });
-    qc.invalidateQueries({ queryKey: ["chore-shift-rows", spaceId] });
-    qc.invalidateQueries({ queryKey: ["chore-shift-cells", spaceId] });
     qc.invalidateQueries({ queryKey: ["chore-space-clients", spaceId] });
     qc.invalidateQueries({ queryKey: ["chore-daily-items", spaceId] });
   };

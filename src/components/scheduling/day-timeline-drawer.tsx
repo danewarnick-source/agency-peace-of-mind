@@ -11,6 +11,7 @@ import { listShiftsInRange, updateShift } from "@/lib/scheduling/shifts.function
 import { listCoverageRequirements, listLocations } from "@/lib/scheduling/locations.functions";
 import { coverageCountMinutes, requiredMinutes, uncoveredBands } from "@/lib/scheduling/coverage-count";
 import { AddSegmentDialog, type ParentShiftInfo } from "@/components/scheduling/add-segment-dialog";
+import { PersonAvatar } from "@/components/person/person-avatar";
 
 interface Props {
   open: boolean;

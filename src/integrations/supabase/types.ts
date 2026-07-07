@@ -3227,6 +3227,7 @@ export type Database = {
           housing_voucher: string | null
           hr_applicable: boolean
           id: string
+          identifying_marks: string | null
           immunizations: string[] | null
           income_sources: string[] | null
           intake_date: string | null
@@ -3356,6 +3357,7 @@ export type Database = {
           housing_voucher?: string | null
           hr_applicable?: boolean
           id?: string
+          identifying_marks?: string | null
           immunizations?: string[] | null
           income_sources?: string[] | null
           intake_date?: string | null
@@ -3485,6 +3487,7 @@ export type Database = {
           housing_voucher?: string | null
           hr_applicable?: boolean
           id?: string
+          identifying_marks?: string | null
           immunizations?: string[] | null
           income_sources?: string[] | null
           intake_date?: string | null
@@ -16212,6 +16215,7 @@ export type Database = {
           housing_voucher: string | null
           hr_applicable: boolean
           id: string
+          identifying_marks: string | null
           immunizations: string[] | null
           income_sources: string[] | null
           intake_date: string | null

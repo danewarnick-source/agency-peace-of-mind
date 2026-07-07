@@ -1,0 +1,2 @@
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS identifying_marks text;
+COMMENT ON COLUMN public.clients.identifying_marks IS 'Free text: scars, tattoos, birthmarks, prosthetics — used on the Client Face Sheet for missing-person identification.';

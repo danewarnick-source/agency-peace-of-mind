@@ -111,7 +111,7 @@ export function EmployeesPage() {
       const ids = (data ?? []).map((m) => m.user_id);
       const { data: profs } = await supabase.from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, must_change_password, department, hire_date, start_date, end_date, employee_id, position, positions, account_status, worker_type, ce_suggested_topics" as any)
+        .select("id, full_name, email, username, must_change_password, department, hire_date, start_date, end_date, employee_id, position, positions, account_status, worker_type, ce_suggested_topics, photo_path, photo_updated_at" as any)
         .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const profMap = new Map(((profs ?? []) as any[]).map((p) => [p.id as string, p]));

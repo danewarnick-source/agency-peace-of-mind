@@ -64,6 +64,13 @@ import {
   type MealPlanLogo,
   type PlanActualRow,
 } from "@/lib/client-meal-plan-pdf";
+import {
+  generatePlanVsActualReport,
+  shipPlanVsActualReport,
+  rangeLabelOf,
+  rangeTagOf,
+} from "@/lib/meal-plan-vs-actual-report";
+
 
 
 

@@ -630,6 +630,19 @@ export function WhiteboardPlanningBoard() {
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
 
+  /**
+   * Collision detection: prefer the droppable directly under the pointer
+   * (fixes the case where a small pill dragged from the pool still overlaps
+   * its origin container by rect and the origin "wins" over the intended
+   * target). Falls back to rectIntersection only if the pointer is between
+   * containers (whitespace).
+   */
+  const collisionDetection: CollisionDetection = (args) => {
+    const pointerHits = pointerWithin(args);
+    if (pointerHits.length > 0) return pointerHits;
+    return rectIntersection(args);
+  };
+
   // --- Indexes -----------------------------------------------------------
 
   const rhsClientById = useMemo(() => {

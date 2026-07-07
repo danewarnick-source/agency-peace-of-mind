@@ -1387,6 +1387,7 @@ export function WhiteboardPlanningBoard() {
                       key={c.id}
                       client={c}
                       staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
+                      score={scoreByDs.get(`ds-client:${c.id}`) ?? null}
                       canDrag={canDrag}
                     />
                   );
@@ -1401,6 +1402,7 @@ export function WhiteboardPlanningBoard() {
                       name={sl.name}
                       clients={cIds.map((id) => rhsClientById.get(id) ?? wbClientById.get(id)).filter(Boolean) as Array<RhsClient | WhiteboardClient>}
                       staff={sIds.map((id) => staffById.get(id)).filter(Boolean) as BoardStaff[]}
+                      score={scoreByDs.get(`ds-slot:${sl.id}`) ?? null}
                       canDrag={canDrag}
                       onRename={(v) => renameScenario("dsSlots", sl.id, v)}
                       onRemove={() => removeScenario("dsSlots", sl.id)}

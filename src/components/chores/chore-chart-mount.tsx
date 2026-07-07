@@ -265,6 +265,13 @@ export function ChoreChartForClient({
     </Card>
   );
 
+  const ownedContent =
+    clientOwnedSpaces.length === 0
+      ? createBlock
+      : clientOwnedSpaces.map((s) => (
+          <ChoreChartPanel key={s.id} spaceId={s.id} readOnly={readOnly} />
+        ));
+
   return (
     <div className="space-y-4">
       {/* RHS/HHS: ON by default — show home-linked charts directly. */}
@@ -272,14 +279,12 @@ export function ChoreChartForClient({
         <ChoreChartPanel key={s.id} spaceId={s.id} readOnly={readOnly} />
       ))}
 
-      {/* DSI/SLH/SLN/other: gated by per-client activation. */}
-      <ChoreSupportGate clientId={clientId}>
-        {clientOwnedSpaces.length === 0
-          ? createBlock
-          : clientOwnedSpaces.map((s) => (
-              <ChoreChartPanel key={s.id} spaceId={s.id} readOnly={readOnly} />
-            ))}
-      </ChoreSupportGate>
+      {/* HHS/RHS clients (by authorized code) skip the activation gate even if
+          they don't yet have a linked home chart — chore support is inherent. */}
+      {hasResidentialCode ? ownedContent : (
+        <ChoreSupportGate clientId={clientId}>{ownedContent}</ChoreSupportGate>
+      )}
     </div>
   );
 }
+

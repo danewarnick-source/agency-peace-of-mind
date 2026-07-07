@@ -237,6 +237,8 @@ export function DailyNotesImportWizard() {
   const createJob = useServerFn(createDailyNotesImportJob);
   const commitRows = useServerFn(importHistoricalDailyNotes);
   const suggestMap = useServerFn(suggestImportColumnMapping);
+  const checkDupes = useServerFn(checkImportDuplicates);
+  const [dupeChecking, setDupeChecking] = useState(false);
 
 
   const peopleQ = useQuery({

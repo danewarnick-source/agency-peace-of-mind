@@ -242,7 +242,15 @@ export function ClientMealPlannerPanel({
   });
 
   const addMeal = useMutation({
-    mutationFn: async ({ day, slot }: { day: number; slot: Slot }) => {
+    mutationFn: async ({
+      day,
+      slot,
+      recipe,
+    }: {
+      day: number;
+      slot: Slot;
+      recipe?: Recipe | null;
+    }) => {
       let pid = planId;
       if (!pid) {
         const created = await createPlan.mutateAsync();
@@ -255,7 +263,8 @@ export function ClientMealPlannerPanel({
         meal_plan_id: pid,
         day_of_week: day,
         meal_slot: slot,
-        label: "",
+        label: recipe?.name ?? "",
+        recipe_id: recipe?.id ?? null,
         sort_order: existing.length,
       });
       if (error) throw error;

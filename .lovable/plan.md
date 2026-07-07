@@ -1,33 +1,51 @@
-## Problem
+## Goal
 
-In the client Files tab, clicking **Open** on a document doesn't always show the file in its native format:
+Replace the "open in a new tab / download" behavior on a client document with an in-app preview dialog that lets the user scroll through the file and, from the same dialog, download it.
 
-- **Client-source docs** (PCSP uploaded to `client-documents` bucket) already open the signed URL, so PDFs render inline and DOCX/others download — this path is fine.
-- **Nectar-source docs** (everything else) open `/dashboard/nectar-docs?doc={id}` — an internal viewer route that renders the parsed text/PDF preview, not the original DOCX/CSV/etc. So a Word doc uploaded here never opens as a Word doc.
+## UX
 
-## Plan
+- Click **Open** on a Files-tab row → a large modal (`Dialog`, ~90vw × 85vh) opens.
+- Header: file title, badge with file type, and a **Download** button (+ close X).
+- Body: scrollable preview area sized to the dialog. Content depends on file type:
+  - **PDF** → `<iframe src={signedUrl}>` (browser's native PDF viewer, full scroll/zoom).
+  - **Images** (png/jpg/jpeg/gif/webp/svg) → `<img>` with `object-contain`, scrollable.
+  - **Plain text / CSV / MD / JSON / HTML source** → fetch text from signed URL, render in a `<pre>` (or highlighted `<code>` for JSON).
+  - **DOCX** → convert to HTML in the browser with `mammoth` (already Worker-safe; runs client-side), render inside a styled scroll container.
+  - **DOC (legacy)** or anything unrecognized → show a "Preview not available for this file type" message with the Download button front-and-center.
+- Download button = anchor to the signed URL with `download={file_name}` attribute so the browser saves the original file with its real name.
 
-Frontend-only change to `src/components/clients/client-documents-card.tsx`.
+## Implementation
 
-Replace the nectar branch of the **Open** handler so it fetches a signed URL to the original file and opens it in a new tab, mirroring the client-source path.
+New file: `src/components/clients/document-preview-dialog.tsx`
+- Props: `{ open, onOpenChange, doc: { id, fileName, mimeType?, signedUrl } }`
+- Detect kind from `mimeType` first, fall back to filename extension.
+- For DOCX: `bun add mammoth` (browser build). Lazy-import inside the DOCX branch so it isn't loaded until needed. Fetch the file as `arrayBuffer` from the signed URL, call `mammoth.convertToHtml`, inject sanitized HTML into a `prose`-styled container.
+- Loading state (spinner) while fetching text / DOCX conversion.
+- Error state falls back to the "download instead" panel.
 
-- Add a `useServerFn(getDocument)` binding at the top of `ClientDocumentsCard` (already imported alongside the other nectar server fns).
-- In the row's Open `onClick`:
-  - If `d.source === "client"` → keep existing signed-URL flow from the `client-documents` bucket.
-  - Else (nectar) → call `getDocument({ data: { documentId: d.id } })`, then `window.open(res.signedUrl, "_blank")`. Toast an error if no URL comes back.
-- Remove the `window.open("/dashboard/nectar-docs?doc=…")` fallback for nectar docs. The internal viewer is still reachable from the Nectar Docs page itself; the Open button on a client's Files card is about seeing the file.
+Edit: `src/components/clients/client-documents-card.tsx`
+- Add local state `previewDoc: { id, fileName, mimeType, signedUrl } | null`.
+- Rewrite the row **Open** handler:
+  - Client-source → generate signed URL from `client-documents` bucket, then open the preview dialog with `{ fileName: d.file_name, mimeType: <derive>, signedUrl }`.
+  - Nectar-source → `getDocFn({ data: { documentId: d.id } })` → open the preview dialog with `{ fileName: doc.file_name, mimeType: doc.mime_type, signedUrl }`.
+- Render `<DocumentPreviewDialog />` next to the existing dialogs.
 
-Because we hand the browser the raw file URL with its stored `mime_type`, PDFs render inline, DOCX/XLSX/CSV/TXT download or open in the OS handler — native behavior per file type, as requested.
+### DocRow shape
+
+Add `mime_type` to the nectar branch of the merge query (already selected in the server fn) so we can pass it to the dialog without an extra round trip. Client-source rows can pass `null` — the dialog derives type from extension.
 
 ## Verification
 
 On the client Files tab:
-- Open on a PDF → opens in the browser PDF viewer (new tab).
-- Open on a .docx → browser downloads / hands off to Word (native).
-- Open on a .txt / .csv → opens as text in the tab.
-- Open on the PCSP (client-source) → unchanged.
+- PDF → preview scrolls in the dialog; Download saves the PDF.
+- .docx → renders as formatted HTML in the dialog; Download saves the original .docx.
+- .png/.jpg → image renders inside the scroll area.
+- .txt/.csv/.json → text renders in a `<pre>`.
+- .doc or unknown type → "Preview not available" panel with Download button.
+- Existing PCSP (client-source) preview and Nectar-source preview both work.
 
 ## Out of scope
 
-- The Nectar Docs viewer page itself (still works when navigating from Nectar Docs).
-- Any bucket, MIME, or schema changes.
+- No changes to the standalone Nectar Docs page.
+- No server-side rendering of DOCX / no new server functions.
+- No editing or annotation inside the preview.

@@ -88,6 +88,8 @@ type ActualRow = {
   meal_slot: Slot;
   outcome: Outcome;
   note: string | null;
+  confirmed_by: string | null;
+  confirmed_at: string | null;
 };
 
 function mondayOf(d: Date): Date {
@@ -136,7 +138,7 @@ export function ClientMealPlannerPanel({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("dietary_needs, allergies, needs_shopping_help")
+        .select("dietary_needs, allergies, needs_shopping_help, meal_actuals_assignee, team_id")
         .eq("id", clientId)
         .maybeSingle();
       if (error) throw error;
@@ -144,16 +146,62 @@ export function ClientMealPlannerPanel({
         dietary_needs: string | null;
         allergies: string[] | null;
         needs_shopping_help: boolean | null;
+        meal_actuals_assignee: string | null;
+        team_id: string | null;
       } | null;
     },
   });
   const needsHelp = !!clientQ.data?.needs_shopping_help;
+
+  // Staff pool for the standing meal-actuals assignee selector (manager only).
+  const staffQ = useQuery({
+    enabled: !!orgId && canEdit,
+    queryKey: ["mp-org-staff", orgId],
+    queryFn: async () => {
+      const { data: members } = await supabase
+        .from("organization_members")
+        .select("user_id")
+        .eq("organization_id", orgId!)
+        .eq("active", true);
+      const ids = (members ?? [])
+        .map((m) => (m as { user_id: string | null }).user_id)
+        .filter((x): x is string => !!x);
+      if (!ids.length) return [] as { id: string; name: string }[];
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, full_name")
+        .in("id", ids);
+      return ((profs ?? []) as Array<{
+        id: string; first_name: string | null; last_name: string | null; full_name: string | null;
+      }>)
+        .map((p) => ({
+          id: p.id,
+          name:
+            (p.full_name?.trim()) ||
+            [p.first_name, p.last_name].filter(Boolean).join(" ").trim() ||
+            "Staff",
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    },
+  });
 
   const toggleNeedsHelp = useMutation({
     mutationFn: async (v: boolean) => {
       const { error } = await supabase
         .from("clients")
         .update({ needs_shopping_help: v })
+        .eq("id", clientId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["mp-client-diet", clientId] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const setAssignee = useMutation({
+    mutationFn: async (userId: string | null) => {
+      const { error } = await supabase
+        .from("clients")
+        .update({ meal_actuals_assignee: userId })
         .eq("id", clientId);
       if (error) throw error;
     },
@@ -370,7 +418,7 @@ export function ClientMealPlannerPanel({
     queryFn: async (): Promise<ActualRow[]> => {
       const { data, error } = await supabase
         .from("client_meal_actuals")
-        .select("id, meal_plan_id, actual_date, meal_slot, outcome, note")
+        .select("id, meal_plan_id, actual_date, meal_slot, outcome, note, confirmed_by, confirmed_at")
         .eq("meal_plan_id", planId!);
       if (error) throw error;
       return (data ?? []) as ActualRow[];
@@ -657,8 +705,23 @@ export function ClientMealPlannerPanel({
         />
 
 
-        {/* Staff "what did they actually eat" — current day */}
-        {planId && canRecordActuals && (
+        {/* Actuals — staff record; manager sees read-only plan-vs-actual */}
+        {planId && canEdit && (
+          <>
+            <ActualsAssigneeCard
+              value={clientQ.data?.meal_actuals_assignee ?? null}
+              staff={staffQ.data ?? []}
+              onChange={(id) => setAssignee.mutate(id)}
+            />
+            <ActualsReadOnly
+              weekStart={weekStart}
+              actuals={actualsQ.data ?? []}
+              meals={meals}
+              staff={staffQ.data ?? []}
+            />
+          </>
+        )}
+        {planId && !canEdit && canRecordActuals && (
           <ActualsToday
             planId={planId}
             actuals={actualsQ.data ?? []}
@@ -1063,6 +1126,112 @@ function ActualsToday({
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function ActualsAssigneeCard({
+  value,
+  staff,
+  onChange,
+}: {
+  value: string | null;
+  staff: { id: string; name: string }[];
+  onChange: (id: string | null) => void;
+}) {
+  return (
+    <div className="rounded-md border p-3">
+      <div className="mb-1 flex items-center gap-2">
+        <h4 className="text-sm font-semibold">Meal-actuals assignee</h4>
+        <Badge variant="outline" className="text-[10px]">Optional</Badge>
+      </div>
+      <p className="mb-2 text-xs text-muted-foreground">
+        Standing staff who can always record what was eaten. On-shift staff and the
+        assigned/respite host can record actuals too.
+      </p>
+      <select
+        className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value || null)}
+      >
+        <option value="">— No standing assignee —</option>
+        {staff.map((s) => (
+          <option key={s.id} value={s.id}>{s.name}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function ActualsReadOnly({
+  weekStart,
+  actuals,
+  meals,
+  staff,
+}: {
+  weekStart: Date;
+  actuals: ActualRow[];
+  meals: MealRow[];
+  staff: { id: string; name: string }[];
+}) {
+  const staffName = (id: string | null) =>
+    (id && staff.find((s) => s.id === id)?.name) || (id ? "Staff" : "—");
+  const outcomeLabel = (v: Outcome) => OUTCOMES.find((o) => o.v === v)?.label ?? v;
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const plannedFor = (dow: number, slot: Slot) =>
+    meals.filter((m) => m.day_of_week === dow && m.meal_slot === slot)
+      .map((m) => m.label || "(unnamed)").join(", ") || "—";
+  const actualFor = (dateISO: string, slot: Slot) =>
+    actuals.find((a) => a.actual_date === dateISO && a.meal_slot === slot);
+  return (
+    <div className="rounded-md border">
+      <div className="flex items-center justify-between border-b bg-muted/40 px-3 py-2">
+        <h4 className="text-sm font-semibold">Plan vs. actual — this week</h4>
+        <Badge variant="outline" className="text-[10px]">Read-only — staff records</Badge>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-muted/30 text-left">
+            <tr>
+              <th className="px-2 py-1 font-semibold">Day</th>
+              <th className="px-2 py-1 font-semibold">Slot</th>
+              <th className="px-2 py-1 font-semibold">Planned</th>
+              <th className="px-2 py-1 font-semibold">Outcome</th>
+              <th className="px-2 py-1 font-semibold">Note</th>
+              <th className="px-2 py-1 font-semibold">Confirmed by</th>
+            </tr>
+          </thead>
+          <tbody>
+            {days.flatMap((d, i) =>
+              SLOTS.map((slot) => {
+                const iso = fmtISO(d);
+                const a = actualFor(iso, slot);
+                return (
+                  <tr key={`${iso}-${slot}`} className="border-t">
+                    <td className="px-2 py-1 whitespace-nowrap">
+                      {DAYS[i].slice(0, 3)} {shortDate(d)}
+                    </td>
+                    <td className="px-2 py-1 capitalize">{slot}</td>
+                    <td className="px-2 py-1 text-muted-foreground">{plannedFor(i, slot)}</td>
+                    <td className="px-2 py-1">
+                      {a ? outcomeLabel(a.outcome) : <span className="text-muted-foreground">—</span>}
+                    </td>
+                    <td className="px-2 py-1 text-muted-foreground">{a?.note ?? ""}</td>
+                    <td className="px-2 py-1 whitespace-nowrap text-muted-foreground">
+                      {a ? (
+                        <>
+                          {staffName(a.confirmed_by)}
+                          {a.confirmed_at ? ` · ${new Date(a.confirmed_at).toLocaleDateString()}` : ""}
+                        </>
+                      ) : ""}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

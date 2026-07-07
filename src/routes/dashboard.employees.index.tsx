@@ -28,6 +28,7 @@ import { CustomAttributesSection } from "@/components/custom-attributes-section"
 import { LifecyclePanel } from "@/components/lifecycle-panel";
 import { SuggestedTopicsInput } from "@/components/ce/suggested-topics-input";
 import { getRosterTrainingStatus } from "@/lib/hive-training-roster.functions";
+import { PersonAvatar } from "@/components/person/person-avatar";
 import { useEntitlements } from "@/hooks/use-entitlements";
 import { StaffTrainingStrip, type StaffTrainingStatus } from "@/components/training/staff-training-strip";
 
@@ -111,7 +112,7 @@ export function EmployeesPage() {
       const ids = (data ?? []).map((m) => m.user_id);
       const { data: profs } = await supabase.from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, must_change_password, department, hire_date, start_date, end_date, employee_id, position, positions, account_status, worker_type, ce_suggested_topics" as any)
+        .select("id, full_name, email, username, must_change_password, department, hire_date, start_date, end_date, employee_id, position, positions, account_status, worker_type, ce_suggested_topics, photo_path, photo_updated_at" as any)
         .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const profMap = new Map(((profs ?? []) as any[]).map((p) => [p.id as string, p]));
@@ -400,12 +401,8 @@ export function EmployeesPage() {
                 const needsReset = m.profile?.must_change_password;
                 const position = (m.profile?.position ?? "") as Position | "";
                 const startDate = (m.profile?.start_date ?? m.profile?.hire_date ?? null) as string | null;
-                const initials = (name || "—")
-                  .split(/\s+/)
-                  .filter(Boolean)
-                  .slice(0, 2)
-                  .map((p: string) => p[0]?.toUpperCase() ?? "")
-                  .join("") || "—";
+                // Roster avatar now uses <PersonAvatar>, which handles the
+                // initials fallback itself when photo_path is null.
                 const openProfile = () => {
                   window.location.href = `/dashboard/employees/${m.user_id}`;
                 };
@@ -447,9 +444,12 @@ export function EmployeesPage() {
                   >
                     <td className="px-4 py-2 font-medium whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
-                          {initials}
-                        </span>
+                        <PersonAvatar
+                          bucket="staff-photos"
+                          path={(m.profile as { photo_path?: string | null } | undefined)?.photo_path ?? null}
+                          name={name === "—" ? null : name}
+                          className="h-7 w-7 text-[11px]"
+                        />
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 truncate">
                             <span className="truncate">{name}</span>

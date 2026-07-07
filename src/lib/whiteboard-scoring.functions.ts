@@ -95,11 +95,11 @@ export const getBoardScoringInputs = createServerFn({ method: "GET" })
 
     const pcsp: PcspRow[] = ((pcspQ.data ?? []) as Array<{
       id: string;
-      pcsp_goals: string | null;
+      pcsp_goals: string[] | null;
       special_directions: string | null;
       pertinent_health_notes: string | null;
       preferred_living: string | null;
-      preferred_activities: string | null;
+      preferred_activities: string[] | null;
     }>).map((r) => ({
       client_id: r.id,
       pcsp_goals: r.pcsp_goals,

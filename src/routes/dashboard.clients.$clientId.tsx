@@ -34,6 +34,7 @@ import { ClientDocumentsCard } from "@/components/clients/client-documents-card"
 import { PcspTab } from "@/components/clients/pcsp-tab";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
+import { FaceSheetButton } from "@/components/clients/face-sheet-button";
 import { SectionsView, ClientSpecificTrainingCard, GoalsEditor, PublishConfirmDialog } from "@/components/clients/client-specific-training-card";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, RefreshCw, Sparkles, Trash2, Upload, UserCircle2 } from "lucide-react";
 import { clientFeatureVisible } from "@/lib/client-features";

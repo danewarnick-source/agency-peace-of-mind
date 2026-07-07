@@ -65,9 +65,10 @@ export function NotesPopover({
       <PopoverTrigger asChild>
         <button
           type="button"
-          onPointerDown={(e) => e.stopPropagation()}
+          onPointerDownCapture={(e) => e.stopPropagation()}
+          onMouseDownCapture={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
-          className="relative inline-flex items-center justify-center rounded-md p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="relative inline-flex shrink-0 items-center justify-center rounded-md p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           title="Placement notes"
           aria-label={`Placement notes for ${subjectLabel}`}
         >

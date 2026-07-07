@@ -33,6 +33,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
 import {
   AlertTriangle,
   GripVertical,
@@ -214,7 +215,7 @@ function ClientPillDraggable({
   canDrag: boolean;
 }) {
   const dragId = draggableId("client", client.id);
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: dragId,
     disabled: !canDrag,
   });
@@ -224,27 +225,32 @@ function ClientPillDraggable({
   if ("med_count" in client && client.med_count > 0) tags.push(`${client.med_count} meds`);
   const notesCtx = useContext(NotesBoardContext);
   const label = `${client.first_name} ${("last_name" in client ? client.last_name : "") || ""}`.trim();
+  const style: React.CSSProperties = {
+    transform: CSS.Translate.toString(transform),
+    touchAction: "none",
+  };
   return (
     <div
       ref={setNodeRef}
-      className={`flex items-start gap-1.5 rounded-md border border-border bg-background px-2 py-1.5 text-xs shadow-sm ${
+      style={style}
+      {...listeners}
+      {...attributes}
+      className={`relative flex items-start gap-1.5 rounded-md border border-border bg-background px-2 py-1.5 text-xs shadow-sm ${
         canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed opacity-90"
       } ${isDragging ? "opacity-50" : ""}`}
     >
-      <div {...listeners} {...attributes} className="flex min-w-0 flex-1 items-start gap-1.5">
-        {canDrag && <GripVertical className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />}
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-medium">{label || "Client"}</div>
-          {tags.length > 0 && (
-            <div className="mt-0.5 flex flex-wrap gap-1">
-              {tags.map((t) => (
-                <span key={t} className="rounded bg-muted px-1 py-0 text-[9px] text-muted-foreground">
-                  {t}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
+      {canDrag && <GripVertical className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />}
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-medium">{label || "Client"}</div>
+        {tags.length > 0 && (
+          <div className="mt-0.5 flex flex-wrap gap-1">
+            {tags.map((t) => (
+              <span key={t} className="rounded bg-muted px-1 py-0 text-[9px] text-muted-foreground">
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       {notesCtx.organizationId && (
         <NotesPopover
@@ -268,28 +274,33 @@ function StaffPillDraggable({
   canDrag: boolean;
 }) {
   const dragId = draggableId("staff", staff.id);
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: dragId,
     disabled: !canDrag,
   });
   const notesCtx = useContext(NotesBoardContext);
+  const style: React.CSSProperties = {
+    transform: CSS.Translate.toString(transform),
+    touchAction: "none",
+  };
   return (
     <div
       ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
       className={`flex items-center gap-1 rounded-full border border-border bg-background px-1 py-1 pr-1.5 text-xs shadow-sm ${
         canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed opacity-90"
       } ${isDragging ? "opacity-50" : ""}`}
       title={staff.position ?? undefined}
     >
-      <div {...listeners} {...attributes} className="flex items-center gap-1.5 min-w-0">
-        <PersonAvatar
-          bucket="staff-photos"
-          path={staff.photo_path}
-          name={staff.full_name}
-          className="h-6 w-6 text-[10px] border"
-        />
-        <span className="truncate max-w-[110px] font-medium">{staff.full_name}</span>
-      </div>
+      <PersonAvatar
+        bucket="staff-photos"
+        path={staff.photo_path}
+        name={staff.full_name}
+        className="h-6 w-6 text-[10px] border"
+      />
+      <span className="truncate max-w-[110px] font-medium">{staff.full_name}</span>
       {notesCtx.organizationId && (
         <NotesPopover
           organizationId={notesCtx.organizationId}

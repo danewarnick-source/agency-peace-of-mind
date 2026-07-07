@@ -108,20 +108,22 @@ export function DayTimelineDrawer({
     queryFn: async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("id, first_name, last_name, full_name")
+        .select("id, first_name, last_name, full_name, photo_path")
         .in("id", staffIds);
-      const m = new Map<string, string>();
+      const m = new Map<string, { name: string; photo_path: string | null }>();
       for (const p of data ?? []) {
         const name = (p.full_name && p.full_name.trim())
           || [p.first_name, p.last_name].filter(Boolean).join(" ").trim()
           || "Staff";
-        m.set(p.id, name);
+        m.set(p.id, { name, photo_path: (p.photo_path as string | null) ?? null });
       }
       return m;
     },
   });
   const staffName = (id: string | null) =>
-    id ? (staffNamesQ.data?.get(id) ?? "Staff") : "Open";
+    id ? (staffNamesQ.data?.get(id)?.name ?? "Staff") : "Open";
+  const staffPhoto = (id: string | null) =>
+    id ? (staffNamesQ.data?.get(id)?.photo_path ?? null) : null;
 
   const dayStartMs = day ? new Date(day).setHours(0, 0, 0, 0) : 0;
   const dow = day ? day.getDay() : -1;

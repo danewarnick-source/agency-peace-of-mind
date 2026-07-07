@@ -113,6 +113,7 @@ export async function generateChoreChartReport(
   };
 
   const payload: ChoreChartPdfPayload = {
+    weekStartISO: args.weekStartISO,
     orgName,
     spaceName: space.name,
     spaceType: space.space_type,

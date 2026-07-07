@@ -544,6 +544,20 @@ export function WhiteboardPlanningBoard() {
     enabled: !!orgId,
   });
 
+  const notesCountsFn = useServerFn(getWhiteboardNoteCounts);
+  const notesCountsQ = useQuery({
+    queryKey: ["whiteboard-note-counts", orgId],
+    queryFn: () => notesCountsFn({ data: { organization_id: orgId! } }),
+    enabled: !!orgId,
+  });
+  const notesCtxValue = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of notesCountsQ.data ?? []) {
+      m.set(notesKey(r.subject_type, r.subject_id), r.count);
+    }
+    return { organizationId: orgId ?? null, canWrite: canDrag, countsByKey: m };
+  }, [notesCountsQ.data, orgId, canDrag]);
+
   const rhs = rhsQ.data;
   const wb = wbQ.data;
   const staff = staffQ.data;

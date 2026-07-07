@@ -106,7 +106,7 @@ export async function generateBudgetReport(
     logo: await fetchOrgLogo(sb, organizationId),
     clientName,
     periodLabel,
-    details: budget?.details ?? null,
+    details: budget?.details ?? "",
     income: toSection("income"),
     expense: toSection("expense"),
     other: toSection("other"),

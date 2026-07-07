@@ -448,9 +448,12 @@ export function EmployeesPage() {
                   >
                     <td className="px-4 py-2 font-medium whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
-                          {initials}
-                        </span>
+                        <PersonAvatar
+                          bucket="staff-photos"
+                          path={(m.profile as { photo_path?: string | null } | undefined)?.photo_path ?? null}
+                          name={name === "—" ? null : name}
+                          className="h-7 w-7 text-[11px]"
+                        />
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 truncate">
                             <span className="truncate">{name}</span>

@@ -696,7 +696,6 @@ export function WhiteboardPlanningBoard() {
 
   // Scoring — RHS only, using the planned RHS-client roster. Non-RHS clients
   // are ALLOWED to be dropped in but surfaced as risks (flag, never block).
-  const scoreByHome = useMemo(() => {
   // Combined RHS homes = real + scenario. Scenario homes get synthetic RhsHome
   // shape so scoreComposition can flag mismatches consistently.
   const allRhsHomes = useMemo<RhsHome[]>(() => {

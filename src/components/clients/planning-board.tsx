@@ -103,11 +103,19 @@ function parseDraggable(id: string): { kind: "client" | "staff"; id: string } | 
 
 /** Placement maps — the entire session-scoped plan state. */
 type Plan = {
-  // client_id → containerId (rhs-home:<id>, hhs-host:<id>, or POOL_CLIENTS)
+  // client_id → containerId (rhs-home:<id>, hhs-host:<id>, ds-slot:<id>, POOL_CLIENTS)
   clients: Record<string, string>;
-  // staff_id → containerId (rhs-home / hhs-host / ds-client / POOL_STAFF)
+  // staff_id → containerId (rhs-home / hhs-host / ds-client / ds-slot / POOL_STAFF)
   staff: Record<string, string>;
 };
+
+/** Session-only hypothetical containers layered on top of the real snapshot. */
+type Scenarios = {
+  rhsHomes: Array<{ id: string; name: string }>;
+  hhsHosts: Array<{ id: string; name: string }>;
+  dsSlots: Array<{ id: string; name: string }>;
+};
+const emptyScenarios: Scenarios = { rhsHomes: [], hhsHosts: [], dsSlots: [] };
 
 function lightClasses(l: MoveLight): string {
   switch (l) {

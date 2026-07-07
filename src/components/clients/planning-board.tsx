@@ -632,6 +632,7 @@ function DsSlotContainer({
 }) {
   return (
     <Droppable id={`ds-slot:${slotId}`} className="min-h-[180px]">
+      <div style={glowStyle(score)} className="rounded-2xl">
       <HumanFrame
         title={name}
         subtitle="Direct support · scenario slot"
@@ -678,7 +679,9 @@ function DsSlotContainer({
             ))
           )}
         </div>
+        <ScoreReasoning score={score} />
       </HumanFrame>
+      </div>
     </Droppable>
   );
 }

@@ -71,7 +71,9 @@ import {
 } from "@/lib/whiteboard.functions";
 import {
   getBoardStaff,
+  getCurrentStaffPlacements,
   type BoardStaff,
+  type CurrentStaffPlacement,
 } from "@/lib/whiteboard-board.functions";
 import {
   type MoveLight,

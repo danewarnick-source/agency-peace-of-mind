@@ -95,6 +95,7 @@ export function ClientDocumentsCard({
   const getDocFn = useServerFn(getDocument);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [offerDocId, setOfferDocId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ fileName: string; mimeType: string | null; signedUrl: string } | null>(null);
 
   const invalidateAll = () => {
     qc.invalidateQueries({ queryKey: ["client-docs", orgId, clientId] });

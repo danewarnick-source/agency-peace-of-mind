@@ -26,7 +26,7 @@ import {
   Settings2,
   Check,
   GripVertical,
-  ShoppingCart,
+  
   BookOpen,
   Eye,
   FileText,

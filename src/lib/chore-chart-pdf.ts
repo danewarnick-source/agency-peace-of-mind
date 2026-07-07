@@ -36,6 +36,8 @@ export type ChoreChartPdfPayload = {
   clientCells: ChoreClientCell[];
   shiftRows: ChoreShiftRow[];
   shiftCells: ChoreShiftCell[];
+  /** ISO date (YYYY-MM-DD) of the Monday that anchors this chart's week. */
+  weekStartISO?: string;
 };
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -43,6 +45,41 @@ const PAGE_W = 792; // landscape US Letter
 const PAGE_H = 612;
 const MARGIN = 36;
 const CONTENT_W = PAGE_W - MARGIN * 2;
+
+const MONTHS_SHORT = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/** Parse YYYY-MM-DD as a local-noon date to avoid timezone drift. */
+function parseISODateLocal(iso: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0, 0);
+}
+function addDays(d: Date, n: number): Date {
+  const c = new Date(d);
+  c.setDate(c.getDate() + n);
+  return c;
+}
+function shortDate(d: Date): string {
+  return `${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}`;
+}
+export function formatWeekRange(weekStartISO: string): string | null {
+  const start = parseISODateLocal(weekStartISO);
+  if (!start) return null;
+  const end = addDays(start, 6);
+  const sameMonth = start.getMonth() === end.getMonth();
+  const yr = end.getFullYear();
+  return sameMonth
+    ? `Week of ${MONTHS_SHORT[start.getMonth()]} ${start.getDate()}–${end.getDate()}, ${yr}`
+    : `Week of ${shortDate(start)} – ${shortDate(end)}, ${yr}`;
+}
+function dayDateLabels(weekStartISO?: string): (string | null)[] {
+  const start = weekStartISO ? parseISODateLocal(weekStartISO) : null;
+  if (!start) return [null, null, null, null, null, null, null];
+  return [0, 1, 2, 3, 4, 5, 6].map((i) => shortDate(addDays(start, i)));
+}
 
 const C = {
   ink: rgb(0.09, 0.09, 0.11),
@@ -104,9 +141,18 @@ export async function renderChoreChartPdf(p: ChoreChartPdfPayload): Promise<Uint
   };
 
   // Header
+  const weekRange = p.weekStartISO ? formatWeekRange(p.weekStartISO) : null;
+  const dateLabels = dayDateLabels(p.weekStartISO);
   drawText(page, p.orgName || "Organization", MARGIN, y - 12, { font: bold, size: 10, color: C.muted });
   drawText(page, `Cleaning Chart — ${p.spaceName}`, MARGIN, y - 30, { font: bold, size: 18, color: C.ink });
-  drawText(page, p.spaceType.toUpperCase(), MARGIN, y - 46, { font, size: 9, color: C.muted });
+  const typeLabel = p.spaceType.toUpperCase();
+  drawText(page, typeLabel, MARGIN, y - 46, { font, size: 9, color: C.muted });
+  if (weekRange) {
+    const typeW = font.widthOfTextAtSize(typeLabel, 9);
+    drawText(page, `  ·  ${weekRange}`, MARGIN + typeW, y - 46, {
+      font: bold, size: 9, color: C.ink,
+    });
+  }
   const today = new Date().toLocaleDateString();
   const todayW = font.widthOfTextAtSize(today, 9);
   drawText(page, today, PAGE_W - MARGIN - todayW, y - 12, { font, size: 9, color: C.muted });
@@ -158,18 +204,31 @@ export async function renderChoreChartPdf(p: ChoreChartPdfPayload): Promise<Uint
     if (y - 60 < MARGIN + 20) newPage();
     page.drawRectangle({ x: MARGIN, y: y - 18, width: CONTENT_W, height: 18, color: C.band });
     drawText(page, title, MARGIN + 8, y - 13, { font: bold, size: 9, color: C.bandText });
+    if (weekRange) {
+      const wrW = font.widthOfTextAtSize(weekRange, 8.5);
+      drawText(page, weekRange, MARGIN + CONTENT_W - 8 - wrW, y - 13, {
+        font: bold, size: 8.5, color: C.bandText,
+      });
+    }
     y -= 22;
 
     const labelColW = 120;
     const dayColW = (CONTENT_W - labelColW) / 7;
-    // Header row
-    drawText(page, "", MARGIN + 4, y - 10, { font, size: 8 });
+    const hasDates = dateLabels.some((d) => d !== null);
+    const headerH = hasDates ? 24 : 14;
+    // Header row (weekday + optional date)
     DAYS.forEach((d, i) => {
       drawText(page, d, MARGIN + labelColW + i * dayColW + 6, y - 10, {
         font: bold, size: 8.5, color: C.muted,
       });
+      const dl = dateLabels[i];
+      if (dl) {
+        drawText(page, dl, MARGIN + labelColW + i * dayColW + 6, y - 20, {
+          font, size: 7.5, color: C.muted,
+        });
+      }
     });
-    y -= 14;
+    y -= headerH;
     page.drawLine({
       start: { x: MARGIN, y }, end: { x: MARGIN + CONTENT_W, y },
       color: C.rule, thickness: 0.5,

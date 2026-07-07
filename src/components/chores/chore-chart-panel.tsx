@@ -21,11 +21,42 @@ import {
 import { toast } from "sonner";
 import {
   renderChoreChartPdf,
+  formatWeekRange,
   type ChoreChartPdfPayload,
 } from "@/lib/chore-chart-pdf";
 import { shipChoreChartReport } from "@/lib/chore-chart-report";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"] as const;
+
+/** Monday of the week containing `d` (local time). */
+function mondayOf(d: Date): Date {
+  const c = new Date(d);
+  c.setHours(12, 0, 0, 0);
+  const dow = c.getDay(); // 0=Sun..6=Sat
+  const diff = dow === 0 ? -6 : 1 - dow;
+  c.setDate(c.getDate() + diff);
+  return c;
+}
+function toISODate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function parseISODateLocal(iso: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return mondayOf(new Date());
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0, 0);
+}
+function addDays(d: Date, n: number): Date {
+  const c = new Date(d);
+  c.setDate(c.getDate() + n);
+  return c;
+}
+function shortDate(d: Date): string {
+  return `${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}`;
+}
 const FREE_DAY_VALUE = "__free__";
 const NONE_VALUE = "__none__";
 
@@ -352,9 +383,19 @@ export function ChoreChartPanel({
 
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfOpen, setPdfOpen] = useState(false);
+  const [weekStartISO, setWeekStartISO] = useState<string>(() => toISODate(mondayOf(new Date())));
+  const weekStart = parseISODateLocal(weekStartISO);
+  const weekRangeLabel = formatWeekRange(weekStartISO) ?? "";
+  const dayDates = [0, 1, 2, 3, 4, 5, 6].map((i) => shortDate(addDays(weekStart, i)));
+  const setWeekStartFromInput = (raw: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return;
+    // Snap whatever they picked to the Monday of that week.
+    setWeekStartISO(toISODate(mondayOf(parseISODateLocal(raw))));
+  };
 
   const buildPdf = async (): Promise<Uint8Array> => {
     const payload: ChoreChartPdfPayload = {
+      weekStartISO,
       orgName: (org as { organization_name?: string } | undefined)?.organization_name ?? "",
       spaceName: space?.name ?? "",
       spaceType: space?.space_type ?? "",
@@ -445,7 +486,7 @@ export function ChoreChartPanel({
     if (!clients.length) { toast.error("Add at least one client to this space before shipping"); return; }
     setShipping(true);
     try {
-      const result = await shipChoreChartReport({ spaceId });
+      const result = await shipChoreChartReport({ spaceId, weekStartISO });
       toast.success(
         `Shipped chore chart to ${result.snapshots.length} client file${result.snapshots.length === 1 ? "" : "s"} — ${result.dateLabel}`,
       );
@@ -481,6 +522,18 @@ export function ChoreChartPanel({
           <p className="text-xs text-muted-foreground">
             Post this chart so anyone in the home knows what to clean and when. Staff check off completed items each shift for inspection readiness.
           </p>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <Label htmlFor="chore-week-start" className="text-xs text-muted-foreground">Week of</Label>
+            <Input
+              id="chore-week-start"
+              type="date"
+              value={weekStartISO}
+              onChange={(e) => setWeekStartFromInput(e.target.value)}
+              className="h-7 w-36 text-xs"
+              disabled={!canEdit}
+            />
+            <Badge variant="outline" className="font-medium">{weekRangeLabel}</Badge>
+          </div>
           <div className="text-xs text-muted-foreground">
             {latestShipped ? (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/60 bg-emerald-50 px-2 py-0.5 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
@@ -621,8 +674,11 @@ export function ChoreChartPanel({
                 <thead>
                   <tr className="border-b">
                     <th className="p-2 text-left font-semibold w-40">Client</th>
-                    {DAYS.map((d) => (
-                      <th key={d} className="p-2 text-left font-semibold text-muted-foreground">{d}</th>
+                    {DAYS.map((d, i) => (
+                      <th key={d} className="p-2 text-left font-semibold text-muted-foreground">
+                        <div>{d}</div>
+                        <div className="text-[10px] font-normal">{dayDates[i]}</div>
+                      </th>
                     ))}
                   </tr>
                 </thead>
@@ -712,8 +768,11 @@ export function ChoreChartPanel({
                 <thead>
                   <tr className="border-b">
                     <th className="p-2 text-left font-semibold w-44">Shift</th>
-                    {DAYS.map((d) => (
-                      <th key={d} className="p-2 text-left font-semibold text-muted-foreground">{d}</th>
+                    {DAYS.map((d, i) => (
+                      <th key={d} className="p-2 text-left font-semibold text-muted-foreground">
+                        <div>{d}</div>
+                        <div className="text-[10px] font-normal">{dayDates[i]}</div>
+                      </th>
                     ))}
                   </tr>
                 </thead>

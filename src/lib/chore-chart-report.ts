@@ -11,6 +11,8 @@ import { fetchOrgName } from "./client-report-shared";
 export type ChoreChartReportArgs = {
   spaceId: string;
   supabaseClient?: SupabaseClient;
+  /** Optional ISO Monday for the week this chart covers. */
+  weekStartISO?: string;
 };
 
 export type ChoreChartReportResult = {
@@ -111,6 +113,7 @@ export async function generateChoreChartReport(
   };
 
   const payload: ChoreChartPdfPayload = {
+    weekStartISO: args.weekStartISO,
     orgName,
     spaceName: space.name,
     spaceType: space.space_type,

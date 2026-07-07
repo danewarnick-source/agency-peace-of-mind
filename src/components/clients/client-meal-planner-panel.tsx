@@ -341,6 +341,91 @@ export function ClientMealPlannerPanel({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Actuals (staff daily confirmation)
+  const actualsQ = useQuery({
+    enabled: !!planId,
+    queryKey: ["mp-actuals", planId],
+    queryFn: async (): Promise<ActualRow[]> => {
+      const { data, error } = await supabase
+        .from("client_meal_actuals")
+        .select("id, meal_plan_id, actual_date, meal_slot, outcome, note")
+        .eq("meal_plan_id", planId!);
+      if (error) throw error;
+      return (data ?? []) as ActualRow[];
+    },
+  });
+
+  const setActual = useMutation({
+    mutationFn: async (args: { date: string; slot: Slot; outcome: Outcome; note?: string | null }) => {
+      let pid = planId;
+      if (!pid) {
+        const created = await createPlan.mutateAsync();
+        pid = created.id;
+      }
+      const existing = (actualsQ.data ?? []).find(
+        (a) => a.actual_date === args.date && a.meal_slot === args.slot,
+      );
+      if (existing) {
+        const { error } = await supabase
+          .from("client_meal_actuals")
+          .update({
+            outcome: args.outcome,
+            note: args.note ?? existing.note,
+            confirmed_by: session?.user?.id ?? null,
+            confirmed_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("client_meal_actuals").insert({
+          meal_plan_id: pid,
+          actual_date: args.date,
+          meal_slot: args.slot,
+          outcome: args.outcome,
+          note: args.note ?? null,
+          confirmed_by: session?.user?.id ?? null,
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["mp-actuals", planId] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Drag-drop: reassign meal's day_of_week + meal_slot. Shopping list is untouched.
+  const moveMeal = useMutation({
+    mutationFn: async (args: { id: string; day: number; slot: Slot }) => {
+      const existing = (mealsQ.data ?? []).filter(
+        (m) => m.day_of_week === args.day && m.meal_slot === args.slot,
+      );
+      const { error } = await supabase
+        .from("client_meals")
+        .update({
+          day_of_week: args.day,
+          meal_slot: args.slot,
+          sort_order: existing.length,
+        })
+        .eq("id", args.id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["mp-meals", planId] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const handleDragEnd = (e: DragEndEvent) => {
+    if (!e.over || !canEdit) return;
+    const mealId = String(e.active.id);
+    const overId = String(e.over.id);
+    const m = /^cell:(\d+):(breakfast|lunch|dinner|snack)$/.exec(overId);
+    if (!m) return;
+    const day = Number(m[1]);
+    const slot = m[2] as Slot;
+    const src = (mealsQ.data ?? []).find((x) => x.id === mealId);
+    if (!src || (src.day_of_week === day && src.meal_slot === slot)) return;
+    moveMeal.mutate({ id: mealId, day, slot });
+  };
+
   const cfg = cfgQ.data ?? { id: "", nutrition_label: "Fat Grams", nutrition_unit: "g" };
   const meals = mealsQ.data ?? [];
   const cellMeals = (day: number, slot: Slot) =>

@@ -344,6 +344,10 @@ function ClientWorkspace() {
             />
           </TabsContent>
 
+          <TabsContent value="meals" className="mt-5">
+            <ClientMealPlannerPanel clientId={client.id} readOnly />
+          </TabsContent>
+
           {showBehaviorTab && bsTab?.organizationId && (
             <TabsContent value="behavior-data" className="mt-5">
               <StaffBehaviorDataTab

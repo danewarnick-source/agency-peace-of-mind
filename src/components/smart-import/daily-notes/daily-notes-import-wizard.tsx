@@ -481,6 +481,8 @@ export function DailyNotesImportWizard() {
           onChooseStaff={chooseStaff}
           onChooseClient={chooseClient}
           onLink={linkManually}
+          onSetNarrative={setNarrative}
+          onSetDate={setDate}
           onSkip={skipRow}
           onUnskip={unskipRow}
           onDownloadSkipped={downloadSkipped}

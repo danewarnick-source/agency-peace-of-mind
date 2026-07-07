@@ -130,6 +130,7 @@ export function ClientDocumentsCard({
         fiscal_year: (d.fiscal_year as string | null) ?? null,
         file_name: (d.file_name as string) ?? "",
         parse_status: (d.parse_status as string) ?? "",
+        mime_type: (d.mime_type as string | null) ?? null,
         uploaded_by_name: (d.uploaded_by_name as string | null) ?? null,
         created_at: (d.created_at as string) ?? new Date().toISOString(),
         source: "nectar",

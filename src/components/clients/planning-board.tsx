@@ -272,23 +272,34 @@ function StaffPillDraggable({
     id: dragId,
     disabled: !canDrag,
   });
+  const notesCtx = useContext(NotesBoardContext);
   return (
     <div
       ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      className={`flex items-center gap-1.5 rounded-full border border-border bg-background px-1 py-1 pr-2 text-xs shadow-sm ${
+      className={`flex items-center gap-1 rounded-full border border-border bg-background px-1 py-1 pr-1.5 text-xs shadow-sm ${
         canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed opacity-90"
       } ${isDragging ? "opacity-50" : ""}`}
       title={staff.position ?? undefined}
     >
-      <PersonAvatar
-        bucket="staff-photos"
-        path={staff.photo_path}
-        name={staff.full_name}
-        className="h-6 w-6 text-[10px] border"
-      />
-      <span className="truncate max-w-[110px] font-medium">{staff.full_name}</span>
+      <div {...listeners} {...attributes} className="flex items-center gap-1.5 min-w-0">
+        <PersonAvatar
+          bucket="staff-photos"
+          path={staff.photo_path}
+          name={staff.full_name}
+          className="h-6 w-6 text-[10px] border"
+        />
+        <span className="truncate max-w-[110px] font-medium">{staff.full_name}</span>
+      </div>
+      {notesCtx.organizationId && (
+        <NotesPopover
+          organizationId={notesCtx.organizationId}
+          subjectType="staff"
+          subjectId={staff.id}
+          subjectLabel={staff.full_name}
+          canWrite={notesCtx.canWrite}
+          initialCount={notesCtx.countsByKey.get(notesKey("staff", staff.id)) ?? 0}
+        />
+      )}
     </div>
   );
 }

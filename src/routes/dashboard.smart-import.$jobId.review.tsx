@@ -2843,9 +2843,9 @@ function ImportSummaryPanel({
 
         {/* Plan & documents */}
         <div className={cardCls}>
-          <SectionHeader title="Plan & documents" step="plan" count={`${docs.length} supporting doc${docs.length === 1 ? "" : "s"}`} />
+          <SectionHeader title="Unmatched notes" step="plan" count={`${docs.length} note${docs.length === 1 ? "" : "s"} still to file`} />
           {docs.length === 0 ? (
-            <div className="text-[11px] text-muted-foreground italic">— no additional supporting documents —</div>
+            <div className="text-[11px] text-muted-foreground italic">— every note from your uploads was filed automatically —</div>
           ) : (
             <ul className="space-y-0.5 text-[11px]">
               {docs.slice(0, 8).map((d) => (

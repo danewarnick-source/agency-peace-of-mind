@@ -15990,6 +15990,47 @@ export type Database = {
           },
         ]
       }
+      whiteboard_notes: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          note_text: string
+          organization_id: string
+          subject_id: string
+          subject_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          note_text: string
+          organization_id: string
+          subject_id: string
+          subject_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          note_text?: string
+          organization_id?: string
+          subject_id?: string
+          subject_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whiteboard_notes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       day_program_billable_v: {

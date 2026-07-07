@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   Info,
   Brain,
+  Utensils,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,6 +43,7 @@ import { useTodayShifts } from "@/hooks/use-today-shifts";
 import { ClientPhoto } from "@/components/client-photo";
 import { FaceSheetButton } from "@/components/clients/face-sheet-button";
 import { useClientFeature, clientFeatureVisible } from "@/lib/client-features";
+import { ClientMealPlannerPanel } from "@/components/clients/client-meal-planner-panel";
 
 function ActiveShiftReimbursementSlot({ clientId }: { clientId: string }) {
   const { data: active } = useActiveShift();
@@ -269,24 +271,38 @@ function ClientWorkspace() {
           className="w-full"
         >
           {/* Touch-friendly tab bar — amber active w/ 2px underline, navy inactive (tappable, never dimmed) */}
-          <TabsList className={`grid h-auto w-full ${showBehaviorTab ? "grid-cols-5" : "grid-cols-4"} gap-1 border-b border-border bg-transparent p-0 text-foreground`}>
-            {[
+          {(() => {
+            const tabDefs = [
               { v: "about", label: "About", Icon: User, show: true },
               { v: "clock-in", label: "Clock In", Icon: Clock, show: true },
               { v: "emar", label: "MAR", Icon: Pill, show: emarEnabled },
               { v: "forms", label: "Forms", Icon: FileText, show: true },
+              { v: "meals", label: "Meals", Icon: Utensils, show: true },
               { v: "behavior-data", label: "Behavior Data", Icon: Brain, show: showBehaviorTab },
-            ].filter((t) => t.show).map(({ v, label, Icon }) => (
-              <TabsTrigger
-                key={v}
-                value={v}
-                className="h-12 min-w-[44px] gap-1.5 rounded-none px-1 text-xs font-semibold text-[color:var(--navy-900,#0d112b)] hover:text-[color:var(--amber-700,#d97a1c)] data-[state=active]:text-[color:var(--amber-700,#d97a1c)] sm:text-sm"
+            ].filter((t) => t.show);
+            const gridCls =
+              tabDefs.length === 4
+                ? "grid-cols-4"
+                : tabDefs.length === 5
+                  ? "grid-cols-5"
+                  : "grid-cols-6";
+            return (
+              <TabsList
+                className={`grid h-auto w-full ${gridCls} gap-1 border-b border-border bg-transparent p-0 text-foreground`}
               >
-                <Icon className="h-4 w-4" />
-                <span>{label}</span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
+                {tabDefs.map(({ v, label, Icon }) => (
+                  <TabsTrigger
+                    key={v}
+                    value={v}
+                    className="h-12 min-w-[44px] gap-1.5 rounded-none px-1 text-xs font-semibold text-[color:var(--navy-900,#0d112b)] hover:text-[color:var(--amber-700,#d97a1c)] data-[state=active]:text-[color:var(--amber-700,#d97a1c)] sm:text-sm"
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span>{label}</span>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            );
+          })()}
 
           <TabsContent value="about" className="mt-5">
             <AboutTab client={client} />
@@ -326,6 +342,10 @@ function ClientWorkspace() {
               clientId={client.id}
               clientName={`${client.first_name} ${client.last_name}`}
             />
+          </TabsContent>
+
+          <TabsContent value="meals" className="mt-5">
+            <ClientMealPlannerPanel clientId={client.id} readOnly />
           </TabsContent>
 
           {showBehaviorTab && bsTab?.organizationId && (

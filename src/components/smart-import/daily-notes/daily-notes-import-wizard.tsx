@@ -798,16 +798,25 @@ function ReviewStep({
         </TabsContent>
       </Tabs>
 
+      <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-[11px] text-muted-foreground">
+        <span className="font-medium text-foreground">Next step is Submit to staff.</span> Nothing is released
+        to staff members until you click submit below. Once submitted, each staff member sees only their own
+        notes and signs them one at a time — they are not approved evidence until then. If a staff member
+        no longer works here and has no platform access, an admin can attest on their behalf from the
+        "Attest on behalf of former staff" screen, permanently labeled as such.
+      </div>
+
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={onBack}><ArrowLeft className="mr-1.5 h-4 w-4" /> Back to mapping</Button>
         <Button onClick={onCommit} disabled={committing || ready.length === 0}>
           {committing && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-          Import {ready.length} historical daily note{ready.length === 1 ? "" : "s"}
+          Submit {ready.length} note{ready.length === 1 ? "" : "s"} to staff for attestation
         </Button>
       </div>
     </div>
   );
 }
+
 
 function EmptyMsg({ text }: { text: string }) {
   return <div className="rounded-md border border-dashed border-border p-6 text-center text-xs text-muted-foreground">{text}</div>;

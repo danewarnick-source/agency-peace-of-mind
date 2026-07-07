@@ -438,6 +438,8 @@ export function ChoreChartPanel({
   const [editDef, setEditDef] = useState<Def | null>(null);
   const [newShiftLabel, setNewShiftLabel] = useState("");
   const [pickClient, setPickClient] = useState("");
+  const [newDailyLabel, setNewDailyLabel] = useState("");
+  const [newDailyDetail, setNewDailyDetail] = useState("");
 
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfOpen, setPdfOpen] = useState(false);

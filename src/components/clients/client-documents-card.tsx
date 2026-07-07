@@ -40,6 +40,7 @@ import {
 } from "@/lib/nectar-documents.functions";
 import { attachClientDocument } from "@/lib/import-checklist.functions";
 import { NectarDocumentActionsDialog } from "@/components/nectar/document-actions-dialog";
+import { DocumentPreviewDialog } from "./document-preview-dialog";
 
 const CLIENT_DOC_TYPES = [
   { value: "pcsp", label: "PCSP" },
@@ -60,6 +61,7 @@ type DocRow = {
   version: number;
   fiscal_year: string | null;
   file_name: string;
+  mime_type?: string | null;
   parse_status: string;
   uploaded_by_name: string | null;
   created_at: string;
@@ -93,6 +95,7 @@ export function ClientDocumentsCard({
   const getDocFn = useServerFn(getDocument);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [offerDocId, setOfferDocId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ fileName: string; mimeType: string | null; signedUrl: string } | null>(null);
 
   const invalidateAll = () => {
     qc.invalidateQueries({ queryKey: ["client-docs", orgId, clientId] });
@@ -129,6 +132,7 @@ export function ClientDocumentsCard({
         fiscal_year: (d.fiscal_year as string | null) ?? null,
         file_name: (d.file_name as string) ?? "",
         parse_status: (d.parse_status as string) ?? "",
+        mime_type: (d.mime_type as string | null) ?? null,
         uploaded_by_name: (d.uploaded_by_name as string | null) ?? null,
         created_at: (d.created_at as string) ?? new Date().toISOString(),
         source: "nectar",
@@ -198,6 +202,11 @@ export function ClientDocumentsCard({
             open={!!offerDocId}
             onOpenChange={(v) => { if (!v) setOfferDocId(null); }}
           />
+          <DocumentPreviewDialog
+            open={!!preview}
+            onOpenChange={(v) => { if (!v) setPreview(null); }}
+            doc={preview}
+          />
         </div>
         <p className="text-xs text-muted-foreground">
           Guardian papers, PCSP, 1056, intake/referrals, assessments, consents.
@@ -256,15 +265,20 @@ export function ClientDocumentsCard({
                     const { data: signed } = await supabase.storage
                       .from("client-documents")
                       .createSignedUrl(d.storage_path, 300);
-                    if (signed?.signedUrl) window.open(signed.signedUrl, "_blank");
-                    else toast.error("Could not generate a link for this file.");
+                    if (signed?.signedUrl) {
+                      setPreview({ fileName: d.file_name, mimeType: d.mime_type ?? null, signedUrl: signed.signedUrl });
+                    } else toast.error("Could not generate a link for this file.");
                     return;
                   }
                   try {
                     const res = await getDocFn({ data: { documentId: d.id } });
                     const url = (res as { signedUrl?: string | null })?.signedUrl;
-                    if (url) window.open(url, "_blank");
-                    else toast.error("Could not generate a link for this file.");
+                    const mime =
+                      ((res as { document?: { mime_type?: string | null } })?.document?.mime_type ?? d.mime_type) ??
+                      null;
+                    if (url) {
+                      setPreview({ fileName: d.file_name, mimeType: mime, signedUrl: url });
+                    } else toast.error("Could not generate a link for this file.");
                   } catch (e) {
                     toast.error((e as Error).message);
                   }

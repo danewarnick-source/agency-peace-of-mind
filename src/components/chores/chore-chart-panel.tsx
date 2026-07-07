@@ -383,6 +383,15 @@ export function ChoreChartPanel({
 
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfOpen, setPdfOpen] = useState(false);
+  const [weekStartISO, setWeekStartISO] = useState<string>(() => toISODate(mondayOf(new Date())));
+  const weekStart = parseISODateLocal(weekStartISO);
+  const weekRangeLabel = formatWeekRange(weekStartISO) ?? "";
+  const dayDates = [0, 1, 2, 3, 4, 5, 6].map((i) => shortDate(addDays(weekStart, i)));
+  const setWeekStartFromInput = (raw: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return;
+    // Snap whatever they picked to the Monday of that week.
+    setWeekStartISO(toISODate(mondayOf(parseISODateLocal(raw))));
+  };
 
   const buildPdf = async (): Promise<Uint8Array> => {
     const payload: ChoreChartPdfPayload = {

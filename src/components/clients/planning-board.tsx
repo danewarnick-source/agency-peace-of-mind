@@ -1081,7 +1081,6 @@ export function WhiteboardPlanningBoard() {
     setScenarios(emptyScenarios);
     setMode("current");
     setDirty(false);
-    });
   }
 
   function undo() {
@@ -1091,11 +1090,16 @@ export function WhiteboardPlanningBoard() {
     setPlan(prev);
   }
 
+  /** Reset = blank slate. Everyone in pools, plan from scratch. */
   function reset() {
-    if (!startingRef.current) return;
+    if (!rhs || !wb) return;
+    const blank = buildBlankPlan(rhs, wb);
+    startingRef.current = blank;
     historyRef.current = [];
-    setPlan(startingRef.current);
+    setPlan(blank);
     setScenarios(emptyScenarios);
+    setMode("blank");
+    setDirty(false);
   }
 
   // Scenario creation — session only. IDs are prefixed so they never collide

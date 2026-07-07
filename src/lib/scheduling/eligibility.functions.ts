@@ -222,7 +222,7 @@ export const rankStaffForShift = createServerFn({ method: "POST" })
       staff: memberRows.map((r) => ({
         ...r,
         weeklyShifts: byStaffShifts.get(r.id) ?? [],
-        activeCertKeys: activeCertsByStaff.get(r.id) ?? new Set<string>(),
+        activeCertKeys: qualsByStaff.get(r.id) ?? new Set<string>(),
         completedClientTrainings: completedTrainingsByStaff.get(r.id) ?? new Set<string>(),
         assignedToClient: assignedSet.has(r.id),
         isHostForLocation: hostSet.has(r.id),

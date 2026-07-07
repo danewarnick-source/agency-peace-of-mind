@@ -14,16 +14,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2, Save, Sparkles, FileText, Printer } from "lucide-react";
+import { Plus, Trash2, Save, Sparkles, FileText, Printer, Send, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { useOrgBranding } from "@/components/branding/org-logo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { renderClientBudgetPdf, budgetPdfFilename, type BudgetPdfPayload } from "@/lib/client-budget-pdf";
+import {
+  renderClientBudgetPdf,
+  budgetPdfFilename,
+  type BudgetPdfPayload,
+  type BudgetPdfLogo,
+} from "@/lib/client-budget-pdf";
 
 type Section = "income" | "expense" | "other";
 
@@ -53,6 +59,10 @@ function firstOfMonth(iso: string): string {
   // Accept "YYYY-MM" or "YYYY-MM-DD"; return YYYY-MM-01
   const m = iso.slice(0, 7);
   return `${m}-01`;
+}
+function periodMonthTag(iso: string): string {
+  // "YYYY-MM" tag used in stored filenames + shipped-lookup pattern.
+  return iso.slice(0, 7);
 }
 function currentMonthValue(): string {
   const d = new Date();
@@ -230,6 +240,9 @@ export function ClientBudgetPanel({ clientId }: { clientId: string }) {
             budget={budget}
             lines={lines}
             canEdit={canEdit}
+            clientId={clientId}
+            organizationId={orgId ?? ""}
+            orgName={org?.organization_name ?? "Organization"}
             clientName={
               [clientQ.data?.first_name, clientQ.data?.last_name].filter(Boolean).join(" ") || "Client"
             }
@@ -242,7 +255,17 @@ export function ClientBudgetPanel({ clientId }: { clientId: string }) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-function BudgetEditor({ budget, lines, canEdit, clientName }: { budget: Budget; lines: BudgetLine[]; canEdit: boolean; clientName: string }) {
+function BudgetEditor({
+  budget, lines, canEdit, clientName, clientId, organizationId, orgName,
+}: {
+  budget: Budget;
+  lines: BudgetLine[];
+  canEdit: boolean;
+  clientName: string;
+  clientId: string;
+  organizationId: string;
+  orgName: string;
+}) {
   const qc = useQueryClient();
 
   // Local draft state so keystrokes don't fire a request per character.
@@ -330,6 +353,50 @@ function BudgetEditor({ budget, lines, canEdit, clientName }: { budget: Budget; 
     year: "numeric",
   });
 
+  const { data: branding } = useOrgBranding(organizationId);
+  const qcInner = useQueryClient();
+
+  // ── Load logo bytes on demand (cached). ────────────────────────────────
+  const [logoState, setLogoState] = useState<BudgetPdfLogo | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const path = branding?.logo_path;
+    if (!path) { setLogoState(null); return; }
+    (async () => {
+      try {
+        const { data, error } = await supabase.storage
+          .from("org-branding")
+          .createSignedUrl(path, 60 * 10);
+        if (error || !data?.signedUrl) throw error ?? new Error("no signed url");
+        const resp = await fetch(data.signedUrl);
+        if (!resp.ok) throw new Error("logo fetch failed");
+        const mime = resp.headers.get("content-type") || (path.endsWith(".png") ? "image/png" : "image/jpeg");
+        const buf = new Uint8Array(await resp.arrayBuffer());
+        if (!cancelled) setLogoState({ bytes: buf, mime });
+      } catch {
+        if (!cancelled) setLogoState(null); // graceful fallback to org name
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [branding?.logo_path]);
+
+  // ── Has this period been shipped to the client file already? ───────────
+  const shippedQ = useQuery({
+    enabled: !!organizationId && !!clientId,
+    queryKey: ["client-budget-shipped", clientId, budget.period_month],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_documents")
+        .select("id, file_name, uploaded_at, uploaded_by_name, storage_path")
+        .eq("client_id", clientId)
+        .eq("document_type", "financial_support_budget")
+        .ilike("storage_path", `%/financial-support-${periodMonthTag(budget.period_month)}-%`)
+        .order("uploaded_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const buildPayload = (): BudgetPdfPayload => {
     const toLines = (section: Section) =>
       draft
@@ -349,6 +416,8 @@ function BudgetEditor({ budget, lines, canEdit, clientName }: { budget: Budget; 
           day_of_month: l.day_of_month,
         }));
     return {
+      orgName,
+      logo: logoState,
       clientName,
       periodLabel,
       details,
@@ -358,13 +427,12 @@ function BudgetEditor({ budget, lines, canEdit, clientName }: { budget: Budget; 
     };
   };
 
-  const [pdfBusy, setPdfBusy] = useState<null | "download" | "print">(null);
+  const [pdfBusy, setPdfBusy] = useState<null | "download" | "print" | "ship">(null);
 
   const openPdf = async (mode: "download" | "print") => {
     setPdfBusy(mode);
     try {
       const bytes = await renderClientBudgetPdf(buildPayload());
-      // Uint8Array → Blob (avoid ArrayBufferLike TS complaint)
       const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const filename = budgetPdfFilename(clientName, periodLabel);
@@ -377,7 +445,6 @@ function BudgetEditor({ budget, lines, canEdit, clientName }: { budget: Budget; 
         a.click();
         a.remove();
       } else if (mode === "print") {
-        // Trigger print once loaded (browser PDF viewer honors afterprint via user).
         win.addEventListener("load", () => {
           try { win.focus(); win.print(); } catch { /* noop */ }
         });
@@ -390,37 +457,98 @@ function BudgetEditor({ budget, lines, canEdit, clientName }: { budget: Budget; 
     }
   };
 
+  // ── Ship to client file: generate the current PDF and store the
+  // snapshot under the client's Files tab (client_documents), tagged as
+  // financial-support evidence. Deliberate action — never automatic.
+  const shipToClientFile = async () => {
+    if (dirty) {
+      toast.error("Save your changes before shipping");
+      return;
+    }
+    setPdfBusy("ship");
+    try {
+      const bytes = await renderClientBudgetPdf(buildPayload());
+      const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+      const stamp = new Date();
+      const stampSlug = stamp.toISOString().replace(/[:.]/g, "-");
+      const storagePath =
+        `${organizationId}/${clientId}/budgets/financial-support-${periodMonthTag(budget.period_month)}-${stampSlug}.pdf`;
+      const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
+      const { error: upErr } = await supabase.storage
+        .from("client-documents")
+        .upload(storagePath, blob, { upsert: false, contentType: "application/pdf" });
+      if (upErr) throw upErr;
+
+      const fileName = `Financial Support — Monthly Budget ${periodLabel}.pdf`;
+      const { error: insErr } = await supabase
+        .from("client_documents")
+        .insert({
+          client_id: clientId,
+          organization_id: organizationId,
+          file_name: fileName,
+          document_type: "financial_support_budget",
+          file_url: `storage://client-documents/${storagePath}`,
+          storage_path: storagePath,
+          file_size_bytes: bytes.byteLength,
+          uploaded_by: uid,
+        });
+      if (insErr) throw insErr;
+
+      toast.success(`Shipped to client file (${periodLabel})`);
+      qcInner.invalidateQueries({ queryKey: ["client-budget-shipped", clientId, budget.period_month] });
+      qcInner.invalidateQueries({ queryKey: ["client-documents", clientId] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not ship budget");
+    } finally {
+      setPdfBusy(null);
+    }
+  };
+
+  const shipped = shippedQ.data ?? [];
+  const latestShipped = shipped[0] ?? null;
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => openPdf("download")}
-          disabled={pdfBusy !== null}
-        >
-          <FileText className="mr-2 h-4 w-4" />
-          {pdfBusy === "download" ? "Building…" : "Download PDF"}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => openPdf("print")}
-          disabled={pdfBusy !== null}
-        >
-          <Printer className="mr-2 h-4 w-4" />
-          {pdfBusy === "print" ? "Building…" : "Print"}
-        </Button>
-        {canEdit && (
-          <Button
-            size="sm"
-            onClick={() => saveAll.mutate()}
-            disabled={!dirty || saveAll.isPending}
-          >
-            <Save className="mr-2 h-4 w-4" />
-            {saveAll.isPending ? "Saving…" : dirty ? "Save changes" : "Saved"}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-xs text-muted-foreground">
+          {latestShipped ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/60 bg-emerald-50 px-2.5 py-1 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Shipped {new Date(latestShipped.uploaded_at).toLocaleDateString()} — {periodLabel}
+              {shipped.length > 1 ? ` (${shipped.length} snapshots)` : ""}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">Not yet shipped to client file for {periodLabel}</span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => openPdf("download")} disabled={pdfBusy !== null}>
+            <FileText className="mr-2 h-4 w-4" />
+            {pdfBusy === "download" ? "Building…" : "Download PDF"}
           </Button>
-        )}
+          <Button size="sm" variant="outline" onClick={() => openPdf("print")} disabled={pdfBusy !== null}>
+            <Printer className="mr-2 h-4 w-4" />
+            {pdfBusy === "print" ? "Building…" : "Print"}
+          </Button>
+          {canEdit && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={shipToClientFile}
+              disabled={pdfBusy !== null || dirty}
+              title={dirty ? "Save your changes before shipping" : "Save a finalized snapshot to the client's Files"}
+            >
+              <Send className="mr-2 h-4 w-4" />
+              {pdfBusy === "ship" ? "Shipping…" : "Ship to client file"}
+            </Button>
+          )}
+          {canEdit && (
+            <Button size="sm" onClick={() => saveAll.mutate()} disabled={!dirty || saveAll.isPending}>
+              <Save className="mr-2 h-4 w-4" />
+              {saveAll.isPending ? "Saving…" : dirty ? "Save changes" : "Saved"}
+            </Button>
+          )}
+        </div>
       </div>
 
 

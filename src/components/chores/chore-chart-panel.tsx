@@ -16,7 +16,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Plus, Trash2, Sparkles, FileDown, Printer, ClipboardList, Users, Clock, Send, CheckCircle2,
+  Plus, Trash2, Sparkles, FileDown, Printer, ClipboardList, Users, Send, CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {

@@ -2896,12 +2896,14 @@ export type Database = {
           created_at: string
           day_of_week: number
           description: string | null
+          estimated_cost: number | null
           id: string
           label: string
           meal_plan_id: string
           meal_slot: string
           notes: string | null
           nutrition_value: number | null
+          recipe_id: string | null
           sort_order: number
           updated_at: string
         }
@@ -2909,12 +2911,14 @@ export type Database = {
           created_at?: string
           day_of_week: number
           description?: string | null
+          estimated_cost?: number | null
           id?: string
           label?: string
           meal_plan_id: string
           meal_slot: string
           notes?: string | null
           nutrition_value?: number | null
+          recipe_id?: string | null
           sort_order?: number
           updated_at?: string
         }
@@ -2922,12 +2926,14 @@ export type Database = {
           created_at?: string
           day_of_week?: number
           description?: string | null
+          estimated_cost?: number | null
           id?: string
           label?: string
           meal_plan_id?: string
           meal_slot?: string
           notes?: string | null
           nutrition_value?: number | null
+          recipe_id?: string | null
           sort_order?: number
           updated_at?: string
         }
@@ -2937,6 +2943,13 @@ export type Database = {
             columns: ["meal_plan_id"]
             isOneToOne: false
             referencedRelation: "client_meal_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_meals_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "client_recipes"
             referencedColumns: ["id"]
           },
         ]
@@ -3279,6 +3292,95 @@ export type Database = {
           },
           {
             foreignKeyName: "client_ratios_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_recipe_ingredients: {
+        Row: {
+          created_at: string
+          estimated_cost: number | null
+          id: string
+          item: string
+          quantity: string | null
+          recipe_id: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          estimated_cost?: number | null
+          id?: string
+          item: string
+          quantity?: string | null
+          recipe_id: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          estimated_cost?: number | null
+          id?: string
+          item?: string
+          quantity?: string | null
+          recipe_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_recipe_ingredients_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "client_recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_recipes: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          notes: string | null
+          organization_id: string
+          source_text: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          organization_id: string
+          source_text?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          organization_id?: string
+          source_text?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_recipes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_recipes_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -11663,6 +11765,38 @@ export type Database = {
             foreignKeyName: "org_shift_behavior_settings_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      org_shopping_library: {
+        Row: {
+          created_at: string
+          id: string
+          item: string
+          last_used_at: string
+          organization_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item: string
+          last_used_at?: string
+          organization_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item?: string
+          last_used_at?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_shopping_library_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },

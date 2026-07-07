@@ -19,6 +19,7 @@ import {
   Check,
   GripVertical,
   ShoppingCart,
+  BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -30,6 +31,16 @@ import {
   useDroppable,
   type DragEndEvent,
 } from "@dnd-kit/core";
+import {
+  AddRecipeDialog,
+  PickRecipeMenu,
+  AutoShoppingDialog,
+  BudgetFitCard,
+  SuggestionsDialog,
+  useShoppingLibrary,
+  recordShoppingItemUse,
+  type Recipe,
+} from "./client-meal-recipes";
 
 
 /** 0=Mon..6=Sun (matches the reference sheet). */
@@ -47,6 +58,8 @@ type MealRow = {
   nutrition_value: number | null;
   notes: string | null;
   sort_order: number;
+  recipe_id: string | null;
+  estimated_cost: number | null;
 };
 
 type ShoppingItem = {
@@ -229,7 +242,15 @@ export function ClientMealPlannerPanel({
   });
 
   const addMeal = useMutation({
-    mutationFn: async ({ day, slot }: { day: number; slot: Slot }) => {
+    mutationFn: async ({
+      day,
+      slot,
+      recipe,
+    }: {
+      day: number;
+      slot: Slot;
+      recipe?: Recipe | null;
+    }) => {
       let pid = planId;
       if (!pid) {
         const created = await createPlan.mutateAsync();
@@ -242,7 +263,8 @@ export function ClientMealPlannerPanel({
         meal_plan_id: pid,
         day_of_week: day,
         meal_slot: slot,
-        label: "",
+        label: recipe?.name ?? "",
+        recipe_id: recipe?.id ?? null,
         sort_order: existing.length,
       });
       if (error) throw error;
@@ -432,6 +454,15 @@ export function ClientMealPlannerPanel({
     meals.filter((m) => m.day_of_week === day && m.meal_slot === slot);
   const dayTotal = (day: number) =>
     meals.filter((m) => m.day_of_week === day).reduce((s, m) => s + (m.nutrition_value ?? 0), 0);
+  const plannedCostTotal = useMemo(
+    () => meals.reduce((s, m) => s + (Number(m.estimated_cost) || 0), 0),
+    [meals],
+  );
+  const recipeIdsInPlan = useMemo(
+    () => Array.from(new Set(meals.map((m) => m.recipe_id).filter((x): x is string => !!x))),
+    [meals],
+  );
+  const shopLibQ = useShoppingLibrary(orgId);
   const weekLabel = useMemo(() => {
     const end = addDays(weekStart, 6);
     return `${shortDate(weekStart)} – ${shortDate(end)}, ${end.getFullYear()}`;
@@ -475,6 +506,35 @@ export function ClientMealPlannerPanel({
       </CardHeader>
 
       <CardContent className="space-y-6">
+        {/* Pass 3 toolbar: recipes, auto-shopping, budget-fit, NECTAR suggestions */}
+        {canEdit && orgId && (
+          <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 p-2">
+            <AddRecipeDialog orgId={orgId} clientId={clientId} />
+            {planId && (
+              <AutoShoppingDialog
+                orgId={orgId}
+                planId={planId}
+                recipeIdsInPlan={recipeIdsInPlan}
+              />
+            )}
+            <SuggestionsDialog
+              meals={meals.map((m) => ({
+                day: DAYS[m.day_of_week],
+                slot: m.meal_slot,
+                label: m.label,
+                estimated_cost: m.estimated_cost,
+              }))}
+              dietaryNeeds={clientQ.data?.dietary_needs ?? null}
+              allergies={clientQ.data?.allergies ?? null}
+              foodsToAvoid={planQ.data?.foods_to_avoid ?? null}
+              budgetRemaining={null}
+            />
+            <div className="ml-auto text-[11px] text-muted-foreground">
+              Recipes are org-scoped and reusable across cells; meal moves never change the shopping list.
+            </div>
+          </div>
+        )}
+
         {/* Nutrition metric config */}
         <div className="flex flex-col gap-2 rounded-md border bg-muted/30 p-3 sm:flex-row sm:items-end">
           <Settings2 className="mt-2 h-4 w-4 text-muted-foreground sm:mt-0 sm:mb-2" />
@@ -566,7 +626,10 @@ export function ClientMealPlannerPanel({
                           entries={entries}
                           unit={cfg.nutrition_unit}
                           canEdit={canEdit}
+                          orgId={orgId ?? ""}
+                          clientId={clientId}
                           onAdd={() => addMeal.mutate({ day: i, slot })}
+                          onAddFromRecipe={(r) => addMeal.mutate({ day: i, slot, recipe: r })}
                           onChange={(id, patch) => updateMeal.mutate({ id, ...patch })}
                           onDelete={(id) => deleteMeal.mutate(id)}
                         />
@@ -585,6 +648,14 @@ export function ClientMealPlannerPanel({
           </table>
         </div>
         </DndContext>
+
+        {/* Budget fit — pulls from client_budgets food/grocery lines */}
+        <BudgetFitCard
+          clientId={clientId}
+          weekStart={weekStart}
+          plannedTotal={plannedCostTotal}
+        />
+
 
         {/* Staff "what did they actually eat" — current day */}
         {planId && canRecordActuals && (
@@ -652,6 +723,11 @@ export function ClientMealPlannerPanel({
 
         {/* Shopping list */}
         <div className="rounded-md border">
+          <datalist id={`shop-lib-${orgId ?? "none"}`}>
+            {(shopLibQ.data ?? []).map((it) => (
+              <option key={it} value={it} />
+            ))}
+          </datalist>
           <div className="flex items-center justify-between border-b bg-muted/40 px-3 py-2">
             <h4 className="text-sm font-semibold">Shopping List</h4>
             {canEdit && (
@@ -686,12 +762,16 @@ export function ClientMealPlannerPanel({
                 <Input
                   defaultValue={s.item}
                   disabled={!canEdit}
+                  list={`shop-lib-${orgId ?? "none"}`}
                   className={`h-8 ${s.checked ? "line-through text-muted-foreground" : ""}`}
                   onBlur={(e) => {
-                    if (e.target.value !== s.item)
+                    if (e.target.value !== s.item) {
                       updateShop.mutate({ id: s.id, item: e.target.value });
+                      if (orgId) recordShoppingItemUse(orgId, e.target.value);
+                    }
                   }}
                 />
+
                 <Input
                   defaultValue={s.quantity ?? ""}
                   disabled={!canEdit}
@@ -726,9 +806,10 @@ export function ClientMealPlannerPanel({
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Managers: drag meal pills between cells to reschedule (shopping list is unchanged).
-          Staff: confirm what the client actually ate each day below. Pass 3 will add recipe
-          scanning, auto-populated shopping list, and budget-fit checks.
+          Managers: drag meal pills between cells to reschedule (shopping list stays put — only recipe
+          changes drive it). Add recipes from the toolbar; auto-populate shopping from recipes on the
+          plan; NECTAR suggests healthier/cheaper swaps but never overrides your call. Prices and
+          ingredients are never invented.
         </p>
       </CardContent>
     </Card>
@@ -741,7 +822,10 @@ function MealCell({
   entries,
   unit,
   canEdit,
+  orgId,
+  clientId,
   onAdd,
+  onAddFromRecipe,
   onChange,
   onDelete,
 }: {
@@ -750,7 +834,10 @@ function MealCell({
   entries: MealRow[];
   unit: string;
   canEdit: boolean;
+  orgId: string;
+  clientId: string;
   onAdd: () => void;
+  onAddFromRecipe: (r: Recipe) => void;
   onChange: (id: string, patch: Partial<MealRow>) => void;
   onDelete: (id: string) => void;
 }) {
@@ -773,14 +860,19 @@ function MealCell({
         />
       ))}
       {canEdit && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 justify-start px-2 text-xs text-muted-foreground"
-          onClick={onAdd}
-        >
-          <Plus className="mr-1 h-3 w-3" /> Add
-        </Button>
+        <div className="flex flex-col gap-0.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 justify-start px-2 text-xs text-muted-foreground"
+            onClick={onAdd}
+          >
+            <Plus className="mr-1 h-3 w-3" /> Add
+          </Button>
+          {orgId && (
+            <PickRecipeMenu orgId={orgId} clientId={clientId} onPick={onAddFromRecipe} />
+          )}
+        </div>
       )}
     </div>
   );
@@ -849,7 +941,7 @@ function MealPill({
           </Button>
         )}
       </div>
-      <div className="flex items-center gap-1 px-1">
+      <div className="flex flex-wrap items-center gap-1 px-1">
         <Input
           type="number"
           step="0.1"
@@ -863,6 +955,25 @@ function MealPill({
           }}
         />
         <span className="text-[10px] text-muted-foreground">{unit}</span>
+        <span className="text-[10px] text-muted-foreground">·</span>
+        <span className="text-[10px] text-muted-foreground">$</span>
+        <Input
+          type="number"
+          step="0.01"
+          defaultValue={meal.estimated_cost ?? ""}
+          disabled={!canEdit}
+          placeholder="cost"
+          className="h-6 w-16 px-1 text-xs tabular-nums"
+          onBlur={(e) => {
+            const v = e.target.value === "" ? null : Number(e.target.value);
+            if (v !== meal.estimated_cost) onChange({ estimated_cost: v });
+          }}
+        />
+        {meal.recipe_id && (
+          <span title="From recipe" className="ml-auto inline-flex items-center gap-0.5 text-[10px] text-primary">
+            <BookOpen className="h-2.5 w-2.5" />
+          </span>
+        )}
       </div>
       {(expanded || meal.description) && (
         <Textarea

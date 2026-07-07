@@ -19,8 +19,9 @@ import {
   runSmartExtraction,
   getSmartImportSummary,
 } from "@/lib/smart-import.functions";
+import { TimesheetsImportWizard } from "@/components/smart-import/timesheets/timesheets-import-wizard";
 
-const SearchSchema = z.object({ mode: z.enum(["employee", "client"]).optional() });
+const SearchSchema = z.object({ mode: z.enum(["employee", "client", "timesheets"]).optional() });
 
 export const Route = createFileRoute("/dashboard/smart-import/")({
   head: () => ({ meta: [{ title: "Smart Import — NECTAR" }] }),
@@ -32,7 +33,7 @@ export const Route = createFileRoute("/dashboard/smart-import/")({
   ),
 });
 
-type Mode = "employee" | "client";
+type Mode = "employee" | "client" | "timesheets";
 type FileChip = {
   id: string;
   file: File;
@@ -400,7 +401,7 @@ function SmartImportPage() {
 
       {/* Mode switch */}
       <div className="flex items-center gap-2 rounded-lg border border-border bg-card p-1 w-fit">
-        {(["client", "employee"] as Mode[]).map((m) => (
+        {(["client", "employee", "timesheets"] as Mode[]).map((m) => (
           <button
             key={m}
             type="button"
@@ -410,12 +411,14 @@ function SmartImportPage() {
               mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            {m === "client" ? "Client" : "Employee"}
+            {m === "client" ? "Client" : m === "employee" ? "Employee" : "Historical timesheets"}
           </button>
         ))}
       </div>
 
-      {!jobId && (
+      {mode === "timesheets" && !jobId && <TimesheetsImportWizard />}
+
+      {!jobId && mode !== "timesheets" && (
         <>
           {/* Drop zone */}
           <div

@@ -5075,6 +5075,8 @@ export type Database = {
           gps_out_coordinates: Json | null
           gps_validated: boolean
           id: string
+          import_job_id: string | null
+          import_source: string | null
           incident_flag: boolean
           is_edited_by_admin: boolean
           is_out_of_bounds: boolean
@@ -5145,6 +5147,8 @@ export type Database = {
           gps_out_coordinates?: Json | null
           gps_validated?: boolean
           id?: string
+          import_job_id?: string | null
+          import_source?: string | null
           incident_flag?: boolean
           is_edited_by_admin?: boolean
           is_out_of_bounds?: boolean
@@ -5215,6 +5219,8 @@ export type Database = {
           gps_out_coordinates?: Json | null
           gps_validated?: boolean
           id?: string
+          import_job_id?: string | null
+          import_source?: string | null
           incident_flag?: boolean
           is_edited_by_admin?: boolean
           is_out_of_bounds?: boolean
@@ -5266,6 +5272,13 @@ export type Database = {
             columns: ["day_program_session_id"]
             isOneToOne: false
             referencedRelation: "day_program_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evv_timesheets_import_job_id_fkey"
+            columns: ["import_job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
             referencedColumns: ["id"]
           },
           {

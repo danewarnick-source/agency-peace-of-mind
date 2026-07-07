@@ -248,17 +248,9 @@ export function ClientMealPlannerPanel({
     },
   });
 
-  const toggleNeedsHelp = useMutation({
-    mutationFn: async (v: boolean) => {
-      const { error } = await supabase
-        .from("clients")
-        .update({ needs_shopping_help: v })
-        .eq("id", clientId);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["mp-client-diet", clientId] }),
-    onError: (e: Error) => toast.error(e.message),
-  });
+  // toggleNeedsHelp removed — activation now via client_meal_support.
+
+
 
   const setAssignee = useMutation({
     mutationFn: async (userId: string | null) => {

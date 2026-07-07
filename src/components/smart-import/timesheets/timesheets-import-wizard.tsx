@@ -324,25 +324,29 @@ export function TimesheetsImportWizard() {
   const buildReviewRows = useCallback(() => {
     if (!parsed || !mapping || !peopleQ.data) return;
     const { staff, clients } = peopleQ.data;
+
+    const wholeStaff = wholeFile.staffId ? staff.find((s) => s.id === wholeFile.staffId) ?? null : null;
+    const wholeClient = wholeFile.clientId ? clients.find((c) => c.id === wholeFile.clientId) ?? null : null;
+
     const result: ReviewRow[] = parsed.rows.map((raw, idx) => {
-      const staffLabel = mapping.staff ? raw[mapping.staff] ?? "" : "";
-      const clientLabel = mapping.client ? raw[mapping.client] ?? "" : "";
+      const staffLabel = wholeStaff ? wholeStaff.label : (mapping.staff ? raw[mapping.staff] ?? "" : "");
+      const clientLabel = wholeClient ? wholeClient.label : (mapping.client ? raw[mapping.client] ?? "" : "");
       const dateStr = mapping.date ? raw[mapping.date] ?? "" : "";
       const clockInStr = mapping.clock_in ? raw[mapping.clock_in] ?? "" : "";
       const clockOutStr = mapping.clock_out ? raw[mapping.clock_out] ?? "" : "";
       const notes = mapping.notes ? raw[mapping.notes] ?? "" : "";
       const serviceCode = mapping.service_code ? (raw[mapping.service_code] ?? "").toUpperCase() : "";
 
-      const staffCandidates = findCandidates(staff, staffLabel);
-      const clientCandidates = findCandidates(clients, clientLabel);
+      const staffCandidates = wholeStaff ? [wholeStaff] : findCandidates(staff, staffLabel);
+      const clientCandidates = wholeClient ? [wholeClient] : findCandidates(clients, clientLabel);
 
       const inDate = tryParseDateTime(mapping.singleDateTimeIn ? clockInStr : dateStr, clockInStr, mapping.singleDateTimeIn);
       const outDate = tryParseDateTime(mapping.singleDateTimeOut ? clockOutStr : dateStr, clockOutStr, mapping.singleDateTimeOut);
 
       let status: MatchStatus;
       let reason: string | null = null;
-      let staffId: string | null = null;
-      let clientId: string | null = null;
+      let staffId: string | null = wholeStaff?.id ?? null;
+      let clientId: string | null = wholeClient?.id ?? null;
 
       if (!staffLabel || !clientLabel || !dateStr || !clockInStr || !clockOutStr) {
         status = "invalid";
@@ -364,10 +368,12 @@ export function TimesheetsImportWizard() {
       } else if (staffCandidates.length > 1 || clientCandidates.length > 1) {
         status = "ambiguous";
         reason = "multiple possible matches";
+        if (!staffId && staffCandidates.length === 1) staffId = staffCandidates[0].id;
+        if (!clientId && clientCandidates.length === 1) clientId = clientCandidates[0].id;
       } else {
         status = "matched";
-        staffId = staffCandidates[0].id;
-        clientId = clientCandidates[0].id;
+        staffId = staffId ?? staffCandidates[0].id;
+        clientId = clientId ?? clientCandidates[0].id;
       }
 
       return {
@@ -384,7 +390,8 @@ export function TimesheetsImportWizard() {
     });
     setRows(result);
     setStep(3);
-  }, [parsed, mapping, peopleQ.data]);
+  }, [parsed, mapping, peopleQ.data, wholeFile]);
+
 
   // Actions on review rows
   const updateRow = (idx: number, patch: Partial<ReviewRow>) => {

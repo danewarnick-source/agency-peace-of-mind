@@ -65,7 +65,7 @@ export async function generateChoreChartReport(
 
   const orgName = await fetchOrgName(sb, space.organization_id);
 
-  const [linksRes, defsRes, rotRes, rowsRes, cellsRes] = await Promise.all([
+  const [linksRes, defsRes, rotRes, rowsRes, cellsRes, dailyRes] = await Promise.all([
     sb.from("chore_space_clients").select("client_id").eq("space_id", space.id),
     sb
       .from("chore_definitions")
@@ -85,6 +85,11 @@ export async function generateChoreChartReport(
       .from("chore_shift_assignments")
       .select("shift_row_id, day_of_week, task_text, helps_client_id, definition_id")
       .eq("space_id", space.id),
+    sb
+      .from("chore_daily_items")
+      .select("label, detail, sort_order")
+      .eq("space_id", space.id)
+      .order("sort_order"),
   ]);
 
   const linkedClientIds = ((linksRes.data ?? []) as Array<{ client_id: string }>).map(

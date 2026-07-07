@@ -158,6 +158,7 @@ export async function renderClientBudgetPdf(p: BudgetPdfPayload): Promise<Uint8A
       color: COLORS.headerBg,
     });
     const xs = colXs();
+    drawText("Day", xs.day + 4, y, { size: 9, font: bold, color: COLORS.muted });
     drawText("Label", xs.label + 4, y, { size: 9, font: bold, color: COLORS.muted });
     drawRight("Non-Var", xs.nonVar + COL.nonVar - 4, y, { size: 9, font: bold, color: COLORS.muted });
     drawRight("Variable", xs.variable + COL.variable - 4, y, { size: 9, font: bold, color: COLORS.muted });
@@ -165,17 +166,26 @@ export async function renderClientBudgetPdf(p: BudgetPdfPayload): Promise<Uint8A
     drawText("Notes", xs.notes + 4, y, { size: 9, font: bold, color: COLORS.muted });
     y -= 14;
 
-    if (rows.length === 0) {
+    // Rows are pre-sorted by day upstream, but sort defensively.
+    const sortedRows = [...rows].sort((a, b) => {
+      const ad = a.day_of_month ?? 99;
+      const bd = b.day_of_month ?? 99;
+      return ad - bd;
+    });
+
+    if (sortedRows.length === 0) {
       drawText("— no lines —", MARGIN + 4, y, { size: 10, color: COLORS.muted });
       y -= 14;
     } else {
-      for (const l of rows) {
+      for (const l of sortedRows) {
         const labelLines = wrap(font, l.label || "—", 10, COL.label - 8);
         const notesLines = wrap(font, l.notes || "—", 9, COL.notes - 8);
         const rowLines = Math.max(labelLines.length, notesLines.length);
         const rowH = rowLines * 12 + 4;
         ensure(rowH + 4);
 
+        const dayText = l.day_of_month != null ? String(l.day_of_month) : "—";
+        drawText(dayText, xs.day + (COL.day - font.widthOfTextAtSize(dayText, 10)) / 2, y, { size: 10 });
         labelLines.forEach((ln, i) => drawText(ln, xs.label + 4, y - i * 12, { size: 10 }));
         drawRight(fmt$(Number(l.non_variable || 0)), xs.nonVar + COL.nonVar - 4, y, { size: 10 });
         drawRight(fmt$(Number(l.variable || 0)), xs.variable + COL.variable - 4, y, { size: 10 });

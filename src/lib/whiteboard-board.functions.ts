@@ -70,3 +70,37 @@ export const getBoardStaff = createServerFn({ method: "GET" })
       })
       .sort((a, b) => a.full_name.localeCompare(b.full_name));
   });
+
+/**
+ * Real, currently-recorded staff→team placements. Read from
+ * `home_staff_designations` (active only). Used by the whiteboard planning
+ * board's "Current" starting-state loader. READ-ONLY.
+ */
+export type CurrentStaffPlacement = { staff_id: string; team_id: string };
+
+export const getCurrentStaffPlacements = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => orgOnly.parse(d))
+  .handler(async ({ data, context }): Promise<CurrentStaffPlacement[]> => {
+    const { supabase, userId } = context;
+    await requireAnyPermission(supabase, userId, data.organization_id, [
+      "view_referrals",
+      "manage_referrals",
+    ]);
+    const q = await supabase
+      .from("home_staff_designations")
+      .select("staff_id, team_id, active")
+      .eq("organization_id", data.organization_id)
+      .eq("active", true);
+    if (q.error) throw new Error(q.error.message);
+    const rows = (q.data ?? []) as Array<{ staff_id: string; team_id: string }>;
+    // De-dup by staff_id: a staff member may have multiple designations, keep first.
+    const seen = new Set<string>();
+    const out: CurrentStaffPlacement[] = [];
+    for (const r of rows) {
+      if (seen.has(r.staff_id)) continue;
+      seen.add(r.staff_id);
+      out.push({ staff_id: r.staff_id, team_id: r.team_id });
+    }
+    return out;
+  });

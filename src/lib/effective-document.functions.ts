@@ -60,7 +60,7 @@ export const getEffectiveDocument = createServerFn({ method: "POST" })
       as_of: z.union([z.literal("now"), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]),
     }).parse(d),
   )
-  .handler(async ({ data, context }): Promise<{ document: Record<string, unknown> | null; governingSource: GoverningSource }> => {
+  .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

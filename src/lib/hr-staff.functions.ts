@@ -1028,6 +1028,7 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
 export interface HrMatrixRequirement {
   requirement_id: string;
   title: string;
+  short_label: string | null;
   category: string | null;
   source_citation: string | null;
   checklist_layer: string | null;
@@ -1040,6 +1041,7 @@ export interface HrMatrixRequirement {
   applies_to_confirmed_at: string | null;
   phase: string | null;
 }
+
 
 
 export interface HrMatrixCell {

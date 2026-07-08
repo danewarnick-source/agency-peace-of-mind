@@ -58,13 +58,15 @@ export type ReportType =
   | "client_budget"
   | "meal_plan_menu"
   | "meal_plan_vs_actual"
-  | "chore_chart";
+  | "chore_chart"
+  | "employee_face_sheet";
 
 export const REPORT_TYPES: ReadonlyArray<ReportType> = [
   "client_budget",
   "meal_plan_menu",
   "meal_plan_vs_actual",
   "chore_chart",
+  "employee_face_sheet",
 ];
 
 /** Params accepted by any report. Consumers pass a superset; each report
@@ -72,6 +74,8 @@ export const REPORT_TYPES: ReadonlyArray<ReportType> = [
 export type ReportParams = {
   clientId?: string;
   spaceId?: string;
+  /** Employee/staff id for employee-scoped reports (e.g. Employee Face Sheet). */
+  staffId?: string;
   /** "YYYY-MM" or "YYYY-MM-DD" for budget. */
   periodMonth?: string;
   /** Any date within the target week for meal reports. */

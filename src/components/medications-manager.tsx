@@ -107,8 +107,45 @@ function medToForm(m: Medication): FormVals {
   };
 }
 
+// Serialize a form into the proposal payload (matches columns the RPC reads).
+function formToPayload(v: FormVals): Record<string, unknown> {
+  return {
+    medication_name: v.medication_name.trim(),
+    dosage: v.dosage.trim(),
+    frequency: v.frequency.trim(),
+    route: v.route.trim(),
+    scheduled_times: v.scheduled_times,
+    instructions: v.instructions.trim(),
+    prescriber: v.prescriber.trim(),
+    purpose: v.purpose.trim(),
+    adverse_effects: v.adverse_effects.trim(),
+    choking_risk: v.choking_risk,
+    choking_risk_details: v.choking_risk_details.trim(),
+    is_controlled: v.is_controlled,
+    is_prn: v.is_prn,
+    prn_instructions: v.prn_instructions.trim(),
+    pharmacy: v.pharmacy.trim(),
+    rx_number: v.rx_number.trim(),
+    packaging: v.packaging.trim(),
+    side_effects: v.side_effects.trim(),
+    contributes_to_swallowing_difficulty: v.contributes_to_swallowing_difficulty,
+  };
+}
+
+type ProposalRow = {
+  id: string;
+  medication_id: string | null;
+  change_type: "add" | "edit" | "discontinue";
+  proposed_payload: Record<string, any>;
+  status: "pending" | "approved" | "rejected";
+  source: "manual" | "appointment_upload";
+  proposed_by: string;
+  proposed_at: string;
+};
+
 
 // ─── Main component ────────────────────────────────────────────────────────────
+
 
 export function MedicationsManager({
   clientId, organizationId,

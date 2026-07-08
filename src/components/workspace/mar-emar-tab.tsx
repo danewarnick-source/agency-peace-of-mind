@@ -1309,6 +1309,32 @@ export function MarEmarTab({
   const { role } = usePermissions();
   const canManageMeds = role === "admin" || role === "manager" || role === "super_admin";
   const [safetyEditorOpen, setSafetyEditorOpen] = useState(false);
+  const [disableConfirmOpen, setDisableConfirmOpen] = useState(false);
+  const [disabling, setDisabling] = useState(false);
+
+  // Direct on-page disable of self-directed self-administration. Writes the
+  // same `clients.self_admin_med_support` field as the Clinical Safety
+  // Profile modal — medication records are preserved (no cascade delete);
+  // the eMAR simply returns to the eligibility gate on next render.
+  async function handleDirectDisable() {
+    if (!clientSafety) return;
+    setDisabling(true);
+    try {
+      const { error } = await supabase
+        .from("clients")
+        .update({ self_admin_med_support: false })
+        .eq("id", clientSafety.id);
+      if (error) throw error;
+      toast.success("Self-administration support turned off. Medication records retained.");
+      setDisableConfirmOpen(false);
+      qc.invalidateQueries({ queryKey: ["client-safety", clientSafety.id] });
+      qc.invalidateQueries({ queryKey: ["clients"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to disable self-administration.");
+    } finally {
+      setDisabling(false);
+    }
+  }
 
 
 
@@ -1595,19 +1621,31 @@ export function MarEmarTab({
             {serviceContext.toUpperCase()}
           </span>
           {canManageMeds && clientSafety && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 gap-1 text-[11px]"
-              onClick={() => setSafetyEditorOpen(true)}
-              title="Edit clinical safety profile (allergies, dysphagia, self-admin toggle)"
-            >
-              <Settings2 className="h-3.5 w-3.5" />
-              Clinical safety profile
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1 text-[11px] border-emerald-500/40 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
+                onClick={() => setDisableConfirmOpen(true)}
+                title="Turn off self-directed self-administration support (returns client to eligibility gate; records preserved)"
+              >
+                Self-admin: ON
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1 text-[11px]"
+                onClick={() => setSafetyEditorOpen(true)}
+                title="Edit clinical safety profile (allergies, dysphagia, self-admin toggle)"
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+                Clinical safety profile
+              </Button>
+            </>
           )}
         </div>
       </div>
+
 
       {canManageMeds && clientSafety && (
         <Dialog open={safetyEditorOpen} onOpenChange={setSafetyEditorOpen}>
@@ -1627,6 +1665,31 @@ export function MarEmarTab({
           </DialogContent>
         </Dialog>
       )}
+
+      {canManageMeds && clientSafety && (
+        <Dialog open={disableConfirmOpen} onOpenChange={setDisableConfirmOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Turn off self-administration support?</DialogTitle>
+              <DialogDescription className="pt-2">
+                Turn off self-administration support for {clientSafety.first_name} {clientSafety.last_name}?
+                Medication records are kept, not deleted. The client returns to the eligibility gate,
+                where support can be re-enabled at any time.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setDisableConfirmOpen(false)} disabled={disabling}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDirectDisable} disabled={disabling}>
+                {disabling ? "Turning off…" : "Turn off"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+
 
 
       {/* Permanent legal/scope banner — required at every eMAR surface */}

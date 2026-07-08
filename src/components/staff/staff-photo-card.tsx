@@ -48,25 +48,23 @@ export function StaffPhotoCard({
         <CardTitle className="text-base">Photo</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="[&_.flex.items-center.gap-3]:gap-5 [&_.h-32.w-32]:h-40 [&_.h-32.w-32]:w-40 [&_.h-32.w-32]:text-3xl">
-          <PhotoUpload
-            bucket="staff-photos"
-            organizationId={orgId}
-            subjectId={staffId}
-            currentPath={(q.data?.photo_path ?? null) as string | null}
-            personName={name}
-            avatarClassName="h-32 w-32 text-lg"
-            onUploaded={async (path) => {
-              await persist.mutateAsync({
-                photo_path: path,
-                photo_updated_at: new Date().toISOString(),
-              });
-            }}
-            onCleared={async () => {
-              await persist.mutateAsync({ photo_path: null, photo_updated_at: null });
-            }}
-          />
-        </div>
+        <PhotoUpload
+          bucket="staff-photos"
+          organizationId={orgId}
+          subjectId={staffId}
+          currentPath={(q.data?.photo_path ?? null) as string | null}
+          personName={name}
+          avatarClassName="h-40 w-40 text-3xl"
+          onUploaded={async (path) => {
+            await persist.mutateAsync({
+              photo_path: path,
+              photo_updated_at: new Date().toISOString(),
+            });
+          }}
+          onCleared={async () => {
+            await persist.mutateAsync({ photo_path: null, photo_updated_at: null });
+          }}
+        />
         <p className="mt-3 text-xs text-muted-foreground">
           Used on the staff file, scheduler pill, and coverage lists.
         </p>

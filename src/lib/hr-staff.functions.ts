@@ -255,6 +255,7 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
           title:
             (r.title as string) ?? (r.short_label as string) ?? "Untitled",
           category: (r.category as string) ?? null,
+          phase: typeof meta.phase === "string" ? (meta.phase as string) : null,
           source_citation: (r.source_citation as string) ?? null,
           evidence_type: (r.evidence_type as string) ?? null,
           renewal_frequency: (r.renewal_frequency as string) ?? null,

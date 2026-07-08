@@ -3430,6 +3430,7 @@ export type Database = {
           start_date: string | null
           support_explanation: string | null
           support_level: string | null
+          support_level_needs_review: boolean
         }
         Insert: {
           adverse_effects?: string | null
@@ -3475,6 +3476,7 @@ export type Database = {
           start_date?: string | null
           support_explanation?: string | null
           support_level?: string | null
+          support_level_needs_review?: boolean
         }
         Update: {
           adverse_effects?: string | null
@@ -3520,6 +3522,7 @@ export type Database = {
           start_date?: string | null
           support_explanation?: string | null
           support_level?: string | null
+          support_level_needs_review?: boolean
         }
         Relationships: []
       }
@@ -5470,9 +5473,11 @@ export type Database = {
           admin_reviewed_at: string | null
           admin_reviewed_by: string | null
           administered_at: string | null
+          administrator_role: string | null
           attestation_signed: boolean
           client_id: string
           created_at: string
+          credential_id: string | null
           documented_at: string
           emergency_services_called: boolean | null
           error_description: string | null
@@ -5513,9 +5518,11 @@ export type Database = {
           admin_reviewed_at?: string | null
           admin_reviewed_by?: string | null
           administered_at?: string | null
+          administrator_role?: string | null
           attestation_signed?: boolean
           client_id: string
           created_at?: string
+          credential_id?: string | null
           documented_at?: string
           emergency_services_called?: boolean | null
           error_description?: string | null
@@ -5556,9 +5563,11 @@ export type Database = {
           admin_reviewed_at?: string | null
           admin_reviewed_by?: string | null
           administered_at?: string | null
+          administrator_role?: string | null
           attestation_signed?: boolean
           client_id?: string
           created_at?: string
+          credential_id?: string | null
           documented_at?: string
           emergency_services_called?: boolean | null
           error_description?: string | null
@@ -17318,6 +17327,10 @@ export type Database = {
         Returns: boolean
       }
       client_deletion_impact: { Args: { _client_id: string }; Returns: Json }
+      client_has_med_admin_code: {
+        Args: { _client_id: string }
+        Returns: boolean
+      }
       clients_for_staff: {
         Args: { _org: string; _staff: string }
         Returns: {
@@ -17691,6 +17704,15 @@ export type Database = {
         }[]
       }
       mcp_exec_read_sql: { Args: { query: string }; Returns: Json }
+      med_admin_role_permitted: {
+        Args: {
+          _client_id: string
+          _org_id: string
+          _role: string
+          _user_id: string
+        }
+        Returns: boolean
+      }
       nectar_bump_chunk_attempt: {
         Args: { p_index: number; p_job: string }
         Returns: number
@@ -17757,6 +17779,10 @@ export type Database = {
       set_hive_executive: {
         Args: { _grant: boolean; _user_id: string }
         Returns: undefined
+      }
+      user_has_active_credential: {
+        Args: { _cert_type: string; _org_id: string; _user_id: string }
+        Returns: boolean
       }
       user_org_ids: { Args: { _user: string }; Returns: string[] }
       verify_certificate: {

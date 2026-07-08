@@ -220,46 +220,68 @@ function ClientProfileHub() {
           </SectionGroup>
         </TabsContent>
 
-        <TabsContent value="care" className="space-y-10">
+        <TabsContent value="care" className="space-y-6">
           <TrainingSetupBadge clientId={clientId} />
 
-          {/* Group 1 — PCSP-derived planning */}
-          <CareGroup
-            label="Plan & supports"
-            hint="Built from the client's PCSP"
-          >
-            <CareSection icon={Target} accent="indigo">
-              <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
-            </CareSection>
-            <CareSection icon={ListChecks} accent="violet">
-              <SupportStrategiesPanel client={client} clientId={clientId} orgId={orgId} />
-            </CareSection>
-            <CareSection icon={GraduationCap} accent="amber">
-              <CollapsibleSimpleCard title="Client-specific training">
-                <ClientSpecificTrainingCard clientId={clientId} />
-              </CollapsibleSimpleCard>
-            </CareSection>
-            <CareSection icon={HeartHandshake} accent="rose">
-              <PersonCenteredProfilePanel clientId={clientId} orgId={orgId} />
-            </CareSection>
-          </CareGroup>
+          <Tabs defaultValue="plan">
+            <TabsList className="mb-4">
+              <TabsTrigger value="plan">Plan & Support</TabsTrigger>
+              <TabsTrigger value="ops">Operational Tools</TabsTrigger>
+              {showEmarSubTab && <TabsTrigger value="emar">MAR / eMAR</TabsTrigger>}
+            </TabsList>
 
-          {/* Group 2 — Operational tools */}
-          <CareGroup
-            label="Operational tools"
-            hint="Day-to-day care coordination"
-            divider
-          >
-            <CareSection icon={Users} accent="sky">
-              <CaseloadEditor clientId={clientId} />
-            </CareSection>
-            <CareSection icon={UtensilsCrossed} accent="orange">
-              <ClientMealPlannerMount clientId={clientId} />
-            </CareSection>
-            <CareSection icon={Sparkles} accent="teal">
-              <ChoreChartForClient clientId={clientId} />
-            </CareSection>
-          </CareGroup>
+            <TabsContent value="plan" className="space-y-10">
+              <CareGroup
+                label="Plan & supports"
+                hint="Built from the client's PCSP"
+              >
+                <CareSection icon={Target} accent="indigo">
+                  <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
+                </CareSection>
+                <CareSection icon={ListChecks} accent="violet">
+                  <SupportStrategiesPanel client={client} clientId={clientId} orgId={orgId} />
+                </CareSection>
+                <CareSection icon={GraduationCap} accent="amber">
+                  <CollapsibleSimpleCard title="Client-specific training">
+                    <ClientSpecificTrainingCard clientId={clientId} />
+                  </CollapsibleSimpleCard>
+                </CareSection>
+                <CareSection icon={HeartHandshake} accent="rose">
+                  <PersonCenteredProfilePanel clientId={clientId} orgId={orgId} />
+                </CareSection>
+              </CareGroup>
+            </TabsContent>
+
+            <TabsContent value="ops" className="space-y-10">
+              <CareGroup
+                label="Operational tools"
+                hint="Day-to-day care coordination"
+              >
+                <CareSection icon={Users} accent="sky">
+                  <CaseloadEditor clientId={clientId} />
+                </CareSection>
+                <CareSection icon={UtensilsCrossed} accent="orange">
+                  <ClientMealPlannerMount clientId={clientId} />
+                </CareSection>
+                <CareSection icon={Sparkles} accent="teal">
+                  <ChoreChartForClient clientId={clientId} />
+                </CareSection>
+              </CareGroup>
+            </TabsContent>
+
+            {showEmarSubTab && (
+              <TabsContent value="emar" className="space-y-6">
+                <CareGroup label="Medication administration" hint="eMAR — same record staff use on shift">
+                  <CareSection icon={Pill} accent="rose">
+                    <MarEmarTab
+                      clientId={clientId}
+                      clientName={fullName}
+                    />
+                  </CareSection>
+                </CareGroup>
+              </TabsContent>
+            )}
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="activity" className="space-y-10">

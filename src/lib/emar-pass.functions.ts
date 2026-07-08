@@ -26,6 +26,11 @@ const PassInput = z.object({
   scheduledFor: z.string(), // ISO
   scheduledTimeLabel: z.string().optional().nullable(),
   status: StatusEnum,
+  // Who administered — drives the compliance gate (see med_admin_role_permitted).
+  // Defaults to 'self' to preserve the legacy self-directed pass path.
+  administratorRole: AdministratorRoleEnum.default("self"),
+  // Optional link to the credential row that authorizes lpn/rn/delegated.
+  credentialId: z.string().uuid().optional().nullable(),
   route: z.string().min(1).max(80),
   actualTakenAt: z.string(), // ISO — when the Person actually took it
   exceptionReason: z.string().max(200).optional().nullable(),

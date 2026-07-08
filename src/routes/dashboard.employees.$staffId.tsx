@@ -338,6 +338,7 @@ function StaffProfilePage() {
         <TabsList className="flex flex-wrap h-auto justify-start">
           <TabsTrigger value="profile">Overview</TabsTrigger>
           <TabsTrigger value="requirements">Certs &amp; trainings</TabsTrigger>
+          <TabsTrigger value="checklist">Compliance Checklist</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
           <TabsTrigger value="hrdocs">HR docs</TabsTrigger>
           <TabsTrigger value="deadlines">Deadlines</TabsTrigger>

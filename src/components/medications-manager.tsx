@@ -115,6 +115,11 @@ export function MedicationsManager({
 }: { clientId: string; organizationId?: string }) {
   const qc = useQueryClient();
   const parseAI = useServerFn(parseMedicationsAI);
+  const { data: org } = useCurrentOrg();
+  const role = org?.role ?? null;
+  const canApprove = role === "admin" || role === "super_admin";
+  const canPropose = role === "manager";
+  const readOnly = !canApprove && !canPropose;
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
@@ -137,7 +142,50 @@ export function MedicationsManager({
     },
   });
 
+  // Pending proposals (visible to all org members so they know a change is proposed)
+  const { data: proposals } = useQuery({
+    queryKey: ["med-proposals", clientId],
+    queryFn: async (): Promise<ProposalRow[]> => {
+      const { data, error } = await (supabase as any)
+        .from("medication_change_proposals")
+        .select("id, medication_id, change_type, proposed_payload, status, source, proposed_by, proposed_at")
+        .eq("client_id", clientId)
+        .eq("status", "pending")
+        .order("proposed_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as ProposalRow[];
+    },
+  });
+  const pendingCount = proposals?.length ?? 0;
 
+  // Fetch proposer display names for the approval panel
+  const proposerIds = useMemo(
+    () => Array.from(new Set((proposals ?? []).map((p) => p.proposed_by).filter(Boolean))),
+    [proposals],
+  );
+  const { data: proposerNames } = useQuery({
+    enabled: canApprove && proposerIds.length > 0,
+    queryKey: ["med-proposal-proposers", proposerIds],
+    queryFn: async (): Promise<Record<string, string>> => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, email")
+        .in("id", proposerIds);
+      const map: Record<string, string> = {};
+      (data ?? []).forEach((p: any) => {
+        map[p.id] = [p.first_name, p.last_name].filter(Boolean).join(" ") || p.email || "Unknown";
+      });
+      return map;
+    },
+  });
+
+  const invalidateMedRelated = () => {
+    qc.invalidateQueries({ queryKey: ["client-medications", clientId] });
+    qc.invalidateQueries({ queryKey: ["med-proposals", clientId] });
+    qc.invalidateQueries({ queryKey: ["mar-meds", clientId] });
+  };
+
+  // Direct writes — admin only. Managers/hosts route through proposals below.
   const insertMut = useMutation({
     mutationFn: async (v: FormVals) => {
       if (!organizationId) throw new Error("Missing organization");
@@ -164,13 +212,11 @@ export function MedicationsManager({
         side_effects:        v.side_effects.trim() || null,
         contributes_to_swallowing_difficulty: v.contributes_to_swallowing_difficulty,
       });
-
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Medication added.");
-      qc.invalidateQueries({ queryKey: ["client-medications", clientId] });
-      qc.invalidateQueries({ queryKey: ["mar-meds", clientId] });
+      invalidateMedRelated();
       setAddOpen(false);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -199,13 +245,11 @@ export function MedicationsManager({
         side_effects:        v.side_effects.trim() || null,
         contributes_to_swallowing_difficulty: v.contributes_to_swallowing_difficulty,
       }).eq("id", id);
-
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Medication updated.");
-      qc.invalidateQueries({ queryKey: ["client-medications", clientId] });
-      qc.invalidateQueries({ queryKey: ["mar-meds", clientId] });
+      invalidateMedRelated();
       setEditMed(null);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -220,8 +264,35 @@ export function MedicationsManager({
     },
     onSuccess: () => {
       toast.success("Medication discontinued. Record preserved.");
-      qc.invalidateQueries({ queryKey: ["client-medications", clientId] });
-      qc.invalidateQueries({ queryKey: ["mar-meds", clientId] });
+      invalidateMedRelated();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Proposal-writing mutations — managers/hosts submit these; nothing goes live.
+  const proposeMut = useMutation({
+    mutationFn: async (args: {
+      change_type: "add" | "edit" | "discontinue";
+      medication_id?: string | null;
+      payload: Record<string, unknown>;
+      source?: "manual" | "appointment_upload";
+    }) => {
+      if (!organizationId) throw new Error("Missing organization");
+      const { error } = await (supabase as any).from("medication_change_proposals").insert({
+        organization_id: organizationId,
+        client_id: clientId,
+        medication_id: args.medication_id ?? null,
+        change_type: args.change_type,
+        proposed_payload: args.payload,
+        source: args.source ?? "manual",
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Change proposed. Awaiting admin approval.");
+      invalidateMedRelated();
+      setAddOpen(false);
+      setEditMed(null);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -229,29 +300,68 @@ export function MedicationsManager({
   const bulkInsertMut = useMutation({
     mutationFn: async (rows: FormVals[]) => {
       if (!organizationId) throw new Error("Missing organization");
+      if (canApprove) {
+        const payload = rows.map((r) => ({
+          organization_id: organizationId,
+          client_id: clientId,
+          medication_name: r.medication_name,
+          dosage: r.dosage || null,
+          frequency: r.frequency || null,
+          route: r.route || null,
+          scheduled_times: r.scheduled_times,
+          instructions: r.instructions || null,
+          prescriber: r.prescriber || null,
+          purpose: null, adverse_effects: null, choking_risk: false,
+          is_controlled: false, is_prn: false,
+        }));
+        const { error } = await (supabase as any).from("client_medications").insert(payload);
+        if (error) throw error;
+        return { proposed: false as const, count: rows.length };
+      }
+      // Manager / host uploads → create pending proposals, one per parsed med.
       const payload = rows.map((r) => ({
         organization_id: organizationId,
         client_id: clientId,
-        medication_name: r.medication_name,
-        dosage: r.dosage || null,
-        frequency: r.frequency || null,
-        route: r.route || null,
-        scheduled_times: r.scheduled_times,
-        instructions: r.instructions || null,
-        prescriber: r.prescriber || null,
-        purpose: null, adverse_effects: null, choking_risk: false,
-        is_controlled: false, is_prn: false,
+        change_type: "add" as const,
+        source: "appointment_upload" as const,
+        proposed_payload: formToPayload(r),
       }));
-      const { error } = await (supabase as any).from("client_medications").insert(payload);
+      const { error } = await (supabase as any).from("medication_change_proposals").insert(payload);
       if (error) throw error;
+      return { proposed: true as const, count: rows.length };
     },
-    onSuccess: (_d, rows) => {
-      toast.success(`Imported ${rows.length} medication${rows.length === 1 ? "" : "s"}.`);
-      qc.invalidateQueries({ queryKey: ["client-medications", clientId] });
+    onSuccess: (res) => {
+      if (res.proposed) {
+        toast.success(`${res.count} proposed medication${res.count === 1 ? "" : "s"} awaiting admin approval.`);
+      } else {
+        toast.success(`Imported ${res.count} medication${res.count === 1 ? "" : "s"}.`);
+      }
+      invalidateMedRelated();
       setImportOpen(false);
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const approveMut = useMutation({
+    mutationFn: async (proposalId: string) => {
+      const { error } = await (supabase as any).rpc("apply_med_change_proposal", { _proposal_id: proposalId });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Proposal approved and applied."); invalidateMedRelated(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const rejectMut = useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes: string }) => {
+      const { error } = await (supabase as any).rpc("reject_med_change_proposal", {
+        _proposal_id: id, _notes: notes || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Proposal rejected."); invalidateMedRelated(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
 
   const visible = (meds ?? []).filter((m) => showInactive || m.is_active);
   const hasChokingRisk = visible.some((m) => m.choking_risk);

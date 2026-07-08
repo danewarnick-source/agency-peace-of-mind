@@ -1635,6 +1635,20 @@ export function MarEmarTab({
         </div>
       </div>
 
+          {canManageMeds && clientSafety && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1 text-[11px] border-amber-500/40 text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/30"
+              onClick={() => setDisableConfirmOpen(true)}
+              title="Turn off self-directed self-administration support (returns client to eligibility gate; records preserved)"
+            >
+              Self-admin: ON
+            </Button>
+          )}
+        </div>
+      </div>
+
       {canManageMeds && clientSafety && (
         <Dialog open={safetyEditorOpen} onOpenChange={setSafetyEditorOpen}>
           <DialogContent className="max-w-2xl">
@@ -1653,6 +1667,31 @@ export function MarEmarTab({
           </DialogContent>
         </Dialog>
       )}
+
+      {canManageMeds && clientSafety && (
+        <Dialog open={disableConfirmOpen} onOpenChange={setDisableConfirmOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Turn off self-administration support?</DialogTitle>
+              <DialogDescription className="pt-2">
+                Turn off self-administration support for {clientSafety.first_name} {clientSafety.last_name}?
+                Medication records are kept, not deleted. The client returns to the eligibility gate,
+                where support can be re-enabled at any time.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setDisableConfirmOpen(false)} disabled={disabling}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDirectDisable} disabled={disabling}>
+                {disabling ? "Turning off…" : "Turn off"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+
 
 
       {/* Permanent legal/scope banner — required at every eMAR surface */}

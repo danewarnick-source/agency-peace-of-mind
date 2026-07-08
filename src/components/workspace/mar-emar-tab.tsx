@@ -31,8 +31,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { toast } from "sonner";
 import {
   EmarLegalBanner, ClinicalSafetyHeader, EmarEligibilityGate,
-  MedicationChart, useClientSafety,
+  MedicationChart, useClientSafety, ClientSafetyEditor,
 } from "./emar-chart";
+
 import { EmarOpsPanel } from "./emar-ops-panel";
 import { EmarNectarPanel } from "./emar-nectar-panel";
 import { MedicationsManager } from "@/components/medications-manager";
@@ -1307,6 +1308,9 @@ export function MarEmarTab({
   const orgId = org?.organization_id;
   const { role } = usePermissions();
   const canManageMeds = role === "admin" || role === "manager" || role === "super_admin";
+  const [safetyEditorOpen, setSafetyEditorOpen] = useState(false);
+
+
 
 
   // ── Realtime: any INSERT to emar_logs for this client refetches every
@@ -1590,8 +1594,40 @@ export function MarEmarTab({
           >
             {serviceContext.toUpperCase()}
           </span>
+          {canManageMeds && clientSafety && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1 text-[11px]"
+              onClick={() => setSafetyEditorOpen(true)}
+              title="Edit clinical safety profile (allergies, dysphagia, self-admin toggle)"
+            >
+              <Settings2 className="h-3.5 w-3.5" />
+              Clinical safety profile
+            </Button>
+          )}
         </div>
       </div>
+
+      {canManageMeds && clientSafety && (
+        <Dialog open={safetyEditorOpen} onOpenChange={setSafetyEditorOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Clinical safety profile — {clientSafety.first_name} {clientSafety.last_name}</DialogTitle>
+            </DialogHeader>
+            <ClientSafetyEditor
+              client={clientSafety}
+              onSaved={({ self_admin_med_support }) => {
+                setSafetyEditorOpen(false);
+                if (!self_admin_med_support) {
+                  toast.success("eMAR disabled. Client returned to eligibility gate.");
+                }
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
 
       {/* Permanent legal/scope banner — required at every eMAR surface */}
       <EmarLegalBanner />

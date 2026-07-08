@@ -102,6 +102,7 @@ export function NectarDocsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [offerDocId, setOfferDocId] = useState<string | null>(null);
+  const [dating, setDating] = useState<{ id: string; documentType: string } | null>(null);
 
   const queryFn = useServerFn(queryDocuments);
   const qc = useQueryClient();

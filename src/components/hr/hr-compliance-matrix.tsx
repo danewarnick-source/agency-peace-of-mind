@@ -534,15 +534,11 @@ function deriveShortLabel(title: string): string {
 
 function HeaderLabel({ req }: { req: HrMatrix["requirements"][number] }) {
   const short = req.short_label?.trim() || deriveShortLabel(req.title);
-  const [open, setOpen] = useState(false);
   return (
-    <Tooltip open={open} onOpenChange={setOpen}>
+    <Tooltip>
       <TooltipTrigger asChild>
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
-          onMouseEnter={() => setOpen(true)}
-          onMouseLeave={() => setOpen(false)}
           className="inline-flex flex-col items-center gap-0.5 rounded px-1 py-0.5 text-[11px] font-medium leading-tight focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <span className="max-w-[140px] whitespace-normal break-words text-center">

@@ -1659,7 +1659,10 @@ export function MarEmarTab({
 
 
         {/* ── CHART — per-med profile with completeness flags ── */}
-        <TabsContent value="chart" className="space-y-3 pt-2">
+        <TabsContent value="chart" className="space-y-4 pt-2">
+          {canManageMeds && (
+            <MedicationsManager clientId={clientId} organizationId={orgId ?? undefined} />
+          )}
           <MedicationChart clientId={clientId} />
         </TabsContent>
 

@@ -78,6 +78,7 @@ function validate(input: unknown): PullClientReportInput {
   const p = (i.params ?? {}) as PullClientReportInput["params"];
   if (p.clientId && !UUID_RE.test(p.clientId)) throw new Error("Invalid clientId");
   if (p.spaceId && !UUID_RE.test(p.spaceId)) throw new Error("Invalid spaceId");
+  if (p.staffId && !UUID_RE.test(p.staffId)) throw new Error("Invalid staffId");
   if (p.weeksCount !== undefined) {
     const n = Number(p.weeksCount);
     if (!Number.isFinite(n) || n < 1 || n > 12) throw new Error("weeksCount must be 1..12");

@@ -5476,6 +5476,7 @@ export type Database = {
           documented_at: string
           emergency_services_called: boolean | null
           error_description: string | null
+          evv_timesheet_id: string | null
           exception_reason: string | null
           id: string
           is_controlled: boolean
@@ -5491,6 +5492,7 @@ export type Database = {
           provider_id: string | null
           recorded_in: string
           scheduled_for: string
+          scheduled_shift_id: string | null
           scheduled_time_label: string | null
           second_witness_id: string | null
           seizure_duration_seconds: number | null
@@ -5498,6 +5500,7 @@ export type Database = {
           service_context: string | null
           signature_attestation: string | null
           signature_data_url: string | null
+          source: string
           staff_id: string | null
           staff_name: string | null
           status: string
@@ -5516,6 +5519,7 @@ export type Database = {
           documented_at?: string
           emergency_services_called?: boolean | null
           error_description?: string | null
+          evv_timesheet_id?: string | null
           exception_reason?: string | null
           id?: string
           is_controlled?: boolean
@@ -5531,6 +5535,7 @@ export type Database = {
           provider_id?: string | null
           recorded_in?: string
           scheduled_for: string
+          scheduled_shift_id?: string | null
           scheduled_time_label?: string | null
           second_witness_id?: string | null
           seizure_duration_seconds?: number | null
@@ -5538,6 +5543,7 @@ export type Database = {
           service_context?: string | null
           signature_attestation?: string | null
           signature_data_url?: string | null
+          source?: string
           staff_id?: string | null
           staff_name?: string | null
           status: string
@@ -5556,6 +5562,7 @@ export type Database = {
           documented_at?: string
           emergency_services_called?: boolean | null
           error_description?: string | null
+          evv_timesheet_id?: string | null
           exception_reason?: string | null
           id?: string
           is_controlled?: boolean
@@ -5571,6 +5578,7 @@ export type Database = {
           provider_id?: string | null
           recorded_in?: string
           scheduled_for?: string
+          scheduled_shift_id?: string | null
           scheduled_time_label?: string | null
           second_witness_id?: string | null
           seizure_duration_seconds?: number | null
@@ -5578,6 +5586,7 @@ export type Database = {
           service_context?: string | null
           signature_attestation?: string | null
           signature_data_url?: string | null
+          source?: string
           staff_id?: string | null
           staff_name?: string | null
           status?: string
@@ -5592,10 +5601,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "emar_logs_evv_timesheet_id_fkey"
+            columns: ["evv_timesheet_id"]
+            isOneToOne: false
+            referencedRelation: "evv_timesheets"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "emar_logs_medication_id_fkey"
             columns: ["medication_id"]
             isOneToOne: false
             referencedRelation: "client_medications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emar_logs_scheduled_shift_id_fkey"
+            columns: ["scheduled_shift_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_shifts"
             referencedColumns: ["id"]
           },
           {

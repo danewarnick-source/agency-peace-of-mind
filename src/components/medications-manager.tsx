@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,9 +16,10 @@ import {
   Table, TableBody, TableCell, TableHead,
   TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Pill, Plus, Upload, X, Loader2, Sparkles, Pencil, AlertTriangle } from "lucide-react";
+import { Pill, Plus, Upload, X, Loader2, Sparkles, Pencil, AlertTriangle, ClipboardCheck, Check, ShieldAlert, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { parseMedicationsAI } from "@/lib/medications.functions";
+import { useCurrentOrg } from "@/hooks/use-org";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

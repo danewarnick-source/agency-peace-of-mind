@@ -1130,7 +1130,11 @@ function AIImportDialog({
           <DialogFooter>
             <Button variant="outline" onClick={() => setRows([])}>Start Over</Button>
             <Button disabled={!rows.length || committing} onClick={() => onCommit(rows)}>
-              {committing ? "Saving..." : `Save ${rows.length} Medication${rows.length === 1 ? "" : "s"}`}
+              {committing
+                ? (proposeMode ? "Submitting..." : "Saving...")
+                : proposeMode
+                  ? `Propose ${rows.length} Medication${rows.length === 1 ? "" : "s"} (admin approval)`
+                  : `Save ${rows.length} Medication${rows.length === 1 ? "" : "s"}`}
             </Button>
           </DialogFooter>
         </div>

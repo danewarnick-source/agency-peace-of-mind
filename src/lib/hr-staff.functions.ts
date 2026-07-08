@@ -1148,6 +1148,10 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
         requirement_id: r.id as string,
         title:
           (r.title as string) ?? (r.short_label as string) ?? "Untitled",
+        short_label:
+          typeof meta.short_label === "string" && meta.short_label.trim()
+            ? (meta.short_label as string).trim()
+            : null,
         category: (r.category as string) ?? null,
         source_citation: (r.source_citation as string) ?? null,
         checklist_layer: (meta.checklist_layer as string) ?? null,

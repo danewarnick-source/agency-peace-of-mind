@@ -318,6 +318,9 @@ function StaffProfilePage() {
               >
                 {m.active ? "Active" : "Deactivated"}
               </Badge>
+              {/* Face Sheet trigger — same placement as the client header's
+                  Face Sheet pill (immediately next to the status badge). */}
+              <EmployeeFaceSheetButton staffId={staffId} variant="pill" />
               {p?.hire_date && (
                 <span className="text-muted-foreground">· Hired {p.hire_date}</span>
               )}

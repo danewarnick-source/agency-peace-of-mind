@@ -191,9 +191,15 @@ function ClientProfileHub() {
           <TabsTrigger value="pcsp">PCSP</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="profile" className="space-y-4">
-          <UpdateInfoFromDocumentCard clientId={clientId} orgId={orgId} />
-          <ClientProfileTab clientId={clientId} onOpenFiles={() => setTab("files")} />
+        <TabsContent value="profile" className="space-y-10">
+          <SectionGroup label="Client profile" hint="Identity & imported details">
+            <SectionPanel icon={FileUp} accent="amber">
+              <UpdateInfoFromDocumentCard clientId={clientId} orgId={orgId} />
+            </SectionPanel>
+            <SectionPanel icon={UserCircle} accent="indigo">
+              <ClientProfileTab clientId={clientId} onOpenFiles={() => setTab("files")} />
+            </SectionPanel>
+          </SectionGroup>
         </TabsContent>
 
         <TabsContent value="care" className="space-y-10">
@@ -238,26 +244,58 @@ function ClientProfileHub() {
           </CareGroup>
         </TabsContent>
 
-        <TabsContent value="activity" className="space-y-4">
-          <ShiftsPanel clientId={clientId} orgId={orgId} />
-          <DailyLogsPanel clientId={clientId} orgId={orgId} />
-          <IncidentsPanel clientId={clientId} orgId={orgId} />
-          <SummariesPanel clientId={clientId} orgId={orgId} client={client} />
-          {isHostHome && <HostHomeCertPanel clientId={clientId} orgId={orgId} />}
-          <DeadlinesPanel clientId={clientId} />
+        <TabsContent value="activity" className="space-y-10">
+          <SectionGroup label="Service delivery" hint="Time, notes & incidents">
+            <SectionPanel icon={Clock} accent="sky">
+              <ShiftsPanel clientId={clientId} orgId={orgId} />
+            </SectionPanel>
+            <SectionPanel icon={FileText} accent="indigo">
+              <DailyLogsPanel clientId={clientId} orgId={orgId} />
+            </SectionPanel>
+            <SectionPanel icon={AlertOctagon} accent="rose">
+              <IncidentsPanel clientId={clientId} orgId={orgId} />
+            </SectionPanel>
+          </SectionGroup>
+          <SectionGroup label="Reporting & deadlines" hint="Summaries and upcoming due dates" divider>
+            <SectionPanel icon={ClipboardList} accent="violet">
+              <SummariesPanel clientId={clientId} orgId={orgId} client={client} />
+            </SectionPanel>
+            {isHostHome && (
+              <SectionPanel icon={HomeIcon} accent="emerald">
+                <HostHomeCertPanel clientId={clientId} orgId={orgId} />
+              </SectionPanel>
+            )}
+            <SectionPanel icon={CalendarClock} accent="amber">
+              <DeadlinesPanel clientId={clientId} />
+            </SectionPanel>
+          </SectionGroup>
         </TabsContent>
 
-        <TabsContent value="funds" className="space-y-4">
-          <BillingCodesPanel clientId={clientId} />
-          <ClientBudgetPanel clientId={clientId} />
+        <TabsContent value="funds" className="space-y-10">
+          <SectionGroup label="Authorizations & budget" hint="Billing codes and remaining funds">
+            <SectionPanel icon={ShieldCheck} accent="emerald">
+              <BillingCodesPanel clientId={clientId} />
+            </SectionPanel>
+            <SectionPanel icon={Wallet} accent="teal">
+              <ClientBudgetPanel clientId={clientId} />
+            </SectionPanel>
+          </SectionGroup>
         </TabsContent>
 
-        <TabsContent value="files" className="space-y-4">
-          <ClientDocumentsCard clientId={clientId} clientName={fullName} />
+        <TabsContent value="files" className="space-y-10">
+          <SectionGroup label="Documents" hint="Uploaded files for this client">
+            <SectionPanel icon={FolderOpen} accent="sky">
+              <ClientDocumentsCard clientId={clientId} clientName={fullName} />
+            </SectionPanel>
+          </SectionGroup>
         </TabsContent>
 
-        <TabsContent value="pcsp" className="space-y-4">
-          <PcspTab client={client} clientId={clientId} orgId={orgId} />
+        <TabsContent value="pcsp" className="space-y-10">
+          <SectionGroup label="Person-Centered Support Plan" hint="Current PCSP document & extractions">
+            <SectionPanel icon={ScrollText} accent="violet">
+              <PcspTab client={client} clientId={clientId} orgId={orgId} />
+            </SectionPanel>
+          </SectionGroup>
         </TabsContent>
       </Tabs>
     </div>

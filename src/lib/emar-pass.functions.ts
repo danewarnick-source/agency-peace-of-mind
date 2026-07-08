@@ -1,8 +1,24 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  requiredAttestation,
+  isHandsOnRole,
+  type AdministratorRole,
+} from "@/lib/med-attestation";
 
-const StatusEnum = z.enum(["self_administered", "refused", "omitted", "missed"]);
+// 'given' = hands-on administration; distinct from 'self_administered'
+// (self-directed) so a hands-on pass never inherits the self-directed
+// attestation language.
+const StatusEnum = z.enum(["self_administered", "given", "refused", "omitted", "missed"]);
+const AdministratorRoleEnum = z.enum([
+  "self",
+  "staff_observed",
+  "staff_administered",
+  "lpn",
+  "rn",
+  "delegated",
+]);
 
 const PassInput = z.object({
   clientId: z.string().uuid(),

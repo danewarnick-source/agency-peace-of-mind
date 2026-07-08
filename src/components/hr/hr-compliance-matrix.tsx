@@ -125,7 +125,9 @@ export function HrComplianceMatrix({
     );
   }
 
-  const reqs = data.requirements;
+  const reqs = useMemo(() => sortByPhase(data.requirements), [data.requirements]);
+  const phaseGroups = useMemo(() => groupByPhase(reqs), [reqs]);
+
 
   const viewEvidence = async (docId: string) => {
     try {

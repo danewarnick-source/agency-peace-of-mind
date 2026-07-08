@@ -1038,7 +1038,9 @@ export interface HrMatrixRequirement {
   cumulative_config: CumulativeRequirementConfig | null;
   applies_to_staff_types: string[] | "all";
   applies_to_confirmed_at: string | null;
+  phase: string | null;
 }
+
 
 export interface HrMatrixCell {
   status: string; // not_started | in_progress | complete | expired | waived

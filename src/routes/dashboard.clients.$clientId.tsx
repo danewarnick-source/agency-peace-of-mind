@@ -242,6 +242,9 @@ function ClientProfileHub() {
                 <CareSection icon={ListChecks} accent="violet">
                   <SupportStrategiesPanel client={client} clientId={clientId} orgId={orgId} />
                 </CareSection>
+                <CareSection icon={Users} accent="sky">
+                  <CaseloadEditor clientId={clientId} />
+                </CareSection>
                 <CareSection icon={GraduationCap} accent="amber">
                   <CollapsibleSimpleCard title="Client-specific training">
                     <ClientSpecificTrainingCard clientId={clientId} />

@@ -130,10 +130,12 @@ export interface CommonShipOutput extends CommonReportOutput {
 export interface ReportTypeMeta {
   key: ReportType;
   label: string;
-  scope: "client" | "space";
-  requiredParams: Array<"clientId" | "spaceId" | "periodMonth" | "weekStart">;
+  scope: "client" | "space" | "staff";
+  requiredParams: Array<"clientId" | "spaceId" | "staffId" | "periodMonth" | "weekStart">;
   optionalParams: Array<"weeksCount">;
-  documentType: string; // matches client_documents.document_type
+  /** For client-scoped reports this matches `client_documents.document_type`.
+   *  For employee-scoped reports it matches `employee_documents.kind`. */
+  documentType: string;
   description: string;
 }
 
@@ -176,6 +178,16 @@ export const REPORT_META: Record<ReportType, ReportTypeMeta> = {
     documentType: "chore_chart",
     description:
       "Living-space chore chart (client rotation + staff shift grid).",
+  },
+  employee_face_sheet: {
+    key: "employee_face_sheet",
+    label: "Employee Face Sheet",
+    scope: "staff",
+    requiredParams: ["staffId"],
+    optionalParams: [],
+    documentType: "face_sheet",
+    description:
+      "One-page aggregated employee record: identity, contact, employment, certifications & trainings, deadlines, and HR docs on file.",
   },
 };
 

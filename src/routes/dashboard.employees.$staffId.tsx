@@ -57,6 +57,7 @@ import { SectionPanel, SectionGroup } from "@/components/clients/section-panel";
 import { RequirePermission } from "@/components/rbac-guard";
 import { StaffTypeEditor } from "@/components/hr/staff-type-editor";
 import { EmployeeDocumentsCard } from "@/components/employees/employee-documents-card";
+import { EmployeeFaceSheetButton } from "@/components/employees/employee-face-sheet-button";
 import {
   getStaffChecklist,
   getStaffPii,

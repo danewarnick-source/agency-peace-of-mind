@@ -104,25 +104,38 @@ export interface CommonReportOutput {
   /** Chore-chart reports carry the space identity here. */
   spaceId: string | null;
   spaceName: string | null;
+  /** Employee-scoped reports (Employee Face Sheet) carry the staff identity here. */
+  staffId: string | null;
+  staffName: string | null;
   /** Client IDs the report is / would be attached to on ship.
    *  - client_budget / meal_plan_menu / meal_plan_vs_actual: [clientId]
-   *  - chore_chart: linked space clients                          */
+   *  - chore_chart: linked space clients
+   *  - employee_face_sheet: [] (ships to employee_documents, not client files) */
   attachClientIds: string[];
   /** Underlying generator payload, for callers that need the specifics. */
   raw:
     | BudgetReportResult
     | MealMenuReportResult
     | PlanVsActualResult
-    | ChoreChartReportResult;
+    | ChoreChartReportResult
+    | EmployeeFaceSheetResult;
 }
 
 export interface CommonShipOutput extends CommonReportOutput {
-  /** One entry per client file the snapshot was attached to. */
+  /** One entry per client file the snapshot was attached to.
+   *  Employee-scoped ships surface via `employeeSnapshot` instead. */
   snapshots: Array<{
     clientId: string;
     documentId: string;
     storagePath: string;
   }>;
+  /** Populated when the shipped report was employee-scoped
+   *  (employee_documents row, not client_documents). */
+  employeeSnapshot?: {
+    staffId: string;
+    documentId: string;
+    storagePath: string;
+  };
 }
 
 // ── Metadata (for UI + NECTAR discovery) ────────────────────────────────────

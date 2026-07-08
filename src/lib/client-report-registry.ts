@@ -449,5 +449,35 @@ export async function shipClientReport(
         snapshots: r.snapshots,
       };
     }
+    case "employee_face_sheet": {
+      const args: EmployeeFaceSheetArgs = {
+        staffId: requireField(params.staffId, "staffId"),
+        supabaseClient: params.supabaseClient,
+      };
+      const r: ShippedEmployeeFaceSheet = await shipEmployeeFaceSheet(args);
+      return {
+        reportType,
+        bytes: r.bytes,
+        filename: r.filename,
+        periodLabel: r.periodLabel,
+        organizationId: r.organizationId,
+        orgName: r.orgName,
+        clientId: null,
+        clientName: null,
+        spaceId: null,
+        spaceName: null,
+        staffId: r.staffId,
+        staffName: r.staffName,
+        attachClientIds: [],
+        raw: r,
+        // Employee face sheets ship into employee_documents, not client_documents.
+        snapshots: [],
+        employeeSnapshot: {
+          staffId: r.staffId,
+          documentId: r.documentId,
+          storagePath: r.storagePath,
+        },
+      };
+    }
   }
 }

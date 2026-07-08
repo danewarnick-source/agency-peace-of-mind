@@ -339,36 +339,74 @@ function StaffProfilePage() {
         </TabsList>
 
         {/* ----- OVERVIEW ----- */}
-        <TabsContent value="profile" className="mt-4 space-y-10">
-          <SectionGroup label="Identity & contact" hint="Who this person is">
-            <SectionPanel icon={Camera} accent="indigo">
-              <StaffPhotoCard orgId={orgId} staffId={staffId} name={name} />
-            </SectionPanel>
-            <SectionPanel icon={Contact} accent="violet">
-              <ContactCard
-                orgId={orgId}
-                staffId={staffId}
-                p={p}
-                m={m}
-                positions={positions}
-                onSaved={invalidateProfile}
+        {/* Structure mirrors the client Profile tab: completeness bar → main
+            2-col grid (identity/contact + at-a-glance) → assignments group →
+            documents group. Same SectionPanel/SectionGroup language as the
+            client profile so both surfaces read as one design. */}
+        <TabsContent value="profile" className="mt-4 space-y-6">
+          <StaffRecordCompletenessBar
+            photoPath={(p?.photo_path as string | null) ?? null}
+            email={(p?.email as string | null) ?? null}
+            phone={(p?.phone as string | null) ?? null}
+            employeeId={(p?.employee_id as string | null) ?? null}
+            hireDate={(p?.hire_date as string | null) ?? null}
+            teamId={teamId}
+            staffTypeCount={((p?.staff_type_keys as string[] | null) ?? []).length}
+            emergencyName={(p?.emergency_contact_name as string | null) ?? null}
+            emergencyPhone={(p?.emergency_contact_phone as string | null) ?? null}
+            positionsCount={positions.length}
+          />
+
+          <div className="grid gap-6 items-start lg:grid-cols-[1.65fr_1fr]">
+            {/* Main column: identity & contact panels stack vertically. */}
+            <div className="space-y-6">
+              <SectionGroup label="Identity & contact" hint="Who this person is">
+                <SectionPanel icon={Camera} accent="indigo">
+                  <StaffPhotoCard orgId={orgId} staffId={staffId} name={name} />
+                </SectionPanel>
+                <SectionPanel icon={Contact} accent="violet">
+                  <ContactCard
+                    orgId={orgId}
+                    staffId={staffId}
+                    p={p}
+                    m={m}
+                    positions={positions}
+                    onSaved={invalidateProfile}
+                  />
+                </SectionPanel>
+                <SectionPanel icon={UsersIcon} accent="sky">
+                  <TeamCard
+                    orgId={orgId}
+                    staffId={staffId}
+                    teamId={teamId}
+                    teamData={teamQ.data ?? null}
+                    allTeams={teamsQ.data ?? []}
+                    orgRole={org?.role}
+                    onSaved={() => {
+                      qc.invalidateQueries({ queryKey: ["staff-profile", orgId, staffId] });
+                      qc.invalidateQueries({ queryKey: ["staff-team", teamId] });
+                    }}
+                  />
+                </SectionPanel>
+              </SectionGroup>
+            </div>
+
+            {/* Right column: at-a-glance summary — parallels the client's
+                right-column summary card. */}
+            <div className="space-y-4">
+              <AtGlanceEmployeeCard
+                orgTitle={orgTitle}
+                role={m.role}
+                active={m.active}
+                hireDate={(p?.hire_date as string | null) ?? null}
+                teamName={teamQ.data?.team_name ?? null}
+                employeeId={(p?.employee_id as string | null) ?? null}
+                phone={(p?.phone as string | null) ?? null}
+                email={(p?.email as string | null) ?? null}
+                department={(p?.department as string | null) ?? null}
               />
-            </SectionPanel>
-            <SectionPanel icon={UsersIcon} accent="sky">
-              <TeamCard
-                orgId={orgId}
-                staffId={staffId}
-                teamId={teamId}
-                teamData={teamQ.data ?? null}
-                allTeams={teamsQ.data ?? []}
-                orgRole={org?.role}
-                onSaved={() => {
-                  qc.invalidateQueries({ queryKey: ["staff-profile", orgId, staffId] });
-                  qc.invalidateQueries({ queryKey: ["staff-team", teamId] });
-                }}
-              />
-            </SectionPanel>
-          </SectionGroup>
+            </div>
+          </div>
 
           <SectionGroup label="Assignments & role" hint="Caseload, schedule & staff types" divider>
             <SectionPanel icon={UserCircle} accent="rose">

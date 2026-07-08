@@ -261,9 +261,6 @@ function ClientProfileHub() {
                 label="Operational tools"
                 hint="Day-to-day care coordination"
               >
-                <CareSection icon={Users} accent="sky">
-                  <CaseloadEditor clientId={clientId} />
-                </CareSection>
                 <CareSection icon={UtensilsCrossed} accent="orange">
                   <ClientMealPlannerMount clientId={clientId} />
                 </CareSection>

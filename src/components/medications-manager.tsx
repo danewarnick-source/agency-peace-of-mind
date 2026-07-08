@@ -1260,12 +1260,13 @@ function PendingProposalsPanel({
 }
 
 function AddSummary({ payload }: { payload: Record<string, any> }) {
-  const fields: Array<[string, any]> = [
+  const raw: Array<[string, unknown]> = [
     ["Dose", payload.dosage], ["Route", payload.route], ["Frequency", payload.frequency],
     ["Prescriber", payload.prescriber],
     ["Times", Array.isArray(payload.scheduled_times) ? payload.scheduled_times.join(", ") : ""],
     ["Purpose", payload.purpose],
-  ].filter(([, v]) => v);
+  ];
+  const fields = raw.filter(([, v]) => v);
   return (
     <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
       {fields.map(([k, v]) => (

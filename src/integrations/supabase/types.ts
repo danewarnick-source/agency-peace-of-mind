@@ -12679,6 +12679,7 @@ export type Database = {
         Row: {
           active: boolean
           created_at: string
+          custom_role_id: string | null
           id: string
           is_company_executive: boolean
           job_title: string | null
@@ -12690,6 +12691,7 @@ export type Database = {
         Insert: {
           active?: boolean
           created_at?: string
+          custom_role_id?: string | null
           id?: string
           is_company_executive?: boolean
           job_title?: string | null
@@ -12701,6 +12703,7 @@ export type Database = {
         Update: {
           active?: boolean
           created_at?: string
+          custom_role_id?: string | null
           id?: string
           is_company_executive?: boolean
           job_title?: string | null
@@ -12710,6 +12713,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "organization_members_custom_role_id_fkey"
+            columns: ["custom_role_id"]
+            isOneToOne: false
+            referencedRelation: "rbac_roles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "organization_members_manager_id_fkey"
             columns: ["manager_id"]
@@ -13747,6 +13757,47 @@ export type Database = {
           {
             foreignKeyName: "provisioning_rules_org_id_fkey"
             columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rbac_roles: {
+        Row: {
+          capabilities: string[]
+          created_at: string
+          description: string | null
+          id: string
+          is_system: boolean
+          name: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          capabilities?: string[]
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_system?: boolean
+          name: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          capabilities?: string[]
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_system?: boolean
+          name?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rbac_roles_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
@@ -16862,6 +16913,50 @@ export type Database = {
           },
         ]
       }
+      user_capability_overrides: {
+        Row: {
+          capability_key: string
+          created_at: string
+          created_by: string | null
+          id: string
+          mode: string
+          organization_id: string
+          reason: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          capability_key: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mode: string
+          organization_id: string
+          reason?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          capability_key?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mode?: string
+          organization_id?: string
+          reason?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_capability_overrides_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_celebration_mute: {
         Row: {
           muted: boolean
@@ -17343,6 +17438,10 @@ export type Database = {
       }
       delete_client_hard: { Args: { _client_id: string }; Returns: Json }
       discard_import_job_hard: { Args: { _job_id: string }; Returns: Json }
+      effective_capabilities: {
+        Args: { _org_id: string; _user_id: string }
+        Returns: string[]
+      }
       find_possible_duplicate_referral: {
         Args: {
           _age: number
@@ -17486,6 +17585,10 @@ export type Database = {
           staff_id: string
         }[]
       }
+      has_capability: {
+        Args: { _cap: string; _org_id: string; _user_id: string }
+        Returns: boolean
+      }
       has_org_role: {
         Args: {
           _org: string
@@ -17623,6 +17726,7 @@ export type Database = {
         Args: { _org: string }
         Returns: undefined
       }
+      seed_system_rbac_roles: { Args: { _org: string }; Returns: undefined }
       set_company_executive: {
         Args: { _grant: boolean; _membership_id: string }
         Returns: undefined

@@ -96,6 +96,7 @@ export interface ChecklistRow {
   requirement_id: string;
   title: string;
   category: string | null;
+  phase: string | null;
   source_citation: string | null;
   evidence_type: string | null;
   renewal_frequency: string | null;
@@ -128,6 +129,7 @@ export interface ChecklistRow {
   applies_to_staff_types: string[] | "all";
   applies_to_confirmed_at: string | null;
 }
+
 
 
 export const getStaffChecklist = createServerFn({ method: "GET" })

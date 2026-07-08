@@ -171,10 +171,11 @@ function ClientProfileHub() {
       return (count ?? 0) > 0;
     },
   });
-  // Admin gate: show whenever eMAR feature is enabled, so an admin can add the
-  // first medication for a client with none. Also show if the med-monitoring
-  // code is authorized or any med already exists (mirrors workspace).
-  const showEmarSubTab = !!emarFeatureEnabled || !!hasMedMonitoringCode || !!hasMedications;
+  // Admin gate: this route is already admin-only (manage_users). Always show
+  // the MAR/eMAR sub-tab so an admin can add the first medication for a
+  // client with none — MarEmarTab handles its own empty/add state.
+  const showEmarSubTab = true;
+  void emarFeatureEnabled; void hasMedMonitoringCode; void hasMedications;
 
   const disabilityCategory = client?.disability_category as string | null | undefined;
 

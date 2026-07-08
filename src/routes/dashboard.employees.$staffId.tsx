@@ -21,6 +21,16 @@ import {
   Plus,
   Trash2,
   CalendarDays,
+  UserCircle,
+  Camera,
+  Contact,
+  Users as UsersIcon,
+  Briefcase,
+  GraduationCap,
+  Activity as ActivityIcon,
+  Lock,
+  FolderArchive,
+  CalendarClock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,6 +52,7 @@ import {
 import { StaffPhotoCard } from "@/components/staff/staff-photo-card";
 import { PersonAvatar } from "@/components/person/person-avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SectionPanel, SectionGroup } from "@/components/clients/section-panel";
 
 import { RequirePermission } from "@/components/rbac-guard";
 import { StaffTypeEditor } from "@/components/hr/staff-type-editor";
@@ -270,123 +281,144 @@ function StaffProfilePage() {
         </TabsList>
 
         {/* ----- OVERVIEW ----- */}
-        <TabsContent value="profile" className="mt-4">
-          <div className="grid gap-4 lg:grid-cols-2">
+        <TabsContent value="profile" className="mt-4 space-y-10">
+          <SectionGroup label="Identity & contact" hint="Who this person is">
+            <SectionPanel icon={Camera} accent="indigo">
+              <StaffPhotoCard orgId={orgId} staffId={staffId} name={name} />
+            </SectionPanel>
+            <SectionPanel icon={Contact} accent="violet">
+              <ContactCard
+                orgId={orgId}
+                staffId={staffId}
+                p={p}
+                m={m}
+                positions={positions}
+                onSaved={invalidateProfile}
+              />
+            </SectionPanel>
+            <SectionPanel icon={UsersIcon} accent="sky">
+              <TeamCard
+                orgId={orgId}
+                staffId={staffId}
+                teamId={teamId}
+                teamData={teamQ.data ?? null}
+                allTeams={teamsQ.data ?? []}
+                orgRole={org?.role}
+                onSaved={() => {
+                  qc.invalidateQueries({ queryKey: ["staff-profile", orgId, staffId] });
+                  qc.invalidateQueries({ queryKey: ["staff-team", teamId] });
+                }}
+              />
+            </SectionPanel>
+          </SectionGroup>
 
-            {/* Card 0 — Photo */}
-            <StaffPhotoCard orgId={orgId} staffId={staffId} name={name} />
+          <SectionGroup label="Assignments & role" hint="Caseload, schedule & staff types" divider>
+            <SectionPanel icon={UserCircle} accent="rose">
+              <CaseloadCard
+                orgId={orgId}
+                staffId={staffId}
+                caseload={caseloadQ.data ?? []}
+                allClients={allClientsQ.data ?? []}
+                orgRole={org?.role}
+                onChanged={() => qc.invalidateQueries({ queryKey: ["staff-caseload", orgId, staffId] })}
+              />
+            </SectionPanel>
+            <SectionPanel icon={CalendarDays} accent="amber">
+              <Card>
+                <CardHeader><CardTitle className="text-base">Schedule</CardTitle></CardHeader>
+                <CardContent className="text-sm text-muted-foreground">
+                  <p>View and manage shifts for this staff member in the scheduler.</p>
+                  <div className="mt-3">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to="/dashboard/scheduler">
+                        <CalendarDays className="mr-1 h-3.5 w-3.5" /> Open scheduler →
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </SectionPanel>
+            <SectionPanel icon={Briefcase} accent="teal">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    Staff types
+                    <span className="ml-2 text-[10px] font-normal text-muted-foreground">
+                      Union rule: required for any type selected
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <StaffTypeEditor organizationId={orgId} staffId={staffId} />
+                </CardContent>
+              </Card>
+            </SectionPanel>
+          </SectionGroup>
 
-
-            {/* Card 1 — Contact & Position */}
-            <ContactCard
-              orgId={orgId}
-              staffId={staffId}
-              p={p}
-              m={m}
-              positions={positions}
-              onSaved={invalidateProfile}
-            />
-
-            {/* Card 2 — Team */}
-            <TeamCard
-              orgId={orgId}
-              staffId={staffId}
-              teamId={teamId}
-              teamData={teamQ.data ?? null}
-              allTeams={teamsQ.data ?? []}
-              orgRole={org?.role}
-              onSaved={() => {
-                qc.invalidateQueries({ queryKey: ["staff-profile", orgId, staffId] });
-                qc.invalidateQueries({ queryKey: ["staff-team", teamId] });
-              }}
-            />
-
-            {/* Card 3 — Caseload */}
-            <CaseloadCard
-              orgId={orgId}
-              staffId={staffId}
-              caseload={caseloadQ.data ?? []}
-              allClients={allClientsQ.data ?? []}
-              orgRole={org?.role}
-              onChanged={() => qc.invalidateQueries({ queryKey: ["staff-caseload", orgId, staffId] })}
-            />
-
-            {/* Card 4 — Schedule */}
-            <Card className="lg:col-span-2">
-              <CardHeader><CardTitle className="text-base">Schedule</CardTitle></CardHeader>
-              <CardContent className="text-sm text-muted-foreground">
-                <p>View and manage shifts for this staff member in the scheduler.</p>
-                <div className="mt-3">
-                  <Button variant="outline" size="sm" asChild>
-                    <Link to="/dashboard/scheduler">
-                      <CalendarDays className="mr-1 h-3.5 w-3.5" /> Open scheduler →
-                    </Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Card 5 — Staff types */}
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle className="text-base">
-                  Staff types
-                  <span className="ml-2 text-[10px] font-normal text-muted-foreground">
-                    Union rule: required for any type selected
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <StaffTypeEditor organizationId={orgId} staffId={staffId} />
-              </CardContent>
-            </Card>
-
-
-            {/* Card 6 — Employee documents (NECTAR autofill) */}
-            <div className="lg:col-span-2">
+          <SectionGroup label="Employee documents" hint="Uploaded records & autofill" divider>
+            <SectionPanel icon={FolderArchive} accent="emerald">
               <EmployeeDocumentsCard
                 organizationId={orgId}
                 staffId={staffId}
                 onProfileMaybeChanged={invalidateProfile}
               />
-            </div>
-
-          </div>
+            </SectionPanel>
+          </SectionGroup>
         </TabsContent>
 
 
         {/* ----- CERTS & TRAININGS ----- */}
-        <TabsContent value="requirements" className="mt-4">
-          <CertsTab organizationId={orgId} staffId={staffId} staffName={name} caseload={caseloadQ.data ?? []} orgRole={org?.role} />
+        <TabsContent value="requirements" className="mt-4 space-y-10">
+          <SectionGroup label="Certifications & training" hint="Current status and history">
+            <SectionPanel icon={GraduationCap} accent="amber">
+              <CertsTab organizationId={orgId} staffId={staffId} staffName={name} caseload={caseloadQ.data ?? []} orgRole={org?.role} />
+            </SectionPanel>
+          </SectionGroup>
         </TabsContent>
 
         {/* ----- ACTIVITY ----- */}
-        <TabsContent value="activity" className="mt-4">
-          <ActivityFeed organizationId={orgId} staffId={staffId} />
+        <TabsContent value="activity" className="mt-4 space-y-10">
+          <SectionGroup label="Activity" hint="Shifts, notes & recent actions">
+            <SectionPanel icon={ActivityIcon} accent="sky">
+              <ActivityFeed organizationId={orgId} staffId={staffId} />
+            </SectionPanel>
+          </SectionGroup>
         </TabsContent>
 
         {/* ----- HR DOCS ----- */}
-        <TabsContent value="hrdocs" className="mt-4 space-y-4">
-          <HrSensitiveCard
-            orgId={orgId}
-            staffId={staffId}
-            isSelf={isSelf}
-            orgRole={org?.role}
-          />
-          <StaffHrDocsPanel organizationId={orgId} staffId={staffId} />
+        <TabsContent value="hrdocs" className="mt-4 space-y-10">
+          <SectionGroup label="Sensitive HR" hint="Restricted access">
+            <SectionPanel icon={Lock} accent="rose">
+              <HrSensitiveCard
+                orgId={orgId}
+                staffId={staffId}
+                isSelf={isSelf}
+                orgRole={org?.role}
+              />
+            </SectionPanel>
+          </SectionGroup>
+          <SectionGroup label="HR documents" hint="Signed & uploaded files" divider>
+            <SectionPanel icon={FolderArchive} accent="violet">
+              <StaffHrDocsPanel organizationId={orgId} staffId={staffId} />
+            </SectionPanel>
+          </SectionGroup>
         </TabsContent>
 
         {/* ----- DEADLINES ----- */}
-        <TabsContent value="deadlines" className="mt-4">
-          <Card>
-            <CardHeader><CardTitle className="text-base">Deadlines</CardTitle></CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              Staff-scoped deadlines (training expirations, cert renewals, scheduled-shift
-              acknowledgements) are tracked centrally on the deadlines desk.
-              {" "}
-              <Link to="/dashboard/deadlines" className="underline">Open deadlines →</Link>
-            </CardContent>
-          </Card>
+        <TabsContent value="deadlines" className="mt-4 space-y-10">
+          <SectionGroup label="Deadlines" hint="Renewals & acknowledgements">
+            <SectionPanel icon={CalendarClock} accent="amber">
+              <Card>
+                <CardHeader><CardTitle className="text-base">Deadlines</CardTitle></CardHeader>
+                <CardContent className="text-sm text-muted-foreground">
+                  Staff-scoped deadlines (training expirations, cert renewals, scheduled-shift
+                  acknowledgements) are tracked centrally on the deadlines desk.
+                  {" "}
+                  <Link to="/dashboard/deadlines" className="underline">Open deadlines →</Link>
+                </CardContent>
+              </Card>
+            </SectionPanel>
+          </SectionGroup>
         </TabsContent>
       </Tabs>
     </div>

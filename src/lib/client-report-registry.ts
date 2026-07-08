@@ -316,6 +316,29 @@ export async function generateClientReport(
         raw: r,
       };
     }
+    case "employee_face_sheet": {
+      const args: EmployeeFaceSheetArgs = {
+        staffId: requireField(params.staffId, "staffId"),
+        supabaseClient: params.supabaseClient,
+      };
+      const r = await generateEmployeeFaceSheet(args);
+      return {
+        reportType,
+        bytes: r.bytes,
+        filename: r.filename,
+        periodLabel: r.periodLabel,
+        organizationId: r.organizationId,
+        orgName: r.orgName,
+        clientId: null,
+        clientName: null,
+        spaceId: null,
+        spaceName: null,
+        staffId: r.staffId,
+        staffName: r.staffName,
+        attachClientIds: [],
+        raw: r,
+      };
+    }
   }
 }
 

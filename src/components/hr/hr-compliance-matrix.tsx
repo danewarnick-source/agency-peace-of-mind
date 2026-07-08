@@ -95,6 +95,12 @@ export function HrComplianceMatrix({
     return Array.from(map.entries()).map(([key, v]) => ({ key, ...v }));
   }, [q.data, group]);
 
+  const reqs = useMemo(
+    () => sortByPhase(q.data?.requirements ?? []),
+    [q.data?.requirements],
+  );
+  const phaseGroups = useMemo(() => groupByPhase(reqs), [reqs]);
+
   if (q.isLoading) {
     return (
       <Card>
@@ -125,8 +131,7 @@ export function HrComplianceMatrix({
     );
   }
 
-  const reqs = useMemo(() => sortByPhase(data.requirements), [data.requirements]);
-  const phaseGroups = useMemo(() => groupByPhase(reqs), [reqs]);
+
 
 
   const viewEvidence = async (docId: string) => {

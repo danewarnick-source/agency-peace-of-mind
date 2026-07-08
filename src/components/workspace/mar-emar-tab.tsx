@@ -1309,6 +1309,32 @@ export function MarEmarTab({
   const { role } = usePermissions();
   const canManageMeds = role === "admin" || role === "manager" || role === "super_admin";
   const [safetyEditorOpen, setSafetyEditorOpen] = useState(false);
+  const [disableConfirmOpen, setDisableConfirmOpen] = useState(false);
+  const [disabling, setDisabling] = useState(false);
+
+  // Direct on-page disable of self-directed self-administration. Writes the
+  // same `clients.self_admin_med_support` field as the Clinical Safety
+  // Profile modal — medication records are preserved (no cascade delete);
+  // the eMAR simply returns to the eligibility gate on next render.
+  async function handleDirectDisable() {
+    if (!clientSafety) return;
+    setDisabling(true);
+    try {
+      const { error } = await supabase
+        .from("clients")
+        .update({ self_admin_med_support: false })
+        .eq("id", clientSafety.id);
+      if (error) throw error;
+      toast.success("Self-administration support turned off. Medication records retained.");
+      setDisableConfirmOpen(false);
+      qc.invalidateQueries({ queryKey: ["client-safety", clientSafety.id] });
+      qc.invalidateQueries({ queryKey: ["clients"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to disable self-administration.");
+    } finally {
+      setDisabling(false);
+    }
+  }
 
 
 

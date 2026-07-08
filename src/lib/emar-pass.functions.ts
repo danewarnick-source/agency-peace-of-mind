@@ -100,21 +100,75 @@ export const logMedicationPass = createServerFn({ method: "POST" })
     };
     const m = med as MedRow;
 
-    if (m.is_prn && data.status === "self_administered" && !data.prnReason?.trim()) {
+    // ── COMPLIANCE GATE ──────────────────────────────────────────────────
+    // Hands-on administration paths (staff_administered / lpn / rn /
+    // delegated OR status='given') REQUIRE an active PM/PN billing code on
+    // the client AND, for licensed paths, an active credential on the
+    // recording user. Enforced server-side because this is a liability
+    // boundary — hiding the UI is not enough. See migration
+    // med_admin_role_permitted() for the canonical rule; the mapping should
+    // later be sourced from the SOW authoritative-sources engine so
+    // amendments propagate without a code change.
+    const role = data.administratorRole as AdministratorRole;
+    const handsOn = isHandsOnRole(role) || data.status === "given";
+
+    if (handsOn) {
+      const { data: allowed, error: gateErr } = await supabase.rpc(
+        "med_admin_role_permitted",
+        { _client_id: data.clientId, _org_id: orgId, _user_id: userId, _role: role },
+      );
+      if (gateErr) throw new Error(gateErr.message);
+      if (!allowed) {
+        // Explain the specific reason the gate blocked the pass.
+        const { data: hasCode } = await supabase.rpc("client_has_med_admin_code", {
+          _client_id: data.clientId,
+        });
+        if (!hasCode) {
+          throw new Error(
+            "This client is not authorized for hands-on medication administration — no PM/PN billing code on file. Staff may observe and document self-administration only.",
+          );
+        }
+        if (role === "lpn" || role === "rn") {
+          throw new Error(
+            `Hands-on ${role.toUpperCase()} administration blocked: your ${role.toUpperCase()} credential is not on file or has expired.`,
+          );
+        }
+        if (role === "delegated") {
+          throw new Error(
+            "Delegated administration blocked: no active nurse-delegation record on file for this staff member. Delegation records are added in the delegation module.",
+          );
+        }
+        throw new Error(
+          "Hands-on medication administration is not permitted for this staff member on this client.",
+        );
+      }
+    }
+
+    if (m.is_prn && (data.status === "self_administered" || data.status === "given") && !data.prnReason?.trim()) {
       throw new Error("PRN reason is required.");
     }
-    if (m.is_rescue && data.status === "self_administered") {
+    if (m.is_rescue && (data.status === "self_administered" || data.status === "given")) {
       if (data.seizureDurationSeconds == null || !data.seizureOutcome?.trim()) {
         throw new Error("Rescue medication requires seizure duration and outcome.");
       }
     }
-    if (m.is_controlled && data.status === "self_administered") {
+    if (m.is_controlled && (data.status === "self_administered" || data.status === "given")) {
       if (data.controlledCountedValue == null) {
         throw new Error("Controlled-substance count is required.");
       }
     }
     if (data.isMedicationError && !data.errorDescription?.trim()) {
       throw new Error("Medication error requires a description.");
+    }
+
+    // ── ATTESTATION FRAMEWORK ────────────────────────────────────────────
+    // Scale required attestation by admin model + med risk-class. Witness-
+    // level attestations require a second_witness_id.
+    const attnLevel = requiredAttestation(role, m);
+    if (attnLevel === "witness" && !data.secondWitnessId) {
+      throw new Error(
+        "This administration requires a second witness signature (controlled substance, hands-on administration).",
+      );
     }
 
     // Profile display name
@@ -129,7 +183,11 @@ export const logMedicationPass = createServerFn({ method: "POST" })
       "Staff";
 
     const attestation =
-      "I confirm I observed or assisted this Person in self-administering their own prescribed medication, that I verified it matches the prescription's medication, dose, route, and time, and that this record is accurate and complete.";
+      data.status === "given" || isHandsOnRole(role)
+        ? `I confirm I personally administered this medication to this Person as ${role.toUpperCase()}, that I verified the Person, medication, dose, route, and time (Five Rights), and that this record is accurate and complete.`
+        : role === "staff_observed"
+          ? "I observed this Person self-administer their own prescribed medication and confirm this record is accurate."
+          : "I confirm I observed or assisted this Person in self-administering their own prescribed medication, that I verified it matches the prescription's medication, dose, route, and time, and that this record is accurate and complete.";
 
     const recordedIn =
       data.serviceContext && /HH/i.test(data.serviceContext)
@@ -144,9 +202,10 @@ export const logMedicationPass = createServerFn({ method: "POST" })
       .select("id")
       .eq("medication_id", data.medicationId)
       .eq("scheduled_for", data.scheduledFor)
-      .in("status", ["self_administered", "refused", "omitted", "missed"])
+      .in("status", ["self_administered", "given", "refused", "omitted", "missed"])
       .maybeSingle();
     if (existingLog) throw new Error("This dose has already been documented.");
+
 
     const insertPayload = {
       organization_id: orgId,

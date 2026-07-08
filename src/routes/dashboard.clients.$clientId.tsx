@@ -158,6 +158,23 @@ function ClientProfileHub() {
       }
     : null;
   const isHostHome = clientFeatureVisible(featureClient, "host_home");
+  const hasMedMonitoringCode = clientFeatureVisible(featureClient, "med_monitoring");
+  const { enabled: emarFeatureEnabled } = useClientFeature(featureClient, "emar");
+  const { data: hasMedications } = useQuery({
+    queryKey: ["client-profile-has-meds", clientId],
+    enabled: !!clientId,
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("client_medications")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", clientId);
+      return (count ?? 0) > 0;
+    },
+  });
+  // Admin gate: show whenever eMAR feature is enabled, so an admin can add the
+  // first medication for a client with none. Also show if the med-monitoring
+  // code is authorized or any med already exists (mirrors workspace).
+  const showEmarSubTab = !!emarFeatureEnabled || !!hasMedMonitoringCode || !!hasMedications;
 
   const disabilityCategory = client?.disability_category as string | null | undefined;
 

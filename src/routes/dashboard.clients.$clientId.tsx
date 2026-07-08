@@ -40,8 +40,9 @@ import { SectionPanel, SectionGroup, CareSection, CareGroup } from "@/components
 import { ClientProfileTab } from "@/components/clients/profile-tab";
 import { FaceSheetButton } from "@/components/clients/face-sheet-button";
 import { SectionsView, ClientSpecificTrainingCard, GoalsEditor, PublishConfirmDialog } from "@/components/clients/client-specific-training-card";
-import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, RefreshCw, Sparkles, Trash2, Upload, UserCircle2, Target, ShieldCheck, GraduationCap, HeartHandshake, Users, UtensilsCrossed, ListChecks, UserCircle, FileUp, Activity, Clock, FileText, AlertOctagon, ClipboardList, Home as HomeIcon, CalendarClock, Wallet, Coins, FolderOpen, ScrollText } from "lucide-react";
-import { clientFeatureVisible } from "@/lib/client-features";
+import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, Pill, RefreshCw, Sparkles, Trash2, Upload, UserCircle2, Target, ShieldCheck, GraduationCap, HeartHandshake, Users, UtensilsCrossed, ListChecks, UserCircle, FileUp, Activity, Clock, FileText, AlertOctagon, ClipboardList, Home as HomeIcon, CalendarClock, Wallet, Coins, FolderOpen, ScrollText } from "lucide-react";
+import { clientFeatureVisible, useClientFeature } from "@/lib/client-features";
+import { MarEmarTab } from "@/components/workspace/mar-emar-tab";
 import {
   getClientSpecificTraining,
   getSupportStrategiesTraining,
@@ -157,6 +158,23 @@ function ClientProfileHub() {
       }
     : null;
   const isHostHome = clientFeatureVisible(featureClient, "host_home");
+  const hasMedMonitoringCode = clientFeatureVisible(featureClient, "med_monitoring");
+  const { enabled: emarFeatureEnabled } = useClientFeature(featureClient, "emar");
+  const { data: hasMedications } = useQuery({
+    queryKey: ["client-profile-has-meds", clientId],
+    enabled: !!clientId,
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("client_medications")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", clientId);
+      return (count ?? 0) > 0;
+    },
+  });
+  // Admin gate: show whenever eMAR feature is enabled, so an admin can add the
+  // first medication for a client with none. Also show if the med-monitoring
+  // code is authorized or any med already exists (mirrors workspace).
+  const showEmarSubTab = !!emarFeatureEnabled || !!hasMedMonitoringCode || !!hasMedications;
 
   const disabilityCategory = client?.disability_category as string | null | undefined;
 
@@ -202,46 +220,68 @@ function ClientProfileHub() {
           </SectionGroup>
         </TabsContent>
 
-        <TabsContent value="care" className="space-y-10">
+        <TabsContent value="care" className="space-y-6">
           <TrainingSetupBadge clientId={clientId} />
 
-          {/* Group 1 — PCSP-derived planning */}
-          <CareGroup
-            label="Plan & supports"
-            hint="Built from the client's PCSP"
-          >
-            <CareSection icon={Target} accent="indigo">
-              <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
-            </CareSection>
-            <CareSection icon={ListChecks} accent="violet">
-              <SupportStrategiesPanel client={client} clientId={clientId} orgId={orgId} />
-            </CareSection>
-            <CareSection icon={GraduationCap} accent="amber">
-              <CollapsibleSimpleCard title="Client-specific training">
-                <ClientSpecificTrainingCard clientId={clientId} />
-              </CollapsibleSimpleCard>
-            </CareSection>
-            <CareSection icon={HeartHandshake} accent="rose">
-              <PersonCenteredProfilePanel clientId={clientId} orgId={orgId} />
-            </CareSection>
-          </CareGroup>
+          <Tabs defaultValue="plan">
+            <TabsList className="mb-4">
+              <TabsTrigger value="plan">Plan & Support</TabsTrigger>
+              <TabsTrigger value="ops">Operational Tools</TabsTrigger>
+              {showEmarSubTab && <TabsTrigger value="emar">MAR / eMAR</TabsTrigger>}
+            </TabsList>
 
-          {/* Group 2 — Operational tools */}
-          <CareGroup
-            label="Operational tools"
-            hint="Day-to-day care coordination"
-            divider
-          >
-            <CareSection icon={Users} accent="sky">
-              <CaseloadEditor clientId={clientId} />
-            </CareSection>
-            <CareSection icon={UtensilsCrossed} accent="orange">
-              <ClientMealPlannerMount clientId={clientId} />
-            </CareSection>
-            <CareSection icon={Sparkles} accent="teal">
-              <ChoreChartForClient clientId={clientId} />
-            </CareSection>
-          </CareGroup>
+            <TabsContent value="plan" className="space-y-10">
+              <CareGroup
+                label="Plan & supports"
+                hint="Built from the client's PCSP"
+              >
+                <CareSection icon={Target} accent="indigo">
+                  <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
+                </CareSection>
+                <CareSection icon={ListChecks} accent="violet">
+                  <SupportStrategiesPanel client={client} clientId={clientId} orgId={orgId} />
+                </CareSection>
+                <CareSection icon={GraduationCap} accent="amber">
+                  <CollapsibleSimpleCard title="Client-specific training">
+                    <ClientSpecificTrainingCard clientId={clientId} />
+                  </CollapsibleSimpleCard>
+                </CareSection>
+                <CareSection icon={HeartHandshake} accent="rose">
+                  <PersonCenteredProfilePanel clientId={clientId} orgId={orgId} />
+                </CareSection>
+              </CareGroup>
+            </TabsContent>
+
+            <TabsContent value="ops" className="space-y-10">
+              <CareGroup
+                label="Operational tools"
+                hint="Day-to-day care coordination"
+              >
+                <CareSection icon={Users} accent="sky">
+                  <CaseloadEditor clientId={clientId} />
+                </CareSection>
+                <CareSection icon={UtensilsCrossed} accent="orange">
+                  <ClientMealPlannerMount clientId={clientId} />
+                </CareSection>
+                <CareSection icon={Sparkles} accent="teal">
+                  <ChoreChartForClient clientId={clientId} />
+                </CareSection>
+              </CareGroup>
+            </TabsContent>
+
+            {showEmarSubTab && (
+              <TabsContent value="emar" className="space-y-6">
+                <CareGroup label="Medication administration" hint="eMAR — same record staff use on shift">
+                  <CareSection icon={Pill} accent="rose">
+                    <MarEmarTab
+                      clientId={clientId}
+                      clientName={fullName}
+                    />
+                  </CareSection>
+                </CareGroup>
+              </TabsContent>
+            )}
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="activity" className="space-y-10">

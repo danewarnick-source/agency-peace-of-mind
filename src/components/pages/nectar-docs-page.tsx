@@ -214,15 +214,28 @@ export function NectarDocsPage() {
           orgId={orgId}
           open={uploadOpen}
           onOpenChange={setUploadOpen}
-          onUploaded={(docId) => {
+          onUploaded={(docId, docType) => {
             qc.invalidateQueries({ queryKey: ["nectar-docs"] });
+            qc.invalidateQueries({ queryKey: ["outdated-docs"] });
             if (docId) setOfferDocId(docId);
+            if (docId && docType) setDating({ id: docId, documentType: docType });
           }}
         />
         <NectarDocumentActionsDialog
           documentId={offerDocId}
           open={!!offerDocId}
           onOpenChange={(v) => { if (!v) setOfferDocId(null); }}
+        />
+        <DocumentEffectiveDatingDialog
+          open={!!dating}
+          onOpenChange={(v) => { if (!v) setDating(null); }}
+          organizationId={orgId}
+          kind="nectar"
+          documentId={dating?.id ?? null}
+          documentType={dating?.documentType ?? "other"}
+          documentTypeLabel={DOC_TYPES.find((t) => t.value === dating?.documentType)?.label}
+          clientId={clientFilter !== "all" ? clientFilter : null}
+          onDone={() => qc.invalidateQueries({ queryKey: ["outdated-docs"] })}
         />
       </div>
 

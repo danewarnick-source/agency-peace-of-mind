@@ -422,6 +422,32 @@ export function MedicationsManager({
         </div>
       )}
 
+      {/* Pending-proposal banner — visible to everyone so the list state is honest */}
+      {pendingCount > 0 && (
+        <div className="flex items-start gap-2 rounded-lg border-2 border-amber-500 bg-amber-50 px-3 py-2.5 dark:bg-amber-950/20">
+          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <div className="flex-1">
+            <p className="text-xs font-bold text-amber-800 dark:text-amber-200">
+              {pendingCount} pending medication change{pendingCount === 1 ? "" : "s"} awaiting admin approval
+            </p>
+            <p className="text-[11px] text-amber-700 dark:text-amber-300">
+              Proposed changes are NOT live on the medication list until an organization admin approves them.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Read-only banner for direct support staff */}
+      {readOnly && (
+        <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
+          <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="text-muted-foreground">
+            Medication list is <span className="font-semibold">read-only</span> for direct support staff.
+            You can still administer and document medication passes on the eMAR.
+          </span>
+        </div>
+      )}
+
       <div className="rounded-lg border border-border bg-card p-4 space-y-3">
 
         {/* Header */}
@@ -436,42 +462,53 @@ export function MedicationsManager({
               onClick={() => setShowInactive((v) => !v)}>
               {showInactive ? "Hide inactive" : "Show inactive"}
             </Button>
-            <Dialog open={importOpen} onOpenChange={setImportOpen}>
-              <DialogTrigger asChild>
-                <Button type="button" size="sm" variant="outline">
-                  <Upload className="mr-1.5 h-3.5 w-3.5" /> Upload MAR / Order
-                </Button>
-              </DialogTrigger>
-              <AIImportDialog
-                onParse={async (p) => {
-                  const r = await parseAI({ data: p });
-                  return (r.medications ?? []).map((m) => ({
-                    ...EMPTY,
-                    medication_name: m?.medication_name ?? "",
-                    dosage: m?.dosage ?? "",
-                    frequency: m?.frequency ?? "",
-                    route: m?.route ?? "PO",
-                    scheduled_times: Array.isArray(m?.scheduled_times) ? m!.scheduled_times! : [],
-                    instructions: m?.instructions ?? "",
-                    prescriber: m?.prescriber ?? "",
-                  }));
-                }}
-                onCommit={(rows) => bulkInsertMut.mutate(rows)}
-                committing={bulkInsertMut.isPending}
-              />
-            </Dialog>
-            <Dialog open={addOpen} onOpenChange={setAddOpen}>
-              <DialogTrigger asChild>
-                <Button type="button" size="sm">
-                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Medication
-                </Button>
-              </DialogTrigger>
-              <MedFormDialog
-                title="Add Medication"
-                onSubmit={(v) => insertMut.mutate(v)}
-                pending={insertMut.isPending}
-              />
-            </Dialog>
+            {!readOnly && (
+              <>
+                <Dialog open={importOpen} onOpenChange={setImportOpen}>
+                  <DialogTrigger asChild>
+                    <Button type="button" size="sm" variant="outline">
+                      <Upload className="mr-1.5 h-3.5 w-3.5" />
+                      {canApprove ? "Upload MAR / Order" : "Upload MAR (propose)"}
+                    </Button>
+                  </DialogTrigger>
+                  <AIImportDialog
+                    proposeMode={!canApprove}
+                    onParse={async (p) => {
+                      const r = await parseAI({ data: p });
+                      return (r.medications ?? []).map((m) => ({
+                        ...EMPTY,
+                        medication_name: m?.medication_name ?? "",
+                        dosage: m?.dosage ?? "",
+                        frequency: m?.frequency ?? "",
+                        route: m?.route ?? "PO",
+                        scheduled_times: Array.isArray(m?.scheduled_times) ? m!.scheduled_times! : [],
+                        instructions: m?.instructions ?? "",
+                        prescriber: m?.prescriber ?? "",
+                      }));
+                    }}
+                    onCommit={(rows) => bulkInsertMut.mutate(rows)}
+                    committing={bulkInsertMut.isPending}
+                  />
+                </Dialog>
+                <Dialog open={addOpen} onOpenChange={setAddOpen}>
+                  <DialogTrigger asChild>
+                    <Button type="button" size="sm">
+                      <Plus className="mr-1.5 h-3.5 w-3.5" />
+                      {canApprove ? "Add Medication" : "Propose Add"}
+                    </Button>
+                  </DialogTrigger>
+                  <MedFormDialog
+                    title={canApprove ? "Add Medication" : "Propose New Medication"}
+                    submitLabel={canApprove ? "Save Medication" : "Submit Proposal"}
+                    onSubmit={(v) => {
+                      if (canApprove) insertMut.mutate(v);
+                      else proposeMut.mutate({ change_type: "add", payload: formToPayload(v) });
+                    }}
+                    pending={insertMut.isPending || proposeMut.isPending}
+                  />
+                </Dialog>
+              </>
+            )}
           </div>
         </div>
 
@@ -479,7 +516,13 @@ export function MedicationsManager({
         {isLoading ? (
           <p className="text-xs text-muted-foreground">Loading medications...</p>
         ) : !visible.length ? (
-          <p className="text-xs text-muted-foreground">No medications recorded. Click Add Medication to begin.</p>
+          <p className="text-xs text-muted-foreground">
+            {readOnly
+              ? "No medications recorded."
+              : canApprove
+                ? "No medications recorded. Click Add Medication to begin."
+                : "No medications recorded. Click Propose Add to submit for admin approval."}
+          </p>
         ) : (
           <Table>
             <TableHeader>
@@ -491,15 +534,15 @@ export function MedicationsManager({
                 <TableHead>Times</TableHead>
                 <TableHead>Flags</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                {!readOnly && <TableHead className="text-right">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {visible.map((m) => (
                 <TableRow
                   key={m.id}
-                  className={`cursor-pointer hover:bg-muted/40 ${!m.is_active ? "opacity-50" : ""}`}
-                  onClick={() => setEditMed(m)}
+                  className={`${readOnly ? "" : "cursor-pointer hover:bg-muted/40"} ${!m.is_active ? "opacity-50" : ""}`}
+                  onClick={() => { if (!readOnly) setEditMed(m); }}
                 >
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-1.5">
@@ -543,26 +586,41 @@ export function MedicationsManager({
                       ? <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200">Active</Badge>
                       : <Badge variant="outline">Discontinued</Badge>}
                   </TableCell>
-                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        type="button" variant="ghost" size="sm"
-                        onClick={(e) => { e.stopPropagation(); setEditMed(m); }}
-                        className="h-7 px-2"
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      {m.is_active && (
+                  {!readOnly && (
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
                         <Button
                           type="button" variant="ghost" size="sm"
-                          onClick={(e) => { e.stopPropagation(); discontinueMut.mutate(m.id); }}
-                          className="h-7 px-2 text-muted-foreground hover:text-rose-600"
+                          onClick={(e) => { e.stopPropagation(); setEditMed(m); }}
+                          className="h-7 px-2"
+                          title={canApprove ? "Edit" : "Propose edit"}
                         >
-                          <X className="h-3 w-3" />
+                          <Pencil className="h-3 w-3" />
                         </Button>
-                      )}
-                    </div>
-                  </TableCell>
+                        {m.is_active && (
+                          <Button
+                            type="button" variant="ghost" size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (canApprove) {
+                                discontinueMut.mutate(m.id);
+                              } else {
+                                proposeMut.mutate({
+                                  change_type: "discontinue",
+                                  medication_id: m.id,
+                                  payload: { medication_name: m.medication_name },
+                                });
+                              }
+                            }}
+                            className="h-7 px-2 text-muted-foreground hover:text-rose-600"
+                            title={canApprove ? "Discontinue" : "Propose discontinue"}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -570,15 +628,36 @@ export function MedicationsManager({
         )}
       </div>
 
+      {/* Admin approval panel */}
+      {canApprove && pendingCount > 0 && (
+        <PendingProposalsPanel
+          proposals={proposals ?? []}
+          meds={meds ?? []}
+          proposerNames={proposerNames ?? {}}
+          onApprove={(id) => approveMut.mutate(id)}
+          onReject={(id, notes) => rejectMut.mutate({ id, notes })}
+          approving={approveMut.isPending}
+          rejecting={rejectMut.isPending}
+        />
+      )}
+
       {/* Edit dialog */}
       <Dialog open={!!editMed} onOpenChange={(o) => { if (!o) setEditMed(null); }}>
         {editMed && (
           <MedFormDialog
-            title={`Edit — ${editMed.medication_name}`}
+            title={canApprove ? `Edit — ${editMed.medication_name}` : `Propose edit — ${editMed.medication_name}`}
+            submitLabel={canApprove ? "Save Medication" : "Submit Proposal"}
             initial={medToForm(editMed)}
-            onSubmit={(v) => updateMut.mutate({ id: editMed.id, v })}
-            pending={updateMut.isPending}
-            showDiscontinue={editMed.is_active}
+            onSubmit={(v) => {
+              if (canApprove) updateMut.mutate({ id: editMed.id, v });
+              else proposeMut.mutate({
+                change_type: "edit",
+                medication_id: editMed.id,
+                payload: formToPayload(v),
+              });
+            }}
+            pending={updateMut.isPending || proposeMut.isPending}
+            showDiscontinue={editMed.is_active && canApprove}
             onDiscontinue={() => { discontinueMut.mutate(editMed.id); setEditMed(null); }}
           />
         )}
@@ -588,6 +667,7 @@ export function MedicationsManager({
     </div>
   );
 }
+
 
 // ─── Medication Form Dialog ────────────────────────────────────────────────────
 

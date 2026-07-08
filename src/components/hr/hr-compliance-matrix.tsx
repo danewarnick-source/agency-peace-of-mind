@@ -508,32 +508,27 @@ function computeBandSummary(
 }
 
 function deriveShortLabel(title: string): string {
-  let t = title.replace(/^\s*Training\s*:\s*/i, "").trim();
-  t = t.replace(/\s*\(.*?\)\s*/g, " ").trim();
-  t = t.split(/\s+[–—\-·:/]\s+/)[0].trim();
-  t = t
-    .replace(/Professional/gi, "Prof.")
-    .replace(/Communicable/gi, "Comm.")
-    .replace(/Disease[s]?/gi, "Disease")
-    .replace(/Prevention/gi, "Prev.")
-    .replace(/Response/gi, "Resp.")
-    .replace(/Management/gi, "Mgmt")
-    .replace(/Discrimination/gi, "Disc.")
-    .replace(/Certification/gi, "Cert");
-  t = t.replace(/\s+/g, " ").trim();
-  const words = t.split(" ");
-  let out = words[0] ?? t;
-  for (let i = 1; i < words.length && out.length + 1 + words[i].length <= 14; i++) {
-    out += " " + words[i];
-  }
-  if (out.length > 16) out = out.slice(0, 15) + "…";
-  return out;
+  let t = title.trim();
+  // Strip leading verbs typical of checklist phrasing.
+  t = t.replace(
+    /^(?:Complete|Obtain|Maintain|Ensure(?:\s+Staff)?|Register(?:\s+staff)?|Conduct|Verify|Collect|Provide|Perform)\s+/i,
+    "",
+  );
+  // Strip trailing timing / conditional clauses.
+  t = t.replace(
+    /\s+(?:within\s+\d+\s+days?(?:\s+of\s+(?:hire|contract\s+execution))?|before\s+working(?:\s+alone|\s+with[^,]*)?|upon\s+hire|annually|in\s+subsequent\s+years|and\s+annually|where\s+applicable|for\s+each\s+(?:new\s+hire|staff\s+member))\b.*$/i,
+    "",
+  );
+  // Strip a trailing "training" / "certification" / "check" noun if the topic still reads clearly.
+  t = t.replace(/\s+training$/i, "");
+  t = t.replace(/\s*\(.*?\)\s*$/g, "").trim();
+  // Capitalize first letter.
+  if (t.length > 0) t = t[0].toUpperCase() + t.slice(1);
+  return t || title;
 }
 
 function HeaderLabel({ req }: { req: HrMatrix["requirements"][number] }) {
-  const short =
-    (req as { short_label?: string }).short_label?.trim() ||
-    deriveShortLabel(req.title);
+  const short = req.short_label?.trim() || deriveShortLabel(req.title);
   const [open, setOpen] = useState(false);
   return (
     <Tooltip open={open} onOpenChange={setOpen}>
@@ -545,7 +540,9 @@ function HeaderLabel({ req }: { req: HrMatrix["requirements"][number] }) {
           onMouseLeave={() => setOpen(false)}
           className="inline-flex flex-col items-center gap-0.5 rounded px-1 py-0.5 text-[11px] font-medium leading-tight focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
-          <span className="whitespace-nowrap">{short}</span>
+          <span className="max-w-[140px] whitespace-normal break-words text-center">
+            {short}
+          </span>
           {req.is_renewable && req.renewal_interval_months && (
             <span className="text-[9px] font-normal text-muted-foreground">
               {req.renewal_interval_months}mo

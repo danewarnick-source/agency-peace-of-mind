@@ -155,13 +155,37 @@ export function ClinicalSafetyHeader({ client }: { client: ClientSafety }) {
   );
 }
 
-/** Admin-only mini editor for client safety + self-admin flag. */
-function ClientSafetyEditor({ client }: { client: ClientSafety }) {
+/** Admin-only mini editor for client safety + self-admin flag.
+ *  Exported so it can be surfaced BOTH from the eligibility gate (to turn
+ *  self-admin ON) and from inside the enabled eMAR (to turn it OFF again). */
+export function ClientSafetyEditor({
+  client,
+  onSaved,
+}: {
+  client: ClientSafety;
+  /** Called after a successful save — used by the header dialog to close itself. */
+  onSaved?: (next: { self_admin_med_support: boolean }) => void;
+}) {
   const qc = useQueryClient();
   const [allergiesText, setAllergiesText] = useState((client.allergies ?? []).join(", "));
   const [dysphagia, setDysphagia] = useState(client.dysphagia);
   const [alertsText, setAlertsText] = useState((client.swallowing_alerts ?? []).join("\n"));
   const [selfAdmin, setSelfAdmin] = useState(client.self_admin_med_support);
+  const [confirmOff, setConfirmOff] = useState(false);
+
+  // Count active meds so we can warn (but never delete) when disabling.
+  const { data: activeMedsCount = 0 } = useQuery({
+    queryKey: ["client-safety-active-meds-count", client.id],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("client_medications")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", client.id)
+        .eq("is_active", true);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
 
   const saveMut = useMutation({
     mutationFn: async () => {
@@ -175,56 +199,117 @@ function ClientSafetyEditor({ client }: { client: ClientSafety }) {
     onSuccess: () => {
       toast.success("Safety profile saved.");
       qc.invalidateQueries({ queryKey: ["client-safety", client.id] });
+      setConfirmOff(false);
+      onSaved?.({ self_admin_med_support: selfAdmin });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const turningOff = client.self_admin_med_support && !selfAdmin;
+  const needsConfirm = turningOff && activeMedsCount > 0;
+
+  function handleSaveClick() {
+    if (needsConfirm) {
+      setConfirmOff(true);
+      return;
+    }
+    saveMut.mutate();
+  }
+
   return (
-    <Card className="p-4">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-        <Pencil className="h-3.5 w-3.5" /> Admin — edit clinical safety profile
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="grid gap-1.5">
-          <Label className="text-xs">Allergies (comma-separated)</Label>
-          <Input
-            value={allergiesText}
-            onChange={(e) => setAllergiesText(e.target.value)}
-            placeholder="Penicillin, Sulfa drugs"
-          />
+    <>
+      <Card className="p-4">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+          <Pencil className="h-3.5 w-3.5" /> Admin — edit clinical safety profile
         </div>
-        <label className="flex cursor-pointer items-center justify-between rounded-md border p-2 text-sm">
-          <span>Dysphagia / swallowing risk</span>
-          <Switch checked={dysphagia} onCheckedChange={setDysphagia} />
-        </label>
-        <div className="grid gap-1.5 sm:col-span-2">
-          <Label className="text-xs">Swallowing alerts (one per line)</Label>
-          <Textarea
-            rows={2}
-            value={alertsText}
-            onChange={(e) => setAlertsText(e.target.value)}
-            placeholder="Confirm upright posture for every oral med"
-          />
-        </div>
-        <label className="flex cursor-pointer items-center justify-between rounded-md border-2 border-primary/40 bg-primary/5 p-2 text-sm sm:col-span-2">
-          <span>
-            <span className="font-semibold">Self-directed self-administration support</span>
-            <span className="block text-[11px] text-muted-foreground">
-              Turn ON only if this client self-administers their own prescription medication with staff observing/assisting.
-              Clients requiring a nurse to administer medication should be OFF.
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-1.5">
+            <Label className="text-xs">Allergies (comma-separated)</Label>
+            <Input
+              value={allergiesText}
+              onChange={(e) => setAllergiesText(e.target.value)}
+              placeholder="Penicillin, Sulfa drugs"
+            />
+          </div>
+          <label className="flex cursor-pointer items-center justify-between rounded-md border p-2 text-sm">
+            <span>Dysphagia / swallowing risk</span>
+            <Switch checked={dysphagia} onCheckedChange={setDysphagia} />
+          </label>
+          <div className="grid gap-1.5 sm:col-span-2">
+            <Label className="text-xs">Swallowing alerts (one per line)</Label>
+            <Textarea
+              rows={2}
+              value={alertsText}
+              onChange={(e) => setAlertsText(e.target.value)}
+              placeholder="Confirm upright posture for every oral med"
+            />
+          </div>
+          <label className="flex cursor-pointer items-center justify-between rounded-md border-2 border-primary/40 bg-primary/5 p-2 text-sm sm:col-span-2">
+            <span>
+              <span className="font-semibold">Self-directed self-administration support</span>
+              <span className="block text-[11px] text-muted-foreground">
+                Turn ON only if this client self-administers their own prescription medication with staff observing/assisting.
+                Clients requiring a nurse to administer medication should be OFF. Turning OFF returns this client
+                to the eligibility gate and hides the eMAR — medication records are kept, not deleted.
+              </span>
             </span>
-          </span>
-          <Switch checked={selfAdmin} onCheckedChange={setSelfAdmin} />
-        </label>
-      </div>
-      <div className="mt-3 flex justify-end">
-        <Button size="sm" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
-          {saveMut.isPending ? "Saving…" : "Save safety profile"}
-        </Button>
-      </div>
-    </Card>
+            <Switch checked={selfAdmin} onCheckedChange={setSelfAdmin} />
+          </label>
+          {turningOff && (
+            <div className="sm:col-span-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+              <AlertTriangle className="mr-1 inline h-3.5 w-3.5" />
+              You are about to <span className="font-semibold">disable</span> the eMAR for this client.
+              {activeMedsCount > 0 ? (
+                <> {activeMedsCount} active medication{activeMedsCount === 1 ? "" : "s"} on file will be
+                <span className="font-semibold"> preserved</span> — nothing is deleted — but staff will not
+                be able to log passes until self-admin support is turned back on.</>
+              ) : (
+                <> No active medications are on file. The client will return to the eligibility gate.</>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="mt-3 flex justify-end">
+          <Button size="sm" onClick={handleSaveClick} disabled={saveMut.isPending}>
+            {saveMut.isPending ? "Saving…" : "Save safety profile"}
+          </Button>
+        </div>
+      </Card>
+
+      <Dialog open={confirmOff} onOpenChange={setConfirmOff}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              Disable eMAR for {client.first_name} {client.last_name}?
+            </DialogTitle>
+            <DialogDescription>
+              This client has <span className="font-semibold">{activeMedsCount} active
+              medication{activeMedsCount === 1 ? "" : "s"}</span> on file. Turning self-directed
+              self-administration support <span className="font-semibold">OFF</span> will hide the
+              eMAR and return this client to the eligibility gate. Medication records are
+              <span className="font-semibold"> preserved</span> — nothing is deleted — but no new
+              passes can be logged until self-admin support is turned back on.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmOff(false)} disabled={saveMut.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => saveMut.mutate()}
+              disabled={saveMut.isPending}
+            >
+              {saveMut.isPending ? "Disabling…" : "Disable eMAR"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
+
 
 /** Eligibility gate — rendered when the client is NOT flagged for self-admin support. */
 export function EmarEligibilityGate({ client }: { client: ClientSafety }) {

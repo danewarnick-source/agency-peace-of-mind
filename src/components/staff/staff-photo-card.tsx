@@ -54,7 +54,7 @@ export function StaffPhotoCard({
           subjectId={staffId}
           currentPath={(q.data?.photo_path ?? null) as string | null}
           personName={name}
-          avatarClassName="h-32 w-32 text-lg"
+          avatarClassName="h-40 w-40 text-3xl"
           onUploaded={async (path) => {
             await persist.mutateAsync({
               photo_path: path,

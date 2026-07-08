@@ -272,8 +272,8 @@ export const logMedicationPass = createServerFn({ method: "POST" })
       } as never);
     }
 
-    // Inventory decrement on confirmed self-administration
-    if (data.status === "self_administered" && typeof m.pill_count_current === "number") {
+    // Inventory decrement on any confirmed dose (self-directed or hands-on).
+    if (wasTaken && typeof m.pill_count_current === "number") {
       const next = Math.max(0, m.pill_count_current - 1);
       const refillStatus =
         next <= (m.refill_threshold ?? 7) && m.refill_status === "ok" ? "pending" : m.refill_status;

@@ -242,6 +242,9 @@ function ClientProfileHub() {
                 <CareSection icon={ListChecks} accent="violet">
                   <SupportStrategiesPanel client={client} clientId={clientId} orgId={orgId} />
                 </CareSection>
+                <CareSection icon={Users} accent="sky">
+                  <CaseloadEditor clientId={clientId} />
+                </CareSection>
                 <CareSection icon={GraduationCap} accent="amber">
                   <CollapsibleSimpleCard title="Client-specific training">
                     <ClientSpecificTrainingCard clientId={clientId} />
@@ -258,9 +261,6 @@ function ClientProfileHub() {
                 label="Operational tools"
                 hint="Day-to-day care coordination"
               >
-                <CareSection icon={Users} accent="sky">
-                  <CaseloadEditor clientId={clientId} />
-                </CareSection>
                 <CareSection icon={UtensilsCrossed} accent="orange">
                   <ClientMealPlannerMount clientId={clientId} />
                 </CareSection>

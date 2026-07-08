@@ -257,10 +257,14 @@ function StaffProfilePage() {
             className="h-11 w-11"
           />
           <div>
-            <h1 className="text-xl font-semibold">{name}</h1>
-            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <h1 className="text-xl font-semibold leading-tight">{name}</h1>
+            {positions.length > 0 ? (
+              <p className="text-sm font-normal text-muted-foreground">
+                {positions.join(", ")}
+              </p>
+            ) : null}
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <Badge variant="secondary" className="uppercase">{m.role}</Badge>
-              {positions.map((pos) => <Badge key={pos} variant="outline">{pos}</Badge>)}
               <span>{m.active ? "Active" : "Deactivated"}</span>
               {p?.hire_date && <span>· Hired {p.hire_date}</span>}
             </div>

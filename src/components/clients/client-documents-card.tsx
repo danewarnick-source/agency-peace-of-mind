@@ -41,6 +41,8 @@ import {
 import { attachClientDocument } from "@/lib/import-checklist.functions";
 import { NectarDocumentActionsDialog } from "@/components/nectar/document-actions-dialog";
 import { DocumentPreviewDialog } from "./document-preview-dialog";
+import { DocumentEffectiveDatingDialog } from "@/components/documents/document-effective-dating-dialog";
+import { OutdatedDocumentsSection } from "@/components/documents/outdated-documents-section";
 
 const CLIENT_DOC_TYPES = [
   { value: "pcsp", label: "PCSP" },
@@ -96,12 +98,14 @@ export function ClientDocumentsCard({
   const [uploadOpen, setUploadOpen] = useState(false);
   const [offerDocId, setOfferDocId] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ fileName: string; mimeType: string | null; signedUrl: string } | null>(null);
+  const [dating, setDating] = useState<{ id: string; kind: "client" | "nectar"; documentType: string; documentTypeLabel: string } | null>(null);
 
   const invalidateAll = () => {
     qc.invalidateQueries({ queryKey: ["client-docs", orgId, clientId] });
     qc.invalidateQueries({ queryKey: ["nectar-docs"] });
     qc.invalidateQueries({ queryKey: ["client-has-pcsp", clientId] });
     qc.invalidateQueries({ queryKey: ["client-specific-training", clientId] });
+    qc.invalidateQueries({ queryKey: ["outdated-docs"] });
   };
 
   const { data, isLoading } = useQuery({
@@ -192,8 +196,17 @@ export function ClientDocumentsCard({
             clientName={clientName}
             open={uploadOpen}
             onOpenChange={setUploadOpen}
-            onUploaded={(docId, sourceKind) => {
+            onUploaded={(docId, sourceKind, docType) => {
               invalidateAll();
+              if (docId && docType) {
+                const label = CLIENT_DOC_TYPES.find((t) => t.value === docType)?.label ?? docType;
+                setDating({
+                  id: docId,
+                  kind: sourceKind === "client" ? "client" : "nectar",
+                  documentType: docType,
+                  documentTypeLabel: label,
+                });
+              }
               if (docId && sourceKind === "nectar") setOfferDocId(docId);
             }}
           />
@@ -201,6 +214,17 @@ export function ClientDocumentsCard({
             documentId={offerDocId}
             open={!!offerDocId}
             onOpenChange={(v) => { if (!v) setOfferDocId(null); }}
+          />
+          <DocumentEffectiveDatingDialog
+            open={!!dating}
+            onOpenChange={(v) => { if (!v) setDating(null); }}
+            organizationId={orgId}
+            kind={dating?.kind ?? "client"}
+            documentId={dating?.id ?? null}
+            documentType={dating?.documentType ?? "other"}
+            documentTypeLabel={dating?.documentTypeLabel}
+            clientId={clientId}
+            onDone={invalidateAll}
           />
           <DocumentPreviewDialog
             open={!!preview}
@@ -299,6 +323,18 @@ export function ClientDocumentsCard({
             </div>
           </div>
         ))}
+        <OutdatedDocumentsSection
+          organizationId={orgId}
+          kind="nectar"
+          clientId={clientId}
+          title="Outdated / Superseded (Company Docs)"
+        />
+        <OutdatedDocumentsSection
+          organizationId={orgId}
+          kind="client"
+          clientId={clientId}
+          title="Outdated / Superseded (PCSP & files)"
+        />
       </CardContent>
     </Card>
   );
@@ -334,7 +370,7 @@ function UploadDocDialog({
   clientName: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onUploaded: (docId?: string, sourceKind?: "nectar" | "client") => void;
+  onUploaded: (docId?: string, sourceKind?: "nectar" | "client", docType?: string) => void;
 }) {
   const ingest = useServerFn(ingestDocument);
   const attachClient = useServerFn(attachClientDocument);
@@ -361,7 +397,7 @@ function UploadDocDialog({
           .from("client-documents")
           .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
         if (up.error) throw up.error;
-        await attachClient({
+        const att = await attachClient({
           data: {
             clientId,
             documentType: "pcsp",
@@ -369,7 +405,7 @@ function UploadDocDialog({
             storagePath: path,
           },
         });
-        return { __pcsp: true } as const;
+        return { __pcsp: true, id: att.id as string } as const;
       }
       const b64 = await fileToBase64(file);
       return ingest({
@@ -389,11 +425,14 @@ function UploadDocDialog({
       });
     },
     onSuccess: (res) => {
-      if ((res as { __pcsp?: boolean })?.__pcsp) {
+      const pcsp = res as { __pcsp?: boolean; id?: string };
+      if (pcsp?.__pcsp) {
         toast.success(`PCSP uploaded — visible in Care and Files`);
+        const newId = pcsp.id;
+        const chosenType = docType;
         setTitle(""); setFile(null); setFiscalYear("");
         onOpenChange(false);
-        onUploaded(undefined, "client");
+        onUploaded(newId, "client", chosenType);
         return;
       }
       const r = res as {
@@ -410,9 +449,10 @@ function UploadDocDialog({
           ? `NECTAR autofilled ${autoN} field${autoN === 1 ? "" : "s"} on ${clientName}'s profile${sugN > 0 ? ` · ${sugN} need review` : ""}`
           : `Uploaded — NECTAR extracted ${extractedN} field${extractedN === 1 ? "" : "s"}${sugN > 0 ? ` · ${sugN} need review` : ""}`,
       );
+      const chosenType = docType;
       setTitle(""); setFile(null); setFiscalYear("");
       onOpenChange(false);
-      onUploaded(r.document?.id, "nectar");
+      onUploaded(r.document?.id, "nectar", chosenType);
     },
     onError: (e: Error) => toast.error(e.message),
   });

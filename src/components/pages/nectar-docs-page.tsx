@@ -305,7 +305,7 @@ function UploadButton({
   orgId: string | undefined;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onUploaded: (docId?: string) => void;
+  onUploaded: (docId?: string, docType?: string) => void;
 }) {
   const ingest = useServerFn(ingestDocument);
   const [title, setTitle] = useState("");

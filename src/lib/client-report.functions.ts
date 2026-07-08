@@ -29,12 +29,14 @@ export interface PullClientReportInput {
   params: {
     clientId?: string;
     spaceId?: string;
+    staffId?: string;
     periodMonth?: string;
     weekStart?: string; // ISO date
     weeksCount?: number;
   };
-  /** When true, ship a point-in-time snapshot to client_documents in
-   *  addition to returning the bytes. Defaults to false (preview only). */
+  /** When true, ship a point-in-time snapshot to client_documents (or
+   *  employee_documents for staff-scoped reports) in addition to
+   *  returning the bytes. Defaults to false (preview only). */
   ship?: boolean;
 }
 
@@ -76,6 +78,7 @@ function validate(input: unknown): PullClientReportInput {
   const p = (i.params ?? {}) as PullClientReportInput["params"];
   if (p.clientId && !UUID_RE.test(p.clientId)) throw new Error("Invalid clientId");
   if (p.spaceId && !UUID_RE.test(p.spaceId)) throw new Error("Invalid spaceId");
+  if (p.staffId && !UUID_RE.test(p.staffId)) throw new Error("Invalid staffId");
   if (p.weeksCount !== undefined) {
     const n = Number(p.weeksCount);
     if (!Number.isFinite(n) || n < 1 || n > 12) throw new Error("weeksCount must be 1..12");
@@ -88,7 +91,7 @@ async function resolveScopeOrg(
   supabase: import("@supabase/supabase-js").SupabaseClient,
   input: PullClientReportInput,
 ): Promise<string> {
-  const { clientId, spaceId } = input.params;
+  const { clientId, spaceId, staffId } = input.params;
   if (clientId) {
     const { data, error } = await supabase
       .from("clients")
@@ -111,7 +114,18 @@ async function resolveScopeOrg(
     if (!orgId) throw new Error("Chore space not found or not accessible");
     return orgId;
   }
-  throw new Error("Report requires either clientId or spaceId");
+  if (staffId) {
+    const { data, error } = await supabase
+      .from("organization_members")
+      .select("organization_id")
+      .eq("user_id", staffId)
+      .maybeSingle();
+    if (error) throw error;
+    const orgId = (data as { organization_id: string } | null)?.organization_id;
+    if (!orgId) throw new Error("Employee not found or not accessible");
+    return orgId;
+  }
+  throw new Error("Report requires clientId, spaceId, or staffId");
 }
 
 function bytesToBase64(bytes: Uint8Array): string {

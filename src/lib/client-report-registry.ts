@@ -44,6 +44,13 @@ import {
   type ChoreChartReportResult,
   type ShippedChoreChartReport,
 } from "./chore-chart-report";
+import {
+  generateEmployeeFaceSheet,
+  shipEmployeeFaceSheet,
+  type EmployeeFaceSheetArgs,
+  type EmployeeFaceSheetResult,
+  type ShippedEmployeeFaceSheet,
+} from "./employee-face-sheet";
 
 // ── Report type keys ────────────────────────────────────────────────────────
 
@@ -51,13 +58,15 @@ export type ReportType =
   | "client_budget"
   | "meal_plan_menu"
   | "meal_plan_vs_actual"
-  | "chore_chart";
+  | "chore_chart"
+  | "employee_face_sheet";
 
 export const REPORT_TYPES: ReadonlyArray<ReportType> = [
   "client_budget",
   "meal_plan_menu",
   "meal_plan_vs_actual",
   "chore_chart",
+  "employee_face_sheet",
 ];
 
 /** Params accepted by any report. Consumers pass a superset; each report
@@ -65,6 +74,8 @@ export const REPORT_TYPES: ReadonlyArray<ReportType> = [
 export type ReportParams = {
   clientId?: string;
   spaceId?: string;
+  /** Employee/staff id for employee-scoped reports (e.g. Employee Face Sheet). */
+  staffId?: string;
   /** "YYYY-MM" or "YYYY-MM-DD" for budget. */
   periodMonth?: string;
   /** Any date within the target week for meal reports. */
@@ -93,25 +104,38 @@ export interface CommonReportOutput {
   /** Chore-chart reports carry the space identity here. */
   spaceId: string | null;
   spaceName: string | null;
+  /** Employee-scoped reports (Employee Face Sheet) carry the staff identity here. */
+  staffId?: string | null;
+  staffName?: string | null;
   /** Client IDs the report is / would be attached to on ship.
    *  - client_budget / meal_plan_menu / meal_plan_vs_actual: [clientId]
-   *  - chore_chart: linked space clients                          */
+   *  - chore_chart: linked space clients
+   *  - employee_face_sheet: [] (ships to employee_documents, not client files) */
   attachClientIds: string[];
   /** Underlying generator payload, for callers that need the specifics. */
   raw:
     | BudgetReportResult
     | MealMenuReportResult
     | PlanVsActualResult
-    | ChoreChartReportResult;
+    | ChoreChartReportResult
+    | EmployeeFaceSheetResult;
 }
 
 export interface CommonShipOutput extends CommonReportOutput {
-  /** One entry per client file the snapshot was attached to. */
+  /** One entry per client file the snapshot was attached to.
+   *  Employee-scoped ships surface via `employeeSnapshot` instead. */
   snapshots: Array<{
     clientId: string;
     documentId: string;
     storagePath: string;
   }>;
+  /** Populated when the shipped report was employee-scoped
+   *  (employee_documents row, not client_documents). */
+  employeeSnapshot?: {
+    staffId: string;
+    documentId: string;
+    storagePath: string;
+  };
 }
 
 // ── Metadata (for UI + NECTAR discovery) ────────────────────────────────────
@@ -119,10 +143,12 @@ export interface CommonShipOutput extends CommonReportOutput {
 export interface ReportTypeMeta {
   key: ReportType;
   label: string;
-  scope: "client" | "space";
-  requiredParams: Array<"clientId" | "spaceId" | "periodMonth" | "weekStart">;
+  scope: "client" | "space" | "staff";
+  requiredParams: Array<"clientId" | "spaceId" | "staffId" | "periodMonth" | "weekStart">;
   optionalParams: Array<"weeksCount">;
-  documentType: string; // matches client_documents.document_type
+  /** For client-scoped reports this matches `client_documents.document_type`.
+   *  For employee-scoped reports it matches `employee_documents.kind`. */
+  documentType: string;
   description: string;
 }
 
@@ -165,6 +191,16 @@ export const REPORT_META: Record<ReportType, ReportTypeMeta> = {
     documentType: "chore_chart",
     description:
       "Living-space chore chart (client rotation + staff shift grid).",
+  },
+  employee_face_sheet: {
+    key: "employee_face_sheet",
+    label: "Employee Face Sheet",
+    scope: "staff",
+    requiredParams: ["staffId"],
+    optionalParams: [],
+    documentType: "face_sheet",
+    description:
+      "One-page aggregated employee record: identity, contact, employment, certifications & trainings, deadlines, and HR docs on file.",
   },
 };
 
@@ -280,6 +316,29 @@ export async function generateClientReport(
         raw: r,
       };
     }
+    case "employee_face_sheet": {
+      const args: EmployeeFaceSheetArgs = {
+        staffId: requireField(params.staffId, "staffId"),
+        supabaseClient: params.supabaseClient,
+      };
+      const r = await generateEmployeeFaceSheet(args);
+      return {
+        reportType,
+        bytes: r.bytes,
+        filename: r.filename,
+        periodLabel: r.periodLabel,
+        organizationId: r.organizationId,
+        orgName: r.orgName,
+        clientId: null,
+        clientName: null,
+        spaceId: null,
+        spaceName: null,
+        staffId: r.staffId,
+        staffName: r.staffName,
+        attachClientIds: [],
+        raw: r,
+      };
+    }
   }
 }
 
@@ -388,6 +447,36 @@ export async function shipClientReport(
         attachClientIds: r.clientIds,
         raw: r,
         snapshots: r.snapshots,
+      };
+    }
+    case "employee_face_sheet": {
+      const args: EmployeeFaceSheetArgs = {
+        staffId: requireField(params.staffId, "staffId"),
+        supabaseClient: params.supabaseClient,
+      };
+      const r: ShippedEmployeeFaceSheet = await shipEmployeeFaceSheet(args);
+      return {
+        reportType,
+        bytes: r.bytes,
+        filename: r.filename,
+        periodLabel: r.periodLabel,
+        organizationId: r.organizationId,
+        orgName: r.orgName,
+        clientId: null,
+        clientName: null,
+        spaceId: null,
+        spaceName: null,
+        staffId: r.staffId,
+        staffName: r.staffName,
+        attachClientIds: [],
+        raw: r,
+        // Employee face sheets ship into employee_documents, not client_documents.
+        snapshots: [],
+        employeeSnapshot: {
+          staffId: r.staffId,
+          documentId: r.documentId,
+          storagePath: r.storagePath,
+        },
       };
     }
   }

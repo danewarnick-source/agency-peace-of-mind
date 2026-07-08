@@ -171,9 +171,23 @@ export function HrComplianceMatrix({
             <table className="min-w-full border-separate border-spacing-0 text-xs">
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-20 bg-background border-b border-r border-border px-3 py-2 text-left font-medium min-w-[180px]">
+                  <th
+                    rowSpan={2}
+                    className="sticky left-0 z-20 bg-background border-b border-r border-border px-3 py-2 text-left font-medium min-w-[180px] align-bottom"
+                  >
                     Staff
                   </th>
+                  {phaseGroups.map((g) => (
+                    <th
+                      key={`phase-${g.phase ?? "unphased"}`}
+                      colSpan={g.reqs.length}
+                      className="border-b border-l border-border bg-muted/40 px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                    >
+                      {PHASE_LABEL[g.phase ?? "unphased"] ?? "Other"}
+                    </th>
+                  ))}
+                </tr>
+                <tr>
                   {reqs.map((r) => {
                     const isCum = r.requirement_type === "cumulative_hours";
                     return (
@@ -189,6 +203,7 @@ export function HrComplianceMatrix({
                   })}
                 </tr>
               </thead>
+
               <tbody>
                 {bands.map((band) => {
                   const summary = computeBandSummary(

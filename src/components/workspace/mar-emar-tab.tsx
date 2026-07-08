@@ -31,8 +31,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { toast } from "sonner";
 import {
   EmarLegalBanner, ClinicalSafetyHeader, EmarEligibilityGate,
-  MedicationChart, useClientSafety,
+  MedicationChart, useClientSafety, ClientSafetyEditor,
 } from "./emar-chart";
+
 import { EmarOpsPanel } from "./emar-ops-panel";
 import { EmarNectarPanel } from "./emar-nectar-panel";
 import { MedicationsManager } from "@/components/medications-manager";

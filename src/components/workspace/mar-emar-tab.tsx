@@ -35,6 +35,8 @@ import {
 } from "./emar-chart";
 import { EmarOpsPanel } from "./emar-ops-panel";
 import { EmarNectarPanel } from "./emar-nectar-panel";
+import { MedicationsManager } from "@/components/medications-manager";
+import { usePermissions } from "@/hooks/use-permissions";
 import { logMedicationPass, addEmarAddendum } from "@/lib/emar-pass.functions";
 import { type EmarStatus, normalizeEmarStatus, EMAR_STATUS_LABELS } from "@/lib/emar-status";
 
@@ -1303,6 +1305,8 @@ export function MarEmarTab({
   const { data: clientSafety, isLoading: safetyLoading } = useClientSafety(clientId);
   const qc = useQueryClient();
   const orgId = org?.organization_id;
+  const { role } = usePermissions();
+  const canManageMeds = role === "admin" || role === "manager" || role === "super_admin";
 
 
   // ── Realtime: any INSERT to emar_logs for this client refetches every
@@ -1655,7 +1659,10 @@ export function MarEmarTab({
 
 
         {/* ── CHART — per-med profile with completeness flags ── */}
-        <TabsContent value="chart" className="space-y-3 pt-2">
+        <TabsContent value="chart" className="space-y-4 pt-2">
+          {canManageMeds && (
+            <MedicationsManager clientId={clientId} organizationId={orgId ?? undefined} />
+          )}
           <MedicationChart clientId={clientId} />
         </TabsContent>
 

@@ -288,7 +288,30 @@ export function MedicationsManager({
               onClick={() => setShowInactive((v) => !v)}>
               {showInactive ? "Hide inactive" : "Show inactive"}
             </Button>
-            {/* Per-section NECTAR import removed — use NECTAR Bulk Import (AI PDF mode) to auto-fill the whole profile from a PCSP. */}
+            <Dialog open={importOpen} onOpenChange={setImportOpen}>
+              <DialogTrigger asChild>
+                <Button type="button" size="sm" variant="outline">
+                  <Upload className="mr-1.5 h-3.5 w-3.5" /> Upload MAR / Order
+                </Button>
+              </DialogTrigger>
+              <AIImportDialog
+                onParse={async (p) => {
+                  const r = await parseAI({ data: p });
+                  return (r.medications ?? []).map((m) => ({
+                    ...EMPTY,
+                    medication_name: m?.medication_name ?? "",
+                    dosage: m?.dosage ?? "",
+                    frequency: m?.frequency ?? "",
+                    route: m?.route ?? "PO",
+                    scheduled_times: Array.isArray(m?.scheduled_times) ? m!.scheduled_times! : [],
+                    instructions: m?.instructions ?? "",
+                    prescriber: m?.prescriber ?? "",
+                  }));
+                }}
+                onCommit={(rows) => bulkInsertMut.mutate(rows)}
+                committing={bulkInsertMut.isPending}
+              />
+            </Dialog>
             <Dialog open={addOpen} onOpenChange={setAddOpen}>
               <DialogTrigger asChild>
                 <Button type="button" size="sm">

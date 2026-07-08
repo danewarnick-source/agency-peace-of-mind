@@ -339,10 +339,11 @@ function UploadButton({
       toast.success(
         `Uploaded — NECTAR extracted ${res.extracted?.length ?? 0} field(s)`,
       );
+      const chosenType = docType;
       setTitle(""); setFile(null); setFiscalYear(""); setMedicaidId("");
       onOpenChange(false);
       const docId = (res as { document?: { id?: string } }).document?.id;
-      onUploaded(docId);
+      onUploaded(docId, chosenType);
     },
     onError: (e: Error) => toast.error(e.message),
   });

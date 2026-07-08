@@ -29,12 +29,14 @@ export interface PullClientReportInput {
   params: {
     clientId?: string;
     spaceId?: string;
+    staffId?: string;
     periodMonth?: string;
     weekStart?: string; // ISO date
     weeksCount?: number;
   };
-  /** When true, ship a point-in-time snapshot to client_documents in
-   *  addition to returning the bytes. Defaults to false (preview only). */
+  /** When true, ship a point-in-time snapshot to client_documents (or
+   *  employee_documents for staff-scoped reports) in addition to
+   *  returning the bytes. Defaults to false (preview only). */
   ship?: boolean;
 }
 

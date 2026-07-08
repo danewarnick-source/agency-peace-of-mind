@@ -36,11 +36,11 @@ import { ClientMealPlannerMount } from "@/components/clients/client-meal-planner
 import { ChoreChartForClient } from "@/components/chores/chore-chart-mount";
 import { PcspTab } from "@/components/clients/pcsp-tab";
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
-import { CareSection, CareGroup } from "@/components/clients/care-section";
+import { SectionPanel, SectionGroup, CareSection, CareGroup } from "@/components/clients/section-panel";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
 import { FaceSheetButton } from "@/components/clients/face-sheet-button";
 import { SectionsView, ClientSpecificTrainingCard, GoalsEditor, PublishConfirmDialog } from "@/components/clients/client-specific-training-card";
-import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, RefreshCw, Sparkles, Trash2, Upload, UserCircle2, Target, ShieldCheck, GraduationCap, HeartHandshake, Users, UtensilsCrossed, ListChecks } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, RefreshCw, Sparkles, Trash2, Upload, UserCircle2, Target, ShieldCheck, GraduationCap, HeartHandshake, Users, UtensilsCrossed, ListChecks, UserCircle, FileUp, Activity, Clock, FileText, AlertOctagon, ClipboardList, Home as HomeIcon, CalendarClock, Wallet, Coins, FolderOpen, ScrollText } from "lucide-react";
 import { clientFeatureVisible } from "@/lib/client-features";
 import {
   getClientSpecificTraining,

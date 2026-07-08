@@ -2658,3 +2658,165 @@ function StaffHrDocsPanel({ organizationId, staffId }: { organizationId: string;
     </Card>
   );
 }
+
+// ── Employee record completeness bar ──────────────────────────────────────
+// Mirrors the client Profile tab's RecordCompletenessBar: a compact progress
+// bar showing "X of Y required complete / N missing", expandable to the row
+// list. All checks read profile fields that already load in memberQ — no new
+// data fetches, purely presentational.
+type StaffReq = {
+  key: string;
+  title: string;
+  sub: string;
+  ok: boolean;
+};
+function StaffRecordCompletenessBar({
+  photoPath, email, phone, employeeId, hireDate, teamId,
+  staffTypeCount, emergencyName, emergencyPhone, positionsCount,
+}: {
+  photoPath: string | null;
+  email: string | null;
+  phone: string | null;
+  employeeId: string | null;
+  hireDate: string | null;
+  teamId: string | null;
+  staffTypeCount: number;
+  emergencyName: string | null;
+  emergencyPhone: string | null;
+  positionsCount: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const reqs: StaffReq[] = [
+    { key: "photo", title: "Profile photo", sub: "Used on scheduler & coverage", ok: !!photoPath },
+    { key: "email", title: "Work email", sub: "Login & notifications", ok: !!email },
+    { key: "phone", title: "Phone number", sub: "Reachable for shifts", ok: !!phone },
+    { key: "employee_id", title: "Employee ID", sub: "Internal roster identifier", ok: !!(employeeId && employeeId.trim()) },
+    { key: "hire_date", title: "Hire date", sub: "Anchors tenure & renewals", ok: !!hireDate },
+    { key: "position", title: "Position / role", sub: "Job title on record", ok: positionsCount > 0 },
+    { key: "team", title: "Team assignment", sub: "Home or workgroup", ok: !!teamId },
+    { key: "staff_types", title: "Staff type(s)", sub: "Drives required trainings", ok: staffTypeCount > 0 },
+    { key: "emergency", title: "Emergency contact", sub: "Name + phone on file", ok: !!(emergencyName && emergencyPhone) },
+  ];
+  const completed = reqs.filter((r) => r.ok).length;
+  const required = reqs.length;
+  const missing = required - completed;
+  const pct = Math.round((completed / required) * 100);
+  const allDone = missing === 0;
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="w-full flex items-center gap-3 text-left"
+        >
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Record</span>
+          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+            <div
+              className={`h-full transition-all ${allDone ? "bg-emerald-500" : "bg-amber-500"}`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <span className="text-xs text-muted-foreground">
+            {allDone ? "Record complete" : `${completed} of ${required} required complete`}
+          </span>
+          {!allDone ? (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+              {missing} missing
+            </span>
+          ) : null}
+          {open ? <ChevronDown className="h-4 w-4 rotate-180 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        </button>
+
+        {open ? (
+          <div className="mt-4 pt-4 border-t space-y-2">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Required fields</div>
+            {reqs.map((r) => (
+              <div key={r.key} className="flex items-center gap-3 py-1.5">
+                <div
+                  className={
+                    "h-6 w-6 rounded grid place-items-center text-xs font-bold flex-none " +
+                    (r.ok ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")
+                  }
+                >
+                  {r.ok ? "✓" : "!"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{r.title}</div>
+                  <div className="text-xs text-muted-foreground truncate">{r.sub}</div>
+                </div>
+                <span className={"text-xs " + (r.ok ? "text-emerald-700" : "text-amber-700")}>
+                  {r.ok ? "On file" : "Missing"}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Employee at-a-glance summary card ─────────────────────────────────────
+// Mirrors the client Profile tab's AtGlanceCard: key facts pulled from data
+// already in memberQ / teamQ — no new fetches, purely a right-column summary.
+function AtGlanceEmployeeCard({
+  orgTitle, role, active, hireDate, teamName, employeeId, phone, email, department,
+}: {
+  orgTitle: string | null;
+  role: string;
+  active: boolean;
+  hireDate: string | null;
+  teamName: string | null;
+  employeeId: string | null;
+  phone: string | null;
+  email: string | null;
+  department: string | null;
+}) {
+  const rows: Array<[string, React.ReactNode]> = [
+    ["Title", orgTitle ?? <span className="text-muted-foreground italic">Not set</span>],
+    ["HIVE role", <span className="uppercase tracking-wide">{role}</span>],
+    ["Status", (
+      <span className={active ? "text-emerald-700" : "text-muted-foreground"}>
+        {active ? "Active" : "Deactivated"}
+      </span>
+    )],
+    ["Hired", hireDate ?? <span className="text-muted-foreground">—</span>],
+    ["Team", teamName ?? <span className="text-muted-foreground">—</span>],
+    ["Employee ID", employeeId ?? <span className="text-muted-foreground">—</span>],
+    ["Department", department ?? <span className="text-muted-foreground">—</span>],
+    ["Phone", phone ?? <span className="text-muted-foreground">—</span>],
+    ["Email", email ?? <span className="text-muted-foreground">—</span>],
+  ];
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-0">
+        <div className="flex items-start gap-2.5 px-5 py-4 border-b border-border/60">
+          <span
+            aria-hidden
+            className="grid place-items-center h-[18px] w-[18px] bg-primary/15 flex-none"
+            style={{ clipPath: "polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)" }}
+          >
+            <span
+              className="block h-[7px] w-[7px] bg-primary"
+              style={{ clipPath: "polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)" }}
+            />
+          </span>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold leading-tight">At a glance</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Key facts pulled from this record</p>
+          </div>
+        </div>
+        <div className="p-5">
+          {rows.map(([label, value]) => (
+            <div key={label} className="flex items-center justify-between gap-4 py-2 text-sm border-b border-border/60 last:border-0">
+              <span className="text-muted-foreground">{label}</span>
+              <span className="font-semibold text-right">{value}</span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

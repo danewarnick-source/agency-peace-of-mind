@@ -1621,33 +1621,31 @@ export function MarEmarTab({
             {serviceContext.toUpperCase()}
           </span>
           {canManageMeds && clientSafety && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 gap-1 text-[11px]"
-              onClick={() => setSafetyEditorOpen(true)}
-              title="Edit clinical safety profile (allergies, dysphagia, self-admin toggle)"
-            >
-              <Settings2 className="h-3.5 w-3.5" />
-              Clinical safety profile
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1 text-[11px] border-emerald-500/40 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
+                onClick={() => setDisableConfirmOpen(true)}
+                title="Turn off self-directed self-administration support (returns client to eligibility gate; records preserved)"
+              >
+                Self-admin: ON
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1 text-[11px]"
+                onClick={() => setSafetyEditorOpen(true)}
+                title="Edit clinical safety profile (allergies, dysphagia, self-admin toggle)"
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+                Clinical safety profile
+              </Button>
+            </>
           )}
         </div>
       </div>
 
-          {canManageMeds && clientSafety && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 gap-1 text-[11px] border-amber-500/40 text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/30"
-              onClick={() => setDisableConfirmOpen(true)}
-              title="Turn off self-directed self-administration support (returns client to eligibility gate; records preserved)"
-            >
-              Self-admin: ON
-            </Button>
-          )}
-        </div>
-      </div>
 
       {canManageMeds && clientSafety && (
         <Dialog open={safetyEditorOpen} onOpenChange={setSafetyEditorOpen}>

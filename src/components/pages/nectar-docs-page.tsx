@@ -278,6 +278,13 @@ export function NectarDocsPage() {
         ))}
       </div>
 
+      <OutdatedDocumentsSection
+        organizationId={orgId}
+        kind="nectar"
+        title="Outdated Company Docs"
+      />
+
+
       {selectedId && (
         <DocumentDetailDialog
           documentId={selectedId}

@@ -1591,8 +1591,40 @@ export function MarEmarTab({
           >
             {serviceContext.toUpperCase()}
           </span>
+          {canManageMeds && clientSafety && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1 text-[11px]"
+              onClick={() => setSafetyEditorOpen(true)}
+              title="Edit clinical safety profile (allergies, dysphagia, self-admin toggle)"
+            >
+              <Settings2 className="h-3.5 w-3.5" />
+              Clinical safety profile
+            </Button>
+          )}
         </div>
       </div>
+
+      {canManageMeds && clientSafety && (
+        <Dialog open={safetyEditorOpen} onOpenChange={setSafetyEditorOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Clinical safety profile — {clientSafety.first_name} {clientSafety.last_name}</DialogTitle>
+            </DialogHeader>
+            <ClientSafetyEditor
+              client={clientSafety}
+              onSaved={({ self_admin_med_support }) => {
+                setSafetyEditorOpen(false);
+                if (!self_admin_med_support) {
+                  toast.success("eMAR disabled. Client returned to eligibility gate.");
+                }
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
 
       {/* Permanent legal/scope banner — required at every eMAR surface */}
       <EmarLegalBanner />

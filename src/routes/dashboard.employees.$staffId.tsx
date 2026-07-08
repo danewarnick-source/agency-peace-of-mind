@@ -118,12 +118,26 @@ function StaffProfilePage() {
       const { data: p, error: pErr } = await supabase
         .from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, employee_id, position, positions, department, hire_date, account_status, worker_type, team_id, photo_path, photo_updated_at, phone, emergency_contact_name, emergency_contact_relationship, emergency_contact_phone" as any)
+        .select("id, full_name, email, username, employee_id, position, positions, department, hire_date, account_status, worker_type, team_id, photo_path, photo_updated_at, phone, emergency_contact_name, emergency_contact_relationship, emergency_contact_phone, staff_type_keys" as any)
         .eq("id", staffId)
         .maybeSingle();
       if (pErr) throw pErr;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return { member: m, profile: (p ?? null) as any };
+    },
+  });
+
+  // Org staff-types catalog → labels for the derived org-title tier in the header.
+  const staffTypesCatalogQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["staff-types-catalog", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("staff_types")
+        .select("key, label")
+        .eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as Array<{ key: string; label: string }>;
     },
   });
 
@@ -239,6 +253,23 @@ function StaffProfilePage() {
     return list.length ? list : fallback;
   })();
 
+  // Derive the org-title tier from the employee's selected staff types.
+  // Composition rules:
+  //   • Primary = first key in profiles.staff_type_keys (provider-ordered).
+  //   • 1–3 types → labels joined with " / " (primary first).
+  //   • 4+ types → "<primary label> and N more" to keep the header scannable.
+  const orgTitle = (() => {
+    const keys = ((p?.staff_type_keys as string[] | null) ?? []).filter(Boolean);
+    if (keys.length === 0) return null;
+    const byKey = new Map(
+      (staffTypesCatalogQ.data ?? []).map((t) => [t.key, t.label]),
+    );
+    const labels = keys.map((k) => byKey.get(k) ?? k);
+    if (labels.length <= 3) return labels.join(" / ");
+    return `${labels[0]} and ${labels.length - 1} more`;
+  })();
+
+
   const invalidateProfile = () => {
     qc.invalidateQueries({ queryKey: ["staff-profile", orgId, staffId] });
   };
@@ -258,17 +289,40 @@ function StaffProfilePage() {
           />
           <div>
             <h1 className="text-xl font-semibold leading-tight">{name}</h1>
-            {positions.length > 0 ? (
-              <p className="text-sm font-normal text-muted-foreground">
-                {positions.join(", ")}
+            {/* Tier 2: derived org title from selected staff types (job title). */}
+            {orgTitle ? (
+              <p className="text-sm font-medium text-foreground/80">{orgTitle}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                No staff type selected
               </p>
-            ) : null}
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <Badge variant="secondary" className="uppercase">{m.role}</Badge>
-              <span>{m.active ? "Active" : "Deactivated"}</span>
-              {p?.hire_date && <span>· Hired {p.hire_date}</span>}
+            )}
+            {/* Tier 3: HIVE system status — platform access level, not job title. */}
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+              <Badge
+                variant="outline"
+                className="border-primary/30 bg-primary/5 uppercase tracking-wide text-primary"
+                title="HIVE platform role"
+              >
+                {m.role}
+              </Badge>
+              <Badge
+                variant="outline"
+                className={
+                  m.active
+                    ? "border-emerald-300 bg-emerald-50 uppercase tracking-wide text-emerald-700"
+                    : "border-muted-foreground/30 bg-muted uppercase tracking-wide text-muted-foreground"
+                }
+                title="HIVE account status"
+              >
+                {m.active ? "Active" : "Deactivated"}
+              </Badge>
+              {p?.hire_date && (
+                <span className="text-muted-foreground">· Hired {p.hire_date}</span>
+              )}
             </div>
           </div>
+
         </div>
         <Button variant="outline" onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/hub/employees" })}>
           Back to list (quick edit)

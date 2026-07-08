@@ -1003,11 +1003,12 @@ function MedFormDialog({
 // ─── AI Import Dialog ─────────────────────────────────────────────────────────
 
 function AIImportDialog({
-  onParse, onCommit, committing,
+  onParse, onCommit, committing, proposeMode,
 }: {
   onParse: (payload: { imageBase64?: string; mime?: string; text?: string }) => Promise<FormVals[]>;
   onCommit: (rows: FormVals[]) => void;
   committing: boolean;
+  proposeMode?: boolean;
 }) {
   const [parsing, setParsing] = useState(false);
   const [rows, setRows] = useState<FormVals[]>([]);

@@ -1305,6 +1305,8 @@ export function MarEmarTab({
   const { data: clientSafety, isLoading: safetyLoading } = useClientSafety(clientId);
   const qc = useQueryClient();
   const orgId = org?.organization_id;
+  const { role } = usePermissions();
+  const canManageMeds = role === "admin" || role === "manager" || role === "super_admin";
 
 
   // ── Realtime: any INSERT to emar_logs for this client refetches every

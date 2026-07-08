@@ -98,7 +98,8 @@ export const getEffectiveDocument = createServerFn({ method: "POST" })
 
     const picked = resolveEffectiveDocument(candidates, data.as_of);
     return {
-      document: (picked as unknown as Record<string, unknown> | null) ?? null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      document: (picked as any) ?? null,
       governingSource: toGoverningSource(picked ?? null, data.document_type),
     };
   });

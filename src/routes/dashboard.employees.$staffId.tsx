@@ -58,6 +58,7 @@ import { RequirePermission } from "@/components/rbac-guard";
 import { StaffTypeEditor } from "@/components/hr/staff-type-editor";
 import { EmployeeDocumentsCard } from "@/components/employees/employee-documents-card";
 import { EmployeeFaceSheetButton } from "@/components/employees/employee-face-sheet-button";
+import { StaffHrChecklistCard } from "@/components/hr/staff-hr-checklist-card";
 import {
   getStaffChecklist,
   getStaffPii,
@@ -337,6 +338,7 @@ function StaffProfilePage() {
         <TabsList className="flex flex-wrap h-auto justify-start">
           <TabsTrigger value="profile">Overview</TabsTrigger>
           <TabsTrigger value="requirements">Certs &amp; trainings</TabsTrigger>
+          <TabsTrigger value="checklist">Compliance Checklist</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
           <TabsTrigger value="hrdocs">HR docs</TabsTrigger>
           <TabsTrigger value="deadlines">Deadlines</TabsTrigger>
@@ -475,6 +477,22 @@ function StaffProfilePage() {
             </SectionPanel>
           </SectionGroup>
         </TabsContent>
+
+        {/* ----- COMPLIANCE CHECKLIST (full per-staff HR checklist) ----- */}
+        <TabsContent value="checklist" className="mt-4 space-y-10">
+          <SectionGroup label="HR Compliance Checklist" hint="Full per-staff requirements — evidence, sign-off, attestation, training hours">
+            <SectionPanel icon={ClipboardList} accent="emerald">
+              <StaffHrChecklistCard
+                organizationId={orgId}
+                staffId={staffId}
+                view="checklist"
+                filter="all"
+              />
+            </SectionPanel>
+          </SectionGroup>
+        </TabsContent>
+
+
 
         {/* ----- ACTIVITY ----- */}
         <TabsContent value="activity" className="mt-4 space-y-10">

@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { createEmployeeManually, adminResetEmployeePassword } from "@/lib/employees.functions";
 import { listStaffPii, updateStaffPii, type StaffPii } from "@/lib/hr-staff.functions";
-// StaffHrChecklistCard now lives on the staff profile route.
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

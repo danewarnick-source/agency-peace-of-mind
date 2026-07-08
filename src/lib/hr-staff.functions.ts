@@ -96,6 +96,7 @@ export interface ChecklistRow {
   requirement_id: string;
   title: string;
   category: string | null;
+  phase: string | null;
   source_citation: string | null;
   evidence_type: string | null;
   renewal_frequency: string | null;
@@ -128,6 +129,22 @@ export interface ChecklistRow {
   applies_to_staff_types: string[] | "all";
   applies_to_confirmed_at: string | null;
 }
+function baselinePhaseFor(key: string): string | null {
+  switch (key) {
+    case "thirty_day":
+    case "cpr_first_aid":
+    case "deescalation":
+      return "within_30_days";
+    case "abi":
+      return "within_180_days";
+    case "annual_12h":
+      return "annual";
+    default:
+      return null;
+  }
+}
+
+
 
 
 export const getStaffChecklist = createServerFn({ method: "GET" })
@@ -253,6 +270,7 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
           title:
             (r.title as string) ?? (r.short_label as string) ?? "Untitled",
           category: (r.category as string) ?? null,
+          phase: typeof meta.phase === "string" ? (meta.phase as string) : null,
           source_citation: (r.source_citation as string) ?? null,
           evidence_type: (r.evidence_type as string) ?? null,
           renewal_frequency: (r.renewal_frequency as string) ?? null,
@@ -345,6 +363,7 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
         requirement_id: baselineRequirementId(t.key),
         title: t.title,
         category: t.category,
+        phase: baselinePhaseFor(t.key),
         source_citation: t.hint ?? null,
         evidence_type: t.tracks_expiration ? "certificate" : "completion",
         renewal_frequency: null,

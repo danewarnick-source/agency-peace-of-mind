@@ -308,17 +308,32 @@ export function StaffHrChecklistCard({
           ) : (
             (() => {
               const rows = checklistQ.data ?? [];
-              const byCat = new Map<string, typeof rows>();
+              const PHASE_ORDER: Array<{ key: string; label: string }> = [
+                { key: "upon_hire", label: "Upon Hire" },
+                { key: "within_30_days", label: "Within 30 Days" },
+                { key: "within_90_days", label: "Within 90 Days" },
+                { key: "within_180_days", label: "Within 180 Days" },
+                { key: "annual", label: "Annual" },
+                { key: "evaluation", label: "Evaluations" },
+                { key: "__other__", label: "Other" },
+              ];
+              const byPhase = new Map<string, typeof rows>();
               for (const r of rows) {
-                const k = r.category ?? "Other";
-                if (!byCat.has(k)) byCat.set(k, [] as typeof rows);
-                byCat.get(k)!.push(r);
+                const phase = (r as { phase?: string | null }).phase ?? null;
+                const k = phase && PHASE_ORDER.some((p) => p.key === phase)
+                  ? phase
+                  : "__other__";
+                if (!byPhase.has(k)) byPhase.set(k, [] as typeof rows);
+                byPhase.get(k)!.push(r);
               }
+              const orderedGroups = PHASE_ORDER
+                .filter((p) => byPhase.has(p.key))
+                .map((p) => ({ label: p.label, items: byPhase.get(p.key)! }));
               const todayMs = Date.now();
               const in60Ms = todayMs + 60 * 86400_000;
               return (
                 <div className="space-y-2">
-                  {Array.from(byCat.entries()).map(([cat, items]) => {
+                  {orderedGroups.map(({ label: cat, items }) => {
                     const applicableItems = items.filter((i) => i.applicable !== false);
                     const complete = applicableItems.filter(
                       (i) => i.completion.status === "complete",
@@ -327,15 +342,16 @@ export function StaffHrChecklistCard({
                       <details
                         key={cat}
                         className="group rounded-lg border border-border/60"
+                        open
                       >
-                        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-sm font-medium hover:bg-muted/40">
+                        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-sm font-semibold hover:bg-muted/40">
                           <span className="flex items-center gap-2">
                             <span className="text-xs text-muted-foreground transition-transform group-open:rotate-90">
                               ▶
                             </span>
                             {cat}
                           </span>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs font-normal text-muted-foreground">
                             {complete} of {applicableItems.length} ✓
                             {items.length > applicableItems.length && (
                               <span className="ml-1 italic">
@@ -344,6 +360,7 @@ export function StaffHrChecklistCard({
                             )}
                           </span>
                         </summary>
+
                         <div className="space-y-2 border-t border-border/60 p-3">
                           {[...items]
                             .sort((a, b) => {

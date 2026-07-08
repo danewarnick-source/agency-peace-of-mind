@@ -225,12 +225,22 @@ export const checkBillingEntry = createServerFn({ method: "POST" })
         serviceCodes: z.array(z.string().min(1)).min(1),
         staffId: z.string().uuid().optional(),
         contextExtra: z.record(z.string(), z.unknown()).optional(),
+        // Pass 3: which point in time to read the governing source at.
+        // "now" = evaluate against current rules; YYYY-MM-DD = evaluate a
+        // past event against the sources that governed on that date.
+        // Defaults to the serviceDate (audit-correct: an entry billed on
+        // 3/1/2025 is judged by the sources effective 3/1/2025).
+        asOf: z
+          .union([z.literal("now"), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)])
+          .optional(),
       })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
     const upperCodes = data.serviceCodes.map((c) => c.trim().toUpperCase());
+    const asOf: "now" | string =
+      data.asOf ?? (/^\d{4}-\d{2}-\d{2}/.test(data.serviceDate) ? data.serviceDate.slice(0, 10) : "now");
 
     // Only confirmed rules whose requirement is active enforce.
     const { data: rules, error } = await supabase
@@ -238,12 +248,39 @@ export const checkBillingEntry = createServerFn({ method: "POST" })
       .from("nectar_compliance_rules" as any)
       .select(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        "id, requirement_id, rule_definition, requirement:nectar_requirements!inner(id, title, original_title, description, original_description, source_citation, activation_state)" as any,
+        "id, requirement_id, rule_definition, requirement:nectar_requirements!inner(id, title, original_title, description, original_description, source_citation, activation_state, source_document_id)" as any,
       )
       .eq("organization_id", data.organizationId)
       .eq("rule_type", "billing_conflict")
       .eq("status", "confirmed");
     if (error) throw new Error(error.message);
+
+    // Point-in-time: only requirements whose source document was effective
+    // on `asOf` should enforce for an event on that date. Requirements with
+    // no source document (org-authored) always evaluate.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rulesArr = (rules ?? []) as any[];
+    const sourceIds: string[] = Array.from(
+      new Set(
+        rulesArr
+          .map((r) => r.requirement?.source_document_id as string | null)
+          .filter((v): v is string => !!v),
+      ),
+    );
+    let governingById: Record<string, import("@/lib/effective-document").GoverningSource> = {};
+    let effectiveIds = new Set<string>();
+    if (sourceIds.length) {
+      const { filterSourcesEffectiveOn } = await import("@/lib/effective-document.functions");
+      const res = await filterSourcesEffectiveOn({
+        data: {
+          organization_id: data.organizationId,
+          source_document_ids: sourceIds,
+          as_of: asOf,
+        },
+      });
+      governingById = res.governing_by_id;
+      effectiveIds = new Set(res.effective_ids);
+    }
 
     const potentialFlags: Array<{
       ruleId: string;
@@ -251,13 +288,16 @@ export const checkBillingEntry = createServerFn({ method: "POST" })
       matchedCodes: string[];
       humanExplanation: string;
       source: { title: string; verbatim: string; citation: string | null };
+      governingSource: import("@/lib/effective-document").GoverningSource | null;
     }> = [];
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const r of (rules ?? []) as any[]) {
+    for (const r of rulesArr) {
       const req = r.requirement;
       if (!req) continue;
       if (!ACTIVE_STATES.includes(req.activation_state)) continue;
+      // Skip rules whose source was NOT effective on `asOf` (past event).
+      const srcId = req.source_document_id as string | null;
+      if (srcId && !effectiveIds.has(srcId)) continue;
       const def = r.rule_definition ?? {};
       const conflicting = Array.isArray(def.conflicting_codes)
         ? (def.conflicting_codes as string[]).map((c) => String(c).toUpperCase())
@@ -275,10 +315,11 @@ export const checkBillingEntry = createServerFn({ method: "POST" })
             verbatim: req.original_description ?? req.description ?? "",
             citation: req.source_citation ?? null,
           },
+          governingSource: srcId ? (governingById[srcId] ?? null) : null,
         });
       }
     }
-    return { flags: potentialFlags };
+    return { flags: potentialFlags, asOf };
   });
 
 // ─── Flag raise + resolve loop ───────────────────────────────────────────

@@ -45,6 +45,8 @@ import {
   reviewExtractedField,
   deleteDocument,
 } from "@/lib/nectar-documents.functions";
+import { DocumentEffectiveDatingDialog } from "@/components/documents/document-effective-dating-dialog";
+import { OutdatedDocumentsSection } from "@/components/documents/outdated-documents-section";
 
 
 const DOC_TYPES = [

@@ -118,12 +118,26 @@ function StaffProfilePage() {
       const { data: p, error: pErr } = await supabase
         .from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, employee_id, position, positions, department, hire_date, account_status, worker_type, team_id, photo_path, photo_updated_at, phone, emergency_contact_name, emergency_contact_relationship, emergency_contact_phone" as any)
+        .select("id, full_name, email, username, employee_id, position, positions, department, hire_date, account_status, worker_type, team_id, photo_path, photo_updated_at, phone, emergency_contact_name, emergency_contact_relationship, emergency_contact_phone, staff_type_keys" as any)
         .eq("id", staffId)
         .maybeSingle();
       if (pErr) throw pErr;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return { member: m, profile: (p ?? null) as any };
+    },
+  });
+
+  // Org staff-types catalog → labels for the derived org-title tier in the header.
+  const staffTypesCatalogQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["staff-types-catalog", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("staff_types")
+        .select("key, label")
+        .eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as Array<{ key: string; label: string }>;
     },
   });
 

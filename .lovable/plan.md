@@ -1,99 +1,68 @@
 
-# eMAR / MAR — capacity & view-selection report (Blake Adams, admin Care tab)
+# Mount MedicationsManager inside the eMAR (wire, don't rebuild)
 
-Report only. No code changes proposed.
+## Scope
 
-## 1. What administration models the system actually supports
+Make the already-built `MedicationsManager` (add/edit meds) and its `AIImportDialog` (parse pharmacy/physician order → review → save) reachable from the MAR/eMAR tab. No new component, no new server function, no schema change — pure wiring.
 
-**Data model (`client_medications`, ~43 cols) — rich, model-agnostic:**
-- `is_prn` + `prn_instructions` + `prn_reason` (as-needed meds)
-- `is_controlled` + `controlled_schedule` + `pill_count_current` / `pill_count_verified` + second-witness fields + `controlled_med_counts` table + `medication_transfers` table
-- `is_rescue` (seizure/emergency meds) with `seizure_duration_seconds`, `seizure_outcome`, `emergency_services_called`
-- `route` (PO, topical, IM, SQ, etc.), `dosage`, `frequency`, `scheduled_times[]`
-- `packaging`, `pharmacy`, `rx_number`, `prescriber`
-- Clinical safety: `purpose`, `adverse_effects`, `side_effects`, `choking_risk`, `contributes_to_swallowing_difficulty`
-- Client-level: `self_admin_med_support` (boolean flag), `allergies`, `dysphagia`, `swallowing_alerts`
+## Changes
 
-**`emar_logs` (~38 cols) records:** status (self_administered / refused / omitted / missed / held), exception_reason, pill counts, PRN reason, rescue-med outcome, second-witness signature, medication_error flag, admin_reviewed, addenda (`emar_log_addenda`).
+### 1. `src/components/medications-manager.tsx` — expose the AI import trigger
 
-**MarEmarTab (1,959 lines) UI supports:** PRN pass flow (reason required), controlled-substance pass flow (pill count + witness), rescue-med pass flow (seizure duration/outcome/EMS), scheduled-dose pass flow, exception logging, error flagging, controlled counts, transfers ops panel, Nectar advisory.
+The `AIImportDialog` is fully implemented (lines 750–886) and the `parseAI` server-fn hook, `importOpen` state, and `bulkInsertMut` are already declared — they were left un-triggered when the per-section NECTAR import was removed. Add the missing Dialog trigger next to "Add Medication" in the header (around line 292):
 
-**BUT — the entire pass surface is scoped to one attestation:**
 ```
-"I confirm I observed or assisted this Person in self-administering
- their own prescribed medication…"
-```
-Every code path (Chart/Today/Calendar/Directives/History/Ops/Nectar sub-tabs) assumes the Person is the administrator and staff observe/assist. There is **no** nurse-administered mode, no staff-administered (delegated) mode, no separate attestation text, no separate log status, and no branching on administrator role in `emar_logs`. The data model *could* represent nurse/staff administration, but the UI represents only the DOPL/SOW self-directed model.
-
-## 2. Why Blake's view shows only the self-administration interface
-
-The screen you see is **the eligibility gate**, not the eMAR itself:
-
-`src/components/workspace/mar-emar-tab.tsx:1550-1554`
-```
-if (clientSafety && !clientSafety.self_admin_med_support) {
-  return <EmarEligibilityGate client={clientSafety} />;
-}
+<Dialog open={importOpen} onOpenChange={setImportOpen}>
+  <DialogTrigger asChild>
+    <Button type="button" size="sm" variant="outline">
+      <Upload className="mr-1.5 h-3.5 w-3.5" /> Upload MAR / Order
+    </Button>
+  </DialogTrigger>
+  <AIImportDialog
+    onParse={async (p) => {
+      const r = await parseAI({ data: p });
+      return (r.medications ?? []).map((m) => ({ ...EMPTY, ...m,
+        scheduled_times: m.scheduled_times ?? [] }));
+    }}
+    onCommit={(rows) => bulkInsertMut.mutate(rows)}
+    committing={bulkInsertMut.isPending}
+  />
+</Dialog>
 ```
 
-`EmarEligibilityGate` (`emar-chart.tsx:230-251`) renders the legal banner, the "eMAR is not enabled for {name} — not flagged as self-directed self-administration" card, and (for admins/managers) a `ClientSafetyEditor` that lets you toggle `self_admin_med_support`. That toggle is the only path in.
+Parse → review (editable table) → explicit "Save N Medications" click. No silent writes — same discipline as the other NECTAR parsers.
 
-So: **Blake is NOT flagged `self_admin_med_support = true`.** Once you flip that flag, the full 7-sub-tab eMAR renders on this same mount. It's "one mode of a fuller eMAR" *only in the sense that the fuller eMAR opens up once the flag is on* — but the fuller eMAR is itself still exclusively the self-directed model (see §1).
+### 2. `src/components/workspace/mar-emar-tab.tsx` — mount inside the Chart sub-tab
 
-## 3. What determines which MAR view a client sees
+At the top of the `Chart` `TabsContent` (currently just `<MedicationChart clientId={clientId} />` at line 1658–1660), render `MedicationsManager` above the chart for admin/manager roles:
 
-Single boolean input: `clients.self_admin_med_support`.
+```
+<TabsContent value="chart" className="space-y-4 pt-2">
+  {(role === "admin" || role === "manager" || role === "super_admin") && (
+    <MedicationsManager clientId={clientId} organizationId={orgId ?? undefined} />
+  )}
+  <MedicationChart clientId={clientId} />
+</TabsContent>
+```
 
-Not consulted anywhere in the MAR view decision: PCSP content, `authorized_dspd_codes`, med-monitoring billing codes, nurse-vs-self setting (doesn't exist), org features. `emarEnabled` feature flag and med-monitoring code presence only affect whether the **Care sub-tab is shown** (currently forced `true` from the prior task) — they do not affect what renders inside the tab.
+Imports to add: `MedicationsManager` from `@/components/medications-manager`, `usePermissions` from `@/hooks/use-permissions` (component already has `orgId`).
 
-## 4. Nurse-administered / staff-administered path
+### 3. Empty-state wording
 
-**Does not exist.** The gate copy references a "nurse-administered medication workflow" as a pointer to something outside the eMAR, but:
-- No component, route, table column, or workflow implements it.
-- `emar_logs.status` has no nurse/staff-administered value (only self_administered / refused / omitted / missed).
-- No second attestation text, no delegated-administration signature capture, no MAR grid designed for staff-as-administrator.
-- No RN role, RN credential check, or delegation record anywhere in the codebase.
+`MedicationChart`'s empty-state copy already reads "Add medications from the chart manager." With MedicationsManager now mounted directly above it, that pointer is live — no copy change required. (The Add Medication + Upload MAR / Order buttons sit in the manager's header, visible even when zero meds exist.)
 
-It is referenced but not built.
+## Not changed
 
-## 5. Pharmacy MAR / physician-order upload path
+- `EmarEligibilityGate` / `self_admin_med_support` flag — unchanged. The manager mounts inside the Chart sub-tab, which only renders after the client is flagged for self-directed self-administration (per the prior report). Flipping that flag remains the admin's one-time toggle on the gate screen.
+- Staff workspace eMAR — same component, so staff who reach the Chart sub-tab in an admin/manager role would also see it; permission gate above prevents non-admins from adding/editing meds. Log-administrations flow (Today/pass surface) untouched.
+- RLS / `client_medications` policies / `parseMedicationsAI` — unchanged.
+- `MarEmarTab`'s 7 sub-tabs, layout, banners, gate — unchanged.
 
-**Parser exists, entry point is orphaned.**
-- `src/lib/medications.functions.ts` — `parseMedicationsAI` server fn (AWS Bedrock via gateway) parses image or text of pharmacy/physician orders into structured `medication_name / dosage / frequency / route / scheduled_times / instructions / prescriber`. Wired to Zod, ready to insert.
-- `src/components/medications-manager.tsx` (886 lines) — `MedicationsManager` component: full add/edit dialog, "Upload MAR sheet / physician order" import flow that calls `parseAI` and writes to `client_medications`.
-- **`MedicationsManager` is not mounted anywhere.** `grep -rn "MedicationsManager" src/` returns only its own definition.
-- Neither `MarEmarTab` nor `MedicationChart` exposes an "Add medication" button, an upload button, or a call to `parseMedicationsAI`. `MedicationChart`'s empty state literally says "Add medications from the chart manager" — but the chart manager is unreachable in the UI.
+## Verification
 
-So: the pipeline (upload → parse → populate `client_medications` → active eMAR) is fully built in code but has **no UI entry point** anywhere in the app today. The eMAR can only be populated by direct DB insert.
-
-## 6. Sub-tab capacity on the admin Care mount
-
-Not trimmed. `MarEmarTab` renders the full 7 sub-tabs on every mount (staff workspace and admin Care both):
-
-`Chart` (MedicationChart profiles) · `Today` (pass list) · `Calendar` (MarCalendar) · `Directives` (per-med directives/adversities) · `History` (emar_logs history) · `Ops` (EmarOpsPanel — controlled counts, transfers) · `Nectar` (EmarNectarPanel).
-
-Admin Care mount = staff workspace mount, same component, same gate, same sub-tabs.
-
----
-
-## Summary map
-
-| Capability | Data model | UI built | UI reachable |
-|---|---|---|---|
-| Self-directed self-administration (observe/assist) | ✅ | ✅ full 7 sub-tabs | ✅ when `self_admin_med_support = true` |
-| PRN meds | ✅ | ✅ | via gate |
-| Controlled substances (counts, witness, transfers) | ✅ | ✅ | via gate |
-| Rescue / seizure meds | ✅ | ✅ | via gate |
-| Multiple routes (PO/topical/IM/SQ/…) | ✅ | ✅ (as data fields) | via gate |
-| Nurse-administered workflow | ❌ | ❌ | ❌ (referenced in copy only) |
-| Staff-administered / delegated | ❌ | ❌ | ❌ |
-| Add medication (manual) | ✅ (`MedicationsManager`) | ✅ | ❌ (component not mounted) |
-| Pharmacy/order upload → auto-populate | ✅ (`parseMedicationsAI`) | ✅ (inside `MedicationsManager`) | ❌ (not mounted) |
-
-## What "expand the eMAR" would mean, at a glance
-
-- **To let Blake use the current eMAR:** flip `self_admin_med_support = true` via the editor already rendered on the gate screen (or DB).
-- **To let anyone add/upload medications from the UI:** mount `MedicationsManager` inside `MarEmarTab` (e.g. in the Chart sub-tab header) — code exists, just no mount point.
-- **To support nurse- or staff-administered meds:** net-new work — new `emar_logs.status` values, a second attestation, an administrator-role branch in the pass flow, and (for RN scope) a delegation/credential record. Not present today.
-
-Awaiting your decision on which of these to open up before making any changes.
+- `bun run tsgo` on the two edited files.
+- Playwright: open admin client profile → Care → MAR/eMAR (for a client already flagged self-admin with zero meds — flip the flag on the gate first if needed). Confirm:
+  1. Chart sub-tab shows "Add Medication" + "Upload MAR / Order" buttons in the manager header.
+  2. Clicking Add Medication opens the form dialog; saving inserts a row and it appears both in the manager table AND in the MedicationChart profile grid below.
+  3. Clicking Upload MAR / Order opens the AIImportDialog; pasting order text → "Parse Text" produces an editable review table; "Save N Medications" writes and toasts success.
+  4. All rendered on a client with zero meds beforehand.

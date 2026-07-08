@@ -35,6 +35,8 @@ import {
 } from "./emar-chart";
 import { EmarOpsPanel } from "./emar-ops-panel";
 import { EmarNectarPanel } from "./emar-nectar-panel";
+import { MedicationsManager } from "@/components/medications-manager";
+import { usePermissions } from "@/hooks/use-permissions";
 import { logMedicationPass, addEmarAddendum } from "@/lib/emar-pass.functions";
 import { type EmarStatus, normalizeEmarStatus, EMAR_STATUS_LABELS } from "@/lib/emar-status";
 

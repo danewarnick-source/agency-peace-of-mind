@@ -91,7 +91,7 @@ async function resolveScopeOrg(
   supabase: import("@supabase/supabase-js").SupabaseClient,
   input: PullClientReportInput,
 ): Promise<string> {
-  const { clientId, spaceId } = input.params;
+  const { clientId, spaceId, staffId } = input.params;
   if (clientId) {
     const { data, error } = await supabase
       .from("clients")
@@ -114,7 +114,18 @@ async function resolveScopeOrg(
     if (!orgId) throw new Error("Chore space not found or not accessible");
     return orgId;
   }
-  throw new Error("Report requires either clientId or spaceId");
+  if (staffId) {
+    const { data, error } = await supabase
+      .from("organization_members")
+      .select("organization_id")
+      .eq("user_id", staffId)
+      .maybeSingle();
+    if (error) throw error;
+    const orgId = (data as { organization_id: string } | null)?.organization_id;
+    if (!orgId) throw new Error("Employee not found or not accessible");
+    return orgId;
+  }
+  throw new Error("Report requires clientId, spaceId, or staffId");
 }
 
 function bytesToBase64(bytes: Uint8Array): string {

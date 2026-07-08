@@ -1142,3 +1142,186 @@ function AIImportDialog({
     </DialogContent>
   );
 }
+
+// ─── Pending Proposals Review Panel (admin only) ──────────────────────────────
+
+function PendingProposalsPanel({
+  proposals, meds, proposerNames, onApprove, onReject, approving, rejecting,
+}: {
+  proposals: ProposalRow[];
+  meds: Medication[];
+  proposerNames: Record<string, string>;
+  onApprove: (id: string) => void;
+  onReject: (id: string, notes: string) => void;
+  approving: boolean;
+  rejecting: boolean;
+}) {
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectNotes, setRejectNotes] = useState("");
+  const medById = useMemo(() => {
+    const m: Record<string, Medication> = {};
+    meds.forEach((x) => { m[x.id] = x; });
+    return m;
+  }, [meds]);
+
+  return (
+    <div className="rounded-lg border-2 border-amber-500/60 bg-amber-50/40 p-4 space-y-3 dark:bg-amber-950/10">
+      <div className="flex items-center gap-2">
+        <ClipboardCheck className="h-4 w-4 text-amber-700 dark:text-amber-300" />
+        <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+          Pending medication change proposals
+        </h3>
+        <Badge className="bg-amber-200 text-amber-900 dark:bg-amber-900/50 dark:text-amber-100">{proposals.length}</Badge>
+      </div>
+      <p className="text-[11px] text-amber-800 dark:text-amber-200">
+        Nothing here is live on the medication list yet. Approve to apply the change; reject to discard it.
+      </p>
+
+      <div className="space-y-2">
+        {proposals.map((p) => {
+          const existing = p.medication_id ? medById[p.medication_id] : undefined;
+          const pl = p.proposed_payload ?? {};
+          const proposer = proposerNames[p.proposed_by] ?? "Unknown proposer";
+          return (
+            <div key={p.id} className="rounded-md border border-border bg-card p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Badge variant={p.change_type === "discontinue" ? "destructive" : "secondary"}>
+                    {p.change_type === "add" ? "Add" : p.change_type === "edit" ? "Edit" : "Discontinue"}
+                  </Badge>
+                  <span className="text-sm font-medium">
+                    {pl.medication_name || existing?.medication_name || "—"}
+                  </span>
+                  {p.source === "appointment_upload" && (
+                    <Badge variant="outline" className="text-[10px]">from appointment upload</Badge>
+                  )}
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  Proposed by {proposer} · {new Date(p.proposed_at).toLocaleString()}
+                </div>
+              </div>
+
+              {p.change_type === "edit" && existing && (
+                <EditDiff before={existing} after={pl} />
+              )}
+              {p.change_type === "add" && (
+                <AddSummary payload={pl} />
+              )}
+              {p.change_type === "discontinue" && existing && (
+                <p className="text-xs text-muted-foreground">
+                  Will mark <span className="font-semibold">{existing.medication_name}</span> as
+                  discontinued. The historical record is preserved.
+                </p>
+              )}
+
+              {rejectingId === p.id ? (
+                <div className="space-y-2 pt-1">
+                  <Textarea
+                    rows={2}
+                    placeholder="Reason for rejection (optional but recommended)…"
+                    value={rejectNotes}
+                    onChange={(e) => setRejectNotes(e.target.value)}
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => { setRejectingId(null); setRejectNotes(""); }}>
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={rejecting}
+                      onClick={() => { onReject(p.id, rejectNotes); setRejectingId(null); setRejectNotes(""); }}
+                    >
+                      Confirm reject
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex justify-end gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setRejectingId(p.id)}>
+                    Reject
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={approving}
+                    onClick={() => onApprove(p.id)}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    <Check className="mr-1 h-3.5 w-3.5" /> Approve &amp; apply
+                  </Button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AddSummary({ payload }: { payload: Record<string, any> }) {
+  const fields: Array<[string, any]> = [
+    ["Dose", payload.dosage], ["Route", payload.route], ["Frequency", payload.frequency],
+    ["Prescriber", payload.prescriber],
+    ["Times", Array.isArray(payload.scheduled_times) ? payload.scheduled_times.join(", ") : ""],
+    ["Purpose", payload.purpose],
+  ].filter(([, v]) => v);
+  return (
+    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+      {fields.map(([k, v]) => (
+        <div key={k}><span className="text-muted-foreground">{k}:</span> <span className="font-medium">{String(v)}</span></div>
+      ))}
+    </div>
+  );
+}
+
+function EditDiff({ before, after }: { before: Medication; after: Record<string, any> }) {
+  const keys: Array<keyof Medication> = [
+    "medication_name", "dosage", "frequency", "route", "prescriber",
+    "instructions", "purpose", "adverse_effects", "pharmacy", "rx_number",
+    "packaging", "side_effects", "prn_instructions", "choking_risk_details",
+  ];
+  const rows: Array<{ k: string; b: string; a: string }> = [];
+  keys.forEach((k) => {
+    if (!(k in after)) return;
+    const b = (before as any)[k] ?? "";
+    const a = (after as any)[k] ?? "";
+    if (String(b) !== String(a)) rows.push({ k: String(k), b: String(b || "—"), a: String(a || "—") });
+  });
+  if (Array.isArray(after.scheduled_times)) {
+    const b = (before.scheduled_times ?? []).join(", ");
+    const a = after.scheduled_times.join(", ");
+    if (b !== a) rows.push({ k: "scheduled_times", b: b || "—", a: a || "—" });
+  }
+  const bools: Array<keyof Medication> = ["choking_risk", "is_controlled", "is_prn", "contributes_to_swallowing_difficulty"];
+  bools.forEach((k) => {
+    if (!(k in after)) return;
+    const b = !!(before as any)[k]; const a = !!(after as any)[k];
+    if (b !== a) rows.push({ k: String(k), b: b ? "yes" : "no", a: a ? "yes" : "no" });
+  });
+
+  if (!rows.length) return <p className="text-xs text-muted-foreground">No field changes detected.</p>;
+  return (
+    <div className="rounded-md border border-border overflow-hidden">
+      <table className="w-full text-xs">
+        <thead className="bg-muted/40">
+          <tr>
+            <th className="px-2 py-1 text-left font-medium">Field</th>
+            <th className="px-2 py-1 text-left font-medium text-muted-foreground">Current</th>
+            <th className="px-2 py-1 text-left font-medium text-emerald-700 dark:text-emerald-300">Proposed</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.k} className="border-t border-border">
+              <td className="px-2 py-1 font-mono text-[10px] text-muted-foreground">{r.k}</td>
+              <td className="px-2 py-1 line-through opacity-70">{r.b}</td>
+              <td className="px-2 py-1 font-medium text-emerald-700 dark:text-emerald-300">{r.a}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+

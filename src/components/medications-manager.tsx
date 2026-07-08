@@ -678,6 +678,7 @@ function MedFormDialog({
   pending,
   showDiscontinue,
   onDiscontinue,
+  submitLabel,
 }: {
   title: string;
   initial?: FormVals;
@@ -685,6 +686,7 @@ function MedFormDialog({
   pending: boolean;
   showDiscontinue?: boolean;
   onDiscontinue?: () => void;
+  submitLabel?: string;
 }) {
   const [v, setV] = useState<FormVals>(initial ?? EMPTY);
   const [timeInput, setTimeInput] = useState("");

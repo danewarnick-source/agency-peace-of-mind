@@ -12,19 +12,21 @@
  *   - When a replacement is confirmed, the old doc is auto-outdated and its
  *     open-ended range is closed to the day before the new effective_from.
  *
- * Pass 1: NECTAR date detection is stubbed on the server; the UI always
- * shows the provider-entered branch. Real detection lands in a later pass.
+ * Pass 2: NECTAR proposes candidate dates + a source snippet + confidence.
+ * The provider ALWAYS confirms. If they change any proposed date, we record
+ * date_source=provider_entered; if they accept as-is, from_document.
  */
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sparkles, AlertTriangle } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Badge } from "@/components/ui/badge";
 import {
   detectEffectiveDates,
   findCurrentSibling,
@@ -68,6 +70,12 @@ export function DocumentEffectiveDatingDialog({
   const [mode, setMode] = useState<Mode>("until_replaced");
   const [to, setTo] = useState("");
   const [replacing, setReplacing] = useState<"unknown" | "yes" | "no">("unknown");
+  // Track what NECTAR originally proposed so we can decide date_source at save.
+  const [proposed, setProposed] = useState<{
+    from: string | null;
+    to: string | null;
+    mode: Mode | null;
+  }>({ from: null, to: null, mode: null });
   const label = documentTypeLabel || documentType.replace(/_/g, " ");
 
   // Reset on open
@@ -77,6 +85,7 @@ export function DocumentEffectiveDatingDialog({
       setMode("until_replaced");
       setTo("");
       setReplacing("unknown");
+      setProposed({ from: null, to: null, mode: null });
     }
   }, [open, today]);
 
@@ -103,9 +112,37 @@ export function DocumentEffectiveDatingDialog({
     },
   });
 
-  const detected = siblingQ.data?.detect?.detected;
+  // Prefill fields from NECTAR's proposal (provider still confirms/edits).
+  useEffect(() => {
+    const d = siblingQ.data?.detect;
+    if (!d || !d.detected) return;
+    const nextMode: Mode = (d.effective_to_mode as Mode | null) ?? (d.effective_to ? "fixed_date" : "until_replaced");
+    setFrom(d.effective_from ?? today);
+    setMode(nextMode);
+    setTo(nextMode === "fixed_date" ? (d.effective_to ?? "") : "");
+    setProposed({
+      from: d.effective_from ?? null,
+      to: d.effective_to ?? null,
+      mode: nextMode,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siblingQ.data]);
+
+  const detect = siblingQ.data?.detect;
+  const detected = !!detect?.detected;
   const sibling = siblingQ.data?.sibling ?? null;
-  const dateSource: "from_document" | "provider_entered" = detected ? "from_document" : "provider_entered";
+  const confidence = (detect?.confidence ?? "low") as "low" | "medium" | "high";
+  const snippet = detect?.source_snippet ?? null;
+
+  // date_source = from_document only when the provider accepts NECTAR's
+  // proposal verbatim; any edit flips to provider_entered.
+  const dateSource: "from_document" | "provider_entered" = useMemo(() => {
+    if (!detected) return "provider_entered";
+    const currentTo = mode === "fixed_date" ? to : null;
+    const proposedTo = proposed.mode === "fixed_date" ? (proposed.to ?? null) : null;
+    const same = proposed.from === from && proposed.mode === mode && currentTo === proposedTo;
+    return same ? "from_document" : "provider_entered";
+  }, [detected, proposed, from, mode, to]);
 
   const disabledSave = useMemo(() => {
     if (!from) return true;
@@ -161,7 +198,7 @@ export function DocumentEffectiveDatingDialog({
 
         {siblingQ.isLoading ? (
           <div className="flex items-center justify-center gap-2 p-4 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" /> Checking existing versions…
+            <Loader2 className="h-4 w-4 animate-spin" /> NECTAR is reading the file…
           </div>
         ) : (
           <div className="space-y-4">
@@ -188,6 +225,44 @@ export function DocumentEffectiveDatingDialog({
                     No — keep both (different document).
                   </label>
                 </RadioGroup>
+              </div>
+            )}
+
+            {detected && (
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 font-medium">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    NECTAR proposed dates from the file
+                  </div>
+                  <Badge
+                    variant={confidence === "high" ? "default" : confidence === "medium" ? "secondary" : "outline"}
+                    className="text-[10px] uppercase tracking-wide"
+                  >
+                    {confidence} confidence
+                  </Badge>
+                </div>
+                <div className="mt-1 text-sm">
+                  <span className="font-medium">{proposed.from ?? "—"}</span>
+                  {" → "}
+                  <span className="font-medium">
+                    {proposed.mode === "fixed_date" ? (proposed.to ?? "—") : (proposed.mode ?? "—").replace("_", " ")}
+                  </span>
+                </div>
+                {snippet && (
+                  <blockquote className="mt-2 border-l-2 border-primary/40 pl-2 text-xs italic text-muted-foreground">
+                    “{snippet}”
+                  </blockquote>
+                )}
+                {confidence === "low" && (
+                  <div className="mt-2 flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-300">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5" />
+                    Low confidence — please verify against the file before saving.
+                  </div>
+                )}
+                <div className="mt-2 text-xs text-muted-foreground">
+                  Confirm, edit, or override below. Nothing saves until you press Save.
+                </div>
               </div>
             )}
 
@@ -240,8 +315,8 @@ export function DocumentEffectiveDatingDialog({
               You confirm and are responsible for the accuracy of these effective dates. HIVE surfaces
               and prompts — it does not decide dates or keep files current for you.
               {detected
-                ? " (Dates were detected from the uploaded file.)"
-                : " (No dates found in the file — please enter them.)"}
+                ? ` Saving as: ${dateSource === "from_document" ? "accepted NECTAR's read" : "provider-entered (edited)"}.`
+                : " No dates found in the file — please enter them."}
             </p>
           </div>
         )}

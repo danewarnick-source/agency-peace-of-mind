@@ -54,8 +54,10 @@ const modeSchema = z.enum(["fixed_date", "ongoing", "until_replaced"]);
 const dateSourceSchema = z.enum(["from_document", "provider_entered"]);
 
 // ---------------------------------------------------------------------------
-// DETECT (stub). Returns null in pass 1 so the UI always shows the
-// provider-entered prompt. Wire a real AI call here in a later pass.
+// DETECT — real NECTAR extraction via the detect-doc-dates edge function.
+// Provider still owns the final dates: this returns candidates + a source
+// snippet + confidence and never mutates the document. If nothing is
+// confidently found, returns detected:false so the provider-entry path runs.
 // ---------------------------------------------------------------------------
 export const detectEffectiveDates = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -69,12 +71,36 @@ export const detectEffectiveDates = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     await requireOrgMembership(supabase, userId, data.organization_id);
-    // Stub: always defer to provider entry. Real detection later.
-    return {
+    const empty = {
       detected: false as const,
       effective_from: null as string | null,
       effective_to: null as string | null,
+      effective_to_mode: null as string | null,
+      confidence: "low" as "low" | "medium" | "high",
+      source_snippet: null as string | null,
     };
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = supabase as any;
+      const { data: fnRes, error } = await sb.functions.invoke("detect-doc-dates", {
+        body: {
+          kind: data.kind,
+          document_id: data.document_id,
+          organization_id: data.organization_id,
+        },
+      });
+      if (error || !fnRes || fnRes.detected !== true) return empty;
+      return {
+        detected: true as const,
+        effective_from: (fnRes.effective_from as string | null) ?? null,
+        effective_to: (fnRes.effective_to as string | null) ?? null,
+        effective_to_mode: (fnRes.effective_to_mode as string | null) ?? null,
+        confidence: ((fnRes.confidence as string | null) ?? "medium") as "low" | "medium" | "high",
+        source_snippet: (fnRes.source_snippet as string | null) ?? null,
+      };
+    } catch {
+      return empty;
+    }
   });
 
 // ---------------------------------------------------------------------------

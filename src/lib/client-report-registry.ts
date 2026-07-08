@@ -44,6 +44,13 @@ import {
   type ChoreChartReportResult,
   type ShippedChoreChartReport,
 } from "./chore-chart-report";
+import {
+  generateEmployeeFaceSheet,
+  shipEmployeeFaceSheet,
+  type EmployeeFaceSheetArgs,
+  type EmployeeFaceSheetResult,
+  type ShippedEmployeeFaceSheet,
+} from "./employee-face-sheet";
 
 // ── Report type keys ────────────────────────────────────────────────────────
 

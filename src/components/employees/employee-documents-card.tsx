@@ -30,6 +30,8 @@ import {
   deleteEmployeeDocument,
   extractEmployeeDocument,
 } from "@/lib/employee-documents.functions";
+import { DocumentEffectiveDatingDialog } from "@/components/documents/document-effective-dating-dialog";
+import { OutdatedDocumentsSection } from "@/components/documents/outdated-documents-section";
 
 const KINDS: Array<{ value: string; label: string }> = [
   { value: "application", label: "Application" },
@@ -66,6 +68,7 @@ export function EmployeeDocumentsCard({
 
   const [kind, setKind] = useState<string>("application");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dating, setDating] = useState<{ id: string; kind: string; label: string } | null>(null);
 
   const docsQ = useQuery({
     enabled: !!organizationId && !!staffId,
@@ -96,11 +99,12 @@ export function EmployeeDocumentsCard({
         body: file,
       });
       if (!put.ok) throw new Error(`Upload failed (${put.status})`);
-      return signed.employee_document_id;
+      return { id: signed.employee_document_id, kind, label: labelFor(kind) };
     },
-    onSuccess: () => {
-      toast.success("Uploaded — hit ‘Extract with NECTAR' to autofill the profile.");
+    onSuccess: (res) => {
+      toast.success("Uploaded — confirm effective dates.");
       invalidate();
+      setDating({ id: res.id, kind: res.kind, label: res.label });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -217,7 +221,23 @@ export function EmployeeDocumentsCard({
             ))}
           </ul>
         )}
+        <OutdatedDocumentsSection
+          organizationId={organizationId}
+          kind="employee"
+          staffId={staffId}
+        />
       </CardContent>
+      <DocumentEffectiveDatingDialog
+        open={!!dating}
+        onOpenChange={(v) => { if (!v) setDating(null); }}
+        organizationId={organizationId}
+        kind="employee"
+        documentId={dating?.id ?? null}
+        documentType={dating?.kind ?? "other"}
+        documentTypeLabel={dating?.label}
+        staffId={staffId}
+        onDone={invalidate}
+      />
     </Card>
   );
 }

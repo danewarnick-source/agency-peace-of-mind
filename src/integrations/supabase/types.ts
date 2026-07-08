@@ -2749,39 +2749,66 @@ export type Database = {
       client_documents: {
         Row: {
           client_id: string
+          date_source: Database["public"]["Enums"]["doc_date_source"] | null
           document_type: string
+          effective_from: string | null
+          effective_to: string | null
+          effective_to_mode:
+            | Database["public"]["Enums"]["doc_effective_to_mode"]
+            | null
           file_name: string
           file_size_bytes: number | null
           file_url: string
           id: string
           organization_id: string
+          status: Database["public"]["Enums"]["doc_status"]
           storage_path: string | null
+          superseded_at: string | null
+          superseded_by: string | null
           uploaded_at: string
           uploaded_by: string | null
           uploaded_by_name: string | null
         }
         Insert: {
           client_id: string
+          date_source?: Database["public"]["Enums"]["doc_date_source"] | null
           document_type: string
+          effective_from?: string | null
+          effective_to?: string | null
+          effective_to_mode?:
+            | Database["public"]["Enums"]["doc_effective_to_mode"]
+            | null
           file_name: string
           file_size_bytes?: number | null
           file_url: string
           id?: string
           organization_id: string
+          status?: Database["public"]["Enums"]["doc_status"]
           storage_path?: string | null
+          superseded_at?: string | null
+          superseded_by?: string | null
           uploaded_at?: string
           uploaded_by?: string | null
           uploaded_by_name?: string | null
         }
         Update: {
           client_id?: string
+          date_source?: Database["public"]["Enums"]["doc_date_source"] | null
           document_type?: string
+          effective_from?: string | null
+          effective_to?: string | null
+          effective_to_mode?:
+            | Database["public"]["Enums"]["doc_effective_to_mode"]
+            | null
           file_name?: string
           file_size_bytes?: number | null
           file_url?: string
           id?: string
           organization_id?: string
+          status?: Database["public"]["Enums"]["doc_status"]
           storage_path?: string | null
+          superseded_at?: string | null
+          superseded_by?: string | null
           uploaded_at?: string
           uploaded_by?: string | null
           uploaded_by_name?: string | null
@@ -2792,6 +2819,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_documents_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "client_documents"
             referencedColumns: ["id"]
           },
         ]
@@ -5583,6 +5617,12 @@ export type Database = {
       employee_documents: {
         Row: {
           created_at: string
+          date_source: Database["public"]["Enums"]["doc_date_source"] | null
+          effective_from: string | null
+          effective_to: string | null
+          effective_to_mode:
+            | Database["public"]["Enums"]["doc_effective_to_mode"]
+            | null
           file_name: string | null
           file_path: string
           id: string
@@ -5595,6 +5635,9 @@ export type Database = {
           organization_id: string
           size_bytes: number | null
           staff_id: string
+          status: Database["public"]["Enums"]["doc_status"]
+          superseded_at: string | null
+          superseded_by: string | null
           title: string | null
           updated_at: string
           uploaded_at: string
@@ -5602,6 +5645,12 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          date_source?: Database["public"]["Enums"]["doc_date_source"] | null
+          effective_from?: string | null
+          effective_to?: string | null
+          effective_to_mode?:
+            | Database["public"]["Enums"]["doc_effective_to_mode"]
+            | null
           file_name?: string | null
           file_path: string
           id?: string
@@ -5614,6 +5663,9 @@ export type Database = {
           organization_id: string
           size_bytes?: number | null
           staff_id: string
+          status?: Database["public"]["Enums"]["doc_status"]
+          superseded_at?: string | null
+          superseded_by?: string | null
           title?: string | null
           updated_at?: string
           uploaded_at?: string
@@ -5621,6 +5673,12 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          date_source?: Database["public"]["Enums"]["doc_date_source"] | null
+          effective_from?: string | null
+          effective_to?: string | null
+          effective_to_mode?:
+            | Database["public"]["Enums"]["doc_effective_to_mode"]
+            | null
           file_name?: string | null
           file_path?: string
           id?: string
@@ -5633,6 +5691,9 @@ export type Database = {
           organization_id?: string
           size_bytes?: number | null
           staff_id?: string
+          status?: Database["public"]["Enums"]["doc_status"]
+          superseded_at?: string | null
+          superseded_by?: string | null
           title?: string | null
           updated_at?: string
           uploaded_at?: string
@@ -5644,6 +5705,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_documents_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "employee_documents"
             referencedColumns: ["id"]
           },
         ]
@@ -11038,9 +11106,15 @@ export type Database = {
           category: string | null
           client_id: string | null
           created_at: string
+          date_source: Database["public"]["Enums"]["doc_date_source"] | null
           document_type: string
           effective_end: string | null
+          effective_from: string | null
           effective_start: string | null
+          effective_to: string | null
+          effective_to_mode:
+            | Database["public"]["Enums"]["doc_effective_to_mode"]
+            | null
           external_ids: Json
           file_name: string
           file_size_bytes: number | null
@@ -11061,8 +11135,11 @@ export type Database = {
           raw_text: string | null
           source: string | null
           staff_id: string | null
+          status: Database["public"]["Enums"]["doc_status"]
           storage_bucket: string
           storage_path: string
+          superseded_at: string | null
+          superseded_by: string | null
           tags: string[]
           title: string
           updated_at: string
@@ -11076,9 +11153,15 @@ export type Database = {
           category?: string | null
           client_id?: string | null
           created_at?: string
+          date_source?: Database["public"]["Enums"]["doc_date_source"] | null
           document_type: string
           effective_end?: string | null
+          effective_from?: string | null
           effective_start?: string | null
+          effective_to?: string | null
+          effective_to_mode?:
+            | Database["public"]["Enums"]["doc_effective_to_mode"]
+            | null
           external_ids?: Json
           file_name: string
           file_size_bytes?: number | null
@@ -11099,8 +11182,11 @@ export type Database = {
           raw_text?: string | null
           source?: string | null
           staff_id?: string | null
+          status?: Database["public"]["Enums"]["doc_status"]
           storage_bucket?: string
           storage_path: string
+          superseded_at?: string | null
+          superseded_by?: string | null
           tags?: string[]
           title: string
           updated_at?: string
@@ -11114,9 +11200,15 @@ export type Database = {
           category?: string | null
           client_id?: string | null
           created_at?: string
+          date_source?: Database["public"]["Enums"]["doc_date_source"] | null
           document_type?: string
           effective_end?: string | null
+          effective_from?: string | null
           effective_start?: string | null
+          effective_to?: string | null
+          effective_to_mode?:
+            | Database["public"]["Enums"]["doc_effective_to_mode"]
+            | null
           external_ids?: Json
           file_name?: string
           file_size_bytes?: number | null
@@ -11137,8 +11229,11 @@ export type Database = {
           raw_text?: string | null
           source?: string | null
           staff_id?: string | null
+          status?: Database["public"]["Enums"]["doc_status"]
           storage_bucket?: string
           storage_path?: string
+          superseded_at?: string | null
+          superseded_by?: string | null
           tags?: string[]
           title?: string
           updated_at?: string
@@ -11157,6 +11252,13 @@ export type Database = {
           {
             foreignKeyName: "nectar_documents_parent_document_id_fkey"
             columns: ["parent_document_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nectar_documents_superseded_by_fkey"
+            columns: ["superseded_by"]
             isOneToOne: false
             referencedRelation: "nectar_documents"
             referencedColumns: ["id"]
@@ -17566,6 +17668,9 @@ export type Database = {
       bc_doc_type: "FBA" | "BSP"
       bc_flag_type: "credential_mismatch" | "deadline_overdue" | "coverage_gap"
       bc_review_note_type: "monthly_review" | "note"
+      doc_date_source: "from_document" | "provider_entered"
+      doc_effective_to_mode: "fixed_date" | "ongoing" | "until_replaced"
+      doc_status: "current" | "outdated"
       external_cert_status: "pending" | "approved" | "rejected" | "expired"
       functionality_report_source: "self_report" | "auto_detect"
       functionality_report_status: "open" | "triaged" | "resolved" | "dismissed"
@@ -17773,6 +17878,9 @@ export const Constants = {
       bc_doc_type: ["FBA", "BSP"],
       bc_flag_type: ["credential_mismatch", "deadline_overdue", "coverage_gap"],
       bc_review_note_type: ["monthly_review", "note"],
+      doc_date_source: ["from_document", "provider_entered"],
+      doc_effective_to_mode: ["fixed_date", "ongoing", "until_replaced"],
+      doc_status: ["current", "outdated"],
       external_cert_status: ["pending", "approved", "rejected", "expired"],
       functionality_report_source: ["self_report", "auto_detect"],
       functionality_report_status: ["open", "triaged", "resolved", "dismissed"],

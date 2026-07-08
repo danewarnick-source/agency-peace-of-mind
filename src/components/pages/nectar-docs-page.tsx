@@ -45,6 +45,8 @@ import {
   reviewExtractedField,
   deleteDocument,
 } from "@/lib/nectar-documents.functions";
+import { DocumentEffectiveDatingDialog } from "@/components/documents/document-effective-dating-dialog";
+import { OutdatedDocumentsSection } from "@/components/documents/outdated-documents-section";
 
 
 const DOC_TYPES = [
@@ -100,6 +102,7 @@ export function NectarDocsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [offerDocId, setOfferDocId] = useState<string | null>(null);
+  const [dating, setDating] = useState<{ id: string; documentType: string } | null>(null);
 
   const queryFn = useServerFn(queryDocuments);
   const qc = useQueryClient();
@@ -211,15 +214,28 @@ export function NectarDocsPage() {
           orgId={orgId}
           open={uploadOpen}
           onOpenChange={setUploadOpen}
-          onUploaded={(docId) => {
+          onUploaded={(docId, docType) => {
             qc.invalidateQueries({ queryKey: ["nectar-docs"] });
+            qc.invalidateQueries({ queryKey: ["outdated-docs"] });
             if (docId) setOfferDocId(docId);
+            if (docId && docType) setDating({ id: docId, documentType: docType });
           }}
         />
         <NectarDocumentActionsDialog
           documentId={offerDocId}
           open={!!offerDocId}
           onOpenChange={(v) => { if (!v) setOfferDocId(null); }}
+        />
+        <DocumentEffectiveDatingDialog
+          open={!!dating}
+          onOpenChange={(v) => { if (!v) setDating(null); }}
+          organizationId={orgId}
+          kind="nectar"
+          documentId={dating?.id ?? null}
+          documentType={dating?.documentType ?? "other"}
+          documentTypeLabel={DOC_TYPES.find((t) => t.value === dating?.documentType)?.label}
+          clientId={clientFilter !== "all" ? clientFilter : null}
+          onDone={() => qc.invalidateQueries({ queryKey: ["outdated-docs"] })}
         />
       </div>
 
@@ -261,6 +277,13 @@ export function NectarDocsPage() {
           </button>
         ))}
       </div>
+
+      <OutdatedDocumentsSection
+        organizationId={orgId}
+        kind="nectar"
+        title="Outdated Company Docs"
+      />
+
 
       {selectedId && (
         <DocumentDetailDialog
@@ -305,7 +328,7 @@ function UploadButton({
   orgId: string | undefined;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onUploaded: (docId?: string) => void;
+  onUploaded: (docId?: string, docType?: string) => void;
 }) {
   const ingest = useServerFn(ingestDocument);
   const [title, setTitle] = useState("");
@@ -339,10 +362,11 @@ function UploadButton({
       toast.success(
         `Uploaded — NECTAR extracted ${res.extracted?.length ?? 0} field(s)`,
       );
+      const chosenType = docType;
       setTitle(""); setFile(null); setFiscalYear(""); setMedicaidId("");
       onOpenChange(false);
       const docId = (res as { document?: { id?: string } }).document?.id;
-      onUploaded(docId);
+      onUploaded(docId, chosenType);
     },
     onError: (e: Error) => toast.error(e.message),
   });

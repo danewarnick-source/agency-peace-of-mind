@@ -289,17 +289,40 @@ function StaffProfilePage() {
           />
           <div>
             <h1 className="text-xl font-semibold leading-tight">{name}</h1>
-            {positions.length > 0 ? (
-              <p className="text-sm font-normal text-muted-foreground">
-                {positions.join(", ")}
+            {/* Tier 2: derived org title from selected staff types (job title). */}
+            {orgTitle ? (
+              <p className="text-sm font-medium text-foreground/80">{orgTitle}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                No staff type selected
               </p>
-            ) : null}
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <Badge variant="secondary" className="uppercase">{m.role}</Badge>
-              <span>{m.active ? "Active" : "Deactivated"}</span>
-              {p?.hire_date && <span>· Hired {p.hire_date}</span>}
+            )}
+            {/* Tier 3: HIVE system status — platform access level, not job title. */}
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+              <Badge
+                variant="outline"
+                className="border-primary/30 bg-primary/5 uppercase tracking-wide text-primary"
+                title="HIVE platform role"
+              >
+                {m.role}
+              </Badge>
+              <Badge
+                variant="outline"
+                className={
+                  m.active
+                    ? "border-emerald-300 bg-emerald-50 uppercase tracking-wide text-emerald-700"
+                    : "border-muted-foreground/30 bg-muted uppercase tracking-wide text-muted-foreground"
+                }
+                title="HIVE account status"
+              >
+                {m.active ? "Active" : "Deactivated"}
+              </Badge>
+              {p?.hire_date && (
+                <span className="text-muted-foreground">· Hired {p.hire_date}</span>
+              )}
             </div>
           </div>
+
         </div>
         <Button variant="outline" onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/hub/employees" })}>
           Back to list (quick edit)

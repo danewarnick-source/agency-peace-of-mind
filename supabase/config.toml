@@ -29,3 +29,6 @@ verify_jwt = true
 
 [functions.estimate-meal-nutrition]
 verify_jwt = true
+
+[functions.detect-doc-dates]
+verify_jwt = true

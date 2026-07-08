@@ -207,21 +207,25 @@ export const logMedicationPass = createServerFn({ method: "POST" })
     if (existingLog) throw new Error("This dose has already been documented.");
 
 
+    // Treat 'self_administered' and 'given' as terminal-taken statuses.
+    const wasTaken = data.status === "self_administered" || data.status === "given";
     const insertPayload = {
       organization_id: orgId,
       client_id: data.clientId,
       medication_id: data.medicationId,
       scheduled_for: data.scheduledFor,
       scheduled_time_label: data.scheduledTimeLabel ?? null,
-      administered_at: data.status === "self_administered" ? data.actualTakenAt : null,
-      actual_taken_at: data.status === "self_administered" ? data.actualTakenAt : null,
+      administered_at: wasTaken ? data.actualTakenAt : null,
+      actual_taken_at: wasTaken ? data.actualTakenAt : null,
       status: data.status,
+      administrator_role: role,
+      credential_id: data.credentialId ?? null,
       route: data.route ?? null,
-      exception_reason: data.status === "self_administered" ? null : (data.exceptionReason ?? null),
+      exception_reason: wasTaken ? null : (data.exceptionReason ?? null),
       notes: data.notes ?? null,
       staff_id: userId,
       staff_name: fullName,
-      signature_attestation: `${fullName} @ ${new Date().toISOString()} — ${attestation}`,
+      signature_attestation: `${fullName} @ ${new Date().toISOString()} — [${attnLevel}] ${attestation}`,
       signature_data_url: data.signatureDataUrl,
       attestation_signed: true,
       is_prn: m.is_prn,

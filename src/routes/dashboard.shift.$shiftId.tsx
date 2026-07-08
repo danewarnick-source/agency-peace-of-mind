@@ -441,34 +441,56 @@ function MarPanel({ shift, userId }: { shift: Shift; userId?: string }) {
       return (data ?? []) as any[];
     },
   });
+  // Unified read: any administration for this client that either was recorded
+  // from this shift (source='shift', scheduled_shift_id=shift.id) OR was
+  // recorded in the eMAR during the shift window. One record, both surfaces.
   const { data: entries } = useQuery({
-    queryKey: ["mar-entries", shift.id],
+    queryKey: ["mar-entries-unified", shift.id, shift.client_id],
     queryFn: async () => {
-      const { data } = await supabase.from("shift_mar_entries" as any).select("*").eq("scheduled_shift_id", shift.id);
+      const { data } = await supabase
+        .from("emar_logs")
+        .select("id, medication_id, scheduled_for, scheduled_time_label, status, administered_at, source, scheduled_shift_id, notes, staff_name")
+        .eq("client_id", shift.client_id)
+        .or(`scheduled_shift_id.eq.${shift.id},and(administered_at.gte.${shift.starts_at},administered_at.lte.${shift.ends_at})`);
       return (data ?? []) as any[];
     },
   });
 
+  // Map the shift-screen's simple statuses to the unified emar_logs status set.
+  //   given   → administered
+  //   refused → refused
+  //   missed  → missed
+  //   held    → held
   const record = useMutation({
     mutationFn: async (p: { med: any; status: "given" | "refused" | "missed" | "held"; scheduled_time?: string; notes?: string }) => {
-      const { error } = await (supabase as any).from("shift_mar_entries").insert({
+      const statusMap = { given: "administered", refused: "refused", missed: "missed", held: "held" } as const;
+      const now = new Date().toISOString();
+      const { error } = await (supabase as any).from("emar_logs").insert({
         organization_id: shift.organization_id,
-        scheduled_shift_id: shift.id,
-        client_medication_id: p.med.id,
         client_id: shift.client_id,
+        medication_id: p.med.id,
+        source: "shift",
+        scheduled_shift_id: shift.id,
+        // scheduled_for is NOT NULL — fall back to the shift start when the row
+        // is a PRN / unscheduled pass. Keep the raw HH:MM label for display.
+        scheduled_for: shift.starts_at,
+        scheduled_time_label: p.scheduled_time ?? null,
+        status: statusMap[p.status],
+        administered_at: p.status === "given" ? now : null,
         staff_id: userId,
-        scheduled_time: p.scheduled_time ?? null,
-        status: p.status,
         notes: p.notes ?? null,
       });
       if (error) throw error;
     },
-    onSuccess: (_d, vars) => { toast.success(`Marked ${vars.status}`); qc.invalidateQueries({ queryKey: ["mar-entries", shift.id] }); },
+    onSuccess: (_d, vars) => {
+      toast.success(`Marked ${vars.status}`);
+      qc.invalidateQueries({ queryKey: ["mar-entries-unified", shift.id, shift.client_id] });
+    },
     onError: (e: any) => toast.error(e.message ?? "Record failed"),
   });
 
   const entryFor = (medId: string, time?: string) =>
-    (entries ?? []).find((e) => e.client_medication_id === medId && (time ? e.scheduled_time === time : true));
+    (entries ?? []).find((e) => e.medication_id === medId && (time ? e.scheduled_time_label === time : true));
 
   return (
     <section className="rounded-xl border border-border bg-card p-4">
@@ -492,15 +514,20 @@ function MarPanel({ shift, userId }: { shift: Shift; userId?: string }) {
                 <div className="mt-2 space-y-1">
                   {times.map((t: string) => {
                     const e = entryFor(m.id, m.is_prn ? undefined : t);
+                    const stampAt = e?.administered_at ?? e?.scheduled_for;
                     return (
                       <div key={t} className="flex items-center gap-2">
                         <span className="text-[11px] font-mono w-12 shrink-0 text-muted-foreground">{t}</span>
                         {e ? (
                           <Badge className={
-                            e.status === "given" ? "bg-emerald-600 text-white" :
+                            e.status === "administered" || e.status === "self_administered" ? "bg-emerald-600 text-white" :
                             e.status === "refused" ? "bg-amber-600 text-white" :
-                            e.status === "missed" ? "bg-rose-600 text-white" : "bg-muted"
-                          }>{e.status} · {new Date(e.administered_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</Badge>
+                            e.status === "missed" || e.status === "omitted" ? "bg-rose-600 text-white" : "bg-muted"
+                          }>
+                            {e.status}
+                            {stampAt ? ` · ${new Date(stampAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}
+                            {e.source === "emar" ? " · eMAR" : ""}
+                          </Badge>
                         ) : (
                           <div className="flex gap-1">
                             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => record.mutate({ med: m, status: "given", scheduled_time: m.is_prn ? undefined : t })}>Given</Button>
@@ -520,6 +547,7 @@ function MarPanel({ shift, userId }: { shift: Shift; userId?: string }) {
     </section>
   );
 }
+
 
 function CalloutPanel({ shift, userId }: { shift: Shift; userId?: string }) {
   const qc = useQueryClient();

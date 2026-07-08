@@ -129,6 +129,21 @@ export interface ChecklistRow {
   applies_to_staff_types: string[] | "all";
   applies_to_confirmed_at: string | null;
 }
+function baselinePhaseFor(key: string): string | null {
+  switch (key) {
+    case "thirty_day":
+    case "cpr_first_aid":
+    case "deescalation":
+      return "within_30_days";
+    case "abi":
+      return "within_180_days";
+    case "annual_12h":
+      return "annual";
+    default:
+      return null;
+  }
+}
+
 
 
 

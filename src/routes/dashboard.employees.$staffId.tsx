@@ -478,6 +478,22 @@ function StaffProfilePage() {
           </SectionGroup>
         </TabsContent>
 
+        {/* ----- COMPLIANCE CHECKLIST (full per-staff HR checklist) ----- */}
+        <TabsContent value="checklist" className="mt-4 space-y-10">
+          <SectionGroup label="HR Compliance Checklist" hint="Full per-staff requirements — evidence, sign-off, attestation, training hours">
+            <SectionPanel icon={ClipboardList} accent="emerald">
+              <StaffHrChecklistCard
+                organizationId={orgId}
+                staffId={staffId}
+                view="checklist"
+                filter="all"
+              />
+            </SectionPanel>
+          </SectionGroup>
+        </TabsContent>
+
+
+
         {/* ----- ACTIVITY ----- */}
         <TabsContent value="activity" className="mt-4 space-y-10">
           <SectionGroup label="Activity" hint="Shifts, notes & recent actions">

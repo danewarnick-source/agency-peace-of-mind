@@ -253,6 +253,23 @@ function StaffProfilePage() {
     return list.length ? list : fallback;
   })();
 
+  // Derive the org-title tier from the employee's selected staff types.
+  // Composition rules:
+  //   • Primary = first key in profiles.staff_type_keys (provider-ordered).
+  //   • 1–3 types → labels joined with " / " (primary first).
+  //   • 4+ types → "<primary label> and N more" to keep the header scannable.
+  const orgTitle = (() => {
+    const keys = ((p?.staff_type_keys as string[] | null) ?? []).filter(Boolean);
+    if (keys.length === 0) return null;
+    const byKey = new Map(
+      (staffTypesCatalogQ.data ?? []).map((t) => [t.key, t.label]),
+    );
+    const labels = keys.map((k) => byKey.get(k) ?? k);
+    if (labels.length <= 3) return labels.join(" / ");
+    return `${labels[0]} and ${labels.length - 1} more`;
+  })();
+
+
   const invalidateProfile = () => {
     qc.invalidateQueries({ queryKey: ["staff-profile", orgId, staffId] });
   };

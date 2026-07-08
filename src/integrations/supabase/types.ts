@@ -10716,6 +10716,78 @@ export type Database = {
           },
         ]
       }
+      medication_change_proposals: {
+        Row: {
+          applied_medication_id: string | null
+          change_type: string
+          client_id: string
+          created_at: string
+          id: string
+          medication_id: string | null
+          organization_id: string
+          proposed_at: string
+          proposed_by: string
+          proposed_payload: Json
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          applied_medication_id?: string | null
+          change_type: string
+          client_id: string
+          created_at?: string
+          id?: string
+          medication_id?: string | null
+          organization_id: string
+          proposed_at?: string
+          proposed_by?: string
+          proposed_payload?: Json
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          applied_medication_id?: string | null
+          change_type?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          medication_id?: string | null
+          organization_id?: string
+          proposed_at?: string
+          proposed_by?: string
+          proposed_payload?: Json
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medication_change_proposals_applied_medication_id_fkey"
+            columns: ["applied_medication_id"]
+            isOneToOne: false
+            referencedRelation: "client_medications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medication_change_proposals_medication_id_fkey"
+            columns: ["medication_id"]
+            isOneToOne: false
+            referencedRelation: "client_medications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       medication_transfers: {
         Row: {
           client_id: string
@@ -17313,6 +17385,10 @@ export type Database = {
     }
     Functions: {
       accept_invitation: { Args: { _token: string }; Returns: string }
+      apply_med_change_proposal: {
+        Args: { _proposal_id: string }
+        Returns: string
+      }
       archive_eligible_referrals: {
         Args: { _organization_id: string }
         Returns: number
@@ -17766,6 +17842,10 @@ export type Database = {
       rebuild_wipe_requirements_tns_fake:
         | { Args: never; Returns: number }
         | { Args: { p_keep_pending?: boolean }; Returns: number }
+      reject_med_change_proposal: {
+        Args: { _notes: string; _proposal_id: string }
+        Returns: undefined
+      }
       restore_my_admin_role: { Args: never; Returns: undefined }
       seed_standard_service_codes: {
         Args: { _org: string }

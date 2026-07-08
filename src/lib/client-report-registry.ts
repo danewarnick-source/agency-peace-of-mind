@@ -105,8 +105,8 @@ export interface CommonReportOutput {
   spaceId: string | null;
   spaceName: string | null;
   /** Employee-scoped reports (Employee Face Sheet) carry the staff identity here. */
-  staffId: string | null;
-  staffName: string | null;
+  staffId?: string | null;
+  staffName?: string | null;
   /** Client IDs the report is / would be attached to on ship.
    *  - client_budget / meal_plan_menu / meal_plan_vs_actual: [clientId]
    *  - chore_chart: linked space clients

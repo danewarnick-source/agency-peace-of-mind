@@ -1160,8 +1160,10 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
         applies_to_staff_types:
           applies_to === null || applies_to === undefined ? "all" : applies_to,
         applies_to_confirmed_at,
+        phase: typeof meta.phase === "string" ? (meta.phase as string) : null,
       };
     });
+
     const reqById = new Map(requirements.map((r) => [r.requirement_id, r]));
 
     // Teams + managers

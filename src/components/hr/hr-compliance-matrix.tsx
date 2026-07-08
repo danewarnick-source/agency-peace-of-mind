@@ -125,7 +125,9 @@ export function HrComplianceMatrix({
     );
   }
 
-  const reqs = data.requirements;
+  const reqs = useMemo(() => sortByPhase(data.requirements), [data.requirements]);
+  const phaseGroups = useMemo(() => groupByPhase(reqs), [reqs]);
+
 
   const viewEvidence = async (docId: string) => {
     try {
@@ -169,9 +171,23 @@ export function HrComplianceMatrix({
             <table className="min-w-full border-separate border-spacing-0 text-xs">
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-20 bg-background border-b border-r border-border px-3 py-2 text-left font-medium min-w-[180px]">
+                  <th
+                    rowSpan={2}
+                    className="sticky left-0 z-20 bg-background border-b border-r border-border px-3 py-2 text-left font-medium min-w-[180px] align-bottom"
+                  >
                     Staff
                   </th>
+                  {phaseGroups.map((g) => (
+                    <th
+                      key={`phase-${g.phase ?? "unphased"}`}
+                      colSpan={g.reqs.length}
+                      className="border-b border-l border-border bg-muted/40 px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                    >
+                      {PHASE_LABEL[g.phase ?? "unphased"] ?? "Other"}
+                    </th>
+                  ))}
+                </tr>
+                <tr>
                   {reqs.map((r) => {
                     const isCum = r.requirement_type === "cumulative_hours";
                     return (
@@ -187,6 +203,7 @@ export function HrComplianceMatrix({
                   })}
                 </tr>
               </thead>
+
               <tbody>
                 {bands.map((band) => {
                   const summary = computeBandSummary(
@@ -556,3 +573,57 @@ function LegendDot({ color, label }: { color: string; label: string }) {
     </span>
   );
 }
+
+// ---------- Phase grouping ------------------------------------------------
+
+const PHASE_ORDER = [
+  "upon_hire",
+  "within_30_days",
+  "within_90_days",
+  "within_180_days",
+  "annual",
+  "evaluation",
+  "unphased",
+] as const;
+
+const PHASE_LABEL: Record<string, string> = {
+  upon_hire: "Upon Hire",
+  within_30_days: "Within 30 Days",
+  within_90_days: "Within 90 Days",
+  within_180_days: "Within 180 Days",
+  annual: "Annual",
+  evaluation: "Evaluations",
+  unphased: "Other",
+};
+
+function phaseRank(phase: string | null): number {
+  const key = phase ?? "unphased";
+  const i = PHASE_ORDER.indexOf(key as (typeof PHASE_ORDER)[number]);
+  return i === -1 ? PHASE_ORDER.length : i;
+}
+
+function sortByPhase(reqs: HrMatrix["requirements"]): HrMatrix["requirements"] {
+  return [...reqs].sort((a, b) => {
+    const pa = phaseRank(a.phase);
+    const pb = phaseRank(b.phase);
+    if (pa !== pb) return pa - pb;
+    return a.title.localeCompare(b.title);
+  });
+}
+
+function groupByPhase(
+  reqs: HrMatrix["requirements"],
+): Array<{ phase: string | null; reqs: HrMatrix["requirements"] }> {
+  const groups: Array<{ phase: string | null; reqs: HrMatrix["requirements"] }> = [];
+  for (const r of reqs) {
+    const key = r.phase ?? null;
+    const last = groups[groups.length - 1];
+    if (last && last.phase === key) {
+      last.reqs.push(r);
+    } else {
+      groups.push({ phase: key, reqs: [r] });
+    }
+  }
+  return groups;
+}
+

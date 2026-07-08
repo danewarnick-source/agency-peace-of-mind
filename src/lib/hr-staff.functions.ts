@@ -1038,7 +1038,9 @@ export interface HrMatrixRequirement {
   cumulative_config: CumulativeRequirementConfig | null;
   applies_to_staff_types: string[] | "all";
   applies_to_confirmed_at: string | null;
+  phase: string | null;
 }
+
 
 export interface HrMatrixCell {
   status: string; // not_started | in_progress | complete | expired | waived
@@ -1158,8 +1160,10 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
         applies_to_staff_types:
           applies_to === null || applies_to === undefined ? "all" : applies_to,
         applies_to_confirmed_at,
+        phase: typeof meta.phase === "string" ? (meta.phase as string) : null,
       };
     });
+
     const reqById = new Map(requirements.map((r) => [r.requirement_id, r]));
 
     // Teams + managers

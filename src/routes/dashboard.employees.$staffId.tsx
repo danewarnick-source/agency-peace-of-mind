@@ -52,6 +52,7 @@ import {
 import { StaffPhotoCard } from "@/components/staff/staff-photo-card";
 import { PersonAvatar } from "@/components/person/person-avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SectionPanel, SectionGroup } from "@/components/clients/section-panel";
 
 import { RequirePermission } from "@/components/rbac-guard";
 import { StaffTypeEditor } from "@/components/hr/staff-type-editor";

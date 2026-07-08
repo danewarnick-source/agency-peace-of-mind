@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,9 +16,10 @@ import {
   Table, TableBody, TableCell, TableHead,
   TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Pill, Plus, Upload, X, Loader2, Sparkles, Pencil, AlertTriangle } from "lucide-react";
+import { Pill, Plus, Upload, X, Loader2, Sparkles, Pencil, AlertTriangle, ClipboardCheck, Check, ShieldAlert, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { parseMedicationsAI } from "@/lib/medications.functions";
+import { useCurrentOrg } from "@/hooks/use-org";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -106,14 +107,56 @@ function medToForm(m: Medication): FormVals {
   };
 }
 
+// Serialize a form into the proposal payload (matches columns the RPC reads).
+function formToPayload(v: FormVals): Record<string, unknown> {
+  return {
+    medication_name: v.medication_name.trim(),
+    dosage: v.dosage.trim(),
+    frequency: v.frequency.trim(),
+    route: v.route.trim(),
+    scheduled_times: v.scheduled_times,
+    instructions: v.instructions.trim(),
+    prescriber: v.prescriber.trim(),
+    purpose: v.purpose.trim(),
+    adverse_effects: v.adverse_effects.trim(),
+    choking_risk: v.choking_risk,
+    choking_risk_details: v.choking_risk_details.trim(),
+    is_controlled: v.is_controlled,
+    is_prn: v.is_prn,
+    prn_instructions: v.prn_instructions.trim(),
+    pharmacy: v.pharmacy.trim(),
+    rx_number: v.rx_number.trim(),
+    packaging: v.packaging.trim(),
+    side_effects: v.side_effects.trim(),
+    contributes_to_swallowing_difficulty: v.contributes_to_swallowing_difficulty,
+  };
+}
+
+type ProposalRow = {
+  id: string;
+  medication_id: string | null;
+  change_type: "add" | "edit" | "discontinue";
+  proposed_payload: Record<string, any>;
+  status: "pending" | "approved" | "rejected";
+  source: "manual" | "appointment_upload";
+  proposed_by: string;
+  proposed_at: string;
+};
+
 
 // ─── Main component ────────────────────────────────────────────────────────────
+
 
 export function MedicationsManager({
   clientId, organizationId,
 }: { clientId: string; organizationId?: string }) {
   const qc = useQueryClient();
   const parseAI = useServerFn(parseMedicationsAI);
+  const { data: org } = useCurrentOrg();
+  const role = org?.role ?? null;
+  const canApprove = role === "admin" || role === "super_admin";
+  const canPropose = role === "manager";
+  const readOnly = !canApprove && !canPropose;
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
@@ -136,7 +179,50 @@ export function MedicationsManager({
     },
   });
 
+  // Pending proposals (visible to all org members so they know a change is proposed)
+  const { data: proposals } = useQuery({
+    queryKey: ["med-proposals", clientId],
+    queryFn: async (): Promise<ProposalRow[]> => {
+      const { data, error } = await (supabase as any)
+        .from("medication_change_proposals")
+        .select("id, medication_id, change_type, proposed_payload, status, source, proposed_by, proposed_at")
+        .eq("client_id", clientId)
+        .eq("status", "pending")
+        .order("proposed_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as ProposalRow[];
+    },
+  });
+  const pendingCount = proposals?.length ?? 0;
 
+  // Fetch proposer display names for the approval panel
+  const proposerIds = useMemo(
+    () => Array.from(new Set((proposals ?? []).map((p) => p.proposed_by).filter(Boolean))),
+    [proposals],
+  );
+  const { data: proposerNames } = useQuery({
+    enabled: canApprove && proposerIds.length > 0,
+    queryKey: ["med-proposal-proposers", proposerIds],
+    queryFn: async (): Promise<Record<string, string>> => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, email")
+        .in("id", proposerIds);
+      const map: Record<string, string> = {};
+      (data ?? []).forEach((p: any) => {
+        map[p.id] = [p.first_name, p.last_name].filter(Boolean).join(" ") || p.email || "Unknown";
+      });
+      return map;
+    },
+  });
+
+  const invalidateMedRelated = () => {
+    qc.invalidateQueries({ queryKey: ["client-medications", clientId] });
+    qc.invalidateQueries({ queryKey: ["med-proposals", clientId] });
+    qc.invalidateQueries({ queryKey: ["mar-meds", clientId] });
+  };
+
+  // Direct writes — admin only. Managers/hosts route through proposals below.
   const insertMut = useMutation({
     mutationFn: async (v: FormVals) => {
       if (!organizationId) throw new Error("Missing organization");
@@ -163,13 +249,11 @@ export function MedicationsManager({
         side_effects:        v.side_effects.trim() || null,
         contributes_to_swallowing_difficulty: v.contributes_to_swallowing_difficulty,
       });
-
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Medication added.");
-      qc.invalidateQueries({ queryKey: ["client-medications", clientId] });
-      qc.invalidateQueries({ queryKey: ["mar-meds", clientId] });
+      invalidateMedRelated();
       setAddOpen(false);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -198,13 +282,11 @@ export function MedicationsManager({
         side_effects:        v.side_effects.trim() || null,
         contributes_to_swallowing_difficulty: v.contributes_to_swallowing_difficulty,
       }).eq("id", id);
-
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Medication updated.");
-      qc.invalidateQueries({ queryKey: ["client-medications", clientId] });
-      qc.invalidateQueries({ queryKey: ["mar-meds", clientId] });
+      invalidateMedRelated();
       setEditMed(null);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -219,8 +301,35 @@ export function MedicationsManager({
     },
     onSuccess: () => {
       toast.success("Medication discontinued. Record preserved.");
-      qc.invalidateQueries({ queryKey: ["client-medications", clientId] });
-      qc.invalidateQueries({ queryKey: ["mar-meds", clientId] });
+      invalidateMedRelated();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Proposal-writing mutations — managers/hosts submit these; nothing goes live.
+  const proposeMut = useMutation({
+    mutationFn: async (args: {
+      change_type: "add" | "edit" | "discontinue";
+      medication_id?: string | null;
+      payload: Record<string, unknown>;
+      source?: "manual" | "appointment_upload";
+    }) => {
+      if (!organizationId) throw new Error("Missing organization");
+      const { error } = await (supabase as any).from("medication_change_proposals").insert({
+        organization_id: organizationId,
+        client_id: clientId,
+        medication_id: args.medication_id ?? null,
+        change_type: args.change_type,
+        proposed_payload: args.payload,
+        source: args.source ?? "manual",
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Change proposed. Awaiting admin approval.");
+      invalidateMedRelated();
+      setAddOpen(false);
+      setEditMed(null);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -228,29 +337,68 @@ export function MedicationsManager({
   const bulkInsertMut = useMutation({
     mutationFn: async (rows: FormVals[]) => {
       if (!organizationId) throw new Error("Missing organization");
+      if (canApprove) {
+        const payload = rows.map((r) => ({
+          organization_id: organizationId,
+          client_id: clientId,
+          medication_name: r.medication_name,
+          dosage: r.dosage || null,
+          frequency: r.frequency || null,
+          route: r.route || null,
+          scheduled_times: r.scheduled_times,
+          instructions: r.instructions || null,
+          prescriber: r.prescriber || null,
+          purpose: null, adverse_effects: null, choking_risk: false,
+          is_controlled: false, is_prn: false,
+        }));
+        const { error } = await (supabase as any).from("client_medications").insert(payload);
+        if (error) throw error;
+        return { proposed: false as const, count: rows.length };
+      }
+      // Manager / host uploads → create pending proposals, one per parsed med.
       const payload = rows.map((r) => ({
         organization_id: organizationId,
         client_id: clientId,
-        medication_name: r.medication_name,
-        dosage: r.dosage || null,
-        frequency: r.frequency || null,
-        route: r.route || null,
-        scheduled_times: r.scheduled_times,
-        instructions: r.instructions || null,
-        prescriber: r.prescriber || null,
-        purpose: null, adverse_effects: null, choking_risk: false,
-        is_controlled: false, is_prn: false,
+        change_type: "add" as const,
+        source: "appointment_upload" as const,
+        proposed_payload: formToPayload(r),
       }));
-      const { error } = await (supabase as any).from("client_medications").insert(payload);
+      const { error } = await (supabase as any).from("medication_change_proposals").insert(payload);
       if (error) throw error;
+      return { proposed: true as const, count: rows.length };
     },
-    onSuccess: (_d, rows) => {
-      toast.success(`Imported ${rows.length} medication${rows.length === 1 ? "" : "s"}.`);
-      qc.invalidateQueries({ queryKey: ["client-medications", clientId] });
+    onSuccess: (res) => {
+      if (res.proposed) {
+        toast.success(`${res.count} proposed medication${res.count === 1 ? "" : "s"} awaiting admin approval.`);
+      } else {
+        toast.success(`Imported ${res.count} medication${res.count === 1 ? "" : "s"}.`);
+      }
+      invalidateMedRelated();
       setImportOpen(false);
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const approveMut = useMutation({
+    mutationFn: async (proposalId: string) => {
+      const { error } = await (supabase as any).rpc("apply_med_change_proposal", { _proposal_id: proposalId });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Proposal approved and applied."); invalidateMedRelated(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const rejectMut = useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes: string }) => {
+      const { error } = await (supabase as any).rpc("reject_med_change_proposal", {
+        _proposal_id: id, _notes: notes || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Proposal rejected."); invalidateMedRelated(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
 
   const visible = (meds ?? []).filter((m) => showInactive || m.is_active);
   const hasChokingRisk = visible.some((m) => m.choking_risk);
@@ -274,6 +422,32 @@ export function MedicationsManager({
         </div>
       )}
 
+      {/* Pending-proposal banner — visible to everyone so the list state is honest */}
+      {pendingCount > 0 && (
+        <div className="flex items-start gap-2 rounded-lg border-2 border-amber-500 bg-amber-50 px-3 py-2.5 dark:bg-amber-950/20">
+          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <div className="flex-1">
+            <p className="text-xs font-bold text-amber-800 dark:text-amber-200">
+              {pendingCount} pending medication change{pendingCount === 1 ? "" : "s"} awaiting admin approval
+            </p>
+            <p className="text-[11px] text-amber-700 dark:text-amber-300">
+              Proposed changes are NOT live on the medication list until an organization admin approves them.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Read-only banner for direct support staff */}
+      {readOnly && (
+        <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
+          <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="text-muted-foreground">
+            Medication list is <span className="font-semibold">read-only</span> for direct support staff.
+            You can still administer and document medication passes on the eMAR.
+          </span>
+        </div>
+      )}
+
       <div className="rounded-lg border border-border bg-card p-4 space-y-3">
 
         {/* Header */}
@@ -288,42 +462,53 @@ export function MedicationsManager({
               onClick={() => setShowInactive((v) => !v)}>
               {showInactive ? "Hide inactive" : "Show inactive"}
             </Button>
-            <Dialog open={importOpen} onOpenChange={setImportOpen}>
-              <DialogTrigger asChild>
-                <Button type="button" size="sm" variant="outline">
-                  <Upload className="mr-1.5 h-3.5 w-3.5" /> Upload MAR / Order
-                </Button>
-              </DialogTrigger>
-              <AIImportDialog
-                onParse={async (p) => {
-                  const r = await parseAI({ data: p });
-                  return (r.medications ?? []).map((m) => ({
-                    ...EMPTY,
-                    medication_name: m?.medication_name ?? "",
-                    dosage: m?.dosage ?? "",
-                    frequency: m?.frequency ?? "",
-                    route: m?.route ?? "PO",
-                    scheduled_times: Array.isArray(m?.scheduled_times) ? m!.scheduled_times! : [],
-                    instructions: m?.instructions ?? "",
-                    prescriber: m?.prescriber ?? "",
-                  }));
-                }}
-                onCommit={(rows) => bulkInsertMut.mutate(rows)}
-                committing={bulkInsertMut.isPending}
-              />
-            </Dialog>
-            <Dialog open={addOpen} onOpenChange={setAddOpen}>
-              <DialogTrigger asChild>
-                <Button type="button" size="sm">
-                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Medication
-                </Button>
-              </DialogTrigger>
-              <MedFormDialog
-                title="Add Medication"
-                onSubmit={(v) => insertMut.mutate(v)}
-                pending={insertMut.isPending}
-              />
-            </Dialog>
+            {!readOnly && (
+              <>
+                <Dialog open={importOpen} onOpenChange={setImportOpen}>
+                  <DialogTrigger asChild>
+                    <Button type="button" size="sm" variant="outline">
+                      <Upload className="mr-1.5 h-3.5 w-3.5" />
+                      {canApprove ? "Upload MAR / Order" : "Upload MAR (propose)"}
+                    </Button>
+                  </DialogTrigger>
+                  <AIImportDialog
+                    proposeMode={!canApprove}
+                    onParse={async (p) => {
+                      const r = await parseAI({ data: p });
+                      return (r.medications ?? []).map((m) => ({
+                        ...EMPTY,
+                        medication_name: m?.medication_name ?? "",
+                        dosage: m?.dosage ?? "",
+                        frequency: m?.frequency ?? "",
+                        route: m?.route ?? "PO",
+                        scheduled_times: Array.isArray(m?.scheduled_times) ? m!.scheduled_times! : [],
+                        instructions: m?.instructions ?? "",
+                        prescriber: m?.prescriber ?? "",
+                      }));
+                    }}
+                    onCommit={(rows) => bulkInsertMut.mutate(rows)}
+                    committing={bulkInsertMut.isPending}
+                  />
+                </Dialog>
+                <Dialog open={addOpen} onOpenChange={setAddOpen}>
+                  <DialogTrigger asChild>
+                    <Button type="button" size="sm">
+                      <Plus className="mr-1.5 h-3.5 w-3.5" />
+                      {canApprove ? "Add Medication" : "Propose Add"}
+                    </Button>
+                  </DialogTrigger>
+                  <MedFormDialog
+                    title={canApprove ? "Add Medication" : "Propose New Medication"}
+                    submitLabel={canApprove ? "Save Medication" : "Submit Proposal"}
+                    onSubmit={(v) => {
+                      if (canApprove) insertMut.mutate(v);
+                      else proposeMut.mutate({ change_type: "add", payload: formToPayload(v) });
+                    }}
+                    pending={insertMut.isPending || proposeMut.isPending}
+                  />
+                </Dialog>
+              </>
+            )}
           </div>
         </div>
 
@@ -331,7 +516,13 @@ export function MedicationsManager({
         {isLoading ? (
           <p className="text-xs text-muted-foreground">Loading medications...</p>
         ) : !visible.length ? (
-          <p className="text-xs text-muted-foreground">No medications recorded. Click Add Medication to begin.</p>
+          <p className="text-xs text-muted-foreground">
+            {readOnly
+              ? "No medications recorded."
+              : canApprove
+                ? "No medications recorded. Click Add Medication to begin."
+                : "No medications recorded. Click Propose Add to submit for admin approval."}
+          </p>
         ) : (
           <Table>
             <TableHeader>
@@ -343,15 +534,15 @@ export function MedicationsManager({
                 <TableHead>Times</TableHead>
                 <TableHead>Flags</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                {!readOnly && <TableHead className="text-right">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {visible.map((m) => (
                 <TableRow
                   key={m.id}
-                  className={`cursor-pointer hover:bg-muted/40 ${!m.is_active ? "opacity-50" : ""}`}
-                  onClick={() => setEditMed(m)}
+                  className={`${readOnly ? "" : "cursor-pointer hover:bg-muted/40"} ${!m.is_active ? "opacity-50" : ""}`}
+                  onClick={() => { if (!readOnly) setEditMed(m); }}
                 >
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-1.5">
@@ -395,26 +586,41 @@ export function MedicationsManager({
                       ? <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200">Active</Badge>
                       : <Badge variant="outline">Discontinued</Badge>}
                   </TableCell>
-                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        type="button" variant="ghost" size="sm"
-                        onClick={(e) => { e.stopPropagation(); setEditMed(m); }}
-                        className="h-7 px-2"
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      {m.is_active && (
+                  {!readOnly && (
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
                         <Button
                           type="button" variant="ghost" size="sm"
-                          onClick={(e) => { e.stopPropagation(); discontinueMut.mutate(m.id); }}
-                          className="h-7 px-2 text-muted-foreground hover:text-rose-600"
+                          onClick={(e) => { e.stopPropagation(); setEditMed(m); }}
+                          className="h-7 px-2"
+                          title={canApprove ? "Edit" : "Propose edit"}
                         >
-                          <X className="h-3 w-3" />
+                          <Pencil className="h-3 w-3" />
                         </Button>
-                      )}
-                    </div>
-                  </TableCell>
+                        {m.is_active && (
+                          <Button
+                            type="button" variant="ghost" size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (canApprove) {
+                                discontinueMut.mutate(m.id);
+                              } else {
+                                proposeMut.mutate({
+                                  change_type: "discontinue",
+                                  medication_id: m.id,
+                                  payload: { medication_name: m.medication_name },
+                                });
+                              }
+                            }}
+                            className="h-7 px-2 text-muted-foreground hover:text-rose-600"
+                            title={canApprove ? "Discontinue" : "Propose discontinue"}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -422,15 +628,36 @@ export function MedicationsManager({
         )}
       </div>
 
+      {/* Admin approval panel */}
+      {canApprove && pendingCount > 0 && (
+        <PendingProposalsPanel
+          proposals={proposals ?? []}
+          meds={meds ?? []}
+          proposerNames={proposerNames ?? {}}
+          onApprove={(id) => approveMut.mutate(id)}
+          onReject={(id, notes) => rejectMut.mutate({ id, notes })}
+          approving={approveMut.isPending}
+          rejecting={rejectMut.isPending}
+        />
+      )}
+
       {/* Edit dialog */}
       <Dialog open={!!editMed} onOpenChange={(o) => { if (!o) setEditMed(null); }}>
         {editMed && (
           <MedFormDialog
-            title={`Edit — ${editMed.medication_name}`}
+            title={canApprove ? `Edit — ${editMed.medication_name}` : `Propose edit — ${editMed.medication_name}`}
+            submitLabel={canApprove ? "Save Medication" : "Submit Proposal"}
             initial={medToForm(editMed)}
-            onSubmit={(v) => updateMut.mutate({ id: editMed.id, v })}
-            pending={updateMut.isPending}
-            showDiscontinue={editMed.is_active}
+            onSubmit={(v) => {
+              if (canApprove) updateMut.mutate({ id: editMed.id, v });
+              else proposeMut.mutate({
+                change_type: "edit",
+                medication_id: editMed.id,
+                payload: formToPayload(v),
+              });
+            }}
+            pending={updateMut.isPending || proposeMut.isPending}
+            showDiscontinue={editMed.is_active && canApprove}
             onDiscontinue={() => { discontinueMut.mutate(editMed.id); setEditMed(null); }}
           />
         )}
@@ -441,6 +668,7 @@ export function MedicationsManager({
   );
 }
 
+
 // ─── Medication Form Dialog ────────────────────────────────────────────────────
 
 function MedFormDialog({
@@ -450,6 +678,7 @@ function MedFormDialog({
   pending,
   showDiscontinue,
   onDiscontinue,
+  submitLabel,
 }: {
   title: string;
   initial?: FormVals;
@@ -457,6 +686,7 @@ function MedFormDialog({
   pending: boolean;
   showDiscontinue?: boolean;
   onDiscontinue?: () => void;
+  submitLabel?: string;
 }) {
   const [v, setV] = useState<FormVals>(initial ?? EMPTY);
   const [timeInput, setTimeInput] = useState("");
@@ -763,7 +993,7 @@ function MedFormDialog({
         >
           {pending
             ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
-            : "Save Medication"}
+            : (submitLabel ?? "Save Medication")}
         </Button>
       </DialogFooter>
     </DialogContent>
@@ -773,11 +1003,12 @@ function MedFormDialog({
 // ─── AI Import Dialog ─────────────────────────────────────────────────────────
 
 function AIImportDialog({
-  onParse, onCommit, committing,
+  onParse, onCommit, committing, proposeMode,
 }: {
   onParse: (payload: { imageBase64?: string; mime?: string; text?: string }) => Promise<FormVals[]>;
   onCommit: (rows: FormVals[]) => void;
   committing: boolean;
+  proposeMode?: boolean;
 }) {
   const [parsing, setParsing] = useState(false);
   const [rows, setRows] = useState<FormVals[]>([]);
@@ -899,7 +1130,11 @@ function AIImportDialog({
           <DialogFooter>
             <Button variant="outline" onClick={() => setRows([])}>Start Over</Button>
             <Button disabled={!rows.length || committing} onClick={() => onCommit(rows)}>
-              {committing ? "Saving..." : `Save ${rows.length} Medication${rows.length === 1 ? "" : "s"}`}
+              {committing
+                ? (proposeMode ? "Submitting..." : "Saving...")
+                : proposeMode
+                  ? `Propose ${rows.length} Medication${rows.length === 1 ? "" : "s"} (admin approval)`
+                  : `Save ${rows.length} Medication${rows.length === 1 ? "" : "s"}`}
             </Button>
           </DialogFooter>
         </div>
@@ -907,3 +1142,187 @@ function AIImportDialog({
     </DialogContent>
   );
 }
+
+// ─── Pending Proposals Review Panel (admin only) ──────────────────────────────
+
+function PendingProposalsPanel({
+  proposals, meds, proposerNames, onApprove, onReject, approving, rejecting,
+}: {
+  proposals: ProposalRow[];
+  meds: Medication[];
+  proposerNames: Record<string, string>;
+  onApprove: (id: string) => void;
+  onReject: (id: string, notes: string) => void;
+  approving: boolean;
+  rejecting: boolean;
+}) {
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectNotes, setRejectNotes] = useState("");
+  const medById = useMemo(() => {
+    const m: Record<string, Medication> = {};
+    meds.forEach((x) => { m[x.id] = x; });
+    return m;
+  }, [meds]);
+
+  return (
+    <div className="rounded-lg border-2 border-amber-500/60 bg-amber-50/40 p-4 space-y-3 dark:bg-amber-950/10">
+      <div className="flex items-center gap-2">
+        <ClipboardCheck className="h-4 w-4 text-amber-700 dark:text-amber-300" />
+        <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+          Pending medication change proposals
+        </h3>
+        <Badge className="bg-amber-200 text-amber-900 dark:bg-amber-900/50 dark:text-amber-100">{proposals.length}</Badge>
+      </div>
+      <p className="text-[11px] text-amber-800 dark:text-amber-200">
+        Nothing here is live on the medication list yet. Approve to apply the change; reject to discard it.
+      </p>
+
+      <div className="space-y-2">
+        {proposals.map((p) => {
+          const existing = p.medication_id ? medById[p.medication_id] : undefined;
+          const pl = p.proposed_payload ?? {};
+          const proposer = proposerNames[p.proposed_by] ?? "Unknown proposer";
+          return (
+            <div key={p.id} className="rounded-md border border-border bg-card p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Badge variant={p.change_type === "discontinue" ? "destructive" : "secondary"}>
+                    {p.change_type === "add" ? "Add" : p.change_type === "edit" ? "Edit" : "Discontinue"}
+                  </Badge>
+                  <span className="text-sm font-medium">
+                    {pl.medication_name || existing?.medication_name || "—"}
+                  </span>
+                  {p.source === "appointment_upload" && (
+                    <Badge variant="outline" className="text-[10px]">from appointment upload</Badge>
+                  )}
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  Proposed by {proposer} · {new Date(p.proposed_at).toLocaleString()}
+                </div>
+              </div>
+
+              {p.change_type === "edit" && existing && (
+                <EditDiff before={existing} after={pl} />
+              )}
+              {p.change_type === "add" && (
+                <AddSummary payload={pl} />
+              )}
+              {p.change_type === "discontinue" && existing && (
+                <p className="text-xs text-muted-foreground">
+                  Will mark <span className="font-semibold">{existing.medication_name}</span> as
+                  discontinued. The historical record is preserved.
+                </p>
+              )}
+
+              {rejectingId === p.id ? (
+                <div className="space-y-2 pt-1">
+                  <Textarea
+                    rows={2}
+                    placeholder="Reason for rejection (optional but recommended)…"
+                    value={rejectNotes}
+                    onChange={(e) => setRejectNotes(e.target.value)}
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => { setRejectingId(null); setRejectNotes(""); }}>
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={rejecting}
+                      onClick={() => { onReject(p.id, rejectNotes); setRejectingId(null); setRejectNotes(""); }}
+                    >
+                      Confirm reject
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex justify-end gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setRejectingId(p.id)}>
+                    Reject
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={approving}
+                    onClick={() => onApprove(p.id)}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    <Check className="mr-1 h-3.5 w-3.5" /> Approve &amp; apply
+                  </Button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AddSummary({ payload }: { payload: Record<string, any> }) {
+  const raw: Array<[string, unknown]> = [
+    ["Dose", payload.dosage], ["Route", payload.route], ["Frequency", payload.frequency],
+    ["Prescriber", payload.prescriber],
+    ["Times", Array.isArray(payload.scheduled_times) ? payload.scheduled_times.join(", ") : ""],
+    ["Purpose", payload.purpose],
+  ];
+  const fields = raw.filter(([, v]) => v);
+  return (
+    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+      {fields.map(([k, v]) => (
+        <div key={k}><span className="text-muted-foreground">{k}:</span> <span className="font-medium">{String(v)}</span></div>
+      ))}
+    </div>
+  );
+}
+
+function EditDiff({ before, after }: { before: Medication; after: Record<string, any> }) {
+  const keys: Array<keyof Medication> = [
+    "medication_name", "dosage", "frequency", "route", "prescriber",
+    "instructions", "purpose", "adverse_effects", "pharmacy", "rx_number",
+    "packaging", "side_effects", "prn_instructions", "choking_risk_details",
+  ];
+  const rows: Array<{ k: string; b: string; a: string }> = [];
+  keys.forEach((k) => {
+    if (!(k in after)) return;
+    const b = (before as any)[k] ?? "";
+    const a = (after as any)[k] ?? "";
+    if (String(b) !== String(a)) rows.push({ k: String(k), b: String(b || "—"), a: String(a || "—") });
+  });
+  if (Array.isArray(after.scheduled_times)) {
+    const b = (before.scheduled_times ?? []).join(", ");
+    const a = after.scheduled_times.join(", ");
+    if (b !== a) rows.push({ k: "scheduled_times", b: b || "—", a: a || "—" });
+  }
+  const bools: Array<keyof Medication> = ["choking_risk", "is_controlled", "is_prn", "contributes_to_swallowing_difficulty"];
+  bools.forEach((k) => {
+    if (!(k in after)) return;
+    const b = !!(before as any)[k]; const a = !!(after as any)[k];
+    if (b !== a) rows.push({ k: String(k), b: b ? "yes" : "no", a: a ? "yes" : "no" });
+  });
+
+  if (!rows.length) return <p className="text-xs text-muted-foreground">No field changes detected.</p>;
+  return (
+    <div className="rounded-md border border-border overflow-hidden">
+      <table className="w-full text-xs">
+        <thead className="bg-muted/40">
+          <tr>
+            <th className="px-2 py-1 text-left font-medium">Field</th>
+            <th className="px-2 py-1 text-left font-medium text-muted-foreground">Current</th>
+            <th className="px-2 py-1 text-left font-medium text-emerald-700 dark:text-emerald-300">Proposed</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.k} className="border-t border-border">
+              <td className="px-2 py-1 font-mono text-[10px] text-muted-foreground">{r.k}</td>
+              <td className="px-2 py-1 line-through opacity-70">{r.b}</td>
+              <td className="px-2 py-1 font-medium text-emerald-700 dark:text-emerald-300">{r.a}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+

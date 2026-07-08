@@ -21,6 +21,16 @@ import {
   Plus,
   Trash2,
   CalendarDays,
+  UserCircle,
+  Camera,
+  Contact,
+  Users as UsersIcon,
+  Briefcase,
+  GraduationCap,
+  Activity as ActivityIcon,
+  Lock,
+  FolderArchive,
+  CalendarClock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";

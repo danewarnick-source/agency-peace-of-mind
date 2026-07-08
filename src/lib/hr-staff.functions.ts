@@ -348,6 +348,7 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
         requirement_id: baselineRequirementId(t.key),
         title: t.title,
         category: t.category,
+        phase: baselinePhaseFor(t.key),
         source_citation: t.hint ?? null,
         evidence_type: t.tracks_expiration ? "certificate" : "completion",
         renewal_frequency: null,

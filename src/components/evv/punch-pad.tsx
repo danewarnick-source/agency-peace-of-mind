@@ -2722,7 +2722,7 @@ export function PunchPad({
                           size="sm"
                           variant="outline"
                           onClick={() => (isRecording ? stopRecording() : startRecording())}
-                          className={`min-h-[44px] ${isRecording ? "border-rose-500 text-rose-700" : ""}`}
+                          className={`min-h-[44px] border ${isRecording ? selectedPill : unselectedPill}`}
                         >
                           {isRecording ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
                           {isRecording ? "Stop voice" : "Speak shorthand"}

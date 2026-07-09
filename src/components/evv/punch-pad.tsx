@@ -2775,18 +2775,18 @@ export function PunchPad({
                   />
                 )}
 
-                {/* Per-shift medication observation attestation */}
+                {/* Pre-submit medication check — routes staff into the real MAR */}
                 {active && org?.organization_id && (
-                  <ShiftMedAttestationSlot
+                  <ShiftMedDueCheckSlot
                     organizationId={org.organization_id}
                     clientId={active.client_id}
                     clientName={active.client_name ?? "this client"}
                     clockInIso={active.clock_in_timestamp}
                     emarHref={`/dashboard/workspace/${active.client_id}?tab=mar-emar`}
-                    value={medAttestation}
-                    onChange={setMedAttestation}
+                    onResolvedChange={setMedDosesResolved}
                   />
                 )}
+
 
 
                 {/* NECTAR Completeness Check */}
@@ -3002,19 +3002,18 @@ export function PunchPad({
 }
 
 /**
- * Wraps ShiftMedAttestation with a windowEnd that is captured ONCE per shift
- * (keyed on clockInIso). The parent re-renders every second to drive the live
- * shift timer, which previously caused the underlying React Query key to change
- * every second and refetch continuously, blocking the user from answering.
+ * Wraps ShiftMedDueCheck with a windowEnd captured ONCE per shift (keyed on
+ * clockInIso). The parent re-renders every second to drive the live shift
+ * timer; without this the React Query key would change every second and
+ * refetch continuously.
  */
-function ShiftMedAttestationSlot(props: {
+function ShiftMedDueCheckSlot(props: {
   organizationId: string;
   clientId: string;
   clientName: string;
   clockInIso: string;
   emarHref: string;
-  value: Parameters<typeof ShiftMedAttestation>[0]["value"];
-  onChange: Parameters<typeof ShiftMedAttestation>[0]["onChange"];
+  onResolvedChange: (resolved: boolean) => void;
 }) {
   const windowEnd = useMemo(
     () => new Date().toISOString(),
@@ -3022,15 +3021,15 @@ function ShiftMedAttestationSlot(props: {
     [props.clockInIso],
   );
   return (
-    <ShiftMedAttestation
+    <ShiftMedDueCheck
       organizationId={props.organizationId}
       clientId={props.clientId}
       clientName={props.clientName}
       windowStart={props.clockInIso}
       windowEnd={windowEnd}
       emarHref={props.emarHref}
-      value={props.value}
-      onChange={props.onChange}
+      onResolvedChange={props.onResolvedChange}
     />
   );
 }
+

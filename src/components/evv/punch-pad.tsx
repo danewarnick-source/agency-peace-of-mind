@@ -2623,17 +2623,20 @@ export function PunchPad({
                     )}
                     {activeClientGoals.map((goal, idx) => {
                       const id = `goal-${idx}`;
+                      const sel = !!checkedGoals[goal];
                       return (
                         <label
                           key={id}
                           htmlFor={id}
-                          className="flex cursor-pointer items-start gap-2 rounded-md p-1.5 text-sm hover:bg-accent"
+                          className={`flex cursor-pointer items-start gap-2 rounded-md border p-1.5 text-sm ${
+                            sel ? selectedPill : unselectedPill
+                          }`}
                         >
                           <input
                             id={id}
                             type="checkbox"
-                            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-primary"
-                            checked={!!checkedGoals[goal]}
+                            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[color:var(--amber-600)]"
+                            checked={sel}
                             onChange={(e) => setCheckedGoals((p) => ({ ...p, [goal]: e.target.checked }))}
                           />
                           <span className="break-words">{goal}</span>
@@ -2643,12 +2646,14 @@ export function PunchPad({
                     <div className="my-1 border-t border-dashed border-border" />
                     <label
                       htmlFor="goal-baseline"
-                      className="flex cursor-pointer items-start gap-2 rounded-md p-1.5 text-sm hover:bg-accent"
+                      className={`flex cursor-pointer items-start gap-2 rounded-md border p-1.5 text-sm ${
+                        baselineChecked ? selectedPill : unselectedPill
+                      }`}
                     >
                       <input
                         id="goal-baseline"
                         type="checkbox"
-                        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-primary"
+                        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[color:var(--amber-600)]"
                         checked={baselineChecked}
                         onChange={(e) => setBaselineChecked(e.target.checked)}
                       />

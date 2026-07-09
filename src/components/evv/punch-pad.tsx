@@ -939,6 +939,10 @@ export function PunchPad({
     setLongShiftAck(false);
     setTriggersResolved(true);
     setMedDosesResolved(true);
+    setCorrectionOpen(false);
+    setCorrectionIn("");
+    setCorrectionOut("");
+    setCorrectionReason("");
     stopRecording();
     setShowCompliance(true);
   }

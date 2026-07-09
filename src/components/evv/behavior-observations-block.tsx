@@ -267,9 +267,7 @@ export function BehaviorObservationsBlock({
             <label
               key={k}
               className={`flex min-h-[40px] cursor-pointer items-center justify-center rounded-md border px-2 text-[11px] font-medium ${
-                value.trendVsRecent === k
-                  ? "border-[color:var(--amber-600)] bg-[color:var(--amber-100)] text-[color:var(--navy-900)]"
-                  : "border-border bg-background hover:bg-accent"
+                value.trendVsRecent === k ? selectedPill : unselectedPill
               }`}
             >
               <input

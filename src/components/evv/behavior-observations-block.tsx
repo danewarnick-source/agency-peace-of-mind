@@ -156,9 +156,7 @@ export function BehaviorObservationsBlock({
                             key={f}
                             onClick={() => setCount(name, f)}
                             className={`min-h-[36px] min-w-[44px] rounded-md border px-2 text-[11px] font-medium ${
-                              (value.counts[name] ?? "") === f
-                                ? "border-[color:var(--amber-600)] bg-[color:var(--amber-100)] text-[color:var(--navy-900)]"
-                                : "border-border bg-background hover:bg-accent"
+                              (value.counts[name] ?? "") === f ? selectedPill : unselectedPill
                             }`}
                           >
                             {f}

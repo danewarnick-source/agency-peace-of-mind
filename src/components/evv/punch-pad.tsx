@@ -3071,7 +3071,7 @@ export function PunchPad({
                             type="button"
                             size="sm"
                             variant="outline"
-                            onClick={() => openCorrectionPanel(active)}
+                            onClick={() => active && openCorrectionPanel(active)}
                             className="h-8 border-amber-500/60 text-amber-900 hover:bg-amber-500/20 dark:text-amber-100"
                           >
                             <Pencil className="mr-1.5 h-3.5 w-3.5" /> Request time correction

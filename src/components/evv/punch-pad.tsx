@@ -1868,11 +1868,16 @@ export function PunchPad({
     ? fmtElapsed(now - new Date(active!.clock_in_timestamp).getTime())
     : "00:00:00";
   const isRunning = !!activeMatchesThisPad;
+  const endIsEvv = isEvvLockedCode(active?.service_type_code ?? "");
+  const startIsEvv = isEvvLockedCode(serviceCode);
+  const padAriaLabel = isRunning
+    ? (endIsEvv ? "EVV Shift Punch Pad" : "Time Clock")
+    : (startIsEvv ? "EVV Shift Punch Pad" : "Time Clock");
 
   return (
     <EvvConsentGate>
       <section
-        aria-label="EVV Shift Punch Pad"
+        aria-label={padAriaLabel}
         className="relative overflow-hidden rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-card to-primary/5 p-4 shadow-[var(--shadow-card)] sm:p-5"
       >
         {/* ── Header ── */}

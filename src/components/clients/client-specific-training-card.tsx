@@ -701,7 +701,7 @@ export function GoalsEditor({ goals, onChange }: { goals: CSTGoal[]; onChange: (
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-medium">Supports</label>
+            <label className="text-xs font-medium">Supports (what staff do)</label>
             <Textarea
               value={g.supports}
               rows={2}
@@ -710,7 +710,7 @@ export function GoalsEditor({ goals, onChange }: { goals: CSTGoal[]; onChange: (
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-medium">Details</label>
+            <label className="text-xs font-medium">Objective / measure</label>
             <Textarea
               value={g.details}
               rows={2}
@@ -719,14 +719,17 @@ export function GoalsEditor({ goals, onChange }: { goals: CSTGoal[]; onChange: (
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-medium">Job codes</label>
+            <label className="text-xs font-medium">Service codes</label>
             <Input
               value={g.job_codes.join(", ")}
               onChange={(e) => patchGoal(idx, {
-                job_codes: e.target.value.split(",").map((s) => s.trim()).filter(Boolean),
+                job_codes: e.target.value.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean),
               })}
               placeholder="e.g. SLN, DSI"
             />
+            <p className="text-[11px] text-muted-foreground">
+              Staff only see this goal during shifts clocked under one of these codes.
+            </p>
           </div>
         </div>
       ))}

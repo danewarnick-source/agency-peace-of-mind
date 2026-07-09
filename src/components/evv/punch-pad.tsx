@@ -2801,12 +2801,11 @@ export function PunchPad({
 
                 {/* Per-shift medication observation attestation */}
                 {active && org?.organization_id && (
-                  <ShiftMedAttestation
+                  <ShiftMedAttestationSlot
                     organizationId={org.organization_id}
                     clientId={active.client_id}
                     clientName={active.client_name ?? "this client"}
-                    windowStart={active.clock_in_timestamp}
-                    windowEnd={new Date(now).toISOString()}
+                    clockInIso={active.clock_in_timestamp}
                     emarHref={`/dashboard/workspace/${active.client_id}?tab=mar-emar`}
                     value={medAttestation}
                     onChange={setMedAttestation}

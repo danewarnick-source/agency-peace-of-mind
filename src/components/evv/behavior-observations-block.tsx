@@ -107,9 +107,7 @@ export function BehaviorObservationsBlock({
             <label
               key={String(opt.v)}
               className={`flex min-h-[44px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium ${
-                value.behaviorsObserved === opt.v
-                  ? "border-[color:var(--amber-600)] bg-[color:var(--amber-100)] text-[color:var(--navy-900)]"
-                  : "border-border bg-background hover:bg-accent"
+                value.behaviorsObserved === opt.v ? selectedPill : unselectedPill
               }`}
             >
               <input

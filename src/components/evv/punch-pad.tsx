@@ -2528,10 +2528,16 @@ export function PunchPad({
                 </div>
                 <div>
                   <p className={`text-base font-bold ${success?.evvClean ? "text-emerald-800 dark:text-emerald-200" : "text-amber-800 dark:text-amber-200"}`}>
-                    {success?.evvClean ? "✅ Shift Successfully Closed" : "⚠️ Shift Closed with Variance"}
+                    {success?.correctionSubmitted
+                      ? "🕒 Correction Request Submitted"
+                      : success?.evvClean
+                      ? "✅ Shift Successfully Closed"
+                      : "⚠️ Shift Closed with Variance"}
                   </p>
                   <p className={`text-xs ${success?.evvClean ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}`}>
-                    {success?.evvClean
+                    {success?.correctionSubmitted
+                      ? "Your supervisor will review the corrected times before this shift bills."
+                      : success?.evvClean
                       ? "GPS verified · Documentation complete · Submitted to EVV"
                       : "Variance logged · Pending admin review · Submitted to EVV"}
                   </p>
@@ -2544,7 +2550,9 @@ export function PunchPad({
                 <span className="font-mono text-lg font-bold tabular-nums">{success?.duration}</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                {success?.evvClean
+                {success?.correctionSubmitted
+                  ? "The shift is held for supervisor review. You can track its status on My Time Corrections. If approved, the corrected times replace the recorded times for billing; if denied, you'll see the reviewer's note there."
+                  : success?.evvClean
                   ? "Your timesheet has been submitted to EVV & Timesheet Control for administrative sign-off. No further action required."
                   : "Your timesheet has been submitted with a variance flag. An administrator will review the out-of-bounds justification before final approval."}
               </p>

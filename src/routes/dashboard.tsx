@@ -134,6 +134,7 @@ const STAFF_NAV: NavItem[] = [
   { to: "/dashboard/schedule", label: "Schedule", icon: CalendarDays, feature: "evv_timesheets" },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/my-historical-timesheets", label: "Historical Timesheets", icon: Archive, feature: "evv_timesheets" },
+  { to: "/dashboard/my-time-corrections", label: "My Time Corrections", icon: Clock, feature: "evv_timesheets" },
   { to: "/dashboard/ask-nectar", label: "Ask NECTAR", icon: Sparkles, feature: "nectar" },
   { to: "/dashboard/courses", label: "My Trainings", icon: GraduationCap, feature: "staff_onboarding" },
   { to: "/dashboard/hive-training", label: "HIVE Training", icon: GraduationCap, feature: "hive_training" },

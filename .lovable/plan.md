@@ -1,70 +1,61 @@
-# Clock-out screen — consistent selection styling + scroll fix
+# Auto-enable self-administration support when a client has any medication on file
 
-Scope: the "Shift Verification & Medicaid Compliance Form" dialog opened from Submit Final Timesheet (`src/components/evv/punch-pad.tsx`) plus the shared `src/components/evv/behavior-observations-block.tsx` used inside it. Presentation only — no submit logic, gates, billing, or copy meaning changes.
+## What changes
 
-## Problem 1: inconsistent selected vs unselected states
+Right now `public.clients.self_admin_med_support` is a plain boolean with `DEFAULT false`. The Clinical Safety toggle in the eMAR chart is the only thing that flips it, so a client with meds on file but the toggle still off gets blocked out of the eMAR until an admin remembers to open the safety profile and turn it on.
 
-The dialog mixes several different visual languages for "on/off":
+The rule the user wants: **the first time a client has any medication on file, self-admin support turns ON automatically, no matter which entry path added the medication (Smart Import commit, manual add on the profile, any future importer). Admins can still turn it OFF for a specific client, and the rule must not fight that decision by flipping it back on the next time a med row is written.**
 
-- Behavior Observations block already has a good, consistent pattern for its Yes/No, frequency chips, and trend segmented control:
-  selected → `border-[color:var(--amber-600)] bg-[color:var(--amber-100)] text-[color:var(--navy-900)]`
-  unselected → `border-border bg-background hover:bg-accent`
-- Elsewhere in the same dialog the same idea is styled differently:
-  - Mic "Speak shorthand / Stop voice" toggles to a rose border/text when active — rose is used everywhere else as destructive, so it reads as an error, not "on".
-  - Completeness Check "Run check" is solid amber, then flips to `variant="outline"` after running — that visually reads as a state toggle even though it's really the same action with a new label.
-  - Goal checkboxes, baseline checkbox, "these times are accurate", and "I've reviewed this note" checkboxes are a mix of `accent-primary` and `accent-[color:var(--amber-600)]`, and none of them highlight the row when selected (unlike the behavior-block checkboxes).
-  - "Request time correction" is an outline amber button; the sibling "recorded times are wrong — request a correction" is a plain ghost link. Same action, two shapes.
+## Approach
 
-## Problem 2: layout / scroll
+Do it at the database layer with a trigger on `client_medications`. That is the only surface every entry path funnels into — smart import commit, manual add, and any future import all `INSERT` rows here — so one trigger covers all of them and stays correct even if we add another importer later.
 
-The dialog is `flex-col` with a sticky header, a `flex-1 overflow-y-auto` middle, and a sticky footer. The footer currently holds:
+To respect an admin's explicit "off," add a lock column that records whether an admin has taken over the decision. The trigger only auto-enables when the lock is clear. The toggle UI sets the lock the moment a human touches it.
 
-- Long-shift acknowledgement banner (when applicable)
-- Ghost "recorded times are wrong" button
-- The full correction request panel (two datetime inputs + reason textarea + cancel)
-- GPS status pill
-- Primary submit button
-- Secondary "submit anyway" exception button
+### 1. Schema (single migration)
 
-On phones (`max-h-[100dvh]`), opening the correction panel plus a long-shift banner grows the footer past half the viewport and squeezes the scrollable middle so goals/narrative are barely reachable. On short viewports the exception button can be pushed off-screen entirely.
+- Add `public.clients.self_admin_med_support_locked boolean NOT NULL DEFAULT false`.
+  - `false` (the default) means "the auto rule owns this flag."
+  - `true` means "an admin has explicitly set this — leave it alone."
+- Add trigger function `public.autoenable_self_admin_on_med()`:
+  - Fires `AFTER INSERT` on `public.client_medications`.
+  - When the new row's client currently has `self_admin_med_support = false` AND `self_admin_med_support_locked = false`, update that client row to `self_admin_med_support = true`. Never touches the flag when the lock is on. Never turns it back off.
+  - `SECURITY DEFINER`, `SET search_path = public`, owned by the migration role so it can update `clients` regardless of the writer's RLS scope (Smart Import commits and manual inserts already run as authenticated org members).
+- Same migration includes the retroactive backfill:
+  ```sql
+  UPDATE public.clients c
+     SET self_admin_med_support = true
+   WHERE c.self_admin_med_support = false
+     AND c.self_admin_med_support_locked = false
+     AND EXISTS (SELECT 1 FROM public.client_medications m WHERE m.client_id = c.id);
+  ```
+  This catches the ~5 clients today that already have meds but the toggle off.
 
-## Fix
+### 2. UI: mark the lock when an admin sets the toggle
 
-### A. One shared "toggle" look
+Only file touched: `src/components/workspace/emar-chart.tsx` (`ClientSafetyEditor` save mutation, ~line 194-210). Extend the `clients.update({...})` call to also write `self_admin_med_support_locked: true`. That means any admin save — whether flipping ON or OFF — takes ownership of the flag going forward, so the trigger stops auto-managing that client. This matches the user's stated case ("an admin should still be able to turn it off for a specific client") without the auto rule ever undoing the admin's choice.
 
-Introduce two tiny local class helpers at the top of `punch-pad.tsx` (no new file):
+No other component reads or writes `self_admin_med_support_locked`. It is invisible to staff and admins; it is internal bookkeeping for the trigger.
 
-```
-const selectedPill   = "border-[color:var(--amber-600)] bg-[color:var(--amber-100)] text-[color:var(--navy-900)]";
-const unselectedPill = "border-border bg-background hover:bg-accent";
-```
+### 3. Types
 
-Apply them to every selectable control inside the dialog:
+`src/integrations/supabase/types.ts` is auto-regenerated after the migration is approved, so the new column shows up there automatically for the UI edit.
 
-1. Mic button — drop the rose styling; use `selectedPill` when `isRecording`, `unselectedPill` otherwise. Keep the MicOff icon + "Stop voice" label as the affordance for "click to turn off".
-2. Completeness Check button — stop switching variants. Keep a single visual (outline amber) and only change the label between "Run check" and "Re-check". This removes the false "selected" read.
-3. Goal + baseline checkboxes, "These times are accurate", "I've reviewed this note", and behavior-block Q6 checkbox — standardize on `accent-[color:var(--amber-600)]` and wrap each row so the whole row picks up `selectedPill` when checked (matching how the behavior block already treats Yes/No). This ties every checkbox in the dialog to the same visual grammar.
-4. "Request time correction" (in the long-shift banner) and the ghost "recorded times are wrong" link — collapse to a single outline-amber button placement; the long-shift banner shows it inline, the non-long-shift path shows the same button right-aligned above the submit row.
+## What is deliberately NOT changing
 
-Behavior block file needs no logic edits; only the shared class strings change so the same tokens live in both files (or we import the two strings from a small `src/components/evv/toggle-styles.ts` — cleaner, and the plan uses this).
+- No new UI element, no new admin screen. The existing "Admin — edit clinical safety profile" editor is the same control it is today; only its save payload grows by one field.
+- No changes to Smart Import, the manual "add medication" form, or any other insert path — the trigger is what unifies them.
+- No changes to how the flag is *read* anywhere (mar-emar-tab gate, emar-chart eligibility, etc.).
+- No mass update to `self_admin_med_support_locked` for existing rows — everyone starts at "auto rule owns this," and the backfill lifts existing med-holding clients into the ON state in the same migration.
+- No changes to `client_medications` schema or RLS.
 
-### B. Layout / scroll
+## Edge cases considered
 
-1. Move the long-shift banner and the correction panel out of the sticky footer and into the bottom of the scrollable middle (`flex-1 overflow-y-auto`). They are shift-context inputs, not submit controls, so they belong with the rest of the form and are free to grow without eating the viewport.
-2. Keep the sticky footer minimal and predictable: GPS status pill + primary submit + (when shown) exception button. That footer is now a fixed ~2 rows tall regardless of state.
-3. Tighten the dialog shell:
-   - `DialogContent` → `max-h-[calc(100dvh-1rem)] sm:max-h-[90vh] overflow-hidden`
-   - Middle scroller → add `min-h-0` (needed for `flex-1 overflow-y-auto` to actually scroll inside a flex column on iOS) and bump bottom padding (`pb-6`) so the last field isn't hugging the footer border.
-4. Ensure the sticky footer stacks vertically on narrow widths so the exception button never gets clipped next to the primary submit.
+- **Deleting/discontinuing the last med** does not turn the flag back off. The user asked for "on when meds are present," not "off when they aren't"; and turning it off silently would break access to historical eMAR data. If a client legitimately no longer self-administers, an admin uses the existing toggle (which now also sets the lock).
+- **Smart Import commits multiple meds at once**: the trigger runs per row, but the update is idempotent — once the client is ON, subsequent rows in the same commit are no-ops.
+- **Trigger + admin race**: if an admin turns the toggle OFF at the same moment a new med row is inserted, whichever transaction commits last wins. That is acceptable — a human touching the toggle sets the lock, so any later med inserts will not flip it back on.
 
-### Files touched
+## Order of operations
 
-- `src/components/evv/punch-pad.tsx` — the whole compliance `Dialog` (header stays, middle grows, footer shrinks) and the toggle-class swaps.
-- `src/components/evv/behavior-observations-block.tsx` — swap the inline "selected" class strings for the shared ones.
-- `src/components/evv/toggle-styles.ts` — new tiny module exporting the two class strings.
-
-### Out of scope
-
-- No changes to submit gates, NECTAR checks, med-due logic, correction submit path, billing, or dialog copy.
-- No changes to the incident dialog or the pending-forms dialog.
-- No changes outside the clock-out dialog surface.
+1. Ship the migration (adds column, adds trigger, runs the backfill in one call).
+2. After the migration is approved and the types file regenerates, update `emar-chart.tsx` to include `self_admin_med_support_locked: true` in the safety-profile save.

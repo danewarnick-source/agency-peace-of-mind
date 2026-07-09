@@ -4175,6 +4175,7 @@ export type Database = {
           rights_restrictions: string[] | null
           roommates: string[] | null
           self_admin_med_support: boolean
+          self_admin_med_support_locked: boolean
           special_directions: string | null
           specialist_name: string | null
           specialist_phone: string | null
@@ -4307,6 +4308,7 @@ export type Database = {
           rights_restrictions?: string[] | null
           roommates?: string[] | null
           self_admin_med_support?: boolean
+          self_admin_med_support_locked?: boolean
           special_directions?: string | null
           specialist_name?: string | null
           specialist_phone?: string | null
@@ -4439,6 +4441,7 @@ export type Database = {
           rights_restrictions?: string[] | null
           roommates?: string[] | null
           self_admin_med_support?: boolean
+          self_admin_med_support_locked?: boolean
           special_directions?: string | null
           specialist_name?: string | null
           specialist_phone?: string | null
@@ -17526,6 +17529,7 @@ export type Database = {
           rights_restrictions: string[] | null
           roommates: string[] | null
           self_admin_med_support: boolean
+          self_admin_med_support_locked: boolean
           special_directions: string | null
           specialist_name: string | null
           specialist_phone: string | null

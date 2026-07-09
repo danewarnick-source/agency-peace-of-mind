@@ -964,6 +964,9 @@ export function PunchPad({
     setCorrectionIn((prev) => prev || toLocalDatetimeInput(a.clock_in_timestamp));
     setCorrectionOut((prev) => prev || toLocalDatetimeInput(now));
     if (!correctionReason) setCorrectionReason("");
+  }
+
+
 
   // Re-running the check is required after staff edit the note/goals
   useEffect(() => {

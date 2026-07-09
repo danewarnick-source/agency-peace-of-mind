@@ -31,11 +31,7 @@ import { evaluateShiftNote } from "@/lib/ai-coach.functions";
 import { saveDailyRecord, setAttendance, savePrnForm, saveIncidentReport, listAttendance } from "@/lib/hhs.functions";
 import { useClientFeature } from "@/lib/client-features";
 import { NoteTriggerPrompt } from "@/components/residential/note-trigger-prompt";
-import {
-  ShiftMedAttestation,
-  emptyMedAttestation,
-  type MedAttestationValue,
-} from "@/components/medications/shift-med-attestation";
+import { ShiftMedDueCheck } from "@/components/medications/shift-med-due-check";
 
 const hhsSearch = z.object({ tab: z.string().optional() });
 export const Route = createFileRoute("/dashboard/hhs-hub/$clientId")({
@@ -304,7 +300,7 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
   const [triggersResolved, setTriggersResolved] = useState(true);
   // Final attestation — "I attest this note accurately reflects today's support".
   const [finalAttest, setFinalAttest] = useState(false);
-  const [medAttestation, setMedAttestation] = useState<MedAttestationValue>(emptyMedAttestation);
+  const [medDosesResolved, setMedDosesResolved] = useState(true);
 
   // Shift window for the daily-note attestation = the local calendar day.
   const dayWindow = useMemo(() => {

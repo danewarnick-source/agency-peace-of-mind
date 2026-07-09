@@ -1570,6 +1570,10 @@ export function PunchPad({
       toast.error("Resolve the NECTAR trigger(s) in your note before submitting.");
       return;
     }
+    if (!medDosesResolved) {
+      toast.error("Log all scheduled medication doses in eMAR before submitting.");
+      return;
+    }
     // Hard gate: if staff toggled the clock-out incident flag (or a Nectar
     // trigger fired), require a SUBMITTED Incident Report on this shift.
     if (incidentFlag && incidentReportIds.length === 0) {

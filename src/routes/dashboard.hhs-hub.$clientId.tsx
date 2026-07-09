@@ -591,17 +591,17 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
           <span>I attest this note accurately reflects today's support.</span>
         </label>
 
-        {/* Medication observation attestation — blocks save if active meds exist */}
-        <ShiftMedAttestation
+        {/* Pre-submit medication check — routes staff into the real MAR */}
+        <ShiftMedDueCheck
           organizationId={orgId}
           clientId={client.id}
           clientName={client.first_name}
           windowStart={dayWindow.start}
           windowEnd={dayWindow.end}
           emarHref={`/dashboard/hhs-hub/${client.id}?tab=mar`}
-          value={medAttestation}
-          onChange={setMedAttestation}
+          onResolvedChange={setMedDosesResolved}
         />
+
 
         {/* Action buttons */}
         <div className="space-y-2"

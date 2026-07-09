@@ -14,23 +14,36 @@
 // permission so most staff never see dollar figures.
 
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   AlertTriangle,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   FileText,
+  Loader2,
   Lock,
+  Plus,
   Sparkles,
+  X,
 } from "lucide-react";
 import { usePermissions } from "@/hooks/use-permissions";
-import type { CSTGoal } from "@/lib/client-specific-training.functions";
+import {
+  updateClientSpecificTraining,
+  type CSTGoal,
+} from "@/lib/client-specific-training.functions";
 
 type ClientRow = Record<string, unknown> | null | undefined;
 

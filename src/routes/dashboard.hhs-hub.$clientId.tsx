@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -54,6 +55,9 @@ interface ClientFull {
   geofence_radius_feet: number | null;
   authorized_dspd_codes: string[] | null;
   feature_config: Record<string, boolean> | null;
+  allergies: string[] | null;
+  dysphagia: boolean | null;
+  swallowing_alerts: string[] | null;
 }
 
 function HhsClientHub() {
@@ -70,7 +74,7 @@ function HhsClientHub() {
     queryFn: async () => {
       const { data } = await supabase
         .from("clients")
-        .select("id, first_name, last_name, pcsp_goals, physical_address, special_directions, profile_photo_url, geofence_radius_feet, authorized_dspd_codes, feature_config" as any)
+        .select("id, first_name, last_name, pcsp_goals, physical_address, special_directions, profile_photo_url, geofence_radius_feet, authorized_dspd_codes, feature_config, allergies, dysphagia, swallowing_alerts" as any)
         .eq("id", clientId)
         .maybeSingle();
       return data as ClientFull | null;
@@ -138,8 +142,55 @@ function HhsClientHub() {
               <Badge className="bg-amber-500 text-[10px]">HHS</Badge>
             </div>
             <div className="leading-snug">
-              <strong>Medical Concerns / Allergies:</strong> See client chart — re-verify before any med pass.
+              <strong>Medical Concerns / Allergies:</strong>{" "}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="font-semibold text-red-700 underline decoration-dotted underline-offset-2 hover:text-red-900 dark:text-red-300"
+                  >
+                    See client chart
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-80 space-y-2 text-xs">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Allergies & swallowing — {fullName}
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold text-red-700">Allergies</div>
+                    {(client.allergies ?? []).length > 0 ? (
+                      <ul className="mt-0.5 list-disc pl-4">
+                        {(client.allergies ?? []).map((a) => (
+                          <li key={a}>{a}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="mt-0.5 text-muted-foreground">No known allergies on file.</div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold text-amber-700">Dysphagia / Swallowing</div>
+                    {client.dysphagia ? (
+                      <div className="mt-0.5">Dysphagia flagged — follow crushed-med / thickened-liquid policy.</div>
+                    ) : (
+                      <div className="mt-0.5 text-muted-foreground">No dysphagia flag.</div>
+                    )}
+                    {(client.swallowing_alerts ?? []).length > 0 && (
+                      <ul className="mt-1 list-disc pl-4">
+                        {(client.swallowing_alerts ?? []).map((s) => (
+                          <li key={s}>{s}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                    Re-verify allergies in the client's profile before any med pass.
+                  </div>
+                </PopoverContent>
+              </Popover>{" "}
+              — re-verify before any med pass.
             </div>
+
             <div className="leading-snug text-amber-800 dark:text-amber-200">
               <AlertTriangle className="-mt-0.5 mr-1 inline h-3.5 w-3.5" />
               <strong>Choking / Swallow Reflex:</strong> Confirm upright posture and crushed-med policy per care plan.

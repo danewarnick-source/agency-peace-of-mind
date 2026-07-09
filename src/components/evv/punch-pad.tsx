@@ -885,8 +885,34 @@ export function PunchPad({
     ? Math.max(0, now - new Date(active.clock_in_timestamp).getTime())
     : 0;
   const isLongShift = liveDurationMs > 16 * 60 * 60 * 1000;
-  const longShiftOk = !isLongShift || longShiftAck;
-  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk && longShiftOk && triggersResolved && medDosesResolved && !busy;
+  // Correction request: staff is explicitly saying the recorded times are
+  // wrong. Parse datetime-local values, require at least one changed field,
+  // require reason ≥ 10 chars, and validate ordering / sanity window.
+  const correctionInIso = correctionIn ? new Date(correctionIn).toISOString() : null;
+  const correctionOutIso = correctionOut ? new Date(correctionOut).toISOString() : null;
+  const effectiveInIso = correctionInIso ?? active?.clock_in_timestamp ?? null;
+  const effectiveOutMs = correctionOutIso ? new Date(correctionOutIso).getTime() : now;
+  const effectiveInMs = effectiveInIso ? new Date(effectiveInIso).getTime() : NaN;
+  const correctionOrderOk =
+    Number.isFinite(effectiveInMs) && effectiveOutMs > effectiveInMs;
+  const correctionWithinWindow =
+    !!active &&
+    Number.isFinite(effectiveInMs) &&
+    effectiveOutMs - new Date(active.clock_in_timestamp).getTime() <= 36 * 60 * 60 * 1000 &&
+    effectiveInMs >= new Date(active.clock_in_timestamp).getTime() - 24 * 60 * 60 * 1000;
+  const correctionHasChange =
+    (!!correctionInIso && correctionInIso !== active?.clock_in_timestamp) ||
+    !!correctionOutIso;
+  const correctionReasonOk = correctionReason.trim().length >= 10;
+  const correctionValid =
+    correctionOpen && correctionHasChange && correctionReasonOk && correctionOrderOk && correctionWithinWindow;
+  // When staff opens a correction, the "these times are accurate" ack is
+  // moot — the whole point is that they aren't.
+  const longShiftOk = !isLongShift || longShiftAck || correctionOpen;
+  const canSubmitCompliance =
+    hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk &&
+    longShiftOk && triggersResolved && medDosesResolved && !busy &&
+    (!correctionOpen || correctionValid);
 
 
   function openCompliance() {

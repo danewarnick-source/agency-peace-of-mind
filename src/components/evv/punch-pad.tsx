@@ -3029,27 +3029,125 @@ export function PunchPad({
 
             <div className="shrink-0 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:px-6 sm:py-4">
               <div className="flex flex-col gap-2">
-                {isLongShift && (
+                {isLongShift && !correctionOpen && (
                   <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-100">
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                       <div className="space-y-2">
                         <p>
-                          This shift shows <span className="font-mono font-semibold">{elapsed}</span>. If you forgot to clock out, don't submit — tell your supervisor so the times can be corrected. Submitting confirms these times are accurate.
+                          This shift shows <span className="font-mono font-semibold">{elapsed}</span>. If you forgot to clock out or the times are wrong, request a time correction below instead of confirming these times.
                         </p>
-                        <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 cursor-pointer accent-amber-600"
-                            checked={longShiftAck}
-                            onChange={(e) => setLongShiftAck(e.target.checked)}
-                          />
-                          These times are accurate
-                        </label>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 cursor-pointer accent-amber-600"
+                              checked={longShiftAck}
+                              onChange={(e) => setLongShiftAck(e.target.checked)}
+                            />
+                            These times are accurate
+                          </label>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openCorrectionPanel(active)}
+                            className="h-8 border-amber-500/60 text-amber-900 hover:bg-amber-500/20 dark:text-amber-100"
+                          >
+                            <Pencil className="mr-1.5 h-3.5 w-3.5" /> Request time correction
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
                 )}
+
+                {/* Staff-requested time correction panel. Writes to
+                    corrected_clock_in/out + edit_reason and routes to
+                    supervisor review; raw punches are never mutated. */}
+                {!correctionOpen && !isLongShift && active && (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => openCorrectionPanel(active)}
+                      className="h-8 text-[11px] text-muted-foreground hover:text-foreground"
+                    >
+                      <Pencil className="mr-1.5 h-3 w-3" /> The recorded times are wrong — request a correction
+                    </Button>
+                  </div>
+                )}
+                {correctionOpen && active && (
+                  <div className="rounded-md border border-amber-500/60 bg-amber-500/5 p-3 text-sm">
+                    <div className="mb-2 flex items-start gap-2">
+                      <Pencil className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                      <div className="flex-1">
+                        <p className="font-medium text-amber-900 dark:text-amber-100">
+                          Request a time correction
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          Enter what your clock-in and/or clock-out should have been. Your supervisor reviews the request and either approves the corrected times (they become the billable times) or denies it with a note.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <Label className="text-[11px] font-medium">Corrected clock-in</Label>
+                        <input
+                          type="datetime-local"
+                          value={correctionIn}
+                          onChange={(e) => setCorrectionIn(e.target.value)}
+                          className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                        />
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">
+                          Recorded: {new Date(active.clock_in_timestamp).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-[11px] font-medium">Corrected clock-out</Label>
+                        <input
+                          type="datetime-local"
+                          value={correctionOut}
+                          onChange={(e) => setCorrectionOut(e.target.value)}
+                          className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                        />
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">
+                          Recorded: about to be set to now ({new Date(now).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}).
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <Label className="text-[11px] font-medium">Reason (visible to your supervisor)</Label>
+                      <Textarea
+                        rows={2}
+                        value={correctionReason}
+                        onChange={(e) => setCorrectionReason(e.target.value)}
+                        placeholder="e.g. I forgot to clock out — I actually left at 6:15 PM. Or: I clocked in ~15 min late; started at 8:00 AM."
+                        className="mt-1 min-h-[60px] text-sm"
+                      />
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">
+                        {correctionReason.trim().length} / 10 min characters
+                      </p>
+                    </div>
+                    <div className="mt-2 flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setCorrectionOpen(false);
+                          setCorrectionIn("");
+                          setCorrectionOut("");
+                          setCorrectionReason("");
+                        }}
+                      >
+                        Cancel correction
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-end text-[11px]">
                   {hardwareDenied ? (
                     <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-amber-800 dark:text-amber-200">
@@ -3078,7 +3176,11 @@ export function PunchPad({
                     type="button"
                     onClick={() => submitCompliance()}
                     disabled={!canSubmitCompliance || aiBusy}
-                    className="w-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+                    className={
+                      correctionOpen
+                        ? "w-full bg-amber-600 text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+                        : "w-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+                    }
                   >
                     {(busy || aiBusy) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {aiBusy
@@ -3087,6 +3189,8 @@ export function PunchPad({
                       ? "Getting location…"
                       : aiCoach?.status === "Flagged"
                       ? "🔁 Re-Check with NECTAR Coach"
+                      : correctionOpen
+                      ? "🕒 Submit correction request"
                       : "💾 Submit Final Timesheet"}
                   </Button>
                 </div>

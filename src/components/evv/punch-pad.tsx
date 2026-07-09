@@ -2594,7 +2594,7 @@ export function PunchPad({
         {/* Clock-Out Compliance Modal */}
         <Dialog open={showCompliance} onOpenChange={(o) => { if (!busy) setShowCompliance(o); }}>
           <DialogContent
-            className="flex max-h-[100dvh] w-[calc(100%-1rem)] max-w-2xl flex-col gap-0 p-0 sm:max-h-[90vh] sm:w-full"
+            className="flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:max-h-[90vh] sm:w-full"
             onPointerDownOutside={(e) => e.preventDefault()}
             onEscapeKeyDown={(e) => e.preventDefault()}
           >

@@ -41,7 +41,7 @@ function ShellInner({ title, children }: { title: string; children: ReactNode })
   return (
     <div
       ref={ref}
-      className="md:hidden fixed inset-0 z-30 flex flex-col overflow-hidden bg-background"
+      className="md:hidden fixed left-0 top-0 z-30 h-[100dvh] w-[100dvw] flex flex-col overflow-hidden bg-background"
     >
       <StaffTopBar title={title} framed />
       {/*

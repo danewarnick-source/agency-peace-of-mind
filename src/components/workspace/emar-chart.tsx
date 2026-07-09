@@ -196,7 +196,11 @@ export function ClientSafetyEditor({
       const allergies = allergiesText.split(",").map((s) => s.trim()).filter(Boolean);
       const swallowing_alerts = alertsText.split("\n").map((s) => s.trim()).filter(Boolean);
       const { error } = await (supabase as any).from("clients").update({
-        allergies, dysphagia, swallowing_alerts, self_admin_med_support: selfAdmin,
+        allergies, dysphagia, swallowing_alerts,
+        self_admin_med_support: selfAdmin,
+        // An admin touching this toggle takes ownership of the flag, so the
+        // "auto-enable when meds are added" trigger will stop managing it.
+        self_admin_med_support_locked: true,
       }).eq("id", client.id);
       if (error) throw error;
     },

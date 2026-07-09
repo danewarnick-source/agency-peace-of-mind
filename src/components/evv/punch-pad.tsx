@@ -279,22 +279,20 @@ export function PunchPad({
   const [incidentReportIds, setIncidentReportIds] = useState<string[]>([]);
 
   // ── Review-by-exception (Timeclock pass) ────────────────────────────────────
-  // Variance + attestation + incident + "forgot to clock out" correction. None
-  // of these mutate raw clock_in/out timestamps; corrections go to the new
+  // Variance + attestation + incident + staff-requested time correction. None
+  // of these mutate raw clock_in/out timestamps; corrections go to the
   // corrected_clock_in/out + edit_reason fields and the row is routed to
   // supervisor review (review_status='needs_review') instead of billing.
+  // The supervisor screen is dashboard.compliance-desk → Needs Review; on
+  // approval, billing-units.ts reads corrected_clock_in/out instead of the
+  // raw punches. Staff can see status on /dashboard/my-time-corrections.
   const [incidentFlag, setIncidentFlag] = useState(false);
   const [attestAccurate, setAttestAccurate] = useState(false);
   const [scheduledMinutes, setScheduledMinutes] = useState<number | null>(null);
-  const [forgotOpen, setForgotOpen] = useState(false);
-  const [forgotIn, setForgotIn] = useState<string>("");   // datetime-local
-  const [forgotOut, setForgotOut] = useState<string>(""); // datetime-local
-  const [forgotReason, setForgotReason] = useState("");
-  const [correction, setCorrection] = useState<null | {
-    inIso: string;
-    outIso: string;
-    reason: string;
-  }>(null);
+  const [correctionOpen, setCorrectionOpen] = useState(false);
+  const [correctionIn, setCorrectionIn] = useState<string>("");   // datetime-local
+  const [correctionOut, setCorrectionOut] = useState<string>(""); // datetime-local
+  const [correctionReason, setCorrectionReason] = useState("");
 
   // ── NECTAR Documentation Coach state ────────────────────────────────────────────
   const [aiBusy, setAiBusy]               = useState(false);

@@ -55,6 +55,9 @@ interface ClientFull {
   geofence_radius_feet: number | null;
   authorized_dspd_codes: string[] | null;
   feature_config: Record<string, boolean> | null;
+  allergies: string[] | null;
+  dysphagia: boolean | null;
+  swallowing_alerts: string[] | null;
 }
 
 function HhsClientHub() {

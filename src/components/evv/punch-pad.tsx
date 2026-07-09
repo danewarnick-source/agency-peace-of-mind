@@ -1830,6 +1830,7 @@ export function PunchPad({
               aiStatus: aiStatusForRow,
               aiFeedback: aiFeedbackForRow,
               aiIterationCount: iterationsToPersist,
+              correction: correctionPayload,
             });
           setPendingFormsDialog({
             mode: "clockout",

@@ -1,28 +1,37 @@
-## Goal
-Make `/dashboard/admin/emar-audit` (Master eMAR Audit Desk) reachable for admins/managers, since it's currently orphaned (no nav entry anywhere).
+## Problem
 
-## Change
-Add a single navigation entry pointing to `/dashboard/admin/emar-audit`, gated to users with `manage_users` (same gate the route itself uses).
+In `src/components/evv/punch-pad.tsx` (line 2809), the clock-out screen passes a live-updating `windowEnd` into the med-attestation check:
 
-**Placement options** — pick one:
-1. **Admin sidebar / admin section** of the main dashboard nav (alongside other admin-only links like user management). Best fit since the route lives under `/dashboard/admin/*`.
-2. **Card/tile on the admin landing page** (`/dashboard/admin` or the admin hub, if one exists) — more discoverable but requires a hub page to host it.
-3. **Both** — sidebar link + admin hub tile.
+```tsx
+<ShiftMedAttestation
+  windowStart={active.clock_in_timestamp}
+  windowEnd={new Date(now).toISOString()}   // `now` ticks every 1s
+/>
+```
 
-Default recommendation: **Option 1** (sidebar link labeled "eMAR Audit" under an Admin group), because it's the lowest-friction way to un-orphan the page and matches how other admin routes are exposed.
+`now` is the shift-timer state that re-renders every second (line 460: `setInterval(() => setNow(Date.now()), 1000)`). That value flows into `useShiftMedAttestationStatus`, where it becomes part of the React Query `queryKey`. New key every second → the query refetches every second → the attestation UI resets constantly and the user can never finish answering it, blocking clock-out.
 
-## Out of scope
-- No changes to the audit page itself (component, data, permissions).
-- No changes to the route gate.
-- No new roles or policies.
+## Fix
 
-## Technical notes
-- Locate the sidebar/nav config (likely `src/components/dashboard-sidebar.tsx` or similar) and add one `<Link to="/dashboard/admin/emar-audit">` entry conditionally rendered when the current user has `manage_users` (reuse the existing role hook already used for other admin links).
-- No route file changes — the route already exists.
-- No migration, no server function, no type changes.
+Freeze `windowEnd` to a single timestamp captured when the clock-out flow opens, instead of the ticking timer. The shift's actual window for the med check is "clock-in → the moment we're checking", which only needs to be sampled once (the med schedule is anchored on `clock_in_timestamp` and doesn't move as seconds pass).
 
-## Verification
-- As admin: link appears in nav, clicking it lands on the audit desk.
-- As non-admin staff: link is not rendered.
+### Change (frontend only, `src/components/evv/punch-pad.tsx`)
 
-Confirm Option 1 (or pick 2/3) and I'll implement.
+Inside `ShiftMedAttestation` render site:
+
+- Compute a stable end-of-window with `useMemo`, keyed on `active.clock_in_timestamp` (and only recomputed if the active shift itself changes), e.g.:
+  ```tsx
+  const medCheckWindowEnd = useMemo(
+    () => new Date().toISOString(),
+    [active?.clock_in_timestamp],
+  );
+  ```
+- Pass `windowEnd={medCheckWindowEnd}` instead of `new Date(now).toISOString()`.
+
+That's the whole change. The 1-second timer keeps driving the on-screen elapsed clock; the med check receives a stable window and runs once per shift instead of once per second.
+
+### Verification
+
+- Open the clock-out sheet on a shift with active meds → attestation loads once, stays interactive, user can submit.
+- The visible shift timer still ticks every second.
+- No changes to hook logic, query, RLS, or DB.

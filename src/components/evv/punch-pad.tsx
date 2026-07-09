@@ -2801,12 +2801,11 @@ export function PunchPad({
 
                 {/* Per-shift medication observation attestation */}
                 {active && org?.organization_id && (
-                  <ShiftMedAttestation
+                  <ShiftMedAttestationSlot
                     organizationId={org.organization_id}
                     clientId={active.client_id}
                     clientName={active.client_name ?? "this client"}
-                    windowStart={active.clock_in_timestamp}
-                    windowEnd={new Date(now).toISOString()}
+                    clockInIso={active.clock_in_timestamp}
                     emarHref={`/dashboard/workspace/${active.client_id}?tab=mar-emar`}
                     value={medAttestation}
                     onChange={setMedAttestation}
@@ -3023,5 +3022,39 @@ export function PunchPad({
         {clockInComplianceDialogEl}
       </section>
     </EvvConsentGate>
+  );
+}
+
+/**
+ * Wraps ShiftMedAttestation with a windowEnd that is captured ONCE per shift
+ * (keyed on clockInIso). The parent re-renders every second to drive the live
+ * shift timer, which previously caused the underlying React Query key to change
+ * every second and refetch continuously, blocking the user from answering.
+ */
+function ShiftMedAttestationSlot(props: {
+  organizationId: string;
+  clientId: string;
+  clientName: string;
+  clockInIso: string;
+  emarHref: string;
+  value: Parameters<typeof ShiftMedAttestation>[0]["value"];
+  onChange: Parameters<typeof ShiftMedAttestation>[0]["onChange"];
+}) {
+  const windowEnd = useMemo(
+    () => new Date().toISOString(),
+    // Only recompute when the active shift itself changes.
+    [props.clockInIso],
+  );
+  return (
+    <ShiftMedAttestation
+      organizationId={props.organizationId}
+      clientId={props.clientId}
+      clientName={props.clientName}
+      windowStart={props.clockInIso}
+      windowEnd={windowEnd}
+      emarHref={props.emarHref}
+      value={props.value}
+      onChange={props.onChange}
+    />
   );
 }

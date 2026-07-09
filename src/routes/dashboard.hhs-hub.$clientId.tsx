@@ -142,8 +142,55 @@ function HhsClientHub() {
               <Badge className="bg-amber-500 text-[10px]">HHS</Badge>
             </div>
             <div className="leading-snug">
-              <strong>Medical Concerns / Allergies:</strong> See client chart — re-verify before any med pass.
+              <strong>Medical Concerns / Allergies:</strong>{" "}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="font-semibold text-red-700 underline decoration-dotted underline-offset-2 hover:text-red-900 dark:text-red-300"
+                  >
+                    See client chart
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-80 space-y-2 text-xs">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Allergies & swallowing — {fullName}
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold text-red-700">Allergies</div>
+                    {(client.allergies ?? []).length > 0 ? (
+                      <ul className="mt-0.5 list-disc pl-4">
+                        {(client.allergies ?? []).map((a) => (
+                          <li key={a}>{a}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="mt-0.5 text-muted-foreground">No known allergies on file.</div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold text-amber-700">Dysphagia / Swallowing</div>
+                    {client.dysphagia ? (
+                      <div className="mt-0.5">Dysphagia flagged — follow crushed-med / thickened-liquid policy.</div>
+                    ) : (
+                      <div className="mt-0.5 text-muted-foreground">No dysphagia flag.</div>
+                    )}
+                    {(client.swallowing_alerts ?? []).length > 0 && (
+                      <ul className="mt-1 list-disc pl-4">
+                        {(client.swallowing_alerts ?? []).map((s) => (
+                          <li key={s}>{s}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                    Re-verify allergies in the client's profile before any med pass.
+                  </div>
+                </PopoverContent>
+              </Popover>{" "}
+              — re-verify before any med pass.
             </div>
+
             <div className="leading-snug text-amber-800 dark:text-amber-200">
               <AlertTriangle className="-mt-0.5 mr-1 inline h-3.5 w-3.5" />
               <strong>Choking / Swallow Reflex:</strong> Confirm upright posture and crushed-med policy per care plan.

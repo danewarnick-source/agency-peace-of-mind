@@ -216,7 +216,11 @@ export function BehaviorObservationsBlock({
           </div>
 
           {/* Q6 */}
-          <div className="flex flex-col items-start gap-2 rounded-md border border-border bg-background/70 p-2 sm:flex-row sm:items-center sm:justify-between">
+          <div
+            className={`flex flex-col items-start gap-2 rounded-md border p-2 sm:flex-row sm:items-center sm:justify-between ${
+              value.reportableIncident ? selectedPill : unselectedPill
+            }`}
+          >
             <label className="flex min-h-[44px] cursor-pointer items-center gap-2 text-xs font-medium">
               <input
                 type="checkbox"

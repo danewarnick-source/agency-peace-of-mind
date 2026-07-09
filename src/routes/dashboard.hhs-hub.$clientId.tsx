@@ -392,8 +392,8 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
       toast.error("Please attest the note accurately reflects today's support.");
       return;
     }
-    if (!medAttestation.resolved) {
-      toast.error("Complete the medication observation attestation before saving.");
+    if (!medDosesResolved) {
+      toast.error("Log all scheduled medication doses in eMAR before submitting.");
       return;
     }
     if (!hasSigRef.current) { toast.error("Please sign the daily note before saving."); return; }
@@ -440,33 +440,14 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
           signatureDataUrl: signature,
         },
       });
-      // Persist the medication observation attestation (non-blocking).
-      if (medAttestation.observed !== null && medAttestation.signatureDataUrl) {
-        const { error: medErr } = await supabase
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .from("shift_medication_attestations" as any)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .insert({
-            organization_id: orgId,
-            client_id: client.id,
-            staff_id: user?.id,
-            shift_id: null,
-            hhs_daily_record_id: null,
-            observed: medAttestation.observed,
-            reason: medAttestation.observed === false ? medAttestation.reason.trim() : null,
-            signature_data_url: medAttestation.signatureDataUrl,
-            shift_window_start: dayWindow.start,
-            shift_window_end: dayWindow.end,
-          } as any);
-        if (medErr && !/relation .* does not exist|schema cache/i.test(medErr.message)) {
-          toast.error(`Medication attestation not saved: ${medErr.message}`);
-        }
-      }
+      // Medication compliance is now recorded in the real MAR (`emar_logs`)
+      // via the eMAR tab — no shadow attestation write here.
+
       setSuccess(true);
       toast.success("Daily progress note saved.");
       setNote(""); setGoals([]); setCoach(null); setAiIterations(0);
       setAiFlagCount(0); setAllowException(false); setShowNarrativeError(false);
-      setMedAttestation(emptyMedAttestation);
+      setMedDosesResolved(true);
       hasSigRef.current = false; clearCanvas();
     } catch (e) {
       toast.error((e as Error).message || "Could not save note.");

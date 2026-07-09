@@ -564,32 +564,35 @@ export function PcspTab({
             <ol className="space-y-2">
               {goals.map((g, i) => {
                 const incomplete = !((g.supports ?? "").trim() && (g.details ?? "").trim());
+                const assignedCodes = (Array.isArray(g.job_codes) ? g.job_codes : []).map((c) =>
+                  String(c).toUpperCase(),
+                );
+                const noCodes = assignedCodes.length === 0;
+                const addableCodes = authorizedCodesForClient.filter(
+                  (c) => !assignedCodes.includes(c),
+                );
+                const rowSaving = saveJobCodesMut.isPending;
                 return (
                   <li
                     key={g.id ?? i}
-                    className={`rounded-md border p-3 ${incomplete ? "border-amber-300 bg-amber-50/40" : ""}`}
+                    className={`rounded-md border p-3 ${
+                      incomplete || noCodes ? "border-amber-300 bg-amber-50/40" : ""
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm font-medium">
                         <span className="text-muted-foreground mr-1">{i + 1}.</span>
                         {g.goal}
                       </p>
-                      <div className="flex flex-wrap items-center gap-1">
-                        {(g.job_codes ?? []).map((c, j) => (
-                          <Badge key={`${c}-${j}`} variant="outline" className="text-[10px]">
-                            {c}
-                          </Badge>
-                        ))}
-                        {incomplete ? (
-                          <Badge variant="outline" className="border-amber-400 text-amber-800 text-[10px]">
-                            Needs supports/details
-                          </Badge>
-                        ) : null}
-                      </div>
+                      {incomplete ? (
+                        <Badge variant="outline" className="border-amber-400 text-amber-800 text-[10px]">
+                          Needs supports/objective
+                        </Badge>
+                      ) : null}
                     </div>
                     <dl className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
                       <div>
-                        <dt className="font-medium text-foreground">Supports</dt>
+                        <dt className="font-medium text-foreground">Supports (what staff do)</dt>
                         <dd className="text-muted-foreground">{g.supports?.trim() || "—"}</dd>
                       </div>
                       <div>
@@ -597,6 +600,80 @@ export function PcspTab({
                         <dd className="text-muted-foreground">{g.details?.trim() || "—"}</dd>
                       </div>
                     </dl>
+                    <div className="mt-2">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Service codes
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1">
+                        {assignedCodes.length === 0 && (
+                          <span className="text-[11px] text-amber-700">
+                            No service code assigned — staff won't see this goal on any shift until a code is added.
+                          </span>
+                        )}
+                        {assignedCodes.map((c) => (
+                          <Badge
+                            key={c}
+                            variant="outline"
+                            className="flex items-center gap-1 text-[11px]"
+                          >
+                            <span>{c}</span>
+                            {canEditGoals && (
+                              <button
+                                type="button"
+                                aria-label={`Remove ${c}`}
+                                disabled={rowSaving}
+                                onClick={() => removeCodeFromGoal(i, c)}
+                                className="rounded-full p-0.5 hover:bg-muted disabled:opacity-40"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            )}
+                          </Badge>
+                        ))}
+                        {canEditGoals && (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 gap-1 px-2 text-[11px]"
+                                disabled={rowSaving || !trainingId}
+                              >
+                                {rowSaving ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Plus className="h-3 w-3" />
+                                )}
+                                Add code
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent align="start" className="w-48 p-1">
+                              {addableCodes.length === 0 ? (
+                                <p className="p-2 text-xs text-muted-foreground">
+                                  {authorizedCodesForClient.length === 0
+                                    ? "No authorized service codes on file. Add codes on the Billing Codes tab first."
+                                    : "All authorized codes are already assigned to this goal."}
+                                </p>
+                              ) : (
+                                <ul className="max-h-56 overflow-y-auto">
+                                  {addableCodes.map((c) => (
+                                    <li key={c}>
+                                      <button
+                                        type="button"
+                                        onClick={() => addCodeToGoal(i, c)}
+                                        className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-muted"
+                                      >
+                                        <Plus className="h-3 w-3" /> {c}
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </PopoverContent>
+                          </Popover>
+                        )}
+                      </div>
+                    </div>
                   </li>
                 );
               })}

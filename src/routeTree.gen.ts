@@ -53,6 +53,7 @@ import { Route as DashboardPermissionsRouteImport } from './routes/dashboard.per
 import { Route as DashboardPbaLedgerRouteImport } from './routes/dashboard.pba-ledger'
 import { Route as DashboardNectarDocsRouteImport } from './routes/dashboard.nectar-docs'
 import { Route as DashboardNectarCompanyProfileRouteImport } from './routes/dashboard.nectar-company-profile'
+import { Route as DashboardMyTimeCorrectionsRouteImport } from './routes/dashboard.my-time-corrections'
 import { Route as DashboardMyHistoricalTimesheetsRouteImport } from './routes/dashboard.my-historical-timesheets'
 import { Route as DashboardMyHistoricalDailyNotesRouteImport } from './routes/dashboard.my-historical-daily-notes'
 import { Route as DashboardMyClientTrainingsRouteImport } from './routes/dashboard.my-client-trainings'
@@ -425,6 +426,12 @@ const DashboardNectarCompanyProfileRoute =
   DashboardNectarCompanyProfileRouteImport.update({
     id: '/nectar-company-profile',
     path: '/nectar-company-profile',
+    getParentRoute: () => DashboardRoute,
+  } as any)
+const DashboardMyTimeCorrectionsRoute =
+  DashboardMyTimeCorrectionsRouteImport.update({
+    id: '/my-time-corrections',
+    path: '/my-time-corrections',
     getParentRoute: () => DashboardRoute,
   } as any)
 const DashboardMyHistoricalTimesheetsRoute =
@@ -1324,6 +1331,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/my-client-trainings': typeof DashboardMyClientTrainingsRoute
   '/dashboard/my-historical-daily-notes': typeof DashboardMyHistoricalDailyNotesRoute
   '/dashboard/my-historical-timesheets': typeof DashboardMyHistoricalTimesheetsRoute
+  '/dashboard/my-time-corrections': typeof DashboardMyTimeCorrectionsRoute
   '/dashboard/nectar-company-profile': typeof DashboardNectarCompanyProfileRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
@@ -1515,6 +1523,7 @@ export interface FileRoutesByTo {
   '/dashboard/my-client-trainings': typeof DashboardMyClientTrainingsRoute
   '/dashboard/my-historical-daily-notes': typeof DashboardMyHistoricalDailyNotesRoute
   '/dashboard/my-historical-timesheets': typeof DashboardMyHistoricalTimesheetsRoute
+  '/dashboard/my-time-corrections': typeof DashboardMyTimeCorrectionsRoute
   '/dashboard/nectar-company-profile': typeof DashboardNectarCompanyProfileRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
@@ -1712,6 +1721,7 @@ export interface FileRoutesById {
   '/dashboard/my-client-trainings': typeof DashboardMyClientTrainingsRoute
   '/dashboard/my-historical-daily-notes': typeof DashboardMyHistoricalDailyNotesRoute
   '/dashboard/my-historical-timesheets': typeof DashboardMyHistoricalTimesheetsRoute
+  '/dashboard/my-time-corrections': typeof DashboardMyTimeCorrectionsRoute
   '/dashboard/nectar-company-profile': typeof DashboardNectarCompanyProfileRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
   '/dashboard/pba-ledger': typeof DashboardPbaLedgerRoute
@@ -1911,6 +1921,7 @@ export interface FileRouteTypes {
     | '/dashboard/my-client-trainings'
     | '/dashboard/my-historical-daily-notes'
     | '/dashboard/my-historical-timesheets'
+    | '/dashboard/my-time-corrections'
     | '/dashboard/nectar-company-profile'
     | '/dashboard/nectar-docs'
     | '/dashboard/pba-ledger'
@@ -2102,6 +2113,7 @@ export interface FileRouteTypes {
     | '/dashboard/my-client-trainings'
     | '/dashboard/my-historical-daily-notes'
     | '/dashboard/my-historical-timesheets'
+    | '/dashboard/my-time-corrections'
     | '/dashboard/nectar-company-profile'
     | '/dashboard/nectar-docs'
     | '/dashboard/pba-ledger'
@@ -2298,6 +2310,7 @@ export interface FileRouteTypes {
     | '/dashboard/my-client-trainings'
     | '/dashboard/my-historical-daily-notes'
     | '/dashboard/my-historical-timesheets'
+    | '/dashboard/my-time-corrections'
     | '/dashboard/nectar-company-profile'
     | '/dashboard/nectar-docs'
     | '/dashboard/pba-ledger'
@@ -2783,6 +2796,13 @@ declare module '@tanstack/react-router' {
       path: '/nectar-company-profile'
       fullPath: '/dashboard/nectar-company-profile'
       preLoaderRoute: typeof DashboardNectarCompanyProfileRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/my-time-corrections': {
+      id: '/dashboard/my-time-corrections'
+      path: '/my-time-corrections'
+      fullPath: '/dashboard/my-time-corrections'
+      preLoaderRoute: typeof DashboardMyTimeCorrectionsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/my-historical-timesheets': {
@@ -4184,6 +4204,7 @@ interface DashboardRouteChildren {
   DashboardMyClientTrainingsRoute: typeof DashboardMyClientTrainingsRoute
   DashboardMyHistoricalDailyNotesRoute: typeof DashboardMyHistoricalDailyNotesRoute
   DashboardMyHistoricalTimesheetsRoute: typeof DashboardMyHistoricalTimesheetsRoute
+  DashboardMyTimeCorrectionsRoute: typeof DashboardMyTimeCorrectionsRoute
   DashboardNectarCompanyProfileRoute: typeof DashboardNectarCompanyProfileRoute
   DashboardNectarDocsRoute: typeof DashboardNectarDocsRoute
   DashboardPbaLedgerRoute: typeof DashboardPbaLedgerRoute
@@ -4275,6 +4296,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardMyClientTrainingsRoute: DashboardMyClientTrainingsRoute,
   DashboardMyHistoricalDailyNotesRoute: DashboardMyHistoricalDailyNotesRoute,
   DashboardMyHistoricalTimesheetsRoute: DashboardMyHistoricalTimesheetsRoute,
+  DashboardMyTimeCorrectionsRoute: DashboardMyTimeCorrectionsRoute,
   DashboardNectarCompanyProfileRoute: DashboardNectarCompanyProfileRoute,
   DashboardNectarDocsRoute: DashboardNectarDocsRoute,
   DashboardPbaLedgerRoute: DashboardPbaLedgerRoute,

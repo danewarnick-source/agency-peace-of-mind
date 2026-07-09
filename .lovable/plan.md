@@ -1,61 +1,58 @@
-# Auto-enable self-administration support when a client has any medication on file
+# Structured PCSP goals + service-code filtering
+
+## What exists today
+
+- `client_specific_trainings.goals` (jsonb) already stores structured `CSTGoal` = `{ id, goal, supports, details, job_codes[] }`. NECTAR's PCSP extractor (`extractGoalsVerbatim` in `src/lib/client-specific-training.functions.ts`) already emits this shape.
+- The legacy `clients.pcsp_goals` (`text[]`) still holds a flat, code-less mirror of the goal *statements*. It's what the client detail PCSP tab, the staff shift clock-out screen (`punch-pad.tsx`), whiteboard scoring, and daily-log tagging all read.
+- The GoalsEditor in `client-specific-training-card.tsx` exposes `job_codes` as a free-text comma-separated field. There is no per-goal service-code editor on the PCSP tab itself.
 
 ## What changes
 
-Right now `public.clients.self_admin_med_support` is a plain boolean with `DEFAULT false`. The Clinical Safety toggle in the eMAR chart is the only thing that flips it, so a client with meds on file but the toggle still off gets blocked out of the eMAR until an admin remembers to open the safety profile and turn it on.
+### 1. Structured goals become the canonical read source
 
-The rule the user wants: **the first time a client has any medication on file, self-admin support turns ON automatically, no matter which entry path added the medication (Smart Import commit, manual add on the profile, any future importer). Admins can still turn it OFF for a specific client, and the rule must not fight that decision by flipping it back on the next time a med row is written.**
+Replace flat-string reads of `clients.pcsp_goals` on the two surfaces that matter for this feature:
 
-## Approach
+- **Client detail → PCSP tab (`src/components/clients/pcsp-tab.tsx`)**: source goals from `client_specific_trainings.goals` (person_specific). Render each goal with: statement, Supports, Objective/measure, and a service-code chip row.
+- **Staff clock-out (`src/components/evv/punch-pad.tsx`)**: fetch structured goals for the locked client and filter to those whose `job_codes` include the shift's active `service_code`. Goals with an empty `job_codes` array are hidden from staff (this is the "flagged, needs admin" state). The goals-worked writeback keeps using the goal statement text as the key so downstream logs are unaffected.
 
-Do it at the database layer with a trigger on `client_medications`. That is the only surface every entry path funnels into — smart import commit, manual add, and any future import all `INSERT` rows here — so one trigger covers all of them and stays correct even if we add another importer later.
+`clients.pcsp_goals` stays populated as a mirror of the goal statements (existing save paths already do this) so whiteboard scoring, daily-log tagging, and audit packaging don't break.
 
-To respect an admin's explicit "off," add a lock column that records whether an admin has taken over the decision. The trigger only auto-enables when the lock is clear. The toggle UI sets the lock the moment a human touches it.
+### 2. Editable service codes on the PCSP tab
 
-### 1. Schema (single migration)
+Directly on `pcsp-tab.tsx`, each goal row gets a chip picker for service codes:
 
-- Add `public.clients.self_admin_med_support_locked boolean NOT NULL DEFAULT false`.
-  - `false` (the default) means "the auto rule owns this flag."
-  - `true` means "an admin has explicitly set this — leave it alone."
-- Add trigger function `public.autoenable_self_admin_on_med()`:
-  - Fires `AFTER INSERT` on `public.client_medications`.
-  - When the new row's client currently has `self_admin_med_support = false` AND `self_admin_med_support_locked = false`, update that client row to `self_admin_med_support = true`. Never touches the flag when the lock is on. Never turns it back off.
-  - `SECURITY DEFINER`, `SET search_path = public`, owned by the migration role so it can update `clients` regardless of the writer's RLS scope (Smart Import commits and manual inserts already run as authenticated org members).
-- Same migration includes the retroactive backfill:
-  ```sql
-  UPDATE public.clients c
-     SET self_admin_med_support = true
-   WHERE c.self_admin_med_support = false
-     AND c.self_admin_med_support_locked = false
-     AND EXISTS (SELECT 1 FROM public.client_medications m WHERE m.client_id = c.id);
-  ```
-  This catches the ~5 clients today that already have meds but the toggle off.
+- Chips render current `job_codes`; each has an × to remove.
+- An "Add code" chip opens a small menu listing the client's currently authorized codes (from `client_billing_codes`, active window). Picking one appends it.
+- Save writes the updated `goals` array back to `client_specific_trainings` for that client + `training_type = 'person_specific'`, and re-mirrors goal statements into `clients.pcsp_goals`.
+- Admin-only (gated behind existing "edit client" permission the tab already uses).
 
-### 2. UI: mark the lock when an admin sets the toggle
+The full goal editor (statement / supports / objective wording) stays reachable via the existing "Edit goals" path — this prompt only adds inline service-code editing at the tab level, since that's the ask.
 
-Only file touched: `src/components/workspace/emar-chart.tsx` (`ClientSafetyEditor` save mutation, ~line 194-210). Extend the `clients.update({...})` call to also write `self_admin_med_support_locked: true`. That means any admin save — whether flipping ON or OFF — takes ownership of the flag going forward, so the trigger stops auto-managing that client. This matches the user's stated case ("an admin should still be able to turn it off for a specific client") without the auto rule ever undoing the admin's choice.
+### 3. Extraction stays as-is, wording surfaced
 
-No other component reads or writes `self_admin_med_support_locked`. It is invisible to staff and admins; it is internal bookkeeping for the trigger.
+NECTAR already extracts `goal`, `supports`, `details`, `job_codes`. UI labels in GoalsEditor and pcsp-tab are relabelled so the four fields read as: **Goal**, **Supports (what staff do)**, **Objective / measure**, **Service codes** — matching the ask. No prompt or schema change to the extractor.
 
-### 3. Types
+### 4. Retroactive backfill (one-time migration)
 
-`src/integrations/supabase/types.ts` is auto-regenerated after the migration is approved, so the new column shows up there automatically for the UI edit.
+For every client where `clients.pcsp_goals` is non-empty AND there is no `client_specific_trainings` row of type `person_specific` with a non-empty `goals` array, insert/update a CST row whose `goals` is:
 
-## What is deliberately NOT changing
+```
+pcsp_goals.map(text => ({ id: gen_random_uuid(), goal: text, supports: '', details: '', job_codes: [] }))
+```
 
-- No new UI element, no new admin screen. The existing "Admin — edit clinical safety profile" editor is the same control it is today; only its save payload grows by one field.
-- No changes to Smart Import, the manual "add medication" form, or any other insert path — the trigger is what unifies them.
-- No changes to how the flag is *read* anywhere (mar-emar-tab gate, emar-chart eligibility, etc.).
-- No mass update to `self_admin_med_support_locked` for existing rows — everyone starts at "auto rule owns this," and the backfill lifts existing med-holding clients into the ON state in the same migration.
-- No changes to `client_medications` schema or RLS.
+Consequence: these clients keep their goal *text*, get `supports`/`details`/`job_codes` empty (visibly flagged as incomplete on the PCSP tab), and — because `job_codes` is empty — none of these goals appear for any staff member during a shift until an admin assigns at least one code. This matches the requested behavior exactly.
 
-## Edge cases considered
+## Files touched
 
-- **Deleting/discontinuing the last med** does not turn the flag back off. The user asked for "on when meds are present," not "off when they aren't"; and turning it off silently would break access to historical eMAR data. If a client legitimately no longer self-administers, an admin uses the existing toggle (which now also sets the lock).
-- **Smart Import commits multiple meds at once**: the trigger runs per row, but the update is idempotent — once the client is ON, subsequent rows in the same commit are no-ops.
-- **Trigger + admin race**: if an admin turns the toggle OFF at the same moment a new med row is inserted, whichever transaction commits last wins. That is acceptable — a human touching the toggle sets the lock, so any later med inserts will not flip it back on.
+- `supabase/migrations/<new>.sql` — one-time backfill from `clients.pcsp_goals` into `client_specific_trainings.goals`. No schema changes; the target column already exists.
+- `src/components/clients/pcsp-tab.tsx` — read structured goals; render Supports / Objective / service-code chip picker; save on edit.
+- `src/components/clients/client-specific-training-card.tsx` — relabel fields; keep GoalsEditor working (used by extract dialog).
+- `src/components/evv/punch-pad.tsx` — fetch structured goals for the locked client, filter by shift `service_code`, drop the flat `clients.pcsp_goals` path for the goals checklist.
+- `src/routes/dashboard.workspace.$clientId.tsx` — pass structured goals (or let punch-pad fetch) instead of the flat string list.
 
-## Order of operations
+Not touched: whiteboard scoring, daily-log tagging, audit package assembly, NECTAR extraction prompt, `clients.pcsp_goals` schema.
 
-1. Ship the migration (adds column, adds trigger, runs the backfill in one call).
-2. After the migration is approved and the types file regenerates, update `emar-chart.tsx` to include `self_admin_med_support_locked: true` in the safety-profile save.
+## Out of scope
+
+- No new DB table for goals. The existing jsonb column already models everything the ask needs, and splitting it out would ripple through a dozen surfaces for no user-visible gain.
+- No change to how the extractor decides which code to attach — it stays best-effort; admins fix it on the tab, which is the whole point of making the codes editable there.

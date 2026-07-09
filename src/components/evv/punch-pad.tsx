@@ -863,14 +863,41 @@ export function PunchPad({
   // CLOCK-OUT FLOW
   // ────────────────────────────────────────────────────────────────────────────
 
+  // Structured PCSP goals for the active shift's client, filtered to the
+  // service code the shift is being billed under. Goals with no service code
+  // assigned (empty job_codes) never surface — an admin must tag them first.
+  const activeClientIdForGoals = active?.client_id ?? null;
+  const structuredGoalsQ = useQuery({
+    enabled: !!activeClientIdForGoals,
+    queryKey: ["shift-structured-goals", activeClientIdForGoals],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_specific_trainings")
+        .select("goals")
+        .eq("client_id", activeClientIdForGoals as string)
+        .eq("training_type", "person_specific")
+        .maybeSingle();
+      if (error) throw error;
+      const raw = (data?.goals ?? []) as Array<{ goal?: string; job_codes?: string[] }>;
+      return Array.isArray(raw) ? raw : [];
+    },
+  });
+
   const activeClientGoals = useMemo<string[]>(() => {
     if (!active) return [];
-    if (lockedClient && active.client_id === lockedClient.id) {
-      return lockedClient.pcspGoals ?? [];
-    }
-    const c = caseload.find((x) => x.id === active.client_id);
-    return c?.pcsp_goals ?? [];
-  }, [active, lockedClient, caseload]);
+    const shiftCode = (active.service_type_code ?? "").toUpperCase();
+    if (!shiftCode) return [];
+    const rows = structuredGoalsQ.data ?? [];
+    return rows
+      .filter((g) => {
+        const codes = Array.isArray(g.job_codes)
+          ? g.job_codes.map((c) => String(c).toUpperCase())
+          : [];
+        return codes.includes(shiftCode);
+      })
+      .map((g) => (g.goal ?? "").toString().trim())
+      .filter((s) => s.length > 0);
+  }, [active, structuredGoalsQ.data]);
 
   const wordCount = useMemo(() => {
     const t = narrative.trim();
@@ -2618,7 +2645,9 @@ export function PunchPad({
                   <div className="grid gap-1.5 rounded-md border border-border p-3">
                     {activeClientGoals.length === 0 && (
                       <p className="text-xs text-muted-foreground">
-                        No active PCSP goals on file for this individual.
+                        No PCSP goals tagged for {active?.service_type_code ?? "this service code"} on this individual.
+                        Goals only appear here when an admin has tagged them with the service code you're clocked in under.
+                        Use baseline monitoring below.
                       </p>
                     )}
                     {activeClientGoals.map((goal, idx) => {

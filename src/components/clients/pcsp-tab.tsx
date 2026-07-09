@@ -14,23 +14,36 @@
 // permission so most staff never see dollar figures.
 
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   AlertTriangle,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   FileText,
+  Loader2,
   Lock,
+  Plus,
   Sparkles,
+  X,
 } from "lucide-react";
 import { usePermissions } from "@/hooks/use-permissions";
-import type { CSTGoal } from "@/lib/client-specific-training.functions";
+import {
+  updateClientSpecificTraining,
+  type CSTGoal,
+} from "@/lib/client-specific-training.functions";
 
 type ClientRow = Record<string, unknown> | null | undefined;
 
@@ -214,8 +227,26 @@ export function PcspTab({
     window.open(data.signedUrl, "_blank");
   };
 
-  const goals: CSTGoal[] = Array.isArray(client?.pcsp_goals)
-    ? (client!.pcsp_goals as CSTGoal[])
+  // Structured PCSP goals live on client_specific_trainings.goals (jsonb).
+  // The legacy clients.pcsp_goals text[] is still mirrored but we no longer
+  // read it here — it can't represent supports, objective, or service codes.
+  const goalsQ = useQuery({
+    enabled: !!clientId,
+    queryKey: ["pcsp-structured-goals", clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_specific_trainings")
+        .select("id, goals")
+        .eq("client_id", clientId)
+        .eq("training_type", "person_specific")
+        .maybeSingle();
+      if (error) throw error;
+      return data as { id: string; goals: CSTGoal[] | null } | null;
+    },
+  });
+  const trainingId = goalsQ.data?.id ?? null;
+  const goals: CSTGoal[] = Array.isArray(goalsQ.data?.goals)
+    ? (goalsQ.data!.goals as CSTGoal[])
     : [];
   const rights: string[] = Array.isArray(client?.rights_restrictions)
     ? (client!.rights_restrictions as string[])
@@ -237,6 +268,60 @@ export function PcspTab({
       (g) => !((g.supports ?? "").trim() && (g.details ?? "").trim()),
     ).length;
   }, [goals]);
+
+  // ── Inline service-code chip editing ────────────────────────────────────────
+  const canEditGoals = can("manage_users");
+  const authorizedCodesForClient: string[] = Array.isArray(codesQ.data)
+    ? Array.from(
+        new Set(
+          (codesQ.data as Array<{ service_code?: string | null; service_end_date?: string | null }>)
+            .filter((r) => {
+              if (!r.service_code) return false;
+              const end = r.service_end_date;
+              if (!end) return true;
+              return new Date(String(end)).getTime() > Date.now();
+            })
+            .map((r) => String(r.service_code).toUpperCase()),
+        ),
+      )
+    : [];
+  const queryClient = useQueryClient();
+  const updateCST = useServerFn(updateClientSpecificTraining);
+  const saveJobCodesMut = useMutation({
+    mutationFn: async (nextGoals: CSTGoal[]) => {
+      if (!trainingId) throw new Error("No PCSP training record yet — extract goals first.");
+      await updateCST({ data: { id: trainingId, goals: nextGoals } });
+      // Mirror goal statements back to clients.pcsp_goals so legacy readers
+      // (whiteboard scoring, daily logs, audit packages) stay in sync.
+      const flat = nextGoals
+        .map((g) => (g.goal ?? "").toString().trim())
+        .filter((s) => s.length > 0);
+      await supabase.from("clients").update({ pcsp_goals: flat }).eq("id", clientId);
+    },
+    onSuccess: () => {
+      toast.success("Service codes updated");
+      queryClient.invalidateQueries({ queryKey: ["pcsp-structured-goals", clientId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to update codes"),
+  });
+
+  function addCodeToGoal(index: number, code: string) {
+    const next = goals.map((g, i) => {
+      if (i !== index) return g;
+      const current = Array.isArray(g.job_codes) ? g.job_codes.map((c) => c.toUpperCase()) : [];
+      if (current.includes(code)) return g;
+      return { ...g, job_codes: [...current, code] };
+    });
+    saveJobCodesMut.mutate(next);
+  }
+  function removeCodeFromGoal(index: number, code: string) {
+    const next = goals.map((g, i) => {
+      if (i !== index) return g;
+      const current = Array.isArray(g.job_codes) ? g.job_codes : [];
+      return { ...g, job_codes: current.filter((c) => c.toUpperCase() !== code.toUpperCase()) };
+    });
+    saveJobCodesMut.mutate(next);
+  }
 
   const latestSummary = summariesQ.data?.[0];
   const latestSummaryFresh = useMemo(() => {
@@ -479,32 +564,35 @@ export function PcspTab({
             <ol className="space-y-2">
               {goals.map((g, i) => {
                 const incomplete = !((g.supports ?? "").trim() && (g.details ?? "").trim());
+                const assignedCodes = (Array.isArray(g.job_codes) ? g.job_codes : []).map((c) =>
+                  String(c).toUpperCase(),
+                );
+                const noCodes = assignedCodes.length === 0;
+                const addableCodes = authorizedCodesForClient.filter(
+                  (c) => !assignedCodes.includes(c),
+                );
+                const rowSaving = saveJobCodesMut.isPending;
                 return (
                   <li
                     key={g.id ?? i}
-                    className={`rounded-md border p-3 ${incomplete ? "border-amber-300 bg-amber-50/40" : ""}`}
+                    className={`rounded-md border p-3 ${
+                      incomplete || noCodes ? "border-amber-300 bg-amber-50/40" : ""
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm font-medium">
                         <span className="text-muted-foreground mr-1">{i + 1}.</span>
                         {g.goal}
                       </p>
-                      <div className="flex flex-wrap items-center gap-1">
-                        {(g.job_codes ?? []).map((c, j) => (
-                          <Badge key={`${c}-${j}`} variant="outline" className="text-[10px]">
-                            {c}
-                          </Badge>
-                        ))}
-                        {incomplete ? (
-                          <Badge variant="outline" className="border-amber-400 text-amber-800 text-[10px]">
-                            Needs supports/details
-                          </Badge>
-                        ) : null}
-                      </div>
+                      {incomplete ? (
+                        <Badge variant="outline" className="border-amber-400 text-amber-800 text-[10px]">
+                          Needs supports/objective
+                        </Badge>
+                      ) : null}
                     </div>
                     <dl className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
                       <div>
-                        <dt className="font-medium text-foreground">Supports</dt>
+                        <dt className="font-medium text-foreground">Supports (what staff do)</dt>
                         <dd className="text-muted-foreground">{g.supports?.trim() || "—"}</dd>
                       </div>
                       <div>
@@ -512,6 +600,80 @@ export function PcspTab({
                         <dd className="text-muted-foreground">{g.details?.trim() || "—"}</dd>
                       </div>
                     </dl>
+                    <div className="mt-2">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Service codes
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1">
+                        {assignedCodes.length === 0 && (
+                          <span className="text-[11px] text-amber-700">
+                            No service code assigned — staff won't see this goal on any shift until a code is added.
+                          </span>
+                        )}
+                        {assignedCodes.map((c) => (
+                          <Badge
+                            key={c}
+                            variant="outline"
+                            className="flex items-center gap-1 text-[11px]"
+                          >
+                            <span>{c}</span>
+                            {canEditGoals && (
+                              <button
+                                type="button"
+                                aria-label={`Remove ${c}`}
+                                disabled={rowSaving}
+                                onClick={() => removeCodeFromGoal(i, c)}
+                                className="rounded-full p-0.5 hover:bg-muted disabled:opacity-40"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            )}
+                          </Badge>
+                        ))}
+                        {canEditGoals && (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 gap-1 px-2 text-[11px]"
+                                disabled={rowSaving || !trainingId}
+                              >
+                                {rowSaving ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Plus className="h-3 w-3" />
+                                )}
+                                Add code
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent align="start" className="w-48 p-1">
+                              {addableCodes.length === 0 ? (
+                                <p className="p-2 text-xs text-muted-foreground">
+                                  {authorizedCodesForClient.length === 0
+                                    ? "No authorized service codes on file. Add codes on the Billing Codes tab first."
+                                    : "All authorized codes are already assigned to this goal."}
+                                </p>
+                              ) : (
+                                <ul className="max-h-56 overflow-y-auto">
+                                  {addableCodes.map((c) => (
+                                    <li key={c}>
+                                      <button
+                                        type="button"
+                                        onClick={() => addCodeToGoal(i, c)}
+                                        className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-muted"
+                                      >
+                                        <Plus className="h-3 w-3" /> {c}
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </PopoverContent>
+                          </Popover>
+                        )}
+                      </div>
+                    </div>
                   </li>
                 );
               })}

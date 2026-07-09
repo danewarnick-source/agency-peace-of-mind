@@ -264,6 +264,7 @@ export function PunchPad({
   const [success, setSuccess] = useState<null | {
     duration: string;
     evvClean: boolean;
+    correctionSubmitted?: boolean;
   }>(null);
 
   // ── Clock-out compliance modal state ────────────────────────────────────────

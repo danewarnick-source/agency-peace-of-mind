@@ -1865,6 +1865,7 @@ export function PunchPad({
         aiStatus: aiStatusForRow,
         aiFeedback: aiFeedbackForRow,
         aiIterationCount: iterationsToPersist,
+        correction: correctionPayload,
       });
     } catch (e) {
       toast.error((e as Error).message || "Could not end shift.");

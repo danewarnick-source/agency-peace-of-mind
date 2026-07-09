@@ -2645,7 +2645,9 @@ export function PunchPad({
                   <div className="grid gap-1.5 rounded-md border border-border p-3">
                     {activeClientGoals.length === 0 && (
                       <p className="text-xs text-muted-foreground">
-                        No active PCSP goals on file for this individual.
+                        No PCSP goals tagged for {active?.service_type_code ?? "this service code"} on this individual.
+                        Goals only appear here when an admin has tagged them with the service code you're clocked in under.
+                        Use baseline monitoring below.
                       </p>
                     )}
                     {activeClientGoals.map((goal, idx) => {

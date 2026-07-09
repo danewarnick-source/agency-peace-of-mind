@@ -10,79 +10,47 @@ export type ScheduledDose = {
   logged: boolean;
 };
 
-export type ShiftMedAttestationStatus = {
+export type ShiftMedDueStatus = {
   loading: boolean;
-  tableMissing: boolean;     // shift_medication_attestations not created yet
-  hasActiveMeds: boolean;
   scheduledDoses: ScheduledDose[];
   allDosesLogged: boolean;
   unloggedCount: number;
 };
 
 /**
- * Reads the client's active medications, expands their scheduled_times into
- * concrete dose timestamps falling inside the given window, then checks
- * `emar_logs` for matching observed/refused/etc. entries.
- *
- * Used by both the staff clock-out gate (EVV punch-pad) and the HHS daily
- * note gate. The window for clock-out is clock-in → now; the window for an
- * HHS daily note is start-of-day → end-of-day for that record.
+ * Expands the client's active medication `scheduled_times` into concrete dose
+ * timestamps inside the given window and checks `emar_logs` for a matching
+ * (medication_id, scheduled_for) row. Single source of truth used by both the
+ * EVV clock-out gate (window = clock-in → now) and the HHS daily-note gate
+ * (window = start-of-day → end-of-day) — "was this dose logged?" is answered
+ * by the real MAR (`emar_logs`), never by a shadow attestation.
  */
-export function useShiftMedAttestationStatus(args: {
+export function useShiftMedDueStatus(args: {
   organizationId: string | null | undefined;
   clientId: string | null | undefined;
   windowStart: string | null | undefined;
   windowEnd: string | null | undefined;
   enabled?: boolean;
-}): ShiftMedAttestationStatus {
+}): ShiftMedDueStatus {
   const { organizationId, clientId, windowStart, windowEnd } = args;
   const enabled = !!(args.enabled !== false && organizationId && clientId && windowStart && windowEnd);
 
   const q = useQuery({
     enabled,
+    // Refetch when the user returns from the eMAR tab so newly-logged doses
+    // flip the gate green automatically.
+    refetchOnWindowFocus: true,
     queryKey: [
-      "shift-med-attestation-status",
+      "shift-med-due-status",
       organizationId,
       clientId,
       windowStart,
       windowEnd,
     ],
-    queryFn: async () => {
-      // 1) Probe whether the attestation table exists yet.
+    queryFn: async (): Promise<{ scheduledDoses: ScheduledDose[] }> => {
+      // 1) Active medications for this client.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const probe = await (supabase as any)
-        .from("shift_medication_attestations")
-        .select("id", { head: true, count: "exact" })
-        .limit(1);
-      const tableMissing =
-        !!probe.error && /relation .* does not exist|schema cache/i.test(String(probe.error.message));
-
-      // 2) Active medications for this client.
-      const { data: meds, error: medsErr } = await (supabase as unknown as {
-        from: (t: string) => {
-          select: (cols: string) => {
-            eq: (
-              c: string,
-              v: string,
-            ) => {
-              eq: (
-                c: string,
-                v: string,
-              ) => {
-                eq: (c: string, v: boolean) => Promise<{
-                  data: Array<{
-                    id: string;
-                    medication_name: string;
-                    dosage: string | null;
-                    scheduled_times: string[] | null;
-                  }> | null;
-                  error: { message: string } | null;
-                }>;
-              };
-            };
-          };
-        };
-      })
+      const { data: meds, error: medsErr } = await (supabase as any)
         .from("client_medications")
         .select("id, medication_name, dosage, scheduled_times")
         .eq("organization_id", organizationId!)
@@ -90,16 +58,15 @@ export function useShiftMedAttestationStatus(args: {
         .eq("is_active", true);
       if (medsErr) throw new Error(medsErr.message);
 
-      const activeMeds = meds ?? [];
-      if (activeMeds.length === 0) {
-        return {
-          tableMissing,
-          hasActiveMeds: false,
-          scheduledDoses: [] as ScheduledDose[],
-        };
-      }
+      const activeMeds = (meds ?? []) as Array<{
+        id: string;
+        medication_name: string;
+        dosage: string | null;
+        scheduled_times: string[] | null;
+      }>;
+      if (activeMeds.length === 0) return { scheduledDoses: [] };
 
-      // 3) Expand scheduled_times into concrete ISO times inside the window.
+      // 2) Expand scheduled_times into concrete ISO times inside the window.
       const wsMs = new Date(windowStart!).getTime();
       const weMs = new Date(windowEnd!).getTime();
       const dayAnchor = new Date(windowStart!);
@@ -130,7 +97,7 @@ export function useShiftMedAttestationStatus(args: {
         });
       });
 
-      // 4) Cross-check existing eMAR logs in window.
+      // 3) Cross-check existing eMAR logs in window.
       if (doses.length > 0) {
         const medIds = Array.from(new Set(doses.map((d) => d.medication_id)));
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -152,25 +119,17 @@ export function useShiftMedAttestationStatus(args: {
         });
       }
 
-      // Sort by scheduled time.
       doses.sort((a, b) => a.scheduled_for_iso.localeCompare(b.scheduled_for_iso));
-
-      return {
-        tableMissing,
-        hasActiveMeds: true,
-        scheduledDoses: doses,
-      };
+      return { scheduledDoses: doses };
     },
   });
 
-  const data = q.data ?? { tableMissing: false, hasActiveMeds: false, scheduledDoses: [] };
-  const unloggedCount = data.scheduledDoses.filter((d) => !d.logged).length;
+  const doses = q.data?.scheduledDoses ?? [];
+  const unloggedCount = doses.filter((d) => !d.logged).length;
   return {
     loading: enabled && q.isLoading,
-    tableMissing: data.tableMissing,
-    hasActiveMeds: data.hasActiveMeds,
-    scheduledDoses: data.scheduledDoses,
-    allDosesLogged: data.scheduledDoses.length === 0 || unloggedCount === 0,
+    scheduledDoses: doses,
+    allDosesLogged: doses.length === 0 || unloggedCount === 0,
     unloggedCount,
   };
 }

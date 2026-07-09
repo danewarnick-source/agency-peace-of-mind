@@ -40,11 +40,7 @@ import { NoteTriggerPrompt } from "@/components/residential/note-trigger-prompt"
 import { IncidentReportDialog } from "@/components/incidents/incident-report-dialog";
 import { AlertTriangle as AlertTriangleIcon } from "lucide-react";
 import { useClientBillingCodes } from "@/hooks/use-client-billing-codes";
-import {
-  ShiftMedAttestation,
-  emptyMedAttestation,
-  type MedAttestationValue,
-} from "@/components/medications/shift-med-attestation";
+import { ShiftMedDueCheck } from "@/components/medications/shift-med-due-check";
 import { useComplianceGate } from "@/hooks/use-compliance-gate";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useServerFn } from "@tanstack/react-start";
@@ -346,8 +342,9 @@ export function PunchPad({
   const behaviorEnabled = behaviorSetting?.enabled ?? true;
   const [behaviorAnswers, setBehaviorAnswers] = useState<BehaviorAnswers>(emptyBehaviorAnswers);
 
-  // ── Per-shift medication observation attestation ──────────────────────────
-  const [medAttestation, setMedAttestation] = useState<MedAttestationValue>(emptyMedAttestation);
+  // ── Pre-submit medication check (reads real emar_logs, no shadow store) ───
+  const [medDosesResolved, setMedDosesResolved] = useState(true);
+
 
 
   // ── NECTAR Procedural Q&A (Infusion add-on) ────────────────────────────────
@@ -891,8 +888,7 @@ export function PunchPad({
     : 0;
   const isLongShift = liveDurationMs > 16 * 60 * 60 * 1000;
   const longShiftOk = !isLongShift || longShiftAck;
-  const medAttestationOk   = medAttestation.resolved;
-  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk && longShiftOk && triggersResolved && medAttestationOk && !busy;
+  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk && longShiftOk && triggersResolved && medDosesResolved && !busy;
 
 
   function openCompliance() {
@@ -918,7 +914,7 @@ export function PunchPad({
     setBehaviorAnswers(emptyBehaviorAnswers);
     setLongShiftAck(false);
     setTriggersResolved(true);
-    setMedAttestation(emptyMedAttestation);
+    setMedDosesResolved(true);
     stopRecording();
     setShowCompliance(true);
   }
@@ -1532,35 +1528,10 @@ export function PunchPad({
       }
     }
 
-    // Persist the per-shift medication observation attestation. Non-blocking:
-    // shift is already saved. If the table doesn't exist yet, the gate above
-    // auto-resolves and there's nothing to insert.
-    if (
-      medAttestation.resolved &&
-      medAttestation.observed !== null &&
-      medAttestation.signatureDataUrl &&
-      org?.organization_id
-    ) {
-      const { error: medErr } = await supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from("shift_medication_attestations" as any)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .insert({
-          organization_id: org.organization_id,
-          client_id: active.client_id,
-          staff_id: user.id,
-          shift_id: active.id,
-          hhs_daily_record_id: null,
-          observed: medAttestation.observed,
-          reason: medAttestation.observed === false ? medAttestation.reason.trim() : null,
-          signature_data_url: medAttestation.signatureDataUrl,
-          shift_window_start: active.clock_in_timestamp,
-          shift_window_end: clockOut,
-        } as any);
-      if (medErr && !/relation .* does not exist|schema cache/i.test(medErr.message)) {
-        toast.error(`Medication attestation not saved: ${medErr.message}`);
-      }
-    }
+    // Medication compliance is now recorded in the real MAR (`emar_logs`) via
+    // the eMAR tab — no shadow attestation write here.
+
+
 
 
 
@@ -1597,6 +1568,10 @@ export function PunchPad({
     }
     if (!triggersResolved) {
       toast.error("Resolve the NECTAR trigger(s) in your note before submitting.");
+      return;
+    }
+    if (!medDosesResolved) {
+      toast.error("Log all scheduled medication doses in eMAR before submitting.");
       return;
     }
     // Hard gate: if staff toggled the clock-out incident flag (or a Nectar
@@ -2804,18 +2779,18 @@ export function PunchPad({
                   />
                 )}
 
-                {/* Per-shift medication observation attestation */}
+                {/* Pre-submit medication check — routes staff into the real MAR */}
                 {active && org?.organization_id && (
-                  <ShiftMedAttestationSlot
+                  <ShiftMedDueCheckSlot
                     organizationId={org.organization_id}
                     clientId={active.client_id}
                     clientName={active.client_name ?? "this client"}
                     clockInIso={active.clock_in_timestamp}
                     emarHref={`/dashboard/workspace/${active.client_id}?tab=mar-emar`}
-                    value={medAttestation}
-                    onChange={setMedAttestation}
+                    onResolvedChange={setMedDosesResolved}
                   />
                 )}
+
 
 
                 {/* NECTAR Completeness Check */}
@@ -3031,19 +3006,18 @@ export function PunchPad({
 }
 
 /**
- * Wraps ShiftMedAttestation with a windowEnd that is captured ONCE per shift
- * (keyed on clockInIso). The parent re-renders every second to drive the live
- * shift timer, which previously caused the underlying React Query key to change
- * every second and refetch continuously, blocking the user from answering.
+ * Wraps ShiftMedDueCheck with a windowEnd captured ONCE per shift (keyed on
+ * clockInIso). The parent re-renders every second to drive the live shift
+ * timer; without this the React Query key would change every second and
+ * refetch continuously.
  */
-function ShiftMedAttestationSlot(props: {
+function ShiftMedDueCheckSlot(props: {
   organizationId: string;
   clientId: string;
   clientName: string;
   clockInIso: string;
   emarHref: string;
-  value: Parameters<typeof ShiftMedAttestation>[0]["value"];
-  onChange: Parameters<typeof ShiftMedAttestation>[0]["onChange"];
+  onResolvedChange: (resolved: boolean) => void;
 }) {
   const windowEnd = useMemo(
     () => new Date().toISOString(),
@@ -3051,15 +3025,15 @@ function ShiftMedAttestationSlot(props: {
     [props.clockInIso],
   );
   return (
-    <ShiftMedAttestation
+    <ShiftMedDueCheck
       organizationId={props.organizationId}
       clientId={props.clientId}
       clientName={props.clientName}
       windowStart={props.clockInIso}
       windowEnd={windowEnd}
       emarHref={props.emarHref}
-      value={props.value}
-      onChange={props.onChange}
+      onResolvedChange={props.onResolvedChange}
     />
   );
 }
+

@@ -2,6 +2,7 @@ import { useId } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ClipboardList, Info } from "lucide-react";
+import { selectedPill, unselectedPill } from "@/components/evv/toggle-styles";
 
 export type BehaviorTrend = "fewer" | "same" | "more" | "na";
 export type BehaviorFrequency = "0" | "1" | "2-3" | "4+";

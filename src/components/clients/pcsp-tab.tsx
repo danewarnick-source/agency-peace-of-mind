@@ -269,6 +269,60 @@ export function PcspTab({
     ).length;
   }, [goals]);
 
+  // ── Inline service-code chip editing ────────────────────────────────────────
+  const canEditGoals = can("manage_users");
+  const authorizedCodesForClient: string[] = Array.isArray(codesQ.data)
+    ? Array.from(
+        new Set(
+          (codesQ.data as Array<{ service_code?: string | null; service_end_date?: string | null }>)
+            .filter((r) => {
+              if (!r.service_code) return false;
+              const end = r.service_end_date;
+              if (!end) return true;
+              return new Date(String(end)).getTime() > Date.now();
+            })
+            .map((r) => String(r.service_code).toUpperCase()),
+        ),
+      )
+    : [];
+  const queryClient = useQueryClient();
+  const updateCST = useServerFn(updateClientSpecificTraining);
+  const saveJobCodesMut = useMutation({
+    mutationFn: async (nextGoals: CSTGoal[]) => {
+      if (!trainingId) throw new Error("No PCSP training record yet — extract goals first.");
+      await updateCST({ data: { id: trainingId, goals: nextGoals } });
+      // Mirror goal statements back to clients.pcsp_goals so legacy readers
+      // (whiteboard scoring, daily logs, audit packages) stay in sync.
+      const flat = nextGoals
+        .map((g) => (g.goal ?? "").toString().trim())
+        .filter((s) => s.length > 0);
+      await supabase.from("clients").update({ pcsp_goals: flat }).eq("id", clientId);
+    },
+    onSuccess: () => {
+      toast.success("Service codes updated");
+      queryClient.invalidateQueries({ queryKey: ["pcsp-structured-goals", clientId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to update codes"),
+  });
+
+  function addCodeToGoal(index: number, code: string) {
+    const next = goals.map((g, i) => {
+      if (i !== index) return g;
+      const current = Array.isArray(g.job_codes) ? g.job_codes.map((c) => c.toUpperCase()) : [];
+      if (current.includes(code)) return g;
+      return { ...g, job_codes: [...current, code] };
+    });
+    saveJobCodesMut.mutate(next);
+  }
+  function removeCodeFromGoal(index: number, code: string) {
+    const next = goals.map((g, i) => {
+      if (i !== index) return g;
+      const current = Array.isArray(g.job_codes) ? g.job_codes : [];
+      return { ...g, job_codes: current.filter((c) => c.toUpperCase() !== code.toUpperCase()) };
+    });
+    saveJobCodesMut.mutate(next);
+  }
+
   const latestSummary = summariesQ.data?.[0];
   const latestSummaryFresh = useMemo(() => {
     const last = latestSummary?.finalized_at || latestSummary?.updated_at;

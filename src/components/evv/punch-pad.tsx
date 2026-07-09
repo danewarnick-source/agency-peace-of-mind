@@ -2084,11 +2084,11 @@ export function PunchPad({
               onClick={openCompliance}
               disabled={busy}
               className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-rose-600 text-base font-bold uppercase tracking-wider text-white shadow-lg shadow-rose-600/30 transition hover:bg-rose-700 disabled:opacity-60"
-              aria-label="End EVV Shift"
+              aria-label={endIsEvv ? "End EVV Shift" : "Clock Out"}
             >
               {busy
                 ? <Loader2 className="h-5 w-5 animate-spin" />
-                : <><Square className="h-5 w-5 fill-current" /> ⏹️ END EVV SHIFT</>}
+                : <><Square className="h-5 w-5 fill-current" /> {endIsEvv ? "⏹️ END EVV SHIFT" : "⏹️ CLOCK OUT"}</>}
             </button>
           </div>
         ) : (
@@ -2099,7 +2099,7 @@ export function PunchPad({
                 onClick={handleClockIn}
                 disabled={busy || !inReady}
                 className="flex h-32 w-32 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 transition hover:scale-[1.02] hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                aria-label="Start EVV Shift"
+                aria-label={startIsEvv ? "Start EVV Shift" : "Clock In"}
               >
                 {busy
                   ? <Loader2 className="h-10 w-10 animate-spin" />
@@ -2107,7 +2107,7 @@ export function PunchPad({
               </button>
             </div>
             <p className="mt-3 text-center text-sm font-semibold uppercase tracking-wider">
-              ▶️ START EVV SHIFT
+              {startIsEvv ? "▶️ START EVV SHIFT" : "▶️ CLOCK IN"}
             </p>
           </>
         )}

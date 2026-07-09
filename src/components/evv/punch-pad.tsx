@@ -1361,6 +1361,11 @@ export function PunchPad({
     aiStatus?: "Verified" | "Flagged" | "Exception";
     aiFeedback?: string;
     aiIterationCount?: number;
+    correction?: {
+      correctedInIso: string | null;
+      correctedOutIso: string | null;
+      reason: string;
+    };
   }) {
     if (!user || !active) return;
 
@@ -1397,6 +1402,46 @@ export function PunchPad({
       update.ai_compliance_status    = args.aiStatus;
       update.ai_compliance_feedback  = args.aiFeedback ?? null;
       update.ai_coaching_iterations  = args.aiIterationCount ?? 0;
+    }
+
+    // Staff-requested time correction: never mutate raw punches. Write
+    // corrected_clock_in/out, edit_reason, and route to supervisor via
+    // review_status='needs_review'. Corrected times only become effective
+    // for billing after the supervisor approves (see billing-units.ts).
+    if (args.correction) {
+      const { correctedInIso, correctedOutIso, reason } = args.correction;
+      if (correctedInIso) update.corrected_clock_in = correctedInIso;
+      // If the staff didn't correct the out time, use the just-recorded
+      // clock-out — supervisors need a corrected pair to review a variance.
+      update.corrected_clock_out = correctedOutIso ?? clockOut;
+      update.edit_reason = reason.trim();
+      update.review_status = "needs_review";
+      update.edited_by = user.id;
+      update.edited_at = clockOut;
+      const auditEntry = {
+        kind: "staff_correction_request",
+        requested_by: user.id,
+        requested_at: clockOut,
+        from: {
+          clock_in: active.clock_in_timestamp,
+          clock_out: clockOut,
+        },
+        to: {
+          clock_in: correctedInIso ?? active.clock_in_timestamp,
+          clock_out: correctedOutIso ?? clockOut,
+        },
+        reason: reason.trim(),
+      };
+      // Append to edit_audit_history_log without clobbering existing entries.
+      const { data: existing } = await supabase
+        .from("evv_timesheets")
+        .select("edit_audit_history_log")
+        .eq("id", active.id)
+        .maybeSingle();
+      const prior = Array.isArray(existing?.edit_audit_history_log)
+        ? (existing!.edit_audit_history_log as unknown[])
+        : [];
+      update.edit_audit_history_log = [...prior, auditEntry];
     }
 
     // ── Compliance gate: check confirmed billing_conflict rules against the

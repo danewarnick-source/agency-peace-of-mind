@@ -1,35 +1,25 @@
 ## Problem
 
-In `src/components/evv/punch-pad.tsx`, the start/end buttons hard-code "EVV Shift" regardless of the selected service code:
+`src/components/staff-mobile/staff-mobile-shell.tsx` (line 44) sizes the mobile shell with `fixed inset-0`. On mobile browsers, `fixed inset-0` resolves against the **large viewport** (100vh equivalent) — a snapshot of the viewport as if the browser's URL/toolbar were hidden. As the address bar collapses and re-expands during scroll, the shell doesn't resize, so the top bar drifts off-screen and the bottom tabs/content misalign.
 
-- Line 2082 / 2086 — End button: `aria-label="End EVV Shift"` and label `END EVV SHIFT`
-- Line 2097 / 2105 — Start button: `aria-label="Start EVV Shift"` and label `START EVV SHIFT`
+Modern mobile browsers expose `dvh`/`dvw` (dynamic viewport units) that track the currently-visible area in real time — exactly what this shell needs.
 
-`isEvvLockedCode()` from `@/lib/evv-codes` already exists (used elsewhere in this same file) and returns true only for codes that actually require EVV transmission (COM, HSQ, PAC, ACA, CHA, RP2, RP3, SLH, SLN, CMP, CMS). All other codes (SEI, RHS, HHS, DSI, etc.) should read as plain time-clock actions.
+## Fix (frontend CSS only)
 
-## Fix (frontend copy only)
+In `src/components/staff-mobile/staff-mobile-shell.tsx`, change the outer container's sizing from `fixed inset-0` to a fixed anchor + dynamic viewport dimensions:
 
-In `src/components/evv/punch-pad.tsx`:
+```tsx
+className="md:hidden fixed left-0 top-0 z-30 h-[100dvh] w-[100dvw] flex flex-col overflow-hidden bg-background"
+```
 
-1. End button (running shift). Compute once:
-   ```ts
-   const endIsEvv = isEvvLockedCode(active?.service_type_code ?? "");
-   ```
-   - `aria-label` → `endIsEvv ? "End EVV Shift" : "Clock Out"`
-   - Visible label → `endIsEvv ? "⏹️ END EVV SHIFT" : "⏹️ CLOCK OUT"`
+- `fixed left-0 top-0` — same top-left anchor as `inset-0`.
+- `h-[100dvh]` — height tracks the browser's live visible area (shrinks/grows with the URL bar).
+- `w-[100dvw]` — width tracks the live visible width (safe against scrollbar/keyboard side-effects).
 
-2. Start button (pre-clock-in). Use the already-in-scope `serviceCode`:
-   ```ts
-   const startIsEvv = isEvvLockedCode(serviceCode);
-   ```
-   - `aria-label` → `startIsEvv ? "Start EVV Shift" : "Clock In"`
-   - Caption line (2104-2106) → `startIsEvv ? "▶️ START EVV SHIFT" : "▶️ CLOCK IN"`
-
-3. Section `aria-label` at line 1875 — make it dynamic on the current mode too: `isRunning ? (endIsEvv ? "EVV Shift Punch Pad" : "Time Clock") : (startIsEvv ? "EVV Shift Punch Pad" : "Time Clock")` — so screen-reader users don't hear "EVV" for non-EVV codes.
-
-No other strings changed. Lines 2307 ("Confirm Clock In & Start Shift"), 2390 ("Submit & Clock Out"), 2431 ("Got it — Start Shift") already use generic wording and are left alone. No logic/gating/business changes — the EVV geofence, consent gate, and locked-code enforcement still apply exactly as today; only the visible copy shifts to match the selected code.
+No other files change. The internal flex layout (top bar → main → active-shift bar → bottom tabs) already flows from that container, so once the outer height becomes dynamic, every child aligns correctly on scroll. No JS listeners, no CSS custom-property hack, no changes to overlays or portals.
 
 ## Verification
 
-- Select an EVV-locked code (e.g., SLH) → buttons still say "START EVV SHIFT" / "END EVV SHIFT".
-- Select a non-EVV code (e.g., HHS, DSI, SEI, RHS) → buttons say "CLOCK IN" / "CLOCK OUT" with no EVV wording anywhere on the pad.
+- On a phone (or DevTools mobile emulator with a simulated address bar), scroll a long staff page: the top bar stays pinned to the visible top edge and the bottom tabs stay pinned to the visible bottom edge as the address bar collapses/expands.
+- Desktop is unaffected (`md:hidden` still hides the shell above `md`).
+- Overlays/bottom sheets still portal into the shell container — behavior unchanged.

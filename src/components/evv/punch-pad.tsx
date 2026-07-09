@@ -948,6 +948,23 @@ export function PunchPad({
     setShowCompliance(true);
   }
 
+  // Format an ISO/Date as the value expected by <input type="datetime-local">
+  // in the browser's local timezone: YYYY-MM-DDTHH:MM.
+  function toLocalDatetimeInput(v: string | number | Date): string {
+    const d = new Date(v);
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function openCorrectionPanel(a: ActiveShift) {
+    setCorrectionOpen(true);
+    // Seed inputs so staff can nudge one field without retyping the whole
+    // date/time. Unchanged fields are treated as "this one was fine" only
+    // when they match the recorded value (see correctionHasChange).
+    setCorrectionIn((prev) => prev || toLocalDatetimeInput(a.clock_in_timestamp));
+    setCorrectionOut((prev) => prev || toLocalDatetimeInput(now));
+    if (!correctionReason) setCorrectionReason("");
+
   // Re-running the check is required after staff edit the note/goals
   useEffect(() => {
     if (completenessRan) {

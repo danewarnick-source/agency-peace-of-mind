@@ -88,6 +88,7 @@ const TIMEZONES = [
 const MAX_GPS_ACCURACY_METERS = 100; // readings worse (larger) than this are too coarse to trust
 
 import { haversineFeet as _sharedHaversineFeet } from "@/lib/geo";
+import { selectedPill, unselectedPill } from "@/components/evv/toggle-styles";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -2593,7 +2594,7 @@ export function PunchPad({
         {/* Clock-Out Compliance Modal */}
         <Dialog open={showCompliance} onOpenChange={(o) => { if (!busy) setShowCompliance(o); }}>
           <DialogContent
-            className="flex max-h-[100dvh] w-[calc(100%-1rem)] max-w-2xl flex-col gap-0 p-0 sm:max-h-[90vh] sm:w-full"
+            className="flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:max-h-[90vh] sm:w-full"
             onPointerDownOutside={(e) => e.preventDefault()}
             onEscapeKeyDown={(e) => e.preventDefault()}
           >
@@ -2609,7 +2610,7 @@ export function PunchPad({
               </div>
             </DialogHeader>
 
-            <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-6 sm:px-6">
               <div className="grid gap-4">
                 {/* PCSP goals */}
                 <div className="grid gap-2">
@@ -2622,17 +2623,20 @@ export function PunchPad({
                     )}
                     {activeClientGoals.map((goal, idx) => {
                       const id = `goal-${idx}`;
+                      const sel = !!checkedGoals[goal];
                       return (
                         <label
                           key={id}
                           htmlFor={id}
-                          className="flex cursor-pointer items-start gap-2 rounded-md p-1.5 text-sm hover:bg-accent"
+                          className={`flex cursor-pointer items-start gap-2 rounded-md border p-1.5 text-sm ${
+                            sel ? selectedPill : unselectedPill
+                          }`}
                         >
                           <input
                             id={id}
                             type="checkbox"
-                            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-primary"
-                            checked={!!checkedGoals[goal]}
+                            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[color:var(--amber-600)]"
+                            checked={sel}
                             onChange={(e) => setCheckedGoals((p) => ({ ...p, [goal]: e.target.checked }))}
                           />
                           <span className="break-words">{goal}</span>
@@ -2642,12 +2646,14 @@ export function PunchPad({
                     <div className="my-1 border-t border-dashed border-border" />
                     <label
                       htmlFor="goal-baseline"
-                      className="flex cursor-pointer items-start gap-2 rounded-md p-1.5 text-sm hover:bg-accent"
+                      className={`flex cursor-pointer items-start gap-2 rounded-md border p-1.5 text-sm ${
+                        baselineChecked ? selectedPill : unselectedPill
+                      }`}
                     >
                       <input
                         id="goal-baseline"
                         type="checkbox"
-                        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-primary"
+                        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[color:var(--amber-600)]"
                         checked={baselineChecked}
                         onChange={(e) => setBaselineChecked(e.target.checked)}
                       />
@@ -2716,7 +2722,7 @@ export function PunchPad({
                           size="sm"
                           variant="outline"
                           onClick={() => (isRecording ? stopRecording() : startRecording())}
-                          className={`min-h-[44px] ${isRecording ? "border-rose-500 text-rose-700" : ""}`}
+                          className={`min-h-[44px] border ${isRecording ? selectedPill : unselectedPill}`}
                         >
                           {isRecording ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
                           {isRecording ? "Stop voice" : "Speak shorthand"}
@@ -2936,10 +2942,10 @@ export function PunchPad({
                       <Button
                         type="button"
                         size="sm"
-                        variant={completenessRan ? "outline" : "default"}
+                        variant="outline"
                         onClick={() => { void runCompletenessCheck(); }}
                         disabled={completenessBusy}
-                        className={completenessRan ? "" : "bg-[color:var(--amber-600)] text-white hover:bg-[color:var(--amber-700)]"}
+                        className="border-[color:var(--amber-600)]/60 text-[color:var(--amber-700)] hover:bg-[color:var(--amber-50)]"
                       >
                         {completenessBusy && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                         {completenessRan ? "Re-check" : "Run check"}
@@ -3043,12 +3049,10 @@ export function PunchPad({
                     )}
                   </div>
                 </NectarInfusionLock>
-              </div>
-            </div>
 
-
-            <div className="shrink-0 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:px-6 sm:py-4">
-              <div className="flex flex-col gap-2">
+                {/* Long-shift acknowledgement / correction request — lives in
+                    the scrollable area so a growing correction panel never
+                    pushes the submit button off-screen. */}
                 {isLongShift && !correctionOpen && (
                   <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-100">
                     <div className="flex items-start gap-2">
@@ -3058,10 +3062,14 @@ export function PunchPad({
                           This shift shows <span className="font-mono font-semibold">{elapsed}</span>. If you forgot to clock out or the times are wrong, request a time correction below instead of confirming these times.
                         </p>
                         <div className="flex flex-wrap items-center gap-3">
-                          <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
+                          <label
+                            className={`flex min-h-[36px] cursor-pointer items-center gap-2 rounded-md border px-2 text-xs font-medium ${
+                              longShiftAck ? selectedPill : unselectedPill
+                            }`}
+                          >
                             <input
                               type="checkbox"
-                              className="h-4 w-4 cursor-pointer accent-amber-600"
+                              className="h-4 w-4 cursor-pointer accent-[color:var(--amber-600)]"
                               checked={longShiftAck}
                               onChange={(e) => setLongShiftAck(e.target.checked)}
                             />
@@ -3072,7 +3080,7 @@ export function PunchPad({
                             size="sm"
                             variant="outline"
                             onClick={() => active && openCorrectionPanel(active)}
-                            className="h-8 border-amber-500/60 text-amber-900 hover:bg-amber-500/20 dark:text-amber-100"
+                            className="h-8 border-[color:var(--amber-600)]/60 text-[color:var(--amber-700)] hover:bg-[color:var(--amber-50)]"
                           >
                             <Pencil className="mr-1.5 h-3.5 w-3.5" /> Request time correction
                           </Button>
@@ -3082,22 +3090,20 @@ export function PunchPad({
                   </div>
                 )}
 
-                {/* Staff-requested time correction panel. Writes to
-                    corrected_clock_in/out + edit_reason and routes to
-                    supervisor review; raw punches are never mutated. */}
                 {!correctionOpen && !isLongShift && active && (
                   <div className="flex justify-end">
                     <Button
                       type="button"
                       size="sm"
-                      variant="ghost"
+                      variant="outline"
                       onClick={() => openCorrectionPanel(active)}
-                      className="h-8 text-[11px] text-muted-foreground hover:text-foreground"
+                      className="h-8 border-[color:var(--amber-600)]/60 text-[color:var(--amber-700)] hover:bg-[color:var(--amber-50)]"
                     >
-                      <Pencil className="mr-1.5 h-3 w-3" /> The recorded times are wrong — request a correction
+                      <Pencil className="mr-1.5 h-3.5 w-3.5" /> Request time correction
                     </Button>
                   </div>
                 )}
+
                 {correctionOpen && active && (
                   <div className="rounded-md border border-amber-500/60 bg-amber-500/5 p-3 text-sm">
                     <div className="mb-2 flex items-start gap-2">
@@ -3167,6 +3173,12 @@ export function PunchPad({
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+
+
+            <div className="shrink-0 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:px-6 sm:py-4">
+              <div className="flex flex-col gap-2">
 
                 <div className="flex items-center justify-end text-[11px]">
                   {hardwareDenied ? (

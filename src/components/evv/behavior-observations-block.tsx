@@ -2,6 +2,7 @@ import { useId } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ClipboardList, Info } from "lucide-react";
+import { selectedPill, unselectedPill } from "@/components/evv/toggle-styles";
 
 export type BehaviorTrend = "fewer" | "same" | "more" | "na";
 export type BehaviorFrequency = "0" | "1" | "2-3" | "4+";
@@ -107,9 +108,7 @@ export function BehaviorObservationsBlock({
             <label
               key={String(opt.v)}
               className={`flex min-h-[44px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium ${
-                value.behaviorsObserved === opt.v
-                  ? "border-[color:var(--amber-600)] bg-[color:var(--amber-100)] text-[color:var(--navy-900)]"
-                  : "border-border bg-background hover:bg-accent"
+                value.behaviorsObserved === opt.v ? selectedPill : unselectedPill
               }`}
             >
               <input
@@ -157,9 +156,7 @@ export function BehaviorObservationsBlock({
                             key={f}
                             onClick={() => setCount(name, f)}
                             className={`min-h-[36px] min-w-[44px] rounded-md border px-2 text-[11px] font-medium ${
-                              (value.counts[name] ?? "") === f
-                                ? "border-[color:var(--amber-600)] bg-[color:var(--amber-100)] text-[color:var(--navy-900)]"
-                                : "border-border bg-background hover:bg-accent"
+                              (value.counts[name] ?? "") === f ? selectedPill : unselectedPill
                             }`}
                           >
                             {f}
@@ -219,7 +216,11 @@ export function BehaviorObservationsBlock({
           </div>
 
           {/* Q6 */}
-          <div className="flex flex-col items-start gap-2 rounded-md border border-border bg-background/70 p-2 sm:flex-row sm:items-center sm:justify-between">
+          <div
+            className={`flex flex-col items-start gap-2 rounded-md border p-2 sm:flex-row sm:items-center sm:justify-between ${
+              value.reportableIncident ? selectedPill : unselectedPill
+            }`}
+          >
             <label className="flex min-h-[44px] cursor-pointer items-center gap-2 text-xs font-medium">
               <input
                 type="checkbox"
@@ -270,9 +271,7 @@ export function BehaviorObservationsBlock({
             <label
               key={k}
               className={`flex min-h-[40px] cursor-pointer items-center justify-center rounded-md border px-2 text-[11px] font-medium ${
-                value.trendVsRecent === k
-                  ? "border-[color:var(--amber-600)] bg-[color:var(--amber-100)] text-[color:var(--navy-900)]"
-                  : "border-border bg-background hover:bg-accent"
+                value.trendVsRecent === k ? selectedPill : unselectedPill
               }`}
             >
               <input

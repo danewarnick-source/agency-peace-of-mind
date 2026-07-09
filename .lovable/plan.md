@@ -1,55 +1,70 @@
-## Goal
-Give staff a real end-to-end path to request a time correction on the Submit Final Timesheet screen, route the request to a supervisor who can actually approve/deny it, apply the corrected times to the shift on approval, and let the staff member see status.
+# Clock-out screen — consistent selection styling + scroll fix
 
-## What already exists (verified in code)
-- `evv_timesheets` columns: `corrected_clock_in`, `corrected_clock_out`, `edit_reason`, `review_status`, `review_note`, `reviewed_by`, `reviewed_at`, `edit_audit_history_log`.
-- `src/lib/billing-units.ts` already treats `corrected_clock_in/out` as effective ONLY when `review_status='approved'` — so approving a correction automatically flips billing to the corrected times without touching raw punches.
-- `dashboard.compliance-desk.tsx` "Needs Review" tab already lists rows where `review_status='needs_review'`, shows original vs corrected times side-by-side and `edit_reason`, and has approve (sets `review_status='approved'`) and reject with required reviewer note (sets `rejected`).
-- `punch-pad.tsx` already has unused state (`correction`, `forgotOpen`, `forgotIn`, `forgotOut`, `forgotReason`) and a comment describing this exact intended flow — but no UI or submit wiring.
+Scope: the "Shift Verification & Medicaid Compliance Form" dialog opened from Submit Final Timesheet (`src/components/evv/punch-pad.tsx`) plus the shared `src/components/evv/behavior-observations-block.tsx` used inside it. Presentation only — no submit logic, gates, billing, or copy meaning changes.
 
-So the DB, billing math, and supervisor screen are all in place. The gap is entirely on the staff side (request UI, submit wiring, status view).
+## Problem 1: inconsistent selected vs unselected states
 
-## What to build
+The dialog mixes several different visual languages for "on/off":
 
-### 1. Staff correction UI on the Submit Final Timesheet screen
-In `src/components/evv/punch-pad.tsx`, in the submit dialog footer (near the amber long-shift banner), add a "Request time correction" secondary button that opens a small in-dialog panel with:
-- Current recorded clock-in (read-only, for reference)
-- Current recorded clock-out (read-only)
-- Two `datetime-local` inputs for proposed corrected in / out (either or both may be edited; unchanged means "this one is fine")
-- A required reason textarea (≥10 chars)
-- Cancel / "Submit correction request" actions
+- Behavior Observations block already has a good, consistent pattern for its Yes/No, frequency chips, and trend segmented control:
+  selected → `border-[color:var(--amber-600)] bg-[color:var(--amber-100)] text-[color:var(--navy-900)]`
+  unselected → `border-border bg-background hover:bg-accent`
+- Elsewhere in the same dialog the same idea is styled differently:
+  - Mic "Speak shorthand / Stop voice" toggles to a rose border/text when active — rose is used everywhere else as destructive, so it reads as an error, not "on".
+  - Completeness Check "Run check" is solid amber, then flips to `variant="outline"` after running — that visually reads as a state toggle even though it's really the same action with a new label.
+  - Goal checkboxes, baseline checkbox, "these times are accurate", and "I've reviewed this note" checkboxes are a mix of `accent-primary` and `accent-[color:var(--amber-600)]`, and none of them highlight the row when selected (unlike the behavior-block checkboxes).
+  - "Request time correction" is an outline amber button; the sibling "recorded times are wrong — request a correction" is a plain ghost link. Same action, two shapes.
 
-Reuse the existing `correction` / `forgotIn` / `forgotOut` / `forgotReason` state (rename to a single `correctionDraft` for clarity). Validate: at least one of in/out must actually differ from the recorded time; corrected out must be after corrected in; correction window can't extend more than 24h past clock-in.
+## Problem 2: layout / scroll
 
-Replace the current "don't submit — tell your supervisor" copy on the long-shift amber banner with a direct "Request a time correction" button that opens the same panel.
+The dialog is `flex-col` with a sticky header, a `flex-1 overflow-y-auto` middle, and a sticky footer. The footer currently holds:
 
-### 2. Submit path for a correction
-Extend `finalizeClockOut` to accept an optional `correction: { correctedIn?: string; correctedOut?: string; reason: string }` and, when present, add to the update object:
-- `corrected_clock_in` / `corrected_clock_out` (only the field(s) the staff changed)
-- `edit_reason` (the reason)
-- `review_status: 'needs_review'`
-- `edited_by: user.id`, `edited_at: now`
-- Append an entry to `edit_audit_history_log` describing `{ kind: 'staff_correction_request', requested_by, requested_at, from: {...}, to: {...}, reason }`
+- Long-shift acknowledgement banner (when applicable)
+- Ghost "recorded times are wrong" button
+- The full correction request panel (two datetime inputs + reason textarea + cancel)
+- GPS status pill
+- Primary submit button
+- Secondary "submit anyway" exception button
 
-Route the "Submit correction request" button through `submitCompliance({ correction })` so it still passes the existing gates (narrative, goals, med check, incident, NECTAR coach). On success, toast "Correction request sent to your supervisor" and close the dialog.
+On phones (`max-h-[100dvh]`), opening the correction panel plus a long-shift banner grows the footer past half the viewport and squeezes the scrollable middle so goals/narrative are barely reachable. On short viewports the exception button can be pushed off-screen entirely.
 
-### 3. Staff status visibility
-Add `src/routes/dashboard.my-time-corrections.tsx` (under the authenticated dashboard) showing the current staff member's own timesheets where `edit_reason IS NOT NULL` AND `review_status IN ('needs_review','approved','rejected')`, most recent first. Columns: client · service · original in/out · requested in/out · reason · status badge · reviewer note (if rejected) · reviewed_at.
+## Fix
 
-Add a nav entry under the staff/employee dashboard sidebar section (matching the existing pattern for `dashboard.my-historical-timesheets.tsx`). Also surface a small "Correction pending / approved / needs another try" badge on the punch-pad's recent-shifts strip so staff see status without navigating.
+### A. One shared "toggle" look
 
-### 4. Supervisor screen touch-up (small)
-The compliance-desk "Needs Review" tab already handles the row, but two small changes:
-- On the row card, when `edit_reason` was set by a staff correction (detectable via the audit-log entry's `kind`), label the block "Staff-requested correction" so supervisors know this came from the caregiver, not from a system flag (incident / 16h / etc.).
-- On approve success toast, keep the existing wording; on reject, add a line that the staff member will see the reviewer note in their My Time Corrections screen.
+Introduce two tiny local class helpers at the top of `punch-pad.tsx` (no new file):
 
-## Files touched
-- `src/components/evv/punch-pad.tsx` — correction panel UI, wire `finalizeClockOut` + `submitCompliance` to accept correction, replace long-shift banner CTA.
-- `src/routes/dashboard.my-time-corrections.tsx` — new route.
-- Sidebar/nav file that lists `dashboard.my-historical-timesheets` — add link.
-- `src/routes/dashboard.compliance-desk.tsx` — label tweak for staff-originated corrections.
+```
+const selectedPill   = "border-[color:var(--amber-600)] bg-[color:var(--amber-100)] text-[color:var(--navy-900)]";
+const unselectedPill = "border-border bg-background hover:bg-accent";
+```
 
-## Out of scope
-- No DB migration (columns already exist).
-- No changes to `billing-units.ts` (approval-gated corrected-times logic already correct).
-- No changes to raw `clock_in_timestamp` / `clock_out_timestamp` — those stay immutable; corrections live in the corrected columns and take effect via `review_status='approved'`.
+Apply them to every selectable control inside the dialog:
+
+1. Mic button — drop the rose styling; use `selectedPill` when `isRecording`, `unselectedPill` otherwise. Keep the MicOff icon + "Stop voice" label as the affordance for "click to turn off".
+2. Completeness Check button — stop switching variants. Keep a single visual (outline amber) and only change the label between "Run check" and "Re-check". This removes the false "selected" read.
+3. Goal + baseline checkboxes, "These times are accurate", "I've reviewed this note", and behavior-block Q6 checkbox — standardize on `accent-[color:var(--amber-600)]` and wrap each row so the whole row picks up `selectedPill` when checked (matching how the behavior block already treats Yes/No). This ties every checkbox in the dialog to the same visual grammar.
+4. "Request time correction" (in the long-shift banner) and the ghost "recorded times are wrong" link — collapse to a single outline-amber button placement; the long-shift banner shows it inline, the non-long-shift path shows the same button right-aligned above the submit row.
+
+Behavior block file needs no logic edits; only the shared class strings change so the same tokens live in both files (or we import the two strings from a small `src/components/evv/toggle-styles.ts` — cleaner, and the plan uses this).
+
+### B. Layout / scroll
+
+1. Move the long-shift banner and the correction panel out of the sticky footer and into the bottom of the scrollable middle (`flex-1 overflow-y-auto`). They are shift-context inputs, not submit controls, so they belong with the rest of the form and are free to grow without eating the viewport.
+2. Keep the sticky footer minimal and predictable: GPS status pill + primary submit + (when shown) exception button. That footer is now a fixed ~2 rows tall regardless of state.
+3. Tighten the dialog shell:
+   - `DialogContent` → `max-h-[calc(100dvh-1rem)] sm:max-h-[90vh] overflow-hidden`
+   - Middle scroller → add `min-h-0` (needed for `flex-1 overflow-y-auto` to actually scroll inside a flex column on iOS) and bump bottom padding (`pb-6`) so the last field isn't hugging the footer border.
+4. Ensure the sticky footer stacks vertically on narrow widths so the exception button never gets clipped next to the primary submit.
+
+### Files touched
+
+- `src/components/evv/punch-pad.tsx` — the whole compliance `Dialog` (header stays, middle grows, footer shrinks) and the toggle-class swaps.
+- `src/components/evv/behavior-observations-block.tsx` — swap the inline "selected" class strings for the shared ones.
+- `src/components/evv/toggle-styles.ts` — new tiny module exporting the two class strings.
+
+### Out of scope
+
+- No changes to submit gates, NECTAR checks, med-due logic, correction submit path, billing, or dialog copy.
+- No changes to the incident dialog or the pending-forms dialog.
+- No changes outside the clock-out dialog surface.

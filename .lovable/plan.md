@@ -1,6 +1,6 @@
 ## Problem
 
-`src/components/staff-mobile/staff-mobile-shell.tsx` (line 44) sizes the mobile shell with `fixed inset-0`. On mobile browsers, `fixed inset-0` resolves against the **large viewport** (100vh equivalent) — a snapshot of the viewport as if the browser's URL/toolbar were hidden. As the address bar collapses and re-expands during scroll, the shell doesn't resize, so the top bar drifts off-screen and the bottom tabs/content misalign.
+`src/components/staff-mobile/staff-mobile-shell.tsx` (line 44) sizes the mobile shell with `fixed inset-0`. On mobile browsers, `fixed inset-0` resolves against the **large viewport** — a static snapshot taken as if the URL/toolbar were hidden. As the address bar collapses and re-expands during scroll, the shell doesn't resize, so the top bar drifts off-screen and the bottom tabs/content misalign.
 
 Modern mobile browsers expose `dvh`/`dvw` (dynamic viewport units) that track the currently-visible area in real time — exactly what this shell needs.
 
@@ -14,7 +14,7 @@ className="md:hidden fixed left-0 top-0 z-30 h-[100dvh] w-[100dvw] flex flex-col
 
 - `fixed left-0 top-0` — same top-left anchor as `inset-0`.
 - `h-[100dvh]` — height tracks the browser's live visible area (shrinks/grows with the URL bar).
-- `w-[100dvw]` — width tracks the live visible width (safe against scrollbar/keyboard side-effects).
+- `w-[100dvw]` — width tracks the live visible width.
 
 No other files change. The internal flex layout (top bar → main → active-shift bar → bottom tabs) already flows from that container, so once the outer height becomes dynamic, every child aligns correctly on scroll. No JS listeners, no CSS custom-property hack, no changes to overlays or portals.
 

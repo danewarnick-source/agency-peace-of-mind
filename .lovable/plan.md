@@ -1,37 +1,35 @@
 ## Problem
 
-In `src/components/evv/punch-pad.tsx` (line 2809), the clock-out screen passes a live-updating `windowEnd` into the med-attestation check:
+In `src/components/evv/punch-pad.tsx`, the start/end buttons hard-code "EVV Shift" regardless of the selected service code:
 
-```tsx
-<ShiftMedAttestation
-  windowStart={active.clock_in_timestamp}
-  windowEnd={new Date(now).toISOString()}   // `now` ticks every 1s
-/>
-```
+- Line 2082 / 2086 — End button: `aria-label="End EVV Shift"` and label `END EVV SHIFT`
+- Line 2097 / 2105 — Start button: `aria-label="Start EVV Shift"` and label `START EVV SHIFT`
 
-`now` is the shift-timer state that re-renders every second (line 460: `setInterval(() => setNow(Date.now()), 1000)`). That value flows into `useShiftMedAttestationStatus`, where it becomes part of the React Query `queryKey`. New key every second → the query refetches every second → the attestation UI resets constantly and the user can never finish answering it, blocking clock-out.
+`isEvvLockedCode()` from `@/lib/evv-codes` already exists (used elsewhere in this same file) and returns true only for codes that actually require EVV transmission (COM, HSQ, PAC, ACA, CHA, RP2, RP3, SLH, SLN, CMP, CMS). All other codes (SEI, RHS, HHS, DSI, etc.) should read as plain time-clock actions.
 
-## Fix
+## Fix (frontend copy only)
 
-Freeze `windowEnd` to a single timestamp captured when the clock-out flow opens, instead of the ticking timer. The shift's actual window for the med check is "clock-in → the moment we're checking", which only needs to be sampled once (the med schedule is anchored on `clock_in_timestamp` and doesn't move as seconds pass).
+In `src/components/evv/punch-pad.tsx`:
 
-### Change (frontend only, `src/components/evv/punch-pad.tsx`)
+1. End button (running shift). Compute once:
+   ```ts
+   const endIsEvv = isEvvLockedCode(active?.service_type_code ?? "");
+   ```
+   - `aria-label` → `endIsEvv ? "End EVV Shift" : "Clock Out"`
+   - Visible label → `endIsEvv ? "⏹️ END EVV SHIFT" : "⏹️ CLOCK OUT"`
 
-Inside `ShiftMedAttestation` render site:
+2. Start button (pre-clock-in). Use the already-in-scope `serviceCode`:
+   ```ts
+   const startIsEvv = isEvvLockedCode(serviceCode);
+   ```
+   - `aria-label` → `startIsEvv ? "Start EVV Shift" : "Clock In"`
+   - Caption line (2104-2106) → `startIsEvv ? "▶️ START EVV SHIFT" : "▶️ CLOCK IN"`
 
-- Compute a stable end-of-window with `useMemo`, keyed on `active.clock_in_timestamp` (and only recomputed if the active shift itself changes), e.g.:
-  ```tsx
-  const medCheckWindowEnd = useMemo(
-    () => new Date().toISOString(),
-    [active?.clock_in_timestamp],
-  );
-  ```
-- Pass `windowEnd={medCheckWindowEnd}` instead of `new Date(now).toISOString()`.
+3. Section `aria-label` at line 1875 — make it dynamic on the current mode too: `isRunning ? (endIsEvv ? "EVV Shift Punch Pad" : "Time Clock") : (startIsEvv ? "EVV Shift Punch Pad" : "Time Clock")` — so screen-reader users don't hear "EVV" for non-EVV codes.
 
-That's the whole change. The 1-second timer keeps driving the on-screen elapsed clock; the med check receives a stable window and runs once per shift instead of once per second.
+No other strings changed. Lines 2307 ("Confirm Clock In & Start Shift"), 2390 ("Submit & Clock Out"), 2431 ("Got it — Start Shift") already use generic wording and are left alone. No logic/gating/business changes — the EVV geofence, consent gate, and locked-code enforcement still apply exactly as today; only the visible copy shifts to match the selected code.
 
-### Verification
+## Verification
 
-- Open the clock-out sheet on a shift with active meds → attestation loads once, stays interactive, user can submit.
-- The visible shift timer still ticks every second.
-- No changes to hook logic, query, RLS, or DB.
+- Select an EVV-locked code (e.g., SLH) → buttons still say "START EVV SHIFT" / "END EVV SHIFT".
+- Select a non-EVV code (e.g., HHS, DSI, SEI, RHS) → buttons say "CLOCK IN" / "CLOCK OUT" with no EVV wording anywhere on the pad.

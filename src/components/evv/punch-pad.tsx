@@ -1618,7 +1618,11 @@ export function PunchPad({
     setShowCompliance(false);
     setOutVariance(null);
     setOutVarianceReason("");
-    setSuccess({ duration, evvClean: !args.outsideReason });
+    setSuccess({
+      duration,
+      evvClean: !args.outsideReason && !args.correction,
+      correctionSubmitted: !!args.correction,
+    });
     await qc.invalidateQueries({ queryKey: ["evv-active", user.id] });
   }
 

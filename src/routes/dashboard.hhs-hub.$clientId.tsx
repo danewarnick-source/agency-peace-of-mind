@@ -74,7 +74,7 @@ function HhsClientHub() {
     queryFn: async () => {
       const { data } = await supabase
         .from("clients")
-        .select("id, first_name, last_name, pcsp_goals, physical_address, special_directions, profile_photo_url, geofence_radius_feet, authorized_dspd_codes, feature_config" as any)
+        .select("id, first_name, last_name, pcsp_goals, physical_address, special_directions, profile_photo_url, geofence_radius_feet, authorized_dspd_codes, feature_config, allergies, dysphagia, swallowing_alerts" as any)
         .eq("id", clientId)
         .maybeSingle();
       return data as ClientFull | null;

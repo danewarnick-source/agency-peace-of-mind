@@ -2942,10 +2942,10 @@ export function PunchPad({
                       <Button
                         type="button"
                         size="sm"
-                        variant={completenessRan ? "outline" : "default"}
+                        variant="outline"
                         onClick={() => { void runCompletenessCheck(); }}
                         disabled={completenessBusy}
-                        className={completenessRan ? "" : "bg-[color:var(--amber-600)] text-white hover:bg-[color:var(--amber-700)]"}
+                        className="border-[color:var(--amber-600)]/60 text-[color:var(--amber-700)] hover:bg-[color:var(--amber-50)]"
                       >
                         {completenessBusy && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                         {completenessRan ? "Re-check" : "Run check"}

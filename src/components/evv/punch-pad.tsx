@@ -1647,6 +1647,27 @@ export function PunchPad({
       toast.error("Log all scheduled medication doses in eMAR before submitting.");
       return;
     }
+    if (correctionOpen && !correctionValid) {
+      if (!correctionHasChange) {
+        toast.error("Enter the corrected clock-in and/or clock-out time.");
+      } else if (!correctionReasonOk) {
+        toast.error("Add a short reason (at least 10 characters) for the correction.");
+      } else if (!correctionOrderOk) {
+        toast.error("Corrected clock-out must be after the corrected clock-in.");
+      } else if (!correctionWithinWindow) {
+        toast.error("Correction times are outside the allowed window for this shift.");
+      } else {
+        toast.error("Fix the time-correction fields before submitting.");
+      }
+      return;
+    }
+    const correctionPayload = correctionOpen
+      ? {
+          correctedInIso: correctionInIso,
+          correctedOutIso: correctionOutIso,
+          reason: correctionReason,
+        }
+      : undefined;
     // Hard gate: if staff toggled the clock-out incident flag (or a Nectar
     // trigger fired), require a SUBMITTED Incident Report on this shift.
     if (incidentFlag && incidentReportIds.length === 0) {

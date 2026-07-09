@@ -264,6 +264,7 @@ export function PunchPad({
   const [success, setSuccess] = useState<null | {
     duration: string;
     evvClean: boolean;
+    correctionSubmitted?: boolean;
   }>(null);
 
   // ── Clock-out compliance modal state ────────────────────────────────────────
@@ -279,22 +280,20 @@ export function PunchPad({
   const [incidentReportIds, setIncidentReportIds] = useState<string[]>([]);
 
   // ── Review-by-exception (Timeclock pass) ────────────────────────────────────
-  // Variance + attestation + incident + "forgot to clock out" correction. None
-  // of these mutate raw clock_in/out timestamps; corrections go to the new
+  // Variance + attestation + incident + staff-requested time correction. None
+  // of these mutate raw clock_in/out timestamps; corrections go to the
   // corrected_clock_in/out + edit_reason fields and the row is routed to
   // supervisor review (review_status='needs_review') instead of billing.
+  // The supervisor screen is dashboard.compliance-desk → Needs Review; on
+  // approval, billing-units.ts reads corrected_clock_in/out instead of the
+  // raw punches. Staff can see status on /dashboard/my-time-corrections.
   const [incidentFlag, setIncidentFlag] = useState(false);
   const [attestAccurate, setAttestAccurate] = useState(false);
   const [scheduledMinutes, setScheduledMinutes] = useState<number | null>(null);
-  const [forgotOpen, setForgotOpen] = useState(false);
-  const [forgotIn, setForgotIn] = useState<string>("");   // datetime-local
-  const [forgotOut, setForgotOut] = useState<string>(""); // datetime-local
-  const [forgotReason, setForgotReason] = useState("");
-  const [correction, setCorrection] = useState<null | {
-    inIso: string;
-    outIso: string;
-    reason: string;
-  }>(null);
+  const [correctionOpen, setCorrectionOpen] = useState(false);
+  const [correctionIn, setCorrectionIn] = useState<string>("");   // datetime-local
+  const [correctionOut, setCorrectionOut] = useState<string>(""); // datetime-local
+  const [correctionReason, setCorrectionReason] = useState("");
 
   // ── NECTAR Documentation Coach state ────────────────────────────────────────────
   const [aiBusy, setAiBusy]               = useState(false);
@@ -887,8 +886,34 @@ export function PunchPad({
     ? Math.max(0, now - new Date(active.clock_in_timestamp).getTime())
     : 0;
   const isLongShift = liveDurationMs > 16 * 60 * 60 * 1000;
-  const longShiftOk = !isLongShift || longShiftAck;
-  const canSubmitCompliance = hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk && longShiftOk && triggersResolved && medDosesResolved && !busy;
+  // Correction request: staff is explicitly saying the recorded times are
+  // wrong. Parse datetime-local values, require at least one changed field,
+  // require reason ≥ 10 chars, and validate ordering / sanity window.
+  const correctionInIso = correctionIn ? new Date(correctionIn).toISOString() : null;
+  const correctionOutIso = correctionOut ? new Date(correctionOut).toISOString() : null;
+  const effectiveInIso = correctionInIso ?? active?.clock_in_timestamp ?? null;
+  const effectiveOutMs = correctionOutIso ? new Date(correctionOutIso).getTime() : now;
+  const effectiveInMs = effectiveInIso ? new Date(effectiveInIso).getTime() : NaN;
+  const correctionOrderOk =
+    Number.isFinite(effectiveInMs) && effectiveOutMs > effectiveInMs;
+  const correctionWithinWindow =
+    !!active &&
+    Number.isFinite(effectiveInMs) &&
+    effectiveOutMs - new Date(active.clock_in_timestamp).getTime() <= 36 * 60 * 60 * 1000 &&
+    effectiveInMs >= new Date(active.clock_in_timestamp).getTime() - 24 * 60 * 60 * 1000;
+  const correctionHasChange =
+    (!!correctionInIso && correctionInIso !== active?.clock_in_timestamp) ||
+    !!correctionOutIso;
+  const correctionReasonOk = correctionReason.trim().length >= 10;
+  const correctionValid =
+    correctionOpen && correctionHasChange && correctionReasonOk && correctionOrderOk && correctionWithinWindow;
+  // When staff opens a correction, the "these times are accurate" ack is
+  // moot — the whole point is that they aren't.
+  const longShiftOk = !isLongShift || longShiftAck || correctionOpen;
+  const canSubmitCompliance =
+    hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk &&
+    longShiftOk && triggersResolved && medDosesResolved && !busy &&
+    (!correctionOpen || correctionValid);
 
 
   function openCompliance() {
@@ -915,9 +940,33 @@ export function PunchPad({
     setLongShiftAck(false);
     setTriggersResolved(true);
     setMedDosesResolved(true);
+    setCorrectionOpen(false);
+    setCorrectionIn("");
+    setCorrectionOut("");
+    setCorrectionReason("");
     stopRecording();
     setShowCompliance(true);
   }
+
+  // Format an ISO/Date as the value expected by <input type="datetime-local">
+  // in the browser's local timezone: YYYY-MM-DDTHH:MM.
+  function toLocalDatetimeInput(v: string | number | Date): string {
+    const d = new Date(v);
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function openCorrectionPanel(a: ActiveShift) {
+    setCorrectionOpen(true);
+    // Seed inputs so staff can nudge one field without retyping the whole
+    // date/time. Unchanged fields are treated as "this one was fine" only
+    // when they match the recorded value (see correctionHasChange).
+    setCorrectionIn((prev) => prev || toLocalDatetimeInput(a.clock_in_timestamp));
+    setCorrectionOut((prev) => prev || toLocalDatetimeInput(now));
+    if (!correctionReason) setCorrectionReason("");
+  }
+
+
 
   // Re-running the check is required after staff edit the note/goals
   useEffect(() => {
@@ -1333,6 +1382,11 @@ export function PunchPad({
     aiStatus?: "Verified" | "Flagged" | "Exception";
     aiFeedback?: string;
     aiIterationCount?: number;
+    correction?: {
+      correctedInIso: string | null;
+      correctedOutIso: string | null;
+      reason: string;
+    };
   }) {
     if (!user || !active) return;
 
@@ -1369,6 +1423,46 @@ export function PunchPad({
       update.ai_compliance_status    = args.aiStatus;
       update.ai_compliance_feedback  = args.aiFeedback ?? null;
       update.ai_coaching_iterations  = args.aiIterationCount ?? 0;
+    }
+
+    // Staff-requested time correction: never mutate raw punches. Write
+    // corrected_clock_in/out, edit_reason, and route to supervisor via
+    // review_status='needs_review'. Corrected times only become effective
+    // for billing after the supervisor approves (see billing-units.ts).
+    if (args.correction) {
+      const { correctedInIso, correctedOutIso, reason } = args.correction;
+      if (correctedInIso) update.corrected_clock_in = correctedInIso;
+      // If the staff didn't correct the out time, use the just-recorded
+      // clock-out — supervisors need a corrected pair to review a variance.
+      update.corrected_clock_out = correctedOutIso ?? clockOut;
+      update.edit_reason = reason.trim();
+      update.review_status = "needs_review";
+      update.edited_by = user.id;
+      update.edited_at = clockOut;
+      const auditEntry = {
+        kind: "staff_correction_request",
+        requested_by: user.id,
+        requested_at: clockOut,
+        from: {
+          clock_in: active.clock_in_timestamp,
+          clock_out: clockOut,
+        },
+        to: {
+          clock_in: correctedInIso ?? active.clock_in_timestamp,
+          clock_out: correctedOutIso ?? clockOut,
+        },
+        reason: reason.trim(),
+      };
+      // Append to edit_audit_history_log without clobbering existing entries.
+      const { data: existing } = await supabase
+        .from("evv_timesheets")
+        .select("edit_audit_history_log")
+        .eq("id", active.id)
+        .maybeSingle();
+      const prior = Array.isArray(existing?.edit_audit_history_log)
+        ? (existing!.edit_audit_history_log as unknown[])
+        : [];
+      update.edit_audit_history_log = [...prior, auditEntry];
     }
 
     // ── Compliance gate: check confirmed billing_conflict rules against the
@@ -1544,7 +1638,11 @@ export function PunchPad({
     setShowCompliance(false);
     setOutVariance(null);
     setOutVarianceReason("");
-    setSuccess({ duration, evvClean: !args.outsideReason });
+    setSuccess({
+      duration,
+      evvClean: !args.outsideReason && !args.correction,
+      correctionSubmitted: !!args.correction,
+    });
     await qc.invalidateQueries({ queryKey: ["evv-active", user.id] });
   }
 
@@ -1574,6 +1672,27 @@ export function PunchPad({
       toast.error("Log all scheduled medication doses in eMAR before submitting.");
       return;
     }
+    if (correctionOpen && !correctionValid) {
+      if (!correctionHasChange) {
+        toast.error("Enter the corrected clock-in and/or clock-out time.");
+      } else if (!correctionReasonOk) {
+        toast.error("Add a short reason (at least 10 characters) for the correction.");
+      } else if (!correctionOrderOk) {
+        toast.error("Corrected clock-out must be after the corrected clock-in.");
+      } else if (!correctionWithinWindow) {
+        toast.error("Correction times are outside the allowed window for this shift.");
+      } else {
+        toast.error("Fix the time-correction fields before submitting.");
+      }
+      return;
+    }
+    const correctionPayload = correctionOpen
+      ? {
+          correctedInIso: correctionInIso,
+          correctedOutIso: correctionOutIso,
+          reason: correctionReason,
+        }
+      : undefined;
     // Hard gate: if staff toggled the clock-out incident flag (or a Nectar
     // trigger fired), require a SUBMITTED Incident Report on this shift.
     if (incidentFlag && incidentReportIds.length === 0) {
@@ -1736,6 +1855,7 @@ export function PunchPad({
               aiStatus: aiStatusForRow,
               aiFeedback: aiFeedbackForRow,
               aiIterationCount: iterationsToPersist,
+              correction: correctionPayload,
             });
           setPendingFormsDialog({
             mode: "clockout",
@@ -1770,6 +1890,7 @@ export function PunchPad({
         aiStatus: aiStatusForRow,
         aiFeedback: aiFeedbackForRow,
         aiIterationCount: iterationsToPersist,
+        correction: correctionPayload,
       });
     } catch (e) {
       toast.error((e as Error).message || "Could not end shift.");
@@ -2427,10 +2548,16 @@ export function PunchPad({
                 </div>
                 <div>
                   <p className={`text-base font-bold ${success?.evvClean ? "text-emerald-800 dark:text-emerald-200" : "text-amber-800 dark:text-amber-200"}`}>
-                    {success?.evvClean ? "✅ Shift Successfully Closed" : "⚠️ Shift Closed with Variance"}
+                    {success?.correctionSubmitted
+                      ? "🕒 Correction Request Submitted"
+                      : success?.evvClean
+                      ? "✅ Shift Successfully Closed"
+                      : "⚠️ Shift Closed with Variance"}
                   </p>
                   <p className={`text-xs ${success?.evvClean ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}`}>
-                    {success?.evvClean
+                    {success?.correctionSubmitted
+                      ? "Your supervisor will review the corrected times before this shift bills."
+                      : success?.evvClean
                       ? "GPS verified · Documentation complete · Submitted to EVV"
                       : "Variance logged · Pending admin review · Submitted to EVV"}
                   </p>
@@ -2443,7 +2570,9 @@ export function PunchPad({
                 <span className="font-mono text-lg font-bold tabular-nums">{success?.duration}</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                {success?.evvClean
+                {success?.correctionSubmitted
+                  ? "The shift is held for supervisor review. You can track its status on My Time Corrections. If approved, the corrected times replace the recorded times for billing; if denied, you'll see the reviewer's note there."
+                  : success?.evvClean
                   ? "Your timesheet has been submitted to EVV & Timesheet Control for administrative sign-off. No further action required."
                   : "Your timesheet has been submitted with a variance flag. An administrator will review the out-of-bounds justification before final approval."}
               </p>
@@ -2920,27 +3049,125 @@ export function PunchPad({
 
             <div className="shrink-0 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:px-6 sm:py-4">
               <div className="flex flex-col gap-2">
-                {isLongShift && (
+                {isLongShift && !correctionOpen && (
                   <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-100">
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                       <div className="space-y-2">
                         <p>
-                          This shift shows <span className="font-mono font-semibold">{elapsed}</span>. If you forgot to clock out, don't submit — tell your supervisor so the times can be corrected. Submitting confirms these times are accurate.
+                          This shift shows <span className="font-mono font-semibold">{elapsed}</span>. If you forgot to clock out or the times are wrong, request a time correction below instead of confirming these times.
                         </p>
-                        <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 cursor-pointer accent-amber-600"
-                            checked={longShiftAck}
-                            onChange={(e) => setLongShiftAck(e.target.checked)}
-                          />
-                          These times are accurate
-                        </label>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 cursor-pointer accent-amber-600"
+                              checked={longShiftAck}
+                              onChange={(e) => setLongShiftAck(e.target.checked)}
+                            />
+                            These times are accurate
+                          </label>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => active && openCorrectionPanel(active)}
+                            className="h-8 border-amber-500/60 text-amber-900 hover:bg-amber-500/20 dark:text-amber-100"
+                          >
+                            <Pencil className="mr-1.5 h-3.5 w-3.5" /> Request time correction
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
                 )}
+
+                {/* Staff-requested time correction panel. Writes to
+                    corrected_clock_in/out + edit_reason and routes to
+                    supervisor review; raw punches are never mutated. */}
+                {!correctionOpen && !isLongShift && active && (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => openCorrectionPanel(active)}
+                      className="h-8 text-[11px] text-muted-foreground hover:text-foreground"
+                    >
+                      <Pencil className="mr-1.5 h-3 w-3" /> The recorded times are wrong — request a correction
+                    </Button>
+                  </div>
+                )}
+                {correctionOpen && active && (
+                  <div className="rounded-md border border-amber-500/60 bg-amber-500/5 p-3 text-sm">
+                    <div className="mb-2 flex items-start gap-2">
+                      <Pencil className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                      <div className="flex-1">
+                        <p className="font-medium text-amber-900 dark:text-amber-100">
+                          Request a time correction
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          Enter what your clock-in and/or clock-out should have been. Your supervisor reviews the request and either approves the corrected times (they become the billable times) or denies it with a note.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <Label className="text-[11px] font-medium">Corrected clock-in</Label>
+                        <input
+                          type="datetime-local"
+                          value={correctionIn}
+                          onChange={(e) => setCorrectionIn(e.target.value)}
+                          className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                        />
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">
+                          Recorded: {new Date(active.clock_in_timestamp).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-[11px] font-medium">Corrected clock-out</Label>
+                        <input
+                          type="datetime-local"
+                          value={correctionOut}
+                          onChange={(e) => setCorrectionOut(e.target.value)}
+                          className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                        />
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">
+                          Recorded: about to be set to now ({new Date(now).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}).
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <Label className="text-[11px] font-medium">Reason (visible to your supervisor)</Label>
+                      <Textarea
+                        rows={2}
+                        value={correctionReason}
+                        onChange={(e) => setCorrectionReason(e.target.value)}
+                        placeholder="e.g. I forgot to clock out — I actually left at 6:15 PM. Or: I clocked in ~15 min late; started at 8:00 AM."
+                        className="mt-1 min-h-[60px] text-sm"
+                      />
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">
+                        {correctionReason.trim().length} / 10 min characters
+                      </p>
+                    </div>
+                    <div className="mt-2 flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setCorrectionOpen(false);
+                          setCorrectionIn("");
+                          setCorrectionOut("");
+                          setCorrectionReason("");
+                        }}
+                      >
+                        Cancel correction
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-end text-[11px]">
                   {hardwareDenied ? (
                     <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-amber-800 dark:text-amber-200">
@@ -2969,7 +3196,11 @@ export function PunchPad({
                     type="button"
                     onClick={() => submitCompliance()}
                     disabled={!canSubmitCompliance || aiBusy}
-                    className="w-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+                    className={
+                      correctionOpen
+                        ? "w-full bg-amber-600 text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+                        : "w-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+                    }
                   >
                     {(busy || aiBusy) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {aiBusy
@@ -2978,6 +3209,8 @@ export function PunchPad({
                       ? "Getting location…"
                       : aiCoach?.status === "Flagged"
                       ? "🔁 Re-Check with NECTAR Coach"
+                      : correctionOpen
+                      ? "🕒 Submit correction request"
                       : "💾 Submit Final Timesheet"}
                   </Button>
                 </div>

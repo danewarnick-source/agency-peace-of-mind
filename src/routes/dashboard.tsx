@@ -26,7 +26,7 @@ import { StaffMobileShell } from "@/components/staff-mobile/staff-mobile-shell";
 import { StaffMobilePreviewFrame } from "@/components/staff-mobile/staff-mobile-preview-frame";
 import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";
 import { NectarSearchBar } from "@/components/nectar/nectar-search-bar";
-import { ListChecks } from "lucide-react";
+import { ListChecks, Clock } from "lucide-react";
 import { FeatureLockedRoute, UpgradeGate } from "@/components/upgrade-gate";
 import { OrgSwitcher, DemoBadge, DemoOrgBanner } from "@/components/org-switcher";
 import { useQuery } from "@tanstack/react-query";
@@ -134,6 +134,7 @@ const STAFF_NAV: NavItem[] = [
   { to: "/dashboard/schedule", label: "Schedule", icon: CalendarDays, feature: "evv_timesheets" },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/my-historical-timesheets", label: "Historical Timesheets", icon: Archive, feature: "evv_timesheets" },
+  { to: "/dashboard/my-time-corrections", label: "My Time Corrections", icon: Clock, feature: "evv_timesheets" },
   { to: "/dashboard/ask-nectar", label: "Ask NECTAR", icon: Sparkles, feature: "nectar" },
   { to: "/dashboard/courses", label: "My Trainings", icon: GraduationCap, feature: "staff_onboarding" },
   { to: "/dashboard/hive-training", label: "HIVE Training", icon: GraduationCap, feature: "hive_training" },

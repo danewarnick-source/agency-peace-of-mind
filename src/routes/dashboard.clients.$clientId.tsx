@@ -236,6 +236,7 @@ function ClientProfileHub() {
               <ClientProfileTab clientId={clientId} onOpenFiles={() => setTab("files")} />
             </SectionPanel>
           </SectionGroup>
+          <CustomFieldsForSection clientId={clientId} section="identity" />
         </TabsContent>
 
         {/* CARE PLAN — Goals + Medications only. All PCSP-derived edits

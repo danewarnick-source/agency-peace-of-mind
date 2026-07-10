@@ -86,6 +86,7 @@ export type CareAuthorizedCode = {
   service_end_date: string | null;
   sce: string | null;
   provider_approver_email: string | null;
+  authorization_pending: boolean | null;
 };
 
 export type ClientCareVisibility = {

@@ -40,6 +40,7 @@ import { NoteTriggerPrompt } from "@/components/residential/note-trigger-prompt"
 import { IncidentReportDialog } from "@/components/incidents/incident-report-dialog";
 import { AlertTriangle as AlertTriangleIcon } from "lucide-react";
 import { useClientBillingCodes } from "@/hooks/use-client-billing-codes";
+import { useClientCareData } from "@/hooks/use-client-care-data";
 import { ShiftMedDueCheck } from "@/components/medications/shift-med-due-check";
 import { useComplianceGate } from "@/hooks/use-compliance-gate";
 import { usePermissions } from "@/hooks/use-permissions";

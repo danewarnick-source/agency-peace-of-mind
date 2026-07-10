@@ -6,9 +6,7 @@
  * Both write through `setClientStaffVisibility` and invalidate the
  * `client-care-data` query keys so every staff surface refreshes.
  */
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
@@ -27,19 +25,24 @@ function useVisibility(clientId: string) {
   const qc = useQueryClient();
   const setFn = useServerFn(setClientStaffVisibility);
   const q = useQuery(clientCareDataQueryOptions(clientId));
-  const mutate = useMutation({
-    mutationFn: (input: Parameters<typeof setFn>[0]["data"]) =>
-      setFn({ data: input }),
-    onSuccess: () => {
+  const [pending, setPending] = useState(false);
+
+  const save = async (input: Parameters<typeof setFn>[0]["data"]) => {
+    setPending(true);
+    try {
+      await setFn({ data: input });
       qc.invalidateQueries({ queryKey: ["client-care-data", clientId] });
-    },
-    onError: (err: unknown) => {
+    } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to update visibility";
       toast.error(msg);
-    },
-  });
-  return { data: q.data, mutate };
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return { data: q.data, save, pending };
 }
+
 
 export function SectionVisibilityToggle({
   clientId,

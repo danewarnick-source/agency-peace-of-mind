@@ -241,6 +241,7 @@ function ClientProfileHub() {
             (goals with editable job codes, medications) live here and
             nowhere else. */}
         <TabsContent value="care-plan" className="space-y-6">
+          <SectionVisibilityToggle clientId={clientId} section="care_plan" />
           <TrainingSetupBadge clientId={clientId} />
 
           <Tabs defaultValue="goals">
@@ -275,6 +276,7 @@ function ClientProfileHub() {
         {/* BILLING — sole home for authorized codes, per-code rates,
             annual authorization units, and budget. */}
         <TabsContent value="billing" className="space-y-10">
+          <SectionVisibilityToggle clientId={clientId} section="billing" />
           <SectionGroup label="Authorizations & budget" hint="Billing codes, rates, annual units, and remaining funds">
             <SectionPanel icon={ShieldCheck} accent="emerald">
               <BillingCodesPanel clientId={clientId} />
@@ -287,6 +289,7 @@ function ClientProfileHub() {
 
         {/* FILES — sole home for uploaded source documents (incl. PCSPs). */}
         <TabsContent value="files" className="space-y-10">
+          <SectionVisibilityToggle clientId={clientId} section="files" />
           <SectionGroup label="Documents" hint="Uploaded files for this client — PCSPs, 1056s, intake, and more">
             <SectionPanel icon={FolderOpen} accent="sky">
               <ClientDocumentsCard clientId={clientId} clientName={fullName} />
@@ -311,6 +314,7 @@ function ClientProfileHub() {
 
         {/* OPERATIONS — day-to-day coordination tools and non-goal PCSP supports. */}
         <TabsContent value="operations" className="space-y-10">
+          <SectionVisibilityToggle clientId={clientId} section="operations" />
           <CareGroup label="Supports & coordination" hint="Support strategies and team">
             <CareSection icon={ListChecks} accent="violet">
               <SupportStrategiesPanel client={client} clientId={clientId} orgId={orgId} />
@@ -334,6 +338,7 @@ function ClientProfileHub() {
 
         {/* COMPLIANCE — summaries, host-home certifications, deadlines. */}
         <TabsContent value="compliance" className="space-y-10">
+          <SectionVisibilityToggle clientId={clientId} section="compliance" />
           <SectionGroup label="Reporting & deadlines" hint="Summaries and upcoming due dates">
             <SectionPanel icon={ClipboardList} accent="violet">
               <SummariesPanel clientId={clientId} orgId={orgId} client={client} />

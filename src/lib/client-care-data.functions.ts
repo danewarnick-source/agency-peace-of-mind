@@ -319,6 +319,33 @@ export const getClientCareData = createServerFn({ method: "GET" })
       ? authorized_codes.filter((c) => isFieldVisible(visibilityRow, fieldKey("billing", "code", c.id)))
       : [];
 
+    // ── Custom fields ────────────────────────────────────────────────────
+    // Scope defs to the client's own org (cross-org rows would be blocked
+    // by RLS anyway, but this keeps the payload tight for the common case
+    // where the querier belongs to that same org).
+    const orgId = identity.organization_id;
+    const cfValueByDef = new Map<string, CustomFieldValue>();
+    for (const v of ((cfValsRes?.data ?? []) as any[])) {
+      cfValueByDef.set(v.definition_id, {
+        value_text: v.value_text ?? null,
+        value_number: v.value_number ?? null,
+        value_boolean: v.value_boolean ?? null,
+        value_date: v.value_date ?? null,
+      });
+    }
+    const custom_fields: CustomFieldWithValue[] = ((cfDefsRes?.data ?? []) as any[])
+      .filter((d) => !orgId || d.organization_id === orgId)
+      .map((d) => ({
+        id: String(d.id),
+        field_key: String(d.field_key ?? ""),
+        field_label: String(d.field_label ?? ""),
+        data_type: (d.data_type ?? "text") as CustomFieldWithValue["data_type"],
+        section: ((d.section ?? "identity") as SectionName),
+        value: cfValueByDef.get(d.id) ?? null,
+      }));
+    // Custom fields inherit their section's toggle — no per-field key.
+    const customFieldsStaff = custom_fields.filter((f) => sections[f.section]);
+
     // goalsForStaff also applies the shift-service-code filter (existing).
     const codeUpper = shiftServiceCode ? shiftServiceCode.toUpperCase() : null;
     const goalsForStaff = goalsStaffAll.filter((g) => {
@@ -337,6 +364,7 @@ export const getClientCareData = createServerFn({ method: "GET" })
         goals: goalsStaffAll,
         medications: medicationsStaff,
         authorized_codes: authorizedCodesStaff,
+        custom_fields: customFieldsStaff,
       },
     };
 
@@ -348,6 +376,7 @@ export const getClientCareData = createServerFn({ method: "GET" })
       goals,
       medications,
       authorized_codes,
+      custom_fields,
       visibilityRow,
       visibility,
     };

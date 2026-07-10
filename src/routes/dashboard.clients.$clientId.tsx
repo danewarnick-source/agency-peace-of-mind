@@ -34,13 +34,13 @@ import { ClientDocumentsCard } from "@/components/clients/client-documents-card"
 import { ClientBudgetPanel } from "@/components/clients/client-budget-panel";
 import { ClientMealPlannerMount } from "@/components/clients/client-meal-planner-mount";
 import { ChoreChartForClient } from "@/components/chores/chore-chart-mount";
-import { PcspTab } from "@/components/clients/pcsp-tab";
+
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { SectionPanel, SectionGroup, CareSection, CareGroup } from "@/components/clients/section-panel";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
 import { FaceSheetButton } from "@/components/clients/face-sheet-button";
 import { SectionsView, ClientSpecificTrainingCard, GoalsEditor, PublishConfirmDialog } from "@/components/clients/client-specific-training-card";
-import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, Pill, RefreshCw, Sparkles, Trash2, Upload, UserCircle2, Target, ShieldCheck, GraduationCap, HeartHandshake, Users, UtensilsCrossed, ListChecks, UserCircle, FileUp, Activity, Clock, FileText, AlertOctagon, ClipboardList, Home as HomeIcon, CalendarClock, Wallet, Coins, FolderOpen, ScrollText } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, Pill, RefreshCw, Sparkles, Trash2, Upload, UserCircle2, Target, ShieldCheck, GraduationCap, HeartHandshake, Users, UtensilsCrossed, ListChecks, UserCircle, FileUp, Clock, FileText, AlertOctagon, ClipboardList, Home as HomeIcon, CalendarClock, Wallet, FolderOpen } from "lucide-react";
 import { clientFeatureVisible, useClientFeature } from "@/lib/client-features";
 import { MarEmarTab } from "@/components/workspace/mar-emar-tab";
 import {
@@ -58,11 +58,15 @@ import {
   type CSTReviewQuestion,
 } from "@/lib/client-specific-training.functions";
 
+type ProfileTab = "identity" | "care-plan" | "billing" | "files" | "activity" | "operations" | "compliance";
+
 const search = z.object({
   tab: z
     .enum([
-      "profile", "care", "activity", "funds", "files", "pcsp",
+      // canonical four + siblings
+      "identity", "care-plan", "billing", "files", "activity", "operations", "compliance",
       // legacy deep-link values kept for backwards compat
+      "profile", "care", "funds", "pcsp",
       "overview", "plan", "codes", "caseload", "shifts", "logs", "incidents",
       "summaries", "hhcert", "deadlines", "documents",
     ])
@@ -79,16 +83,23 @@ export const Route = createFileRoute("/dashboard/clients/$clientId")({
   ),
 });
 
-// Map legacy deep-link tab values to the new five-tab model
-function resolveTab(raw: string | undefined): "profile" | "care" | "activity" | "funds" | "files" | "pcsp" {
-  if (!raw) return "profile";
-  if (raw === "profile" || raw === "overview") return "profile";
-  if (raw === "care" || raw === "plan" || raw === "caseload") return "care";
-  if (raw === "activity" || raw === "shifts" || raw === "logs" || raw === "incidents" || raw === "summaries" || raw === "hhcert" || raw === "deadlines") return "activity";
-  if (raw === "funds" || raw === "codes") return "funds";
-  if (raw === "files" || raw === "documents") return "files";
-  if (raw === "pcsp") return "pcsp";
-  return "profile";
+// Map legacy deep-link tab values to the consolidated tab model.
+// Identity / Care plan / Billing / Files are the four editable tabs.
+// Activity / Operations / Compliance are sibling read/coordination tabs.
+function resolveTab(raw: string | undefined): ProfileTab {
+  if (!raw) return "identity";
+  // canonical
+  if (raw === "identity" || raw === "care-plan" || raw === "billing" || raw === "files" ||
+      raw === "activity" || raw === "operations" || raw === "compliance") return raw;
+  // legacy
+  if (raw === "profile" || raw === "overview") return "identity";
+  if (raw === "care" || raw === "plan") return "care-plan";
+  if (raw === "caseload") return "operations";
+  if (raw === "shifts" || raw === "logs" || raw === "incidents") return "activity";
+  if (raw === "summaries" || raw === "hhcert" || raw === "deadlines") return "compliance";
+  if (raw === "funds" || raw === "codes") return "billing";
+  if (raw === "documents" || raw === "pcsp") return "files";
+  return "identity";
 }
 
 function CollapsibleSimpleCard({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
@@ -201,17 +212,20 @@ function ClientProfileHub() {
 
       {/* Tab navigation */}
       <Tabs value={activeTab} onValueChange={setTab}>
-        <TabsList className="mb-4">
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="care">Care</TabsTrigger>
-          <TabsTrigger value="activity">Activity</TabsTrigger>
-          <TabsTrigger value="funds">Funds</TabsTrigger>
+        <TabsList className="mb-4 flex-wrap h-auto">
+          <TabsTrigger value="identity">Identity</TabsTrigger>
+          <TabsTrigger value="care-plan">Care plan</TabsTrigger>
+          <TabsTrigger value="billing">Billing</TabsTrigger>
           <TabsTrigger value="files">Files</TabsTrigger>
-          <TabsTrigger value="pcsp">PCSP</TabsTrigger>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="operations">Operations</TabsTrigger>
+          <TabsTrigger value="compliance">Compliance</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="profile" className="space-y-10">
-          <SectionGroup label="Client profile" hint="Identity & imported details">
+        {/* IDENTITY — sole home for name, DOB, Medicaid #, guardian,
+            emergency contacts, support coordinator, admission date. */}
+        <TabsContent value="identity" className="space-y-10">
+          <SectionGroup label="Identity" hint="Who this person is — the record of record">
             <SectionPanel icon={FileUp} accent="amber">
               <UpdateInfoFromDocumentCard clientId={clientId} orgId={orgId} />
             </SectionPanel>
@@ -221,70 +235,64 @@ function ClientProfileHub() {
           </SectionGroup>
         </TabsContent>
 
-        <TabsContent value="care" className="space-y-6">
+        {/* CARE PLAN — Goals + Medications only. All PCSP-derived edits
+            (goals with editable job codes, medications) live here and
+            nowhere else. */}
+        <TabsContent value="care-plan" className="space-y-6">
           <TrainingSetupBadge clientId={clientId} />
 
-          <Tabs defaultValue="plan">
+          <Tabs defaultValue="goals">
             <TabsList className="mb-4">
-              <TabsTrigger value="plan">Plan & Support</TabsTrigger>
-              <TabsTrigger value="ops">Operational Tools</TabsTrigger>
-              {showEmarSubTab && <TabsTrigger value="emar">MAR / eMAR</TabsTrigger>}
+              <TabsTrigger value="goals">Goals</TabsTrigger>
+              <TabsTrigger value="medications">Medications</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="plan" className="space-y-10">
-              <CareGroup
-                label="Plan & supports"
-                hint="Built from the client's PCSP"
-              >
+            <TabsContent value="goals" className="space-y-10">
+              <CareGroup label="Goals" hint="Structured PCSP goals — sole editable home">
                 <CareSection icon={Target} accent="indigo">
                   <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
-                </CareSection>
-                <CareSection icon={ListChecks} accent="violet">
-                  <SupportStrategiesPanel client={client} clientId={clientId} orgId={orgId} />
-                </CareSection>
-                <CareSection icon={Users} accent="sky">
-                  <CaseloadEditor clientId={clientId} />
                 </CareSection>
                 <CareSection icon={GraduationCap} accent="amber">
                   <CollapsibleSimpleCard title="Client-specific training">
                     <ClientSpecificTrainingCard clientId={clientId} />
                   </CollapsibleSimpleCard>
                 </CareSection>
-                <CareSection icon={HeartHandshake} accent="rose">
-                  <PersonCenteredProfilePanel clientId={clientId} orgId={orgId} />
-                </CareSection>
               </CareGroup>
             </TabsContent>
 
-            <TabsContent value="ops" className="space-y-10">
-              <CareGroup
-                label="Operational tools"
-                hint="Day-to-day care coordination"
-              >
-                <CareSection icon={UtensilsCrossed} accent="orange">
-                  <ClientMealPlannerMount clientId={clientId} />
-                </CareSection>
-                <CareSection icon={Sparkles} accent="teal">
-                  <ChoreChartForClient clientId={clientId} />
+            <TabsContent value="medications" className="space-y-6">
+              <CareGroup label="Medications" hint="Medication list & eMAR — same record staff use on shift">
+                <CareSection icon={Pill} accent="rose">
+                  <MarEmarTab clientId={clientId} clientName={fullName} />
                 </CareSection>
               </CareGroup>
             </TabsContent>
-
-            {showEmarSubTab && (
-              <TabsContent value="emar" className="space-y-6">
-                <CareGroup label="Medication administration" hint="eMAR — same record staff use on shift">
-                  <CareSection icon={Pill} accent="rose">
-                    <MarEmarTab
-                      clientId={clientId}
-                      clientName={fullName}
-                    />
-                  </CareSection>
-                </CareGroup>
-              </TabsContent>
-            )}
           </Tabs>
         </TabsContent>
 
+        {/* BILLING — sole home for authorized codes, per-code rates,
+            annual authorization units, and budget. */}
+        <TabsContent value="billing" className="space-y-10">
+          <SectionGroup label="Authorizations & budget" hint="Billing codes, rates, annual units, and remaining funds">
+            <SectionPanel icon={ShieldCheck} accent="emerald">
+              <BillingCodesPanel clientId={clientId} />
+            </SectionPanel>
+            <SectionPanel icon={Wallet} accent="teal">
+              <ClientBudgetPanel clientId={clientId} />
+            </SectionPanel>
+          </SectionGroup>
+        </TabsContent>
+
+        {/* FILES — sole home for uploaded source documents (incl. PCSPs). */}
+        <TabsContent value="files" className="space-y-10">
+          <SectionGroup label="Documents" hint="Uploaded files for this client — PCSPs, 1056s, intake, and more">
+            <SectionPanel icon={FolderOpen} accent="sky">
+              <ClientDocumentsCard clientId={clientId} clientName={fullName} />
+            </SectionPanel>
+          </SectionGroup>
+        </TabsContent>
+
+        {/* ACTIVITY — pure shift/log/incident history. */}
         <TabsContent value="activity" className="space-y-10">
           <SectionGroup label="Service delivery" hint="Time, notes & incidents">
             <SectionPanel icon={Clock} accent="sky">
@@ -297,7 +305,34 @@ function ClientProfileHub() {
               <IncidentsPanel clientId={clientId} orgId={orgId} />
             </SectionPanel>
           </SectionGroup>
-          <SectionGroup label="Reporting & deadlines" hint="Summaries and upcoming due dates" divider>
+        </TabsContent>
+
+        {/* OPERATIONS — day-to-day coordination tools and non-goal PCSP supports. */}
+        <TabsContent value="operations" className="space-y-10">
+          <CareGroup label="Supports & coordination" hint="Support strategies and team">
+            <CareSection icon={ListChecks} accent="violet">
+              <SupportStrategiesPanel client={client} clientId={clientId} orgId={orgId} />
+            </CareSection>
+            <CareSection icon={HeartHandshake} accent="rose">
+              <PersonCenteredProfilePanel clientId={clientId} orgId={orgId} />
+            </CareSection>
+            <CareSection icon={Users} accent="sky">
+              <CaseloadEditor clientId={clientId} />
+            </CareSection>
+          </CareGroup>
+          <CareGroup label="Operational tools" hint="Day-to-day care coordination">
+            <CareSection icon={UtensilsCrossed} accent="orange">
+              <ClientMealPlannerMount clientId={clientId} />
+            </CareSection>
+            <CareSection icon={Sparkles} accent="teal">
+              <ChoreChartForClient clientId={clientId} />
+            </CareSection>
+          </CareGroup>
+        </TabsContent>
+
+        {/* COMPLIANCE — summaries, host-home certifications, deadlines. */}
+        <TabsContent value="compliance" className="space-y-10">
+          <SectionGroup label="Reporting & deadlines" hint="Summaries and upcoming due dates">
             <SectionPanel icon={ClipboardList} accent="violet">
               <SummariesPanel clientId={clientId} orgId={orgId} client={client} />
             </SectionPanel>
@@ -308,33 +343,6 @@ function ClientProfileHub() {
             )}
             <SectionPanel icon={CalendarClock} accent="amber">
               <DeadlinesPanel clientId={clientId} />
-            </SectionPanel>
-          </SectionGroup>
-        </TabsContent>
-
-        <TabsContent value="funds" className="space-y-10">
-          <SectionGroup label="Authorizations & budget" hint="Billing codes and remaining funds">
-            <SectionPanel icon={ShieldCheck} accent="emerald">
-              <BillingCodesPanel clientId={clientId} />
-            </SectionPanel>
-            <SectionPanel icon={Wallet} accent="teal">
-              <ClientBudgetPanel clientId={clientId} />
-            </SectionPanel>
-          </SectionGroup>
-        </TabsContent>
-
-        <TabsContent value="files" className="space-y-10">
-          <SectionGroup label="Documents" hint="Uploaded files for this client">
-            <SectionPanel icon={FolderOpen} accent="sky">
-              <ClientDocumentsCard clientId={clientId} clientName={fullName} />
-            </SectionPanel>
-          </SectionGroup>
-        </TabsContent>
-
-        <TabsContent value="pcsp" className="space-y-10">
-          <SectionGroup label="Person-Centered Support Plan" hint="Current PCSP document & extractions">
-            <SectionPanel icon={ScrollText} accent="violet">
-              <PcspTab client={client} clientId={clientId} orgId={orgId} />
             </SectionPanel>
           </SectionGroup>
         </TabsContent>

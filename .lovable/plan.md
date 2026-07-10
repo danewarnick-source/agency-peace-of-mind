@@ -1,85 +1,62 @@
-# Plan — one shared reader for client care data
+## Goal
 
-## Why
+Collapse today's six client-profile tabs (Profile / Care / Activity / Funds / Files / PCSP) into **four editable tabs** — Identity, Care plan, Billing, Files — with every piece of information having exactly one editable home. Activity stays where it is. Operations and Compliance move out into their own separate areas (siblings to the four, not merged).
 
-Today every care surface (PCSP tab, eMAR chart, shift screen, workspace, punch-pad, whiteboard scoring, setup checklist, etc.) queries `clients`, `client_medications`, `client_specific_trainings`, and `client_billing_codes` independently. That's what let the PCSP admission-date bug and the eMAR-vs-attestation table mismatch happen. We need one canonical read path with the visibility rules baked in.
+## New tab layout
 
-## Scope of "care data"
-
-For this pass, the shared function returns exactly what the current bug-prone surfaces need:
-
-- **identity**: normalized profile fields (name, dob, admission_date as a raw `YYYY-MM-DD` string — no timezone conversion, matching the Profile-tab fix), plus the tenure/care flags used by cards (self_admin_med_support + locked, behavior toggles, etc.).
-- **pcsp_goals**: structured `CSTGoal[]` from `client_specific_trainings` (person_specific), each `{ id, goal, supports, details, job_codes[], is_complete }`. `is_complete` = has goal text AND at least one job_code. Legacy `clients.pcsp_goals` is NOT read from — the CST row is canonical (we already backfilled).
-- **medications**: rows from `client_medications` in the shape the eMAR chart / MAR calendar / attestation flow expects — one source of truth, so nothing can drift to a different table again.
-- **authorized_codes**: currently-open `client_billing_codes` (same "no end date or end date in the future" filter `useClientBillingCodes` uses).
-
-Out of scope for now (kept in their existing hooks; can migrate later): scheduling, financial rollups, EVV timesheets, whiteboard SCORING math, incident/behavior histories.
-
-## The function
-
-`src/lib/client-care-data.functions.ts`
-
-```ts
-export const getClientCareData = createServerFn({ method: 'GET' })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((i: { clientId: string; shiftServiceCode?: string | null }) => i)
-  .handler(async ({ data, context }) => { ... })
+```text
+Identity        Care plan       Billing         Files       | Activity   Operations   Compliance
+────────        ─────────       ───────         ─────       | ────────   ──────────   ──────────
+Header card     ├─ Goals        Authorized      Uploaded    | Shifts     Meal planner Summaries
+Demographics    └─ Medications  codes + rates   documents   | Daily logs Chore chart  Host-home certs
+Guardian /                      Annual auth     (incl.      | Incidents  Caseload     Deadlines
+ emergency                       units          PCSP docs)  |
+Support coord.                  Budget / funds
+Admission date
 ```
 
-Returns:
+The four consolidated tabs are the only editable homes for the data they show. Activity / Operations / Compliance are additional top-level tabs, unchanged in content but re-scoped so each holds only what it says on the tin.
 
-```ts
-type ClientCareData = {
-  identity: { id, first_name, last_name, admission_date: string|null, dob: string|null, ... };
-  flags: { self_admin_med_support, self_admin_med_support_locked, ... };
-  goals: CSTGoal[];                         // all structured goals
-  medications: ClientMedication[];          // raw rows, canonical shape
-  authorized_codes: ClientBillingCode[];    // currently-open only
-  visibility: {
-    goalsForStaff: CSTGoal[];               // filtered: is_complete AND job_codes ∋ shiftServiceCode
-    medicationsVisible: boolean;            // section toggle
-    // room for future per-section toggles
-  };
-};
-```
+## Tab-by-tab content
 
-The `visibility` block is the **only** place staff-visibility rules live: which sections are toggled on, which goals are complete enough to show, and which goals match the active service code. When `shiftServiceCode` is omitted, `goalsForStaff` returns admin-view (all complete goals). Callers never re-implement these filters.
+**Identity** — sole home for name, DOB, Medicaid #, guardian, emergency contacts, support coordinator, admission date.
+- Keep: `UpdateInfoFromDocumentCard`, `ClientProfileTab` (profile-tab.tsx).
+- No change to the fields themselves; admission date already renders correctly here (Profile-tab fmtDate is the good one).
 
-## Client-side hook
+**Care plan** — two sub-tabs, both reading through `useClientCareData`:
+- **Goals** — `PlanGoalsPanel` + `ClientSpecificTrainingCard` (structured PCSP goals with editable job codes). This is the ONLY place PCSP goals appear as editable rows.
+- **Medications** — `MarEmarTab` (medication list + eMAR when enabled), gated by `showEmarSubTab` today. When gate is off, show medications list only (still via shared hook).
 
-`src/hooks/use-client-care-data.tsx` — thin `useQuery` wrapper with a stable key `['client-care-data', clientId, shiftServiceCode ?? null]` and shared `queryOptions` so loaders can `ensureQueryData`.
+**Billing** — sole home for authorized codes, per-code rates, annual authorization units, budget/funds.
+- Keep: `BillingCodesPanel`, `ClientBudgetPanel`.
+- Add annual auth units display (already in `client_billing_codes`, currently shown as duplicate on PCSP tab).
 
-## Migration — screens that switch to it in this change
+**Files** — sole home for uploaded source documents.
+- Keep: `ClientDocumentsCard`.
+- Absorb the PCSP-tab document upload/viewer surface — after this change, PCSPs are just documents that live in Files (with a `kind = 'pcsp'` filter chip in the existing card).
 
-Only the surfaces the user called out plus their direct siblings, so we prove the pattern end-to-end without touching every consumer at once:
+**Activity** (unchanged): `ShiftsPanel`, `DailyLogsPanel`, `IncidentsPanel`.
 
-1. `src/components/clients/pcsp-tab.tsx` — replace its own goals/identity queries.
-2. `src/components/workspace/emar-chart.tsx` — read `medications` + `flags` (self-admin) from the hook; the toggle mutation stays where it is.
-3. `src/components/workspace/mar-emar-tab.tsx` and `src/components/medications-manager.tsx` + `src/components/mar-calendar.tsx` — same.
-4. `src/components/evv/punch-pad.tsx` — read `visibility.goalsForStaff` (passing the shift's `service_type_code`) instead of its own filter.
-5. `src/routes/dashboard.workspace.$clientId.tsx` and `src/routes/dashboard.shift.$shiftId.tsx` — prime the cache via loader, drop ad-hoc client fetches.
-6. `src/components/staff-mobile/client-quick-info-sheet.tsx` — read from the hook.
+**Operations** (new sibling tab, holds today's Care > Ops + PCSP-derived non-goal supports):
+- `SupportStrategiesPanel`, `PersonCenteredProfilePanel`, `CaseloadEditor`, `ClientMealPlannerMount`, `ChoreChartForClient`.
 
-Everything else keeps working unchanged (existing hooks like `useClientBillingCodes` stay, but internally we point them at the shared function in a later pass — not this PR).
+**Compliance** (new sibling tab): `SummariesPanel`, `HostHomeCertPanel` (when host-home), `DeadlinesPanel`.
 
-## Guardrail so no new screen bypasses it
+## Duplicates removed
 
-- ESLint rule `no-restricted-syntax` in `eslint.config.js` that flags direct `.from('clients')`, `.from('client_medications')`, `.from('client_specific_trainings')`, `.from('client_billing_codes')` reads outside an allowlist:
-  - `src/lib/client-care-data.functions.ts`
-  - existing hooks named in the allowlist (billing hooks, etc.) until they're migrated
-  - migrations / types / server-only import & billing pipelines
-- Rule message: "Read client care data via `getClientCareData` / `useClientCareData`."
+The **PCSP tab is deleted entirely.** Its three data surfaces get exactly one home each:
+- PCSP goals → Care plan > Goals (only).
+- Authorized codes / rates / annual units → Billing (only). Removed from PCSP tab.
+- Admission date → Identity (only). Removed from PCSP tab (this was the timezone-bug tab).
+- The PCSP document itself → Files (kind = pcsp).
 
-New screens can't add fresh queries without either adding themselves to the allowlist (visible in review) or going through the shared function.
+Nothing in this change touches read paths — every consolidated tab already reads through the shared `useClientCareData` hook from Prompt 1, so the removals just delete duplicate render code, not queries.
 
-## Files touched
+## Technical notes
 
-- new: `src/lib/client-care-data.functions.ts`, `src/hooks/use-client-care-data.tsx`
-- edited: the six migration targets above, `eslint.config.js`
-- no schema changes, no migrations
-
-## Not doing in this PR
-
-- Rewriting the ~40 other files that touch `clients`/`client_medications`/goals. They're on the allowlist and get migrated in follow-ups, one care-surface at a time. Doing them all at once is where this kind of refactor usually breaks the app.
-- Changing what data is stored, or any RLS/GRANT changes.
-- Consolidating scheduling / financial / EVV reads — different domain, separate refactor.
+- File edited: `src/routes/dashboard.clients.$clientId.tsx` — tab list rewritten; `TabsContent value="pcsp"` block deleted; `care` block restructured to `goals` + `medications` sub-tabs; `funds` renamed to `billing`; new `operations` and `compliance` `TabsContent` blocks moved out of Care/Activity.
+- File deleted: `src/components/clients/pcsp-tab.tsx` (its remaining useful pieces — structured goals editor, doc upload — already exist elsewhere via the shared hook and `ClientDocumentsCard`).
+- Route param `tab` values change (`profile→identity`, `care→care-plan`, `funds→billing`, `pcsp` gone). Add a small redirect map at the top of the route so old bookmarks (`?tab=profile`, `?tab=pcsp`) land on the right new tab.
+- `setTab("files")` callsite in `ClientProfileTab` keeps working (Files tab still exists).
+- No schema changes. No changes to `useClientCareData` — this is a pure UI reorganization on top of Prompt 1.
+- After edits, run `npm run build` per repo rules so `routeTree.gen.ts` stays in sync, then verify (a) no `pcsp` tab renders, (b) authorized codes appear only under Billing, (c) admission date appears only under Identity, (d) goals appear only under Care plan > Goals.

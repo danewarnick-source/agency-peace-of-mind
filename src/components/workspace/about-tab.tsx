@@ -12,9 +12,27 @@ import {
 import type { CaseloadClient } from "@/hooks/use-caseload";
 import { FaceSheetInfoCard } from "@/components/clients/face-sheet-info-card";
 import { ClientPhotoCard } from "@/components/clients/client-photo-card";
+import { useClientCareData } from "@/hooks/use-client-care-data";
 
 export function AboutTab({ client }: { client: CaseloadClient }) {
-  const goals = client.pcsp_goals ?? [];
+  // Route ALL client-info reads through the shared visibility layer so
+  // section+field toggles set on the admin side automatically hide data
+  // from staff. Falls back to the caseload row while data loads.
+  const care = useClientCareData(client.id);
+  const staffCare = care.data?.visibility.staffCare;
+  const sections = care.data?.visibility.sections;
+
+  const identitySectionOn = sections?.identity ?? true;
+  const carePlanSectionOn = sections?.care_plan ?? true;
+
+  const goals =
+    carePlanSectionOn
+      ? (staffCare?.goals ?? []).map((g) => g.goal).filter(Boolean)
+      : [];
+
+  const medicaidId = identitySectionOn
+    ? staffCare?.identity.medicaid_id ?? client.medicaid_id
+    : null;
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {/* Identity card */}

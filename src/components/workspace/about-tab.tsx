@@ -13,6 +13,18 @@ import type { CaseloadClient } from "@/hooks/use-caseload";
 import { FaceSheetInfoCard } from "@/components/clients/face-sheet-info-card";
 import { ClientPhotoCard } from "@/components/clients/client-photo-card";
 import { useClientCareData } from "@/hooks/use-client-care-data";
+import type { CustomFieldWithValue } from "@/lib/client-care-data.functions";
+
+function formatCustomValue(f: CustomFieldWithValue): string {
+  const v = f.value;
+  if (!v) return "—";
+  switch (f.data_type) {
+    case "text": return v.value_text ?? "—";
+    case "number": return v.value_number == null ? "—" : String(v.value_number);
+    case "boolean": return v.value_boolean ? "Yes" : "No";
+    case "date": return v.value_date ?? "—";
+  }
+}
 
 export function AboutTab({ client }: { client: CaseloadClient }) {
   // Route ALL client-info reads through the shared visibility layer so

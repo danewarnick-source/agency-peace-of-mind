@@ -141,7 +141,7 @@ export const getClientCareData = createServerFn({ method: "GET" })
         .maybeSingle(),
       supabase
         .from("client_specific_trainings")
-        .select("goals")
+        .select("id, goals")
         .eq("client_id", clientId)
         .eq("training_type", "person_specific")
         .maybeSingle(),

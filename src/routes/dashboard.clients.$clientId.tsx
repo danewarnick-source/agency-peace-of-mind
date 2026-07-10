@@ -296,6 +296,7 @@ function ClientProfileHub() {
               <ClientDocumentsCard clientId={clientId} clientName={fullName} />
             </SectionPanel>
           </SectionGroup>
+          <CustomFieldsForSection clientId={clientId} section="files" />
         </TabsContent>
 
         {/* ACTIVITY — pure shift/log/incident history. */}

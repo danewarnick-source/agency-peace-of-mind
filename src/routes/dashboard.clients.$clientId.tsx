@@ -257,12 +257,8 @@ function ClientProfileHub() {
                 <CareSection icon={Target} accent="indigo">
                   <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
                 </CareSection>
-                <CareSection icon={GraduationCap} accent="amber">
-                  <CollapsibleSimpleCard title="Client-specific training">
-                    <ClientSpecificTrainingCard clientId={clientId} />
-                  </CollapsibleSimpleCard>
-                </CareSection>
               </CareGroup>
+
             </TabsContent>
 
             <TabsContent value="medications" className="space-y-6">

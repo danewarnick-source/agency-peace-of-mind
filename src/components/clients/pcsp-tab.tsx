@@ -273,7 +273,7 @@ export function PcspTab({
     },
     onSuccess: () => {
       toast.success("Service codes updated");
-      queryClient.invalidateQueries({ queryKey: ["pcsp-structured-goals", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["client-care-data", clientId] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to update codes"),
   });

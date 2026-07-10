@@ -27,7 +27,6 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { queryOptions } from "@tanstack/react-query";
 import type { CSTGoal } from "./client-specific-training.functions";
 import {
-  SECTION_DEFAULTS,
   type ClientVisibilityRow,
   type SectionName,
   fieldKey,

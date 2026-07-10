@@ -49,14 +49,19 @@ type ClientRow = Record<string, unknown> | null | undefined;
 
 function fmtDate(d: unknown): string {
   if (!d) return "—";
+  const s = String(d);
+  // ISO date-only → MM/DD/YYYY without timezone conversion
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (m) return `${m[2]}/${m[3]}/${m[1]}`;
   try {
-    const dt = new Date(String(d));
-    if (Number.isNaN(dt.getTime())) return String(d);
+    const dt = new Date(s);
+    if (Number.isNaN(dt.getTime())) return s;
     return dt.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   } catch {
-    return String(d);
+    return s;
   }
 }
+
 
 function daysUntil(d: unknown): number | null {
   if (!d) return null;

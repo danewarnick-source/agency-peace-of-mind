@@ -1,62 +1,96 @@
 ## Goal
 
-Collapse today's six client-profile tabs (Profile / Care / Activity / Funds / Files / PCSP) into **four editable tabs** — Identity, Care plan, Billing, Files — with every piece of information having exactly one editable home. Activity stays where it is. Operations and Compliance move out into their own separate areas (siblings to the four, not merged).
+Add two-level staff-visibility control per client: **section toggle** as a hard override, and **per-field toggle** within each on-section. All enforcement lives in the shared `getClientCareData` visibility block from Prompt 1 — no screen re-implements the rules.
 
-## New tab layout
+## Sections and defaults
 
-```text
-Identity        Care plan       Billing         Files       | Activity   Operations   Compliance
-────────        ─────────       ───────         ─────       | ────────   ──────────   ──────────
-Header card     ├─ Goals        Authorized      Uploaded    | Shifts     Meal planner Summaries
-Demographics    └─ Medications  codes + rates   documents   | Daily logs Chore chart  Host-home certs
-Guardian /                      Annual auth     (incl.      | Incidents  Caseload     Deadlines
- emergency                       units          PCSP docs)  |
-Support coord.                  Budget / funds
-Admission date
+Six sections match the consolidated tabs (Activity is out of scope — it's a staff-generated record, not admin-editable data staff would read):
+
+| Section    | Default for staff |
+| ---------- | ----------------- |
+| Identity   | **on**            |
+| Care plan  | **on**            |
+| Operations | **on**            |
+| Billing    | off               |
+| Files      | off               |
+| Compliance | off               |
+
+Rule: **section off ⇒ nothing in it reaches staff**, and per-field toggles are ignored while the section is off (hard override, matching the request).
+
+## Data model
+
+Two new tables, both `client_id`-scoped and org-scoped via RLS. Section rows are sparse (row exists only when admin overrides the default); field rows are sparse (row exists only when admin hid the field). Absence = default.
+
+**`client_section_visibility`**
+- `client_id uuid` (FK clients)
+- `section text` — one of `identity | care_plan | billing | files | operations | compliance`
+- `visible_to_staff boolean not null`
+- unique (`client_id`, `section`)
+
+**`client_field_visibility`**
+- `client_id uuid` (FK clients)
+- `section text` — same enum as above
+- `field_key text` — stable identifier: goal id (uuid), medication id, custom-field-definition id, or a fixed identity-field name (`medicaid_id`, `emergency_contact`, `guardian`, `support_coordinator`, `admission_date`, `dob`, `preferred_name`)
+- `hidden_from_staff boolean not null default true` (rows only exist to hide)
+- unique (`client_id`, `section`, `field_key`)
+
+Both tables: standard grants (authenticated CRUD, service_role all), RLS via `is_org_admin_or_manager` for writes and `is_org_member` for reads (staff need to read to know what to render). `updated_at` trigger. No anon grant.
+
+## Shared function changes
+
+Extend `ClientCareVisibility` in `src/lib/client-care-data.functions.ts`:
+
+```ts
+export type StaffSection = "identity" | "care_plan" | "billing" | "files" | "operations" | "compliance";
+
+sectionsForStaff: Record<StaffSection, boolean>;    // resolved: defaults ∘ overrides
+hiddenFieldKeys: Record<StaffSection, Set<string>>; // only fields explicitly hidden
 ```
 
-The four consolidated tabs are the only editable homes for the data they show. Activity / Operations / Compliance are additional top-level tabs, unchanged in content but re-scoped so each holds only what it says on the tin.
+`getClientCareData` handler:
+1. Load both visibility tables in the existing `Promise.all`.
+2. Apply defaults, overlay section overrides → `sectionsForStaff`.
+3. Build `hiddenFieldKeys` per section from field rows.
+4. Rewrite existing derived visibility:
+   - `goalsForStaff` = current rule **AND** `sectionsForStaff.care_plan` **AND** goal id ∉ `hiddenFieldKeys.care_plan`.
+   - `medicationsVisible` becomes `medicationsForStaff: CareMedication[]` filtered by section + per-med id.
+   - Add `identityForStaff`: partial identity object with hidden fields nulled out (or `null` when section off).
+5. Everything staff-facing (`punch-pad`, workspace, eMAR) already reads `visibility.*`, so it automatically inherits the new rules with no per-screen change beyond swapping `medicationsVisible: boolean` → `medicationsForStaff: CareMedication[]`.
 
-## Tab-by-tab content
+Cache key: add nothing — visibility rows live under the same `clientId` query key and invalidate together.
 
-**Identity** — sole home for name, DOB, Medicaid #, guardian, emergency contacts, support coordinator, admission date.
-- Keep: `UpdateInfoFromDocumentCard`, `ClientProfileTab` (profile-tab.tsx).
-- No change to the fields themselves; admission date already renders correctly here (Profile-tab fmtDate is the good one).
+## Admin UI
 
-**Care plan** — two sub-tabs, both reading through `useClientCareData`:
-- **Goals** — `PlanGoalsPanel` + `ClientSpecificTrainingCard` (structured PCSP goals with editable job codes). This is the ONLY place PCSP goals appear as editable rows.
-- **Medications** — `MarEmarTab` (medication list + eMAR when enabled), gated by `showEmarSubTab` today. When gate is off, show medications list only (still via shared hook).
+In the consolidated client profile (`dashboard.clients.$clientId.tsx`):
 
-**Billing** — sole home for authorized codes, per-code rates, annual authorization units, budget/funds.
-- Keep: `BillingCodesPanel`, `ClientBudgetPanel`.
-- Add annual auth units display (already in `client_billing_codes`, currently shown as duplicate on PCSP tab).
+- **Section toggle**: a `Switch` in each tab's header (Identity / Care plan / Billing / Files / Operations / Compliance) labeled *"Visible to staff"*, seeded from `sectionsForStaff[section]`. Writes a row to `client_section_visibility` (upsert).
+- **Per-field toggle**: an eye/eye-off icon button next to each row where per-field control makes sense:
+  - Identity: fixed fields (medicaid_id, dob, emergency contacts, guardian, support coordinator, admission date, preferred name).
+  - Care plan → Goals: each `CareGoal` row (keyed by goal id).
+  - Care plan → Medications: each `CareMedication` row (keyed by med id).
+  - Operations: each custom-field row (keyed by `custom_field_definitions.id`).
+  - Billing/Files/Compliance: no per-field UI needed (default-off sections; admin flips the section toggle when they want staff to see them, then everything inside is visible unless a specific row is hidden — same eye-off pattern on any listed row).
 
-**Files** — sole home for uploaded source documents.
-- Keep: `ClientDocumentsCard`.
-- Absorb the PCSP-tab document upload/viewer surface — after this change, PCSPs are just documents that live in Files (with a `kind = 'pcsp'` filter chip in the existing card).
+When a section is off, the per-field controls in that tab render disabled with tooltip *"Section is hidden from staff — turn on to control individual fields."*
 
-**Activity** (unchanged): `ShiftsPanel`, `DailyLogsPanel`, `IncidentsPanel`.
+Two server functions in a new `src/lib/client-visibility.functions.ts`:
+- `setSectionVisibility({ clientId, section, visibleToStaff })`
+- `setFieldVisibility({ clientId, section, fieldKey, hidden })` (deletes the row when `hidden === false`, upserts when true)
 
-**Operations** (new sibling tab, holds today's Care > Ops + PCSP-derived non-goal supports):
-- `SupportStrategiesPanel`, `PersonCenteredProfilePanel`, `CaseloadEditor`, `ClientMealPlannerMount`, `ChoreChartForClient`.
+Both `.middleware([requireSupabaseAuth])`, both verify admin/manager via `has_role`.
 
-**Compliance** (new sibling tab): `SummariesPanel`, `HostHomeCertPanel` (when host-home), `DeadlinesPanel`.
+## Files touched
 
-## Duplicates removed
+- Migration: `client_section_visibility` + `client_field_visibility` (+ grants, RLS, trigger).
+- Edit: `src/lib/client-care-data.functions.ts` — extend visibility block.
+- New: `src/lib/client-visibility.functions.ts` — two mutation server fns.
+- New: `src/components/clients/visibility-controls.tsx` — `<SectionVisibilitySwitch />` and `<FieldVisibilityToggle />`.
+- Edit: `src/routes/dashboard.clients.$clientId.tsx` — mount `SectionVisibilitySwitch` in each of the six tab headers.
+- Edit: goal-editor row (`ClientSpecificTrainingCard` / `PlanGoalsPanel`), medication row (`MarEmarTab` list), custom-field row, and the Identity fixed-field list — each gets a `<FieldVisibilityToggle />` in admin view (hidden in staff view).
+- Edit: staff-facing consumers of `visibility.medicationsVisible` → `visibility.medicationsForStaff.length > 0` (small mechanical change, ~3 call sites).
 
-The **PCSP tab is deleted entirely.** Its three data surfaces get exactly one home each:
-- PCSP goals → Care plan > Goals (only).
-- Authorized codes / rates / annual units → Billing (only). Removed from PCSP tab.
-- Admission date → Identity (only). Removed from PCSP tab (this was the timezone-bug tab).
-- The PCSP document itself → Files (kind = pcsp).
+## Out of scope
 
-Nothing in this change touches read paths — every consolidated tab already reads through the shared `useClientCareData` hook from Prompt 1, so the removals just delete duplicate render code, not queries.
-
-## Technical notes
-
-- File edited: `src/routes/dashboard.clients.$clientId.tsx` — tab list rewritten; `TabsContent value="pcsp"` block deleted; `care` block restructured to `goals` + `medications` sub-tabs; `funds` renamed to `billing`; new `operations` and `compliance` `TabsContent` blocks moved out of Care/Activity.
-- File deleted: `src/components/clients/pcsp-tab.tsx` (its remaining useful pieces — structured goals editor, doc upload — already exist elsewhere via the shared hook and `ClientDocumentsCard`).
-- Route param `tab` values change (`profile→identity`, `care→care-plan`, `funds→billing`, `pcsp` gone). Add a small redirect map at the top of the route so old bookmarks (`?tab=profile`, `?tab=pcsp`) land on the right new tab.
-- `setTab("files")` callsite in `ClientProfileTab` keeps working (Files tab still exists).
-- No schema changes. No changes to `useClientCareData` — this is a pure UI reorganization on top of Prompt 1.
-- After edits, run `npm run build` per repo rules so `routeTree.gen.ts` stays in sync, then verify (a) no `pcsp` tab renders, (b) authorized codes appear only under Billing, (c) admission date appears only under Identity, (d) goals appear only under Care plan > Goals.
+- No changes to the section list itself — Activity stays as-is (staff record, not admin-editable data).
+- No bulk "hide all similar" tool.
+- No audit trail on toggles beyond `updated_at` (can add later if requested).

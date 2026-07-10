@@ -58,11 +58,15 @@ import {
   type CSTReviewQuestion,
 } from "@/lib/client-specific-training.functions";
 
+type ProfileTab = "identity" | "care-plan" | "billing" | "files" | "activity" | "operations" | "compliance";
+
 const search = z.object({
   tab: z
     .enum([
-      "profile", "care", "activity", "funds", "files", "pcsp",
+      // canonical four + siblings
+      "identity", "care-plan", "billing", "files", "activity", "operations", "compliance",
       // legacy deep-link values kept for backwards compat
+      "profile", "care", "funds", "pcsp",
       "overview", "plan", "codes", "caseload", "shifts", "logs", "incidents",
       "summaries", "hhcert", "deadlines", "documents",
     ])
@@ -79,16 +83,23 @@ export const Route = createFileRoute("/dashboard/clients/$clientId")({
   ),
 });
 
-// Map legacy deep-link tab values to the new five-tab model
-function resolveTab(raw: string | undefined): "profile" | "care" | "activity" | "funds" | "files" | "pcsp" {
-  if (!raw) return "profile";
-  if (raw === "profile" || raw === "overview") return "profile";
-  if (raw === "care" || raw === "plan" || raw === "caseload") return "care";
-  if (raw === "activity" || raw === "shifts" || raw === "logs" || raw === "incidents" || raw === "summaries" || raw === "hhcert" || raw === "deadlines") return "activity";
-  if (raw === "funds" || raw === "codes") return "funds";
-  if (raw === "files" || raw === "documents") return "files";
-  if (raw === "pcsp") return "pcsp";
-  return "profile";
+// Map legacy deep-link tab values to the consolidated tab model.
+// Identity / Care plan / Billing / Files are the four editable tabs.
+// Activity / Operations / Compliance are sibling read/coordination tabs.
+function resolveTab(raw: string | undefined): ProfileTab {
+  if (!raw) return "identity";
+  // canonical
+  if (raw === "identity" || raw === "care-plan" || raw === "billing" || raw === "files" ||
+      raw === "activity" || raw === "operations" || raw === "compliance") return raw;
+  // legacy
+  if (raw === "profile" || raw === "overview") return "identity";
+  if (raw === "care" || raw === "plan") return "care-plan";
+  if (raw === "caseload") return "operations";
+  if (raw === "shifts" || raw === "logs" || raw === "incidents") return "activity";
+  if (raw === "summaries" || raw === "hhcert" || raw === "deadlines") return "compliance";
+  if (raw === "funds" || raw === "codes") return "billing";
+  if (raw === "documents" || raw === "pcsp") return "files";
+  return "identity";
 }
 
 function CollapsibleSimpleCard({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {

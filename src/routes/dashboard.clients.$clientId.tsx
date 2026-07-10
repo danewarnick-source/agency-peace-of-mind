@@ -1415,6 +1415,18 @@ function BillingCodesPanel({ clientId }: { clientId: string }) {
             { header: "Annual auth", cell: (r) => r.annual_unit_authorization ?? "—" },
             { header: "Rate", cell: (r) => (r.rate_per_unit != null ? `$${Number(r.rate_per_unit).toFixed(2)}` : "—") },
             { header: "Effective", cell: (r) => `${r.service_start_date ?? "—"} → ${r.service_end_date ?? "open"}` },
+            {
+              header: "Staff view",
+              cell: (r) => (
+                <FieldVisibilityToggle
+                  clientId={clientId}
+                  section="billing"
+                  kind="code"
+                  id={String(r.id)}
+                  label={`code ${r.service_code}`}
+                />
+              ),
+            },
           ]}
         />
       </CardContent>

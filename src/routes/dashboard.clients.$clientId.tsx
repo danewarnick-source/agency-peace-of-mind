@@ -726,19 +726,30 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
                   const incomplete = goalIsIncomplete(g);
                   return (
                     <li key={key} className="rounded-md border border-border p-2">
-                      <button
-                        type="button"
-                        onClick={() => setOpenGoal(isOpen ? null : key)}
-                        className="flex w-full items-start gap-2 text-left"
-                        aria-expanded={isOpen}
-                      >
-                        {isOpen ? (
-                          <ChevronDown className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                      <div className="flex items-start gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setOpenGoal(isOpen ? null : key)}
+                          className="flex flex-1 items-start gap-2 text-left"
+                          aria-expanded={isOpen}
+                        >
+                          {isOpen ? (
+                            <ChevronDown className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                          )}
+                          <p className={isOpen ? "flex-1" : "flex-1 line-clamp-2"}>{g.goal}</p>
+                        </button>
+                        {g.id && (
+                          <FieldVisibilityToggle
+                            clientId={clientId}
+                            section="care_plan"
+                            kind="goal"
+                            id={String(g.id)}
+                            label="this goal"
+                          />
                         )}
-                        <p className={isOpen ? "flex-1" : "flex-1 line-clamp-2"}>{g.goal}</p>
-                      </button>
+                      </div>
                       {(incomplete || (Array.isArray(g.job_codes) && g.job_codes.length > 0)) && (
                         <div className="mt-1 flex flex-wrap items-center gap-1 pl-5">
                           {incomplete && (

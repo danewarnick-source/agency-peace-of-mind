@@ -152,7 +152,7 @@ export const getClientCareData = createServerFn({ method: "GET" })
     const { clientId, shiftServiceCode } = data;
     const supabase = context.supabase as any;
 
-    const [clientRes, cstRes, medsRes, codesRes] = await Promise.all([
+    const [clientRes, cstRes, medsRes, codesRes, visRes] = await Promise.all([
       supabase
         .from("clients")
         .select(
@@ -179,6 +179,11 @@ export const getClientCareData = createServerFn({ method: "GET" })
         .select("*")
         .eq("client_id", clientId)
         .order("service_code"),
+      supabase
+        .from("client_staff_visibility")
+        .select("sections, fields")
+        .eq("client_id", clientId)
+        .maybeSingle(),
     ]);
 
     if (clientRes.error) throw clientRes.error;
@@ -186,6 +191,7 @@ export const getClientCareData = createServerFn({ method: "GET" })
     if (cstRes.error) throw cstRes.error;
     if (medsRes.error) throw medsRes.error;
     if (codesRes.error) throw codesRes.error;
+    // visRes error is non-fatal — a missing row just means "use defaults"
 
     const row = clientRes.data as Record<string, any>;
     const identity: CareIdentity = {
@@ -232,9 +238,56 @@ export const getClientCareData = createServerFn({ method: "GET" })
 
     const medications = (medsRes.data ?? []) as CareMedication[];
 
-    // Visibility layer — the ONE place staff-side filters live.
+    // ── Visibility layer — the ONE place staff-side filters live ──────────
+    const visRow = (visRes?.data ?? null) as {
+      sections?: Record<string, boolean> | null;
+      fields?: Record<string, boolean> | null;
+    } | null;
+    const visibilityRow: ClientVisibilityRow = {
+      sections: (visRow?.sections ?? {}) as ClientVisibilityRow["sections"],
+      fields: (visRow?.fields ?? {}) as ClientVisibilityRow["fields"],
+    };
+
+    const sections = {
+      identity: isSectionVisible(visibilityRow, "identity"),
+      care_plan: isSectionVisible(visibilityRow, "care_plan"),
+      billing: isSectionVisible(visibilityRow, "billing"),
+      files: isSectionVisible(visibilityRow, "files"),
+      operations: isSectionVisible(visibilityRow, "operations"),
+      compliance: isSectionVisible(visibilityRow, "compliance"),
+    } as Record<SectionName, boolean>;
+
+    // Filter individual items for the staff-facing projection.
+    const identityStaff: CareIdentity = sections.identity
+      ? {
+          ...identity,
+          admission_date: isFieldVisible(visibilityRow, fieldKey("identity", "field", "admission_date")) ? identity.admission_date : null,
+          medicaid_id: isFieldVisible(visibilityRow, fieldKey("identity", "field", "medicaid_id")) ? identity.medicaid_id : null,
+          discharge_date: isFieldVisible(visibilityRow, fieldKey("identity", "field", "discharge_date")) ? identity.discharge_date : null,
+        }
+      : {
+          ...identity,
+          // Name/DOB always retained so staff can still identify the person.
+          admission_date: null,
+          discharge_date: null,
+          medicaid_id: null,
+          preferred_name: null,
+          status: null,
+        };
+
+    const goalsStaffAll = sections.care_plan
+      ? goals.filter((g) => isFieldVisible(visibilityRow, fieldKey("care_plan", "goal", g.id)))
+      : [];
+    const medicationsStaff = sections.care_plan
+      ? medications.filter((m) => isFieldVisible(visibilityRow, fieldKey("care_plan", "medication", m.id)))
+      : [];
+    const authorizedCodesStaff = sections.billing
+      ? authorized_codes.filter((c) => isFieldVisible(visibilityRow, fieldKey("billing", "code", c.id)))
+      : [];
+
+    // goalsForStaff also applies the shift-service-code filter (existing).
     const codeUpper = shiftServiceCode ? shiftServiceCode.toUpperCase() : null;
-    const goalsForStaff = goals.filter((g) => {
+    const goalsForStaff = goalsStaffAll.filter((g) => {
       if (!g.is_complete) return false;
       if (!codeUpper) return true;
       return g.job_codes.some((c) => c.toUpperCase() === codeUpper);
@@ -242,8 +295,15 @@ export const getClientCareData = createServerFn({ method: "GET" })
 
     const visibility: ClientCareVisibility = {
       goalsForStaff,
-      medicationsVisible: medications.length > 0,
+      medicationsVisible: medicationsStaff.length > 0,
       shiftServiceCode: codeUpper,
+      sections,
+      staffCare: {
+        identity: identityStaff,
+        goals: goalsStaffAll,
+        medications: medicationsStaff,
+        authorized_codes: authorizedCodesStaff,
+      },
     };
 
     const pcsp_training_id = (cstRes.data?.id as string | undefined) ?? null;
@@ -254,6 +314,7 @@ export const getClientCareData = createServerFn({ method: "GET" })
       goals,
       medications,
       authorized_codes,
+      visibilityRow,
       visibility,
     };
   });

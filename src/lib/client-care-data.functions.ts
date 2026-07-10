@@ -103,6 +103,9 @@ export type ClientCareVisibility = {
 export type ClientCareData = {
   identity: CareIdentity;
   flags: CareFlags;
+  /** CST (person_specific) row id — needed by admin editors that write
+   *  goals back. Null when no CST row exists yet. */
+  pcsp_training_id: string | null;
   goals: CareGoal[];
   medications: CareMedication[];
   authorized_codes: CareAuthorizedCode[];

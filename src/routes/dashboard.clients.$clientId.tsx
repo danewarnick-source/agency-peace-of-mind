@@ -34,7 +34,7 @@ import { ClientDocumentsCard } from "@/components/clients/client-documents-card"
 import { ClientBudgetPanel } from "@/components/clients/client-budget-panel";
 import { ClientMealPlannerMount } from "@/components/clients/client-meal-planner-mount";
 import { ChoreChartForClient } from "@/components/chores/chore-chart-mount";
-import { PcspTab } from "@/components/clients/pcsp-tab";
+
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
 import { SectionPanel, SectionGroup, CareSection, CareGroup } from "@/components/clients/section-panel";
 import { ClientProfileTab } from "@/components/clients/profile-tab";

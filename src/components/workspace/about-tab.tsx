@@ -33,6 +33,11 @@ export function AboutTab({ client }: { client: CaseloadClient }) {
   const medicaidId = identitySectionOn
     ? staffCare?.identity.medicaid_id ?? client.medicaid_id
     : null;
+
+  // Custom fields already filtered by section toggle on the server.
+  const customFields = staffCare?.custom_fields ?? [];
+  const identityCustom = customFields.filter((f) => f.section === "identity");
+  const carePlanCustom = customFields.filter((f) => f.section === "care_plan");
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {/* Identity card */}

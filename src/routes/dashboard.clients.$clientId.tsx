@@ -335,6 +335,7 @@ function ClientProfileHub() {
               <ChoreChartForClient clientId={clientId} />
             </CareSection>
           </CareGroup>
+          <CustomFieldsForSection clientId={clientId} section="operations" />
         </TabsContent>
 
         {/* COMPLIANCE — summaries, host-home certifications, deadlines. */}

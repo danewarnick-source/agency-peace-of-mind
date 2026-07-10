@@ -269,6 +269,7 @@ export function PcspTab({
       const flat = nextGoals
         .map((g) => (g.goal ?? "").toString().trim())
         .filter((s) => s.length > 0);
+      // eslint-disable-next-line no-restricted-syntax -- legacy mirror write; canonical READ is through useClientCareData.
       await supabase.from("clients").update({ pcsp_goals: flat }).eq("id", clientId);
     },
     onSuccess: () => {

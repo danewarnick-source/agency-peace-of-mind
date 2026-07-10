@@ -40,7 +40,7 @@ import { SectionPanel, SectionGroup, CareSection, CareGroup } from "@/components
 import { ClientProfileTab } from "@/components/clients/profile-tab";
 import { FaceSheetButton } from "@/components/clients/face-sheet-button";
 import { SectionsView, ClientSpecificTrainingCard, GoalsEditor, PublishConfirmDialog } from "@/components/clients/client-specific-training-card";
-import { SectionVisibilityToggle } from "@/components/clients/visibility-toggles";
+import { SectionVisibilityToggle, FieldVisibilityToggle } from "@/components/clients/visibility-toggles";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, Pill, RefreshCw, Sparkles, Trash2, Upload, UserCircle2, Target, ShieldCheck, GraduationCap, HeartHandshake, Users, UtensilsCrossed, ListChecks, UserCircle, FileUp, Clock, FileText, AlertOctagon, ClipboardList, Home as HomeIcon, CalendarClock, Wallet, FolderOpen } from "lucide-react";
 import { clientFeatureVisible, useClientFeature } from "@/lib/client-features";
 import { MarEmarTab } from "@/components/workspace/mar-emar-tab";

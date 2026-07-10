@@ -63,6 +63,16 @@ export function AboutTab({ client }: { client: CaseloadClient }) {
                 <span className="font-mono">{medicaidId}</span>
               </p>
             )}
+            {identityCustom.length > 0 && (
+              <dl className="mt-2 space-y-0.5">
+                {identityCustom.map((f) => (
+                  <div key={f.id} className="text-xs text-muted-foreground">
+                    <dt className="inline font-medium">{f.field_label}:</dt>{" "}
+                    <dd className="inline">{formatCustomValue(f)}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
           </div>
         </div>
       </Card>

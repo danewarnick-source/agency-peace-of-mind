@@ -131,6 +131,10 @@ export type ClientCareVisibility = {
     goals: CareGoal[];
     medications: CareMedication[];
     authorized_codes: CareAuthorizedCode[];
+    /** Custom fields whose owning section is toggled on for staff.
+     *  Custom fields have no per-field visibility switch — they inherit
+     *  their section's toggle exclusively. */
+    custom_fields: CustomFieldWithValue[];
   };
 };
 

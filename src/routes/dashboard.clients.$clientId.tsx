@@ -40,6 +40,7 @@ import { SectionPanel, SectionGroup, CareSection, CareGroup } from "@/components
 import { ClientProfileTab } from "@/components/clients/profile-tab";
 import { FaceSheetButton } from "@/components/clients/face-sheet-button";
 import { SectionsView, ClientSpecificTrainingCard, GoalsEditor, PublishConfirmDialog } from "@/components/clients/client-specific-training-card";
+import { SectionVisibilityToggle, FieldVisibilityToggle } from "@/components/clients/visibility-toggles";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, Pill, RefreshCw, Sparkles, Trash2, Upload, UserCircle2, Target, ShieldCheck, GraduationCap, HeartHandshake, Users, UtensilsCrossed, ListChecks, UserCircle, FileUp, Clock, FileText, AlertOctagon, ClipboardList, Home as HomeIcon, CalendarClock, Wallet, FolderOpen } from "lucide-react";
 import { clientFeatureVisible, useClientFeature } from "@/lib/client-features";
 import { MarEmarTab } from "@/components/workspace/mar-emar-tab";
@@ -225,6 +226,7 @@ function ClientProfileHub() {
         {/* IDENTITY — sole home for name, DOB, Medicaid #, guardian,
             emergency contacts, support coordinator, admission date. */}
         <TabsContent value="identity" className="space-y-10">
+          <SectionVisibilityToggle clientId={clientId} section="identity" />
           <SectionGroup label="Identity" hint="Who this person is — the record of record">
             <SectionPanel icon={FileUp} accent="amber">
               <UpdateInfoFromDocumentCard clientId={clientId} orgId={orgId} />
@@ -239,6 +241,7 @@ function ClientProfileHub() {
             (goals with editable job codes, medications) live here and
             nowhere else. */}
         <TabsContent value="care-plan" className="space-y-6">
+          <SectionVisibilityToggle clientId={clientId} section="care_plan" />
           <TrainingSetupBadge clientId={clientId} />
 
           <Tabs defaultValue="goals">
@@ -273,6 +276,7 @@ function ClientProfileHub() {
         {/* BILLING — sole home for authorized codes, per-code rates,
             annual authorization units, and budget. */}
         <TabsContent value="billing" className="space-y-10">
+          <SectionVisibilityToggle clientId={clientId} section="billing" />
           <SectionGroup label="Authorizations & budget" hint="Billing codes, rates, annual units, and remaining funds">
             <SectionPanel icon={ShieldCheck} accent="emerald">
               <BillingCodesPanel clientId={clientId} />
@@ -285,6 +289,7 @@ function ClientProfileHub() {
 
         {/* FILES — sole home for uploaded source documents (incl. PCSPs). */}
         <TabsContent value="files" className="space-y-10">
+          <SectionVisibilityToggle clientId={clientId} section="files" />
           <SectionGroup label="Documents" hint="Uploaded files for this client — PCSPs, 1056s, intake, and more">
             <SectionPanel icon={FolderOpen} accent="sky">
               <ClientDocumentsCard clientId={clientId} clientName={fullName} />
@@ -309,6 +314,7 @@ function ClientProfileHub() {
 
         {/* OPERATIONS — day-to-day coordination tools and non-goal PCSP supports. */}
         <TabsContent value="operations" className="space-y-10">
+          <SectionVisibilityToggle clientId={clientId} section="operations" />
           <CareGroup label="Supports & coordination" hint="Support strategies and team">
             <CareSection icon={ListChecks} accent="violet">
               <SupportStrategiesPanel client={client} clientId={clientId} orgId={orgId} />
@@ -332,6 +338,7 @@ function ClientProfileHub() {
 
         {/* COMPLIANCE — summaries, host-home certifications, deadlines. */}
         <TabsContent value="compliance" className="space-y-10">
+          <SectionVisibilityToggle clientId={clientId} section="compliance" />
           <SectionGroup label="Reporting & deadlines" hint="Summaries and upcoming due dates">
             <SectionPanel icon={ClipboardList} accent="violet">
               <SummariesPanel clientId={clientId} orgId={orgId} client={client} />
@@ -719,19 +726,30 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
                   const incomplete = goalIsIncomplete(g);
                   return (
                     <li key={key} className="rounded-md border border-border p-2">
-                      <button
-                        type="button"
-                        onClick={() => setOpenGoal(isOpen ? null : key)}
-                        className="flex w-full items-start gap-2 text-left"
-                        aria-expanded={isOpen}
-                      >
-                        {isOpen ? (
-                          <ChevronDown className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                      <div className="flex items-start gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setOpenGoal(isOpen ? null : key)}
+                          className="flex flex-1 items-start gap-2 text-left"
+                          aria-expanded={isOpen}
+                        >
+                          {isOpen ? (
+                            <ChevronDown className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                          )}
+                          <p className={isOpen ? "flex-1" : "flex-1 line-clamp-2"}>{g.goal}</p>
+                        </button>
+                        {g.id && (
+                          <FieldVisibilityToggle
+                            clientId={clientId}
+                            section="care_plan"
+                            kind="goal"
+                            id={String(g.id)}
+                            label="this goal"
+                          />
                         )}
-                        <p className={isOpen ? "flex-1" : "flex-1 line-clamp-2"}>{g.goal}</p>
-                      </button>
+                      </div>
                       {(incomplete || (Array.isArray(g.job_codes) && g.job_codes.length > 0)) && (
                         <div className="mt-1 flex flex-wrap items-center gap-1 pl-5">
                           {incomplete && (
@@ -1397,6 +1415,18 @@ function BillingCodesPanel({ clientId }: { clientId: string }) {
             { header: "Annual auth", cell: (r) => r.annual_unit_authorization ?? "—" },
             { header: "Rate", cell: (r) => (r.rate_per_unit != null ? `$${Number(r.rate_per_unit).toFixed(2)}` : "—") },
             { header: "Effective", cell: (r) => `${r.service_start_date ?? "—"} → ${r.service_end_date ?? "open"}` },
+            {
+              header: "Staff view",
+              cell: (r) => (
+                <FieldVisibilityToggle
+                  clientId={clientId}
+                  section="billing"
+                  kind="code"
+                  id={String(r.id)}
+                  label={`code ${r.service_code}`}
+                />
+              ),
+            },
           ]}
         />
       </CardContent>

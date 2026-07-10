@@ -12,9 +12,27 @@ import {
 import type { CaseloadClient } from "@/hooks/use-caseload";
 import { FaceSheetInfoCard } from "@/components/clients/face-sheet-info-card";
 import { ClientPhotoCard } from "@/components/clients/client-photo-card";
+import { useClientCareData } from "@/hooks/use-client-care-data";
 
 export function AboutTab({ client }: { client: CaseloadClient }) {
-  const goals = client.pcsp_goals ?? [];
+  // Route ALL client-info reads through the shared visibility layer so
+  // section+field toggles set on the admin side automatically hide data
+  // from staff. Falls back to the caseload row while data loads.
+  const care = useClientCareData(client.id);
+  const staffCare = care.data?.visibility.staffCare;
+  const sections = care.data?.visibility.sections;
+
+  const identitySectionOn = sections?.identity ?? true;
+  const carePlanSectionOn = sections?.care_plan ?? true;
+
+  const goals =
+    carePlanSectionOn
+      ? (staffCare?.goals ?? []).map((g) => g.goal).filter(Boolean)
+      : [];
+
+  const medicaidId = identitySectionOn
+    ? staffCare?.identity.medicaid_id ?? client.medicaid_id
+    : null;
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {/* Identity card */}
@@ -34,10 +52,10 @@ export function AboutTab({ client }: { client: CaseloadClient }) {
               <MapPin className="h-3.5 w-3.5" />
               {client.physical_address ?? "Address on file with administrator"}
             </p>
-            {client.medicaid_id && (
+            {medicaidId && (
               <p className="mt-0.5 text-xs text-muted-foreground">
                 Medicaid ID:{" "}
-                <span className="font-mono">{client.medicaid_id}</span>
+                <span className="font-mono">{medicaidId}</span>
               </p>
             )}
           </div>

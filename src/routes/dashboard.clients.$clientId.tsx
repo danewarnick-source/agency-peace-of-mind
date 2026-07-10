@@ -226,6 +226,7 @@ function ClientProfileHub() {
         {/* IDENTITY — sole home for name, DOB, Medicaid #, guardian,
             emergency contacts, support coordinator, admission date. */}
         <TabsContent value="identity" className="space-y-10">
+          <SectionVisibilityToggle clientId={clientId} section="identity" />
           <SectionGroup label="Identity" hint="Who this person is — the record of record">
             <SectionPanel icon={FileUp} accent="amber">
               <UpdateInfoFromDocumentCard clientId={clientId} orgId={orgId} />

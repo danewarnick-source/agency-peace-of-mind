@@ -168,37 +168,19 @@ export function PcspTab({
     },
   });
 
-  const medsQ = useQuery({
-    enabled: !!clientId,
-    queryKey: ["pcsp-medications", clientId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("client_medications")
-        .select(
-          "id, medication_name, dosage, route, frequency, scheduled_time, prescriber, instructions, support_level, is_prn, prn_instructions, purpose, adverse_effects, choking_risk, is_controlled",
-        )
-        .eq("client_id", clientId)
-        .eq("is_active", true)
-        .order("medication_name", { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as unknown as Array<Record<string, unknown>>;
-    },
-  });
+  // Meds, authorized codes, and structured goals all come from the single
+  // canonical reader — no ad-hoc queries here so we can't drift from the
+  // eMAR chart / punch pad / other surfaces.
+  const careQ = useClientCareData(clientId);
+  const medsQ = {
+    data: careQ.data?.medications ?? null,
+    isLoading: careQ.isLoading,
+  } as const;
+  const codesQ = {
+    data: careQ.data?.authorized_codes ?? null,
+    isLoading: careQ.isLoading,
+  } as const;
 
-  const codesQ = useQuery({
-    enabled: !!clientId,
-    queryKey: ["pcsp-billing-codes", clientId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("client_billing_codes")
-        .select(
-          "id, service_code, annual_unit_authorization, unit_type, rate_per_unit, service_start_date, service_end_date, authorization_pending",
-        )
-        .eq("client_id", clientId);
-      if (error) throw error;
-      return (data ?? []) as unknown as Array<Record<string, unknown>>;
-    },
-  });
 
   const summariesQ = useQuery({
     enabled: !!clientId,

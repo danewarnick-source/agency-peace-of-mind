@@ -353,6 +353,7 @@ function ClientProfileHub() {
               <DeadlinesPanel clientId={clientId} />
             </SectionPanel>
           </SectionGroup>
+          <CustomFieldsForSection clientId={clientId} section="compliance" />
         </TabsContent>
       </Tabs>
     </div>

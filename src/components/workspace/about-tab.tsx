@@ -104,6 +104,18 @@ export function AboutTab({ client }: { client: CaseloadClient }) {
             </p>
           )}
         </ScrollArea>
+        {carePlanCustom.length > 0 && (
+          <dl className="mt-3 space-y-1 border-t border-border pt-3">
+            {carePlanCustom.map((f) => (
+              <div key={f.id} className="text-xs">
+                <dt className="inline font-medium text-muted-foreground">
+                  {f.field_label}:
+                </dt>{" "}
+                <dd className="inline">{formatCustomValue(f)}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
       </Card>
 
       {/* Behavioral triggers */}

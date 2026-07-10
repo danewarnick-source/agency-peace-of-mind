@@ -215,27 +215,12 @@ export function PcspTab({
     window.open(data.signedUrl, "_blank");
   };
 
-  // Structured PCSP goals live on client_specific_trainings.goals (jsonb).
-  // The legacy clients.pcsp_goals text[] is still mirrored but we no longer
-  // read it here — it can't represent supports, objective, or service codes.
-  const goalsQ = useQuery({
-    enabled: !!clientId,
-    queryKey: ["pcsp-structured-goals", clientId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("client_specific_trainings")
-        .select("id, goals")
-        .eq("client_id", clientId)
-        .eq("training_type", "person_specific")
-        .maybeSingle();
-      if (error) throw error;
-      return data as { id: string; goals: CSTGoal[] | null } | null;
-    },
-  });
-  const trainingId = goalsQ.data?.id ?? null;
-  const goals: CSTGoal[] = Array.isArray(goalsQ.data?.goals)
-    ? (goalsQ.data!.goals as CSTGoal[])
-    : [];
+  // Structured PCSP goals + the CST training id both come from the
+  // canonical `useClientCareData` reader above. Nothing here queries
+  // client_specific_trainings directly.
+  const trainingId = careQ.data?.pcsp_training_id ?? null;
+  const goals: CSTGoal[] = (careQ.data?.goals ?? []) as CSTGoal[];
+
   const rights: string[] = Array.isArray(client?.rights_restrictions)
     ? (client!.rights_restrictions as string[])
     : [];

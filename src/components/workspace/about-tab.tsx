@@ -52,10 +52,10 @@ export function AboutTab({ client }: { client: CaseloadClient }) {
               <MapPin className="h-3.5 w-3.5" />
               {client.physical_address ?? "Address on file with administrator"}
             </p>
-            {client.medicaid_id && (
+            {medicaidId && (
               <p className="mt-0.5 text-xs text-muted-foreground">
                 Medicaid ID:{" "}
-                <span className="font-mono">{client.medicaid_id}</span>
+                <span className="font-mono">{medicaidId}</span>
               </p>
             )}
           </div>

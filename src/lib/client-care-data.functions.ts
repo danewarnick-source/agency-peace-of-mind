@@ -99,13 +99,24 @@ export type CareAuthorizedCode = {
 
 export type ClientCareVisibility = {
   /** Goals that a staff member should see during the given shift.
-   *  Rule: is_complete AND (no shiftServiceCode provided ? all-complete
-   *  : job_codes.includes(shiftServiceCode)). Case-insensitive on codes. */
+   *  Rule: is_complete AND per-goal visible AND care_plan section on AND
+   *  (no shiftServiceCode ? all-complete : job_codes.includes(code)). */
   goalsForStaff: CareGoal[];
   medicationsVisible: boolean;
-  /** The shift's active service code echoed back, uppercased, for callers
-   *  that want to display "showing goals for code X". */
+  /** The shift's active service code echoed back, uppercased. */
   shiftServiceCode: string | null;
+  /** Resolved section on/off state (defaults applied). */
+  sections: Record<SectionName, boolean>;
+  /** Filtered projection staff-facing surfaces should render. Admin
+   *  surfaces read the raw `identity` / `goals` / `medications` /
+   *  `authorized_codes` fields — this block enforces the two-level
+   *  section+field visibility. */
+  staffCare: {
+    identity: CareIdentity;
+    goals: CareGoal[];
+    medications: CareMedication[];
+    authorized_codes: CareAuthorizedCode[];
+  };
 };
 
 export type ClientCareData = {
@@ -117,6 +128,8 @@ export type ClientCareData = {
   goals: CareGoal[];
   medications: CareMedication[];
   authorized_codes: CareAuthorizedCode[];
+  /** Raw visibility row (as stored). Admin toggle UIs read this. */
+  visibilityRow: ClientVisibilityRow;
   visibility: ClientCareVisibility;
 };
 

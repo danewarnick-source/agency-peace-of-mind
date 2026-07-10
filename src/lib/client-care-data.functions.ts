@@ -225,7 +225,16 @@ export const getClientCareData = createServerFn({ method: "GET" })
       shiftServiceCode: codeUpper,
     };
 
-    return { identity, flags, goals, medications, authorized_codes, visibility };
+    const pcsp_training_id = (cstRes.data?.id as string | undefined) ?? null;
+    return {
+      identity,
+      flags,
+      pcsp_training_id,
+      goals,
+      medications,
+      authorized_codes,
+      visibility,
+    };
   });
 
 // ── Query options helper (for loaders and hooks) ────────────────────────────

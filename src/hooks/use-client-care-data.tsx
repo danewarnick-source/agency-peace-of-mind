@@ -17,9 +17,7 @@ export function useClientCareData(
   clientId: string | null | undefined,
   shiftServiceCode?: string | null,
 ) {
-  return useQuery<ClientCareData>(
-    clientCareDataQueryOptions(clientId, shiftServiceCode),
-  );
+  return useQuery(clientCareDataQueryOptions(clientId, shiftServiceCode));
 }
 
 export type { ClientCareData } from "@/lib/client-care-data.functions";

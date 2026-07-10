@@ -96,6 +96,22 @@ export type CareAuthorizedCode = {
   authorization_pending: boolean | null;
 };
 
+export type CustomFieldValue = {
+  value_text: string | null;
+  value_number: number | null;
+  value_boolean: boolean | null;
+  value_date: string | null;
+} | null;
+
+export type CustomFieldWithValue = {
+  id: string;
+  field_key: string;
+  field_label: string;
+  data_type: "text" | "number" | "boolean" | "date";
+  section: SectionName;
+  value: CustomFieldValue;
+};
+
 export type ClientCareVisibility = {
   /** Goals that a staff member should see during the given shift.
    *  Rule: is_complete AND per-goal visible AND care_plan section on AND

@@ -4009,6 +4009,41 @@ export type Database = {
           },
         ]
       }
+      client_staff_visibility: {
+        Row: {
+          client_id: string
+          fields: Json
+          organization_id: string
+          sections: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          client_id: string
+          fields?: Json
+          organization_id: string
+          sections?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          client_id?: string
+          fields?: Json
+          organization_id?: string
+          sections?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_staff_visibility_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_weekly_targets: {
         Row: {
           client_id: string

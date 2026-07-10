@@ -286,6 +286,7 @@ function ClientProfileHub() {
               <ClientBudgetPanel clientId={clientId} />
             </SectionPanel>
           </SectionGroup>
+          <CustomFieldsForSection clientId={clientId} section="billing" />
         </TabsContent>
 
         {/* FILES — sole home for uploaded source documents (incl. PCSPs). */}

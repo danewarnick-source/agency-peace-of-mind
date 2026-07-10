@@ -8,10 +8,7 @@
  * workspace) to get the full picture.
  */
 import { useQuery } from "@tanstack/react-query";
-import {
-  clientCareDataQueryOptions,
-  type ClientCareData,
-} from "@/lib/client-care-data.functions";
+import { clientCareDataQueryOptions } from "@/lib/client-care-data.functions";
 
 export function useClientCareData(
   clientId: string | null | undefined,

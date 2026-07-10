@@ -108,15 +108,15 @@ function CustomFieldRow({
   const saveMut = useMutation({
     mutationFn: (v: string | boolean | null) => {
       if (!orgId) throw new Error("Missing organization");
-      const payload: Parameters<typeof saveFn>[0]["data"] = {
+      const payload = {
         organizationId: orgId,
         definitionId: field.id,
-        entityKind: "client",
+        entityKind: "client" as const,
         entityId: clientId,
-        value_text: null,
-        value_number: null,
-        value_boolean: null,
-        value_date: null,
+        value_text: null as string | null,
+        value_number: null as number | null,
+        value_boolean: null as boolean | null,
+        value_date: null as string | null,
       };
       if (field.data_type === "text") payload.value_text = (v as string) || null;
       else if (field.data_type === "number")

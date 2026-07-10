@@ -272,6 +272,7 @@ function ClientProfileHub() {
               </CareGroup>
             </TabsContent>
           </Tabs>
+          <CustomFieldsForSection clientId={clientId} section="care_plan" />
         </TabsContent>
 
         {/* BILLING — sole home for authorized codes, per-code rates,

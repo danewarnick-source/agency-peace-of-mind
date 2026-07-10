@@ -147,6 +147,9 @@ export type ClientCareData = {
   goals: CareGoal[];
   medications: CareMedication[];
   authorized_codes: CareAuthorizedCode[];
+  /** All custom fields (admin view). Staff view uses
+   *  `visibility.staffCare.custom_fields` (filtered by section toggle). */
+  custom_fields: CustomFieldWithValue[];
   /** Raw visibility row (as stored). Admin toggle UIs read this. */
   visibilityRow: ClientVisibilityRow;
   visibility: ClientCareVisibility;

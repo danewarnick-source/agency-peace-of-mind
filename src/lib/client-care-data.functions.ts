@@ -174,7 +174,8 @@ export const getClientCareData = createServerFn({ method: "GET" })
     const { clientId, shiftServiceCode } = data;
     const supabase = context.supabase as any;
 
-    const [clientRes, cstRes, medsRes, codesRes, visRes] = await Promise.all([
+    const [clientRes, cstRes, medsRes, codesRes, visRes, cfDefsRes, cfValsRes] =
+      await Promise.all([
       supabase
         .from("clients")
         .select(
@@ -206,6 +207,16 @@ export const getClientCareData = createServerFn({ method: "GET" })
         .select("sections, fields")
         .eq("client_id", clientId)
         .maybeSingle(),
+      supabase
+        .from("custom_field_definitions")
+        .select("id, field_key, field_label, data_type, section, organization_id")
+        .eq("entity_kind", "client")
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("custom_field_values")
+        .select("definition_id, value_text, value_number, value_boolean, value_date")
+        .eq("entity_kind", "client")
+        .eq("entity_id", clientId),
     ]);
 
     if (clientRes.error) throw clientRes.error;
@@ -213,7 +224,8 @@ export const getClientCareData = createServerFn({ method: "GET" })
     if (cstRes.error) throw cstRes.error;
     if (medsRes.error) throw medsRes.error;
     if (codesRes.error) throw codesRes.error;
-    // visRes error is non-fatal — a missing row just means "use defaults"
+    // visRes / cfDefsRes / cfValsRes errors are non-fatal — treat as empty
+
 
     const row = clientRes.data as Record<string, any>;
     const identity: CareIdentity = {

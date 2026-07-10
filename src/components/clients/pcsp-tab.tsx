@@ -18,6 +18,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useClientCareData } from "@/hooks/use-client-care-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -167,37 +168,19 @@ export function PcspTab({
     },
   });
 
-  const medsQ = useQuery({
-    enabled: !!clientId,
-    queryKey: ["pcsp-medications", clientId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("client_medications")
-        .select(
-          "id, medication_name, dosage, route, frequency, scheduled_time, prescriber, instructions, support_level, is_prn, prn_instructions, purpose, adverse_effects, choking_risk, is_controlled",
-        )
-        .eq("client_id", clientId)
-        .eq("is_active", true)
-        .order("medication_name", { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as unknown as Array<Record<string, unknown>>;
-    },
-  });
+  // Meds, authorized codes, and structured goals all come from the single
+  // canonical reader — no ad-hoc queries here so we can't drift from the
+  // eMAR chart / punch pad / other surfaces.
+  const careQ = useClientCareData(clientId);
+  const medsQ = {
+    data: careQ.data?.medications ?? null,
+    isLoading: careQ.isLoading,
+  } as const;
+  const codesQ = {
+    data: careQ.data?.authorized_codes ?? null,
+    isLoading: careQ.isLoading,
+  } as const;
 
-  const codesQ = useQuery({
-    enabled: !!clientId,
-    queryKey: ["pcsp-billing-codes", clientId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("client_billing_codes")
-        .select(
-          "id, service_code, annual_unit_authorization, unit_type, rate_per_unit, service_start_date, service_end_date, authorization_pending",
-        )
-        .eq("client_id", clientId);
-      if (error) throw error;
-      return (data ?? []) as unknown as Array<Record<string, unknown>>;
-    },
-  });
 
   const summariesQ = useQuery({
     enabled: !!clientId,
@@ -232,27 +215,12 @@ export function PcspTab({
     window.open(data.signedUrl, "_blank");
   };
 
-  // Structured PCSP goals live on client_specific_trainings.goals (jsonb).
-  // The legacy clients.pcsp_goals text[] is still mirrored but we no longer
-  // read it here — it can't represent supports, objective, or service codes.
-  const goalsQ = useQuery({
-    enabled: !!clientId,
-    queryKey: ["pcsp-structured-goals", clientId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("client_specific_trainings")
-        .select("id, goals")
-        .eq("client_id", clientId)
-        .eq("training_type", "person_specific")
-        .maybeSingle();
-      if (error) throw error;
-      return data as { id: string; goals: CSTGoal[] | null } | null;
-    },
-  });
-  const trainingId = goalsQ.data?.id ?? null;
-  const goals: CSTGoal[] = Array.isArray(goalsQ.data?.goals)
-    ? (goalsQ.data!.goals as CSTGoal[])
-    : [];
+  // Structured PCSP goals + the CST training id both come from the
+  // canonical `useClientCareData` reader above. Nothing here queries
+  // client_specific_trainings directly.
+  const trainingId = careQ.data?.pcsp_training_id ?? null;
+  const goals: CSTGoal[] = (careQ.data?.goals ?? []) as CSTGoal[];
+
   const rights: string[] = Array.isArray(client?.rights_restrictions)
     ? (client!.rights_restrictions as string[])
     : [];
@@ -301,11 +269,12 @@ export function PcspTab({
       const flat = nextGoals
         .map((g) => (g.goal ?? "").toString().trim())
         .filter((s) => s.length > 0);
+      // eslint-disable-next-line no-restricted-syntax -- legacy mirror write; canonical READ is through useClientCareData.
       await supabase.from("clients").update({ pcsp_goals: flat }).eq("id", clientId);
     },
     onSuccess: () => {
       toast.success("Service codes updated");
-      queryClient.invalidateQueries({ queryKey: ["pcsp-structured-goals", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["client-care-data", clientId] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to update codes"),
   });

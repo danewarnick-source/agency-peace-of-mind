@@ -1,58 +1,85 @@
-# Structured PCSP goals + service-code filtering
+# Plan — one shared reader for client care data
 
-## What exists today
+## Why
 
-- `client_specific_trainings.goals` (jsonb) already stores structured `CSTGoal` = `{ id, goal, supports, details, job_codes[] }`. NECTAR's PCSP extractor (`extractGoalsVerbatim` in `src/lib/client-specific-training.functions.ts`) already emits this shape.
-- The legacy `clients.pcsp_goals` (`text[]`) still holds a flat, code-less mirror of the goal *statements*. It's what the client detail PCSP tab, the staff shift clock-out screen (`punch-pad.tsx`), whiteboard scoring, and daily-log tagging all read.
-- The GoalsEditor in `client-specific-training-card.tsx` exposes `job_codes` as a free-text comma-separated field. There is no per-goal service-code editor on the PCSP tab itself.
+Today every care surface (PCSP tab, eMAR chart, shift screen, workspace, punch-pad, whiteboard scoring, setup checklist, etc.) queries `clients`, `client_medications`, `client_specific_trainings`, and `client_billing_codes` independently. That's what let the PCSP admission-date bug and the eMAR-vs-attestation table mismatch happen. We need one canonical read path with the visibility rules baked in.
 
-## What changes
+## Scope of "care data"
 
-### 1. Structured goals become the canonical read source
+For this pass, the shared function returns exactly what the current bug-prone surfaces need:
 
-Replace flat-string reads of `clients.pcsp_goals` on the two surfaces that matter for this feature:
+- **identity**: normalized profile fields (name, dob, admission_date as a raw `YYYY-MM-DD` string — no timezone conversion, matching the Profile-tab fix), plus the tenure/care flags used by cards (self_admin_med_support + locked, behavior toggles, etc.).
+- **pcsp_goals**: structured `CSTGoal[]` from `client_specific_trainings` (person_specific), each `{ id, goal, supports, details, job_codes[], is_complete }`. `is_complete` = has goal text AND at least one job_code. Legacy `clients.pcsp_goals` is NOT read from — the CST row is canonical (we already backfilled).
+- **medications**: rows from `client_medications` in the shape the eMAR chart / MAR calendar / attestation flow expects — one source of truth, so nothing can drift to a different table again.
+- **authorized_codes**: currently-open `client_billing_codes` (same "no end date or end date in the future" filter `useClientBillingCodes` uses).
 
-- **Client detail → PCSP tab (`src/components/clients/pcsp-tab.tsx`)**: source goals from `client_specific_trainings.goals` (person_specific). Render each goal with: statement, Supports, Objective/measure, and a service-code chip row.
-- **Staff clock-out (`src/components/evv/punch-pad.tsx`)**: fetch structured goals for the locked client and filter to those whose `job_codes` include the shift's active `service_code`. Goals with an empty `job_codes` array are hidden from staff (this is the "flagged, needs admin" state). The goals-worked writeback keeps using the goal statement text as the key so downstream logs are unaffected.
+Out of scope for now (kept in their existing hooks; can migrate later): scheduling, financial rollups, EVV timesheets, whiteboard SCORING math, incident/behavior histories.
 
-`clients.pcsp_goals` stays populated as a mirror of the goal statements (existing save paths already do this) so whiteboard scoring, daily-log tagging, and audit packaging don't break.
+## The function
 
-### 2. Editable service codes on the PCSP tab
+`src/lib/client-care-data.functions.ts`
 
-Directly on `pcsp-tab.tsx`, each goal row gets a chip picker for service codes:
-
-- Chips render current `job_codes`; each has an × to remove.
-- An "Add code" chip opens a small menu listing the client's currently authorized codes (from `client_billing_codes`, active window). Picking one appends it.
-- Save writes the updated `goals` array back to `client_specific_trainings` for that client + `training_type = 'person_specific'`, and re-mirrors goal statements into `clients.pcsp_goals`.
-- Admin-only (gated behind existing "edit client" permission the tab already uses).
-
-The full goal editor (statement / supports / objective wording) stays reachable via the existing "Edit goals" path — this prompt only adds inline service-code editing at the tab level, since that's the ask.
-
-### 3. Extraction stays as-is, wording surfaced
-
-NECTAR already extracts `goal`, `supports`, `details`, `job_codes`. UI labels in GoalsEditor and pcsp-tab are relabelled so the four fields read as: **Goal**, **Supports (what staff do)**, **Objective / measure**, **Service codes** — matching the ask. No prompt or schema change to the extractor.
-
-### 4. Retroactive backfill (one-time migration)
-
-For every client where `clients.pcsp_goals` is non-empty AND there is no `client_specific_trainings` row of type `person_specific` with a non-empty `goals` array, insert/update a CST row whose `goals` is:
-
-```
-pcsp_goals.map(text => ({ id: gen_random_uuid(), goal: text, supports: '', details: '', job_codes: [] }))
+```ts
+export const getClientCareData = createServerFn({ method: 'GET' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: { clientId: string; shiftServiceCode?: string | null }) => i)
+  .handler(async ({ data, context }) => { ... })
 ```
 
-Consequence: these clients keep their goal *text*, get `supports`/`details`/`job_codes` empty (visibly flagged as incomplete on the PCSP tab), and — because `job_codes` is empty — none of these goals appear for any staff member during a shift until an admin assigns at least one code. This matches the requested behavior exactly.
+Returns:
+
+```ts
+type ClientCareData = {
+  identity: { id, first_name, last_name, admission_date: string|null, dob: string|null, ... };
+  flags: { self_admin_med_support, self_admin_med_support_locked, ... };
+  goals: CSTGoal[];                         // all structured goals
+  medications: ClientMedication[];          // raw rows, canonical shape
+  authorized_codes: ClientBillingCode[];    // currently-open only
+  visibility: {
+    goalsForStaff: CSTGoal[];               // filtered: is_complete AND job_codes ∋ shiftServiceCode
+    medicationsVisible: boolean;            // section toggle
+    // room for future per-section toggles
+  };
+};
+```
+
+The `visibility` block is the **only** place staff-visibility rules live: which sections are toggled on, which goals are complete enough to show, and which goals match the active service code. When `shiftServiceCode` is omitted, `goalsForStaff` returns admin-view (all complete goals). Callers never re-implement these filters.
+
+## Client-side hook
+
+`src/hooks/use-client-care-data.tsx` — thin `useQuery` wrapper with a stable key `['client-care-data', clientId, shiftServiceCode ?? null]` and shared `queryOptions` so loaders can `ensureQueryData`.
+
+## Migration — screens that switch to it in this change
+
+Only the surfaces the user called out plus their direct siblings, so we prove the pattern end-to-end without touching every consumer at once:
+
+1. `src/components/clients/pcsp-tab.tsx` — replace its own goals/identity queries.
+2. `src/components/workspace/emar-chart.tsx` — read `medications` + `flags` (self-admin) from the hook; the toggle mutation stays where it is.
+3. `src/components/workspace/mar-emar-tab.tsx` and `src/components/medications-manager.tsx` + `src/components/mar-calendar.tsx` — same.
+4. `src/components/evv/punch-pad.tsx` — read `visibility.goalsForStaff` (passing the shift's `service_type_code`) instead of its own filter.
+5. `src/routes/dashboard.workspace.$clientId.tsx` and `src/routes/dashboard.shift.$shiftId.tsx` — prime the cache via loader, drop ad-hoc client fetches.
+6. `src/components/staff-mobile/client-quick-info-sheet.tsx` — read from the hook.
+
+Everything else keeps working unchanged (existing hooks like `useClientBillingCodes` stay, but internally we point them at the shared function in a later pass — not this PR).
+
+## Guardrail so no new screen bypasses it
+
+- ESLint rule `no-restricted-syntax` in `eslint.config.js` that flags direct `.from('clients')`, `.from('client_medications')`, `.from('client_specific_trainings')`, `.from('client_billing_codes')` reads outside an allowlist:
+  - `src/lib/client-care-data.functions.ts`
+  - existing hooks named in the allowlist (billing hooks, etc.) until they're migrated
+  - migrations / types / server-only import & billing pipelines
+- Rule message: "Read client care data via `getClientCareData` / `useClientCareData`."
+
+New screens can't add fresh queries without either adding themselves to the allowlist (visible in review) or going through the shared function.
 
 ## Files touched
 
-- `supabase/migrations/<new>.sql` — one-time backfill from `clients.pcsp_goals` into `client_specific_trainings.goals`. No schema changes; the target column already exists.
-- `src/components/clients/pcsp-tab.tsx` — read structured goals; render Supports / Objective / service-code chip picker; save on edit.
-- `src/components/clients/client-specific-training-card.tsx` — relabel fields; keep GoalsEditor working (used by extract dialog).
-- `src/components/evv/punch-pad.tsx` — fetch structured goals for the locked client, filter by shift `service_code`, drop the flat `clients.pcsp_goals` path for the goals checklist.
-- `src/routes/dashboard.workspace.$clientId.tsx` — pass structured goals (or let punch-pad fetch) instead of the flat string list.
+- new: `src/lib/client-care-data.functions.ts`, `src/hooks/use-client-care-data.tsx`
+- edited: the six migration targets above, `eslint.config.js`
+- no schema changes, no migrations
 
-Not touched: whiteboard scoring, daily-log tagging, audit package assembly, NECTAR extraction prompt, `clients.pcsp_goals` schema.
+## Not doing in this PR
 
-## Out of scope
-
-- No new DB table for goals. The existing jsonb column already models everything the ask needs, and splitting it out would ripple through a dozen surfaces for no user-visible gain.
-- No change to how the extractor decides which code to attach — it stays best-effort; admins fix it on the tab, which is the whole point of making the codes editable there.
+- Rewriting the ~40 other files that touch `clients`/`client_medications`/goals. They're on the allowlist and get migrated in follow-ups, one care-surface at a time. Doing them all at once is where this kind of refactor usually breaks the app.
+- Changing what data is stored, or any RLS/GRANT changes.
+- Consolidating scheduling / financial / EVV reads — different domain, separate refactor.

@@ -40,6 +40,7 @@ import { NoteTriggerPrompt } from "@/components/residential/note-trigger-prompt"
 import { IncidentReportDialog } from "@/components/incidents/incident-report-dialog";
 import { AlertTriangle as AlertTriangleIcon } from "lucide-react";
 import { useClientBillingCodes } from "@/hooks/use-client-billing-codes";
+import { useClientCareData } from "@/hooks/use-client-care-data";
 import { ShiftMedDueCheck } from "@/components/medications/shift-med-due-check";
 import { useComplianceGate } from "@/hooks/use-compliance-gate";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -863,41 +864,21 @@ export function PunchPad({
   // CLOCK-OUT FLOW
   // ────────────────────────────────────────────────────────────────────────────
 
-  // Structured PCSP goals for the active shift's client, filtered to the
-  // service code the shift is being billed under. Goals with no service code
-  // assigned (empty job_codes) never surface — an admin must tag them first.
+  // Structured PCSP goals for the active shift's client come through the
+  // canonical shared reader (`useClientCareData`), which owns the
+  // staff-visibility filter (goal is complete AND job_codes match the
+  // shift's service code). No screen re-implements this filter.
   const activeClientIdForGoals = active?.client_id ?? null;
-  const structuredGoalsQ = useQuery({
-    enabled: !!activeClientIdForGoals,
-    queryKey: ["shift-structured-goals", activeClientIdForGoals],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("client_specific_trainings")
-        .select("goals")
-        .eq("client_id", activeClientIdForGoals as string)
-        .eq("training_type", "person_specific")
-        .maybeSingle();
-      if (error) throw error;
-      const raw = (data?.goals ?? []) as Array<{ goal?: string; job_codes?: string[] }>;
-      return Array.isArray(raw) ? raw : [];
-    },
-  });
+  const careData = useClientCareData(
+    activeClientIdForGoals,
+    active?.service_type_code ?? null,
+  );
 
   const activeClientGoals = useMemo<string[]>(() => {
-    if (!active) return [];
-    const shiftCode = (active.service_type_code ?? "").toUpperCase();
-    if (!shiftCode) return [];
-    const rows = structuredGoalsQ.data ?? [];
-    return rows
-      .filter((g) => {
-        const codes = Array.isArray(g.job_codes)
-          ? g.job_codes.map((c) => String(c).toUpperCase())
-          : [];
-        return codes.includes(shiftCode);
-      })
-      .map((g) => (g.goal ?? "").toString().trim())
-      .filter((s) => s.length > 0);
-  }, [active, structuredGoalsQ.data]);
+    const rows = careData.data?.visibility.goalsForStaff ?? [];
+    return rows.map((g) => g.goal.trim()).filter((s) => s.length > 0);
+  }, [careData.data]);
+
 
   const wordCount = useMemo(() => {
     const t = narrative.trim();

@@ -41,6 +41,7 @@ import { ClientProfileTab } from "@/components/clients/profile-tab";
 import { FaceSheetButton } from "@/components/clients/face-sheet-button";
 import { SectionsView, ClientSpecificTrainingCard, GoalsEditor, PublishConfirmDialog } from "@/components/clients/client-specific-training-card";
 import { SectionVisibilityToggle, FieldVisibilityToggle } from "@/components/clients/visibility-toggles";
+import { CustomFieldsForSection } from "@/components/clients/custom-fields-panel";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, Pill, RefreshCw, Sparkles, Trash2, Upload, UserCircle2, Target, ShieldCheck, GraduationCap, HeartHandshake, Users, UtensilsCrossed, ListChecks, UserCircle, FileUp, Clock, FileText, AlertOctagon, ClipboardList, Home as HomeIcon, CalendarClock, Wallet, FolderOpen } from "lucide-react";
 import { clientFeatureVisible, useClientFeature } from "@/lib/client-features";
 import { MarEmarTab } from "@/components/workspace/mar-emar-tab";
@@ -235,6 +236,7 @@ function ClientProfileHub() {
               <ClientProfileTab clientId={clientId} onOpenFiles={() => setTab("files")} />
             </SectionPanel>
           </SectionGroup>
+          <CustomFieldsForSection clientId={clientId} section="identity" />
         </TabsContent>
 
         {/* CARE PLAN — Goals + Medications only. All PCSP-derived edits
@@ -271,6 +273,7 @@ function ClientProfileHub() {
               </CareGroup>
             </TabsContent>
           </Tabs>
+          <CustomFieldsForSection clientId={clientId} section="care_plan" />
         </TabsContent>
 
         {/* BILLING — sole home for authorized codes, per-code rates,
@@ -285,6 +288,7 @@ function ClientProfileHub() {
               <ClientBudgetPanel clientId={clientId} />
             </SectionPanel>
           </SectionGroup>
+          <CustomFieldsForSection clientId={clientId} section="billing" />
         </TabsContent>
 
         {/* FILES — sole home for uploaded source documents (incl. PCSPs). */}
@@ -295,6 +299,7 @@ function ClientProfileHub() {
               <ClientDocumentsCard clientId={clientId} clientName={fullName} />
             </SectionPanel>
           </SectionGroup>
+          <CustomFieldsForSection clientId={clientId} section="files" />
         </TabsContent>
 
         {/* ACTIVITY — pure shift/log/incident history. */}
@@ -334,6 +339,7 @@ function ClientProfileHub() {
               <ChoreChartForClient clientId={clientId} />
             </CareSection>
           </CareGroup>
+          <CustomFieldsForSection clientId={clientId} section="operations" />
         </TabsContent>
 
         {/* COMPLIANCE — summaries, host-home certifications, deadlines. */}
@@ -352,6 +358,7 @@ function ClientProfileHub() {
               <DeadlinesPanel clientId={clientId} />
             </SectionPanel>
           </SectionGroup>
+          <CustomFieldsForSection clientId={clientId} section="compliance" />
         </TabsContent>
       </Tabs>
     </div>

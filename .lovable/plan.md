@@ -1,102 +1,58 @@
 ## Goal
-
-Add two-level staff visibility for a client's information:
-
-1. **Section toggle (hard override)** — one on/off per section: Identity, Care plan, Billing, Files, Operations, Compliance. Off = nothing in that section reaches staff, no exceptions.
-2. **Per-field toggle** — inside a section that is on, every individual field (each PCSP goal, each medication, each authorized code, each custom field, plus each fixed identity field) has its own on/off, defaulting on. Admins can hide one specific field without touching the rest.
-
-Defaults for the section toggles: **Identity, Care plan, Operations = on**; **Billing, Files, Compliance = off**.
-
-All staff-facing surfaces (workspace About tab, punch pad, eMAR, shift screen, anything else that reads client care data) inherit both filters automatically through the existing `getClientCareData` / `useClientCareData` path — no surface re-implements the rules.
+Let admins add custom fields to a client, pinned to one of the six visibility sections (Identity, Care plan, Billing, Files, Operations, Compliance). Staff visibility is 100% inherited from the section toggle — no per-field switch, no new sections.
 
 ## Data model
 
-One new table storing both levels of visibility as a single JSON blob per client (avoids a row-per-field table that would need a schema entry for every future field):
+Extend the existing `custom_field_definitions` table (already keyed by `organization_id`, `entity_kind`, `field_key`, `field_label`, `data_type`):
 
-```text
-client_staff_visibility
-  client_id            uuid PK, FK -> clients.id
-  organization_id      uuid NOT NULL
-  sections             jsonb NOT NULL default '{}'::jsonb
-       -- { identity: bool, care_plan: bool, billing: bool,
-       --   files: bool, operations: bool, compliance: bool }
-       -- Missing key => fall back to hard-coded default
-       -- (identity/care_plan/operations = true, others = false).
-  fields               jsonb NOT NULL default '{}'::jsonb
-       -- { "identity.admission_date": false,
-       --   "identity.medicaid_id": true,
-       --   "care_plan.goal:<goal-uuid>": false,
-       --   "care_plan.medication:<med-uuid>": false,
-       --   "billing.code:<row-uuid>": false,
-       --   "identity.custom:<custom_field_def_id>": false, ... }
-       -- Missing key => visible (default on).
-  updated_at, updated_by
-```
+- Add `section text not null default 'identity'` with a CHECK constraint restricting it to the six section names from `client-staff-visibility.ts`.
+- Backfill existing rows to `'identity'`.
 
-RLS: org members read; only `manage_clients` permission writes. GRANT `SELECT, INSERT, UPDATE` to `authenticated`; `ALL` to `service_role`.
+`custom_field_values` is unchanged — values are stored per client via `entity_kind='client'` + `entity_id=clientId`, typed columns already exist.
 
-Key format — `"<section>.<kind>:<id>"` where `<kind>` is `field` (fixed identity fields use `identity.field:admission_date`), `goal`, `medication`, `code`, or `custom`. This is stable, cheap to look up, and doesn't require a migration when we add a new goal or med.
+No new `client_staff_visibility` field key is written for custom fields. Visibility is derived from the section alone.
 
-## Server: filtering lives in `getClientCareData`
+## Server layer
 
-`src/lib/client-care-data.functions.ts` already returns `visibility.goalsForStaff` and is the only path staff surfaces are allowed to read from. Extend it:
+New `src/lib/custom-fields.functions.ts`:
+- `listClientCustomFields({ clientId })` — joins definitions (for this client's org, `entity_kind='client'`) with the client's values. Returns `{ id, section, field_key, field_label, data_type, value }[]`.
+- `upsertClientCustomFieldValue({ clientId, definitionId, value })` — writes to the right typed column based on `data_type`.
+- `createCustomFieldDefinition({ section, field_label, data_type })` — admin/manager only; derives `field_key` from label; enforces section is one of the six.
+- `deleteCustomFieldDefinition({ id })` — admin/manager only.
 
-1. Load the client's `client_staff_visibility` row alongside the existing four parallel queries.
-2. Resolve section state: `sectionOn(name) = row?.sections?.[name] ?? DEFAULTS[name]`.
-3. Resolve field state: `fieldOn(key) = row?.fields?.[key] !== false` (default on).
-4. Add to the returned `visibility` block:
-   - `sections`: the resolved six booleans.
-   - `staffCare`: the object staff surfaces should render — a filtered projection of `identity`, `goals`, `medications`, `authorized_codes`, plus custom fields, with:
-     - When the owning section is **off**, the field/list is empty/nulled out.
-     - When the owning section is **on**, hidden individual fields are removed (goals/meds/codes filtered out; identity scalar fields set to `null`).
-     - The existing `goalsForStaff` continues to work, and now also respects per-goal visibility + the care-plan section toggle (in addition to the shift service-code filter it already applies).
-5. Admin surfaces keep reading the raw `identity`, `goals`, `medications`, `authorized_codes` — those are unchanged. Staff surfaces switch to reading `visibility.staffCare` / `visibility.goalsForStaff`.
+Extend `getClientCareData` in `src/lib/client-care-data.functions.ts`:
+- Load custom field definitions + values alongside the existing four reads.
+- Add `custom_fields: CustomFieldWithValue[]` to `ClientCareData` (full list, admin view).
+- In `visibility.staffCare`, add `custom_fields` filtered by `sections[def.section]` only — no per-field key check. When the owning section is off, drop the field entirely.
 
-No schema change to the return type callers already depend on; this is purely additive.
+No changes to `client_staff_visibility` or `setClientStaffVisibility` — custom fields deliberately bypass per-field toggles.
 
-## Server: write path
+## Admin UI
 
-New server function `setClientStaffVisibility` (`.middleware([requireSupabaseAuth])`, permission-checked) that upserts sections/fields patches. Called from the admin UI toggles. Invalidates the `client-care-data` query key.
+New `src/components/clients/custom-fields-panel.tsx`:
+- Small `<CustomFieldsForSection section={...} clientId={...} />` component rendered at the bottom of each of the six `TabsContent` blocks in `src/routes/dashboard.clients.$clientId.tsx`.
+- Lists that section's custom fields with an inline value editor per row (text / number / date / boolean based on `data_type`); saves via `upsertClientCustomFieldValue` and invalidates `['client-care-data', clientId]`.
+- "Add custom field" button opens a dialog: label + data type; `section` is pre-filled from the tab and locked (no dropdown to change section, no way to create a new section).
+- Row overflow menu → delete definition (admin/manager only).
+- No visibility switch anywhere on the row. Small helper text: "Visible to staff whenever the {section} section is on."
 
-## Admin UI: visibility controls
+## Staff surface
 
-A shared `<VisibilityToggle>` (section-level) and `<FieldVisibilityToggle>` (per-field eye icon) component. Wire them into each of the six tabs in `src/routes/dashboard.clients.$clientId.tsx`:
+`src/components/workspace/about-tab.tsx` (and any other staff-facing surface reading `visibility.staffCare`) renders the filtered `custom_fields` list under the matching section heading — Identity fields with identity, Care plan fields with the care panel, etc. Because filtering already happens in `getClientCareData`, staff code just maps over what it receives.
 
-- **Section toggle**: rendered once at the top of each `TabsContent` for Identity, Care plan, Billing, Files, Operations, Compliance. Shows current state + default. When off, the whole section body dims with a "Hidden from staff" banner (admin still sees content — the toggle only affects staff surfaces).
-- **Per-field toggle**: eye/eye-off icon next to
-  - each fixed identity field row in `ClientProfileTab` / face sheet (name/DOB stay always-on and non-toggleable; toggleable set = admission_date, medicaid_id, guardian, emergency contacts, support coordinator, and every custom field);
-  - each goal row in `PlanGoalsPanel`;
-  - each medication row in `MarEmarTab`'s medication list;
-  - each authorized code row in `BillingCodesPanel`;
-  - each custom field row anywhere it renders.
-- When the enclosing section is off, per-field toggles disable and show a tooltip "Section is hidden from staff — turn the section on to control fields individually."
+## Acceptance
+- Add a custom field in Identity → shows up on staff About view (Identity is on by default).
+- Add a custom field in Billing → not visible to staff; flip the Billing section toggle on → it appears.
+- Edit a custom field's value on the admin profile → staff view reflects the new value after refetch (both surfaces share the same `['client-care-data', clientId]` query key).
+- No way in the UI to create a new section or to toggle a single custom field independently of its section.
 
-## Staff surfaces updated to read the filtered projection
-
-- `src/components/workspace/about-tab.tsx` — replace direct `client.pcsp_goals` and identity reads with `useClientCareData(clientId).data.visibility.staffCare`.
-- `src/components/workspace/mar-emar-tab.tsx` and eMAR chart — medications list from `visibility.staffCare.medications`.
-- `src/components/evv/punch-pad.tsx` — already uses `useClientCareData`; switch its identity/goal reads to `visibility.staffCare` / `visibility.goalsForStaff`.
-- Any shift-screen surface pulling client info gets the same swap.
-
-Because the enforcement is in the server function, a staff surface that forgets to swap still cannot see admin-only raw data as long as it goes through the shared hook; the existing eslint rule that forbids re-querying `clients` / `client_medications` / `client_specific_trainings` / `client_billing_codes` from outside `client-care-data.functions.ts` stays in force.
-
-## Migration + defaults for existing clients
-
-- Migration creates the table with the schema above; no backfill needed (missing rows resolve to defaults).
-- The DEFAULTS constant lives in `client-care-data.functions.ts` so server and any client-side default preview stay in sync.
-
-## Out of scope (explicitly)
-
-- No change to who can *edit* client data — this is a staff-**view** filter only.
-- Activity tab is unchanged (it's neither in the six sections nor staff-facing in this sense).
-- No per-role visibility (admin vs. lead vs. DSP) — everything staff-facing gets the same filtered view; role-based nuance can layer on later without changing this schema.
-- No audit history of toggle changes in this pass (updated_at/updated_by only).
+## Out of scope
+- Per-field visibility overrides for custom fields (explicitly rejected by the spec).
+- Reordering custom fields, grouping, or nesting.
+- Custom field types beyond text/number/date/boolean.
+- Custom fields on Activity (Activity is not one of the six sections).
 
 ## Files touched
-
-- **New migration**: `client_staff_visibility` table + RLS + grants (handoff SQL).
-- **Edited**: `src/lib/client-care-data.functions.ts` (load row, compute `sections` + `staffCare`, extend visibility block), new `set-client-staff-visibility.functions.ts`.
-- **Edited**: `src/routes/dashboard.clients.$clientId.tsx` (mount section toggle at each tab head).
-- **Edited** admin panels to render per-field toggles: `ClientProfileTab`, `FaceSheetInfoCard`, `PlanGoalsPanel`, `ClientSpecificTrainingCard`, `MarEmarTab` (med list section), `BillingCodesPanel`, custom-field renderer.
-- **Edited** staff surfaces to read `visibility.staffCare` / `visibility.goalsForStaff`: `workspace/about-tab.tsx`, `workspace/mar-emar-tab.tsx`, `workspace/emar-chart.tsx`, `evv/punch-pad.tsx`, shift screen.
-- **New**: `src/components/clients/visibility-toggles.tsx` (shared section + field toggle components + query invalidation).
+- Migration: add `section` column + CHECK to `custom_field_definitions`.
+- New: `src/lib/custom-fields.ts` (shared types/section list), `src/lib/custom-fields.functions.ts`, `src/components/clients/custom-fields-panel.tsx`.
+- Edited: `src/lib/client-care-data.functions.ts` (load + filter custom fields into `staffCare`), `src/routes/dashboard.clients.$clientId.tsx` (mount panel in each of six tabs), `src/components/workspace/about-tab.tsx` (render staff custom fields under matching section).

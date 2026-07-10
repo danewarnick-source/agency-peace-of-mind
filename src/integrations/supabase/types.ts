@@ -4834,6 +4834,7 @@ export type Database = {
           field_label: string
           id: string
           organization_id: string
+          section: string
           source: string
         }
         Insert: {
@@ -4845,6 +4846,7 @@ export type Database = {
           field_label: string
           id?: string
           organization_id: string
+          section?: string
           source?: string
         }
         Update: {
@@ -4856,6 +4858,7 @@ export type Database = {
           field_label?: string
           id?: string
           organization_id?: string
+          section?: string
           source?: string
         }
         Relationships: []

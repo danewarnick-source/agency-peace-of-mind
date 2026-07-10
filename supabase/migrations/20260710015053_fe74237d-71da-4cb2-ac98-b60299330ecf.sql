@@ -1,0 +1,3 @@
+ALTER TABLE public.custom_field_definitions ADD COLUMN IF NOT EXISTS section text NOT NULL DEFAULT 'identity';
+ALTER TABLE public.custom_field_definitions DROP CONSTRAINT IF EXISTS custom_field_definitions_section_check;
+ALTER TABLE public.custom_field_definitions ADD CONSTRAINT custom_field_definitions_section_check CHECK (section IN ('identity','care_plan','billing','files','operations','compliance'));

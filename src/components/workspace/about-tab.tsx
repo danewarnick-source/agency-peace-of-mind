@@ -13,6 +13,18 @@ import type { CaseloadClient } from "@/hooks/use-caseload";
 import { FaceSheetInfoCard } from "@/components/clients/face-sheet-info-card";
 import { ClientPhotoCard } from "@/components/clients/client-photo-card";
 import { useClientCareData } from "@/hooks/use-client-care-data";
+import type { CustomFieldWithValue } from "@/lib/client-care-data.functions";
+
+function formatCustomValue(f: CustomFieldWithValue): string {
+  const v = f.value;
+  if (!v) return "—";
+  switch (f.data_type) {
+    case "text": return v.value_text ?? "—";
+    case "number": return v.value_number == null ? "—" : String(v.value_number);
+    case "boolean": return v.value_boolean ? "Yes" : "No";
+    case "date": return v.value_date ?? "—";
+  }
+}
 
 export function AboutTab({ client }: { client: CaseloadClient }) {
   // Route ALL client-info reads through the shared visibility layer so
@@ -33,6 +45,11 @@ export function AboutTab({ client }: { client: CaseloadClient }) {
   const medicaidId = identitySectionOn
     ? staffCare?.identity.medicaid_id ?? client.medicaid_id
     : null;
+
+  // Custom fields already filtered by section toggle on the server.
+  const customFields = staffCare?.custom_fields ?? [];
+  const identityCustom = customFields.filter((f) => f.section === "identity");
+  const carePlanCustom = customFields.filter((f) => f.section === "care_plan");
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {/* Identity card */}
@@ -57,6 +74,16 @@ export function AboutTab({ client }: { client: CaseloadClient }) {
                 Medicaid ID:{" "}
                 <span className="font-mono">{medicaidId}</span>
               </p>
+            )}
+            {identityCustom.length > 0 && (
+              <dl className="mt-2 space-y-0.5">
+                {identityCustom.map((f) => (
+                  <div key={f.id} className="text-xs text-muted-foreground">
+                    <dt className="inline font-medium">{f.field_label}:</dt>{" "}
+                    <dd className="inline">{formatCustomValue(f)}</dd>
+                  </div>
+                ))}
+              </dl>
             )}
           </div>
         </div>
@@ -89,6 +116,18 @@ export function AboutTab({ client }: { client: CaseloadClient }) {
             </p>
           )}
         </ScrollArea>
+        {carePlanCustom.length > 0 && (
+          <dl className="mt-3 space-y-1 border-t border-border pt-3">
+            {carePlanCustom.map((f) => (
+              <div key={f.id} className="text-xs">
+                <dt className="inline font-medium text-muted-foreground">
+                  {f.field_label}:
+                </dt>{" "}
+                <dd className="inline">{formatCustomValue(f)}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
       </Card>
 
       {/* Behavioral triggers */}

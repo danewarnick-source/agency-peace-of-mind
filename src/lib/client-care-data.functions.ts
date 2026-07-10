@@ -96,6 +96,22 @@ export type CareAuthorizedCode = {
   authorization_pending: boolean | null;
 };
 
+export type CustomFieldValue = {
+  value_text: string | null;
+  value_number: number | null;
+  value_boolean: boolean | null;
+  value_date: string | null;
+} | null;
+
+export type CustomFieldWithValue = {
+  id: string;
+  field_key: string;
+  field_label: string;
+  data_type: "text" | "number" | "boolean" | "date";
+  section: SectionName;
+  value: CustomFieldValue;
+};
+
 export type ClientCareVisibility = {
   /** Goals that a staff member should see during the given shift.
    *  Rule: is_complete AND per-goal visible AND care_plan section on AND
@@ -115,6 +131,10 @@ export type ClientCareVisibility = {
     goals: CareGoal[];
     medications: CareMedication[];
     authorized_codes: CareAuthorizedCode[];
+    /** Custom fields whose owning section is toggled on for staff.
+     *  Custom fields have no per-field visibility switch — they inherit
+     *  their section's toggle exclusively. */
+    custom_fields: CustomFieldWithValue[];
   };
 };
 
@@ -127,6 +147,9 @@ export type ClientCareData = {
   goals: CareGoal[];
   medications: CareMedication[];
   authorized_codes: CareAuthorizedCode[];
+  /** All custom fields (admin view). Staff view uses
+   *  `visibility.staffCare.custom_fields` (filtered by section toggle). */
+  custom_fields: CustomFieldWithValue[];
   /** Raw visibility row (as stored). Admin toggle UIs read this. */
   visibilityRow: ClientVisibilityRow;
   visibility: ClientCareVisibility;
@@ -151,7 +174,8 @@ export const getClientCareData = createServerFn({ method: "GET" })
     const { clientId, shiftServiceCode } = data;
     const supabase = context.supabase as any;
 
-    const [clientRes, cstRes, medsRes, codesRes, visRes] = await Promise.all([
+    const [clientRes, cstRes, medsRes, codesRes, visRes, cfDefsRes, cfValsRes] =
+      await Promise.all([
       supabase
         .from("clients")
         .select(
@@ -183,6 +207,16 @@ export const getClientCareData = createServerFn({ method: "GET" })
         .select("sections, fields")
         .eq("client_id", clientId)
         .maybeSingle(),
+      supabase
+        .from("custom_field_definitions")
+        .select("id, field_key, field_label, data_type, section, organization_id")
+        .eq("entity_kind", "client")
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("custom_field_values")
+        .select("definition_id, value_text, value_number, value_boolean, value_date")
+        .eq("entity_kind", "client")
+        .eq("entity_id", clientId),
     ]);
 
     if (clientRes.error) throw clientRes.error;
@@ -190,7 +224,8 @@ export const getClientCareData = createServerFn({ method: "GET" })
     if (cstRes.error) throw cstRes.error;
     if (medsRes.error) throw medsRes.error;
     if (codesRes.error) throw codesRes.error;
-    // visRes error is non-fatal — a missing row just means "use defaults"
+    // visRes / cfDefsRes / cfValsRes errors are non-fatal — treat as empty
+
 
     const row = clientRes.data as Record<string, any>;
     const identity: CareIdentity = {
@@ -284,6 +319,33 @@ export const getClientCareData = createServerFn({ method: "GET" })
       ? authorized_codes.filter((c) => isFieldVisible(visibilityRow, fieldKey("billing", "code", c.id)))
       : [];
 
+    // ── Custom fields ────────────────────────────────────────────────────
+    // Scope defs to the client's own org (cross-org rows would be blocked
+    // by RLS anyway, but this keeps the payload tight for the common case
+    // where the querier belongs to that same org).
+    const orgId = identity.organization_id;
+    const cfValueByDef = new Map<string, CustomFieldValue>();
+    for (const v of ((cfValsRes?.data ?? []) as any[])) {
+      cfValueByDef.set(v.definition_id, {
+        value_text: v.value_text ?? null,
+        value_number: v.value_number ?? null,
+        value_boolean: v.value_boolean ?? null,
+        value_date: v.value_date ?? null,
+      });
+    }
+    const custom_fields: CustomFieldWithValue[] = ((cfDefsRes?.data ?? []) as any[])
+      .filter((d) => !orgId || d.organization_id === orgId)
+      .map((d) => ({
+        id: String(d.id),
+        field_key: String(d.field_key ?? ""),
+        field_label: String(d.field_label ?? ""),
+        data_type: (d.data_type ?? "text") as CustomFieldWithValue["data_type"],
+        section: ((d.section ?? "identity") as SectionName),
+        value: cfValueByDef.get(d.id) ?? null,
+      }));
+    // Custom fields inherit their section's toggle — no per-field key.
+    const customFieldsStaff = custom_fields.filter((f) => sections[f.section]);
+
     // goalsForStaff also applies the shift-service-code filter (existing).
     const codeUpper = shiftServiceCode ? shiftServiceCode.toUpperCase() : null;
     const goalsForStaff = goalsStaffAll.filter((g) => {
@@ -302,6 +364,7 @@ export const getClientCareData = createServerFn({ method: "GET" })
         goals: goalsStaffAll,
         medications: medicationsStaff,
         authorized_codes: authorizedCodesStaff,
+        custom_fields: customFieldsStaff,
       },
     };
 
@@ -313,6 +376,7 @@ export const getClientCareData = createServerFn({ method: "GET" })
       goals,
       medications,
       authorized_codes,
+      custom_fields,
       visibilityRow,
       visibility,
     };

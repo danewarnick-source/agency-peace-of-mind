@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useClientBillingCodes } from "@/hooks/use-client-billing-codes";
 import {
   getClientSpecificTraining,
   draftClientSpecificTrainingWithNectar,
@@ -366,7 +367,7 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
         </div>
 
         {editingGoals && draftGoals !== null ? (
-          <GoalsEditor goals={draftGoals} onChange={setDraftGoals} />
+          <GoalsEditor goals={draftGoals} onChange={setDraftGoals} clientId={clientId} />
         ) : (training.goals ?? []).length > 0 ? (
           <GoalsView goals={training.goals ?? []} />
         ) : (
@@ -667,7 +668,10 @@ export function GoalsView({ goals }: { goals: CSTGoal[] }) {
 
 
 // ── Goals editor ─────────────────────────────────────────────────────────────
-export function GoalsEditor({ goals, onChange }: { goals: CSTGoal[]; onChange: (next: CSTGoal[]) => void }) {
+export function GoalsEditor({ goals, onChange, clientId }: { goals: CSTGoal[]; onChange: (next: CSTGoal[]) => void; clientId: string }) {
+  const { data: billingCodes, isLoading: codesLoading } = useClientBillingCodes(clientId);
+  const availableCodes = (billingCodes ?? []).map((r) => r.service_code);
+
   function addGoal() {
     onChange([...goals, {
       id: `s_${Math.random().toString(36).slice(2, 10)}`,
@@ -679,6 +683,13 @@ export function GoalsEditor({ goals, onChange }: { goals: CSTGoal[]; onChange: (
     const next = [...goals];
     next[idx] = { ...next[idx], ...patch };
     onChange(next);
+  }
+  function toggleCode(idx: number, code: string) {
+    const current = goals[idx].job_codes;
+    const next = current.includes(code)
+      ? current.filter((c) => c !== code)
+      : [...current, code];
+    patchGoal(idx, { job_codes: next });
   }
 
   return (
@@ -720,16 +731,42 @@ export function GoalsEditor({ goals, onChange }: { goals: CSTGoal[]; onChange: (
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium">Service codes</label>
-            <Input
-              value={g.job_codes.join(", ")}
-              onChange={(e) => patchGoal(idx, {
-                job_codes: e.target.value.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean),
-              })}
-              placeholder="e.g. SLN, DSI"
-            />
-            <p className="text-[11px] text-muted-foreground">
-              Staff only see this goal during shifts clocked under one of these codes.
-            </p>
+            {codesLoading ? (
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Loader2 className="h-3 w-3 animate-spin" />Loading authorized codes…
+              </p>
+            ) : availableCodes.length === 0 ? (
+              <p className="text-xs text-amber-700 bg-amber-50/70 border border-amber-200 rounded px-2 py-1.5">
+                No authorized service codes on file for this client. Add them under Billing first, then return here to assign codes to this goal.
+              </p>
+            ) : (
+              <>
+                <div className="flex flex-wrap gap-1.5">
+                  {availableCodes.map((code) => {
+                    const selected = g.job_codes.includes(code);
+                    return (
+                      <button
+                        key={code}
+                        type="button"
+                        onClick={() => toggleCode(idx, code)}
+                        className={`rounded px-2 py-0.5 text-xs font-mono border transition-colors ${
+                          selected
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-muted text-muted-foreground border-border hover:border-primary/60 hover:text-foreground"
+                        }`}
+                      >
+                        {code}
+                      </button>
+                    );
+                  })}
+                </div>
+                {g.job_codes.length === 0 && (
+                  <p className="text-xs text-amber-700 mt-1">
+                    No codes selected — this goal won't appear for any staff member during any shift until at least one code is picked.
+                  </p>
+                )}
+              </>
+            )}
           </div>
         </div>
       ))}

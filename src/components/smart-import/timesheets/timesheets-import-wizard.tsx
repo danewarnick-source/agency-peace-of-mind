@@ -553,11 +553,10 @@ export function TimesheetsImportWizard() {
           <div>
             <div className="font-semibold text-amber-800">Historical timesheets — imported from another platform</div>
             <p className="mt-1 text-muted-foreground">
-              This import runs in four explicit stages: <strong>upload &amp; parse</strong>, <strong>admin review</strong>,
-              <strong> submit to staff</strong>, and <strong>staff confirmation</strong>. Nothing moves forward without a
-              deliberate action. Rows are permanently marked as historical imports so nobody mistakes them for live clock
-              punches, and staff never see anything until you (the admin) explicitly submit it to them. This flow never
-              creates new staff or clients — every row must match someone who already exists.
+              Fill in the six-column template below, upload it, review each row, and submit. Nothing moves forward
+              without a deliberate action. Rows are permanently marked as historical imports so nobody mistakes them
+              for live clock punches, and staff never see anything until you (the admin) explicitly submit it to
+              them. This flow never creates new staff or clients — every row must match someone who already exists.
             </p>
           </div>
         </div>
@@ -570,25 +569,7 @@ export function TimesheetsImportWizard() {
         <UploadStep onPick={onPickFile} />
       )}
 
-      {step === 2 && parsed && mapping && (
-        <MapStep
-          parsed={parsed}
-          mapping={mapping}
-          onChange={setMapping}
-          wholeFile={wholeFile}
-          onWholeFileChange={setWholeFile}
-          suggestions={suggestions}
-          suggesting={suggesting}
-          people={peopleQ.data ?? { staff: [], clients: [] }}
-          onBack={() => { setStep(1); setParsed(null); setMapping(null); setFile(null); setWholeFile({ staffId: null, clientId: null }); setSuggestions(null); }}
-          onNext={buildReviewRows}
-          peopleReady={!!peopleQ.data}
-          fileName={file?.name ?? ""}
-        />
-      )}
-
-
-      {step === 3 && peopleQ.data && (
+      {step === 2 && peopleQ.data && (
         <ReviewStep
           rows={rows}
           ready={readyRows}
@@ -605,18 +586,18 @@ export function TimesheetsImportWizard() {
           onSkip={skipRow}
           onUnskip={unskipRow}
           onDownloadSkipped={downloadSkipped}
-          onBack={() => setStep(2)}
+          onBack={() => { setStep(1); setParsed(null); setFile(null); setRows([]); }}
           onCommit={() => commit.mutate()}
           committing={commit.isPending}
         />
       )}
 
-      {step === 4 && committed && (
+      {step === 3 && committed && (
         <DoneStep
           inserted={committed.inserted}
           staffCount={committed.staffCount}
           onAnother={() => {
-            setStep(1); setFile(null); setParsed(null); setMapping(null); setRows([]); setCommitted(null);
+            setStep(1); setFile(null); setParsed(null); setRows([]); setCommitted(null);
           }}
           onArchive={() => navigate({ to: "/dashboard/evv-archive" })}
         />
@@ -624,6 +605,7 @@ export function TimesheetsImportWizard() {
     </div>
   );
 }
+
 
 // ─── Stepper ───────────────────────────────────────────────────────────────
 function Stepper({ step }: { step: 1 | 2 | 3 | 4 }) {

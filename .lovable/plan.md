@@ -1,22 +1,27 @@
-## Problem
 
-Upload shows toast "Still loading staff and clients — try again in a moment." because `peopleQ.data` is undefined. The query at line 199 tries to PostgREST-embed `organization_members` → `profiles` via `profiles:profiles!inner(...)`. Per the project's known landmines, there is no FK between `organization_members` and `profiles` (both key off `auth.users.id`), so this embed errors out. The query never resolves with data, and the guard on line 366 keeps firing.
+## Root cause
 
-Additionally, when the query does error, the wizard shows no feedback — the user only sees the "still loading" toast, so the real cause is invisible.
+The blank screen is a runtime crash from a server function, not the behaviors question itself. Clicking "No" triggers a re-render that (re)fetches client care data, which throws:
+
+```
+column clients.status does not exist
+```
+
+In `src/lib/client-care-data.functions.ts` line 182, the `clients` select still asks for a `status` column that doesn't exist on the live table. Same shape as the earlier `clients.preferred_name` bug we already fixed in this file.
 
 ## Fix
 
-In `src/components/smart-import/timesheets/timesheets-import-wizard.tsx`, `peopleQ.queryFn`:
+One file, two tiny edits — mirrors the previous `preferred_name` fix, no behavior changes:
 
-1. Drop the embed. Fetch `organization_members` selecting only `user_id` (filter `active=true`, org-scoped).
-2. Fetch `profiles` in a second query with `.in("id", userIds)` selecting `id, first_name, last_name, full_name`.
-3. Join in JS to build the `staff: Person[]` list, same shape as today. Clients query stays as-is.
+**`src/lib/client-care-data.functions.ts`**
 
-Also improve the failure signal so this never hides again:
-- In `onPickFile`, when `!peopleQ.data`, if `peopleQ.isError` show the actual error message; if still loading, keep the current wording.
+1. Line 182 — drop `status` from the `clients` select list so PostgREST stops asking for a non-existent column.
+2. Line 241 — set `status: null` in the `CareIdentity` object (keep the field on the type so no downstream consumer breaks), instead of `row.status ?? null`.
 
-Nothing else changes — review flow, template validation, duplicate check, and commit path are untouched.
+That's it. `CareIdentity.status` stays typed as `string | null`; callers that read it just always see `null` until/unless a real column is added later.
 
-## Files
+## Out of scope
 
-- `src/components/smart-import/timesheets/timesheets-import-wizard.tsx` — rewrite `peopleQ.queryFn` to two-step fetch + JS join; refine the guard's error toast.
+- Not touching the behaviors question UI.
+- Not adding a `status` column to `clients` — that's a schema decision for later, not needed to unblock this crash.
+- Not changing any other select in this file.

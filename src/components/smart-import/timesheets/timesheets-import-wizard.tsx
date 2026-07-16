@@ -381,7 +381,11 @@ export function TimesheetsImportWizard() {
       return;
     }
     if (!peopleQ.data) {
-      toast.error("Still loading staff and clients — try again in a moment.");
+      if (peopleQ.isError) {
+        toast.error(`Couldn't load staff and clients: ${(peopleQ.error as Error)?.message ?? "unknown error"}`);
+      } else {
+        toast.error("Still loading staff and clients — try again in a moment.");
+      }
       return;
     }
     try {

@@ -1,22 +1,21 @@
-## Problem
+## Goal
+Replace the free-text service-code input in `GoalsEditor` with a clickable chip multi-select scoped to the client's own authorized codes.
 
-Upload shows toast "Still loading staff and clients — try again in a moment." because `peopleQ.data` is undefined. The query at line 199 tries to PostgREST-embed `organization_members` → `profiles` via `profiles:profiles!inner(...)`. Per the project's known landmines, there is no FK between `organization_members` and `profiles` (both key off `auth.users.id`), so this embed errors out. The query never resolves with data, and the guard on line 366 keeps firing.
+## Changes
 
-Additionally, when the query does error, the wizard shows no feedback — the user only sees the "still loading" toast, so the real cause is invisible.
+**`src/components/clients/client-specific-training-card.tsx`**
+- Add `import { useClientBillingCodes } from "@/hooks/use-client-billing-codes"` and `Badge` (if not already imported).
+- Change `GoalsEditor` signature to `{ goals, onChange, clientId }: { goals: CSTGoal[]; onChange: (next: CSTGoal[]) => void; clientId: string }`.
+- Inside the component, call `const { data: codes, isLoading } = useClientBillingCodes(clientId)` once and derive a deduped list of `service_code` strings.
+- In each goal's card, delete the existing block (lines ~721–733: the "Service codes" label, `<Input>`, its comma-split `onChange`, and the helper `<p>` under it) entirely — no commented-out remnants.
+- Replace with a "Service codes" section that renders one of three states:
+  - `isLoading` → small muted "Loading authorized codes…" text.
+  - Loaded but zero codes for this client → muted message: "No authorized service codes on file. Add them under Billing before assigning goals to codes."
+  - Codes available → row of `Badge`-styled buttons, one per code. Selected = filled/primary variant; unselected = outline. Clicking toggles the code in `g.job_codes` via `patchGoal`. If codes exist but `g.job_codes.length === 0`, show an amber warning line below the chips: "No codes selected — this goal won't appear for any staff on any shift until you pick at least one."
 
-## Fix
+**Call sites — pass `clientId`:**
+- `src/components/clients/client-specific-training-card.tsx` line 369 render: pass the `clientId` already available in that parent component's scope.
+- `src/routes/dashboard.clients.$clientId.tsx` line 623 render: pass the route's `clientId` param.
 
-In `src/components/smart-import/timesheets/timesheets-import-wizard.tsx`, `peopleQ.queryFn`:
-
-1. Drop the embed. Fetch `organization_members` selecting only `user_id` (filter `active=true`, org-scoped).
-2. Fetch `profiles` in a second query with `.in("id", userIds)` selecting `id, first_name, last_name, full_name`.
-3. Join in JS to build the `staff: Person[]` list, same shape as today. Clients query stays as-is.
-
-Also improve the failure signal so this never hides again:
-- In `onPickFile`, when `!peopleQ.data`, if `peopleQ.isError` show the actual error message; if still loading, keep the current wording.
-
-Nothing else changes — review flow, template validation, duplicate check, and commit path are untouched.
-
-## Files
-
-- `src/components/smart-import/timesheets/timesheets-import-wizard.tsx` — rewrite `peopleQ.queryFn` to two-step fetch + JS join; refine the guard's error toast.
+## Out of scope
+No schema changes, no changes to how `job_codes` is persisted (still `string[]` of uppercase codes), no changes to staff-side visibility logic, no changes elsewhere in the file.

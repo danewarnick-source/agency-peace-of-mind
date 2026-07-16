@@ -240,52 +240,52 @@ export function BehaviorObservationsBlock({
               </button>
             )}
           </div>
+
+          {/* Q7 */}
+          <div className="grid gap-1.5">
+            <Label className="text-xs font-semibold">7. Notable positives / exceptional moments (optional)</Label>
+            <Textarea
+              rows={2}
+              value={value.positives}
+              onChange={(e) => set("positives", e.target.value)}
+              placeholder="e.g., initiated conversation with new neighbor, completed laundry independently"
+              maxLength={2000}
+              className="min-h-[60px]"
+            />
+          </div>
+
+          {/* Q8 */}
+          <fieldset className="grid gap-1.5">
+            <legend className="text-xs font-semibold text-foreground">
+              8. Compared to recent shifts, target behaviors today were:
+            </legend>
+            <div className="grid grid-cols-2 gap-1.5 md:grid-cols-4">
+              {([
+                ["fewer", "Fewer"],
+                ["same", "About the same"],
+                ["more", "More"],
+                ["na", "N/A"],
+              ] as const).map(([k, label]) => (
+                <label
+                  key={k}
+                  className={`flex min-h-[40px] cursor-pointer items-center justify-center rounded-md border px-2 text-[11px] font-medium ${
+                    value.trendVsRecent === k ? selectedPill : unselectedPill
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={`${groupId}-trend`}
+                    className="sr-only"
+                    checked={value.trendVsRecent === k}
+                    onChange={() => set("trendVsRecent", k)}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
         </>
       )}
-
-      {/* Q7 — always */}
-      <div className="grid gap-1.5">
-        <Label className="text-xs font-semibold">7. Notable positives / exceptional moments (optional)</Label>
-        <Textarea
-          rows={2}
-          value={value.positives}
-          onChange={(e) => set("positives", e.target.value)}
-          placeholder="e.g., initiated conversation with new neighbor, completed laundry independently"
-          maxLength={2000}
-          className="min-h-[60px]"
-        />
-      </div>
-
-      {/* Q8 */}
-      <fieldset className="grid gap-1.5">
-        <legend className="text-xs font-semibold text-foreground">
-          8. Compared to recent shifts, target behaviors today were:
-        </legend>
-        <div className="grid grid-cols-2 gap-1.5 md:grid-cols-4">
-          {([
-            ["fewer", "Fewer"],
-            ["same", "About the same"],
-            ["more", "More"],
-            ["na", "N/A"],
-          ] as const).map(([k, label]) => (
-            <label
-              key={k}
-              className={`flex min-h-[40px] cursor-pointer items-center justify-center rounded-md border px-2 text-[11px] font-medium ${
-                value.trendVsRecent === k ? selectedPill : unselectedPill
-              }`}
-            >
-              <input
-                type="radio"
-                name={`${groupId}-trend`}
-                className="sr-only"
-                checked={value.trendVsRecent === k}
-                onChange={() => set("trendVsRecent", k)}
-              />
-              {label}
-            </label>
-          ))}
-        </div>
-      </fieldset>
     </div>
   );
 }

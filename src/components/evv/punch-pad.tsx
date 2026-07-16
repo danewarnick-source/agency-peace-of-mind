@@ -3217,7 +3217,7 @@ export function PunchPad({
                     onClick={() => submitCompliance()}
                     disabled={!canSubmitCompliance || aiBusy}
                     className={
-                      correctionOpen
+                      correctionOpen && correctionHasChange
                         ? "w-full bg-amber-600 text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                         : "w-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                     }
@@ -3229,9 +3229,7 @@ export function PunchPad({
                       ? "Getting location…"
                       : aiCoach?.status === "Flagged"
                       ? "🔁 Re-Check with NECTAR Coach"
-                      : correctionOpen
-                      ? "🕒 Submit correction request"
-                      : "💾 Submit Final Timesheet"}
+                      : "💾 Submit Timeclock"}
                   </Button>
                 </div>
                 {allowException && aiCoach?.status === "Flagged" && (

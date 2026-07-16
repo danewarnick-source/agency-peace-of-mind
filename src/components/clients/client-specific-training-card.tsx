@@ -367,7 +367,7 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
         </div>
 
         {editingGoals && draftGoals !== null ? (
-          <GoalsEditor goals={draftGoals} onChange={setDraftGoals} />
+          <GoalsEditor goals={draftGoals} onChange={setDraftGoals} clientId={clientId} />
         ) : (training.goals ?? []).length > 0 ? (
           <GoalsView goals={training.goals ?? []} />
         ) : (

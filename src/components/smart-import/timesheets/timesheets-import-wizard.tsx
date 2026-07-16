@@ -801,7 +801,7 @@ function ReviewStep({
       </Tabs>
 
       <div className="flex flex-col items-stretch gap-2 md:flex-row md:items-center md:justify-between">
-        <Button variant="ghost" onClick={onBack}><ArrowLeft className="mr-1.5 h-4 w-4" /> Back to mapping</Button>
+        <Button variant="ghost" onClick={onBack}><ArrowLeft className="mr-1.5 h-4 w-4" /> Back to upload</Button>
         <div className="flex flex-col items-end gap-1">
           <Button onClick={onCommit} disabled={committing || ready.length === 0}>
             {committing && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}

@@ -608,16 +608,11 @@ export function TimesheetsImportWizard() {
 
 
 // ─── Stepper ───────────────────────────────────────────────────────────────
-function Stepper({ step }: { step: 1 | 2 | 3 | 4 }) {
-  // Wizard steps map onto the four workflow stages:
-  //   Upload + Map columns  = Stage 1 (upload & parse / match)
-  //   Match & review        = Stage 2 (admin review; nothing is written yet)
-  //   Submitted             = Stage 3 landed; staff now own Stage 4 (confirmation)
+function Stepper({ step }: { step: 1 | 2 | 3 }) {
   const items = [
-    { n: 1, label: "Upload" },
-    { n: 2, label: "Map columns" },
-    { n: 3, label: "Admin review" },
-    { n: 4, label: "Submitted to staff" },
+    { n: 1, label: "Upload template" },
+    { n: 2, label: "Admin review" },
+    { n: 3, label: "Submitted to staff" },
   ];
   return (
     <ol className="flex items-center gap-2 text-sm">
@@ -643,274 +638,69 @@ function Stepper({ step }: { step: 1 | 2 | 3 | 4 }) {
 // ─── Step 1 ────────────────────────────────────────────────────────────────
 function UploadStep({ onPick }: { onPick: (f: File) => void }) {
   const [dragging, setDragging] = useState(false);
-  return (
-    <div
-      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={(e) => {
-        e.preventDefault(); setDragging(false);
-        const f = e.dataTransfer.files?.[0];
-        if (f) onPick(f);
-      }}
-      className={`rounded-2xl border-2 border-dashed p-10 text-center transition ${
-        dragging ? "border-primary bg-primary/5" : "border-border bg-card"
-      }`}
-    >
-      <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
-      <p className="mt-3 font-medium">Drop a CSV or Excel file</p>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Only spreadsheets (.csv, .xlsx, .xls). Up to 25 MB. PDFs and images aren't used for this import type — the data is already in columns.
-      </p>
-      <div className="mt-4">
-        <input
-          id="ts-import-file"
-          type="file"
-          accept=".csv,.xlsx,.xls"
-          className="hidden"
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick(f); }}
-        />
-        <label htmlFor="ts-import-file">
-          <Button variant="outline" asChild><span>Choose file</span></Button>
-        </label>
-      </div>
-    </div>
-  );
-}
-
-// ─── Step 2 ────────────────────────────────────────────────────────────────
-const FIELD_LABELS: Record<FieldKey, { label: string; required: boolean; hint: string }> = {
-  staff: { label: "Staff member", required: true, hint: "Column holding the staff name" },
-  client: { label: "Client", required: true, hint: "Column holding the client name" },
-  date: { label: "Date", required: true, hint: "Shift date (skipped if clock-in already includes a date)" },
-  clock_in: { label: "Clock in", required: true, hint: "Time or date+time the shift started" },
-  clock_out: { label: "Clock out", required: true, hint: "Time or date+time the shift ended" },
-  notes: { label: "Notes", required: false, hint: "Free-text note (optional)" },
-  service_code: { label: "Service code", required: false, hint: "Billing code (optional — defaults to HISTORICAL)" },
-};
-
-function MapStep({
-  parsed, mapping, onChange,
-  wholeFile, onWholeFileChange, suggestions, suggesting, people,
-  onBack, onNext, peopleReady, fileName,
-}: {
-  parsed: ParsedFile;
-  mapping: Mapping;
-  onChange: (m: Mapping) => void;
-  wholeFile: WholeFile;
-  onWholeFileChange: (w: WholeFile) => void;
-  suggestions: Record<FieldKey, FieldSuggestion> | null;
-  suggesting: boolean;
-  people: { staff: Person[]; clients: Person[] };
-  onBack: () => void;
-  onNext: () => void;
-  peopleReady: boolean;
-  fileName: string;
-}) {
-  const staffOk = !!mapping.staff || !!wholeFile.staffId;
-  const clientOk = !!mapping.client || !!wholeFile.clientId;
-  const canNext = staffOk && clientOk && mapping.clock_in && mapping.clock_out &&
-    (mapping.singleDateTimeIn || mapping.date);
-
-  const needsWholeStaff = suggestions?.staff?.whole_file_needed === true;
-  const needsWholeClient = suggestions?.client?.whole_file_needed === true;
-
+  const onDownloadCsv = () => {
+    triggerDownload(
+      new Blob([buildTemplateCsv()], { type: "text/csv" }),
+      "historical-timesheets-template.csv",
+    );
+  };
+  const onDownloadXlsx = () => {
+    triggerDownload(buildTemplateXlsxBlob(), "historical-timesheets-template.xlsx");
+  };
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-border bg-card p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <div className="text-sm font-semibold">Map your columns</div>
-            <div className="text-xs text-muted-foreground">
-              File: {fileName} · {parsed.rows.length} row{parsed.rows.length === 1 ? "" : "s"} · {parsed.headers.length} columns detected
+        <div className="flex items-start gap-2">
+          <FileSpreadsheet className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <div className="flex-1">
+            <div className="text-sm font-semibold">Step 1 — download the template, then fill it in</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              The importer only accepts files matching this exact template. Six columns, in this order:{" "}
+              <span className="font-medium text-foreground">{TEMPLATE_HEADERS.join(", ")}</span>. Clock in and clock
+              out should each be a single cell holding both the date and the time (e.g. <code>2026-05-14 08:00</code>
+              {" "}or <code>5/14/2026 8:00 AM</code>). Notes is optional; every other column is required per row.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={onDownloadCsv}>
+                <Download className="mr-1.5 h-3.5 w-3.5" /> Download template (CSV)
+              </Button>
+              <Button variant="outline" size="sm" onClick={onDownloadXlsx}>
+                <Download className="mr-1.5 h-3.5 w-3.5" /> Download template (Excel)
+              </Button>
             </div>
           </div>
-          <div className="text-[11px] text-muted-foreground">
-            {suggesting
-              ? <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> NECTAR is reading your columns…</span>
-              : suggestions
-                ? <span>NECTAR suggested this mapping. Review and correct before continuing.</span>
-                : <span>Automatic mapping unavailable — map manually.</span>}
-          </div>
-        </div>
-
-        <WholeFileConstants
-          people={people}
-          wholeFile={wholeFile}
-          onChange={onWholeFileChange}
-          needsWholeStaff={needsWholeStaff}
-          needsWholeClient={needsWholeClient}
-        />
-
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
-          {(Object.keys(FIELD_LABELS) as FieldKey[]).map((k) => {
-            const meta = FIELD_LABELS[k];
-            if (k === "date" && mapping.singleDateTimeIn) return null;
-            const s = suggestions?.[k];
-            const disabledForWhole =
-              (k === "staff" && !!wholeFile.staffId) || (k === "client" && !!wholeFile.clientId);
-            return (
-              <div key={k} className="space-y-1">
-                <div className="flex items-center gap-1 text-xs font-medium">
-                  {meta.label}
-                  {meta.required && <span className="text-destructive">*</span>}
-                  <span className="text-muted-foreground" title={meta.hint}>
-                    <HelpCircle className="h-3 w-3" />
-                  </span>
-                  {disabledForWhole && (
-                    <Badge variant="outline" className="ml-1 text-[10px]">Using whole-file value</Badge>
-                  )}
-                </div>
-                <Select
-                  value={mapping[k] ?? "__none__"}
-                  onValueChange={(v) => onChange({ ...mapping, [k]: v === "__none__" ? null : v })}
-                  disabled={disabledForWhole}
-                >
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Not mapped" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">— not mapped —</SelectItem>
-                    {parsed.headers.map((h) => (
-                      <SelectItem key={h} value={h}>{h}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {s && !disabledForWhole && <SuggestionHint suggestion={s} />}
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="mt-4 space-y-1.5 rounded-md border border-border/60 bg-muted/30 p-3 text-xs">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={mapping.singleDateTimeIn}
-              onChange={(e) => onChange({ ...mapping, singleDateTimeIn: e.target.checked })}
-            />
-            The <strong>Clock in</strong> column already contains both the date and the time
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={mapping.singleDateTimeOut}
-              onChange={(e) => onChange({ ...mapping, singleDateTimeOut: e.target.checked })}
-            />
-            The <strong>Clock out</strong> column already contains both the date and the time
-          </label>
         </div>
       </div>
 
-      {parsed.rows.length > 0 && (
-        <SamplePreview parsed={parsed} mapping={mapping} />
-      )}
-
-      <div className="flex justify-between">
-        <Button variant="ghost" onClick={onBack}><ArrowLeft className="mr-1.5 h-4 w-4" /> Back</Button>
-        <Button onClick={onNext} disabled={!canNext || !peopleReady || suggesting}>
-          {(!peopleReady || suggesting) && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-          Match & review <ArrowRight className="ml-1.5 h-4 w-4" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function SuggestionHint({ suggestion }: { suggestion: FieldSuggestion }) {
-  const color =
-    suggestion.confidence === "high" ? "text-emerald-700"
-      : suggestion.confidence === "medium" ? "text-amber-700"
-        : "text-muted-foreground";
-  if (suggestion.whole_file_needed) {
-    return (
-      <div className="text-[11px] text-destructive">
-        NECTAR: no column in this file contains this value — use the whole-file setting above.
-      </div>
-    );
-  }
-  if (!suggestion.column) {
-    return <div className="text-[11px] text-muted-foreground">NECTAR: no confident match — pick manually if applicable.</div>;
-  }
-  return (
-    <div className={`text-[11px] ${color}`}>
-      NECTAR ({suggestion.confidence}): {suggestion.reason}
-    </div>
-  );
-}
-
-function WholeFileConstants({
-  people, wholeFile, onChange, needsWholeStaff, needsWholeClient,
-}: {
-  people: { staff: Person[]; clients: Person[] };
-  wholeFile: WholeFile;
-  onChange: (w: WholeFile) => void;
-  needsWholeStaff: boolean;
-  needsWholeClient: boolean;
-}) {
-  const [staffOpen, setStaffOpen] = useState(needsWholeStaff);
-  const [clientOpen, setClientOpen] = useState(needsWholeClient);
-  return (
-    <div className="rounded-md border border-border bg-muted/30 p-3">
-      <div className="text-xs font-medium">This whole file is for one person?</div>
-      <p className="text-[11px] text-muted-foreground">
-        Some exports don't have a staff or client column at all — the whole sheet belongs to one person by
-        context. If that's the case here, pick the person below and the column mapping for that field will be
-        skipped for every row.
-      </p>
-      <div className="mt-2 grid gap-2 md:grid-cols-2">
-        <div>
-          <label className="flex items-center gap-1 text-[11px] font-medium">
-            <input
-              type="checkbox"
-              checked={staffOpen || !!wholeFile.staffId}
-              onChange={(e) => {
-                const on = e.target.checked;
-                setStaffOpen(on);
-                if (!on) onChange({ ...wholeFile, staffId: null });
-              }}
-            />
-            Entire file is for one staff member
-            {needsWholeStaff && <Badge variant="outline" className="ml-1 border-destructive/40 text-destructive text-[10px]">Required</Badge>}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault(); setDragging(false);
+          const f = e.dataTransfer.files?.[0];
+          if (f) onPick(f);
+        }}
+        className={`rounded-2xl border-2 border-dashed p-10 text-center transition ${
+          dragging ? "border-primary bg-primary/5" : "border-border bg-card"
+        }`}
+      >
+        <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
+        <p className="mt-3 font-medium">Drop the filled-in template here</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Accepts .csv, .xlsx, or .xls up to 25 MB. Files that don't match the template's six columns will be
+          rejected before any rows are imported.
+        </p>
+        <div className="mt-4">
+          <input
+            id="ts-import-file"
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick(f); }}
+          />
+          <label htmlFor="ts-import-file">
+            <Button variant="outline" asChild><span>Choose file</span></Button>
           </label>
-          {(staffOpen || wholeFile.staffId) && (
-            <Select
-              value={wholeFile.staffId ?? ""}
-              onValueChange={(v) => onChange({ ...wholeFile, staffId: v || null })}
-            >
-              <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue placeholder="Pick a staff member" /></SelectTrigger>
-              <SelectContent>
-                {people.staff.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-        <div>
-          <label className="flex items-center gap-1 text-[11px] font-medium">
-            <input
-              type="checkbox"
-              checked={clientOpen || !!wholeFile.clientId}
-              onChange={(e) => {
-                const on = e.target.checked;
-                setClientOpen(on);
-                if (!on) onChange({ ...wholeFile, clientId: null });
-              }}
-            />
-            Entire file is about one client
-            {needsWholeClient && <Badge variant="outline" className="ml-1 border-destructive/40 text-destructive text-[10px]">Required</Badge>}
-          </label>
-          {(clientOpen || wholeFile.clientId) && (
-            <Select
-              value={wholeFile.clientId ?? ""}
-              onValueChange={(v) => onChange({ ...wholeFile, clientId: v || null })}
-            >
-              <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue placeholder="Pick a client" /></SelectTrigger>
-              <SelectContent>
-                {people.clients.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
         </div>
       </div>
     </div>
@@ -918,53 +708,6 @@ function WholeFileConstants({
 }
 
 
-function SamplePreview({ parsed, mapping }: { parsed: ParsedFile; mapping: Mapping }) {
-  const sample = parsed.rows.slice(0, 3);
-  const cells = (row: Record<string, string>) => ({
-    staff: mapping.staff ? row[mapping.staff] : "—",
-    client: mapping.client ? row[mapping.client] : "—",
-    date: mapping.date ? row[mapping.date] : (mapping.singleDateTimeIn ? "(from clock in)" : "—"),
-    inTime: mapping.clock_in ? row[mapping.clock_in] : "—",
-    outTime: mapping.clock_out ? row[mapping.clock_out] : "—",
-    notes: mapping.notes ? row[mapping.notes] : "",
-  });
-  return (
-    <div className="rounded-2xl border border-border bg-card p-4">
-      <div className="mb-2 text-sm font-semibold">Preview (first 3 rows)</div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead className="text-muted-foreground">
-            <tr>
-              <th className="px-2 py-1 text-left">Staff</th>
-              <th className="px-2 py-1 text-left">Client</th>
-              <th className="px-2 py-1 text-left">Date</th>
-              <th className="px-2 py-1 text-left">In</th>
-              <th className="px-2 py-1 text-left">Out</th>
-              <th className="px-2 py-1 text-left">Notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sample.map((r, i) => {
-              const c = cells(r);
-              return (
-                <tr key={i} className="border-t border-border/60">
-                  <td className="px-2 py-1">{c.staff}</td>
-                  <td className="px-2 py-1">{c.client}</td>
-                  <td className="px-2 py-1">{c.date}</td>
-                  <td className="px-2 py-1">{c.inTime}</td>
-                  <td className="px-2 py-1">{c.outTime}</td>
-                  <td className="px-2 py-1 truncate max-w-[12rem]">{c.notes}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-// ─── Step 3 ────────────────────────────────────────────────────────────────
 function ReviewStep({
   rows, ready, ambiguous, unmatched, skipped, people,
   repeatedIssues, dupeChecking,

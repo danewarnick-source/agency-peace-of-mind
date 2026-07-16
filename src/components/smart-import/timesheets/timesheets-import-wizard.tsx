@@ -1,7 +1,9 @@
-// Historical timesheets import wizard — spreadsheet-only (CSV/XLSX),
-// column-mapping + name-based matching against EXISTING staff and clients.
-// Never creates new staff or client records. Anything imported here is
-// permanently marked import_source='historical_import' on evv_timesheets.
+// Historical timesheets import wizard — spreadsheet-only, filled in from
+// the FIXED six-column template shipped with the wizard (Staff Name,
+// Client Name, Clock In, Clock Out, Service Code, Notes). No column
+// mapping, no whole-file constants, no auto-suggest. Anything imported
+// here is permanently marked import_source='historical_import' on
+// evv_timesheets and never creates staff or client records.
 import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -11,7 +13,7 @@ import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import {
   Upload, X, Loader2, ArrowRight, ArrowLeft, Download,
-  CheckCircle2, AlertTriangle, HelpCircle, Archive,
+  CheckCircle2, Archive, FileSpreadsheet,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -25,26 +27,16 @@ import {
   createTimesheetImportJob,
   importHistoricalTimesheets,
 } from "@/lib/smart-import-timesheets.functions";
-import { suggestImportColumnMapping } from "@/lib/smart-import-nectar-mapping.functions";
 import { checkImportDuplicates } from "@/lib/smart-import-duplicate-check.functions";
+import {
+  TEMPLATE_HEADERS,
+  buildTemplateCsv,
+  buildTemplateXlsxBlob,
+  triggerDownload,
+  validateTemplateHeaders,
+} from "@/lib/historical-timesheets-template";
 
 type ParsedFile = { headers: string[]; rows: Record<string, string>[]; fileName: string };
-
-type FieldKey = "staff" | "client" | "date" | "clock_in" | "clock_out" | "notes" | "service_code";
-
-type Mapping = Record<FieldKey, string | null> & {
-  singleDateTimeIn: boolean;
-  singleDateTimeOut: boolean;
-};
-
-type WholeFile = { staffId: string | null; clientId: string | null };
-type FieldSuggestion = {
-  column: string | null;
-  confidence: "high" | "medium" | "low";
-  reason: string;
-  whole_file_needed: boolean;
-};
-
 
 type Person = { id: string; label: string; norms: string[] };
 
@@ -75,6 +67,7 @@ type ReviewRow = {
   duplicateOfId: string | null;
   duplicateReason: string | null;
 };
+
 
 const ALLOWED_EXT = [".csv", ".xlsx", ".xls"];
 const MAX_BYTES = 25 * 1024 * 1024;

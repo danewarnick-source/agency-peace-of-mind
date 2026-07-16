@@ -62,6 +62,20 @@ export const importHistoricalTimesheets = createServerFn({ method: "POST" })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
 
+    // Fetch org's DSPD provider ID upfront — required for every row.
+    const { data: orgRow, error: orgErr } = await supabase
+      .from("organizations")
+      .select("dhhs_provider_id")
+      .eq("id", data.organization_id)
+      .single();
+    if (orgErr) throw new Error(orgErr.message);
+    const providerId = (orgRow?.dhhs_provider_id ?? "").trim();
+    if (!providerId) {
+      throw new Error(
+        "Set the agency's DSPD provider ID before importing timesheets.",
+      );
+    }
+
     // Verify staff + clients belong to this org
     const staffIds = Array.from(new Set(data.rows.map((r) => r.staff_id)));
     const clientIds = Array.from(new Set(data.rows.map((r) => r.client_id)));
@@ -73,14 +87,19 @@ export const importHistoricalTimesheets = createServerFn({ method: "POST" })
         .in("user_id", staffIds),
       supabase
         .from("clients")
-        .select("id")
+        .select("id, medicaid_id")
         .eq("organization_id", data.organization_id)
         .in("id", clientIds),
     ]);
     if (staffRes.error) throw new Error(staffRes.error.message);
     if (clientRes.error) throw new Error(clientRes.error.message);
     const validStaff = new Set((staffRes.data ?? []).map((r: { user_id: string }) => r.user_id));
-    const validClients = new Set((clientRes.data ?? []).map((r: { id: string }) => r.id));
+    const clientMedicaid = new Map(
+      (clientRes.data ?? []).map((r: { id: string; medicaid_id: string | null }) => [
+        r.id,
+        (r.medicaid_id ?? "").trim(),
+      ]),
+    );
 
     const importedAt = new Date().toISOString();
     const rejected: Array<{ index: number; reason: string }> = [];
@@ -91,8 +110,16 @@ export const importHistoricalTimesheets = createServerFn({ method: "POST" })
         rejected.push({ index: idx, reason: "staff not in organization" });
         return;
       }
-      if (!validClients.has(r.client_id)) {
+      if (!clientMedicaid.has(r.client_id)) {
         rejected.push({ index: idx, reason: "client not in organization" });
+        return;
+      }
+      const memberId = clientMedicaid.get(r.client_id) ?? "";
+      if (!memberId) {
+        rejected.push({
+          index: idx,
+          reason: "client is missing a Utah Medicaid member ID",
+        });
         return;
       }
       const inTs = new Date(r.clock_in_iso);
@@ -109,8 +136,8 @@ export const importHistoricalTimesheets = createServerFn({ method: "POST" })
         organization_id: data.organization_id,
         staff_id: r.staff_id,
         client_id: r.client_id,
-        utah_medicaid_provider_id: "",
-        utah_medicaid_member_id: "",
+        utah_medicaid_provider_id: providerId,
+        utah_medicaid_member_id: memberId,
         service_type_code: r.service_code.toUpperCase(),
         clock_in_timestamp: inTs.toISOString(),
         clock_out_timestamp: outTs.toISOString(),
@@ -141,6 +168,7 @@ export const importHistoricalTimesheets = createServerFn({ method: "POST" })
         ],
       });
     });
+
 
     if (inserts.length === 0) {
       return { inserted: 0, rejected };

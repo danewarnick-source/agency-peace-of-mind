@@ -731,18 +731,44 @@ export function GoalsEditor({ goals, onChange, clientId }: { goals: CSTGoal[]; o
               placeholder="Measures, frequency, target, timeline (verbatim)"
             />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <label className="text-xs font-medium">Service codes</label>
-            <Input
-              value={g.job_codes.join(", ")}
-              onChange={(e) => patchGoal(idx, {
-                job_codes: e.target.value.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean),
-              })}
-              placeholder="e.g. SLN, DSI"
-            />
-            <p className="text-[11px] text-muted-foreground">
-              Staff only see this goal during shifts clocked under one of these codes.
-            </p>
+            {codesLoading ? (
+              <p className="text-[11px] text-muted-foreground">Loading authorized codes…</p>
+            ) : availableCodes.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">
+                No authorized service codes on file. Add them under Billing before assigning goals to codes.
+              </p>
+            ) : (
+              <>
+                <div className="flex flex-wrap gap-1.5">
+                  {availableCodes.map((code) => {
+                    const selected = g.job_codes.includes(code);
+                    return (
+                      <button
+                        key={code}
+                        type="button"
+                        onClick={() => toggleCode(idx, code)}
+                        className="focus:outline-none"
+                        aria-pressed={selected}
+                      >
+                        <Badge
+                          variant={selected ? "default" : "outline"}
+                          className="cursor-pointer font-mono text-[11px]"
+                        >
+                          {code}
+                        </Badge>
+                      </button>
+                    );
+                  })}
+                </div>
+                {g.job_codes.length === 0 && (
+                  <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                    No codes selected — this goal won't appear for any staff on any shift until you pick at least one.
+                  </p>
+                )}
+              </>
+            )}
           </div>
         </div>
       ))}

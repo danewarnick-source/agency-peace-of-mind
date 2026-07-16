@@ -922,7 +922,7 @@ export function PunchPad({
   const canSubmitCompliance =
     hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk &&
     longShiftOk && triggersResolved && medDosesResolved && !busy &&
-    (!correctionOpen || correctionValid);
+    (!correctionOpen || !correctionHasChange || correctionValid);
 
 
   function openCompliance() {
@@ -1681,10 +1681,8 @@ export function PunchPad({
       toast.error("Log all scheduled medication doses in eMAR before submitting.");
       return;
     }
-    if (correctionOpen && !correctionValid) {
-      if (!correctionHasChange) {
-        toast.error("Enter the corrected clock-in and/or clock-out time.");
-      } else if (!correctionReasonOk) {
+    if (correctionOpen && correctionHasChange && !correctionValid) {
+      if (!correctionReasonOk) {
         toast.error("Add a short reason (at least 10 characters) for the correction.");
       } else if (!correctionOrderOk) {
         toast.error("Corrected clock-out must be after the corrected clock-in.");
@@ -1695,7 +1693,7 @@ export function PunchPad({
       }
       return;
     }
-    const correctionPayload = correctionOpen
+    const correctionPayload = correctionOpen && correctionHasChange
       ? {
           correctedInIso: correctionInIso,
           correctedOutIso: correctionOutIso,
@@ -3219,7 +3217,7 @@ export function PunchPad({
                     onClick={() => submitCompliance()}
                     disabled={!canSubmitCompliance || aiBusy}
                     className={
-                      correctionOpen
+                      correctionOpen && correctionHasChange
                         ? "w-full bg-amber-600 text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                         : "w-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                     }
@@ -3231,9 +3229,7 @@ export function PunchPad({
                       ? "Getting location…"
                       : aiCoach?.status === "Flagged"
                       ? "🔁 Re-Check with NECTAR Coach"
-                      : correctionOpen
-                      ? "🕒 Submit correction request"
-                      : "💾 Submit Final Timesheet"}
+                      : "💾 Submit Timeclock"}
                   </Button>
                 </div>
                 {allowException && aiCoach?.status === "Flagged" && (

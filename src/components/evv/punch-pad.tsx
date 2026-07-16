@@ -1681,10 +1681,8 @@ export function PunchPad({
       toast.error("Log all scheduled medication doses in eMAR before submitting.");
       return;
     }
-    if (correctionOpen && !correctionValid) {
-      if (!correctionHasChange) {
-        toast.error("Enter the corrected clock-in and/or clock-out time.");
-      } else if (!correctionReasonOk) {
+    if (correctionOpen && correctionHasChange && !correctionValid) {
+      if (!correctionReasonOk) {
         toast.error("Add a short reason (at least 10 characters) for the correction.");
       } else if (!correctionOrderOk) {
         toast.error("Corrected clock-out must be after the corrected clock-in.");
@@ -1695,7 +1693,7 @@ export function PunchPad({
       }
       return;
     }
-    const correctionPayload = correctionOpen
+    const correctionPayload = correctionOpen && correctionHasChange
       ? {
           correctedInIso: correctionInIso,
           correctedOutIso: correctionOutIso,

@@ -1,23 +1,41 @@
-## Fix blank Medicaid IDs on historical timesheet imports
+## Replace guess-a-mapping with a fixed six-column template
 
-Right now `importHistoricalTimesheets` writes every row with `utah_medicaid_provider_id: ""` and `utah_medicaid_member_id: ""`. Fill both from records already on file, and reject rows where either is missing instead of saving a blank.
+Kill the column-mapping screen and the Nectar auto-suggest path. The wizard now ships a canonical template and only accepts files that follow it.
 
-### Where the IDs come from
-- **Provider ID** → `organizations.dhhs_provider_id` for the import's `organization_id` (single lookup).
-- **Member ID** → `clients.medicaid_id` for each matched `client_id` (already fetched in the same handler).
+### The template
+Six columns, in this exact order, one header row:
 
-### Changes to `src/lib/smart-import-timesheets.functions.ts`
-1. Extend the `organizations` fetch: alongside verifying the org, select `dhhs_provider_id`. If it's null/blank, fail the whole import with a clear message ("Set the agency's DSPD provider ID before importing timesheets") — no partial commit.
-2. Change the existing `clients` select from `"id"` to `"id, medicaid_id"` and build a `Map<clientId, medicaid_id | null>` instead of the current `Set`.
-3. In the per-row loop, after the existing staff/client/date checks, look up the client's `medicaid_id`. If blank/null, push to `rejected` with reason `"client is missing a Utah Medicaid member ID"` and skip — do NOT insert.
-4. In the insert payload, replace the two `""` literals with the real `dhhs_provider_id` and the row's `medicaid_id`.
+```text
+Staff Name | Client Name | Clock In | Clock Out | Service Code | Notes
+```
 
-### Behavior after the fix
-- Every inserted `evv_timesheets` row carries the real provider + member IDs.
-- Rows for clients without a Medicaid ID on file are surfaced in the wizard's existing `rejected` list (same shape as today's "client not in organization" rejections) so the admin knows exactly which client records to complete before re-importing.
-- Orgs without a `dhhs_provider_id` get a single upfront error instead of silently importing blanks.
+- Clock In / Clock Out are single cells each, holding date + time together (e.g. `2026-05-14 08:00`, `5/14/2026 8:00 AM`). No separate date column.
+- Notes is optional; the other five are required per row.
+- Downloadable as both `.csv` and `.xlsx` from the Step 1 screen.
 
-### Out of scope
-- UI copy in the wizard (existing rejected-row rendering already handles new reasons).
-- Backfilling the blanks already written by previous imports — separate task if wanted.
-- No schema changes.
+### Wizard flow (4 steps → 3 steps)
+1. **Upload** — file picker + "Download template (CSV / Excel)" buttons and a one-line explainer that only files matching this template are accepted.
+2. **Review** — the existing review table (matched / needs attention / invalid, per-row staff/client override, skip toggle, duplicate flagging). No mapping UI.
+3. **Done** — unchanged.
+
+### Parsing rules
+- After `parseFile`, validate that the header row matches the six expected labels (case-insensitive, trimmed). Reject the file with a clear "Doesn't match the template — download it above and fill it in" error, and bounce back to Step 1.
+- Build `ReviewRow`s directly from fixed column keys — no `Mapping`, no `singleDateTimeIn/Out`, no whole-file staff/client override, no Nectar suggestion round-trip.
+- Reuse `findCandidates`, `personNorms`, `tryParseDateTime` unchanged. `tryParseDateTime` is called with `singleField=true` for both clock in and clock out.
+- Reuse the duplicate-check pass unchanged.
+
+### Files to change
+- **`src/components/smart-import/timesheets/timesheets-import-wizard.tsx`** — remove Step 2 markup + `Mapping` / `WholeFile` / `FieldSuggestion` state, remove `suggestImportColumnMapping` and `sampleColumns`, remove `mapping` and `wholeFile` from `buildReviewRows`, add header validation in `onPickFile` that jumps straight to Step 2 (Review) on success. Renumber the stepper to 1/2/3.
+- **New `src/lib/historical-timesheets-template.ts`** — exports the column list, a `buildTemplateCsv()` returning a small CSV string with the header row + 1 example row, and a `buildTemplateXlsx()` returning a Blob via the already-installed `xlsx` package. Also exports `validateTemplateHeaders(headers): { ok: true } | { ok: false; message: string }`.
+- **Nothing to change server-side.** `importHistoricalTimesheets` already takes resolved rows and doesn't know about the mapping step.
+
+### Not changing
+- `suggestImportColumnMapping` server function still exists for other importers (daily notes, etc.) — leave it alone; only the timesheet wizard stops calling it.
+- No changes to the duplicate check, the review table UI, the commit step, or the schema.
+- No migration for existing in-flight `import_jobs`.
+
+### Acceptance
+- Step 1 shows "Download template" buttons that produce a CSV and an XLSX with exactly those six headers.
+- Uploading a file whose header row doesn't match gets rejected before any matching happens, with a message pointing to the template.
+- Uploading a filled-in template goes straight to the existing review screen — no column pickers anywhere.
+- Rows that don't match a staff or client are shown as "needs attention" exactly as today.

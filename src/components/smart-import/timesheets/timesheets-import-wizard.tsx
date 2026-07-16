@@ -1,7 +1,9 @@
-// Historical timesheets import wizard — spreadsheet-only (CSV/XLSX),
-// column-mapping + name-based matching against EXISTING staff and clients.
-// Never creates new staff or client records. Anything imported here is
-// permanently marked import_source='historical_import' on evv_timesheets.
+// Historical timesheets import wizard — spreadsheet-only, filled in from
+// the FIXED six-column template shipped with the wizard (Staff Name,
+// Client Name, Clock In, Clock Out, Service Code, Notes). No column
+// mapping, no whole-file constants, no auto-suggest. Anything imported
+// here is permanently marked import_source='historical_import' on
+// evv_timesheets and never creates staff or client records.
 import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -11,8 +13,9 @@ import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import {
   Upload, X, Loader2, ArrowRight, ArrowLeft, Download,
-  CheckCircle2, AlertTriangle, HelpCircle, Archive,
+  CheckCircle2, AlertTriangle, Archive, FileSpreadsheet,
 } from "lucide-react";
+
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,26 +28,16 @@ import {
   createTimesheetImportJob,
   importHistoricalTimesheets,
 } from "@/lib/smart-import-timesheets.functions";
-import { suggestImportColumnMapping } from "@/lib/smart-import-nectar-mapping.functions";
 import { checkImportDuplicates } from "@/lib/smart-import-duplicate-check.functions";
+import {
+  TEMPLATE_HEADERS,
+  buildTemplateCsv,
+  buildTemplateXlsxBlob,
+  triggerDownload,
+  validateTemplateHeaders,
+} from "@/lib/historical-timesheets-template";
 
 type ParsedFile = { headers: string[]; rows: Record<string, string>[]; fileName: string };
-
-type FieldKey = "staff" | "client" | "date" | "clock_in" | "clock_out" | "notes" | "service_code";
-
-type Mapping = Record<FieldKey, string | null> & {
-  singleDateTimeIn: boolean;
-  singleDateTimeOut: boolean;
-};
-
-type WholeFile = { staffId: string | null; clientId: string | null };
-type FieldSuggestion = {
-  column: string | null;
-  confidence: "high" | "medium" | "low";
-  reason: string;
-  whole_file_needed: boolean;
-};
-
 
 type Person = { id: string; label: string; norms: string[] };
 
@@ -75,6 +68,7 @@ type ReviewRow = {
   duplicateOfId: string | null;
   duplicateReason: string | null;
 };
+
 
 const ALLOWED_EXT = [".csv", ".xlsx", ".xls"];
 const MAX_BYTES = 25 * 1024 * 1024;
@@ -179,40 +173,9 @@ function tryParseDateTime(dateStr: string, timeStr: string | null, singleField: 
   return isNaN(fallback.getTime()) ? null : fallback;
 }
 
-// ─── auto-suggest mapping ──────────────────────────────────────────────────
-// Deep, stratified sample per column: pull up to 60 non-empty values evenly
-// spaced across up to the first 2,000 rows of the file — and also report
-// the column's actual fill rate. A "header looks great but 95% of rows are
-// blank" column can then be downgraded on the server side no matter how
-// promising its header text sounds.
-function sampleColumns(parsed: ParsedFile): Array<{ header: string; samples: string[]; fill_rate: number; sample_size: number }> {
-  const MAX_ROWS = 2000;
-  const MAX_SAMPLES = 60;
-  const scan = parsed.rows.slice(0, MAX_ROWS);
-  const step = Math.max(1, Math.floor(scan.length / (MAX_SAMPLES * 2)));
-  return parsed.headers.map((h) => {
-    let nonEmpty = 0;
-    const seen = new Set<string>();
-    const samples: string[] = [];
-    // First: stratified walk to grab evenly-distributed samples
-    for (let i = 0; i < scan.length; i += step) {
-      const v = (scan[i][h] ?? "").trim();
-      if (!v) continue;
-      const key = v.toLowerCase();
-      if (!seen.has(key) && samples.length < MAX_SAMPLES) {
-        seen.add(key);
-        samples.push(v.slice(0, 200));
-      }
-    }
-    // Then: full scan for accurate fill_rate (cheap)
-    for (const r of scan) {
-      const v = (r[h] ?? "").trim();
-      if (v) nonEmpty++;
-    }
-    const fill_rate = scan.length > 0 ? nonEmpty / scan.length : 0;
-    return { header: h, samples, fill_rate, sample_size: scan.length };
-  });
-}
+// (Column-mapping guesswork removed — the wizard now accepts only the
+// fixed six-column template shipped with the app.)
+
 
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -220,19 +183,14 @@ function sampleColumns(parsed: ParsedFile): Array<{ header: string; samples: str
 export function TimesheetsImportWizard() {
   const { data: org } = useCurrentOrg();
   const navigate = useNavigate();
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [file, setFile] = useState<File | null>(null);
   const [parsed, setParsed] = useState<ParsedFile | null>(null);
-  const [mapping, setMapping] = useState<Mapping | null>(null);
-  const [wholeFile, setWholeFile] = useState<WholeFile>({ staffId: null, clientId: null });
-  const [suggestions, setSuggestions] = useState<Record<FieldKey, FieldSuggestion> | null>(null);
-  const [suggesting, setSuggesting] = useState(false);
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [committed, setCommitted] = useState<{ inserted: number; staffCount: number } | null>(null);
 
   const createJob = useServerFn(createTimesheetImportJob);
   const commitRows = useServerFn(importHistoricalTimesheets);
-  const suggestMap = useServerFn(suggestImportColumnMapping);
   const checkDupes = useServerFn(checkImportDuplicates);
   const [dupeChecking, setDupeChecking] = useState(false);
 
@@ -278,99 +236,32 @@ export function TimesheetsImportWizard() {
     },
   });
 
-  // ── Step 1 handlers ──
-  const onPickFile = useCallback(async (f: File) => {
-    const okExt = ALLOWED_EXT.some((e) => f.name.toLowerCase().endsWith(e));
-    if (!okExt) {
-      toast.error("Historical timesheet import only accepts CSV or Excel (.csv, .xlsx, .xls).");
-      return;
-    }
-    if (f.size > MAX_BYTES) {
-      toast.error(`${f.name} is larger than 25 MB.`);
-      return;
-    }
-    try {
-      const p = await parseFile(f);
-      if (p.headers.length === 0 || p.rows.length === 0) {
-        toast.error("That file didn't contain any readable rows.");
-        return;
-      }
-      setFile(f);
-      setParsed(p);
-      setMapping({
-        staff: null, client: null, date: null, clock_in: null, clock_out: null,
-        notes: null, service_code: null, singleDateTimeIn: false, singleDateTimeOut: false,
-      });
-      setWholeFile({ staffId: null, clientId: null });
-      setSuggestions(null);
-      setStep(2);
-      if (org?.organization_id) {
-        setSuggesting(true);
-        try {
-          const res = await suggestMap({
-            data: {
-              organization_id: org.organization_id,
-              mode: "timesheets",
-              file_name: p.fileName,
-              columns: sampleColumns(p),
-            },
-          });
-          const s = res.mapping as Record<FieldKey, FieldSuggestion>;
-          setSuggestions(s);
-          setMapping((prev) => ({
-            ...(prev ?? {
-              staff: null, client: null, date: null, clock_in: null, clock_out: null,
-              notes: null, service_code: null, singleDateTimeIn: false, singleDateTimeOut: false,
-            }),
-            staff: s.staff?.column ?? null,
-            client: s.client?.column ?? null,
-            date: s.date?.column ?? null,
-            clock_in: s.clock_in?.column ?? null,
-            clock_out: s.clock_out?.column ?? null,
-            notes: s.notes?.column ?? null,
-            service_code: s.service_code?.column ?? null,
-          }));
-        } catch (err) {
-          toast.error(`NECTAR couldn't suggest a mapping: ${(err as Error).message}. You can map columns manually.`);
-        } finally {
-          setSuggesting(false);
-        }
-      }
-    } catch (e) {
-      toast.error(`Couldn't read ${f.name}: ${(e as Error).message}`);
-    }
-  }, [org?.organization_id, suggestMap]);
-
-
-  // ── Step 3 build ──
-  const buildReviewRows = useCallback(() => {
-    if (!parsed || !mapping || !peopleQ.data) return;
+  // Build review rows directly from the fixed template columns. Called
+  // once peopleQ.data resolves after a successful upload.
+  const buildFromParsed = useCallback((p: ParsedFile) => {
+    if (!peopleQ.data) return;
     const { staff, clients } = peopleQ.data;
 
-    const wholeStaff = wholeFile.staffId ? staff.find((s) => s.id === wholeFile.staffId) ?? null : null;
-    const wholeClient = wholeFile.clientId ? clients.find((c) => c.id === wholeFile.clientId) ?? null : null;
+    const result: ReviewRow[] = p.rows.map((raw, idx) => {
+      const staffLabel = raw["Staff Name"] ?? "";
+      const clientLabel = raw["Client Name"] ?? "";
+      const clockInStr = raw["Clock In"] ?? "";
+      const clockOutStr = raw["Clock Out"] ?? "";
+      const serviceCode = (raw["Service Code"] ?? "").toUpperCase();
+      const notes = raw["Notes"] ?? "";
 
-    const result: ReviewRow[] = parsed.rows.map((raw, idx) => {
-      const staffLabel = wholeStaff ? wholeStaff.label : (mapping.staff ? raw[mapping.staff] ?? "" : "");
-      const clientLabel = wholeClient ? wholeClient.label : (mapping.client ? raw[mapping.client] ?? "" : "");
-      const dateStr = mapping.date ? raw[mapping.date] ?? "" : "";
-      const clockInStr = mapping.clock_in ? raw[mapping.clock_in] ?? "" : "";
-      const clockOutStr = mapping.clock_out ? raw[mapping.clock_out] ?? "" : "";
-      const notes = mapping.notes ? raw[mapping.notes] ?? "" : "";
-      const serviceCode = mapping.service_code ? (raw[mapping.service_code] ?? "").toUpperCase() : "";
+      const staffCandidates = findCandidates(staff, staffLabel);
+      const clientCandidates = findCandidates(clients, clientLabel);
 
-      const staffCandidates = wholeStaff ? [wholeStaff] : findCandidates(staff, staffLabel);
-      const clientCandidates = wholeClient ? [wholeClient] : findCandidates(clients, clientLabel);
-
-      const inDate = tryParseDateTime(mapping.singleDateTimeIn ? clockInStr : dateStr, clockInStr, mapping.singleDateTimeIn);
-      const outDate = tryParseDateTime(mapping.singleDateTimeOut ? clockOutStr : dateStr, clockOutStr, mapping.singleDateTimeOut);
+      const inDate = tryParseDateTime(clockInStr, null, true);
+      const outDate = tryParseDateTime(clockOutStr, null, true);
 
       let status: MatchStatus;
       let reason: string | null = null;
-      let staffId: string | null = wholeStaff?.id ?? null;
-      let clientId: string | null = wholeClient?.id ?? null;
+      let staffId: string | null = null;
+      let clientId: string | null = null;
 
-      if (!staffLabel || !clientLabel || !dateStr || !clockInStr || !clockOutStr) {
+      if (!staffLabel || !clientLabel || !clockInStr || !clockOutStr) {
         status = "invalid";
         reason = "missing required cells";
       } else if (!inDate || !outDate) {
@@ -390,18 +281,20 @@ export function TimesheetsImportWizard() {
       } else if (staffCandidates.length > 1 || clientCandidates.length > 1) {
         status = "ambiguous";
         reason = "multiple possible matches";
-        if (!staffId && staffCandidates.length === 1) staffId = staffCandidates[0].id;
-        if (!clientId && clientCandidates.length === 1) clientId = clientCandidates[0].id;
+        if (staffCandidates.length === 1) staffId = staffCandidates[0].id;
+        if (clientCandidates.length === 1) clientId = clientCandidates[0].id;
       } else {
         status = "matched";
-        staffId = staffId ?? staffCandidates[0].id;
-        clientId = clientId ?? clientCandidates[0].id;
+        staffId = staffCandidates[0].id;
+        clientId = clientCandidates[0].id;
       }
 
       return {
         idx,
         raw,
-        staffLabel, clientLabel, dateStr, clockInStr, clockOutStr, notes, serviceCode,
+        staffLabel, clientLabel,
+        dateStr: inDate ? inDate.toLocaleDateString() : clockInStr,
+        clockInStr, clockOutStr, notes, serviceCode,
         staffCandidates, clientCandidates,
         staffId, clientId,
         clockInIso: inDate ? inDate.toISOString() : null,
@@ -413,7 +306,7 @@ export function TimesheetsImportWizard() {
       };
     });
     setRows(result);
-    setStep(3);
+    setStep(2);
 
     // Duplicate check for every fully-resolved row (staff + client + times).
     // Runs async against evv_timesheets; hits are flagged and auto-skipped
@@ -457,7 +350,42 @@ export function TimesheetsImportWizard() {
         })
         .finally(() => setDupeChecking(false));
     }
-  }, [parsed, mapping, peopleQ.data, wholeFile, org?.organization_id, checkDupes]);
+  }, [peopleQ.data, org?.organization_id, checkDupes]);
+
+  // ── Step 1 handler ──
+  const onPickFile = useCallback(async (f: File) => {
+    const okExt = ALLOWED_EXT.some((e) => f.name.toLowerCase().endsWith(e));
+    if (!okExt) {
+      toast.error("Historical timesheet import only accepts CSV or Excel (.csv, .xlsx, .xls).");
+      return;
+    }
+    if (f.size > MAX_BYTES) {
+      toast.error(`${f.name} is larger than 25 MB.`);
+      return;
+    }
+    if (!peopleQ.data) {
+      toast.error("Still loading staff and clients — try again in a moment.");
+      return;
+    }
+    try {
+      const p = await parseFile(f);
+      if (p.headers.length === 0 || p.rows.length === 0) {
+        toast.error("That file didn't contain any readable rows.");
+        return;
+      }
+      const check = validateTemplateHeaders(p.headers);
+      if (!check.ok) {
+        toast.error(check.message);
+        return;
+      }
+      setFile(f);
+      setParsed(p);
+      buildFromParsed(p);
+    } catch (e) {
+      toast.error(`Couldn't read ${f.name}: ${(e as Error).message}`);
+    }
+  }, [peopleQ.data, buildFromParsed]);
+
 
 
   // Actions on review rows
@@ -610,7 +538,7 @@ export function TimesheetsImportWizard() {
     },
     onSuccess: (res) => {
       setCommitted({ inserted: res.inserted, staffCount: res.staffCount ?? 0 });
-      setStep(4);
+      setStep(3);
       toast.success(`Submitted ${res.inserted} historical timesheet${res.inserted === 1 ? "" : "s"} to staff for confirmation.`);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -625,11 +553,10 @@ export function TimesheetsImportWizard() {
           <div>
             <div className="font-semibold text-amber-800">Historical timesheets — imported from another platform</div>
             <p className="mt-1 text-muted-foreground">
-              This import runs in four explicit stages: <strong>upload &amp; parse</strong>, <strong>admin review</strong>,
-              <strong> submit to staff</strong>, and <strong>staff confirmation</strong>. Nothing moves forward without a
-              deliberate action. Rows are permanently marked as historical imports so nobody mistakes them for live clock
-              punches, and staff never see anything until you (the admin) explicitly submit it to them. This flow never
-              creates new staff or clients — every row must match someone who already exists.
+              Fill in the six-column template below, upload it, review each row, and submit. Nothing moves forward
+              without a deliberate action. Rows are permanently marked as historical imports so nobody mistakes them
+              for live clock punches, and staff never see anything until you (the admin) explicitly submit it to
+              them. This flow never creates new staff or clients — every row must match someone who already exists.
             </p>
           </div>
         </div>
@@ -642,25 +569,7 @@ export function TimesheetsImportWizard() {
         <UploadStep onPick={onPickFile} />
       )}
 
-      {step === 2 && parsed && mapping && (
-        <MapStep
-          parsed={parsed}
-          mapping={mapping}
-          onChange={setMapping}
-          wholeFile={wholeFile}
-          onWholeFileChange={setWholeFile}
-          suggestions={suggestions}
-          suggesting={suggesting}
-          people={peopleQ.data ?? { staff: [], clients: [] }}
-          onBack={() => { setStep(1); setParsed(null); setMapping(null); setFile(null); setWholeFile({ staffId: null, clientId: null }); setSuggestions(null); }}
-          onNext={buildReviewRows}
-          peopleReady={!!peopleQ.data}
-          fileName={file?.name ?? ""}
-        />
-      )}
-
-
-      {step === 3 && peopleQ.data && (
+      {step === 2 && peopleQ.data && (
         <ReviewStep
           rows={rows}
           ready={readyRows}
@@ -677,18 +586,18 @@ export function TimesheetsImportWizard() {
           onSkip={skipRow}
           onUnskip={unskipRow}
           onDownloadSkipped={downloadSkipped}
-          onBack={() => setStep(2)}
+          onBack={() => { setStep(1); setParsed(null); setFile(null); setRows([]); }}
           onCommit={() => commit.mutate()}
           committing={commit.isPending}
         />
       )}
 
-      {step === 4 && committed && (
+      {step === 3 && committed && (
         <DoneStep
           inserted={committed.inserted}
           staffCount={committed.staffCount}
           onAnother={() => {
-            setStep(1); setFile(null); setParsed(null); setMapping(null); setRows([]); setCommitted(null);
+            setStep(1); setFile(null); setParsed(null); setRows([]); setCommitted(null);
           }}
           onArchive={() => navigate({ to: "/dashboard/evv-archive" })}
         />
@@ -697,17 +606,13 @@ export function TimesheetsImportWizard() {
   );
 }
 
+
 // ─── Stepper ───────────────────────────────────────────────────────────────
-function Stepper({ step }: { step: 1 | 2 | 3 | 4 }) {
-  // Wizard steps map onto the four workflow stages:
-  //   Upload + Map columns  = Stage 1 (upload & parse / match)
-  //   Match & review        = Stage 2 (admin review; nothing is written yet)
-  //   Submitted             = Stage 3 landed; staff now own Stage 4 (confirmation)
+function Stepper({ step }: { step: 1 | 2 | 3 }) {
   const items = [
-    { n: 1, label: "Upload" },
-    { n: 2, label: "Map columns" },
-    { n: 3, label: "Admin review" },
-    { n: 4, label: "Submitted to staff" },
+    { n: 1, label: "Upload template" },
+    { n: 2, label: "Admin review" },
+    { n: 3, label: "Submitted to staff" },
   ];
   return (
     <ol className="flex items-center gap-2 text-sm">
@@ -733,274 +638,69 @@ function Stepper({ step }: { step: 1 | 2 | 3 | 4 }) {
 // ─── Step 1 ────────────────────────────────────────────────────────────────
 function UploadStep({ onPick }: { onPick: (f: File) => void }) {
   const [dragging, setDragging] = useState(false);
-  return (
-    <div
-      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={(e) => {
-        e.preventDefault(); setDragging(false);
-        const f = e.dataTransfer.files?.[0];
-        if (f) onPick(f);
-      }}
-      className={`rounded-2xl border-2 border-dashed p-10 text-center transition ${
-        dragging ? "border-primary bg-primary/5" : "border-border bg-card"
-      }`}
-    >
-      <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
-      <p className="mt-3 font-medium">Drop a CSV or Excel file</p>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Only spreadsheets (.csv, .xlsx, .xls). Up to 25 MB. PDFs and images aren't used for this import type — the data is already in columns.
-      </p>
-      <div className="mt-4">
-        <input
-          id="ts-import-file"
-          type="file"
-          accept=".csv,.xlsx,.xls"
-          className="hidden"
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick(f); }}
-        />
-        <label htmlFor="ts-import-file">
-          <Button variant="outline" asChild><span>Choose file</span></Button>
-        </label>
-      </div>
-    </div>
-  );
-}
-
-// ─── Step 2 ────────────────────────────────────────────────────────────────
-const FIELD_LABELS: Record<FieldKey, { label: string; required: boolean; hint: string }> = {
-  staff: { label: "Staff member", required: true, hint: "Column holding the staff name" },
-  client: { label: "Client", required: true, hint: "Column holding the client name" },
-  date: { label: "Date", required: true, hint: "Shift date (skipped if clock-in already includes a date)" },
-  clock_in: { label: "Clock in", required: true, hint: "Time or date+time the shift started" },
-  clock_out: { label: "Clock out", required: true, hint: "Time or date+time the shift ended" },
-  notes: { label: "Notes", required: false, hint: "Free-text note (optional)" },
-  service_code: { label: "Service code", required: false, hint: "Billing code (optional — defaults to HISTORICAL)" },
-};
-
-function MapStep({
-  parsed, mapping, onChange,
-  wholeFile, onWholeFileChange, suggestions, suggesting, people,
-  onBack, onNext, peopleReady, fileName,
-}: {
-  parsed: ParsedFile;
-  mapping: Mapping;
-  onChange: (m: Mapping) => void;
-  wholeFile: WholeFile;
-  onWholeFileChange: (w: WholeFile) => void;
-  suggestions: Record<FieldKey, FieldSuggestion> | null;
-  suggesting: boolean;
-  people: { staff: Person[]; clients: Person[] };
-  onBack: () => void;
-  onNext: () => void;
-  peopleReady: boolean;
-  fileName: string;
-}) {
-  const staffOk = !!mapping.staff || !!wholeFile.staffId;
-  const clientOk = !!mapping.client || !!wholeFile.clientId;
-  const canNext = staffOk && clientOk && mapping.clock_in && mapping.clock_out &&
-    (mapping.singleDateTimeIn || mapping.date);
-
-  const needsWholeStaff = suggestions?.staff?.whole_file_needed === true;
-  const needsWholeClient = suggestions?.client?.whole_file_needed === true;
-
+  const onDownloadCsv = () => {
+    triggerDownload(
+      new Blob([buildTemplateCsv()], { type: "text/csv" }),
+      "historical-timesheets-template.csv",
+    );
+  };
+  const onDownloadXlsx = () => {
+    triggerDownload(buildTemplateXlsxBlob(), "historical-timesheets-template.xlsx");
+  };
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-border bg-card p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <div className="text-sm font-semibold">Map your columns</div>
-            <div className="text-xs text-muted-foreground">
-              File: {fileName} · {parsed.rows.length} row{parsed.rows.length === 1 ? "" : "s"} · {parsed.headers.length} columns detected
+        <div className="flex items-start gap-2">
+          <FileSpreadsheet className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <div className="flex-1">
+            <div className="text-sm font-semibold">Step 1 — download the template, then fill it in</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              The importer only accepts files matching this exact template. Six columns, in this order:{" "}
+              <span className="font-medium text-foreground">{TEMPLATE_HEADERS.join(", ")}</span>. Clock in and clock
+              out should each be a single cell holding both the date and the time (e.g. <code>2026-05-14 08:00</code>
+              {" "}or <code>5/14/2026 8:00 AM</code>). Notes is optional; every other column is required per row.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={onDownloadCsv}>
+                <Download className="mr-1.5 h-3.5 w-3.5" /> Download template (CSV)
+              </Button>
+              <Button variant="outline" size="sm" onClick={onDownloadXlsx}>
+                <Download className="mr-1.5 h-3.5 w-3.5" /> Download template (Excel)
+              </Button>
             </div>
           </div>
-          <div className="text-[11px] text-muted-foreground">
-            {suggesting
-              ? <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> NECTAR is reading your columns…</span>
-              : suggestions
-                ? <span>NECTAR suggested this mapping. Review and correct before continuing.</span>
-                : <span>Automatic mapping unavailable — map manually.</span>}
-          </div>
-        </div>
-
-        <WholeFileConstants
-          people={people}
-          wholeFile={wholeFile}
-          onChange={onWholeFileChange}
-          needsWholeStaff={needsWholeStaff}
-          needsWholeClient={needsWholeClient}
-        />
-
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
-          {(Object.keys(FIELD_LABELS) as FieldKey[]).map((k) => {
-            const meta = FIELD_LABELS[k];
-            if (k === "date" && mapping.singleDateTimeIn) return null;
-            const s = suggestions?.[k];
-            const disabledForWhole =
-              (k === "staff" && !!wholeFile.staffId) || (k === "client" && !!wholeFile.clientId);
-            return (
-              <div key={k} className="space-y-1">
-                <div className="flex items-center gap-1 text-xs font-medium">
-                  {meta.label}
-                  {meta.required && <span className="text-destructive">*</span>}
-                  <span className="text-muted-foreground" title={meta.hint}>
-                    <HelpCircle className="h-3 w-3" />
-                  </span>
-                  {disabledForWhole && (
-                    <Badge variant="outline" className="ml-1 text-[10px]">Using whole-file value</Badge>
-                  )}
-                </div>
-                <Select
-                  value={mapping[k] ?? "__none__"}
-                  onValueChange={(v) => onChange({ ...mapping, [k]: v === "__none__" ? null : v })}
-                  disabled={disabledForWhole}
-                >
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Not mapped" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">— not mapped —</SelectItem>
-                    {parsed.headers.map((h) => (
-                      <SelectItem key={h} value={h}>{h}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {s && !disabledForWhole && <SuggestionHint suggestion={s} />}
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="mt-4 space-y-1.5 rounded-md border border-border/60 bg-muted/30 p-3 text-xs">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={mapping.singleDateTimeIn}
-              onChange={(e) => onChange({ ...mapping, singleDateTimeIn: e.target.checked })}
-            />
-            The <strong>Clock in</strong> column already contains both the date and the time
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={mapping.singleDateTimeOut}
-              onChange={(e) => onChange({ ...mapping, singleDateTimeOut: e.target.checked })}
-            />
-            The <strong>Clock out</strong> column already contains both the date and the time
-          </label>
         </div>
       </div>
 
-      {parsed.rows.length > 0 && (
-        <SamplePreview parsed={parsed} mapping={mapping} />
-      )}
-
-      <div className="flex justify-between">
-        <Button variant="ghost" onClick={onBack}><ArrowLeft className="mr-1.5 h-4 w-4" /> Back</Button>
-        <Button onClick={onNext} disabled={!canNext || !peopleReady || suggesting}>
-          {(!peopleReady || suggesting) && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-          Match & review <ArrowRight className="ml-1.5 h-4 w-4" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function SuggestionHint({ suggestion }: { suggestion: FieldSuggestion }) {
-  const color =
-    suggestion.confidence === "high" ? "text-emerald-700"
-      : suggestion.confidence === "medium" ? "text-amber-700"
-        : "text-muted-foreground";
-  if (suggestion.whole_file_needed) {
-    return (
-      <div className="text-[11px] text-destructive">
-        NECTAR: no column in this file contains this value — use the whole-file setting above.
-      </div>
-    );
-  }
-  if (!suggestion.column) {
-    return <div className="text-[11px] text-muted-foreground">NECTAR: no confident match — pick manually if applicable.</div>;
-  }
-  return (
-    <div className={`text-[11px] ${color}`}>
-      NECTAR ({suggestion.confidence}): {suggestion.reason}
-    </div>
-  );
-}
-
-function WholeFileConstants({
-  people, wholeFile, onChange, needsWholeStaff, needsWholeClient,
-}: {
-  people: { staff: Person[]; clients: Person[] };
-  wholeFile: WholeFile;
-  onChange: (w: WholeFile) => void;
-  needsWholeStaff: boolean;
-  needsWholeClient: boolean;
-}) {
-  const [staffOpen, setStaffOpen] = useState(needsWholeStaff);
-  const [clientOpen, setClientOpen] = useState(needsWholeClient);
-  return (
-    <div className="rounded-md border border-border bg-muted/30 p-3">
-      <div className="text-xs font-medium">This whole file is for one person?</div>
-      <p className="text-[11px] text-muted-foreground">
-        Some exports don't have a staff or client column at all — the whole sheet belongs to one person by
-        context. If that's the case here, pick the person below and the column mapping for that field will be
-        skipped for every row.
-      </p>
-      <div className="mt-2 grid gap-2 md:grid-cols-2">
-        <div>
-          <label className="flex items-center gap-1 text-[11px] font-medium">
-            <input
-              type="checkbox"
-              checked={staffOpen || !!wholeFile.staffId}
-              onChange={(e) => {
-                const on = e.target.checked;
-                setStaffOpen(on);
-                if (!on) onChange({ ...wholeFile, staffId: null });
-              }}
-            />
-            Entire file is for one staff member
-            {needsWholeStaff && <Badge variant="outline" className="ml-1 border-destructive/40 text-destructive text-[10px]">Required</Badge>}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault(); setDragging(false);
+          const f = e.dataTransfer.files?.[0];
+          if (f) onPick(f);
+        }}
+        className={`rounded-2xl border-2 border-dashed p-10 text-center transition ${
+          dragging ? "border-primary bg-primary/5" : "border-border bg-card"
+        }`}
+      >
+        <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
+        <p className="mt-3 font-medium">Drop the filled-in template here</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Accepts .csv, .xlsx, or .xls up to 25 MB. Files that don't match the template's six columns will be
+          rejected before any rows are imported.
+        </p>
+        <div className="mt-4">
+          <input
+            id="ts-import-file"
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick(f); }}
+          />
+          <label htmlFor="ts-import-file">
+            <Button variant="outline" asChild><span>Choose file</span></Button>
           </label>
-          {(staffOpen || wholeFile.staffId) && (
-            <Select
-              value={wholeFile.staffId ?? ""}
-              onValueChange={(v) => onChange({ ...wholeFile, staffId: v || null })}
-            >
-              <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue placeholder="Pick a staff member" /></SelectTrigger>
-              <SelectContent>
-                {people.staff.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-        <div>
-          <label className="flex items-center gap-1 text-[11px] font-medium">
-            <input
-              type="checkbox"
-              checked={clientOpen || !!wholeFile.clientId}
-              onChange={(e) => {
-                const on = e.target.checked;
-                setClientOpen(on);
-                if (!on) onChange({ ...wholeFile, clientId: null });
-              }}
-            />
-            Entire file is about one client
-            {needsWholeClient && <Badge variant="outline" className="ml-1 border-destructive/40 text-destructive text-[10px]">Required</Badge>}
-          </label>
-          {(clientOpen || wholeFile.clientId) && (
-            <Select
-              value={wholeFile.clientId ?? ""}
-              onValueChange={(v) => onChange({ ...wholeFile, clientId: v || null })}
-            >
-              <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue placeholder="Pick a client" /></SelectTrigger>
-              <SelectContent>
-                {people.clients.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
         </div>
       </div>
     </div>
@@ -1008,53 +708,6 @@ function WholeFileConstants({
 }
 
 
-function SamplePreview({ parsed, mapping }: { parsed: ParsedFile; mapping: Mapping }) {
-  const sample = parsed.rows.slice(0, 3);
-  const cells = (row: Record<string, string>) => ({
-    staff: mapping.staff ? row[mapping.staff] : "—",
-    client: mapping.client ? row[mapping.client] : "—",
-    date: mapping.date ? row[mapping.date] : (mapping.singleDateTimeIn ? "(from clock in)" : "—"),
-    inTime: mapping.clock_in ? row[mapping.clock_in] : "—",
-    outTime: mapping.clock_out ? row[mapping.clock_out] : "—",
-    notes: mapping.notes ? row[mapping.notes] : "",
-  });
-  return (
-    <div className="rounded-2xl border border-border bg-card p-4">
-      <div className="mb-2 text-sm font-semibold">Preview (first 3 rows)</div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead className="text-muted-foreground">
-            <tr>
-              <th className="px-2 py-1 text-left">Staff</th>
-              <th className="px-2 py-1 text-left">Client</th>
-              <th className="px-2 py-1 text-left">Date</th>
-              <th className="px-2 py-1 text-left">In</th>
-              <th className="px-2 py-1 text-left">Out</th>
-              <th className="px-2 py-1 text-left">Notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sample.map((r, i) => {
-              const c = cells(r);
-              return (
-                <tr key={i} className="border-t border-border/60">
-                  <td className="px-2 py-1">{c.staff}</td>
-                  <td className="px-2 py-1">{c.client}</td>
-                  <td className="px-2 py-1">{c.date}</td>
-                  <td className="px-2 py-1">{c.inTime}</td>
-                  <td className="px-2 py-1">{c.outTime}</td>
-                  <td className="px-2 py-1 truncate max-w-[12rem]">{c.notes}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-// ─── Step 3 ────────────────────────────────────────────────────────────────
 function ReviewStep({
   rows, ready, ambiguous, unmatched, skipped, people,
   repeatedIssues, dupeChecking,
@@ -1148,7 +801,7 @@ function ReviewStep({
       </Tabs>
 
       <div className="flex flex-col items-stretch gap-2 md:flex-row md:items-center md:justify-between">
-        <Button variant="ghost" onClick={onBack}><ArrowLeft className="mr-1.5 h-4 w-4" /> Back to mapping</Button>
+        <Button variant="ghost" onClick={onBack}><ArrowLeft className="mr-1.5 h-4 w-4" /> Back to upload</Button>
         <div className="flex flex-col items-end gap-1">
           <Button onClick={onCommit} disabled={committing || ready.length === 0}>
             {committing && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}

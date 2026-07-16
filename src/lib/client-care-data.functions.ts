@@ -233,7 +233,7 @@ export const getClientCareData = createServerFn({ method: "GET" })
       organization_id: row.organization_id ?? null,
       first_name: row.first_name ?? null,
       last_name: row.last_name ?? null,
-      preferred_name: row.preferred_name ?? null,
+      preferred_name: null,
       date_of_birth: row.date_of_birth ?? null,
       admission_date: row.admission_date ?? null,
       discharge_date: row.discharge_date ?? null,

@@ -182,19 +182,14 @@ function tryParseDateTime(dateStr: string, timeStr: string | null, singleField: 
 export function TimesheetsImportWizard() {
   const { data: org } = useCurrentOrg();
   const navigate = useNavigate();
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [file, setFile] = useState<File | null>(null);
   const [parsed, setParsed] = useState<ParsedFile | null>(null);
-  const [mapping, setMapping] = useState<Mapping | null>(null);
-  const [wholeFile, setWholeFile] = useState<WholeFile>({ staffId: null, clientId: null });
-  const [suggestions, setSuggestions] = useState<Record<FieldKey, FieldSuggestion> | null>(null);
-  const [suggesting, setSuggesting] = useState(false);
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [committed, setCommitted] = useState<{ inserted: number; staffCount: number } | null>(null);
 
   const createJob = useServerFn(createTimesheetImportJob);
   const commitRows = useServerFn(importHistoricalTimesheets);
-  const suggestMap = useServerFn(suggestImportColumnMapping);
   const checkDupes = useServerFn(checkImportDuplicates);
   const [dupeChecking, setDupeChecking] = useState(false);
 
@@ -240,99 +235,32 @@ export function TimesheetsImportWizard() {
     },
   });
 
-  // ── Step 1 handlers ──
-  const onPickFile = useCallback(async (f: File) => {
-    const okExt = ALLOWED_EXT.some((e) => f.name.toLowerCase().endsWith(e));
-    if (!okExt) {
-      toast.error("Historical timesheet import only accepts CSV or Excel (.csv, .xlsx, .xls).");
-      return;
-    }
-    if (f.size > MAX_BYTES) {
-      toast.error(`${f.name} is larger than 25 MB.`);
-      return;
-    }
-    try {
-      const p = await parseFile(f);
-      if (p.headers.length === 0 || p.rows.length === 0) {
-        toast.error("That file didn't contain any readable rows.");
-        return;
-      }
-      setFile(f);
-      setParsed(p);
-      setMapping({
-        staff: null, client: null, date: null, clock_in: null, clock_out: null,
-        notes: null, service_code: null, singleDateTimeIn: false, singleDateTimeOut: false,
-      });
-      setWholeFile({ staffId: null, clientId: null });
-      setSuggestions(null);
-      setStep(2);
-      if (org?.organization_id) {
-        setSuggesting(true);
-        try {
-          const res = await suggestMap({
-            data: {
-              organization_id: org.organization_id,
-              mode: "timesheets",
-              file_name: p.fileName,
-              columns: sampleColumns(p),
-            },
-          });
-          const s = res.mapping as Record<FieldKey, FieldSuggestion>;
-          setSuggestions(s);
-          setMapping((prev) => ({
-            ...(prev ?? {
-              staff: null, client: null, date: null, clock_in: null, clock_out: null,
-              notes: null, service_code: null, singleDateTimeIn: false, singleDateTimeOut: false,
-            }),
-            staff: s.staff?.column ?? null,
-            client: s.client?.column ?? null,
-            date: s.date?.column ?? null,
-            clock_in: s.clock_in?.column ?? null,
-            clock_out: s.clock_out?.column ?? null,
-            notes: s.notes?.column ?? null,
-            service_code: s.service_code?.column ?? null,
-          }));
-        } catch (err) {
-          toast.error(`NECTAR couldn't suggest a mapping: ${(err as Error).message}. You can map columns manually.`);
-        } finally {
-          setSuggesting(false);
-        }
-      }
-    } catch (e) {
-      toast.error(`Couldn't read ${f.name}: ${(e as Error).message}`);
-    }
-  }, [org?.organization_id, suggestMap]);
-
-
-  // ── Step 3 build ──
-  const buildReviewRows = useCallback(() => {
-    if (!parsed || !mapping || !peopleQ.data) return;
+  // Build review rows directly from the fixed template columns. Called
+  // once peopleQ.data resolves after a successful upload.
+  const buildFromParsed = useCallback((p: ParsedFile) => {
+    if (!peopleQ.data) return;
     const { staff, clients } = peopleQ.data;
 
-    const wholeStaff = wholeFile.staffId ? staff.find((s) => s.id === wholeFile.staffId) ?? null : null;
-    const wholeClient = wholeFile.clientId ? clients.find((c) => c.id === wholeFile.clientId) ?? null : null;
+    const result: ReviewRow[] = p.rows.map((raw, idx) => {
+      const staffLabel = raw["Staff Name"] ?? "";
+      const clientLabel = raw["Client Name"] ?? "";
+      const clockInStr = raw["Clock In"] ?? "";
+      const clockOutStr = raw["Clock Out"] ?? "";
+      const serviceCode = (raw["Service Code"] ?? "").toUpperCase();
+      const notes = raw["Notes"] ?? "";
 
-    const result: ReviewRow[] = parsed.rows.map((raw, idx) => {
-      const staffLabel = wholeStaff ? wholeStaff.label : (mapping.staff ? raw[mapping.staff] ?? "" : "");
-      const clientLabel = wholeClient ? wholeClient.label : (mapping.client ? raw[mapping.client] ?? "" : "");
-      const dateStr = mapping.date ? raw[mapping.date] ?? "" : "";
-      const clockInStr = mapping.clock_in ? raw[mapping.clock_in] ?? "" : "";
-      const clockOutStr = mapping.clock_out ? raw[mapping.clock_out] ?? "" : "";
-      const notes = mapping.notes ? raw[mapping.notes] ?? "" : "";
-      const serviceCode = mapping.service_code ? (raw[mapping.service_code] ?? "").toUpperCase() : "";
+      const staffCandidates = findCandidates(staff, staffLabel);
+      const clientCandidates = findCandidates(clients, clientLabel);
 
-      const staffCandidates = wholeStaff ? [wholeStaff] : findCandidates(staff, staffLabel);
-      const clientCandidates = wholeClient ? [wholeClient] : findCandidates(clients, clientLabel);
-
-      const inDate = tryParseDateTime(mapping.singleDateTimeIn ? clockInStr : dateStr, clockInStr, mapping.singleDateTimeIn);
-      const outDate = tryParseDateTime(mapping.singleDateTimeOut ? clockOutStr : dateStr, clockOutStr, mapping.singleDateTimeOut);
+      const inDate = tryParseDateTime(clockInStr, null, true);
+      const outDate = tryParseDateTime(clockOutStr, null, true);
 
       let status: MatchStatus;
       let reason: string | null = null;
-      let staffId: string | null = wholeStaff?.id ?? null;
-      let clientId: string | null = wholeClient?.id ?? null;
+      let staffId: string | null = null;
+      let clientId: string | null = null;
 
-      if (!staffLabel || !clientLabel || !dateStr || !clockInStr || !clockOutStr) {
+      if (!staffLabel || !clientLabel || !clockInStr || !clockOutStr) {
         status = "invalid";
         reason = "missing required cells";
       } else if (!inDate || !outDate) {
@@ -352,18 +280,20 @@ export function TimesheetsImportWizard() {
       } else if (staffCandidates.length > 1 || clientCandidates.length > 1) {
         status = "ambiguous";
         reason = "multiple possible matches";
-        if (!staffId && staffCandidates.length === 1) staffId = staffCandidates[0].id;
-        if (!clientId && clientCandidates.length === 1) clientId = clientCandidates[0].id;
+        if (staffCandidates.length === 1) staffId = staffCandidates[0].id;
+        if (clientCandidates.length === 1) clientId = clientCandidates[0].id;
       } else {
         status = "matched";
-        staffId = staffId ?? staffCandidates[0].id;
-        clientId = clientId ?? clientCandidates[0].id;
+        staffId = staffCandidates[0].id;
+        clientId = clientCandidates[0].id;
       }
 
       return {
         idx,
         raw,
-        staffLabel, clientLabel, dateStr, clockInStr, clockOutStr, notes, serviceCode,
+        staffLabel, clientLabel,
+        dateStr: inDate ? inDate.toLocaleDateString() : clockInStr,
+        clockInStr, clockOutStr, notes, serviceCode,
         staffCandidates, clientCandidates,
         staffId, clientId,
         clockInIso: inDate ? inDate.toISOString() : null,
@@ -375,7 +305,7 @@ export function TimesheetsImportWizard() {
       };
     });
     setRows(result);
-    setStep(3);
+    setStep(2);
 
     // Duplicate check for every fully-resolved row (staff + client + times).
     // Runs async against evv_timesheets; hits are flagged and auto-skipped
@@ -419,7 +349,42 @@ export function TimesheetsImportWizard() {
         })
         .finally(() => setDupeChecking(false));
     }
-  }, [parsed, mapping, peopleQ.data, wholeFile, org?.organization_id, checkDupes]);
+  }, [peopleQ.data, org?.organization_id, checkDupes]);
+
+  // ── Step 1 handler ──
+  const onPickFile = useCallback(async (f: File) => {
+    const okExt = ALLOWED_EXT.some((e) => f.name.toLowerCase().endsWith(e));
+    if (!okExt) {
+      toast.error("Historical timesheet import only accepts CSV or Excel (.csv, .xlsx, .xls).");
+      return;
+    }
+    if (f.size > MAX_BYTES) {
+      toast.error(`${f.name} is larger than 25 MB.`);
+      return;
+    }
+    if (!peopleQ.data) {
+      toast.error("Still loading staff and clients — try again in a moment.");
+      return;
+    }
+    try {
+      const p = await parseFile(f);
+      if (p.headers.length === 0 || p.rows.length === 0) {
+        toast.error("That file didn't contain any readable rows.");
+        return;
+      }
+      const check = validateTemplateHeaders(p.headers);
+      if (!check.ok) {
+        toast.error(check.message);
+        return;
+      }
+      setFile(f);
+      setParsed(p);
+      buildFromParsed(p);
+    } catch (e) {
+      toast.error(`Couldn't read ${f.name}: ${(e as Error).message}`);
+    }
+  }, [peopleQ.data, buildFromParsed]);
+
 
 
   // Actions on review rows

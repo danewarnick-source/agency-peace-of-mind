@@ -200,10 +200,12 @@ export function TimesheetsImportWizard() {
     enabled: !!org?.organization_id,
     queryKey: ["ts-import-people", org?.organization_id],
     queryFn: async () => {
-      const [staffRes, clientsRes] = await Promise.all([
+      // NOTE: no FK between organization_members and profiles (both key off
+      // auth.users.id). PostgREST embed fails — must be two queries + JS join.
+      const [membersRes, clientsRes] = await Promise.all([
         supabase
           .from("organization_members")
-          .select("user_id, profiles:profiles!inner(id, first_name, last_name, full_name)")
+          .select("user_id")
           .eq("organization_id", org!.organization_id)
           .eq("active", true),
         supabase
@@ -211,20 +213,34 @@ export function TimesheetsImportWizard() {
           .select("id, first_name, last_name")
           .eq("organization_id", org!.organization_id),
       ]);
-      if (staffRes.error) throw staffRes.error;
+      if (membersRes.error) throw membersRes.error;
       if (clientsRes.error) throw clientsRes.error;
-      type S = { profiles: { id: string; first_name: string | null; last_name: string | null; full_name: string | null } };
-      const staff: Person[] = ((staffRes.data ?? []) as unknown as S[])
-        .map((m) => m.profiles)
-        .filter(Boolean)
-        .map((p) => ({
-          id: p.id,
-          label:
-            (p.full_name?.trim()) ||
-            [p.first_name, p.last_name].filter(Boolean).join(" ").trim() ||
-            "Staff",
-          norms: personNorms(p.first_name ?? "", p.last_name ?? "", p.full_name),
-        }));
+
+      const userIds = Array.from(
+        new Set((membersRes.data ?? []).map((m: { user_id: string }) => m.user_id)),
+      );
+      let profileRows: Array<{
+        id: string;
+        first_name: string | null;
+        last_name: string | null;
+        full_name: string | null;
+      }> = [];
+      if (userIds.length > 0) {
+        const profRes = await supabase
+          .from("profiles")
+          .select("id, first_name, last_name, full_name")
+          .in("id", userIds);
+        if (profRes.error) throw profRes.error;
+        profileRows = (profRes.data ?? []) as typeof profileRows;
+      }
+      const staff: Person[] = profileRows.map((p) => ({
+        id: p.id,
+        label:
+          (p.full_name?.trim()) ||
+          [p.first_name, p.last_name].filter(Boolean).join(" ").trim() ||
+          "Staff",
+        norms: personNorms(p.first_name ?? "", p.last_name ?? "", p.full_name),
+      }));
       const clients: Person[] = ((clientsRes.data ?? []) as Array<{
         id: string; first_name: string; last_name: string;
       }>).map((c) => ({
@@ -235,6 +251,7 @@ export function TimesheetsImportWizard() {
       return { staff, clients };
     },
   });
+
 
   // Build review rows directly from the fixed template columns. Called
   // once peopleQ.data resolves after a successful upload.
@@ -364,7 +381,11 @@ export function TimesheetsImportWizard() {
       return;
     }
     if (!peopleQ.data) {
-      toast.error("Still loading staff and clients — try again in a moment.");
+      if (peopleQ.isError) {
+        toast.error(`Couldn't load staff and clients: ${(peopleQ.error as Error)?.message ?? "unknown error"}`);
+      } else {
+        toast.error("Still loading staff and clients — try again in a moment.");
+      }
       return;
     }
     try {

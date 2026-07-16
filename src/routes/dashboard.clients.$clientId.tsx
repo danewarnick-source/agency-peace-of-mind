@@ -620,7 +620,7 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
           />
           {editingGoals ? (
             <div className="space-y-2">
-              <GoalsEditor goals={draftGoals ?? []} onChange={setDraftGoals} clientId={clientId} />
+              <GoalsEditor goals={draftGoals ?? []} onChange={setDraftGoals} />
               <div className="flex justify-end gap-2">
                 <Button
                   type="button"

@@ -27,7 +27,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Sparkles, Loader2, CheckCircle2, RefreshCw, Pencil, Trash2, Plus, ArrowUp, ArrowDown, Shield, BookOpen, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { setClientCaseload } from "@/lib/scheduler/setup.functions";
-import { useClientBillingCodes } from "@/hooks/use-client-billing-codes";
 
 type Training = {
   id: string;
@@ -367,7 +366,7 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
         </div>
 
         {editingGoals && draftGoals !== null ? (
-          <GoalsEditor goals={draftGoals} onChange={setDraftGoals} clientId={clientId} />
+          <GoalsEditor goals={draftGoals} onChange={setDraftGoals} />
         ) : (training.goals ?? []).length > 0 ? (
           <GoalsView goals={training.goals ?? []} />
         ) : (
@@ -668,14 +667,7 @@ export function GoalsView({ goals }: { goals: CSTGoal[] }) {
 
 
 // ── Goals editor ─────────────────────────────────────────────────────────────
-export function GoalsEditor({ goals, onChange, clientId }: { goals: CSTGoal[]; onChange: (next: CSTGoal[]) => void; clientId: string }) {
-  const { data: billingCodes, isLoading: codesLoading } = useClientBillingCodes(clientId);
-  const availableCodes = useMemo(() => {
-    const set = new Set<string>();
-    (billingCodes ?? []).forEach((c) => { if (c.service_code) set.add(c.service_code.toUpperCase()); });
-    return Array.from(set).sort();
-  }, [billingCodes]);
-
+export function GoalsEditor({ goals, onChange }: { goals: CSTGoal[]; onChange: (next: CSTGoal[]) => void }) {
   function addGoal() {
     onChange([...goals, {
       id: `s_${Math.random().toString(36).slice(2, 10)}`,
@@ -687,11 +679,6 @@ export function GoalsEditor({ goals, onChange, clientId }: { goals: CSTGoal[]; o
     const next = [...goals];
     next[idx] = { ...next[idx], ...patch };
     onChange(next);
-  }
-  function toggleCode(idx: number, code: string) {
-    const current = goals[idx].job_codes ?? [];
-    const has = current.includes(code);
-    patchGoal(idx, { job_codes: has ? current.filter((c) => c !== code) : [...current, code] });
   }
 
   return (
@@ -731,44 +718,18 @@ export function GoalsEditor({ goals, onChange, clientId }: { goals: CSTGoal[]; o
               placeholder="Measures, frequency, target, timeline (verbatim)"
             />
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <label className="text-xs font-medium">Service codes</label>
-            {codesLoading ? (
-              <p className="text-[11px] text-muted-foreground">Loading authorized codes…</p>
-            ) : availableCodes.length === 0 ? (
-              <p className="text-[11px] text-muted-foreground">
-                No authorized service codes on file. Add them under Billing before assigning goals to codes.
-              </p>
-            ) : (
-              <>
-                <div className="flex flex-wrap gap-1.5">
-                  {availableCodes.map((code) => {
-                    const selected = g.job_codes.includes(code);
-                    return (
-                      <button
-                        key={code}
-                        type="button"
-                        onClick={() => toggleCode(idx, code)}
-                        className="focus:outline-none"
-                        aria-pressed={selected}
-                      >
-                        <Badge
-                          variant={selected ? "default" : "outline"}
-                          className="cursor-pointer font-mono text-[11px]"
-                        >
-                          {code}
-                        </Badge>
-                      </button>
-                    );
-                  })}
-                </div>
-                {g.job_codes.length === 0 && (
-                  <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
-                    No codes selected — this goal won't appear for any staff on any shift until you pick at least one.
-                  </p>
-                )}
-              </>
-            )}
+            <Input
+              value={g.job_codes.join(", ")}
+              onChange={(e) => patchGoal(idx, {
+                job_codes: e.target.value.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean),
+              })}
+              placeholder="e.g. SLN, DSI"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Staff only see this goal during shifts clocked under one of these codes.
+            </p>
           </div>
         </div>
       ))}

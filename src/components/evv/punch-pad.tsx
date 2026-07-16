@@ -922,7 +922,7 @@ export function PunchPad({
   const canSubmitCompliance =
     hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk &&
     longShiftOk && triggersResolved && medDosesResolved && !busy &&
-    (!correctionOpen || correctionValid);
+    (!correctionOpen || !correctionHasChange || correctionValid);
 
 
   function openCompliance() {

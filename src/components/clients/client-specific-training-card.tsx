@@ -668,7 +668,14 @@ export function GoalsView({ goals }: { goals: CSTGoal[] }) {
 
 
 // ── Goals editor ─────────────────────────────────────────────────────────────
-export function GoalsEditor({ goals, onChange }: { goals: CSTGoal[]; onChange: (next: CSTGoal[]) => void }) {
+export function GoalsEditor({ goals, onChange, clientId }: { goals: CSTGoal[]; onChange: (next: CSTGoal[]) => void; clientId: string }) {
+  const { data: billingCodes, isLoading: codesLoading } = useClientBillingCodes(clientId);
+  const availableCodes = useMemo(() => {
+    const set = new Set<string>();
+    (billingCodes ?? []).forEach((c) => { if (c.service_code) set.add(c.service_code.toUpperCase()); });
+    return Array.from(set).sort();
+  }, [billingCodes]);
+
   function addGoal() {
     onChange([...goals, {
       id: `s_${Math.random().toString(36).slice(2, 10)}`,
@@ -680,6 +687,11 @@ export function GoalsEditor({ goals, onChange }: { goals: CSTGoal[]; onChange: (
     const next = [...goals];
     next[idx] = { ...next[idx], ...patch };
     onChange(next);
+  }
+  function toggleCode(idx: number, code: string) {
+    const current = goals[idx].job_codes ?? [];
+    const has = current.includes(code);
+    patchGoal(idx, { job_codes: has ? current.filter((c) => c !== code) : [...current, code] });
   }
 
   return (

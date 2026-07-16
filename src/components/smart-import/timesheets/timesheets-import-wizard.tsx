@@ -538,7 +538,7 @@ export function TimesheetsImportWizard() {
     },
     onSuccess: (res) => {
       setCommitted({ inserted: res.inserted, staffCount: res.staffCount ?? 0 });
-      setStep(4);
+      setStep(3);
       toast.success(`Submitted ${res.inserted} historical timesheet${res.inserted === 1 ? "" : "s"} to staff for confirmation.`);
     },
     onError: (e: Error) => toast.error(e.message),

@@ -179,7 +179,7 @@ export const getClientCareData = createServerFn({ method: "GET" })
       supabase
         .from("clients")
         .select(
-          "id, organization_id, first_name, last_name, preferred_name, date_of_birth, admission_date, discharge_date, medicaid_id, status, self_admin_med_support, self_admin_med_support_locked",
+          "id, organization_id, first_name, last_name, date_of_birth, admission_date, discharge_date, medicaid_id, status, self_admin_med_support, self_admin_med_support_locked",
         )
         .eq("id", clientId)
         .maybeSingle(),
@@ -233,7 +233,7 @@ export const getClientCareData = createServerFn({ method: "GET" })
       organization_id: row.organization_id ?? null,
       first_name: row.first_name ?? null,
       last_name: row.last_name ?? null,
-      preferred_name: row.preferred_name ?? null,
+      preferred_name: null,
       date_of_birth: row.date_of_birth ?? null,
       admission_date: row.admission_date ?? null,
       discharge_date: row.discharge_date ?? null,

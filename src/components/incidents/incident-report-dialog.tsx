@@ -1563,34 +1563,156 @@ export function IncidentReportDialog({
 
               {isQuestionStep && renderQuestionStep(questionIdx)}
 
-              {currentKey === "review" && (
-                <div className="space-y-4">
-                  <div className="rounded-md border border-border bg-muted/30 p-3 text-xs">
-                    <p className="font-semibold">Review before submitting</p>
-                    <p className="mt-1 text-muted-foreground">
-                      Fix any red items below. Submit becomes available once everything is resolved.
-                    </p>
-                  </div>
-
-                  {contradictions.length > 0 && (
-                    <div className="space-y-2">
-                      {contradictions.map((msg, i) => (
-                        <div key={i} className="flex items-start gap-2 rounded-md border-2 border-rose-400 bg-rose-50 p-2 text-xs text-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
-                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                          <div className="flex-1">
-                            <p className="font-medium">{msg}</p>
-                            <button type="button" className="mt-1 text-[11px] underline hover:no-underline"
-                              onClick={() => { const i2 = stepKeys.indexOf("narrative"); if (i2 >= 0) { setStep(i2); setStepError(null); } }}>
-                              Edit narrative
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+              {currentKey === "review" && (() => {
+                const hasBlockers =
+                  contradictions.length > 0 || unresolvedMustFix.length > 0 || aiReviewing;
+                const jumpTo = (key: string) => {
+                  const idx = stepKeys.indexOf(key);
+                  if (idx >= 0) { setStep(idx); setStepError(null); }
+                };
+                const fmtDT = (v: string) => {
+                  if (!v) return "";
+                  const d = new Date(v);
+                  return Number.isNaN(d.getTime()) ? v : d.toLocaleString();
+                };
+                const photos = Array.isArray(details.photos) ? (details.photos as string[]) : [];
+                const detailRows = block
+                  ? block.fields
+                      .filter((f) => f.name !== "photos")
+                      .map((f) => {
+                        const v = details[f.name];
+                        let text = "";
+                        if (Array.isArray(v)) text = v.filter(Boolean).join(", ");
+                        else if (typeof v === "string") text = v.trim();
+                        else if (v !== undefined && v !== null) text = String(v);
+                        if (f.type === "datetime" && text) text = fmtDT(text);
+                        return { label: f.label, text };
+                      })
+                      .filter((r) => r.text.length > 0)
+                  : [];
+                const Section = ({ title, editKey, children }: { title: string; editKey: string; children: React.ReactNode }) => (
+                  <div className="rounded-md border border-border bg-card p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+                      <button type="button" className="text-[11px] text-primary underline hover:no-underline"
+                        onClick={() => jumpTo(editKey)}>Edit</button>
                     </div>
-                  )}
+                    <div className="space-y-1 text-sm">{children}</div>
+                  </div>
+                );
+                const Row = ({ label, value }: { label: string; value: string }) => (
+                  value ? (
+                    <div className="grid grid-cols-[minmax(120px,max-content)_1fr] gap-2">
+                      <span className="text-xs text-muted-foreground">{label}</span>
+                      <span className="whitespace-pre-wrap break-words">{value}</span>
+                    </div>
+                  ) : null
+                );
+                return (
+                  <div className="space-y-4">
+                    <div className={
+                      hasBlockers
+                        ? "rounded-md border-2 border-amber-400 bg-amber-50 p-3 text-xs dark:bg-amber-950/30"
+                        : "rounded-md border-2 border-emerald-400 bg-emerald-50 p-3 text-xs dark:bg-emerald-950/30"
+                    }>
+                      <p className="font-semibold">
+                        {hasBlockers ? "Review before submitting" : "Ready to submit"}
+                      </p>
+                      <p className="mt-1 text-muted-foreground">
+                        {hasBlockers
+                          ? "Fix any red items below. Submit becomes available once everything is resolved."
+                          : "Review the summary below and click Submit incident report."}
+                      </p>
+                    </div>
 
-                </div>
-              )}
+                    {contradictions.length > 0 && (
+                      <div className="space-y-2">
+                        {contradictions.map((msg, i) => (
+                          <div key={i} className="flex items-start gap-2 rounded-md border-2 border-rose-400 bg-rose-50 p-2 text-xs text-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                            <div className="flex-1">
+                              <p className="font-medium">{msg}</p>
+                              <button type="button" className="mt-1 text-[11px] underline hover:no-underline"
+                                onClick={() => jumpTo("narrative")}>
+                                Edit narrative
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {unresolvedMustFix.length > 0 && (
+                      <div className="space-y-2">
+                        {unresolvedMustFix.map(({ q, i }) => (
+                          <div key={i} className="flex items-start gap-2 rounded-md border-2 border-rose-400 bg-rose-50 p-2 text-xs text-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                            <div className="flex-1">
+                              <p className="font-medium">Nectar follow-up needs an answer: {q.question}</p>
+                              <button type="button" className="mt-1 text-[11px] underline hover:no-underline"
+                                onClick={() => jumpTo(`nectar-q-${i}`)}>
+                                Answer question
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {aiReviewing && (
+                      <div className="rounded-md border border-border bg-muted/30 p-2 text-xs text-muted-foreground">
+                        Nectar is still reviewing — Submit will unlock in a moment.
+                      </div>
+                    )}
+
+                    <Section title="Who & when" editKey="who-when">
+                      <Row label="Individual" value={resolvedClientName || "—"} />
+                      <Row label="Occurred" value={fmtDT(occurredAt)} />
+                      <Row label="Discovered" value={fmtDT(discoveredAt)} />
+                    </Section>
+
+                    <Section title="Witnessed" editKey="witnessed">
+                      <Row label="Directly?" value={witnessedDirectly === "yes" ? "Yes" : witnessedDirectly === "no" ? "No" : ""} />
+                      {witnessedDirectly === "no" && <Row label="Reported by" value={reportedBy} />}
+                    </Section>
+
+                    <Section title="Where & what" editKey="where-what">
+                      <Row label="Category" value={category} />
+                      <Row label="Location" value={location} />
+                    </Section>
+
+                    <Section title="Narrative" editKey="narrative">
+                      <div className="max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words rounded border border-border/60 bg-muted/20 p-2 text-sm">
+                        {description || <span className="text-muted-foreground">—</span>}
+                      </div>
+                    </Section>
+
+                    {block && detailRows.length > 0 && (
+                      <Section title={block.title} editKey="details">
+                        {detailRows.map((r) => <Row key={r.label} label={r.label} value={r.text} />)}
+                        {photos.length > 0 && <Row label="Photos" value={`${photos.length} attached`} />}
+                      </Section>
+                    )}
+
+                    <Section title="People" editKey="people">
+                      <Row label="Involved" value={peopleInvolved} />
+                      <Row label="Witnesses" value={witnesses} />
+                    </Section>
+
+                    {stepKeys.includes("injuries") && (injuries.trim() || medicalAttention.trim()) && (
+                      <Section title="Injuries & medical" editKey="injuries">
+                        <Row label="Injuries" value={injuries} />
+                        <Row label="Medical attention" value={medicalAttention} />
+                      </Section>
+                    )}
+
+                    <Section title="Immediate actions" editKey="actions">
+                      <Row label="Actions taken" value={immediateActions} />
+                      {isAbuse && <Row label="Prevention strategies" value={preventionStrategies} />}
+                    </Section>
+                  </div>
+                );
+              })()}
             </div>
 
             {stepError && (

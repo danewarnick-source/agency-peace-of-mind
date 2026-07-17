@@ -16,6 +16,7 @@ export type ActiveTimesheet = {
   id: string;
   client_id: string;
   service_type_code: string;
+  clock_in_timestamp: string;
 };
 
 /**

@@ -1,10 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { Pill, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { Pill, CheckCircle2, AlertTriangle, Pencil } from "lucide-react";
 import { useShiftMedDueStatus } from "@/hooks/use-shift-med-due-status";
-import { logMedicationPass } from "@/lib/emar-pass.functions";
 import { type EmarStatus } from "@/lib/emar-status";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -22,6 +18,24 @@ type DoseEntry = {
   note: string;
 };
 
+/**
+ * Payload the parent will pass to `logMedicationPass` on final Submit
+ * Timeclock. One entry per medication the staff checked.
+ */
+export type PendingMedDose = {
+  clientId: string;
+  medicationId: string;
+  scheduledFor: string;
+  scheduledTimeLabel: string;
+  status: EmarStatus;
+  route: string;
+  actualTakenAt: string;
+  exceptionReason: string | null;
+  notes: string | null;
+  signatureDataUrl: string;
+  isMedicationError: false;
+};
+
 const INLINE_STATUS_OPTIONS: { value: EmarStatus; label: string }[] = [
   { value: "self_administered", label: "Observed" },
   { value: "missed", label: "Missed" },
@@ -33,12 +47,16 @@ const ATTESTATION =
   "I attest that I personally observed the client take, or administered, each medication I checked above during this shift. Medications not checked were not given at the noted time.";
 
 /**
- * Inline medication check for the EVV clock-out and HHS daily note flows.
- * Staff answer Yes / No / Not scheduled for whether medications were addressed.
- * Choosing Yes reveals a per-dose checklist — staff tick the meds they actually
- * administered/observed, fill outcome details for those, and confirm with a
- * typed-name attestation. Checked doses are written to emar_logs; unchecked
- * doses are left alone (the main eMAR remains authoritative).
+ * Inline medication check for the EVV clock-out (and HHS daily note) flows.
+ * This component NO LONGER writes to emar_logs on its own. Staff fill in the
+ * per-dose checklist, type their name, tick the attestation, then click
+ * **Save**. The prepared payloads are handed to the parent via
+ * `onPendingDosesChange`, and the parent flushes them to `emar_logs` when the
+ * staff finally submits the whole timeclock / daily note.
+ *
+ * Saving marks the section resolved so the parent's Submit button can enable.
+ * The section then collapses to a read-only summary with an **Edit** button
+ * that clears the resolved state until Save is pressed again.
  */
 export function ShiftMedDueCheck({
   organizationId,
@@ -48,6 +66,7 @@ export function ShiftMedDueCheck({
   windowEnd,
   emarHref: _emarHref,
   onResolvedChange,
+  onPendingDosesChange,
 }: {
   organizationId: string | null | undefined;
   clientId: string | null | undefined;
@@ -57,16 +76,20 @@ export function ShiftMedDueCheck({
   /** Deep link to the client's real MAR tab — used as fallback for complex meds. */
   emarHref: string;
   onResolvedChange: (resolved: boolean) => void;
+  /** Emits the payloads the parent will pass to `logMedicationPass` on submit. */
+  onPendingDosesChange?: (pending: PendingMedDose[]) => void;
 }) {
   const medStatus = useShiftMedDueStatus({ organizationId, clientId, windowStart, windowEnd });
   const [answer, setAnswer] = useState<MedAnswer | null>(null);
   const [doseEntries, setDoseEntries] = useState<Record<string, DoseEntry>>({});
   const [typedName, setTypedName] = useState("");
   const [attested, setAttested] = useState(false);
-  const [done, setDone] = useState(false);
-
-  const qc = useQueryClient();
-  const logPass = useServerFn(logMedicationPass);
+  const [saved, setSaved] = useState(false);
+  const [savedSummary, setSavedSummary] = useState<{
+    count: number;
+    name: string;
+    kind: MedAnswer;
+  } | null>(null);
 
   const unloggedDoses = medStatus.scheduledDoses.filter((d) => !d.logged);
 
@@ -81,20 +104,26 @@ export function ShiftMedDueCheck({
       });
       return next;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answer, medStatus.scheduledDoses]);
 
   const resolved = (() => {
     if (medStatus.loading) return false;
     if (medStatus.scheduledDoses.length === 0) return true;
-    if (done || medStatus.allDosesLogged) return true;
-    if (answer === "not_scheduled" || answer === "no") return true;
-    return false;
+    if (medStatus.allDosesLogged) return true;
+    return saved;
   })();
 
   useEffect(() => {
     onResolvedChange(resolved);
   }, [resolved, onResolvedChange]);
+
+  const emitPending = useCallback(
+    (payload: PendingMedDose[]) => {
+      onPendingDosesChange?.(payload);
+    },
+    [onPendingDosesChange],
+  );
 
   const updateEntry = useCallback(
     (key: string, field: keyof DoseEntry, value: string | boolean) => {
@@ -116,52 +145,73 @@ export function ShiftMedDueCheck({
     return true;
   });
 
-  const canSubmit =
+  const canSave =
     answer === "yes" &&
     checkedDoses.length > 0 &&
     allCheckedValid &&
     typedName.trim().length > 0 &&
     attested;
 
-  const saveMut = useMutation({
-    mutationFn: async () => {
-      const signatureText = `Typed signature: ${typedName.trim()}`;
-      for (const d of checkedDoses) {
-        const k = `${d.medication_id}|${d.scheduled_for_iso}`;
-        const e = doseEntries[k];
-        if (!e?.status) continue;
-        let actualIso = new Date().toISOString();
-        if (e.timeValue) {
-          const [hh, mm] = e.timeValue.split(":").map(Number);
-          const dt = new Date();
-          dt.setHours(hh, Number.isFinite(mm) ? mm : 0, 0, 0);
-          actualIso = dt.toISOString();
-        }
-        await logPass({
-          data: {
-            clientId: clientId!,
-            medicationId: d.medication_id,
-            scheduledFor: d.scheduled_for_iso,
-            scheduledTimeLabel: d.time_label,
-            status: e.status as EmarStatus,
-            route: d.route || "PO",
-            actualTakenAt: actualIso,
-            exceptionReason: e.status !== "self_administered" ? e.note : null,
-            notes: null,
-            signatureDataUrl: signatureText,
-            isMedicationError: false,
-          },
-        });
+  function buildPending(): PendingMedDose[] {
+    if (!clientId) return [];
+    const signatureText = `Typed signature: ${typedName.trim()}`;
+    return checkedDoses.map((d) => {
+      const k = `${d.medication_id}|${d.scheduled_for_iso}`;
+      const e = doseEntries[k]!;
+      let actualIso = new Date().toISOString();
+      if (e.timeValue) {
+        const [hh, mm] = e.timeValue.split(":").map(Number);
+        const dt = new Date();
+        dt.setHours(hh, Number.isFinite(mm) ? mm : 0, 0, 0);
+        actualIso = dt.toISOString();
       }
-    },
-    onSuccess: () => {
-      toast.success("Medications logged.");
-      setDone(true);
-      qc.invalidateQueries({ queryKey: ["shift-med-due-status"] });
-      qc.invalidateQueries({ queryKey: ["mar-logs"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
+      return {
+        clientId,
+        medicationId: d.medication_id,
+        scheduledFor: d.scheduled_for_iso,
+        scheduledTimeLabel: d.time_label,
+        status: e.status as EmarStatus,
+        route: d.route || "PO",
+        actualTakenAt: actualIso,
+        exceptionReason: e.status !== "self_administered" ? e.note : null,
+        notes: null,
+        signatureDataUrl: signatureText,
+        isMedicationError: false,
+      };
+    });
+  }
+
+  function handleSave() {
+    if (!canSave) return;
+    const pending = buildPending();
+    emitPending(pending);
+    setSavedSummary({
+      count: pending.length,
+      name: typedName.trim(),
+      kind: "yes",
+    });
+    setSaved(true);
+  }
+
+  function handleEdit() {
+    setSaved(false);
+    setSavedSummary(null);
+    emitPending([]);
+  }
+
+  function handleAnswerNone(kind: "no" | "not_scheduled") {
+    setAnswer(kind);
+    emitPending([]);
+    setSavedSummary({ count: 0, name: "", kind });
+    setSaved(true);
+  }
+
+  function handleReset() {
+    setAnswer(null);
+    setSaved(false);
+    setSavedSummary(null);
+    emitPending([]);
+  }
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -173,9 +223,11 @@ export function ShiftMedDueCheck({
     );
   }
 
+  // Nothing scheduled → nothing to show, but the section counts as resolved.
   if (medStatus.scheduledDoses.length === 0) return null;
 
-  if (done || medStatus.allDosesLogged) {
+  // All doses already logged elsewhere (real MAR).
+  if (medStatus.allDosesLogged) {
     return (
       <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-900 dark:text-emerald-200">
         <div className="flex items-center gap-2">
@@ -189,24 +241,34 @@ export function ShiftMedDueCheck({
     );
   }
 
-  if (answer === "not_scheduled" || answer === "no") {
+  // Saved summary — read-only until user hits Edit.
+  if (saved && savedSummary) {
+    const summaryLabel =
+      savedSummary.kind === "not_scheduled"
+        ? "No medications scheduled for this shift."
+        : savedSummary.kind === "no"
+          ? "Medications not applicable for this shift."
+          : savedSummary.count === 1
+            ? `1 medication ready to log — signed by ${savedSummary.name}.`
+            : `${savedSummary.count} medications ready to log — signed by ${savedSummary.name}.`;
     return (
-      <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-          <span>
-            {answer === "not_scheduled"
-              ? "No medications scheduled for this shift."
-              : "Medications not applicable for this shift."}
+      <div className="flex flex-wrap items-center gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-900 dark:text-emerald-200">
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+        <span className="min-w-0 flex-1">
+          <span className="font-semibold">Saved.</span> {summaryLabel}{" "}
+          <span className="text-muted-foreground">
+            Doses will be logged to eMAR when you submit the timeclock.
           </span>
-          <button
-            type="button"
-            className="ml-auto text-[11px] underline hover:no-underline"
-            onClick={() => setAnswer(null)}
-          >
-            Change
-          </button>
-        </div>
+        </span>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-7 gap-1 text-[11px]"
+          onClick={handleEdit}
+        >
+          <Pencil className="h-3 w-3" /> Edit
+        </Button>
       </div>
     );
   }
@@ -239,7 +301,7 @@ export function ShiftMedDueCheck({
             size="sm"
             variant="outline"
             className="flex-1"
-            onClick={() => setAnswer("no")}
+            onClick={() => handleAnswerNone("no")}
           >
             No
           </Button>
@@ -248,7 +310,7 @@ export function ShiftMedDueCheck({
             size="sm"
             variant="outline"
             className="flex-1"
-            onClick={() => setAnswer("not_scheduled")}
+            onClick={() => handleAnswerNone("not_scheduled")}
           >
             Not scheduled
           </Button>
@@ -258,40 +320,39 @@ export function ShiftMedDueCheck({
       {answer === "yes" && (
         <div className="space-y-3">
           <p className="text-[11px] leading-snug text-muted-foreground">
-            Check the medications you administered or observed. Unchecked medications will not
-            be logged from this shift verification.
+            Check the medications you administered or observed. Unchecked medications will not be
+            logged from this shift verification.
           </p>
 
           {/* Already-logged doses */}
-          {medStatus.scheduledDoses.filter((d) => d.logged).map((d) => (
-            <div
-              key={`${d.medication_id}|${d.scheduled_for_iso}`}
-              className="flex flex-wrap items-center gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1.5 text-xs"
-            >
-              <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-600" />
-              <span className="font-mono text-[11px]">{d.time_label}</span>
-              <span className="font-medium">{d.medication_name}</span>
-              {d.dosage && <span className="text-muted-foreground">· {d.dosage}</span>}
-              <span className="ml-auto text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
-                Logged
-              </span>
-            </div>
-          ))}
+          {medStatus.scheduledDoses
+            .filter((d) => d.logged)
+            .map((d) => (
+              <div
+                key={`${d.medication_id}|${d.scheduled_for_iso}`}
+                className="flex flex-wrap items-center gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1.5 text-xs"
+              >
+                <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-600" />
+                <span className="font-mono text-[11px]">{d.time_label}</span>
+                <span className="font-medium">{d.medication_name}</span>
+                {d.dosage && <span className="text-muted-foreground">· {d.dosage}</span>}
+                <span className="ml-auto text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                  Logged
+                </span>
+              </div>
+            ))}
 
           {/* Unlogged doses — checkbox + optional per-dose form */}
           {unloggedDoses.map((d) => {
             const k = `${d.medication_id}|${d.scheduled_for_iso}`;
-            const e =
-              doseEntries[k] ?? { checked: false, status: "", timeValue: "", note: "" };
+            const e = doseEntries[k] ?? { checked: false, status: "", timeValue: "", note: "" };
             const isException = !!e.status && e.status !== "self_administered";
             const noteRequired = isException && !e.note.trim();
             return (
               <div
                 key={k}
                 className={`space-y-2 rounded-md border p-2.5 ${
-                  e.checked
-                    ? "border-amber-500/50 bg-amber-500/10"
-                    : "border-border bg-background"
+                  e.checked ? "border-amber-500/50 bg-amber-500/10" : "border-border bg-background"
                 }`}
               >
                 <label className="flex cursor-pointer items-start gap-2">
@@ -307,9 +368,7 @@ export function ShiftMedDueCheck({
                       )}
                       <span className="font-mono text-[11px]">{d.time_label}</span>
                       <span className="font-semibold">{d.medication_name}</span>
-                      {d.dosage && (
-                        <span className="text-muted-foreground">· {d.dosage}</span>
-                      )}
+                      {d.dosage && <span className="text-muted-foreground">· {d.dosage}</span>}
                     </div>
                     {!e.checked && (
                       <p className="mt-0.5 text-[11px] italic text-muted-foreground">
@@ -410,8 +469,7 @@ export function ShiftMedDueCheck({
               type="button"
               size="sm"
               variant="outline"
-              onClick={() => setAnswer(null)}
-              disabled={saveMut.isPending}
+              onClick={handleReset}
               className="shrink-0"
             >
               Back
@@ -419,12 +477,11 @@ export function ShiftMedDueCheck({
             <Button
               type="button"
               size="sm"
-              disabled={!canSubmit || saveMut.isPending}
-              onClick={() => saveMut.mutate()}
+              disabled={!canSave}
+              onClick={handleSave}
               className="flex-1"
             >
-              {saveMut.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
-              Log {checkedDoses.length} dose{checkedDoses.length !== 1 ? "s" : ""}
+              Save
             </Button>
           </div>
         </div>

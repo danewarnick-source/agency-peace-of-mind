@@ -43,7 +43,7 @@ import { IncidentReportDialog } from "@/components/incidents/incident-report-dia
 import { AlertTriangle as AlertTriangleIcon } from "lucide-react";
 import { useClientBillingCodes } from "@/hooks/use-client-billing-codes";
 import { useClientCareData } from "@/hooks/use-client-care-data";
-import { ShiftMedDueCheck } from "@/components/medications/shift-med-due-check";
+import { ShiftMedDueCheck, type PendingMedDose } from "@/components/medications/shift-med-due-check";
 import { useComplianceGate } from "@/hooks/use-compliance-gate";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useServerFn } from "@tanstack/react-start";
@@ -356,6 +356,7 @@ export function PunchPad({
 
   // ── Pre-submit medication check (reads real emar_logs, no shadow store) ───
   const [medDosesResolved, setMedDosesResolved] = useState(true);
+  const [pendingMedDoses, setPendingMedDoses] = useState<PendingMedDose[]>([]);
 
 
 
@@ -979,6 +980,7 @@ export function PunchPad({
     setLongShiftAck(false);
     setTriggersResolved(true);
     setMedDosesResolved(true);
+    setPendingMedDoses([]);
     setCorrectionOpen(false);
     setCorrectionIn("");
     setCorrectionOut("");
@@ -1453,6 +1455,22 @@ export function PunchPad({
     };
   }) {
     if (!user || !active) return;
+
+    // Flush the shift-med checklist into emar_logs BEFORE the timesheet commits.
+    // If any dose fails, abort — nothing partial ends up in the DB.
+    if (pendingMedDoses.length > 0) {
+      try {
+        const { logMedicationPass } = await import("@/lib/emar-pass.functions");
+        for (const dose of pendingMedDoses) {
+          await logMedicationPass({ data: dose });
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        toast.error(`Medication log failed: ${msg}`);
+        return;
+      }
+    }
+
 
     const selectedGoals = Object.entries(checkedGoals)
       .filter(([, v]) => v)
@@ -2971,6 +2989,7 @@ export function PunchPad({
                     clockInIso={active.clock_in_timestamp}
                     emarHref={`/dashboard/workspace/${active.client_id}?tab=mar-emar`}
                     onResolvedChange={setMedDosesResolved}
+                    onPendingDosesChange={setPendingMedDoses}
                   />
                 )}
 
@@ -3259,7 +3278,7 @@ export function PunchPad({
                     className={
                       correctionOpen && correctionHasChange
                         ? "w-full bg-amber-600 text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
-                        : "w-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+                        : "w-full bg-orange-500 text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                     }
                   >
                     {(busy || aiBusy) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -3309,6 +3328,7 @@ function ShiftMedDueCheckSlot(props: {
   clockInIso: string;
   emarHref: string;
   onResolvedChange: (resolved: boolean) => void;
+  onPendingDosesChange: (pending: PendingMedDose[]) => void;
 }) {
   const windowEnd = useMemo(
     () => new Date().toISOString(),
@@ -3324,6 +3344,7 @@ function ShiftMedDueCheckSlot(props: {
       windowEnd={windowEnd}
       emarHref={props.emarHref}
       onResolvedChange={props.onResolvedChange}
+      onPendingDosesChange={props.onPendingDosesChange}
     />
   );
 }

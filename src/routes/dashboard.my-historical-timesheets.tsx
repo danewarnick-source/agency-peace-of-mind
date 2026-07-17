@@ -161,6 +161,64 @@ function EntryCard({ row, onChanged }: { row: Row; onChanged: () => void }) {
   }, [row.clients]);
 
   const noteDirty = (note ?? "") !== (row.shift_note_text ?? "");
+  const noteMissing = !(row.shift_note_text ?? "").trim() && !note.trim();
+
+  function stopRecording() {
+    try { recognitionRef.current?.stop?.(); } catch { /* ignore */ }
+    setIsRecording(false);
+  }
+  function startRecording() {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const Ctor: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (!Ctor) return;
+      const rec = new Ctor();
+      rec.continuous = true;
+      rec.interimResults = false;
+      rec.lang = "en-US";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      rec.onresult = (ev: any) => {
+        let txt = "";
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          txt += ev.results[i][0].transcript;
+        }
+        setShorthand((s) => (s ? s + " " : "") + txt.trim());
+      };
+      rec.onerror = () => stopRecording();
+      rec.onend = () => setIsRecording(false);
+      recognitionRef.current = rec;
+      rec.start();
+      setIsRecording(true);
+    } catch {
+      toast.error("Couldn't start voice input — please type instead.");
+    }
+  }
+  useEffect(() => () => { try { recognitionRef.current?.stop?.(); } catch { /* ignore */ } }, []);
+
+  async function runDraftWithNectar() {
+    const text = shorthand.trim();
+    if (text.length < 3) {
+      toast.error("Add a few words of shorthand first (e.g. 'park, soda $2, calm all shift').");
+      return;
+    }
+    stopRecording();
+    setDraftBusy(true);
+    try {
+      const clientFirst = row.clients?.first_name?.trim() || "the client";
+      const res = await draftFn({ data: { shorthand: text, goals: [], clientFirstName: clientFirst } });
+      setNectarDraft(res.draft);
+    } catch (e) {
+      toast.error((e as Error).message || "NECTAR couldn't draft the note — please try again.");
+    } finally {
+      setDraftBusy(false);
+    }
+  }
+  function acceptNectarDraft() {
+    if (!nectarDraft) return;
+    setNote(nectarDraft);
+    setNectarUsed(true);
+    setNectarDraft(null);
+  }
 
   return (
     <div className="rounded-2xl border border-border bg-card p-4 space-y-3">

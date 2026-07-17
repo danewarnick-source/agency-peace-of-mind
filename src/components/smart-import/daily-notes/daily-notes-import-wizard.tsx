@@ -806,7 +806,7 @@ function ReviewStep({
       </div>
 
       <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={onBack}><ArrowLeft className="mr-1.5 h-4 w-4" /> Back to mapping</Button>
+        <Button variant="ghost" onClick={onBack}><ArrowLeft className="mr-1.5 h-4 w-4" /> Choose a different file</Button>
         <Button onClick={onCommit} disabled={committing || ready.length === 0}>
           {committing && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
           Submit {ready.length} note{ready.length === 1 ? "" : "s"} to staff for attestation

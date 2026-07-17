@@ -1052,6 +1052,7 @@ export function IncidentReportDialog({
       const detailsOut: Record<string, unknown> = {
         ...details,
         nectar_followups: finalIssues ?? [],
+        nectar_completeness_answers: completenessApproved,
       };
       if (aiSkipped) detailsOut.ai_review_skipped = true;
 

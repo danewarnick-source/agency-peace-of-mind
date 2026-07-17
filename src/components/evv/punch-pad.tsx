@@ -980,6 +980,7 @@ export function PunchPad({
     setLongShiftAck(false);
     setTriggersResolved(true);
     setMedDosesResolved(true);
+    setPendingMedDoses([]);
     setCorrectionOpen(false);
     setCorrectionIn("");
     setCorrectionOut("");

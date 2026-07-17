@@ -1,38 +1,37 @@
 ## Problem
 
-In staff dashboard "Needs Your Attention," the Fix Now button for an open (never clocked-out) shift currently routes to `/dashboard/timeclock` (the non-client General Time Clock). It should land the staff on the exact client's punch pad AND auto-open the "📋 Shift Verification & Medicaid Compliance Form" dialog for the active shift so they can complete goals + narrative and clock out.
+On Justin's caseload > About > Person-Centered Support Plan, the panel says "No PCSP goals recorded yet," but admin has 3 PCSP goals on file (verified in DB: `clients.pcsp_goals` has 3 entries and `client_specific_trainings.goals` has the matching 3 structured rows).
 
-That dialog already exists inside `PunchPad` (`src/components/evv/punch-pad.tsx`, opened by `openCompliance()` at line 950). It only opens when there's an `active` shift. `useActiveShift()` will detect the open timesheet automatically once PunchPad mounts on the client's workspace.
+Root cause: Justin's `client_staff_visibility.sections.care_plan` is `false`, so the server (`src/lib/client-care-data.functions.ts`) collapses `visibility.staffCare.goals` to `[]` before returning. The About tab then renders the empty-state message.
+
+This is the same class of issue we already fixed for the Shift Verification form: PCSP goals should always mirror what admin has on file, regardless of the section toggle. Per-goal visibility switches (admin explicitly hiding one goal) should still be honored, but the blanket section toggle should not zero the list out.
 
 ## Fix
 
-1. **`src/components/evv/punch-pad.tsx`**
-   - Add an optional prop `autoOpenCompliance?: boolean` to `PunchPadProps`.
-   - Add a `useEffect` that, when `autoOpenCompliance` is true and `active` becomes available and no dialog is already open, calls `openCompliance()` exactly once (guarded by a `useRef` so it doesn't re-fire on renders or after the user closes the dialog).
+Two small, targeted changes:
 
-2. **`src/routes/dashboard.workspace.$clientId.tsx`**
-   - Extend `workspaceSearch` to include `verify: z.string().optional()` (URL-safe string; treat any truthy value as "open the form").
-   - Read `verify` from `Route.useSearch()` and pass `autoOpenCompliance={verify === "1"}` to `<PunchPad …>` in the clock-in tab.
+1. **`src/lib/client-care-data.functions.ts` (line ~312)** — change `goalsStaffAll` so it always includes goals, filtered only by per-goal `isFieldVisible(...)`:
+   ```ts
+   const goalsStaffAll = goals.filter((g) =>
+     isFieldVisible(visibilityRow, fieldKey("care_plan", "goal", g.id))
+   );
+   ```
+   No change to `medicationsStaff`, `authorizedCodesStaff`, or custom fields — the section toggle still hides those.
 
-3. **`src/routes/dashboard.index.tsx`** (`ComplianceInbox`, open-shifts row, line 96–100)
-   - Replace `navigate({ to: "/dashboard/timeclock" })` with:
-     ```
-     navigate({
-       to: "/dashboard/workspace/$clientId",
-       params: { clientId: s.client_id },
-       search: { tab: "clock-in", code: s.service_type_code, verify: "1" },
-     })
-     ```
-   - Rejected daily-log row is untouched.
+2. **`src/components/workspace/about-tab.tsx` (line ~40)** — drop the `carePlanSectionOn` gate for the PCSP list so it shows whatever the server returned:
+   ```ts
+   const goals = (staffCare?.goals ?? []).map((g) => g.goal).filter(Boolean);
+   ```
+   The `carePlanCustom` block below still respects `carePlanSectionOn` implicitly (server already filtered custom fields).
 
 ## Behavior
 
-- Tapping Fix Now on an open shift → workspace opens on Clock In tab for the correct client → PunchPad detects the active timesheet → Shift Verification & Medicaid Compliance Form opens automatically, prefilled with that shift's live duration, so staff can complete PCSP goals, narrative, and submit clock-out (including a time-correction request if the recorded clock-in is wrong).
-- If for any reason there's no active shift when the page loads (edge case: someone else already closed it), the dialog simply doesn't open — no error, PunchPad renders normally.
-- The auto-open fires once per navigation (ref guard); closing the dialog won't reopen it on rerender.
+- Every client's About > PCSP panel shows the goals currently on file on the admin side.
+- Any admin edit (add / edit / re-extract from PCSP) flows through immediately on the next fetch — the About tab is already backed by the same `useClientCareData` hook that the compliance form uses.
+- Admins can still hide a specific goal via the per-goal visibility switch; that switch continues to work.
+- Other care-plan surfaces protected by the section toggle (medications, care-plan custom fields) are unaffected.
 
 ## Files touched
 
-- `src/components/evv/punch-pad.tsx` — add prop + one-shot auto-open effect
-- `src/routes/dashboard.workspace.$clientId.tsx` — extend `validateSearch`, pass prop
-- `src/routes/dashboard.index.tsx` — update Fix Now handler for open shifts
+- `src/lib/client-care-data.functions.ts` — one-line change to `goalsStaffAll` derivation
+- `src/components/workspace/about-tab.tsx` — remove the `carePlanSectionOn` guard on `goals`

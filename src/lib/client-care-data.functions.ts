@@ -309,9 +309,14 @@ export const getClientCareData = createServerFn({ method: "GET" })
           status: null,
         };
 
-    const goalsStaffAll = sections.care_plan
-      ? goals.filter((g) => isFieldVisible(visibilityRow, fieldKey("care_plan", "goal", g.id)))
-      : [];
+    // PCSP goals always mirror what admin has on file — the blanket
+    // care_plan section toggle does NOT zero the list out (same rule as
+    // goalsForStaff below). Per-goal visibility switches are still honored
+    // so admins can hide a specific goal.
+    const goalsStaffAll = goals.filter((g) =>
+      isFieldVisible(visibilityRow, fieldKey("care_plan", "goal", g.id))
+    );
+
     const medicationsStaff = sections.care_plan
       ? medications.filter((m) => isFieldVisible(visibilityRow, fieldKey("care_plan", "medication", m.id)))
       : [];

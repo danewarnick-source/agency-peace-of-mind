@@ -144,6 +144,12 @@ export function useShiftMedDueStatus(args: {
           bestByKey.set(key, d);
           continue;
         }
+        // Any logged occurrence wins; otherwise closest to window midpoint.
+        if (d.logged && !existing.logged) {
+          bestByKey.set(key, d);
+          continue;
+        }
+        if (existing.logged && !d.logged) continue;
         const distNew = Math.abs(new Date(d.scheduled_for_iso).getTime() - midMs);
         const distOld = Math.abs(new Date(existing.scheduled_for_iso).getTime() - midMs);
         if (distNew < distOld) bestByKey.set(key, d);

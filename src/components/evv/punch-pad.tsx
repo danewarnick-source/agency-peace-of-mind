@@ -2017,24 +2017,21 @@ export function PunchPad({
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {gpsAcquiring && !hardwareDenied && (
+            {isEvvLockedCode(serviceCode) && gpsAcquiring && !hardwareDenied && (
               <Badge variant="outline" className="gap-1 text-[10px] text-amber-600 border-amber-400">
                 <Wifi className="h-3 w-3 animate-pulse" /> Acquiring GPS
               </Badge>
             )}
-            {!gpsAcquiring && livePos && (
+            {isEvvLockedCode(serviceCode) && !gpsAcquiring && livePos && (
               <Badge variant="outline" className="gap-1 text-[10px] text-emerald-600 border-emerald-400">
                 <MapPin className="h-3 w-3" /> GPS Live
               </Badge>
             )}
-            {hardwareDenied && (
+            {isEvvLockedCode(serviceCode) && hardwareDenied && (
               <Badge variant="outline" className="gap-1 text-[10px] text-rose-600 border-rose-400">
                 <AlertTriangle className="h-3 w-3" /> GPS Blocked
               </Badge>
             )}
-            <Badge variant="outline" className="font-mono text-[10px]">
-              EVV · Utah DHHS
-            </Badge>
           </div>
         </header>
 

@@ -72,7 +72,7 @@ function ClientWorkspace() {
   const { data: caseload, isLoading } = useCaseload();
   const { data: assignments } = useMyAssignments();
   const navigate = useNavigate();
-  const { tab: tabParam, code: presetCode } = Route.useSearch();
+  const { tab: tabParam, code: presetCode, verify } = Route.useSearch();
 
   const client = useMemo(() => {
     return (caseload ?? []).find((c) => c.id === clientId) ?? null;

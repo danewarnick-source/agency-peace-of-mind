@@ -197,13 +197,14 @@ export const getClientCareData = createServerFn({ method: "GET" })
     const { clientId, shiftServiceCode } = data;
     const supabase = context.supabase as any;
 
-    const [clientRes, cstRes, medsRes, codesRes, visRes, cfDefsRes, cfValsRes] =
+    const [clientRes, cstRes, medsRes, codesRes, visRes, cfDefsRes, cfValsRes, tbRes, ecRes] =
       await Promise.all([
       supabase
         .from("clients")
         .select(
-          "id, organization_id, first_name, last_name, date_of_birth, admission_date, discharge_date, medicaid_id, account_status, self_admin_med_support, self_admin_med_support_locked",
+          "id, organization_id, first_name, last_name, date_of_birth, admission_date, discharge_date, medicaid_id, account_status, self_admin_med_support, self_admin_med_support_locked, preferred_activities",
         )
+
         .eq("id", clientId)
         .maybeSingle(),
       supabase

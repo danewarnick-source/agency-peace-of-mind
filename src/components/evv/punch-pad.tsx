@@ -137,7 +137,13 @@ export interface PunchPadProps {
   presetServiceCode?: string;
   /** When true with presetServiceCode, the code dropdown is read-only. */
   lockServiceCode?: boolean;
+  /**
+   * When true, auto-open the Shift Verification & Medicaid Compliance form
+   * once an active shift for this pad is detected (fires once per mount).
+   */
+  autoOpenCompliance?: boolean;
 }
+
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -147,7 +153,9 @@ export function PunchPad({
   caseload = [],
   presetServiceCode,
   lockServiceCode = false,
+  autoOpenCompliance = false,
 }: PunchPadProps) {
+
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
@@ -978,6 +986,20 @@ export function PunchPad({
     stopRecording();
     setShowCompliance(true);
   }
+
+  // Auto-open the Shift Verification & Medicaid Compliance form once, when
+  // arriving here from a "Fix Now" deep link for an open shift.
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (!autoOpenCompliance) return;
+    if (autoOpenedRef.current) return;
+    if (!active || !activeMatchesThisPad) return;
+    autoOpenedRef.current = true;
+    openCompliance();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpenCompliance, active, activeMatchesThisPad]);
+
+
 
   // Format an ISO/Date as the value expected by <input type="datetime-local">
   // in the browser's local timezone: YYYY-MM-DDTHH:MM.

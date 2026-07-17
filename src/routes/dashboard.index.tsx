@@ -95,9 +95,14 @@ function ComplianceInbox() {
             </div>
             <Button size="sm" variant="outline"
               className="shrink-0"
-              onClick={() => navigate({ to: "/dashboard/timeclock" })}>
+              onClick={() => navigate({
+                to: "/dashboard/workspace/$clientId",
+                params: { clientId: s.client_id },
+                search: { tab: "clock-in", code: s.service_type_code, verify: "1" },
+              })}>
               Fix Now <ArrowRight />
             </Button>
+
           </li>
         ))}
         {rejectedLogs.map((l) => (

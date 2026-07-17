@@ -1,7 +1,8 @@
 // Historical daily-notes / shift-notes import wizard — spreadsheet-only
-// (CSV/XLSX), column-mapping + name-based matching against EXISTING staff and
-// clients. NEVER creates new staff or client records. Anything imported here
-// is permanently marked import_source='historical_import' on daily_logs.
+// (CSV/XLSX) using a REQUIRED template (Staff Name, Client Name, Date,
+// Narrative, Goals Addressed). Name-based matching against EXISTING staff
+// and clients. NEVER creates new staff or client records. Anything imported
+// here is permanently marked import_source='historical_import' on daily_logs.
 //
 // Target use case: Host Home providers bringing over daily notes from another
 // platform (no time clock — just staff, client, date, narrative, and any
@@ -14,7 +15,7 @@ import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import {
   Upload, X, Loader2, ArrowRight, ArrowLeft, Download,
-  CheckCircle2, AlertTriangle, HelpCircle, Archive, FileText, Wrench,
+  CheckCircle2, AlertTriangle, Archive, FileText, Wrench, FileSpreadsheet,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,29 +30,25 @@ import {
   createDailyNotesImportJob,
   importHistoricalDailyNotes,
 } from "@/lib/smart-import-daily-notes.functions";
-import { suggestImportColumnMapping } from "@/lib/smart-import-nectar-mapping.functions";
 import { checkImportDuplicates } from "@/lib/smart-import-duplicate-check.functions";
+import {
+  TEMPLATE_HEADERS,
+  buildTemplateCsv,
+  buildTemplateXlsxBlob,
+  triggerDownload,
+  validateTemplateHeaders,
+} from "@/lib/historical-daily-notes-template";
 
 
 type ParsedFile = { headers: string[]; rows: Record<string, string>[]; fileName: string };
 
-type FieldKey = "staff" | "client" | "date" | "narrative" | "goals";
-
-type Mapping = Record<FieldKey, string | null>;
-
-// Whole-file constants — used when the spreadsheet has NO column at all that
-// identifies the staff member or client, and the admin declares the entire
-// upload belongs to one person. Only staff and client are eligible.
-type WholeFile = { staffId: string | null; clientId: string | null };
-
-// NECTAR's per-field suggestion, surfaced so the admin sees WHY a column
-// was chosen (or why no column exists and a whole-file constant is needed).
-type FieldSuggestion = {
-  column: string | null;
-  confidence: "high" | "medium" | "low";
-  reason: string;
-  whole_file_needed: boolean;
-};
+// Fixed column headers from the required template. These are the ONLY
+// columns we read from the file — no header guessing, no column mapping.
+const COL_STAFF = "Staff Name";
+const COL_CLIENT = "Client Name";
+const COL_DATE = "Date";
+const COL_NARRATIVE = "Narrative";
+const COL_GOALS = "Goals Addressed";
 
 
 type Person = { id: string; label: string; norms: string[] };
@@ -189,54 +186,20 @@ function splitGoals(raw: string): string[] {
     .map((s) => s.slice(0, 500));
 }
 
-// Deep, stratified sample per column: pull up to 60 non-empty values evenly
-// spaced across up to the first 2,000 rows of the file, plus the actual
-// fill rate so a well-labeled but empty column gets downgraded server-side.
-function sampleColumns(parsed: ParsedFile): Array<{ header: string; samples: string[]; fill_rate: number; sample_size: number }> {
-  const MAX_ROWS = 2000;
-  const MAX_SAMPLES = 60;
-  const scan = parsed.rows.slice(0, MAX_ROWS);
-  const step = Math.max(1, Math.floor(scan.length / (MAX_SAMPLES * 2)));
-  return parsed.headers.map((h) => {
-    let nonEmpty = 0;
-    const seen = new Set<string>();
-    const samples: string[] = [];
-    for (let i = 0; i < scan.length; i += step) {
-      const v = (scan[i][h] ?? "").trim();
-      if (!v) continue;
-      const key = v.toLowerCase();
-      if (!seen.has(key) && samples.length < MAX_SAMPLES) {
-        seen.add(key);
-        samples.push(v.slice(0, 200));
-      }
-    }
-    for (const r of scan) {
-      const v = (r[h] ?? "").trim();
-      if (v) nonEmpty++;
-    }
-    const fill_rate = scan.length > 0 ? nonEmpty / scan.length : 0;
-    return { header: h, samples, fill_rate, sample_size: scan.length };
-  });
-}
 
 
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function DailyNotesImportWizard() {
   const { data: org } = useCurrentOrg();
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [file, setFile] = useState<File | null>(null);
   const [parsed, setParsed] = useState<ParsedFile | null>(null);
-  const [mapping, setMapping] = useState<Mapping | null>(null);
-  const [wholeFile, setWholeFile] = useState<WholeFile>({ staffId: null, clientId: null });
-  const [suggestions, setSuggestions] = useState<Record<FieldKey, FieldSuggestion> | null>(null);
-  const [suggesting, setSuggesting] = useState(false);
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [committed, setCommitted] = useState<{ inserted: number } | null>(null);
 
   const createJob = useServerFn(createDailyNotesImportJob);
   const commitRows = useServerFn(importHistoricalDailyNotes);
-  const suggestMap = useServerFn(suggestImportColumnMapping);
   const checkDupes = useServerFn(checkImportDuplicates);
   const [dupeChecking, setDupeChecking] = useState(false);
 
@@ -281,101 +244,33 @@ export function DailyNotesImportWizard() {
     },
   });
 
-  const onPickFile = useCallback(async (f: File) => {
-    const okExt = ALLOWED_EXT.some((e) => f.name.toLowerCase().endsWith(e));
-    if (!okExt) {
-      toast.error("Historical daily-notes import only accepts CSV or Excel (.csv, .xlsx, .xls).");
-      return;
-    }
-    if (f.size > MAX_BYTES) {
-      toast.error(`${f.name} is larger than 25 MB.`);
-      return;
-    }
-    try {
-      const p = await parseFile(f);
-      if (p.headers.length === 0 || p.rows.length === 0) {
-        toast.error("That file didn't contain any readable rows.");
-        return;
-      }
-      setFile(f);
-      setParsed(p);
-      // Empty mapping until NECTAR responds; admin sees a "NECTAR is
-      // analyzing your columns…" state on step 2.
-      setMapping({ staff: null, client: null, date: null, narrative: null, goals: null });
-      setWholeFile({ staffId: null, clientId: null });
-      setSuggestions(null);
-      setStep(2);
-      // Fire NECTAR ONCE for this file.
-      if (org?.organization_id) {
-        setSuggesting(true);
-        try {
-          const res = await suggestMap({
-            data: {
-              organization_id: org.organization_id,
-              mode: "daily_notes",
-              file_name: p.fileName,
-              columns: sampleColumns(p),
-            },
-          });
-          const s = res.mapping as Record<FieldKey, FieldSuggestion>;
-          setSuggestions(s);
-          setMapping({
-            staff: s.staff?.column ?? null,
-            client: s.client?.column ?? null,
-            date: s.date?.column ?? null,
-            narrative: s.narrative?.column ?? null,
-            goals: s.goals?.column ?? null,
-          });
-        } catch (err) {
-          toast.error(`NECTAR couldn't suggest a mapping: ${(err as Error).message}. You can map columns manually.`);
-        } finally {
-          setSuggesting(false);
-        }
-      }
-    } catch (e) {
-      toast.error(`Couldn't read ${f.name}: ${(e as Error).message}`);
-    }
-  }, [org?.organization_id, suggestMap]);
-
-
-  const buildReviewRows = useCallback(() => {
-    if (!parsed || !mapping || !peopleQ.data) return;
+  // Build review rows directly from the fixed template columns — no mapping.
+  const buildReviewRows = useCallback((p: ParsedFile) => {
+    if (!peopleQ.data) return;
     const { staff, clients } = peopleQ.data;
 
-    // Whole-file constants override column mapping for staff/client.
-    const wholeStaff = wholeFile.staffId
-      ? staff.find((s) => s.id === wholeFile.staffId) ?? null
-      : null;
-    const wholeClient = wholeFile.clientId
-      ? clients.find((c) => c.id === wholeFile.clientId) ?? null
-      : null;
+    const result: ReviewRow[] = p.rows.map((raw, idx) => {
+      const staffLabel = (raw[COL_STAFF] ?? "").trim();
+      const clientLabel = (raw[COL_CLIENT] ?? "").trim();
+      const dateStr = (raw[COL_DATE] ?? "").trim();
+      const narrative = (raw[COL_NARRATIVE] ?? "").trim();
+      const goals = splitGoals(raw[COL_GOALS] ?? "");
 
-    const result: ReviewRow[] = parsed.rows.map((raw, idx) => {
-      const staffLabel = wholeStaff
-        ? wholeStaff.label
-        : mapping.staff ? raw[mapping.staff] ?? "" : "";
-      const clientLabel = wholeClient
-        ? wholeClient.label
-        : mapping.client ? raw[mapping.client] ?? "" : "";
-      const dateStr = mapping.date ? raw[mapping.date] ?? "" : "";
-      const narrative = (mapping.narrative ? raw[mapping.narrative] ?? "" : "").trim();
-      const goals = mapping.goals ? splitGoals(raw[mapping.goals] ?? "") : [];
-
-      const staffCandidates = wholeStaff ? [wholeStaff] : findCandidates(staff, staffLabel);
-      const clientCandidates = wholeClient ? [wholeClient] : findCandidates(clients, clientLabel);
+      const staffCandidates = findCandidates(staff, staffLabel);
+      const clientCandidates = findCandidates(clients, clientLabel);
       const d = tryParseDate(dateStr);
 
       const missing = {
-        staff: !wholeStaff && (!staffLabel || staffCandidates.length === 0),
-        client: !wholeClient && (!clientLabel || clientCandidates.length === 0),
+        staff: !staffLabel || staffCandidates.length === 0,
+        client: !clientLabel || clientCandidates.length === 0,
         date: !dateStr || !d,
         narrative: !narrative,
       };
 
       let status: MatchStatus;
       let reason: string | null = null;
-      let staffId: string | null = wholeStaff?.id ?? null;
-      let clientId: string | null = wholeClient?.id ?? null;
+      let staffId: string | null = null;
+      let clientId: string | null = null;
 
       const structuralGap =
         missing.staff || missing.client || missing.date || missing.narrative;
@@ -388,17 +283,17 @@ export function DailyNotesImportWizard() {
         if (missing.client) parts.push(clientLabel ? "no client match" : "missing client");
         if (missing.narrative) parts.push("blank narrative");
         reason = parts.join(" · ");
-        if (!staffId && staffCandidates.length === 1) staffId = staffCandidates[0].id;
-        if (!clientId && clientCandidates.length === 1) clientId = clientCandidates[0].id;
+        if (staffCandidates.length === 1) staffId = staffCandidates[0].id;
+        if (clientCandidates.length === 1) clientId = clientCandidates[0].id;
       } else if (staffCandidates.length > 1 || clientCandidates.length > 1) {
         status = "ambiguous";
         reason = "multiple possible matches";
-        if (!staffId && staffCandidates.length === 1) staffId = staffCandidates[0].id;
-        if (!clientId && clientCandidates.length === 1) clientId = clientCandidates[0].id;
+        if (staffCandidates.length === 1) staffId = staffCandidates[0].id;
+        if (clientCandidates.length === 1) clientId = clientCandidates[0].id;
       } else {
         status = "matched";
-        staffId = staffId ?? staffCandidates[0].id;
-        clientId = clientId ?? clientCandidates[0].id;
+        staffId = staffCandidates[0].id;
+        clientId = clientCandidates[0].id;
       }
 
       return {
@@ -416,7 +311,7 @@ export function DailyNotesImportWizard() {
       };
     });
     setRows(result);
-    setStep(3);
+    setStep(2);
 
     // Duplicate check for every fully-resolved row (staff + client + date).
     const resolved = result.filter((r) => r.staffId && r.clientId && r.logDateIso);
@@ -448,7 +343,45 @@ export function DailyNotesImportWizard() {
         .catch((e: unknown) => console.warn("Duplicate check failed:", e))
         .finally(() => setDupeChecking(false));
     }
-  }, [parsed, mapping, peopleQ.data, wholeFile, org?.organization_id]);
+  }, [peopleQ.data, org?.organization_id, checkDupes]);
+
+  const onPickFile = useCallback(async (f: File) => {
+    const okExt = ALLOWED_EXT.some((e) => f.name.toLowerCase().endsWith(e));
+    if (!okExt) {
+      toast.error("Historical daily-notes import only accepts CSV or Excel (.csv, .xlsx, .xls).");
+      return;
+    }
+    if (f.size > MAX_BYTES) {
+      toast.error(`${f.name} is larger than 25 MB.`);
+      return;
+    }
+    if (!peopleQ.data) {
+      if (peopleQ.isError) {
+        toast.error(`Couldn't load staff and clients: ${(peopleQ.error as Error)?.message ?? "unknown error"}`);
+      } else {
+        toast.error("Still loading staff and clients — try again in a moment.");
+      }
+      return;
+    }
+    try {
+      const p = await parseFile(f);
+      if (p.headers.length === 0 || p.rows.length === 0) {
+        toast.error("That file didn't contain any readable rows.");
+        return;
+      }
+      const check = validateTemplateHeaders(p.headers);
+      if (!check.ok) {
+        toast.error(check.message);
+        return;
+      }
+      setFile(f);
+      setParsed(p);
+      buildReviewRows(p);
+    } catch (e) {
+      toast.error(`Couldn't read ${f.name}: ${(e as Error).message}`);
+    }
+  }, [peopleQ.data, peopleQ.isError, peopleQ.error, buildReviewRows]);
+
 
 
   // Recompute status after any manual edit. A row becomes 'matched' only when
@@ -581,7 +514,7 @@ export function DailyNotesImportWizard() {
     },
     onSuccess: (res) => {
       setCommitted({ inserted: res.inserted });
-      setStep(4);
+      setStep(3);
       toast.success(`Submitted ${res.inserted} note${res.inserted === 1 ? "" : "s"} to staff for attestation.`);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -597,11 +530,11 @@ export function DailyNotesImportWizard() {
             <div className="font-semibold text-amber-800">Historical daily notes — imported from another platform</div>
             <p className="mt-1 text-muted-foreground">
               Bring in past daily notes / shift notes from whatever platform you used before HIVE — including
-              Host Home daily notes where nobody clocks in. Only five things are read from the file: who wrote it,
-              who it's about, the date, the written narrative, and (optionally) any goals the note addressed.
-              Every row must match a staff member and a client that already exist in HIVE; anything else is set
-              aside for manual resolution and is never auto-created. Imported notes are permanently marked as
-              historical so they're never confused with a note written live in HIVE.
+              Host Home daily notes where nobody clocks in. The importer only accepts files that match the
+              required template exactly: Staff Name, Client Name, Date, Narrative, and Goals Addressed (goals
+              may be blank). Every row must match a staff member and a client that already exist in HIVE;
+              anything else is set aside for manual resolution and is never auto-created. Imported notes are
+              permanently marked as historical so they're never confused with a note written live in HIVE.
             </p>
           </div>
         </div>
@@ -611,25 +544,7 @@ export function DailyNotesImportWizard() {
 
       {step === 1 && <UploadStep onPick={onPickFile} />}
 
-      {step === 2 && parsed && mapping && (
-        <MapStep
-          parsed={parsed}
-          mapping={mapping}
-          onChange={setMapping}
-          wholeFile={wholeFile}
-          onWholeFileChange={setWholeFile}
-          suggestions={suggestions}
-          suggesting={suggesting}
-          people={peopleQ.data ?? { staff: [], clients: [] }}
-          onBack={() => { setStep(1); setParsed(null); setMapping(null); setFile(null); setWholeFile({ staffId: null, clientId: null }); setSuggestions(null); }}
-          onNext={buildReviewRows}
-          peopleReady={!!peopleQ.data}
-          fileName={file?.name ?? ""}
-
-        />
-      )}
-
-      {step === 3 && peopleQ.data && (
+      {step === 2 && peopleQ.data && (
         <ReviewStep
           rows={rows}
           ready={readyRows}
@@ -648,17 +563,17 @@ export function DailyNotesImportWizard() {
           onSkip={skipRow}
           onUnskip={unskipRow}
           onDownloadSkipped={downloadSkipped}
-          onBack={() => setStep(2)}
+          onBack={() => { setStep(1); setFile(null); setParsed(null); setRows([]); }}
           onCommit={() => commit.mutate()}
           committing={commit.isPending}
         />
       )}
 
-      {step === 4 && committed && (
+      {step === 3 && committed && (
         <DoneStep
           inserted={committed.inserted}
           onAnother={() => {
-            setStep(1); setFile(null); setParsed(null); setMapping(null); setRows([]); setCommitted(null);
+            setStep(1); setFile(null); setParsed(null); setRows([]); setCommitted(null);
           }}
         />
       )}
@@ -667,13 +582,13 @@ export function DailyNotesImportWizard() {
 }
 
 // ─── Stepper ───────────────────────────────────────────────────────────────
-function Stepper({ step }: { step: 1 | 2 | 3 | 4 }) {
+function Stepper({ step }: { step: 1 | 2 | 3 }) {
   const items = [
-    { n: 1, label: "Upload & parse" },
-    { n: 2, label: "Map columns" },
-    { n: 3, label: "Admin review" },
-    { n: 4, label: "Submit to staff" },
+    { n: 1, label: "Upload template" },
+    { n: 2, label: "Admin review" },
+    { n: 3, label: "Submit to staff" },
   ];
+
 
   return (
     <ol className="flex items-center gap-2 text-sm">
@@ -699,260 +614,71 @@ function Stepper({ step }: { step: 1 | 2 | 3 | 4 }) {
 // ─── Step 1 ────────────────────────────────────────────────────────────────
 function UploadStep({ onPick }: { onPick: (f: File) => void }) {
   const [dragging, setDragging] = useState(false);
-  return (
-    <div
-      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={(e) => {
-        e.preventDefault(); setDragging(false);
-        const f = e.dataTransfer.files?.[0];
-        if (f) onPick(f);
-      }}
-      className={`rounded-2xl border-2 border-dashed p-10 text-center transition ${
-        dragging ? "border-primary bg-primary/5" : "border-border bg-card"
-      }`}
-    >
-      <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
-      <p className="mt-3 font-medium">Drop a CSV or Excel file</p>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Only spreadsheets (.csv, .xlsx, .xls). Up to 25 MB. PDFs and scanned documents aren't used for this
-        import type — the data has to already be in columns.
-      </p>
-      <div className="mt-4">
-        <input
-          id="daily-notes-import-file"
-          type="file"
-          accept=".csv,.xlsx,.xls"
-          className="hidden"
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick(f); }}
-        />
-        <label htmlFor="daily-notes-import-file">
-          <Button variant="outline" asChild><span>Choose file</span></Button>
-        </label>
-      </div>
-    </div>
-  );
-}
-
-// ─── Step 2 ────────────────────────────────────────────────────────────────
-const FIELD_LABELS: Record<FieldKey, { label: string; required: boolean; hint: string }> = {
-  staff: { label: "Staff member (who wrote it)", required: true, hint: "Column holding the staff / host name" },
-  client: { label: "Client (who it's about)", required: true, hint: "Column holding the client name" },
-  date: { label: "Note date", required: true, hint: "The day the note was written / the shift happened" },
-  narrative: { label: "Narrative", required: true, hint: "The written note itself" },
-  goals: { label: "Goals addressed", required: false, hint: "Optional — column listing PCSP goals or objectives worked on. Separate multiple goals with new lines or semicolons." },
-};
-
-function MapStep({
-  parsed, mapping, onChange,
-  wholeFile, onWholeFileChange, suggestions, suggesting, people,
-  onBack, onNext, peopleReady, fileName,
-}: {
-  parsed: ParsedFile;
-  mapping: Mapping;
-  onChange: (m: Mapping) => void;
-  wholeFile: WholeFile;
-  onWholeFileChange: (w: WholeFile) => void;
-  suggestions: Record<FieldKey, FieldSuggestion> | null;
-  suggesting: boolean;
-  people: { staff: Person[]; clients: Person[] };
-  onBack: () => void;
-  onNext: () => void;
-  peopleReady: boolean;
-  fileName: string;
-}) {
-  // Staff/client can come from EITHER a column OR a whole-file constant.
-  const staffOk = !!mapping.staff || !!wholeFile.staffId;
-  const clientOk = !!mapping.client || !!wholeFile.clientId;
-  const canNext = staffOk && clientOk && mapping.date && mapping.narrative;
-
-  const needsWholeStaff = suggestions?.staff?.whole_file_needed === true;
-  const needsWholeClient = suggestions?.client?.whole_file_needed === true;
-
+  const onDownloadCsv = () => {
+    triggerDownload(
+      new Blob([buildTemplateCsv()], { type: "text/csv" }),
+      "historical-daily-notes-template.csv",
+    );
+  };
+  const onDownloadXlsx = () => {
+    triggerDownload(buildTemplateXlsxBlob(), "historical-daily-notes-template.xlsx");
+  };
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-border bg-card p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <div className="text-sm font-semibold">Map your columns</div>
-            <div className="text-xs text-muted-foreground">
-              File: {fileName} · {parsed.rows.length} row{parsed.rows.length === 1 ? "" : "s"} · {parsed.headers.length} columns detected
+        <div className="flex items-start gap-2">
+          <FileSpreadsheet className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <div className="flex-1">
+            <div className="text-sm font-semibold">Step 1 — download the template, then fill it in</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              The importer only accepts files matching this exact template. Five columns, in this order:{" "}
+              <span className="font-medium text-foreground">{TEMPLATE_HEADERS.join(", ")}</span>. Only{" "}
+              <span className="font-medium text-foreground">Goals Addressed</span> is allowed to be blank —
+              every other column is required per row. Separate multiple goals with new lines or semicolons.
+              The template ships with one example row so you can see the format; delete that row before
+              importing your real data.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={onDownloadCsv}>
+                <Download className="mr-1.5 h-3.5 w-3.5" /> Download template (CSV)
+              </Button>
+              <Button variant="outline" size="sm" onClick={onDownloadXlsx}>
+                <Download className="mr-1.5 h-3.5 w-3.5" /> Download template (Excel)
+              </Button>
             </div>
           </div>
-          <div className="text-[11px] text-muted-foreground">
-            {suggesting
-              ? <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> NECTAR is reading your columns…</span>
-              : suggestions
-                ? <span>NECTAR suggested this mapping. Review and correct before continuing.</span>
-                : <span>Automatic mapping unavailable — map manually.</span>}
-          </div>
         </div>
+      </div>
 
-        {/* Whole-file constants — surfaced when NECTAR can't find a
-            staff or client column, or when the admin wants to declare the
-            whole upload belongs to one person. */}
-        <WholeFileConstants
-          people={people}
-          wholeFile={wholeFile}
-          onChange={onWholeFileChange}
-          needsWholeStaff={needsWholeStaff}
-          needsWholeClient={needsWholeClient}
-        />
-
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
-          {(Object.keys(FIELD_LABELS) as FieldKey[]).map((k) => {
-            const meta = FIELD_LABELS[k];
-            const s = suggestions?.[k];
-            const disabledForWhole =
-              (k === "staff" && !!wholeFile.staffId) || (k === "client" && !!wholeFile.clientId);
-            return (
-              <div key={k} className="space-y-1">
-                <div className="flex items-center gap-1 text-xs font-medium">
-                  {meta.label}
-                  {meta.required && <span className="text-destructive">*</span>}
-                  <span className="text-muted-foreground" title={meta.hint}>
-                    <HelpCircle className="h-3 w-3" />
-                  </span>
-                  {disabledForWhole && (
-                    <Badge variant="outline" className="ml-1 text-[10px]">Using whole-file value</Badge>
-                  )}
-                </div>
-                <Select
-                  value={mapping[k] ?? "__none__"}
-                  onValueChange={(v) => onChange({ ...mapping, [k]: v === "__none__" ? null : v })}
-                  disabled={disabledForWhole}
-                >
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Not mapped" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">— not mapped —</SelectItem>
-                    {parsed.headers.map((h) => (
-                      <SelectItem key={h} value={h}>{h}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {s && !disabledForWhole && (
-                  <SuggestionHint suggestion={s} />
-                )}
-              </div>
-            );
-          })}
-        </div>
-        <p className="mt-3 text-[11px] text-muted-foreground">
-          Any other columns in your file (billing codes, times, service types, etc.) are ignored on purpose — this import
-          is only for the written narrative and the goals it addressed.
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault(); setDragging(false);
+          const f = e.dataTransfer.files?.[0];
+          if (f) onPick(f);
+        }}
+        className={`rounded-2xl border-2 border-dashed p-10 text-center transition ${
+          dragging ? "border-primary bg-primary/5" : "border-border bg-card"
+        }`}
+      >
+        <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
+        <p className="mt-3 font-medium">Drop the filled-in template here</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Only spreadsheets (.csv, .xlsx, .xls). Up to 25 MB. If the columns don't match the template exactly,
+          the file will be rejected — nothing is guessed.
         </p>
-      </div>
-
-      {parsed.rows.length > 0 && <SamplePreview parsed={parsed} mapping={mapping} />}
-
-      <div className="flex justify-between">
-        <Button variant="ghost" onClick={onBack}><ArrowLeft className="mr-1.5 h-4 w-4" /> Back</Button>
-        <Button onClick={onNext} disabled={!canNext || !peopleReady || suggesting}>
-          {(!peopleReady || suggesting) && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-          Match & review <ArrowRight className="ml-1.5 h-4 w-4" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function SuggestionHint({ suggestion }: { suggestion: FieldSuggestion }) {
-  const color =
-    suggestion.confidence === "high" ? "text-emerald-700"
-      : suggestion.confidence === "medium" ? "text-amber-700"
-        : "text-muted-foreground";
-  if (suggestion.whole_file_needed) {
-    return (
-      <div className="text-[11px] text-destructive">
-        NECTAR: no column in this file contains this value — use the whole-file setting above.
-      </div>
-    );
-  }
-  if (!suggestion.column) {
-    return <div className="text-[11px] text-muted-foreground">NECTAR: no confident match — pick manually if applicable.</div>;
-  }
-  return (
-    <div className={`text-[11px] ${color}`}>
-      NECTAR ({suggestion.confidence}): {suggestion.reason}
-    </div>
-  );
-}
-
-function WholeFileConstants({
-  people, wholeFile, onChange, needsWholeStaff, needsWholeClient,
-}: {
-  people: { staff: Person[]; clients: Person[] };
-  wholeFile: WholeFile;
-  onChange: (w: WholeFile) => void;
-  needsWholeStaff: boolean;
-  needsWholeClient: boolean;
-}) {
-  const [staffOpen, setStaffOpen] = useState(needsWholeStaff);
-  const [clientOpen, setClientOpen] = useState(needsWholeClient);
-  return (
-    <div className="rounded-md border border-border bg-muted/30 p-3">
-      <div className="text-xs font-medium">This whole file is for one person?</div>
-      <p className="text-[11px] text-muted-foreground">
-        Some exports don't have a staff or client column at all — the whole sheet belongs to one person by
-        context. If that's the case here, pick the person below and the column mapping for that field will be
-        skipped for every row.
-      </p>
-      <div className="mt-2 grid gap-2 md:grid-cols-2">
-        <div>
-          <label className="flex items-center gap-1 text-[11px] font-medium">
-            <input
-              type="checkbox"
-              checked={staffOpen || !!wholeFile.staffId}
-              onChange={(e) => {
-                const on = e.target.checked;
-                setStaffOpen(on);
-                if (!on) onChange({ ...wholeFile, staffId: null });
-              }}
-            />
-            Entire file was written by one staff member
-            {needsWholeStaff && <Badge variant="outline" className="ml-1 border-destructive/40 text-destructive text-[10px]">Required</Badge>}
+        <div className="mt-4">
+          <input
+            id="daily-notes-import-file"
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick(f); }}
+          />
+          <label htmlFor="daily-notes-import-file">
+            <Button variant="outline" asChild><span>Choose file</span></Button>
           </label>
-          {(staffOpen || wholeFile.staffId) && (
-            <Select
-              value={wholeFile.staffId ?? ""}
-              onValueChange={(v) => onChange({ ...wholeFile, staffId: v || null })}
-            >
-              <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue placeholder="Pick a staff member" /></SelectTrigger>
-              <SelectContent>
-                {people.staff.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-        <div>
-          <label className="flex items-center gap-1 text-[11px] font-medium">
-            <input
-              type="checkbox"
-              checked={clientOpen || !!wholeFile.clientId}
-              onChange={(e) => {
-                const on = e.target.checked;
-                setClientOpen(on);
-                if (!on) onChange({ ...wholeFile, clientId: null });
-              }}
-            />
-            Entire file is about one client
-            {needsWholeClient && <Badge variant="outline" className="ml-1 border-destructive/40 text-destructive text-[10px]">Required</Badge>}
-          </label>
-          {(clientOpen || wholeFile.clientId) && (
-            <Select
-              value={wholeFile.clientId ?? ""}
-              onValueChange={(v) => onChange({ ...wholeFile, clientId: v || null })}
-            >
-              <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue placeholder="Pick a client" /></SelectTrigger>
-              <SelectContent>
-                {people.clients.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
         </div>
       </div>
     </div>
@@ -960,53 +686,6 @@ function WholeFileConstants({
 }
 
 
-function SamplePreview({ parsed, mapping }: { parsed: ParsedFile; mapping: Mapping }) {
-  const sample = parsed.rows.slice(0, 3);
-  const cells = (row: Record<string, string>) => ({
-    staff: mapping.staff ? row[mapping.staff] : "—",
-    client: mapping.client ? row[mapping.client] : "—",
-    date: mapping.date ? row[mapping.date] : "—",
-    narrative: mapping.narrative ? row[mapping.narrative] : "",
-    goals: mapping.goals ? splitGoals(row[mapping.goals] ?? "") : [],
-  });
-  return (
-    <div className="rounded-2xl border border-border bg-card p-4">
-      <div className="mb-2 text-sm font-semibold">Preview (first 3 rows)</div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead className="text-muted-foreground">
-            <tr>
-              <th className="px-2 py-1 text-left">Staff</th>
-              <th className="px-2 py-1 text-left">Client</th>
-              <th className="px-2 py-1 text-left">Date</th>
-              <th className="px-2 py-1 text-left">Narrative</th>
-              <th className="px-2 py-1 text-left">Goals</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sample.map((r, i) => {
-              const c = cells(r);
-              return (
-                <tr key={i} className="border-t border-border/60">
-                  <td className="px-2 py-1">{c.staff}</td>
-                  <td className="px-2 py-1">{c.client}</td>
-                  <td className="px-2 py-1">{c.date}</td>
-                  <td className="px-2 py-1 max-w-[24rem] truncate">{c.narrative}</td>
-                  <td className="px-2 py-1 max-w-[12rem]">
-                    {c.goals.length === 0 ? <span className="text-muted-foreground">—</span>
-                      : c.goals.map((g, gi) => (
-                          <div key={gi} className="truncate">• {g}</div>
-                        ))}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
 
 // ─── Step 3 ────────────────────────────────────────────────────────────────
 function ReviewStep({
@@ -1128,7 +807,7 @@ function ReviewStep({
       </div>
 
       <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={onBack}><ArrowLeft className="mr-1.5 h-4 w-4" /> Back to mapping</Button>
+        <Button variant="ghost" onClick={onBack}><ArrowLeft className="mr-1.5 h-4 w-4" /> Choose a different file</Button>
         <Button onClick={onCommit} disabled={committing || ready.length === 0}>
           {committing && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
           Submit {ready.length} note{ready.length === 1 ? "" : "s"} to staff for attestation

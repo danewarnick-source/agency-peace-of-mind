@@ -1,36 +1,57 @@
-## Add "Draft with NECTAR" to historical timesheets (only when shift note is missing)
 
-Mirror the time-clock Draft-with-NECTAR pattern inside each pending historical-timesheet card, but ONLY show the panel when the entry has no shift note yet.
+## Goal
 
-### File to change
-`src/routes/dashboard.my-historical-timesheets.tsx` — `EntryCard` only. No new server functions, no schema changes.
+Replace the header-guessing / NECTAR-column-mapping flow in the historical **daily notes** import with the same required-template flow already used by historical timesheets. If the uploaded file doesn't match the template exactly, tell the user to download the template — don't try to guess.
 
-### Visibility rule
-Render the NECTAR panel only when the shift note is missing:
-- `!row.shift_note_text?.trim() && !note.trim()`
-- Once the user accepts a draft (or types anything into the note), the panel hides.
+## Scope
 
-### Behavior (identical to punch-pad flow)
-1. Above the existing "Shift note" textarea, render a NECTAR Infusion-locked amber dashed panel: "NECTAR Infusion / Draft with NECTAR" header + short helper text.
-2. Panel contents:
-   - Shorthand textarea (rows=3, maxLength 4000, same placeholder as punch-pad).
-   - "Draft with NECTAR" button (disabled until 3+ chars, spinner while busy).
-   - "Speak shorthand / Stop voice" mic button, only when `SpeechRecognition` / `webkitSpeechRecognition` is available.
-3. On click, call the existing `draftShiftNote` server fn with:
-   - `shorthand`: textarea text
-   - `goals`: `[]` (historical rows have no live PCSP goal picker)
-   - `clientFirstName`: `row.clients?.first_name` (fallback "the client")
-4. Returned draft renders in a "NECTAR draft — review before confirming" card with:
-   - **Use draft & edit below** → sets `note` state to the draft (marks dirty; user still clicks Save note, then Confirm).
-   - **Discard draft** → clears the draft panel and shorthand.
-5. Show an "AI-drafted — your review required" chip next to the "Shift note" label while a draft has been accepted but not yet edited, matching punch-pad's `nectarUsed` badge.
-6. Errors surface via toast using the server fn's message (credits, rate limit, etc. already handled).
+Frontend only. No changes to server functions, DB schema, or the downstream matching / duplicate-check / staff-attestation flow.
 
-### Gating
-Wrap the panel in `<NectarInfusionLock featureName="Draft with NECTAR" benefit="…same copy as punch-pad…">` so tenants without the add-on see the same upsell.
+## Files
 
-### Out of scope
-- No changes to save / flag / confirm logic.
-- No goals selection UI.
-- No changes to `draftShiftNote` or any other server function.
+### 1. New — `src/lib/historical-daily-notes-template.ts`
+
+Mirrors `src/lib/historical-timesheets-template.ts`. Exports:
+
+- `TEMPLATE_HEADERS`, in this exact order:
+  1. `Staff Name`
+  2. `Client Name`
+  3. `Date`
+  4. `Narrative`
+  5. `Goals Addressed`  *(only column allowed to be blank)*
+- One filled example row, e.g.
+  - Staff Name: `Jane Doe`
+  - Client Name: `John Smith`
+  - Date: `2026-05-14`
+  - Narrative: `Example row — delete before importing. John had a calm morning, ate breakfast independently…`
+  - Goals Addressed: `Independent meal prep; Community outing`
+- `buildTemplateCsv()`, `buildTemplateXlsxBlob()`, `triggerDownload()`, and `validateTemplateHeaders()` — same shape as the timesheets template module. Header check is case-insensitive/trimmed and exact-order; on mismatch, the error message tells the user to download the template and lists the five required columns.
+
+### 2. Edit — `src/components/smart-import/daily-notes/daily-notes-import-wizard.tsx`
+
+Remove all column-guessing; drive review rows off fixed template columns.
+
+- **Remove** the import and any call to `suggestImportColumnMapping` from `@/lib/smart-import-nectar-mapping.functions`, and remove the `FieldSuggestion` / NECTAR-analyzing UI state.
+- **Remove** the `Mapping`, `WholeFile`, and per-field manual mapping UI (Step 2 "Map columns" screen and its `MapStep`-style component).
+- **Remove** the "whole file belongs to one staff/client" constants — no longer needed because the template requires Staff Name and Client Name on every row.
+- Add imports from the new `historical-daily-notes-template` module (`TEMPLATE_HEADERS`, `buildTemplateCsv`, `buildTemplateXlsxBlob`, `triggerDownload`, `validateTemplateHeaders`).
+- In `onPickFile`, after `parseFile`, call `validateTemplateHeaders(p.headers)`. If not ok, `toast.error(check.message)` and stop. Only on success do we continue.
+- Build review rows directly from the fixed header names (`Staff Name`, `Client Name`, `Date`, `Narrative`, `Goals Addressed`) instead of the mapping lookup. Goals parsing keeps the existing `splitGoals` (newlines / semicolons).
+- Collapse the wizard from **Upload → Map columns → Review → Commit** to **Upload → Review → Commit**. Update the stepper labels and step numbers accordingly, and jump straight from upload to review.
+- Rework `UploadStep` to match the timesheets UploadStep: "Step 1 — download the template, then fill it in" card with a short description listing the five columns, a note that Goals Addressed is optional and the example row must be deleted before import, and two buttons: **Download template (CSV)** and **Download template (Excel)**. Keep the existing drag-drop / file-picker UI below.
+
+### Kept exactly as-is
+
+- Staff / client name matching against the org's real records.
+- Ambiguous-match resolution UI.
+- The admin "resolve this unmatched name everywhere it appears" action.
+- Duplicate detection via `checkImportDuplicates`.
+- Commit path through `createDailyNotesImportJob` / `importHistoricalDailyNotes` — imported rows still land in `pending_staff_attestation` awaiting staff sign-off.
+- The former-staff attestation fallback page.
+
+## Out of scope
+
+- No changes to `src/lib/smart-import-daily-notes.functions.ts` or any other server function.
 - No DB migration.
+- No changes to `smart-import-nectar-mapping.functions.ts` (still used elsewhere; just no longer called from daily notes).
+- No changes to the historical timesheets wizard.

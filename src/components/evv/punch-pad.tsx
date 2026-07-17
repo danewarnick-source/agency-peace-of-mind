@@ -356,6 +356,7 @@ export function PunchPad({
 
   // ── Pre-submit medication check (reads real emar_logs, no shadow store) ───
   const [medDosesResolved, setMedDosesResolved] = useState(true);
+  const [pendingMedDoses, setPendingMedDoses] = useState<PendingMedDose[]>([]);
 
 
 

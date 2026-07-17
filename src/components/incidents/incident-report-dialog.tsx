@@ -258,8 +258,6 @@ export function IncidentReportDialog({
   const [aiNA, setAiNA] = useState<Record<number, string>>({});
   const [aiReviewing, setAiReviewing] = useState(false);
   const [aiAttempted, setAiAttempted] = useState(false);
-  const [completenessIssues, setCompletenessIssues] = useState<AiIssue[] | null>(null);
-  const [completenessBusy, setCompletenessBusy] = useState(false);
 
   // ── In-step NECTAR review on the narrative step ─────────────────────────
   // Gates Next on the narrative step until staff click "Review with NECTAR"
@@ -344,7 +342,6 @@ export function IncidentReportDialog({
     setShorthand(""); setNectarDraft(null); setNectarDraftGaps([]); setGapAnswers({}); setGapNA({}); setDraftSkipped(false); setDraftBusy(false);
     setAiIssues(null); setAiStatus(null); setAiAnswers({}); setAiNA({});
     setAiReviewing(false); setAiAttempted(false);
-    setCompletenessIssues(null); setCompletenessBusy(false);
     setNarrativeReviewStatus("idle"); setNarrativeReviewIssues([]);
     setNarrativeGapAnswers({}); setNarrativeGapNA({}); setReviewedDescription("");
     setStep(0); setStepError(null);
@@ -821,48 +818,20 @@ export function IncidentReportDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentKey, aiEnabled, aiAttempted]);
 
-  // ── Completeness Check on Review step (copies shift-note pattern)
-  async function runCompletenessCheck() {
-    setCompletenessBusy(true);
-    try {
-      const draft = buildDraft();
-      const r = await withAiTimeout(reviewFn({ data: { draft } }));
-      if (!r || typeof r.complete !== "boolean" || r.skipped) {
-        setCompletenessIssues([]); setAiStatus("skipped");
-        setDetails((d) => ({ ...d, ai_review_skipped: true }));
-        toast.message("Nectar review unavailable — submitting with standard checks.");
-        return;
-      }
-      const issues = Array.isArray(r.issues) ? (r.issues as AiIssue[]) : [];
-      setCompletenessIssues(issues);
-      if (issues.length === 0) toast.success("NECTAR: no remaining gaps.");
-      else toast.warning(`NECTAR found ${issues.length} remaining item(s) to address.`);
-    } catch {
-      setCompletenessIssues([]); setAiStatus("skipped");
-      setDetails((d) => ({ ...d, ai_review_skipped: true }));
-      toast.message("Nectar didn't respond in 20s — you can still submit.");
-    } finally {
-      setCompletenessBusy(false);
-    }
-  }
-
   const contradictions = useMemo(
     () => (currentKey === "review" ? findContradictions(buildDraft()) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [currentKey, description, peopleInvolved, witnesses, injuries, medicalAttention, immediateActions],
   );
 
-  // Submit blocked while any must_fix Nectar question is unanswered, or
-  // completeness check returned new must_fix items, or contradictions exist.
+  // Submit blocked while any must_fix Nectar question is unanswered or contradictions exist.
   const unresolvedMustFix = (aiIssues ?? [])
     .map((q, i) => ({ q, i }))
     .filter(({ q, i }) => q.severity === "must_fix" && !(aiAnswers[i]?.trim() || aiNA[i]?.trim()));
-  const completenessMustFix = (completenessIssues ?? []).filter((q) => q.severity === "must_fix");
   const submitBlocked =
     contradictions.length > 0 ||
-    aiReviewing || completenessBusy ||
-    (aiStatus !== "skipped" && aiStatus !== "disabled" && unresolvedMustFix.length > 0) ||
-    (aiStatus !== "skipped" && aiStatus !== "disabled" && completenessMustFix.length > 0);
+    aiReviewing ||
+    (aiStatus !== "skipped" && aiStatus !== "disabled" && unresolvedMustFix.length > 0);
 
   const submit = useMutation({
     mutationFn: async () => {
@@ -1539,47 +1508,6 @@ export function IncidentReportDialog({
                     </div>
                   )}
 
-                  {/* NECTAR Completeness Check — copies shift-note "Completeness Check" pattern */}
-                  <div className="rounded-md border border-violet-300 bg-violet-50/60 p-3 text-xs dark:bg-violet-950/30 dark:border-violet-800">
-                    <div className="mb-2 flex flex-wrap items-center gap-2 text-violet-900 dark:text-violet-100">
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                      <span className="font-semibold">NECTAR Completeness Check</span>
-                      {aiStatus === "skipped" && (
-                        <Badge variant="outline" className="text-[10px]">AI review skipped</Badge>
-                      )}
-                      {aiStatus === "disabled" && (
-                        <Badge variant="outline" className="text-[10px]">AI disabled by org settings</Badge>
-                      )}
-                      {aiStatus === "passed" && (
-                        <Badge variant="outline" className="text-[10px]">No follow-ups</Badge>
-                      )}
-                      {aiStatus === "answered" && (
-                        <Badge variant="outline" className="text-[10px]">Follow-ups answered</Badge>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-violet-900/80 dark:text-violet-100/80">
-                      Re-run NECTAR on the enriched draft (narrative + your answers) to surface any remaining gaps before submit.
-                    </p>
-                    <Button type="button" size="sm" variant="outline" className="mt-2" onClick={runCompletenessCheck} disabled={completenessBusy || !aiEnabled}>
-                      {completenessBusy ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" />Re-checking…</> : "Re-check with NECTAR"}
-                    </Button>
-
-                    {completenessIssues && completenessIssues.length === 0 && !completenessBusy && (
-                      <p className="mt-2 text-[11px] text-emerald-800 dark:text-emerald-200">No remaining gaps. You can submit.</p>
-                    )}
-                    {completenessIssues && completenessIssues.length > 0 && (
-                      <ul className="mt-2 space-y-1 text-[11px]">
-                        {completenessIssues.map((q, i) => (
-                          <li key={i} className={`flex items-start gap-2 rounded border p-2 ${q.severity === "must_fix" ? "border-rose-300 bg-rose-50" : "border-amber-300 bg-amber-50"}`}>
-                            <Badge variant={q.severity === "must_fix" ? "destructive" : "outline"} className="text-[10px]">
-                              {q.severity === "must_fix" ? "Must address" : "Suggested"}
-                            </Badge>
-                            <span>{q.question}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
                 </div>
               )}
             </div>

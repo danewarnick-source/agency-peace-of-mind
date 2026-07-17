@@ -185,35 +185,6 @@ function splitGoals(raw: string): string[] {
     .map((s) => s.slice(0, 500));
 }
 
-// Deep, stratified sample per column: pull up to 60 non-empty values evenly
-// spaced across up to the first 2,000 rows of the file, plus the actual
-// fill rate so a well-labeled but empty column gets downgraded server-side.
-function sampleColumns(parsed: ParsedFile): Array<{ header: string; samples: string[]; fill_rate: number; sample_size: number }> {
-  const MAX_ROWS = 2000;
-  const MAX_SAMPLES = 60;
-  const scan = parsed.rows.slice(0, MAX_ROWS);
-  const step = Math.max(1, Math.floor(scan.length / (MAX_SAMPLES * 2)));
-  return parsed.headers.map((h) => {
-    let nonEmpty = 0;
-    const seen = new Set<string>();
-    const samples: string[] = [];
-    for (let i = 0; i < scan.length; i += step) {
-      const v = (scan[i][h] ?? "").trim();
-      if (!v) continue;
-      const key = v.toLowerCase();
-      if (!seen.has(key) && samples.length < MAX_SAMPLES) {
-        seen.add(key);
-        samples.push(v.slice(0, 200));
-      }
-    }
-    for (const r of scan) {
-      const v = (r[h] ?? "").trim();
-      if (v) nonEmpty++;
-    }
-    const fill_rate = scan.length > 0 ? nonEmpty / scan.length : 0;
-    return { header: h, samples, fill_rate, sample_size: scan.length };
-  });
-}
 
 
 // ═══════════════════════════════════════════════════════════════════════════

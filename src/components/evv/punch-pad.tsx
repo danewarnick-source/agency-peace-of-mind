@@ -137,7 +137,13 @@ export interface PunchPadProps {
   presetServiceCode?: string;
   /** When true with presetServiceCode, the code dropdown is read-only. */
   lockServiceCode?: boolean;
+  /**
+   * When true, auto-open the Shift Verification & Medicaid Compliance form
+   * once an active shift for this pad is detected (fires once per mount).
+   */
+  autoOpenCompliance?: boolean;
 }
+
 
 // ─── Component ────────────────────────────────────────────────────────────────
 

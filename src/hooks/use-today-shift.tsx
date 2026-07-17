@@ -16,6 +16,7 @@ export type ActiveTimesheet = {
   id: string;
   client_id: string;
   service_type_code: string;
+  clock_in_timestamp: string;
 };
 
 /**
@@ -75,7 +76,7 @@ export function useTodayShift() {
     queryFn: async (): Promise<ActiveTimesheet | null> => {
       const { data, error } = await supabase
         .from("evv_timesheets")
-        .select("id, client_id, service_type_code")
+        .select("id, client_id, service_type_code, clock_in_timestamp")
         .eq("staff_id", user!.id)
         .is("clock_out_timestamp", null)
         .order("clock_in_timestamp", { ascending: false })

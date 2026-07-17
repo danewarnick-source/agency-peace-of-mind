@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useTodayShift } from "@/hooks/use-today-shift";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { usePortalView } from "@/hooks/use-portal-view";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ export const Route = createFileRoute("/dashboard/")({
 
 function ComplianceInbox() {
   const { user } = useAuth();
+  const { active } = useTodayShift();
   const navigate = useNavigate();
 
   const { data: rejectedLogs = [] } = useQuery({
@@ -69,7 +71,10 @@ function ComplianceInbox() {
     },
   });
 
-  const totalItems = rejectedLogs.length + openShifts.length;
+  // Exclude the currently-active shift — TodayHero already surfaces it
+  // (and promotes itself to a clock-out prompt past 12h).
+  const orphanOpenShifts = openShifts.filter((s) => s.id !== active?.id);
+  const totalItems = rejectedLogs.length + orphanOpenShifts.length;
   if (totalItems === 0) return null;
 
   return (
@@ -79,7 +84,7 @@ function ComplianceInbox() {
         Needs Your Attention ({totalItems})
       </h2>
       <ul className="space-y-2">
-        {openShifts.map((s) => (
+        {orphanOpenShifts.map((s) => (
           <li key={s.id}
             className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2.5">
             <div className="min-w-0 flex items-start gap-2">

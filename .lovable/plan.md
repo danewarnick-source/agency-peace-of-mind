@@ -1,44 +1,35 @@
 ## Problem
 
-On the incident report's NECTAR follow-up step, questions like *"Was Justin's guardian or authorized representative notified of the injury and urgent care visit?"* are marked "Must answer" and block continuing. Today the only way to satisfy them without typing an answer is to check "Not applicable" and type a reason into a text box. For clients who are their own guardian (or clients with no guardian at all), staff shouldn't have to explain that in prose — it's a fact the system already knows or can capture in one tap.
+On My Caseload (staff view), a shift that's been open a long time appears twice:
+- **TodayHero** always renders the green "Shift in progress — Return to shift" card while an EVV punch is open.
+- **ComplianceInbox** *also* lists it under "Needs Your Attention → Open shift · never clocked out" once the clock-in is older than 16 hours.
+
+They should be one card. When the currently active shift has been running >12 hours, the TodayHero card itself should switch into an attention state that still reads "Shift in progress" but visibly prompts the staff member to clock out, with a "Clock out now" (Fix Now) button.
 
 ## Fix
 
-Add a one-click **N/A** button to every NECTAR follow-up question in the incident report form, and make it smart for guardian-notification questions specifically.
+### 1. Expose clock-in time on the active timesheet
+- `src/hooks/use-today-shift.tsx`: add `clock_in_timestamp: string` to `ActiveTimesheet` and select it in `activeQuery`.
 
-### 1. Load the client's guardian status when the dialog opens
+### 2. TodayHero: promote the active-shift card to an attention state past 12h
+- `src/components/staff-mobile/today-hero.tsx`: in the `if (active)` branch, compute `hoursOpen = (Date.now() - Date.parse(active.clock_in_timestamp)) / 3_600_000`.
+- When `hoursOpen >= 12`:
+  - Swap border/background from green (`#15a06a`) to amber (`border-amber-400/60 bg-amber-500/10`) and use an `AlertTriangle` icon.
+  - Eyebrow text: **"Shift in progress · Needs your attention"**.
+  - Headline: **"You've been on the clock for {N}h — clock out now"** (round to whole hours).
+  - Sub-line: "This shift started {date/time}. Open it and clock out to keep your timesheet accurate."
+  - CTA label changes from "Return to shift" to **"Clock out now"**; keep the same link (`/dashboard/workspace/$clientId?tab=clock-in`).
+- Under 12h: unchanged (green "Shift in progress / Return to shift").
 
-When the report dialog mounts with a `clientId`, fetch that client's `is_own_guardian` flag (and `guardian_name` for the label) from `clients` via the existing supabase client. Cache it in local state. No new server function needed — this is a single read the staff already have RLS access to.
+### 3. ComplianceInbox: stop double-listing the currently active shift
+- `src/routes/dashboard.index.tsx`: filter `openShifts` to exclude the row whose `id` matches the current `active` timesheet (fetched via `useTodayShift`). Only truly-orphaned open shifts (e.g. a second forgotten punch from a prior day that is not the active one) remain listed there.
+- If after that filter both `rejectedLogs` and `openShifts` are empty, the whole "Needs Your Attention" card hides — the existing `totalItems === 0` guard already handles that.
 
-### 2. One-click N/A button on each follow-up
-
-In `renderQuestionStep` (src/components/incidents/incident-report-dialog.tsx, ~line 951), add a button row above the existing "Not applicable — reason" checkbox:
-
-- **Default label:** `Mark N/A`
-- Clicking it toggles the N/A state on with a default reason of `"Not applicable"` (already enough to satisfy the "answered" gate — the existing `answered` check in the `submitBlocked` logic accepts any non-empty `aiNA[idx]`, and empty string counts as answered too since the check is `aiNA[idx] !== undefined`, but we set a short default so the audit trail isn't blank).
-- Clicking it again clears N/A.
-- The existing checkbox + free-text reason field stays as-is for staff who want to type a custom reason.
-
-### 3. Smart label for guardian-notification questions
-
-Detect guardian questions by matching the question text (case-insensitive) against `/guardian|authorized rep(resentative)?/`. When it matches AND the client's `is_own_guardian === true`:
-
-- Change the button label to: **`Not applicable — {ClientFirstName} is their own guardian`**
-- The auto-filled reason becomes: `"Client is their own guardian — no separate notification required."` (mirrors the phrasing already used in the admin GuardianNotifyDialog at admin-incidents-section.tsx:218 so the audit trail is consistent across the app.)
-- Show a small helper line under the question: *"This client is their own guardian — no guardian notification is required."*
-
-When it matches but `is_own_guardian` is false/unknown, keep the plain `Mark N/A` label (staff may still legitimately need to explain, e.g., guardian unreachable).
-
-### 4. No changes to submit gating or server payload shape
-
-The existing `submitBlocked` logic already treats a non-undefined `aiNA[idx]` as "answered", and the payload already serializes N/A reasons into `nectar_followups`. Nothing else changes — no migration, no server function edits, no admin-side changes.
+### Out of scope
+- No changes to the admin view, no changes to the underlying `evv_timesheets` schema, no auto-clock-out behavior. The staff still has to open the workspace and clock out themselves — the card only nudges them.
+- The 16h cutoff in the ComplianceInbox query stays as-is for detecting long-forgotten prior shifts; deduplication is done in-memory against the active punch.
 
 ## Files touched
-
-- `src/components/incidents/incident-report-dialog.tsx` — add the client guardian-status fetch, the N/A button, and the smart label logic inside `renderQuestionStep`.
-
-## Out of scope
-
-- The narrative-step follow-ups use the same `renderQuestionStep`, so they get the same button automatically — that's intentional and desirable.
-- No change to the admin-side guardian notification workflow.
-- No change to the existing "Not applicable — reason" typed field; it remains for staff who want to add context.
+- `src/hooks/use-today-shift.tsx`
+- `src/components/staff-mobile/today-hero.tsx`
+- `src/routes/dashboard.index.tsx`

@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Rocket, Clock, CalendarCheck2, Sun } from "lucide-react";
+import { Rocket, Clock, CalendarCheck2, Sun, AlertTriangle } from "lucide-react";
 import { useTodayShift } from "@/hooks/use-today-shift";
 import { useTodayShifts, type TodayShiftRow } from "@/hooks/use-today-shifts";
 
@@ -35,28 +35,60 @@ export function TodayHero() {
 
   // Active EVV punch wins — return to the in-progress shift.
   if (active) {
+    const clockInMs = Date.parse(active.clock_in_timestamp);
+    const hoursOpen = Number.isFinite(clockInMs)
+      ? (Date.now() - clockInMs) / 3_600_000
+      : 0;
+    const needsClockOut = hoursOpen >= 12;
+    const clockInLabel = Number.isFinite(clockInMs)
+      ? new Date(clockInMs).toLocaleString(undefined, {
+          weekday: "short", month: "short", day: "numeric",
+          hour: "numeric", minute: "2-digit",
+        })
+      : "earlier";
+
     return (
       <section
         aria-label="Active shift"
-        className="rounded-2xl border border-[#15a06a]/50 bg-[#15a06a]/5 p-5 shadow-[var(--shadow-card)]"
+        className={`rounded-2xl border p-5 shadow-[var(--shadow-card)] ${
+          needsClockOut
+            ? "border-amber-400/60 bg-amber-500/10"
+            : "border-[#15a06a]/50 bg-[#15a06a]/5"
+        }`}
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#15a06a]/15 text-[#0d5c3d]">
-              <Clock className="h-6 w-6" />
+            <span
+              className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl ${
+                needsClockOut
+                  ? "bg-amber-500/20 text-amber-800"
+                  : "bg-[#15a06a]/15 text-[#0d5c3d]"
+              }`}
+            >
+              {needsClockOut ? <AlertTriangle className="h-6 w-6" /> : <Clock className="h-6 w-6" />}
             </span>
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#0d5c3d]">
-                Shift in progress
+              <p
+                className={`text-xs font-semibold uppercase tracking-wide ${
+                  needsClockOut ? "text-amber-800" : "text-[#0d5c3d]"
+                }`}
+              >
+                {needsClockOut ? "Shift in progress · Needs your attention" : "Shift in progress"}
               </p>
               <h2 className="mt-0.5 text-lg font-semibold leading-snug">
-                You're on the clock
+                {needsClockOut ? (
+                  <>You've been on the clock for {Math.round(hoursOpen)}h — clock out now</>
+                ) : (
+                  <>You're on the clock</>
+                )}
                 <span className="ml-2 font-mono text-base text-muted-foreground">
                   {active.service_type_code}
                 </span>
               </h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Return to finish the shift and clock out.
+                {needsClockOut
+                  ? `This shift started ${clockInLabel}. Open it and clock out to keep your timesheet accurate.`
+                  : "Return to finish the shift and clock out."}
               </p>
             </div>
           </div>
@@ -66,7 +98,7 @@ export function TodayHero() {
               params={{ clientId: active.client_id }}
               search={{ tab: "clock-in" }}
             >
-              Return to shift
+              {needsClockOut ? "Clock out now" : "Return to shift"}
             </Link>
           </Button>
         </div>

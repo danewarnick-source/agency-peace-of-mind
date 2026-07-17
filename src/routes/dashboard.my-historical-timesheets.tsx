@@ -116,6 +116,17 @@ function EntryCard({ row, onChanged }: { row: Row; onChanged: () => void }) {
   const [note, setNote] = useState(row.shift_note_text ?? "");
   const [flagOpen, setFlagOpen] = useState(false);
   const [flagReason, setFlagReason] = useState(row.staff_flag_reason ?? "");
+  const [shorthand, setShorthand] = useState("");
+  const [nectarDraft, setNectarDraft] = useState<string | null>(null);
+  const [draftBusy, setDraftBusy] = useState(false);
+  const [nectarUsed, setNectarUsed] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
+  const speechSupported = typeof window !== "undefined" &&
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+  const draftFn = useServerFn(draftShiftNote);
 
   const updateNoteFn = useServerFn(updateMyHistoricalTimesheetNote);
   const flagFn = useServerFn(flagMyHistoricalTimesheet);

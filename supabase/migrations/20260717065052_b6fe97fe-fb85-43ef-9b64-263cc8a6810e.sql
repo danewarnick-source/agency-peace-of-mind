@@ -1,0 +1,2 @@
+ALTER TABLE public.evv_timesheets DROP CONSTRAINT evv_timesheets_status_check;
+ALTER TABLE public.evv_timesheets ADD CONSTRAINT evv_timesheets_status_check CHECK (status = ANY (ARRAY['Active'::text, 'Pending'::text, 'Approved'::text, 'Rejected'::text, 'Pending_Staff_Confirmation'::text]));

@@ -35,6 +35,7 @@ import {
 } from "@/components/evv/behavior-observations-block";
 import { BehaviorObservationsBoundary } from "@/components/evv/behavior-observations-boundary";
 import { useShiftBehaviorSetting } from "@/hooks/use-shift-behavior-setting";
+import { listClientTargetBehaviors } from "@/lib/client-target-behaviors.functions";
 import { getPendingTrackingForms } from "@/lib/forms.functions";
 import { PendingTrackingFormsDialog, type PendingForm } from "@/components/evv/pending-tracking-forms-dialog";
 import { NoteTriggerPrompt } from "@/components/residential/note-trigger-prompt";
@@ -343,6 +344,20 @@ export function PunchPad({
   const { data: behaviorSetting } = useShiftBehaviorSetting();
   const behaviorEnabled = behaviorSetting?.enabled ?? true;
   const [behaviorAnswers, setBehaviorAnswers] = useState<BehaviorAnswers>(emptyBehaviorAnswers);
+  const listTargetBehaviorsFn = useServerFn(listClientTargetBehaviors);
+  const { data: targetBehaviorRows = [] } = useQuery({
+    queryKey: ["client-target-behaviors", active?.client_id],
+    queryFn: () =>
+      listTargetBehaviorsFn({
+        data: {
+          organization_id: org!.organization_id,
+          client_id: active!.client_id,
+        },
+      }),
+    enabled: behaviorEnabled && !!active?.client_id && !!org?.organization_id,
+    staleTime: 5 * 60_000,
+  });
+  const targetBehaviorOptions = targetBehaviorRows.map((b) => b.behavior_name);
 
   // ── Pre-submit medication check (reads real emar_logs, no shadow store) ───
   const [medDosesResolved, setMedDosesResolved] = useState(true);
@@ -2921,6 +2936,7 @@ export function PunchPad({
                     <BehaviorObservationsBlock
                       value={behaviorAnswers}
                       onChange={setBehaviorAnswers}
+                      targetBehaviorOptions={targetBehaviorOptions}
                       onOpenIncident={() => navigate({ to: "/dashboard/command-center" })}
                     />
                   </BehaviorObservationsBoundary>

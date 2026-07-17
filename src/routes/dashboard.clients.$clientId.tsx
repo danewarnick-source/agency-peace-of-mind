@@ -42,6 +42,7 @@ import { FaceSheetButton } from "@/components/clients/face-sheet-button";
 import { SectionsView, ClientSpecificTrainingCard, GoalsEditor, PublishConfirmDialog } from "@/components/clients/client-specific-training-card";
 import { SectionVisibilityToggle, FieldVisibilityToggle } from "@/components/clients/visibility-toggles";
 import { CustomFieldsForSection } from "@/components/clients/custom-fields-panel";
+import { TargetBehaviorsPanel } from "@/components/clients/target-behaviors-panel";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, Pill, RefreshCw, Sparkles, Trash2, Upload, UserCircle2, Target, ShieldCheck, GraduationCap, HeartHandshake, Users, UtensilsCrossed, ListChecks, UserCircle, FileUp, Clock, FileText, AlertOctagon, ClipboardList, Home as HomeIcon, CalendarClock, Wallet, FolderOpen } from "lucide-react";
 import { clientFeatureVisible, useClientFeature } from "@/lib/client-features";
 import { MarEmarTab } from "@/components/workspace/mar-emar-tab";
@@ -249,6 +250,7 @@ function ClientProfileHub() {
           <Tabs defaultValue="goals">
             <TabsList className="mb-4">
               <TabsTrigger value="goals">Goals</TabsTrigger>
+              <TabsTrigger value="behaviors">Target Behaviors</TabsTrigger>
               <TabsTrigger value="medications">Medications</TabsTrigger>
             </TabsList>
 
@@ -259,6 +261,18 @@ function ClientProfileHub() {
                 </CareSection>
               </CareGroup>
 
+            </TabsContent>
+
+            <TabsContent value="behaviors" className="space-y-6">
+              <CareGroup label="Target Behaviors" hint="Named behaviors staff should recognize and document — surfaces in clock-out behavior observations">
+                <CareSection icon={ClipboardList} accent="amber">
+                  {orgId ? (
+                    <TargetBehaviorsPanel clientId={clientId} orgId={orgId} />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Organization not loaded.</p>
+                  )}
+                </CareSection>
+              </CareGroup>
             </TabsContent>
 
             <TabsContent value="medications" className="space-y-6">

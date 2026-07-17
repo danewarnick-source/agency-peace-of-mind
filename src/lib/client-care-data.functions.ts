@@ -401,6 +401,21 @@ export const getClientCareData = createServerFn({ method: "GET" })
         return g.job_codes.some((c) => c.toUpperCase() === codeUpper);
       });
 
+    const target_behaviors: CareTargetBehavior[] = ((tbRes?.data ?? []) as any[]).map((b) => ({
+      id: String(b.id),
+      behavior_name: String(b.behavior_name ?? ""),
+      description: String(b.description ?? ""),
+    }));
+    const emergency_contacts: CareEmergencyContact[] = ((ecRes?.data ?? []) as any[]).map((c) => ({
+      id: String(c.id),
+      name: String(c.name ?? ""),
+      phone: c.phone ?? null,
+      relationship: c.relationship ?? null,
+    }));
+    const preferred_activities: string[] = Array.isArray(row.preferred_activities)
+      ? (row.preferred_activities as unknown[]).map((s) => String(s ?? "").trim()).filter(Boolean)
+      : [];
+
     const visibility: ClientCareVisibility = {
       goalsForStaff,
       medicationsVisible: medicationsStaff.length > 0,
@@ -412,6 +427,9 @@ export const getClientCareData = createServerFn({ method: "GET" })
         medications: medicationsStaff,
         authorized_codes: authorizedCodesStaff,
         custom_fields: customFieldsStaff,
+        target_behaviors,
+        emergency_contacts,
+        preferred_activities,
       },
     };
 
@@ -424,10 +442,14 @@ export const getClientCareData = createServerFn({ method: "GET" })
       medications,
       authorized_codes,
       custom_fields,
+      target_behaviors,
+      emergency_contacts,
+      preferred_activities,
       visibilityRow,
       visibility,
     };
   });
+
 
 // ── Query options helper (for loaders and hooks) ────────────────────────────
 

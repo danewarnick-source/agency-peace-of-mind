@@ -2890,7 +2890,7 @@ export function PunchPad({
                   }}
                   clientId={active?.client_id}
                   triggeredByNoteId={active?.id}
-                  triggeredByNoteType={incidentTriggerOpen ? "evv_shift_note_trigger" : "evv_shift_quick_action"}
+                  triggeredByNoteType={incidentTriggerOpen ? "evv_timesheet" : null}
                   onSubmitted={(id) => {
                     setIncidentReportIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
                     setIncidentFlag(true);

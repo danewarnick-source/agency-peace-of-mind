@@ -224,9 +224,9 @@ export const logMedicationPass = createServerFn({ method: "POST" })
       administered_at: wasTaken ? data.actualTakenAt : null,
       actual_taken_at: wasTaken ? data.actualTakenAt : null,
       // DB check constraint allows only: administered | refused | omitted | missed | held.
-      // Map the client-facing statuses used by the shift-med check to those values.
+      // Map the client-facing statuses to those values.
       status:
-        data.status === "self_administered"
+        data.status === "self_administered" || data.status === "given"
           ? "administered"
           : data.status === "loa"
             ? "omitted"

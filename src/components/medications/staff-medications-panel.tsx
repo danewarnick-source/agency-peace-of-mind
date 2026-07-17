@@ -281,7 +281,7 @@ export function StaffMedicationsPanel({
                   </div>
                   <div className="shrink-0">
                     {row.logged && row.loggedStatus ? (
-                      <LoggedBadge status={row.loggedStatus} at={row.loggedAt} />
+                      <LoggedBadge status={row.loggedStatus} at={row.loggedAt ?? null} />
                     ) : (
                       <Button size="sm" onClick={() => setLogTarget(row)}>
                         Log

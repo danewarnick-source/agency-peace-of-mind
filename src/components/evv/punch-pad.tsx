@@ -2989,6 +2989,7 @@ export function PunchPad({
                     clockInIso={active.clock_in_timestamp}
                     emarHref={`/dashboard/workspace/${active.client_id}?tab=mar-emar`}
                     onResolvedChange={setMedDosesResolved}
+                    onPendingDosesChange={setPendingMedDoses}
                   />
                 )}
 

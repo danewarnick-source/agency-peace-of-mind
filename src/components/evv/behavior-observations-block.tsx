@@ -100,27 +100,27 @@ export function BehaviorObservationsBlock({
         <legend className="text-xs font-semibold text-foreground">
           1. Any behaviors of concern observed this shift? <span className="text-rose-600">*</span>
         </legend>
-        <div className="flex gap-2">
+        <div className="flex gap-2" role="radiogroup" aria-label="Behaviors of concern observed">
           {[
             { v: false, label: "No" },
             { v: true, label: "Yes" },
-          ].map((opt) => (
-            <label
-              key={String(opt.v)}
-              className={`flex min-h-[44px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium ${
-                value.behaviorsObserved === opt.v ? selectedPill : unselectedPill
-              }`}
-            >
-              <input
-                type="radio"
-                name={`${groupId}-observed`}
-                className="sr-only"
-                checked={value.behaviorsObserved === opt.v}
-                onChange={() => set("behaviorsObserved", opt.v)}
-              />
-              {opt.label}
-            </label>
-          ))}
+          ].map((opt) => {
+            const selected = value.behaviorsObserved === opt.v;
+            return (
+              <button
+                type="button"
+                key={String(opt.v)}
+                role="radio"
+                aria-checked={selected}
+                onClick={() => set("behaviorsObserved", opt.v)}
+                className={`flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium ${
+                  selected ? selectedPill : unselectedPill
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
         </div>
       </fieldset>
 

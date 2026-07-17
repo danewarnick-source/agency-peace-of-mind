@@ -71,7 +71,10 @@ function ComplianceInbox() {
     },
   });
 
-  const totalItems = rejectedLogs.length + openShifts.length;
+  // Exclude the currently-active shift — TodayHero already surfaces it
+  // (and promotes itself to a clock-out prompt past 12h).
+  const orphanOpenShifts = openShifts.filter((s) => s.id !== active?.id);
+  const totalItems = rejectedLogs.length + orphanOpenShifts.length;
   if (totalItems === 0) return null;
 
   return (

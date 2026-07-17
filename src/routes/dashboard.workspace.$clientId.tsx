@@ -34,7 +34,7 @@ import { ClientQuickInfoSheet } from "@/components/staff-mobile/client-quick-inf
 
 import { toast } from "sonner";
 import { AboutTab } from "@/components/workspace/about-tab";
-import { MarEmarTab } from "@/components/workspace/mar-emar-tab";
+import { StaffMedicationsPanel } from "@/components/medications/staff-medications-panel";
 import { FormsHubTab } from "@/components/workspace/forms-hub-tab";
 import { IdlePinLock } from "@/components/workspace/idle-pin-lock";
 import { ReimbursementShiftPanel } from "@/components/staff-mobile/reimbursement-shift-panel";
@@ -368,9 +368,10 @@ function ClientWorkspace() {
 
           {emarEnabled && (
             <TabsContent value="emar" className="mt-5">
-              <MarEmarTab
+              <StaffMedicationsPanel
                 clientId={client.id}
                 clientName={`${client.first_name} ${client.last_name}`}
+                serviceContext={effectivePresetCode ?? null}
               />
             </TabsContent>
           )}

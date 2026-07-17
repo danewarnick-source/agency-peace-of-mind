@@ -1,7 +1,7 @@
 import { useMemo, useState, useRef, useEffect } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
-import { MarEmarTab } from "@/components/workspace/mar-emar-tab";
+import { StaffMedicationsPanel } from "@/components/medications/staff-medications-panel";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -258,9 +258,10 @@ function HhsClientHub() {
         </TabsContent>
         {emarEnabled && (
           <TabsContent value="emar" className="mt-3">
-            <MarEmarTab
+            <StaffMedicationsPanel
               clientId={client.id}
               clientName={`${client.first_name} ${client.last_name}`}
+              serviceContext="HHS"
             />
           </TabsContent>
         )}

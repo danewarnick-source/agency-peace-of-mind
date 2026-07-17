@@ -3328,6 +3328,7 @@ function ShiftMedDueCheckSlot(props: {
   clockInIso: string;
   emarHref: string;
   onResolvedChange: (resolved: boolean) => void;
+  onPendingDosesChange: (pending: PendingMedDose[]) => void;
 }) {
   const windowEnd = useMemo(
     () => new Date().toISOString(),
@@ -3343,6 +3344,7 @@ function ShiftMedDueCheckSlot(props: {
       windowEnd={windowEnd}
       emarHref={props.emarHref}
       onResolvedChange={props.onResolvedChange}
+      onPendingDosesChange={props.onPendingDosesChange}
     />
   );
 }

@@ -23,7 +23,7 @@ import {
 } from "./incident-categories";
 import {
   DETAIL_BLOCKS, detailKeyForCategory, type DetailField,
-  APS_HOTLINE,
+  APS_HOTLINE, INJURY_CATEGORY_NAME, MEDICAL_EMERGENCY_CATEGORY_NAME,
 } from "@/lib/incident-detail-schemas";
 import { scanNarrativeForCategories, type NarrativeCategoryHit } from "@/lib/nectar-triggers";
 import {
@@ -312,14 +312,18 @@ export function IncidentReportDialog({
   const stepKeys = useMemo<string[]>(() => {
     const base: string[] = ["who-when", "witnessed", "where-what", "narrative"];
     if (block) base.push("details");
-    base.push("people", "injuries", "actions");
+    base.push("people");
+    if (category !== INJURY_CATEGORY_NAME && category !== MEDICAL_EMERGENCY_CATEGORY_NAME) {
+      base.push("injuries");
+    }
+    base.push("actions");
     if (aiEnabled && !narrativeReviewedInStep) base.push("nectar-interview");
     if (aiEnabled && !narrativeReviewedInStep && aiIssues) {
       aiIssues.forEach((_, i) => base.push(`nectar-q-${i}`));
     }
     base.push("review");
     return base;
-  }, [block, aiEnabled, aiIssues, narrativeReviewedInStep]);
+  }, [block, aiEnabled, aiIssues, narrativeReviewedInStep, category]);
 
   const [step, setStep] = useState(0);
   const [stepError, setStepError] = useState<string | null>(null);

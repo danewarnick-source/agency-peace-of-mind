@@ -159,8 +159,6 @@ export const DETAIL_BLOCKS: Record<DetailCategoryKey, DetailBlock> = {
         required: true, options: INJURY_TYPES },
       { name: "severity", label: "Severity / treatment level", type: "select",
         required: true, options: INJURY_SEVERITY },
-      { name: "witnessOrAfter", label: "Witnessed or found after the fact?", type: "select",
-        required: true, options: ["Witnessed", "Found after the fact"] },
       { name: "suspectedCause", label: "Suspected cause", type: "textarea", rows: 2 },
       { name: "photos", label: "Photos (optional, multiple)", type: "photos", max: 8 },
     ],

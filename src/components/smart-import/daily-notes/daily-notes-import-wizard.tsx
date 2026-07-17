@@ -14,7 +14,7 @@ import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import {
   Upload, X, Loader2, ArrowRight, ArrowLeft, Download,
-  CheckCircle2, AlertTriangle, HelpCircle, Archive, FileText, Wrench,
+  CheckCircle2, AlertTriangle, Archive, FileText, Wrench, FileSpreadsheet,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,8 +29,14 @@ import {
   createDailyNotesImportJob,
   importHistoricalDailyNotes,
 } from "@/lib/smart-import-daily-notes.functions";
-import { suggestImportColumnMapping } from "@/lib/smart-import-nectar-mapping.functions";
 import { checkImportDuplicates } from "@/lib/smart-import-duplicate-check.functions";
+import {
+  TEMPLATE_HEADERS,
+  buildTemplateCsv,
+  buildTemplateXlsxBlob,
+  triggerDownload,
+  validateTemplateHeaders,
+} from "@/lib/historical-daily-notes-template";
 
 
 type ParsedFile = { headers: string[]; rows: Record<string, string>[]; fileName: string };

@@ -1,34 +1,29 @@
 ## Problem
 
-In `src/components/records/records-tab.tsx` (lines 133–152), `staffOptionsQ` builds the staff name map with:
+Historical-import timesheets are inserted with `import_source = 'historical_import'` and `status = 'Pending_Staff_Confirmation'` (`src/lib/smart-import-timesheets.functions.ts`). On the Documentation → Records page, `reviewExceptions()` (`src/lib/records-review-rules.ts`) doesn't know about that state, so those rows trip "Missing/short note", "PCSP goal not checked", and "No clock-out" and land in the red "Needs attention" queue — even though nothing is actionable from admin's side. The real next step is the staff member confirming the entry at `/dashboard/my-historical-timesheets`.
 
-```ts
-.from("organization_members")
-.select("user_id, profiles:user_id(first_name, last_name)")
-```
+## Fix (records-tab UI only; no schema, no rule engine change)
 
-There's no FK between `organization_members` and `profiles` (both key off `auth.users.id`), so the nested embed silently returns `null` for every row. The fallback is `user_id.slice(0, 8)` — the short random-looking string the user sees. This map feeds every "caregiver" column on the Records tab (EVV timesheets, general shifts, and the exports below).
+Edit `src/components/records/records-tab.tsx`:
 
-## Fix
+1. Add `import_source` to `SELECT_COLS` and to the `Row` type.
+2. Extend `Derived` with `awaiting_staff_confirmation: boolean`, computed as `import_source === 'historical_import' && status === 'Pending_Staff_Confirmation'`.
+3. In the `derivedAll` mapper: when `awaiting_staff_confirmation` is true, set `exceptions = []` (skip `reviewExceptions()` entirely) so these rows do NOT enter the attention set and are not double-flagged as compliance problems.
+4. In the "Why flagged / Flags" cell:
+   - When `awaiting_staff_confirmation`, render a single neutral badge — slate/muted, `<Clock3 />` icon, label `Awaiting staff confirmation`, tooltip `Imported from a historical spreadsheet — waiting for {staff_name} to review and sign off at My historical timesheets. Nothing to fix here.`
+   - Otherwise keep existing `ReasonBadge` list.
+5. In the "In → Out" cell (or right after the caregiver name), keep the existing `edited` chip behavior. No other columns change.
 
-Replace the nested embed with the same two-step pattern already used further down in the same file (lines 429–432), which queries the `org_member_directory` view for staff names.
-
-Rewrite `staffOptionsQ` to:
-
-1. Fetch active members: `supabase.from("organization_members").select("user_id").eq("organization_id", orgId).eq("active", true)`.
-2. Fetch names in one follow-up call: `supabase.from("org_member_directory").select("id, full_name").in("id", userIds)`.
-3. Merge in JS: for each `user_id`, use `full_name` when present; fall back to the 8-char id slice only when truly missing (unchanged behavior for orphaned rows).
-4. Return the same `{ value, label }[]` shape, sorted by label, so no downstream code changes.
-
-No other logic, filters, exports, columns, or types change. Same query key (`["records-staff", orgId]`) so caching stays intact.
+Effect: awaiting-confirmation rows disappear from the "Needs attention" tab and its count, still appear under "All records" with the clear neutral label, and admins can see who owes the sign-off without seeing false compliance red flags.
 
 ## Files touched
 
-- `src/components/records/records-tab.tsx` — only the `staffOptionsQ` block (≈20 lines).
+- `src/components/records/records-tab.tsx` — SELECT, `Row`, `Derived`, `derivedAll` mapper, and the flags cell (~20 lines total).
+
+No changes to `records-review-rules.ts`, no DB migration, no impact on EVV export logic (awaiting-confirmation rows keep their existing `is_evv_locked` classification).
 
 ## Verification
 
-- Records tab caregiver column shows real names for active staff.
-- Staff filter dropdown lists real names.
-- Exports (CSV rows built from `staffMap`) include real names.
-- No TS errors; build passes.
+- Records → Needs attention: no historical-import rows with `Pending_Staff_Confirmation` remain in the list; attention count drops accordingly.
+- Records → All records: those rows show the "Awaiting staff confirmation" badge, no red exception chips, and the tooltip explains the next step.
+- Live (non-imported) shifts with real missing notes / no clock-out are unaffected.

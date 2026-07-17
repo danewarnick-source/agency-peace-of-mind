@@ -522,7 +522,8 @@ function MarPanel({ shift, userId }: { shift: Shift; userId?: string }) {
                           <Badge className={
                             e.status === "administered" || e.status === "self_administered" ? "bg-emerald-600 text-white" :
                             e.status === "refused" ? "bg-amber-600 text-white" :
-                            e.status === "missed" || e.status === "omitted" ? "bg-rose-600 text-white" : "bg-muted"
+                            e.status === "missed" || e.status === "omitted" ? "bg-rose-600 text-white" :
+                            e.status === "loa" ? "bg-blue-600 text-white" : "bg-muted"
                           }>
                             {e.status}
                             {stampAt ? ` · ${new Date(stampAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}

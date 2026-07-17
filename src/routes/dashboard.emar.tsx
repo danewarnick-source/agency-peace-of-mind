@@ -412,10 +412,11 @@ function PassDialog({
             <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="self_administered">✅ Self-administered (observed)</SelectItem>
+                <SelectItem value="self_administered">✅ Observed</SelectItem>
                 <SelectItem value="refused">🛑 Refused</SelectItem>
                 <SelectItem value="omitted">⚠️ Omitted</SelectItem>
                 <SelectItem value="missed">⏰ Missed</SelectItem>
+                <SelectItem value="loa">✈️ LOA (away with meds)</SelectItem>
               </SelectContent>
             </Select>
           </div>

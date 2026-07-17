@@ -5,6 +5,10 @@ export type ScheduledDose = {
   medication_id: string;
   medication_name: string;
   dosage: string | null;
+  route: string | null;
+  is_prn: boolean;
+  is_controlled: boolean;
+  is_rescue: boolean;
   time_label: string;        // "HH:MM"
   scheduled_for_iso: string; // anchored within window
   logged: boolean;
@@ -52,7 +56,7 @@ export function useShiftMedDueStatus(args: {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: meds, error: medsErr } = await (supabase as any)
         .from("client_medications")
-        .select("id, medication_name, dosage, scheduled_times")
+        .select("id, medication_name, dosage, route, scheduled_times, is_prn, is_controlled, is_rescue")
         .eq("organization_id", organizationId!)
         .eq("client_id", clientId!)
         .eq("is_active", true);
@@ -62,7 +66,11 @@ export function useShiftMedDueStatus(args: {
         id: string;
         medication_name: string;
         dosage: string | null;
+        route: string | null;
         scheduled_times: string[] | null;
+        is_prn: boolean;
+        is_controlled: boolean;
+        is_rescue: boolean;
       }>;
       if (activeMeds.length === 0) return { scheduledDoses: [] };
 
@@ -88,6 +96,10 @@ export function useShiftMedDueStatus(args: {
                 medication_id: m.id,
                 medication_name: m.medication_name,
                 dosage: m.dosage,
+                route: m.route,
+                is_prn: m.is_prn,
+                is_controlled: m.is_controlled,
+                is_rescue: m.is_rescue,
                 time_label: t,
                 scheduled_for_iso: d.toISOString(),
                 logged: false,

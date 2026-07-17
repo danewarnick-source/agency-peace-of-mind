@@ -153,7 +153,9 @@ export function PunchPad({
   caseload = [],
   presetServiceCode,
   lockServiceCode = false,
+  autoOpenCompliance = false,
 }: PunchPadProps) {
+
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();

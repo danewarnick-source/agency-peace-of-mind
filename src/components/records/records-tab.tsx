@@ -134,22 +134,36 @@ export function RecordsTab() {
     enabled: !!orgId,
     queryKey: ["records-staff", orgId],
     queryFn: async () => {
-      const { data } = await supabase
+      // Two-step lookup: organization_members has no FK to profiles, so a
+      // nested embed silently returns null. Fetch ids first, then names
+      // from the org_member_directory view, and merge in JS.
+      const { data: members } = await supabase
         .from("organization_members")
-        .select("user_id, profiles:user_id(first_name, last_name)")
+        .select("user_id")
         .eq("organization_id", orgId!)
         .eq("active", true);
-      type R = { user_id: string; profiles: { first_name: string; last_name: string } | null };
-      return ((data as unknown as R[]) ?? [])
-        .map((r) => ({
-          value: r.user_id,
-          label: r.profiles
-            ? `${r.profiles.first_name ?? ""} ${r.profiles.last_name ?? ""}`.trim() || r.user_id.slice(0, 8)
-            : r.user_id.slice(0, 8),
-        }))
+      const userIds = Array.from(
+        new Set(((members ?? []) as Array<{ user_id: string }>).map((m) => m.user_id)),
+      );
+      if (userIds.length === 0) return [];
+      const { data: directory } = await supabase
+        .from("org_member_directory")
+        .select("id, full_name")
+        .in("id", userIds);
+      const nameMap = new Map(
+        ((directory ?? []) as Array<{ id: string; full_name: string | null }>).map(
+          (d) => [d.id, (d.full_name ?? "").trim()],
+        ),
+      );
+      return userIds
+        .map((uid) => {
+          const name = nameMap.get(uid) ?? "";
+          return { value: uid, label: name || uid.slice(0, 8) };
+        })
         .sort((a, b) => a.label.localeCompare(b.label));
     },
   });
+
 
   const clientOptionsQ = useQuery({
     enabled: !!orgId,

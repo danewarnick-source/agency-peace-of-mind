@@ -1,57 +1,34 @@
+## Problem
 
-## Goal
+In `src/components/records/records-tab.tsx` (lines 133–152), `staffOptionsQ` builds the staff name map with:
 
-Replace the header-guessing / NECTAR-column-mapping flow in the historical **daily notes** import with the same required-template flow already used by historical timesheets. If the uploaded file doesn't match the template exactly, tell the user to download the template — don't try to guess.
+```ts
+.from("organization_members")
+.select("user_id, profiles:user_id(first_name, last_name)")
+```
 
-## Scope
+There's no FK between `organization_members` and `profiles` (both key off `auth.users.id`), so the nested embed silently returns `null` for every row. The fallback is `user_id.slice(0, 8)` — the short random-looking string the user sees. This map feeds every "caregiver" column on the Records tab (EVV timesheets, general shifts, and the exports below).
 
-Frontend only. No changes to server functions, DB schema, or the downstream matching / duplicate-check / staff-attestation flow.
+## Fix
 
-## Files
+Replace the nested embed with the same two-step pattern already used further down in the same file (lines 429–432), which queries the `org_member_directory` view for staff names.
 
-### 1. New — `src/lib/historical-daily-notes-template.ts`
+Rewrite `staffOptionsQ` to:
 
-Mirrors `src/lib/historical-timesheets-template.ts`. Exports:
+1. Fetch active members: `supabase.from("organization_members").select("user_id").eq("organization_id", orgId).eq("active", true)`.
+2. Fetch names in one follow-up call: `supabase.from("org_member_directory").select("id, full_name").in("id", userIds)`.
+3. Merge in JS: for each `user_id`, use `full_name` when present; fall back to the 8-char id slice only when truly missing (unchanged behavior for orphaned rows).
+4. Return the same `{ value, label }[]` shape, sorted by label, so no downstream code changes.
 
-- `TEMPLATE_HEADERS`, in this exact order:
-  1. `Staff Name`
-  2. `Client Name`
-  3. `Date`
-  4. `Narrative`
-  5. `Goals Addressed`  *(only column allowed to be blank)*
-- One filled example row, e.g.
-  - Staff Name: `Jane Doe`
-  - Client Name: `John Smith`
-  - Date: `2026-05-14`
-  - Narrative: `Example row — delete before importing. John had a calm morning, ate breakfast independently…`
-  - Goals Addressed: `Independent meal prep; Community outing`
-- `buildTemplateCsv()`, `buildTemplateXlsxBlob()`, `triggerDownload()`, and `validateTemplateHeaders()` — same shape as the timesheets template module. Header check is case-insensitive/trimmed and exact-order; on mismatch, the error message tells the user to download the template and lists the five required columns.
+No other logic, filters, exports, columns, or types change. Same query key (`["records-staff", orgId]`) so caching stays intact.
 
-### 2. Edit — `src/components/smart-import/daily-notes/daily-notes-import-wizard.tsx`
+## Files touched
 
-Remove all column-guessing; drive review rows off fixed template columns.
+- `src/components/records/records-tab.tsx` — only the `staffOptionsQ` block (≈20 lines).
 
-- **Remove** the import and any call to `suggestImportColumnMapping` from `@/lib/smart-import-nectar-mapping.functions`, and remove the `FieldSuggestion` / NECTAR-analyzing UI state.
-- **Remove** the `Mapping`, `WholeFile`, and per-field manual mapping UI (Step 2 "Map columns" screen and its `MapStep`-style component).
-- **Remove** the "whole file belongs to one staff/client" constants — no longer needed because the template requires Staff Name and Client Name on every row.
-- Add imports from the new `historical-daily-notes-template` module (`TEMPLATE_HEADERS`, `buildTemplateCsv`, `buildTemplateXlsxBlob`, `triggerDownload`, `validateTemplateHeaders`).
-- In `onPickFile`, after `parseFile`, call `validateTemplateHeaders(p.headers)`. If not ok, `toast.error(check.message)` and stop. Only on success do we continue.
-- Build review rows directly from the fixed header names (`Staff Name`, `Client Name`, `Date`, `Narrative`, `Goals Addressed`) instead of the mapping lookup. Goals parsing keeps the existing `splitGoals` (newlines / semicolons).
-- Collapse the wizard from **Upload → Map columns → Review → Commit** to **Upload → Review → Commit**. Update the stepper labels and step numbers accordingly, and jump straight from upload to review.
-- Rework `UploadStep` to match the timesheets UploadStep: "Step 1 — download the template, then fill it in" card with a short description listing the five columns, a note that Goals Addressed is optional and the example row must be deleted before import, and two buttons: **Download template (CSV)** and **Download template (Excel)**. Keep the existing drag-drop / file-picker UI below.
+## Verification
 
-### Kept exactly as-is
-
-- Staff / client name matching against the org's real records.
-- Ambiguous-match resolution UI.
-- The admin "resolve this unmatched name everywhere it appears" action.
-- Duplicate detection via `checkImportDuplicates`.
-- Commit path through `createDailyNotesImportJob` / `importHistoricalDailyNotes` — imported rows still land in `pending_staff_attestation` awaiting staff sign-off.
-- The former-staff attestation fallback page.
-
-## Out of scope
-
-- No changes to `src/lib/smart-import-daily-notes.functions.ts` or any other server function.
-- No DB migration.
-- No changes to `smart-import-nectar-mapping.functions.ts` (still used elsewhere; just no longer called from daily notes).
-- No changes to the historical timesheets wizard.
+- Records tab caregiver column shows real names for active staff.
+- Staff filter dropdown lists real names.
+- Exports (CSV rows built from `staffMap`) include real names.
+- No TS errors; build passes.

@@ -290,6 +290,7 @@ export function PunchPad({
   const [incidentDialogOpen, setIncidentDialogOpen] = useState(false);
   const [incidentTriggerOpen, setIncidentTriggerOpen] = useState(false);
   const [incidentReportIds, setIncidentReportIds] = useState<string[]>([]);
+  const [incidentAnswer, setIncidentAnswer] = useState<"yes" | "no" | null>(null);
 
   // ── Review-by-exception (Timeclock pass) ────────────────────────────────────
   // Variance + attestation + incident + staff-requested time correction. None
@@ -952,7 +953,7 @@ export function PunchPad({
   const longShiftOk = !isLongShift || longShiftAck || correctionOpen;
   const canSubmitCompliance =
     hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk &&
-    longShiftOk && triggersResolved && medDosesResolved && !busy &&
+    longShiftOk && triggersResolved && medDosesResolved && incidentAnswer !== null && !busy &&
     (!correctionOpen || !correctionHasChange || correctionValid);
 
 
@@ -981,6 +982,9 @@ export function PunchPad({
     setTriggersResolved(true);
     setMedDosesResolved(true);
     setPendingMedDoses([]);
+    setIncidentReportIds([]);
+    setIncidentFlag(false);
+    setIncidentAnswer(null);
     setCorrectionOpen(false);
     setCorrectionIn("");
     setCorrectionOut("");
@@ -1498,7 +1502,9 @@ export function PunchPad({
       update.nectar_drafted_confirmed_by = user.id;
     }
     if (args.outsideReason) update.outside_geofence_reason = args.outsideReason;
-    if (incidentFlag || incidentReportIds.length > 0) {
+    if (incidentAnswer === "no") {
+      update.incident_flag = false;
+    } else if (incidentFlag || incidentReportIds.length > 0) {
       update.incident_flag = true;
     }
     if (args.aiStatus) {
@@ -2878,21 +2884,53 @@ export function PunchPad({
                   )}
                 </div>
 
-                {/* Quick action: file an Incident Report mid-shift without leaving punch-pad. */}
+                {/* Incident report: explicit Yes/No so staff cannot skip it. */}
                 {active && (
-                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs">
-                    <span className="text-muted-foreground">
-                      Something happen this shift? File the §1.27 Incident Report now — your supervisor is notified the moment you submit.
-                    </span>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setIncidentDialogOpen(true)}
-                    >
-                      <AlertTriangleIcon className="mr-1 h-3.5 w-3.5 text-amber-600" />
-                      File Incident Report
-                    </Button>
+                  <div className="grid gap-2 rounded-md border border-border bg-muted/40 px-3 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <AlertTriangleIcon className="h-4 w-4 text-amber-600" />
+                      <span className="text-sm font-medium">
+                        Did anything happen this shift that needs an incident report?
+                      </span>
+                      {incidentReportIds.length > 0 && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:text-emerald-200">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Incident report filed
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={incidentReportIds.length > 0}
+                        onClick={() => {
+                          setIncidentAnswer("no");
+                          setIncidentFlag(false);
+                          setIncidentDialogOpen(false);
+                        }}
+                        className={`min-h-[44px] rounded-md border px-3 py-2 text-xs font-medium ${incidentAnswer === "no" ? selectedPill : unselectedPill}`}
+                      >
+                        No
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          setIncidentAnswer("yes");
+                          setIncidentFlag(true);
+                          setIncidentDialogOpen(true);
+                        }}
+                        className={`min-h-[44px] rounded-md border px-3 py-2 text-xs font-medium ${incidentAnswer === "yes" || incidentReportIds.length > 0 ? selectedPill : unselectedPill}`}
+                      >
+                        {incidentReportIds.length > 0 ? "Add another report" : "Yes"}
+                      </Button>
+                    </div>
+                    {incidentAnswer === "yes" && incidentReportIds.length === 0 && (
+                      <p className="text-[11px] text-muted-foreground">
+                        Submit the incident report before you can submit the timesheet.
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -2930,6 +2968,7 @@ export function PunchPad({
                   onSubmitted={(id) => {
                     setIncidentReportIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
                     setIncidentFlag(true);
+                    setIncidentAnswer("yes");
                     // Force the NoteTriggerPrompt poll to refetch so the
                     // incident gate clears the moment the IR is submitted.
                     qc.invalidateQueries({

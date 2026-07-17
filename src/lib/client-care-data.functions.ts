@@ -53,7 +53,22 @@ export type CareIdentity = {
   discharge_date: string | null;
   medicaid_id: string | null;
   status: string | null;
+  phone_number: string | null;
+  is_own_guardian: boolean | null;
+  guardian_name: string | null;
+  guardian_phone: string | null;
+  support_coordinator_name: string | null;
+  support_coordinator_phone: string | null;
+  support_coordinator_email: string | null;
+  has_abi: boolean | null;
+  hr_applicable: boolean | null;
+  dnr_applicable: boolean | null;
+  diagnoses: string[];
+  primary_care_name: string | null;
+  pcsp_expiration_date: string | null;
+  special_directions: string | null;
 };
+
 
 export type CareFlags = {
   self_admin_med_support: boolean;

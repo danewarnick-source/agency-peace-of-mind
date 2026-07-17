@@ -1,34 +1,46 @@
-# Fix: Historical Daily Notes CSV/Excel upload stuck on "loading staff and clients"
+## Goal
 
-## Root cause
-`DailyNotesImportWizard` loads the staff pool with a nested PostgREST embed:
+Collapse the staff-facing "Historical Timesheets" and "Historical Daily Notes" pages into one sidebar entry — "Historical Records" — with a top-of-page toggle that swaps between the two existing views. No behavior changes to confirming a timesheet or signing a daily note.
 
-```ts
-supabase
-  .from("organization_members")
-  .select("user_id, profiles:profiles!inner(id, first_name, last_name, full_name)")
-  .eq("organization_id", ...)
-  .eq("active", true)
-```
+## Changes
 
-There is no foreign key between `organization_members` and `profiles` in this project (both tables key off `auth.users.id`). The embed silently errors, `peopleQ` never resolves with data, and every upload attempt hits the guard:
+**1. Extract the page bodies as reusable components (no logic changes)**
 
-```ts
-if (!peopleQ.data) {
-  toast.error("Still loading staff and clients — try again in a moment.");
-  return;
-}
-```
+- `src/routes/dashboard.my-historical-timesheets.tsx`: keep the file and its `Route`, but also `export function MyHistoricalTimesheetsPage()` (already the component — just add `export`). All queries, mutations, and UI stay identical.
+- `src/routes/dashboard.my-historical-daily-notes.tsx`: same treatment — `export` the existing `MyHistoricalDailyNotesPage`.
 
-So the file is never parsed and nothing uploads — exactly the symptom reported.
+Both existing routes keep working at their current URLs so nothing breaks mid-flight; they just become secondary entry points.
 
-## Fix
-In `src/components/smart-import/daily-notes/daily-notes-import-wizard.tsx`, replace the embedded query with the same two-step pattern already used elsewhere in the app for this situation:
+**2. New combined route: `src/routes/dashboard.my-historical-records.tsx`**
 
-1. Query `organization_members` for `user_id` where `organization_id = org` and `active = true`.
-2. Query `profiles` with `.in("id", userIds)` for `id, first_name, last_name, full_name`.
-3. Join in JS to build the `staff: Person[]` array (same shape / `personNorms` output as today).
-4. Keep the clients query unchanged.
-5. Surface real errors from either query via `throw` so the existing `peopleQ.isError` toast has a useful message.
+- `createFileRoute("/dashboard/my-historical-records")`, title "Historical records — HIVE".
+- Renders a header ("Historical records") and a shadcn `Tabs` control with two triggers: **Timesheets** and **Daily notes**.
+- Selected tab renders `<MyHistoricalTimesheetsPage />` or `<MyHistoricalDailyNotesPage />` below the toggle — the imported components already own their own headers, loading, empty, and action UI, so they drop in unchanged.
+- **Default-tab logic (client-side, cheap):** on mount, fire the two existing list server fns in parallel via `useQueries`:
+  - `listMyPendingHistoricalTimesheets` → `queryKey: ["my-historical-timesheets-pending"]`
+  - `listMyPendingHistoricalDailyNotes` → `queryKey: ["my-historical-daily-notes-pending"]`
+  Reusing the same query keys means the child pages hit the cache instantly — no double-fetch.
+  Rule: `timesheetsCount > 0 && dailyNotesCount === 0` → Daily notes tab? No — timesheets. `timesheetsCount === 0 && dailyNotesCount > 0` → Daily notes. Otherwise (both have items, both empty, or still loading) → **Timesheets**. Only set the default once, after both queries settle; user tab clicks after that are respected via local state.
+  Show small numeric badges on each tab trigger when count > 0 so staff can see at a glance what's waiting.
 
-No other files change. No DB / RLS / template / server-fn changes. Parsing, matching, review UI, duplicate check, and commit flow are untouched — once the people pool actually loads, the existing CSV/XLSX parser (which already handles both formats correctly) runs normally.
+**3. Sidebar update — `src/routes/dashboard.tsx`**
+
+- Replace the existing line 136 entry (`/dashboard/my-historical-timesheets` — "Historical Timesheets", `Archive` icon, `evv_timesheets` feature) with a single entry: `to: "/dashboard/my-historical-records"`, label `"Historical Records"`, `Archive` icon, same `evv_timesheets` feature gate.
+- No separate "Historical Daily Notes" sidebar item is added.
+
+**4. Leave the old routes reachable**
+
+Both `/dashboard/my-historical-timesheets` and `/dashboard/my-historical-daily-notes` continue to render exactly as they do today (no redirect, no deprecation banner). The combined route is purely additive — this keeps any existing in-app links, notifications, or bookmarks working while the new sidebar tab becomes the primary entry.
+
+## Out of scope
+
+- No changes to server functions, RLS, DB, import wizard, or attestation/confirmation flows.
+- No changes to the daily-notes CSV import fix or the `import_jobs_mode_check` migration from earlier this session.
+- No design system / color changes beyond using the existing shadcn `Tabs` and `Badge` primitives.
+
+## Files touched
+
+- edit `src/routes/dashboard.my-historical-timesheets.tsx` (add `export` on the page component)
+- edit `src/routes/dashboard.my-historical-daily-notes.tsx` (add `export` on the page component)
+- edit `src/routes/dashboard.tsx` (swap sidebar entry)
+- create `src/routes/dashboard.my-historical-records.tsx` (new combined route + tab shell)

@@ -363,7 +363,7 @@ function BillingSnapshotCard({ claimsReadyAmount, payrollGross }: { claimsReadyA
             Open Billing <ArrowRight className="h-3 w-3" />
           </p>
         </Link>
-        <Link to="/dashboard/compliance-desk" search={{ focus: "payroll-review" }} className="cursor-pointer rounded-lg border border-border bg-background p-4 transition hover:border-primary/40">
+        <Link to="/dashboard/hub/documentation" search={{ tab: "records", focus: "payroll-review" }} className="cursor-pointer rounded-lg border border-border bg-background p-4 transition hover:border-primary/40">
           <p className="text-xs font-medium text-muted-foreground">Payroll this period (gross)</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums">{fmtUSD(payrollGross)}</p>
           <p className="mt-1 inline-flex items-center gap-1 text-xs text-primary">

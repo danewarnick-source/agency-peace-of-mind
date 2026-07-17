@@ -35,7 +35,7 @@ export function AboutTab({ client }: { client: CaseloadClient }) {
   const sections = care.data?.visibility.sections;
 
   const identitySectionOn = sections?.identity ?? true;
-  const carePlanSectionOn = sections?.care_plan ?? true;
+
 
   // PCSP goals always mirror admin — server already applies per-goal
   // visibility switches; the care_plan section toggle does not hide the list.

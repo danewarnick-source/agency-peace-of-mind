@@ -3278,7 +3278,7 @@ export function PunchPad({
                     className={
                       correctionOpen && correctionHasChange
                         ? "w-full bg-amber-600 text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
-                        : "w-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+                        : "w-full bg-orange-500 text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                     }
                   >
                     {(busy || aiBusy) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

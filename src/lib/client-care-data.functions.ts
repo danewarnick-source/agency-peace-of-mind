@@ -53,7 +53,22 @@ export type CareIdentity = {
   discharge_date: string | null;
   medicaid_id: string | null;
   status: string | null;
+  phone_number: string | null;
+  is_own_guardian: boolean | null;
+  guardian_name: string | null;
+  guardian_phone: string | null;
+  support_coordinator_name: string | null;
+  support_coordinator_phone: string | null;
+  support_coordinator_email: string | null;
+  has_abi: boolean | null;
+  hr_applicable: boolean | null;
+  dnr_applicable: boolean | null;
+  diagnoses: string[];
+  primary_care_name: string | null;
+  pcsp_expiration_date: string | null;
+  special_directions: string | null;
 };
+
 
 export type CareFlags = {
   self_admin_med_support: boolean;
@@ -202,11 +217,11 @@ export const getClientCareData = createServerFn({ method: "GET" })
       supabase
         .from("clients")
         .select(
-          "id, organization_id, first_name, last_name, date_of_birth, admission_date, discharge_date, medicaid_id, account_status, self_admin_med_support, self_admin_med_support_locked, preferred_activities",
+          "id, organization_id, first_name, last_name, date_of_birth, admission_date, discharge_date, medicaid_id, account_status, self_admin_med_support, self_admin_med_support_locked, preferred_activities, phone_number, is_own_guardian, guardian_name, guardian_phone, support_coordinator_name, support_coordinator_phone, support_coordinator_email, has_abi, hr_applicable, dnr_applicable, diagnoses, primary_care_name, pcsp_expiration_date, special_directions",
         )
-
         .eq("id", clientId)
         .maybeSingle(),
+
       supabase
         .from("client_specific_trainings")
         .select("id, goals")
@@ -275,7 +290,24 @@ export const getClientCareData = createServerFn({ method: "GET" })
       discharge_date: row.discharge_date ?? null,
       medicaid_id: row.medicaid_id ?? null,
       status: row.account_status ?? null,
+      phone_number: row.phone_number ?? null,
+      is_own_guardian: row.is_own_guardian ?? null,
+      guardian_name: row.guardian_name ?? null,
+      guardian_phone: row.guardian_phone ?? null,
+      support_coordinator_name: row.support_coordinator_name ?? null,
+      support_coordinator_phone: row.support_coordinator_phone ?? null,
+      support_coordinator_email: row.support_coordinator_email ?? null,
+      has_abi: row.has_abi ?? null,
+      hr_applicable: row.hr_applicable ?? null,
+      dnr_applicable: row.dnr_applicable ?? null,
+      diagnoses: Array.isArray(row.diagnoses)
+        ? (row.diagnoses as unknown[]).map((s) => String(s ?? "").trim()).filter(Boolean)
+        : [],
+      primary_care_name: row.primary_care_name ?? null,
+      pcsp_expiration_date: row.pcsp_expiration_date ?? null,
+      special_directions: row.special_directions ?? null,
     };
+
 
     const flags: CareFlags = {
       self_admin_med_support: !!row.self_admin_med_support,

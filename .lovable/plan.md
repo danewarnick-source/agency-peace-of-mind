@@ -1,47 +1,59 @@
 
 ## Goal
 
-The staff **About** tab should show live admin data for **Behavioral Trigger Flags**, **Emergency Contacts**, and **Interests & Hobbies** — read-only. And remove the section-visibility toggles on the admin client page, since they aren't reliably working and are gating this information unnecessarily.
+Make the staff **About** tab a read-only mirror of the admin **Client → Profile** tab. Same fields, same grouping, same values (e.g. Justin's Support Coordinator will now show). Drop the duplicated Face Sheet card that repeats the same data in a different shape.
 
-## Data sources (already exist on admin side)
+## What admin Profile shows today (source of truth)
 
-- **Behavioral triggers** → `client_target_behaviors` (edited on admin's Care Plan → Target Behaviors tab, via `TargetBehaviorsPanel`).
-- **Emergency contacts** → `client_emergency_contacts` (edited on admin's Identity tab).
-- **Interests & hobbies** → `clients.preferred_activities` (string[]; populated via intake/import).
+From `ClientProfileTab`:
+
+- **Identity & contact**
+  - Person: Name, Medicaid ID, Guardian (self-guardian or name + phone), DOB + age, Phone
+  - Support Coordinator: Name, Phone, Email
+  - Enrollment: Admitted, Discharge date
+  - Flags: ABI, Human Rights applicable, DNR order
+- **Contacts** — emergency contacts (name / relationship / phone)
+- **At a glance** — Primary diagnosis, Primary care, PCSP expiration, Admitted
+- **Clinical Alert** banner — `special_directions` (when present)
+
+Plus the record-completeness bar and archive footer, which are admin-only actions and stay off the staff view.
 
 ## Changes
 
 ### 1. `src/lib/client-care-data.functions.ts`
-Extend the shared care-data server fn (the single canonical read path used by the About tab) so it also returns:
+Add the extra client columns to the existing `clients` select and expose them on `CareIdentity`:
 
-- `target_behaviors: { id, behavior_name, description }[]`
-- `emergency_contacts: { id, name, phone, relationship }[]`
-- `preferred_activities: string[]`
+- `phone_number`
+- `is_own_guardian`, `guardian_name`, `guardian_phone`
+- `support_coordinator_name`, `support_coordinator_phone`, `support_coordinator_email`
+- `has_abi`, `hr_applicable`, `dnr_applicable`
+- `diagnoses` (string[]), `primary_care_name`
+- `pcsp_expiration_date`
+- `special_directions`
 
-Add three parallel selects to the existing `Promise.all`, and mirror the results into `visibility.staffCare` unfiltered (these three lists always mirror admin — no per-item visibility gating).
+`identity` (admin view) gets the raw values; `visibility.staffCare.identity` mirrors them 1:1 (no gating — user's directive from the last turn).
 
 ### 2. `src/components/workspace/about-tab.tsx`
-Replace the three static placeholder cards with real data from `staffCare`:
+Rebuild the tab to match admin Profile grouping, read-only:
 
-- **Behavioral Trigger Flags** — list each `behavior_name` with `description` beneath. Empty state: "No documented triggers on file."
-- **Emergency Contacts** — list `name` · `relationship` · `phone` (phone as `tel:` link on mobile). Empty state: existing copy.
-- **Interests & Hobbies** — render each entry in `preferred_activities` as a `Badge`. Empty state: "No interests recorded yet."
+- **Clinical Alert banner** at top when `special_directions` is set (amber card, no edit).
+- **Identity & contact** card with the four admin groups (Person / Support Coordinator / Enrollment / Flags), using the same `Row`-style label/value shape.
+- **Emergency Contacts** card — keep current live-data card (already correct).
+- **At a glance** card — Primary diagnosis, Primary care, PCSP expiration (with the same amber "expiring soon" treatment), Admitted.
+- **Person-Centered Support Plan** goals — keep as-is.
+- **Behavioral Trigger Flags** — keep as-is.
+- **Interests & Hobbies** — keep as-is.
+- **Remove** `<FaceSheetInfoCard />` from About (it renders the same identity/contact/coordinator data admins already see above; the printable face sheet stays available elsewhere).
+- Keep `<ClientPhotoCard />`.
 
-All read-only — no edit affordances.
+No edit affordances anywhere on this tab; no admin-only controls (record-completeness bar, archive footer, edit pencils).
 
-### 3. `src/routes/dashboard.clients.$clientId.tsx`
-Remove the six `<SectionVisibilityToggle>` mounts (identity, care_plan, billing, files, operations, compliance) and drop the import. Per-field eye toggles (`FieldVisibilityToggle`) on individual goals/meds/codes stay — those are working.
-
-Server-side, `getClientCareData` continues to honor per-field toggles; only the section-level gate goes away. About-tab surfaces (triggers/contacts/interests/PCSP goals) are always visible to staff.
-
-## Technical notes
-
-- No migration needed — all three tables/columns already exist.
-- `client_emergency_contacts` and `client_target_behaviors` are org-scoped with existing RLS; the shared care-data fn already runs under `requireSupabaseAuth`, so staff reads pass.
-- `client_care_data` query key is unchanged, so the workspace About tab picks up the new fields on the next fetch with no invalidation plumbing.
+### 3. Copy small helpers into the staff view
+`fmtDate`, `age`, and the amber "PCSP expiring within 30 days" check are trivial — inline them in `about-tab.tsx` so the file stays self-contained.
 
 ## Out of scope
 
-- Editing triggers/contacts/interests from the staff portal (intentional — admin-only).
-- Removing per-field eye toggles on goals/meds/codes.
-- Changing where admins edit interests today (still whatever intake/import flow populates `preferred_activities`).
+- Editing anything from the staff portal.
+- Changing the admin Profile tab.
+- Record-completeness bar, archive/retention footer, or "Continue intake" flow on staff side.
+- Redesign of PCSP goals / behavioral triggers / interests sections (unchanged from the last turn).

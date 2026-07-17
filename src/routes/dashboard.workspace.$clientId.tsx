@@ -360,6 +360,8 @@ function ClientWorkspace() {
               }}
               presetServiceCode={effectivePresetCode}
               lockServiceCode={!!effectivePresetCode}
+              autoOpenCompliance={verify === "1"}
+
             />
             <ActiveShiftReimbursementSlot clientId={client.id} />
           </TabsContent>

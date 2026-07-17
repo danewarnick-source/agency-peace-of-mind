@@ -217,11 +217,11 @@ export const getClientCareData = createServerFn({ method: "GET" })
       supabase
         .from("clients")
         .select(
-          "id, organization_id, first_name, last_name, date_of_birth, admission_date, discharge_date, medicaid_id, account_status, self_admin_med_support, self_admin_med_support_locked, preferred_activities",
+          "id, organization_id, first_name, last_name, date_of_birth, admission_date, discharge_date, medicaid_id, account_status, self_admin_med_support, self_admin_med_support_locked, preferred_activities, phone_number, is_own_guardian, guardian_name, guardian_phone, support_coordinator_name, support_coordinator_phone, support_coordinator_email, has_abi, hr_applicable, dnr_applicable, diagnoses, primary_care_name, pcsp_expiration_date, special_directions",
         )
-
         .eq("id", clientId)
         .maybeSingle(),
+
       supabase
         .from("client_specific_trainings")
         .select("id, goals")

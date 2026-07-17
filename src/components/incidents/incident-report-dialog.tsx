@@ -177,13 +177,24 @@ function missingRequired(block: { fields: DetailField[] }, values: Record<string
   return missing;
 }
 
-// ─── 10-second AI race helper — AI downtime must NEVER block an IR ────────
+// ─── 20-second AI race helper — AI downtime must NEVER block an IR ────────
+// Actually cancels the underlying request when the timeout wins: the caller
+// gets an AbortSignal to forward into the server-fn call, which propagates
+// all the way to the Bedrock client.send() call server-side. Without this,
+// a timed-out request kept running in the background and burned one of our
+// 10 req/min against the org-wide Bedrock cap for nothing.
 const AI_TIMEOUT_MS = 20_000;
-async function withAiTimeout<T>(p: Promise<T>): Promise<T> {
-  return Promise.race([
-    p,
-    new Promise<T>((_, rej) => setTimeout(() => rej(new Error("__AI_TIMEOUT__")), AI_TIMEOUT_MS)),
-  ]);
+async function withAiTimeout<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+  try {
+    return await fn(controller.signal);
+  } catch (e) {
+    if (controller.signal.aborted) throw new Error("__AI_TIMEOUT__");
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 type AiIssue = {
@@ -252,6 +263,13 @@ export function IncidentReportDialog({
   const [speechSupported, setSpeechSupported] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
+
+  // Guards runNectarReview/runCompletenessCheck against overlapping calls —
+  // both hit reviewFn, which shares the org's 10 req/min Bedrock cap. A ref
+  // (not state) so the check is synchronous even across near-simultaneous
+  // triggers (button click, eager post-draft review, nectar-interview effect)
+  // that fire before a state update has re-rendered to disable the button.
+  const reviewInFlightRef = useRef(false);
 
   // ── UNIFIED Nectar follow-up system ────────────────────────────────────
   // One list of questions and one answer map shared by:
@@ -482,7 +500,7 @@ export function IncidentReportDialog({
     stopRecording();
     setDraftBusy(true);
     try {
-      const res = await withAiTimeout(draftFn({
+      const res = await withAiTimeout((signal) => draftFn({
         data: {
           shorthand: text,
           category: category || "",
@@ -494,6 +512,7 @@ export function IncidentReportDialog({
             witnessedDirectly === "no" && reportedBy ? `Reported by: ${reportedBy}` : "",
           ].filter(Boolean).join(" | ") || null,
         },
+        signal,
       }));
       setNectarDraft(res.draft);
       setNectarDraftGaps(res.gaps ?? []);
@@ -555,6 +574,10 @@ export function IncidentReportDialog({
     const text = (descriptionOverride !== undefined ? descriptionOverride : description).trim();
     // Skip if description is unchanged and we already have results
     if (text === lastReviewedDescription && nectarIssues !== null) return;
+    // Skip if a review (or the completeness re-check, which hits the same
+    // endpoint) is already in flight — don't double-spend the rate limit.
+    if (reviewInFlightRef.current) return;
+    reviewInFlightRef.current = true;
 
     // Capture state before the async gap so the merge below sees consistent values
     const prevIssues = nectarIssues;
@@ -567,7 +590,7 @@ export function IncidentReportDialog({
       const draft = descriptionOverride !== undefined
         ? { ...base, description: descriptionOverride.trim() }
         : base;
-      const r = await withAiTimeout(reviewFn({ data: { draft } }));
+      const r = await withAiTimeout((signal) => reviewFn({ data: { draft }, signal }));
       if (isCancelled?.()) return;
       if (!r || typeof r.complete !== "boolean" || r.skipped) {
         setNectarIssues([]);
@@ -621,6 +644,7 @@ export function IncidentReportDialog({
           : "Nectar review unavailable — you can continue.",
       );
     } finally {
+      reviewInFlightRef.current = false;
       if (!isCancelled?.()) setNectarReviewing(false);
     }
   }
@@ -648,7 +672,7 @@ export function IncidentReportDialog({
     setDraftBusy(true);
     let composed = nectarDraft;
     try {
-      const res = await withAiTimeout(draftFn({
+      const res = await withAiTimeout((signal) => draftFn({
         data: {
           shorthand: shorthand.trim(),
           category: category || "",
@@ -657,6 +681,7 @@ export function IncidentReportDialog({
           discoveredAt: discoveredAt ?? null,
           knownFacts: baseFacts || null,
         },
+        signal,
       }));
       composed = res.draft;
       setNectarDraft(res.draft);
@@ -844,10 +869,14 @@ export function IncidentReportDialog({
 
   // ── Completeness check on the review step
   async function runCompletenessCheck() {
+    // Shares reviewFn (and its 10 req/min cap) with runNectarReview — skip
+    // if either is already in flight rather than firing a duplicate call.
+    if (reviewInFlightRef.current) return;
+    reviewInFlightRef.current = true;
     setCompletenessBusy(true);
     try {
       const draft = buildDraft();
-      const r = await withAiTimeout(reviewFn({ data: { draft } }));
+      const r = await withAiTimeout((signal) => reviewFn({ data: { draft }, signal }));
       if (!r || typeof r.complete !== "boolean" || r.skipped) {
         setCompletenessIssues([]); setNectarStatus("skipped");
         setDetails((d) => ({ ...d, ai_review_skipped: true }));
@@ -863,6 +892,7 @@ export function IncidentReportDialog({
       setDetails((d) => ({ ...d, ai_review_skipped: true }));
       toast.message("Nectar didn't respond in 20s — you can still submit.");
     } finally {
+      reviewInFlightRef.current = false;
       setCompletenessBusy(false);
     }
   }

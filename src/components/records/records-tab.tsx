@@ -651,6 +651,10 @@ export function RecordsTab() {
         ))}
       </div>
 
+      {mode === "attention" && orgId && (
+        <TimeCorrectionReviewSection organizationId={orgId} />
+      )}
+
       {type === "hhs_daily" ? (
         <div className="rounded-lg border border-border bg-card p-3">
           <ResidentialDailyTab />

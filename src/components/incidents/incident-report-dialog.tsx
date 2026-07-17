@@ -293,6 +293,15 @@ export function IncidentReportDialog({
 
   const [completenessIssues, setCompletenessIssues] = useState<AiIssue[] | null>(null);
   const [completenessBusy, setCompletenessBusy] = useState(false);
+  // Per-item inline "answer + re-check" state for the completeness list.
+  // Keyed by the issue's question text so state survives list reshuffles.
+  const [completenessAnswers, setCompletenessAnswers] = useState<Record<string, string>>({});
+  const [completenessItemStatus, setCompletenessItemStatus] = useState<
+    Record<string, { kind: "checking" | "needs_more"; note?: string }>
+  >({});
+  const [completenessApproved, setCompletenessApproved] = useState<
+    Array<{ question: string; answer: string }>
+  >([]);
 
   const [orgAiEnabled, setOrgAiEnabled] = useState<boolean | null>(null);
   useEffect(() => {

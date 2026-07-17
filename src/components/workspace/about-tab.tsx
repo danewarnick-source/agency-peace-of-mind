@@ -143,68 +143,79 @@ export function AboutTab({ client }: { client: CaseloadClient }) {
       {/* Identity & contact */}
       <Card className="p-5 md:col-span-2">
         <h3 className="mb-1 text-sm font-semibold">Identity & contact</h3>
-        <GroupHeader>Person</GroupHeader>
-        <Row label="Name">{fullName || null}</Row>
-        <Row label="Individual Medicaid ID">{identity?.medicaid_id || null}</Row>
-        <Row label="Guardian">{guardianValue}</Row>
-        <Row label="Date of birth">{dobAge}</Row>
-        <Row label="Phone">{identity?.phone_number || null}</Row>
+        <Group header="Person">
+          <Row label="Name">{fullName || null}</Row>
+          <Row label="Individual Medicaid ID">{identity?.medicaid_id || null}</Row>
+          <Row label="Guardian">{guardianValue}</Row>
+          <Row label="Date of birth">{dobAge}</Row>
+          <Row label="Phone">{identity?.phone_number || null}</Row>
+        </Group>
 
-        <GroupHeader>Support Coordinator</GroupHeader>
-        <Row label="Name">{identity?.support_coordinator_name || null}</Row>
-        <Row label="Phone">
-          {identity?.support_coordinator_phone ? (
-            <a href={`tel:${identity.support_coordinator_phone}`} className="text-primary hover:underline">
-              {identity.support_coordinator_phone}
-            </a>
-          ) : null}
-        </Row>
-        <Row label="Email">
-          {identity?.support_coordinator_email ? (
-            <a href={`mailto:${identity.support_coordinator_email}`} className="text-primary hover:underline break-all">
-              {identity.support_coordinator_email}
-            </a>
-          ) : null}
-        </Row>
+        <Group header="Support Coordinator">
+          <Row label="Name">{identity?.support_coordinator_name || null}</Row>
+          <Row label="Phone">
+            {identity?.support_coordinator_phone ? (
+              <a href={`tel:${identity.support_coordinator_phone}`} className="text-primary hover:underline">
+                {identity.support_coordinator_phone}
+              </a>
+            ) : null}
+          </Row>
+          <Row label="Email">
+            {identity?.support_coordinator_email ? (
+              <a href={`mailto:${identity.support_coordinator_email}`} className="text-primary hover:underline break-all">
+                {identity.support_coordinator_email}
+              </a>
+            ) : null}
+          </Row>
+        </Group>
 
-        <GroupHeader>Enrollment</GroupHeader>
-        <Row label="Admitted">{identity?.admission_date ? fmtDate(identity.admission_date) : null}</Row>
-        <Row label="Discharge date">
-          {identity?.discharge_date
-            ? fmtDate(identity.discharge_date)
-            : <span className="text-muted-foreground italic font-normal">— active —</span>}
-        </Row>
+        <Group header="Enrollment">
+          <Row label="Admitted">{identity?.admission_date ? fmtDate(identity.admission_date) : null}</Row>
+          <Row label="Discharge date">
+            {identity?.admission_date || identity?.discharge_date
+              ? (identity?.discharge_date
+                  ? fmtDate(identity.discharge_date)
+                  : <span className="text-muted-foreground italic font-normal">— active —</span>)
+              : null}
+          </Row>
+        </Group>
 
-        <GroupHeader>Flags</GroupHeader>
-        <Row label="Acquired brain injury (ABI)">{identity?.has_abi ? "Yes — staff need ABI training" : "No"}</Row>
-        <Row label="Human Rights documentation">{identity?.hr_applicable ? "Applicable" : "Not applicable"}</Row>
-        <Row label="DNR order">{identity?.dnr_applicable ? "On — document on file" : "Off"}</Row>
+        <Group header="Flags">
+          <Row label="Acquired brain injury (ABI)">{identity?.has_abi ? "Yes — staff need ABI training" : null}</Row>
+          <Row label="Human Rights documentation">{identity?.hr_applicable ? "Applicable" : null}</Row>
+          <Row label="DNR order">{identity?.dnr_applicable ? "On — document on file" : null}</Row>
+        </Group>
 
         {identityCustom.length > 0 && (
-          <>
-            <GroupHeader>Additional</GroupHeader>
-            {identityCustom.map((f) => (
-              <Row key={f.id} label={f.field_label}>{formatCustomValue(f)}</Row>
-            ))}
-          </>
+          <Group header="Additional">
+            {identityCustom.map((f) => {
+              const v = formatCustomValue(f);
+              return v && v !== "—" ? (
+                <Row key={f.id} label={f.field_label}>{v}</Row>
+              ) : null;
+            })}
+          </Group>
         )}
       </Card>
 
       {/* At a glance */}
-      <Card className="p-5">
-        <h3 className="mb-1 text-sm font-semibold">At a glance</h3>
-        <Row label="Primary diagnosis">{primaryDx}</Row>
-        <Row label="Primary care">{identity?.primary_care_name || null}</Row>
-        <Row label="PCSP expiration">
-          {pcspExp ? (
-            <span className={cn("inline-flex items-center gap-1", pcspWarn && "text-red-600 font-semibold")}>
-              {pcspWarn ? <AlertTriangle className="h-3.5 w-3.5" /> : null}
-              {fmtDate(pcspExp)}
-            </span>
-          ) : null}
-        </Row>
-        <Row label="Admitted">{identity?.admission_date ? fmtDate(identity.admission_date) : null}</Row>
-      </Card>
+      {(primaryDx || identity?.primary_care_name || pcspExp || identity?.admission_date) && (
+        <Card className="p-5">
+          <h3 className="mb-1 text-sm font-semibold">At a glance</h3>
+          <Row label="Primary diagnosis">{primaryDx}</Row>
+          <Row label="Primary care">{identity?.primary_care_name || null}</Row>
+          <Row label="PCSP expiration">
+            {pcspExp ? (
+              <span className={cn("inline-flex items-center gap-1", pcspWarn && "text-red-600 font-semibold")}>
+                {pcspWarn ? <AlertTriangle className="h-3.5 w-3.5" /> : null}
+                {fmtDate(pcspExp)}
+              </span>
+            ) : null}
+          </Row>
+          <Row label="Admitted">{identity?.admission_date ? fmtDate(identity.admission_date) : null}</Row>
+        </Card>
+      )}
+
 
       {/* Emergency contacts */}
       <Card className="p-5">

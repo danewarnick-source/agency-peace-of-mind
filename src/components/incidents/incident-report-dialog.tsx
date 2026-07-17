@@ -395,6 +395,24 @@ export function IncidentReportDialog({
     return c ? `${c.first_name} ${c.last_name}`.trim() : "";
   }, [caseload, pickedClientId, clientId, clientName]);
 
+  // Fetch the picked client's guardian status so the NECTAR follow-up N/A
+  // button can auto-satisfy guardian-notification questions when the client
+  // is their own guardian.
+  const [clientIsOwnGuardian, setClientIsOwnGuardian] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!open || !pickedClientId) { setClientIsOwnGuardian(null); return; }
+    let cancelled = false;
+    void supabase
+      .from("clients")
+      .select("is_own_guardian")
+      .eq("id", pickedClientId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setClientIsOwnGuardian(data?.is_own_guardian ?? null);
+      });
+    return () => { cancelled = true; };
+  }, [open, pickedClientId]);
+
   // ── Photo upload
   const [photoUploading, setPhotoUploading] = useState(false);
   async function uploadPhotos(files: FileList) {
@@ -631,7 +649,9 @@ export function IncidentReportDialog({
         if (narrativeReviewStatus === "needs_answers") {
           const unresolved = narrativeReviewIssues
             .map((g, i) => ({ g, i }))
-            .filter(({ g, i }) => g.severity === "must_fix" && !narrativeGapAnswers[i]?.trim());
+            .filter(({ g, i }) => g.severity === "must_fix"
+              && !narrativeGapAnswers[i]?.trim()
+              && narrativeGapNA[i] === undefined);
           if (unresolved.length) {
             return "Answer every required NECTAR follow-up before continuing.";
           }
@@ -695,8 +715,10 @@ export function IncidentReportDialog({
         .map((g, i) => {
           if (g.severity !== "must_fix") return null;
           const ans = narrativeGapAnswers[i]?.trim();
-          if (!ans) return null;
-          return `Q: ${g.question}\nA: ${ans}`;
+          const na = narrativeGapNA[i];
+          if (ans) return `Q: ${g.question}\nA: ${ans}`;
+          if (na !== undefined) return `Q: ${g.question}\nA: N/A — ${na?.trim() || "not applicable"}`;
+          return null;
         })
         .filter((s): s is string => !!s);
       if (answered.length) {
@@ -713,6 +735,8 @@ export function IncidentReportDialog({
             severity: g.severity,
             question: g.question,
             answer: narrativeGapAnswers[i]?.trim() || null,
+            not_applicable: narrativeGapNA[i] !== undefined,
+            not_applicable_reason: narrativeGapNA[i] ?? null,
           })),
       }));
     }
@@ -952,6 +976,16 @@ export function IncidentReportDialog({
     const q = aiIssues?.[idx];
     if (!q) return null;
     const answered = !!(aiAnswers[idx]?.trim() || aiNA[idx]?.trim());
+    const isGuardianQ = /guardian|authorized rep(resentative)?/i.test(q.question);
+    const ownGuardianApplies = isGuardianQ && clientIsOwnGuardian === true;
+    const clientFirst = (resolvedClientName || "").split(/\s+/)[0] || "the client";
+    const naActive = aiNA[idx] !== undefined;
+    const naLabel = ownGuardianApplies
+      ? `Not applicable — ${clientFirst} is their own guardian`
+      : "Mark N/A";
+    const naDefaultReason = ownGuardianApplies
+      ? "Client is their own guardian — no separate notification required."
+      : "Not applicable";
     return (
       <div className="space-y-3">
         <div className="flex items-center gap-2 text-xs text-violet-700 dark:text-violet-300">
@@ -965,6 +999,11 @@ export function IncidentReportDialog({
         <div className="rounded-md border border-violet-300 bg-violet-50/50 p-3 text-sm dark:bg-violet-950/30 dark:border-violet-800">
           <p className="text-[11px] uppercase tracking-wide text-violet-700 dark:text-violet-300">Nectar's question — generated from what you wrote</p>
           <p className="mt-1 font-medium">{q.question}</p>
+          {ownGuardianApplies && (
+            <p className="mt-2 text-[11px] text-violet-800 dark:text-violet-200">
+              {clientFirst} is their own guardian — no guardian notification is required.
+            </p>
+          )}
         </div>
         <div>
           <Label className="text-xs">Your answer</Label>
@@ -972,30 +1011,32 @@ export function IncidentReportDialog({
             rows={3}
             value={aiAnswers[idx] ?? ""}
             onChange={(e) => setAiAnswers((s) => ({ ...s, [idx]: e.target.value }))}
-            disabled={aiNA[idx] !== undefined}
+            disabled={naActive}
             placeholder="Answer in 1–2 sentences."
           />
         </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id={`ai-na-${idx}`}
-            checked={aiNA[idx] !== undefined}
-            onChange={(e) => setAiNA((s) => {
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={naActive ? "default" : "outline"}
+            onClick={() => setAiNA((s) => {
               const next = { ...s };
-              if (e.target.checked) next[idx] = "";
-              else delete next[idx];
+              if (naActive) delete next[idx];
+              else next[idx] = naDefaultReason;
               return next;
             })}
-          />
-          <Label htmlFor={`ai-na-${idx}`} className="text-[11px]">Not applicable — reason:</Label>
-          <Input
-            className="h-7 text-[11px]"
-            placeholder="Why this question doesn't apply"
-            value={aiNA[idx] ?? ""}
-            onChange={(e) => setAiNA((s) => ({ ...s, [idx]: e.target.value }))}
-            disabled={aiNA[idx] === undefined}
-          />
+          >
+            {naActive ? "Clear N/A" : naLabel}
+          </Button>
+          {naActive && (
+            <Input
+              className="h-8 flex-1 min-w-[200px] text-[11px]"
+              placeholder="Optional: add a reason"
+              value={aiNA[idx] ?? ""}
+              onChange={(e) => setAiNA((s) => ({ ...s, [idx]: e.target.value }))}
+            />
+          )}
         </div>
       </div>
     );
@@ -1293,8 +1334,18 @@ export function IncidentReportDialog({
                           </p>
                           {narrativeReviewIssues.map((g, i) => {
                             if (g.severity !== "must_fix") return null;
-                            const answered = !!narrativeGapAnswers[i]?.trim();
+                            const answered = !!narrativeGapAnswers[i]?.trim() || narrativeGapNA[i] !== undefined;
                             const isYesNo = g.answer_type === "yes_no";
+                            const isGuardianQ = /guardian|authorized rep(resentative)?/i.test(g.question);
+                            const ownGuardianApplies = isGuardianQ && clientIsOwnGuardian === true;
+                            const clientFirst = (resolvedClientName || "").split(/\s+/)[0] || "the client";
+                            const naActive = narrativeGapNA[i] !== undefined;
+                            const naLabel = ownGuardianApplies
+                              ? `N/A — ${clientFirst} is their own guardian`
+                              : "Mark N/A";
+                            const naDefaultReason = ownGuardianApplies
+                              ? "Client is their own guardian — no separate notification required."
+                              : "Not applicable";
                             return (
                               <div key={i} className="rounded border border-amber-200 bg-background p-2 dark:border-amber-900">
                                 <div className="mb-2 flex items-start gap-2">
@@ -1302,9 +1353,10 @@ export function IncidentReportDialog({
                                   <p className="text-[11px] leading-snug">{g.question}</p>
                                 </div>
                                 {isYesNo ? (
-                                  <div className="flex gap-2">
+                                  <div className="flex flex-wrap gap-2">
                                     {(["Yes", "No"] as const).map((v) => (
                                       <Button key={v} type="button" size="sm"
+                                        disabled={naActive}
                                         variant={narrativeGapAnswers[i] === v ? "default" : "outline"}
                                         onClick={() => setNarrativeGapAnswers((s) => ({ ...s, [i]: v }))}>
                                         {v}
@@ -1314,11 +1366,40 @@ export function IncidentReportDialog({
                                 ) : (
                                   <Textarea
                                     rows={2}
+                                    disabled={naActive}
                                     value={narrativeGapAnswers[i] ?? ""}
                                     onChange={(e) => setNarrativeGapAnswers((s) => ({ ...s, [i]: e.target.value }))}
                                     placeholder="Type your answer in 1–2 sentences…"
                                     className="text-xs"
                                   />
+                                )}
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={naActive ? "default" : "outline"}
+                                    onClick={() => setNarrativeGapNA((s) => {
+                                      const next = { ...s };
+                                      if (naActive) delete next[i];
+                                      else next[i] = naDefaultReason;
+                                      return next;
+                                    })}
+                                  >
+                                    {naActive ? "Clear N/A" : naLabel}
+                                  </Button>
+                                  {naActive && (
+                                    <Input
+                                      className="h-7 flex-1 min-w-[180px] text-[11px]"
+                                      placeholder="Optional: add a reason"
+                                      value={narrativeGapNA[i] ?? ""}
+                                      onChange={(e) => setNarrativeGapNA((s) => ({ ...s, [i]: e.target.value }))}
+                                    />
+                                  )}
+                                </div>
+                                {ownGuardianApplies && (
+                                  <p className="mt-1 text-[10px] text-muted-foreground">
+                                    {clientFirst} is their own guardian — no guardian notification is required.
+                                  </p>
                                 )}
                                 {!answered && (
                                   <p className="mt-1 text-[10px] text-rose-700 dark:text-rose-300">

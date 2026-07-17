@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
   Heart,
@@ -10,7 +11,6 @@ import {
   User,
 } from "lucide-react";
 import type { CaseloadClient } from "@/hooks/use-caseload";
-import { FaceSheetInfoCard } from "@/components/clients/face-sheet-info-card";
 import { ClientPhotoCard } from "@/components/clients/client-photo-card";
 import { useClientCareData } from "@/hooks/use-client-care-data";
 import type { CustomFieldWithValue } from "@/lib/client-care-data.functions";
@@ -26,33 +26,92 @@ function formatCustomValue(f: CustomFieldWithValue): string {
   }
 }
 
+function fmtDate(s: string | null | undefined): string {
+  if (!s) return "—";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (m) return `${m[2]}/${m[3]}/${m[1]}`;
+  return s;
+}
+
+function age(dob: string | null | undefined): number | null {
+  if (!dob) return null;
+  const d = new Date(dob);
+  if (Number.isNaN(d.getTime())) return null;
+  const now = new Date();
+  let a = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) a--;
+  return a;
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  const empty = children == null || children === "" || children === false;
+  return (
+    <div className="flex items-start justify-between gap-4 py-2 text-sm border-b border-border/60 last:border-0">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-semibold text-right">
+        {empty ? <span className="text-muted-foreground font-normal">—</span> : children}
+      </span>
+    </div>
+  );
+}
+
+function GroupHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-muted-foreground/80 mt-4 mb-1.5 first:mt-0">
+      {children}
+    </div>
+  );
+}
+
 export function AboutTab({ client }: { client: CaseloadClient }) {
-  // Route ALL client-info reads through the shared visibility layer so
-  // section+field toggles set on the admin side automatically hide data
-  // from staff. Falls back to the caseload row while data loads.
   const care = useClientCareData(client.id);
   const staffCare = care.data?.visibility.staffCare;
-  const sections = care.data?.visibility.sections;
+  const identity = staffCare?.identity;
 
-  const identitySectionOn = sections?.identity ?? true;
-
-
-  // PCSP goals always mirror admin — server already applies per-goal
-  // visibility switches; the care_plan section toggle does not hide the list.
-  const goals = (staffCare?.goals ?? []).map((g) => g.goal).filter(Boolean);
-
-
-  const medicaidId = identitySectionOn
-    ? staffCare?.identity.medicaid_id ?? client.medicaid_id
-    : null;
-
-  // Custom fields already filtered by section toggle on the server.
   const customFields = staffCare?.custom_fields ?? [];
   const identityCustom = customFields.filter((f) => f.section === "identity");
   const carePlanCustom = customFields.filter((f) => f.section === "care_plan");
+
+  const goals = (staffCare?.goals ?? []).map((g) => g.goal).filter(Boolean);
+
+  const fullName = `${identity?.first_name ?? client.first_name ?? ""} ${identity?.last_name ?? client.last_name ?? ""}`.trim();
+  const dob = identity?.date_of_birth ?? null;
+  const dobAge = dob ? `${fmtDate(dob)}${age(dob) != null ? ` · ${age(dob)}` : ""}` : null;
+
+  const guardianValue = identity?.is_own_guardian === true
+    ? "Self-guardian"
+    : identity?.guardian_name
+      ? `${identity.guardian_name}${identity.guardian_phone ? ` · ${identity.guardian_phone}` : ""}`
+      : null;
+
+  const primaryDx = identity?.diagnoses?.[0] ?? null;
+  const pcspExp = identity?.pcsp_expiration_date ?? null;
+  const pcspWarn = (() => {
+    if (!pcspExp) return false;
+    const d = new Date(pcspExp);
+    if (Number.isNaN(d.getTime())) return false;
+    return d.getTime() - Date.now() < 30 * 24 * 3600 * 1000;
+  })();
+
+  const specialDirections = identity?.special_directions ?? null;
+
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      {/* Identity card */}
+      {/* Clinical alert */}
+      {specialDirections && (
+        <div className="md:col-span-2 rounded-lg border border-amber-300 bg-amber-50 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-600 flex-none mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-amber-800">Clinical Alert</div>
+              <p className="text-sm text-amber-900 mt-1 whitespace-pre-wrap">{specialDirections}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Identity header */}
       <Card className="p-5 md:col-span-2">
         <div className="flex flex-col items-start gap-4 md:flex-row md:items-center">
           <span className="inline-flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -62,31 +121,110 @@ export function AboutTab({ client }: { client: CaseloadClient }) {
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Active Individual
             </p>
-            <h2 className="mt-0.5 text-2xl font-semibold tracking-tight">
-              {client.first_name} {client.last_name}
-            </h2>
+            <h2 className="mt-0.5 text-2xl font-semibold tracking-tight">{fullName}</h2>
             <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-muted-foreground">
               <MapPin className="h-3.5 w-3.5" />
               {client.physical_address ?? "Address on file with administrator"}
             </p>
-            {medicaidId && (
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Medicaid ID:{" "}
-                <span className="font-mono">{medicaidId}</span>
-              </p>
-            )}
-            {identityCustom.length > 0 && (
-              <dl className="mt-2 space-y-0.5">
-                {identityCustom.map((f) => (
-                  <div key={f.id} className="text-xs text-muted-foreground">
-                    <dt className="inline font-medium">{f.field_label}:</dt>{" "}
-                    <dd className="inline">{formatCustomValue(f)}</dd>
-                  </div>
-                ))}
-              </dl>
-            )}
           </div>
         </div>
+      </Card>
+
+      {/* Identity & contact */}
+      <Card className="p-5 md:col-span-2">
+        <h3 className="mb-1 text-sm font-semibold">Identity & contact</h3>
+        <GroupHeader>Person</GroupHeader>
+        <Row label="Name">{fullName || null}</Row>
+        <Row label="Individual Medicaid ID">{identity?.medicaid_id || null}</Row>
+        <Row label="Guardian">{guardianValue}</Row>
+        <Row label="Date of birth">{dobAge}</Row>
+        <Row label="Phone">{identity?.phone_number || null}</Row>
+
+        <GroupHeader>Support Coordinator</GroupHeader>
+        <Row label="Name">{identity?.support_coordinator_name || null}</Row>
+        <Row label="Phone">
+          {identity?.support_coordinator_phone ? (
+            <a href={`tel:${identity.support_coordinator_phone}`} className="text-primary hover:underline">
+              {identity.support_coordinator_phone}
+            </a>
+          ) : null}
+        </Row>
+        <Row label="Email">
+          {identity?.support_coordinator_email ? (
+            <a href={`mailto:${identity.support_coordinator_email}`} className="text-primary hover:underline break-all">
+              {identity.support_coordinator_email}
+            </a>
+          ) : null}
+        </Row>
+
+        <GroupHeader>Enrollment</GroupHeader>
+        <Row label="Admitted">{identity?.admission_date ? fmtDate(identity.admission_date) : null}</Row>
+        <Row label="Discharge date">
+          {identity?.discharge_date
+            ? fmtDate(identity.discharge_date)
+            : <span className="text-muted-foreground italic font-normal">— active —</span>}
+        </Row>
+
+        <GroupHeader>Flags</GroupHeader>
+        <Row label="Acquired brain injury (ABI)">{identity?.has_abi ? "Yes — staff need ABI training" : "No"}</Row>
+        <Row label="Human Rights documentation">{identity?.hr_applicable ? "Applicable" : "Not applicable"}</Row>
+        <Row label="DNR order">{identity?.dnr_applicable ? "On — document on file" : "Off"}</Row>
+
+        {identityCustom.length > 0 && (
+          <>
+            <GroupHeader>Additional</GroupHeader>
+            {identityCustom.map((f) => (
+              <Row key={f.id} label={f.field_label}>{formatCustomValue(f)}</Row>
+            ))}
+          </>
+        )}
+      </Card>
+
+      {/* At a glance */}
+      <Card className="p-5">
+        <h3 className="mb-1 text-sm font-semibold">At a glance</h3>
+        <Row label="Primary diagnosis">{primaryDx}</Row>
+        <Row label="Primary care">{identity?.primary_care_name || null}</Row>
+        <Row label="PCSP expiration">
+          {pcspExp ? (
+            <span className={cn("inline-flex items-center gap-1", pcspWarn && "text-red-600 font-semibold")}>
+              {pcspWarn ? <AlertTriangle className="h-3.5 w-3.5" /> : null}
+              {fmtDate(pcspExp)}
+            </span>
+          ) : null}
+        </Row>
+        <Row label="Admitted">{identity?.admission_date ? fmtDate(identity.admission_date) : null}</Row>
+      </Card>
+
+      {/* Emergency contacts */}
+      <Card className="p-5">
+        <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
+          <Phone className="h-3.5 w-3.5" /> Emergency Contacts
+        </h3>
+        {(staffCare?.emergency_contacts ?? []).length > 0 ? (
+          <ul className="space-y-2">
+            {(staffCare?.emergency_contacts ?? []).map((c) => (
+              <li key={c.id} className="rounded-md border border-border bg-background px-3 py-2 text-sm">
+                <p className="font-medium leading-snug">
+                  {c.name}
+                  {c.relationship && (
+                    <span className="ml-1 text-xs font-normal text-muted-foreground">· {c.relationship}</span>
+                  )}
+                </p>
+                {c.phone && (
+                  <a href={`tel:${c.phone}`} className="text-xs text-primary hover:underline">
+                    {c.phone}
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            No emergency contacts on file. Ask your administrator to add them
+            so they're available during a shift.
+          </p>
+        )}
       </Card>
 
       {/* PCSP summary */}
@@ -155,37 +293,6 @@ export function AboutTab({ client }: { client: CaseloadClient }) {
         )}
       </Card>
 
-      {/* Emergency contacts */}
-      <Card className="p-5">
-        <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
-          <Phone className="h-3.5 w-3.5" /> Emergency Contacts
-        </h3>
-        {(staffCare?.emergency_contacts ?? []).length > 0 ? (
-          <ul className="space-y-2">
-            {(staffCare?.emergency_contacts ?? []).map((c) => (
-              <li key={c.id} className="rounded-md border border-border bg-background px-3 py-2 text-sm">
-                <p className="font-medium leading-snug">
-                  {c.name}
-                  {c.relationship && (
-                    <span className="ml-1 text-xs font-normal text-muted-foreground">· {c.relationship}</span>
-                  )}
-                </p>
-                {c.phone && (
-                  <a href={`tel:${c.phone}`} className="text-xs text-primary hover:underline">
-                    {c.phone}
-                  </a>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            No emergency contacts on file. Ask your administrator to add them
-            so they're available during a shift.
-          </p>
-        )}
-      </Card>
-
       {/* Interests / hobbies */}
       <Card className="p-5">
         <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
@@ -206,15 +313,10 @@ export function AboutTab({ client }: { client: CaseloadClient }) {
         )}
       </Card>
 
-
-      {/* Face Sheet Info — backs every field on the printable Client Face Sheet */}
+      {/* Client photo */}
       <div className="md:col-span-2">
         <ClientPhotoCard clientId={client.id} />
-      </div>
-      <div className="md:col-span-2">
-        <FaceSheetInfoCard clientId={client.id} />
       </div>
     </div>
   );
 }
-

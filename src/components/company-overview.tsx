@@ -268,7 +268,7 @@ function KpiStrip({ metrics, raw, isLoading }: { metrics: HealthMetrics | null; 
     {
       icon: Activity, label: "Overall compliance", value: metrics.overall,
       nextAction: "Open compliance overview",
-      to: "/dashboard/compliance-desk", search: { focus: "compliance-overview" },
+      to: "/dashboard/hub/documentation", search: { tab: "records", focus: "compliance-overview" },
     },
   ];
   return (

@@ -4044,6 +4044,54 @@ export type Database = {
           },
         ]
       }
+      client_target_behaviors: {
+        Row: {
+          behavior_name: string
+          client_id: string
+          created_at: string
+          description: string
+          id: string
+          organization_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          behavior_name: string
+          client_id: string
+          created_at?: string
+          description?: string
+          id?: string
+          organization_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          behavior_name?: string
+          client_id?: string
+          created_at?: string
+          description?: string
+          id?: string
+          organization_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_target_behaviors_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_target_behaviors_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_weekly_targets: {
         Row: {
           client_id: string

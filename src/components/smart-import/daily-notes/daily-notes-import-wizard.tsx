@@ -513,7 +513,7 @@ export function DailyNotesImportWizard() {
     },
     onSuccess: (res) => {
       setCommitted({ inserted: res.inserted });
-      setStep(4);
+      setStep(3);
       toast.success(`Submitted ${res.inserted} note${res.inserted === 1 ? "" : "s"} to staff for attestation.`);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -529,11 +529,11 @@ export function DailyNotesImportWizard() {
             <div className="font-semibold text-amber-800">Historical daily notes — imported from another platform</div>
             <p className="mt-1 text-muted-foreground">
               Bring in past daily notes / shift notes from whatever platform you used before HIVE — including
-              Host Home daily notes where nobody clocks in. Only five things are read from the file: who wrote it,
-              who it's about, the date, the written narrative, and (optionally) any goals the note addressed.
-              Every row must match a staff member and a client that already exist in HIVE; anything else is set
-              aside for manual resolution and is never auto-created. Imported notes are permanently marked as
-              historical so they're never confused with a note written live in HIVE.
+              Host Home daily notes where nobody clocks in. The importer only accepts files that match the
+              required template exactly: Staff Name, Client Name, Date, Narrative, and Goals Addressed (goals
+              may be blank). Every row must match a staff member and a client that already exist in HIVE;
+              anything else is set aside for manual resolution and is never auto-created. Imported notes are
+              permanently marked as historical so they're never confused with a note written live in HIVE.
             </p>
           </div>
         </div>
@@ -543,25 +543,7 @@ export function DailyNotesImportWizard() {
 
       {step === 1 && <UploadStep onPick={onPickFile} />}
 
-      {step === 2 && parsed && mapping && (
-        <MapStep
-          parsed={parsed}
-          mapping={mapping}
-          onChange={setMapping}
-          wholeFile={wholeFile}
-          onWholeFileChange={setWholeFile}
-          suggestions={suggestions}
-          suggesting={suggesting}
-          people={peopleQ.data ?? { staff: [], clients: [] }}
-          onBack={() => { setStep(1); setParsed(null); setMapping(null); setFile(null); setWholeFile({ staffId: null, clientId: null }); setSuggestions(null); }}
-          onNext={buildReviewRows}
-          peopleReady={!!peopleQ.data}
-          fileName={file?.name ?? ""}
-
-        />
-      )}
-
-      {step === 3 && peopleQ.data && (
+      {step === 2 && peopleQ.data && (
         <ReviewStep
           rows={rows}
           ready={readyRows}
@@ -580,17 +562,17 @@ export function DailyNotesImportWizard() {
           onSkip={skipRow}
           onUnskip={unskipRow}
           onDownloadSkipped={downloadSkipped}
-          onBack={() => setStep(2)}
+          onBack={() => { setStep(1); setFile(null); setParsed(null); setRows([]); }}
           onCommit={() => commit.mutate()}
           committing={commit.isPending}
         />
       )}
 
-      {step === 4 && committed && (
+      {step === 3 && committed && (
         <DoneStep
           inserted={committed.inserted}
           onAnother={() => {
-            setStep(1); setFile(null); setParsed(null); setMapping(null); setRows([]); setCommitted(null);
+            setStep(1); setFile(null); setParsed(null); setRows([]); setCommitted(null);
           }}
         />
       )}
@@ -599,13 +581,13 @@ export function DailyNotesImportWizard() {
 }
 
 // ─── Stepper ───────────────────────────────────────────────────────────────
-function Stepper({ step }: { step: 1 | 2 | 3 | 4 }) {
+function Stepper({ step }: { step: 1 | 2 | 3 }) {
   const items = [
-    { n: 1, label: "Upload & parse" },
-    { n: 2, label: "Map columns" },
-    { n: 3, label: "Admin review" },
-    { n: 4, label: "Submit to staff" },
+    { n: 1, label: "Upload template" },
+    { n: 2, label: "Admin review" },
+    { n: 3, label: "Submit to staff" },
   ];
+
 
   return (
     <ol className="flex items-center gap-2 text-sm">

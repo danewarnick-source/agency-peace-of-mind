@@ -1,28 +1,47 @@
-## Problem
 
-The "Fix Now" deep link adds `?verify=1` to the workspace URL to auto-open the Shift Verification & Medicaid Compliance form. That param stays in the URL, so every page reload (and every return to the tab) re-fires the auto-open effect and reopens the modal — even after the user has already closed it or navigated within the page.
+## Goal
 
-## Fix
+The staff **About** tab should show live admin data for **Behavioral Trigger Flags**, **Emergency Contacts**, and **Interests & Hobbies** — read-only. And remove the section-visibility toggles on the admin client page, since they aren't reliably working and are gating this information unnecessarily.
 
-Strip `verify` from the URL as soon as the auto-open fires, so it's a true one-shot deep link and refreshes preserve the user's current page/tab state instead of jumping back into the compliance modal.
+## Data sources (already exist on admin side)
 
-In `src/components/evv/punch-pad.tsx`, inside the existing `useEffect` that watches `autoOpenCompliance` + `active`:
+- **Behavioral triggers** → `client_target_behaviors` (edited on admin's Care Plan → Target Behaviors tab, via `TargetBehaviorsPanel`).
+- **Emergency contacts** → `client_emergency_contacts` (edited on admin's Identity tab).
+- **Interests & hobbies** → `clients.preferred_activities` (string[]; populated via intake/import).
 
-- After calling `openCompliance()`, replace the URL to drop `verify` (keep `tab` and `code`):
-  ```ts
-  navigate({
-    to: ".",
-    search: (prev) => {
-      const { verify: _drop, ...rest } = prev as Record<string, unknown>;
-      return rest;
-    },
-    replace: true,
-  });
-  ```
-- Use `useNavigate` from `@tanstack/react-router` (already an available import pattern in this file's ecosystem; add the import if it isn't already there).
+## Changes
 
-Effect: the deep link opens the form once; the ref guard prevents re-firing within the mount; the URL rewrite prevents re-firing across reloads and back-navigation. Reloading the workspace keeps the user on the current tab with no modal.
+### 1. `src/lib/client-care-data.functions.ts`
+Extend the shared care-data server fn (the single canonical read path used by the About tab) so it also returns:
 
-## Files touched
+- `target_behaviors: { id, behavior_name, description }[]`
+- `emergency_contacts: { id, name, phone, relationship }[]`
+- `preferred_activities: string[]`
 
-- `src/components/evv/punch-pad.tsx` — add a `useNavigate` call and one `navigate({ ..., replace: true })` inside the auto-open effect to strip `verify` from the URL after the modal opens.
+Add three parallel selects to the existing `Promise.all`, and mirror the results into `visibility.staffCare` unfiltered (these three lists always mirror admin — no per-item visibility gating).
+
+### 2. `src/components/workspace/about-tab.tsx`
+Replace the three static placeholder cards with real data from `staffCare`:
+
+- **Behavioral Trigger Flags** — list each `behavior_name` with `description` beneath. Empty state: "No documented triggers on file."
+- **Emergency Contacts** — list `name` · `relationship` · `phone` (phone as `tel:` link on mobile). Empty state: existing copy.
+- **Interests & Hobbies** — render each entry in `preferred_activities` as a `Badge`. Empty state: "No interests recorded yet."
+
+All read-only — no edit affordances.
+
+### 3. `src/routes/dashboard.clients.$clientId.tsx`
+Remove the six `<SectionVisibilityToggle>` mounts (identity, care_plan, billing, files, operations, compliance) and drop the import. Per-field eye toggles (`FieldVisibilityToggle`) on individual goals/meds/codes stay — those are working.
+
+Server-side, `getClientCareData` continues to honor per-field toggles; only the section-level gate goes away. About-tab surfaces (triggers/contacts/interests/PCSP goals) are always visible to staff.
+
+## Technical notes
+
+- No migration needed — all three tables/columns already exist.
+- `client_emergency_contacts` and `client_target_behaviors` are org-scoped with existing RLS; the shared care-data fn already runs under `requireSupabaseAuth`, so staff reads pass.
+- `client_care_data` query key is unchanged, so the workspace About tab picks up the new fields on the next fetch with no invalidation plumbing.
+
+## Out of scope
+
+- Editing triggers/contacts/interests from the staff portal (intentional — admin-only).
+- Removing per-field eye toggles on goals/meds/codes.
+- Changing where admins edit interests today (still whatever intake/import flow populates `preferred_activities`).

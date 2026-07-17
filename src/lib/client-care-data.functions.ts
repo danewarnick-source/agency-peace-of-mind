@@ -112,6 +112,19 @@ export type CustomFieldWithValue = {
   value: CustomFieldValue;
 };
 
+export type CareTargetBehavior = {
+  id: string;
+  behavior_name: string;
+  description: string;
+};
+
+export type CareEmergencyContact = {
+  id: string;
+  name: string;
+  phone: string | null;
+  relationship: string | null;
+};
+
 export type ClientCareVisibility = {
   /** Goals that a staff member should see during the given shift.
    *  Rule: is_complete AND per-goal visible AND care_plan section on AND
@@ -135,6 +148,12 @@ export type ClientCareVisibility = {
      *  Custom fields have no per-field visibility switch — they inherit
      *  their section's toggle exclusively. */
     custom_fields: CustomFieldWithValue[];
+    /** Always mirrors admin — no visibility gating. */
+    target_behaviors: CareTargetBehavior[];
+    /** Always mirrors admin — no visibility gating. */
+    emergency_contacts: CareEmergencyContact[];
+    /** Always mirrors admin — no visibility gating. */
+    preferred_activities: string[];
   };
 };
 
@@ -150,10 +169,14 @@ export type ClientCareData = {
   /** All custom fields (admin view). Staff view uses
    *  `visibility.staffCare.custom_fields` (filtered by section toggle). */
   custom_fields: CustomFieldWithValue[];
+  target_behaviors: CareTargetBehavior[];
+  emergency_contacts: CareEmergencyContact[];
+  preferred_activities: string[];
   /** Raw visibility row (as stored). Admin toggle UIs read this. */
   visibilityRow: ClientVisibilityRow;
   visibility: ClientCareVisibility;
 };
+
 
 // ── Server function ─────────────────────────────────────────────────────────
 
@@ -174,13 +197,14 @@ export const getClientCareData = createServerFn({ method: "GET" })
     const { clientId, shiftServiceCode } = data;
     const supabase = context.supabase as any;
 
-    const [clientRes, cstRes, medsRes, codesRes, visRes, cfDefsRes, cfValsRes] =
+    const [clientRes, cstRes, medsRes, codesRes, visRes, cfDefsRes, cfValsRes, tbRes, ecRes] =
       await Promise.all([
       supabase
         .from("clients")
         .select(
-          "id, organization_id, first_name, last_name, date_of_birth, admission_date, discharge_date, medicaid_id, account_status, self_admin_med_support, self_admin_med_support_locked",
+          "id, organization_id, first_name, last_name, date_of_birth, admission_date, discharge_date, medicaid_id, account_status, self_admin_med_support, self_admin_med_support_locked, preferred_activities",
         )
+
         .eq("id", clientId)
         .maybeSingle(),
       supabase
@@ -217,7 +241,19 @@ export const getClientCareData = createServerFn({ method: "GET" })
         .select("definition_id, value_text, value_number, value_boolean, value_date")
         .eq("entity_kind", "client")
         .eq("entity_id", clientId),
+      supabase
+        .from("client_target_behaviors")
+        .select("id, behavior_name, description")
+        .eq("client_id", clientId)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("client_emergency_contacts")
+        .select("id, name, phone, relationship")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: true }),
     ]);
+
 
     if (clientRes.error) throw clientRes.error;
     if (!clientRes.data) throw new Error("Client not found");
@@ -365,6 +401,21 @@ export const getClientCareData = createServerFn({ method: "GET" })
         return g.job_codes.some((c) => c.toUpperCase() === codeUpper);
       });
 
+    const target_behaviors: CareTargetBehavior[] = ((tbRes?.data ?? []) as any[]).map((b) => ({
+      id: String(b.id),
+      behavior_name: String(b.behavior_name ?? ""),
+      description: String(b.description ?? ""),
+    }));
+    const emergency_contacts: CareEmergencyContact[] = ((ecRes?.data ?? []) as any[]).map((c) => ({
+      id: String(c.id),
+      name: String(c.name ?? ""),
+      phone: c.phone ?? null,
+      relationship: c.relationship ?? null,
+    }));
+    const preferred_activities: string[] = Array.isArray(row.preferred_activities)
+      ? (row.preferred_activities as unknown[]).map((s) => String(s ?? "").trim()).filter(Boolean)
+      : [];
+
     const visibility: ClientCareVisibility = {
       goalsForStaff,
       medicationsVisible: medicationsStaff.length > 0,
@@ -376,6 +427,9 @@ export const getClientCareData = createServerFn({ method: "GET" })
         medications: medicationsStaff,
         authorized_codes: authorizedCodesStaff,
         custom_fields: customFieldsStaff,
+        target_behaviors,
+        emergency_contacts,
+        preferred_activities,
       },
     };
 
@@ -388,10 +442,14 @@ export const getClientCareData = createServerFn({ method: "GET" })
       medications,
       authorized_codes,
       custom_fields,
+      target_behaviors,
+      emergency_contacts,
+      preferred_activities,
       visibilityRow,
       visibility,
     };
   });
+
 
 // ── Query options helper (for loaders and hooks) ────────────────────────────
 

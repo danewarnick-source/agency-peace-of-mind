@@ -136,10 +136,23 @@ export function AboutTab({ client }: { client: CaseloadClient }) {
           <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Behavioral
           Trigger Flags
         </h3>
-        <p className="text-sm text-muted-foreground">
-          No documented triggers on file. Triggers added by your supervisor
-          will appear here so you can recognize them in real time.
-        </p>
+        {(staffCare?.target_behaviors ?? []).length > 0 ? (
+          <ul className="space-y-2">
+            {(staffCare?.target_behaviors ?? []).map((b) => (
+              <li key={b.id} className="rounded-md border border-border bg-background px-3 py-2">
+                <p className="text-sm font-medium leading-snug">{b.behavior_name}</p>
+                {b.description && (
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{b.description}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            No documented triggers on file. Triggers added by your supervisor
+            will appear here so you can recognize them in real time.
+          </p>
+        )}
       </Card>
 
       {/* Emergency contacts */}
@@ -147,10 +160,30 @@ export function AboutTab({ client }: { client: CaseloadClient }) {
         <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
           <Phone className="h-3.5 w-3.5" /> Emergency Contacts
         </h3>
-        <p className="text-sm text-muted-foreground">
-          Emergency phone numbers are kept current by an administrator. If you
-          need them during a shift, contact your on-call supervisor.
-        </p>
+        {(staffCare?.emergency_contacts ?? []).length > 0 ? (
+          <ul className="space-y-2">
+            {(staffCare?.emergency_contacts ?? []).map((c) => (
+              <li key={c.id} className="rounded-md border border-border bg-background px-3 py-2 text-sm">
+                <p className="font-medium leading-snug">
+                  {c.name}
+                  {c.relationship && (
+                    <span className="ml-1 text-xs font-normal text-muted-foreground">· {c.relationship}</span>
+                  )}
+                </p>
+                {c.phone && (
+                  <a href={`tel:${c.phone}`} className="text-xs text-primary hover:underline">
+                    {c.phone}
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            No emergency contacts on file. Ask your administrator to add them
+            so they're available during a shift.
+          </p>
+        )}
       </Card>
 
       {/* Interests / hobbies */}
@@ -158,12 +191,21 @@ export function AboutTab({ client }: { client: CaseloadClient }) {
         <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
           <Heart className="h-3.5 w-3.5 text-rose-500" /> Interests & Hobbies
         </h3>
-        <div className="flex flex-wrap gap-1.5">
-          <Badge variant="secondary" className="font-normal">
-            Personal preferences will populate from intake forms
-          </Badge>
-        </div>
+        {(staffCare?.preferred_activities ?? []).length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {(staffCare?.preferred_activities ?? []).map((a) => (
+              <Badge key={a} variant="secondary" className="font-normal">
+                {a}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            No interests or hobbies recorded yet.
+          </p>
+        )}
       </Card>
+
 
       {/* Face Sheet Info — backs every field on the printable Client Face Sheet */}
       <div className="md:col-span-2">

@@ -10,7 +10,7 @@ import {
 // 'given' = hands-on administration; distinct from 'self_administered'
 // (self-directed) so a hands-on pass never inherits the self-directed
 // attestation language.
-const StatusEnum = z.enum(["self_administered", "given", "refused", "omitted", "missed"]);
+const StatusEnum = z.enum(["self_administered", "given", "refused", "omitted", "missed", "loa"]);
 const AdministratorRoleEnum = z.enum([
   "self",
   "staff_observed",
@@ -161,6 +161,12 @@ export const logMedicationPass = createServerFn({ method: "POST" })
       throw new Error("Medication error requires a description.");
     }
 
+    // Exception statuses require a non-empty note.
+    const isExceptionStatus = data.status === "refused" || data.status === "omitted" || data.status === "missed" || data.status === "loa";
+    if (isExceptionStatus && !data.exceptionReason?.trim()) {
+      throw new Error("A note is required when the status is Refused, Omitted, Missed, or LOA.");
+    }
+
     // ── ATTESTATION FRAMEWORK ────────────────────────────────────────────
     // Scale required attestation by admin model + med risk-class. Witness-
     // level attestations require a second_witness_id.
@@ -202,7 +208,7 @@ export const logMedicationPass = createServerFn({ method: "POST" })
       .select("id")
       .eq("medication_id", data.medicationId)
       .eq("scheduled_for", data.scheduledFor)
-      .in("status", ["self_administered", "given", "refused", "omitted", "missed"])
+      .in("status", ["self_administered", "given", "refused", "omitted", "missed", "loa"])
       .maybeSingle();
     if (existingLog) throw new Error("This dose has already been documented.");
 

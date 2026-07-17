@@ -35,6 +35,7 @@ const STATUS_COLOR: Record<EmarStatus, string> = {
   refused: "bg-rose-100 text-rose-800",
   omitted: "bg-rose-100 text-rose-800",
   missed: "bg-amber-100 text-amber-800",
+  loa: "bg-blue-100 text-blue-800",
 };
 
 function AuditPage() {

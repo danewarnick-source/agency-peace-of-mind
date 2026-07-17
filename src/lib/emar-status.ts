@@ -1,4 +1,4 @@
-export type EmarStatus = "self_administered" | "refused" | "omitted" | "missed";
+export type EmarStatus = "self_administered" | "refused" | "omitted" | "missed" | "loa";
 
 export function normalizeEmarStatus(raw: string): EmarStatus {
   switch (raw.toLowerCase()) {
@@ -13,14 +13,17 @@ export function normalizeEmarStatus(raw: string): EmarStatus {
       return "refused";
     case "missed":
       return "missed";
+    case "loa":
+      return "loa";
     default:
       return "self_administered";
   }
 }
 
 export const EMAR_STATUS_LABELS: Record<EmarStatus, string> = {
-  self_administered: "Self-administered",
+  self_administered: "Observed",
   refused: "Refused",
   omitted: "Omitted",
   missed: "Missed",
+  loa: "LOA",
 };

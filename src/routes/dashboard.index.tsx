@@ -84,7 +84,7 @@ function ComplianceInbox() {
         Needs Your Attention ({totalItems})
       </h2>
       <ul className="space-y-2">
-        {openShifts.map((s) => (
+        {orphanOpenShifts.map((s) => (
           <li key={s.id}
             className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2.5">
             <div className="min-w-0 flex items-start gap-2">

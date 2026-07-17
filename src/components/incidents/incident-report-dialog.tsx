@@ -395,6 +395,24 @@ export function IncidentReportDialog({
     return c ? `${c.first_name} ${c.last_name}`.trim() : "";
   }, [caseload, pickedClientId, clientId, clientName]);
 
+  // Fetch the picked client's guardian status so the NECTAR follow-up N/A
+  // button can auto-satisfy guardian-notification questions when the client
+  // is their own guardian.
+  const [clientIsOwnGuardian, setClientIsOwnGuardian] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!open || !pickedClientId) { setClientIsOwnGuardian(null); return; }
+    let cancelled = false;
+    void supabase
+      .from("clients")
+      .select("is_own_guardian")
+      .eq("id", pickedClientId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setClientIsOwnGuardian(data?.is_own_guardian ?? null);
+      });
+    return () => { cancelled = true; };
+  }, [open, pickedClientId]);
+
   // ── Photo upload
   const [photoUploading, setPhotoUploading] = useState(false);
   async function uploadPhotos(files: FileList) {

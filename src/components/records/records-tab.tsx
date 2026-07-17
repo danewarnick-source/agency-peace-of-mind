@@ -288,7 +288,13 @@ export function RecordsTab() {
       const teamMap = new Map((teamOptionsQ.data ?? []).map((t) => [t.value, t.label]));
 
       const derivedAll: Derived[] = baseRows.map((r) => {
-        const exc = reviewExceptions(r);
+        const awaiting =
+          r.import_source === "historical_import" &&
+          r.status === "Pending_Staff_Confirmation";
+        // Skip the compliance-rule engine for entries that are simply
+        // waiting on the staff member's own sign-off — nothing here is
+        // actionable from the admin's side.
+        const exc = awaiting ? [] : reviewExceptions(r);
         const inTs = r.corrected_clock_in ?? r.clock_in_timestamp;
         const outTs = r.corrected_clock_out ?? r.clock_out_timestamp;
         return {
@@ -301,6 +307,7 @@ export function RecordsTab() {
           duration_min: durationMin(inTs, outTs),
           exceptions: exc,
           is_evv_locked: isEvvLockedCode(r.service_type_code),
+          awaiting_staff_confirmation: awaiting,
         };
       });
 

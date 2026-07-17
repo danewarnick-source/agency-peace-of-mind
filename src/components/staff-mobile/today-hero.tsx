@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Rocket, Clock, CalendarCheck2, Sun } from "lucide-react";
+import { Rocket, Clock, CalendarCheck2, Sun, AlertTriangle } from "lucide-react";
 import { useTodayShift } from "@/hooks/use-today-shift";
 import { useTodayShifts, type TodayShiftRow } from "@/hooks/use-today-shifts";
 

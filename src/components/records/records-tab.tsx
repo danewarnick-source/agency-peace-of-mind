@@ -862,7 +862,14 @@ export function RecordsTab() {
                           )}
                         </td>
                         <td className="px-3 py-2">
-                          {r.exceptions.length > 0 ? (
+                          {r.awaiting_staff_confirmation ? (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600"
+                              title={`Imported from a historical spreadsheet — waiting for ${r.staff_name} to review and sign off at My historical timesheets. Nothing to fix here.`}
+                            >
+                              <Clock3 className="h-3 w-3" /> Awaiting staff confirmation
+                            </span>
+                          ) : r.exceptions.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
                               {r.exceptions.map((e) => <ReasonBadge key={e.code} ex={e} />)}
                             </div>

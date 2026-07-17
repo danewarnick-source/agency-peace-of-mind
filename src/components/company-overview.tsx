@@ -251,7 +251,7 @@ function KpiStrip({ metrics, raw, isLoading }: { metrics: HealthMetrics | null; 
     {
       icon: MapPin, label: "EVV match", value: metrics.evv,
       nextAction: evvOut ? `Investigate ${evvOut} clock-in${evvOut === 1 ? "" : "s"}` : "Open EVV & timesheets",
-      to: "/dashboard/compliance-desk", search: { focus: "evv-out-of-bounds" },
+      to: "/dashboard/hub/documentation", search: { tab: "records", focus: "evv-out-of-bounds" },
     },
     {
       icon: FileCheck2, label: "Documentation", value: metrics.docs,

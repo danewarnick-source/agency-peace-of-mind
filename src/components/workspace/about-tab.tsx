@@ -44,25 +44,35 @@ function age(dob: string | null | undefined): number | null {
   return a;
 }
 
+function isEmpty(v: React.ReactNode): boolean {
+  return v == null || v === "" || v === false;
+}
+
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  const empty = children == null || children === "" || children === false;
+  if (isEmpty(children)) return null;
   return (
     <div className="flex items-start justify-between gap-4 py-2 text-sm border-b border-border/60 last:border-0">
       <span className="text-muted-foreground">{label}</span>
-      <span className="font-semibold text-right">
-        {empty ? <span className="text-muted-foreground font-normal">—</span> : children}
-      </span>
+      <span className="font-semibold text-right">{children}</span>
     </div>
   );
 }
 
-function GroupHeader({ children }: { children: React.ReactNode }) {
+function Group({ header, children }: { header: string; children: React.ReactNode }) {
+  const rendered = (Array.isArray(children) ? children : [children]).filter(
+    (c) => c !== null && c !== false && c !== undefined,
+  );
+  if (rendered.length === 0) return null;
   return (
-    <div className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-muted-foreground/80 mt-4 mb-1.5 first:mt-0">
-      {children}
-    </div>
+    <>
+      <div className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-muted-foreground/80 mt-4 mb-1.5 first:mt-0">
+        {header}
+      </div>
+      {rendered}
+    </>
   );
 }
+
 
 export function AboutTab({ client }: { client: CaseloadClient }) {
   const care = useClientCareData(client.id);

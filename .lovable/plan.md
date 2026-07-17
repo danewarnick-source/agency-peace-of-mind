@@ -1,106 +1,44 @@
-## Goal
+## Problem
 
-Replace the 7-tab staff medications experience (MarEmarTab) with a single, simple, read-only-plus-log screen on the two staff-facing surfaces. Admin keeps MarEmarTab untouched.
+On the incident report's NECTAR follow-up step, questions like *"Was Justin's guardian or authorized representative notified of the injury and urgent care visit?"* are marked "Must answer" and block continuing. Today the only way to satisfy them without typing an answer is to check "Not applicable" and type a reason into a text box. For clients who are their own guardian (or clients with no guardian at all), staff shouldn't have to explain that in prose — it's a fact the system already knows or can capture in one tap.
 
-## Scope
+## Fix
 
-- **Replace on staff surfaces:**
-  - `src/routes/dashboard.workspace.$clientId.tsx` — swap `<MarEmarTab .../>` → new `<StaffMedicationsPanel .../>`
-  - `src/routes/dashboard.hhs-hub.$clientId.tsx` — same swap
-- **Do not touch admin surface:**
-  - `src/routes/dashboard.clients.$clientId.tsx` continues to render `<MarEmarTab .../>` as today.
-- `MarEmarTab` component itself is left in place (still imported by admin).
+Add a one-click **N/A** button to every NECTAR follow-up question in the incident report form, and make it smart for guardian-notification questions specifically.
 
-## New file: `src/components/medications/staff-medications-panel.tsx`
+### 1. Load the client's guardian status when the dialog opens
 
-Single presentational component. Props: `{ clientId, clientName, serviceContext? }`.
+When the report dialog mounts with a `clientId`, fetch that client's `is_own_guardian` flag (and `guardian_name` for the label) from `clients` via the existing supabase client. Cache it in local state. No new server function needed — this is a single read the staff already have RLS access to.
 
-### 1. Client header card
+### 2. One-click N/A button on each follow-up
 
-- Small card, bold client name.
-- Below in smaller muted text:
-  - Allergies: read `clients.allergies` (existing column). If empty → "No known allergies".
-  - Self-administration support status in plain words. Read from `clients` — reuse whatever `MarEmarTab` currently reads (e.g. `self_administration_status` / `self_admin_support_level` — will confirm exact column when writing). Render as human sentence, e.g. "Self-administers with support".
-- No edit buttons, no admin actions.
+In `renderQuestionStep` (src/components/incidents/incident-report-dialog.tsx, ~line 951), add a button row above the existing "Not applicable — reason" checkbox:
 
-### 2. "Due today" list
+- **Default label:** `Mark N/A`
+- Clicking it toggles the N/A state on with a default reason of `"Not applicable"` (already enough to satisfy the "answered" gate — the existing `answered` check in the `submitBlocked` logic accepts any non-empty `aiNA[idx]`, and empty string counts as answered too since the check is `aiNA[idx] !== undefined`, but we set a short default so the audit trail isn't blank).
+- Clicking it again clears N/A.
+- The existing checkbox + free-text reason field stays as-is for staff who want to type a custom reason.
 
-- Heading "Due today".
-- Data source: `useShiftMedDueStatus` (already used by `shift-med-due-check`) with a windowStart = today 00:00 local, windowEnd = today 23:59 local. This is the same expansion of `client_medications.scheduled_times` that admin MAR uses, joined against `emar_logs`.
-- Additionally load PRN meds (`is_prn = true`) from `client_medications` and append them as rows labeled "PRN" (no scheduled time).
-- Each row:
-  - Left: **medication name** (bold) + muted `dose · route · HH:MM AM/PM` (or "PRN").
-  - Right: if `logged === false` → single `<Button>Log</Button>`; if logged → colored `<Badge>` with EMAR_STATUS_LABELS mapping (Observed / Refused / Missed / LOA / Omitted) followed by "· 8:04 PM" formatted from `emar_logs.administered_at ?? scheduled_for`. To get the recorded status+time, extend the query (or add a small sibling query) to return the matched log row for each scheduled dose.
-- Empty state: "Nothing due right now."
+### 3. Smart label for guardian-notification questions
 
-### 3. "View full medication list" disclosure
+Detect guardian questions by matching the question text (case-insensitive) against `/guardian|authorized rep(resentative)?/`. When it matches AND the client's `is_own_guardian === true`:
 
-- Small underlined muted button below the list. Toggles between "View full medication list" / "Hide full medication list".
-- When open, plain list of every active `client_medications` row: name, dose, route, schedule (`scheduled_times` joined with ", " or "PRN" / frequency). Read-only. No action buttons.
+- Change the button label to: **`Not applicable — {ClientFirstName} is their own guardian`**
+- The auto-filled reason becomes: `"Client is their own guardian — no separate notification required."` (mirrors the phrasing already used in the admin GuardianNotifyDialog at admin-incidents-section.tsx:218 so the audit trail is consistent across the app.)
+- Show a small helper line under the question: *"This client is their own guardian — no guardian notification is required."*
 
-### 4. Log dialog
+When it matches but `is_own_guardian` is false/unknown, keep the plain `Mark N/A` label (staff may still legitimately need to explain, e.g., guardian unreachable).
 
-New component `LogDoseDialog` inside the same file (or sibling). Opens from a row's "Log" button.
+### 4. No changes to submit gating or server payload shape
 
-- Title: `Log {medication_name}`.
-- 2×2 grid of toggle buttons: **Observed**, **Refused**, **Missed**, **LOA**. Single-select via local state. Selected button gets `variant="default"`, others `variant="outline"`.
-- **Time observed**: `<Input type="time">` initialized to current time on open. Editable. Combined with today's date to form ISO for `actualTakenAt`.
-- **Note**: `<Textarea>`. Required if status ≠ Observed.
-- **Attestation sentence**: live-computed string, e.g.
-  - Observed → "I attest that {med} was observed being self-administered at {time}, as recorded above."
-  - Refused → "I attest that {med} was refused at {time}, as recorded above."
-  - Missed → "I attest that {med} was missed at {time}, as recorded above."
-  - LOA → "I attest that {med} was sent with the Person during an approved leave at {time}, as recorded above."
-- **Type your full name to confirm**: `<Input>` starting empty on every open (reset via a `key` on the dialog or explicit reset in `onOpenChange`). NOT prefilled — even though we know the user's name server-side.
-- Buttons: `Cancel` (discard + close), `Save`.
-
-### 5. Save behavior — client-side validation then server call
-
-Order of validation (each failure shows a `toast.error` and aborts):
-
-1. Status selected.
-2. Time value present.
-3. If status ≠ Observed → note non-empty (trimmed).
-4. Typed name non-empty (trimmed).
-
-Then invoke existing server fn `logMedicationPass` from `@/lib/emar-pass.functions` via `useServerFn`, mapping:
-
-| Field | Value |
-|---|---|
-| `clientId` | prop |
-| `medicationId` | row.medication_id |
-| `scheduledFor` | row.scheduled_for_iso (for PRN: use current ISO) |
-| `scheduledTimeLabel` | row.time_label (null for PRN) |
-| `status` | Observed→`self_administered`, Refused→`refused`, Missed→`missed`, LOA→`loa` |
-| `administratorRole` | `staff_observed` for Observed; `self` for the exception statuses (matches existing exception flows and avoids the hands-on gate) |
-| `route` | row.route ?? "PO" |
-| `actualTakenAt` | ISO from time picker |
-| `exceptionReason` | note (only for non-Observed) |
-| `notes` | note if Observed and provided; else null |
-| `signatureDataUrl` | small inline SVG data URL rendering typed name — satisfies server's `min(10)` signature requirement and preserves the typed-name evidence: `data:image/svg+xml;utf8,<svg …><text>{typedName}</text></svg>` (URL-encoded) |
-| `serviceContext` | prop (e.g. "HHS", active shift's service code if available) |
-| `isMedicationError` | false |
-
-The server fn already:
-- Writes a canonical `signature_attestation` string with staff full name and timestamp.
-- Enforces PRN/rescue/controlled requirements (staff Log flow will see server errors surfaced via toast if a PRN/rescue/controlled med is logged without required extras — acceptable; those flows already require the full MAR UI and are out of scope for this simplification. If a Log click hits one, we surface the server error message).
-- Writes to `emar_logs`, the same table the admin eMAR reads.
-
-On success: `toast.success`, close dialog, invalidate the due-status query (`queryClient.invalidateQueries({ queryKey: ["shift-med-due-status", ...] })`) so the row flips to the logged badge.
-
-## Data / query notes
-
-- Extend or wrap `useShiftMedDueStatus` locally so each dose also carries the matched `emar_logs.status` + `administered_at` when `logged === true`. Simplest: add a second small `useQuery` in the panel that fetches `emar_logs` for the window and joins in JS by `medication_id + scheduled_for`.
-- All queries use the browser `supabase` client + existing RLS. No schema changes, no migrations.
-
-## Out of scope
-
-- Admin MarEmarTab, EmarChart, EmarNectarPanel, EmarOpsPanel — unchanged.
-- Refills, transfers, compliance audit tools, "Add Medication", "Upload MAR/Order" — removed from staff view entirely (by virtue of not being on the new panel).
-- PRN reason capture / rescue seizure fields / controlled counts UI — not added to the staff Log dialog (server will reject with a clear message on the rare staff PRN/controlled tap; those meds are typically handled from the admin MAR).
+The existing `submitBlocked` logic already treats a non-undefined `aiNA[idx]` as "answered", and the payload already serializes N/A reasons into `nectar_followups`. Nothing else changes — no migration, no server function edits, no admin-side changes.
 
 ## Files touched
 
-- **Create:** `src/components/medications/staff-medications-panel.tsx`
-- **Edit:** `src/routes/dashboard.workspace.$clientId.tsx` (swap import + JSX)
-- **Edit:** `src/routes/dashboard.hhs-hub.$clientId.tsx` (swap import + JSX)
+- `src/components/incidents/incident-report-dialog.tsx` — add the client guardian-status fetch, the N/A button, and the smart label logic inside `renderQuestionStep`.
+
+## Out of scope
+
+- The narrative-step follow-ups use the same `renderQuestionStep`, so they get the same button automatically — that's intentional and desirable.
+- No change to the admin-side guardian notification workflow.
+- No change to the existing "Not applicable — reason" typed field; it remains for staff who want to add context.

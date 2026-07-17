@@ -42,7 +42,7 @@ type Row = {
   clients: { id: string; first_name: string | null; last_name: string | null } | null;
 };
 
-function MyHistoricalTimesheetsPage() {
+export function MyHistoricalTimesheetsPage() {
   const list = useServerFn(listMyPendingHistoricalTimesheets);
   const qc = useQueryClient();
   const q = useQuery({

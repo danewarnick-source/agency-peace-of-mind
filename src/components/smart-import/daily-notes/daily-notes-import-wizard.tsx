@@ -1,7 +1,8 @@
 // Historical daily-notes / shift-notes import wizard — spreadsheet-only
-// (CSV/XLSX), column-mapping + name-based matching against EXISTING staff and
-// clients. NEVER creates new staff or client records. Anything imported here
-// is permanently marked import_source='historical_import' on daily_logs.
+// (CSV/XLSX) using a REQUIRED template (Staff Name, Client Name, Date,
+// Narrative, Goals Addressed). Name-based matching against EXISTING staff
+// and clients. NEVER creates new staff or client records. Anything imported
+// here is permanently marked import_source='historical_import' on daily_logs.
 //
 // Target use case: Host Home providers bringing over daily notes from another
 // platform (no time clock — just staff, client, date, narrative, and any

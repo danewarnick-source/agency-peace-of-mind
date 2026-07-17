@@ -60,7 +60,7 @@ function ActiveShiftReimbursementSlot({ clientId }: { clientId: string }) {
   );
 }
 
-const workspaceSearch = z.object({ tab: z.string().optional(), code: z.string().optional() });
+const workspaceSearch = z.object({ tab: z.string().optional(), code: z.string().optional(), verify: z.string().optional() });
 export const Route = createFileRoute("/dashboard/workspace/$clientId")({
   head: () => ({ meta: [{ title: "Client Workspace — HIVE" }] }),
   validateSearch: workspaceSearch,

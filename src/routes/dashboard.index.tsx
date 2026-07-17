@@ -27,6 +27,7 @@ export const Route = createFileRoute("/dashboard/")({
 
 function ComplianceInbox() {
   const { user } = useAuth();
+  const { active } = useTodayShift();
   const navigate = useNavigate();
 
   const { data: rejectedLogs = [] } = useQuery({

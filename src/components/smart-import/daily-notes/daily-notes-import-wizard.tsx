@@ -208,10 +208,10 @@ export function DailyNotesImportWizard() {
     enabled: !!org?.organization_id,
     queryKey: ["daily-notes-import-people", org?.organization_id],
     queryFn: async () => {
-      const [staffRes, clientsRes] = await Promise.all([
+      const [membersRes, clientsRes] = await Promise.all([
         supabase
           .from("organization_members")
-          .select("user_id, profiles:profiles!inner(id, first_name, last_name, full_name)")
+          .select("user_id")
           .eq("organization_id", org!.organization_id)
           .eq("active", true),
         supabase
@@ -219,20 +219,35 @@ export function DailyNotesImportWizard() {
           .select("id, first_name, last_name")
           .eq("organization_id", org!.organization_id),
       ]);
-      if (staffRes.error) throw staffRes.error;
+      if (membersRes.error) throw membersRes.error;
       if (clientsRes.error) throw clientsRes.error;
-      type S = { profiles: { id: string; first_name: string | null; last_name: string | null; full_name: string | null } };
-      const staff: Person[] = ((staffRes.data ?? []) as unknown as S[])
-        .map((m) => m.profiles)
-        .filter(Boolean)
-        .map((p) => ({
-          id: p.id,
-          label:
-            (p.full_name?.trim()) ||
-            [p.first_name, p.last_name].filter(Boolean).join(" ").trim() ||
-            "Staff",
-          norms: personNorms(p.first_name ?? "", p.last_name ?? "", p.full_name),
-        }));
+
+      const userIds = Array.from(
+        new Set((membersRes.data ?? []).map((m) => m.user_id).filter(Boolean)),
+      );
+      let profiles: Array<{
+        id: string;
+        first_name: string | null;
+        last_name: string | null;
+        full_name: string | null;
+      }> = [];
+      if (userIds.length > 0) {
+        const profRes = await supabase
+          .from("profiles")
+          .select("id, first_name, last_name, full_name")
+          .in("id", userIds);
+        if (profRes.error) throw profRes.error;
+        profiles = profRes.data ?? [];
+      }
+
+      const staff: Person[] = profiles.map((p) => ({
+        id: p.id,
+        label:
+          (p.full_name?.trim()) ||
+          [p.first_name, p.last_name].filter(Boolean).join(" ").trim() ||
+          "Staff",
+        norms: personNorms(p.first_name ?? "", p.last_name ?? "", p.full_name),
+      }));
       const clients: Person[] = ((clientsRes.data ?? []) as Array<{
         id: string; first_name: string; last_name: string;
       }>).map((c) => ({

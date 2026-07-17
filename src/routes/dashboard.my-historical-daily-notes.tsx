@@ -35,7 +35,7 @@ type Row = {
   clients: { id: string; first_name: string | null; last_name: string | null } | null;
 };
 
-function MyHistoricalDailyNotesPage() {
+export function MyHistoricalDailyNotesPage() {
   const list = useServerFn(listMyPendingHistoricalDailyNotes);
   const qc = useQueryClient();
   const q = useQuery({

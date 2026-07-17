@@ -40,7 +40,7 @@ import { SectionPanel, SectionGroup, CareSection, CareGroup } from "@/components
 import { ClientProfileTab } from "@/components/clients/profile-tab";
 import { FaceSheetButton } from "@/components/clients/face-sheet-button";
 import { SectionsView, ClientSpecificTrainingCard, GoalsEditor, PublishConfirmDialog } from "@/components/clients/client-specific-training-card";
-import { SectionVisibilityToggle, FieldVisibilityToggle } from "@/components/clients/visibility-toggles";
+import { FieldVisibilityToggle } from "@/components/clients/visibility-toggles";
 import { CustomFieldsForSection } from "@/components/clients/custom-fields-panel";
 import { TargetBehaviorsPanel } from "@/components/clients/target-behaviors-panel";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, Pill, RefreshCw, Sparkles, Trash2, Upload, UserCircle2, Target, ShieldCheck, GraduationCap, HeartHandshake, Users, UtensilsCrossed, ListChecks, UserCircle, FileUp, Clock, FileText, AlertOctagon, ClipboardList, Home as HomeIcon, CalendarClock, Wallet, FolderOpen } from "lucide-react";
@@ -228,7 +228,6 @@ function ClientProfileHub() {
         {/* IDENTITY — sole home for name, DOB, Medicaid #, guardian,
             emergency contacts, support coordinator, admission date. */}
         <TabsContent value="identity" className="space-y-10">
-          <SectionVisibilityToggle clientId={clientId} section="identity" />
           <SectionGroup label="Identity" hint="Who this person is — the record of record">
             <SectionPanel icon={FileUp} accent="amber">
               <UpdateInfoFromDocumentCard clientId={clientId} orgId={orgId} />
@@ -244,7 +243,6 @@ function ClientProfileHub() {
             (goals with editable job codes, medications) live here and
             nowhere else. */}
         <TabsContent value="care-plan" className="space-y-6">
-          <SectionVisibilityToggle clientId={clientId} section="care_plan" />
           <TrainingSetupBadge clientId={clientId} />
 
           <Tabs defaultValue="goals">
@@ -289,7 +287,6 @@ function ClientProfileHub() {
         {/* BILLING — sole home for authorized codes, per-code rates,
             annual authorization units, and budget. */}
         <TabsContent value="billing" className="space-y-10">
-          <SectionVisibilityToggle clientId={clientId} section="billing" />
           <SectionGroup label="Authorizations & budget" hint="Billing codes, rates, annual units, and remaining funds">
             <SectionPanel icon={ShieldCheck} accent="emerald">
               <BillingCodesPanel clientId={clientId} />
@@ -303,7 +300,6 @@ function ClientProfileHub() {
 
         {/* FILES — sole home for uploaded source documents (incl. PCSPs). */}
         <TabsContent value="files" className="space-y-10">
-          <SectionVisibilityToggle clientId={clientId} section="files" />
           <SectionGroup label="Documents" hint="Uploaded files for this client — PCSPs, 1056s, intake, and more">
             <SectionPanel icon={FolderOpen} accent="sky">
               <ClientDocumentsCard clientId={clientId} clientName={fullName} />
@@ -329,7 +325,6 @@ function ClientProfileHub() {
 
         {/* OPERATIONS — day-to-day coordination tools and non-goal PCSP supports. */}
         <TabsContent value="operations" className="space-y-10">
-          <SectionVisibilityToggle clientId={clientId} section="operations" />
           <CareGroup label="Supports & coordination" hint="Support strategies and team">
             <CareSection icon={ListChecks} accent="violet">
               <SupportStrategiesPanel client={client} clientId={clientId} orgId={orgId} />
@@ -354,7 +349,6 @@ function ClientProfileHub() {
 
         {/* COMPLIANCE — summaries, host-home certifications, deadlines. */}
         <TabsContent value="compliance" className="space-y-10">
-          <SectionVisibilityToggle clientId={clientId} section="compliance" />
           <SectionGroup label="Reporting & deadlines" hint="Summaries and upcoming due dates">
             <SectionPanel icon={ClipboardList} accent="violet">
               <SummariesPanel clientId={clientId} orgId={orgId} client={client} />

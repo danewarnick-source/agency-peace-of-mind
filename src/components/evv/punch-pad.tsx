@@ -987,6 +987,20 @@ export function PunchPad({
     setShowCompliance(true);
   }
 
+  // Auto-open the Shift Verification & Medicaid Compliance form once, when
+  // arriving here from a "Fix Now" deep link for an open shift.
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (!autoOpenCompliance) return;
+    if (autoOpenedRef.current) return;
+    if (!active || !activeMatchesThisPad) return;
+    autoOpenedRef.current = true;
+    openCompliance();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpenCompliance, active, activeMatchesThisPad]);
+
+
+
   // Format an ISO/Date as the value expected by <input type="datetime-local">
   // in the browser's local timezone: YYYY-MM-DDTHH:MM.
   function toLocalDatetimeInput(v: string | number | Date): string {

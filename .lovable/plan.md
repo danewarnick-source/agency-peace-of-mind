@@ -1,39 +1,35 @@
-## Fix medication duplication + add per-med checkbox + typed attestation
+## Defer med logging until Submit Timeclock + orange enabled state
 
-Scope: `src/components/medications/shift-med-due-check.tsx` and `src/hooks/use-shift-med-due-status.tsx`. No DB changes.
+### 1. Shift-med section becomes a draft, not a live writer
 
-### 1. Fix duplicate meds
+`src/components/medications/shift-med-due-check.tsx`
 
-`use-shift-med-due-status.tsx` expands each `scheduled_time` across `dayOffset` [-1, 0, 1] to catch overnight windows. When a shift window is long enough (or straddles midnight), the same medication + time label matches on two different calendar days and appears twice in the list.
+- Remove the `useMutation` that calls `logMedicationPass` on click and the "Log N doses" button.
+- Add a new prop `onPendingDosesChange(pending: PendingDose[] | null) => void`. `PendingDose` = the same payload we currently pass to `logMedicationPass` (clientId, medicationId, scheduledFor, scheduledTimeLabel, status, actualTakenAt, exceptionReason, notes, signatureDataUrl), minus anything the parent will fill in.
+- Replace the submit button with a **Save** button. Save is enabled under the same validity rules as today (at least one checked dose with a valid outcome/note, typed name, attestation ticked). "No" / "Not scheduled" also count as valid, and emit `onPendingDosesChange([])`.
+- After Save, the section collapses into a read-only summary ("3 doses ready to log — signed by <name>") with an **Edit** button that reopens the form and clears the parent's resolved state until Save is pressed again.
+- `onResolvedChange(true)` fires only after Save (or after "No" / "Not scheduled"). Reopening via Edit sets it back to `false`.
 
-Fix: after expansion, dedupe by `medication_id + time_label`, keeping the dose whose `scheduled_for_iso` is closest to the middle of the window. This preserves overnight support without ever showing a med twice for the same shift.
+### 2. Parent stores pending doses and flushes on shift submit
 
-### 2. Per-medication checkbox (opt-in)
+`src/components/evv/punch-pad.tsx`
 
-In `shift-med-due-check.tsx`, replace the "every unlogged dose must be filled out" model with a checkbox next to each unlogged dose:
+- Add state `pendingMedDoses: PendingDose[] | null` (default `null`) alongside `medDosesResolved`.
+- Wire the `ShiftMedDueCheckSlot` → `ShiftMedDueCheck` `onPendingDosesChange` up to `setPendingMedDoses`.
+- In `submitCompliance` / `handleClockOut`, after all existing gates pass but before the timesheet update commits, iterate `pendingMedDoses ?? []` and `await logMedicationPass({ data })` for each entry (status-mapping already lives in `emar-pass.functions.ts`). If any dose insert throws, `toast.error(...)` and abort the timeclock submit so nothing partially commits.
+- Reset `pendingMedDoses` in `openCompliance()` alongside the other resets.
+- Existing gate `medDosesResolved` stays exactly as-is — it becomes true only after the user clicks Save in the med section.
 
-- Default: unchecked. Row shows med name, dose, scheduled time, and helper text: "Not administered this shift — will be recorded as not given at this time."
-- Checked: reveals the existing Outcome / Time / Note fields for that dose. Only checked rows are validated and submitted to `emar_logs`.
-- Already-logged doses continue to show their green "Logged" pill (unchanged).
+### 3. Submit Timeclock button — orange when ready
 
-Nothing is written for unchecked rows — they simply aren't logged from this surface. (The main eMAR remains the source of truth for anything the staff needs to add later.)
+Same file, existing Submit Timeclock button:
 
-### 3. Typed-name attestation (replaces signature pad)
-
-Remove the canvas signature block. Replace with:
-
-- A text input labeled "Type your full name to sign".
-- The existing attestation checkbox, with updated copy:
-  > "I attest that I personally observed the client take, or administered, each medication I checked above during this shift. Medications not checked were not given at the noted time."
-- Submit is enabled only when: at least one dose is checked, every checked dose has a valid Outcome (+ Note if exception), the typed name is non-empty, and the attestation box is ticked.
-- The typed name is passed into `logMedicationPass` in place of the drawn signature (server fn already accepts `signatureDataUrl` as a string — we'll send the typed name as plain text; the eMAR log will store the typed attestation instead of a PNG).
-
-### 4. Small copy / flow tweaks
-
-- "Log N dose(s)" button label switches to the count of *checked* doses.
-- If the user checks zero doses and clicks submit, show inline hint: "Check the medications you administered, or choose 'No' / 'Not scheduled' above."
+- When `canSubmitCompliance && !aiBusy` → orange (`bg-amber-500 hover:bg-amber-600 text-white`), so staff visually see it "wake up" once every section is filled.
+- Correction-path variant stays amber (unchanged in meaning).
+- Disabled state stays muted.
+- Copy stays "💾 Submit Timeclock".
 
 ### Out of scope
 
-- Admin-side eMAR UI, `emar_logs` schema, and the standalone MAR page — unchanged.
-- The HHS daily-note usage of the same component inherits all fixes automatically.
+- `emar_logs` schema and the standalone MAR page — unchanged.
+- The HHS daily-note usage of `ShiftMedDueCheck` — it'll get the new Save/Edit UI too, but since that flow has its own submit path, its parent will simply flush `pendingMedDoses` on its own submit (same pattern) in a follow-up if needed. For this change we keep the HHS caller working by defaulting `onPendingDosesChange` to a no-op and continuing to log inline there. (If you'd prefer the HHS flow updated in the same change, say the word.)

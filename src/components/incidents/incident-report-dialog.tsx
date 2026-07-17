@@ -1088,7 +1088,18 @@ export function IncidentReportDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {submitted ? (
+        {!canManageIncidents ? (
+          <div className="space-y-4 py-4 text-sm">
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-destructive">
+              <p className="font-semibold">You don't have permission to report incidents.</p>
+              <p className="mt-1 text-xs">
+                Ask an admin or manager to grant you incident-reporting access, or have
+                them file this report.
+              </p>
+            </div>
+            <DialogFooter><Button onClick={() => onOpenChange(false)}>Close</Button></DialogFooter>
+          </div>
+        ) : submitted ? (
           <div className="space-y-4 py-4 text-sm">
             <div className="rounded-md border border-emerald-300 bg-emerald-50 p-4 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">
               <p className="font-semibold">Incident submitted.</p>

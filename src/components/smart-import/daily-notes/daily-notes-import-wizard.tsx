@@ -191,19 +191,14 @@ function splitGoals(raw: string): string[] {
 
 export function DailyNotesImportWizard() {
   const { data: org } = useCurrentOrg();
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [file, setFile] = useState<File | null>(null);
   const [parsed, setParsed] = useState<ParsedFile | null>(null);
-  const [mapping, setMapping] = useState<Mapping | null>(null);
-  const [wholeFile, setWholeFile] = useState<WholeFile>({ staffId: null, clientId: null });
-  const [suggestions, setSuggestions] = useState<Record<FieldKey, FieldSuggestion> | null>(null);
-  const [suggesting, setSuggesting] = useState(false);
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [committed, setCommitted] = useState<{ inserted: number } | null>(null);
 
   const createJob = useServerFn(createDailyNotesImportJob);
   const commitRows = useServerFn(importHistoricalDailyNotes);
-  const suggestMap = useServerFn(suggestImportColumnMapping);
   const checkDupes = useServerFn(checkImportDuplicates);
   const [dupeChecking, setDupeChecking] = useState(false);
 
@@ -248,101 +243,33 @@ export function DailyNotesImportWizard() {
     },
   });
 
-  const onPickFile = useCallback(async (f: File) => {
-    const okExt = ALLOWED_EXT.some((e) => f.name.toLowerCase().endsWith(e));
-    if (!okExt) {
-      toast.error("Historical daily-notes import only accepts CSV or Excel (.csv, .xlsx, .xls).");
-      return;
-    }
-    if (f.size > MAX_BYTES) {
-      toast.error(`${f.name} is larger than 25 MB.`);
-      return;
-    }
-    try {
-      const p = await parseFile(f);
-      if (p.headers.length === 0 || p.rows.length === 0) {
-        toast.error("That file didn't contain any readable rows.");
-        return;
-      }
-      setFile(f);
-      setParsed(p);
-      // Empty mapping until NECTAR responds; admin sees a "NECTAR is
-      // analyzing your columns…" state on step 2.
-      setMapping({ staff: null, client: null, date: null, narrative: null, goals: null });
-      setWholeFile({ staffId: null, clientId: null });
-      setSuggestions(null);
-      setStep(2);
-      // Fire NECTAR ONCE for this file.
-      if (org?.organization_id) {
-        setSuggesting(true);
-        try {
-          const res = await suggestMap({
-            data: {
-              organization_id: org.organization_id,
-              mode: "daily_notes",
-              file_name: p.fileName,
-              columns: sampleColumns(p),
-            },
-          });
-          const s = res.mapping as Record<FieldKey, FieldSuggestion>;
-          setSuggestions(s);
-          setMapping({
-            staff: s.staff?.column ?? null,
-            client: s.client?.column ?? null,
-            date: s.date?.column ?? null,
-            narrative: s.narrative?.column ?? null,
-            goals: s.goals?.column ?? null,
-          });
-        } catch (err) {
-          toast.error(`NECTAR couldn't suggest a mapping: ${(err as Error).message}. You can map columns manually.`);
-        } finally {
-          setSuggesting(false);
-        }
-      }
-    } catch (e) {
-      toast.error(`Couldn't read ${f.name}: ${(e as Error).message}`);
-    }
-  }, [org?.organization_id, suggestMap]);
-
-
-  const buildReviewRows = useCallback(() => {
-    if (!parsed || !mapping || !peopleQ.data) return;
+  // Build review rows directly from the fixed template columns — no mapping.
+  const buildReviewRows = useCallback((p: ParsedFile) => {
+    if (!peopleQ.data) return;
     const { staff, clients } = peopleQ.data;
 
-    // Whole-file constants override column mapping for staff/client.
-    const wholeStaff = wholeFile.staffId
-      ? staff.find((s) => s.id === wholeFile.staffId) ?? null
-      : null;
-    const wholeClient = wholeFile.clientId
-      ? clients.find((c) => c.id === wholeFile.clientId) ?? null
-      : null;
+    const result: ReviewRow[] = p.rows.map((raw, idx) => {
+      const staffLabel = (raw[COL_STAFF] ?? "").trim();
+      const clientLabel = (raw[COL_CLIENT] ?? "").trim();
+      const dateStr = (raw[COL_DATE] ?? "").trim();
+      const narrative = (raw[COL_NARRATIVE] ?? "").trim();
+      const goals = splitGoals(raw[COL_GOALS] ?? "");
 
-    const result: ReviewRow[] = parsed.rows.map((raw, idx) => {
-      const staffLabel = wholeStaff
-        ? wholeStaff.label
-        : mapping.staff ? raw[mapping.staff] ?? "" : "";
-      const clientLabel = wholeClient
-        ? wholeClient.label
-        : mapping.client ? raw[mapping.client] ?? "" : "";
-      const dateStr = mapping.date ? raw[mapping.date] ?? "" : "";
-      const narrative = (mapping.narrative ? raw[mapping.narrative] ?? "" : "").trim();
-      const goals = mapping.goals ? splitGoals(raw[mapping.goals] ?? "") : [];
-
-      const staffCandidates = wholeStaff ? [wholeStaff] : findCandidates(staff, staffLabel);
-      const clientCandidates = wholeClient ? [wholeClient] : findCandidates(clients, clientLabel);
+      const staffCandidates = findCandidates(staff, staffLabel);
+      const clientCandidates = findCandidates(clients, clientLabel);
       const d = tryParseDate(dateStr);
 
       const missing = {
-        staff: !wholeStaff && (!staffLabel || staffCandidates.length === 0),
-        client: !wholeClient && (!clientLabel || clientCandidates.length === 0),
+        staff: !staffLabel || staffCandidates.length === 0,
+        client: !clientLabel || clientCandidates.length === 0,
         date: !dateStr || !d,
         narrative: !narrative,
       };
 
       let status: MatchStatus;
       let reason: string | null = null;
-      let staffId: string | null = wholeStaff?.id ?? null;
-      let clientId: string | null = wholeClient?.id ?? null;
+      let staffId: string | null = null;
+      let clientId: string | null = null;
 
       const structuralGap =
         missing.staff || missing.client || missing.date || missing.narrative;
@@ -355,17 +282,17 @@ export function DailyNotesImportWizard() {
         if (missing.client) parts.push(clientLabel ? "no client match" : "missing client");
         if (missing.narrative) parts.push("blank narrative");
         reason = parts.join(" · ");
-        if (!staffId && staffCandidates.length === 1) staffId = staffCandidates[0].id;
-        if (!clientId && clientCandidates.length === 1) clientId = clientCandidates[0].id;
+        if (staffCandidates.length === 1) staffId = staffCandidates[0].id;
+        if (clientCandidates.length === 1) clientId = clientCandidates[0].id;
       } else if (staffCandidates.length > 1 || clientCandidates.length > 1) {
         status = "ambiguous";
         reason = "multiple possible matches";
-        if (!staffId && staffCandidates.length === 1) staffId = staffCandidates[0].id;
-        if (!clientId && clientCandidates.length === 1) clientId = clientCandidates[0].id;
+        if (staffCandidates.length === 1) staffId = staffCandidates[0].id;
+        if (clientCandidates.length === 1) clientId = clientCandidates[0].id;
       } else {
         status = "matched";
-        staffId = staffId ?? staffCandidates[0].id;
-        clientId = clientId ?? clientCandidates[0].id;
+        staffId = staffCandidates[0].id;
+        clientId = clientCandidates[0].id;
       }
 
       return {
@@ -383,7 +310,7 @@ export function DailyNotesImportWizard() {
       };
     });
     setRows(result);
-    setStep(3);
+    setStep(2);
 
     // Duplicate check for every fully-resolved row (staff + client + date).
     const resolved = result.filter((r) => r.staffId && r.clientId && r.logDateIso);
@@ -415,7 +342,45 @@ export function DailyNotesImportWizard() {
         .catch((e: unknown) => console.warn("Duplicate check failed:", e))
         .finally(() => setDupeChecking(false));
     }
-  }, [parsed, mapping, peopleQ.data, wholeFile, org?.organization_id]);
+  }, [peopleQ.data, org?.organization_id, checkDupes]);
+
+  const onPickFile = useCallback(async (f: File) => {
+    const okExt = ALLOWED_EXT.some((e) => f.name.toLowerCase().endsWith(e));
+    if (!okExt) {
+      toast.error("Historical daily-notes import only accepts CSV or Excel (.csv, .xlsx, .xls).");
+      return;
+    }
+    if (f.size > MAX_BYTES) {
+      toast.error(`${f.name} is larger than 25 MB.`);
+      return;
+    }
+    if (!peopleQ.data) {
+      if (peopleQ.isError) {
+        toast.error(`Couldn't load staff and clients: ${(peopleQ.error as Error)?.message ?? "unknown error"}`);
+      } else {
+        toast.error("Still loading staff and clients — try again in a moment.");
+      }
+      return;
+    }
+    try {
+      const p = await parseFile(f);
+      if (p.headers.length === 0 || p.rows.length === 0) {
+        toast.error("That file didn't contain any readable rows.");
+        return;
+      }
+      const check = validateTemplateHeaders(p.headers);
+      if (!check.ok) {
+        toast.error(check.message);
+        return;
+      }
+      setFile(f);
+      setParsed(p);
+      buildReviewRows(p);
+    } catch (e) {
+      toast.error(`Couldn't read ${f.name}: ${(e as Error).message}`);
+    }
+  }, [peopleQ.data, peopleQ.isError, peopleQ.error, buildReviewRows]);
+
 
 
   // Recompute status after any manual edit. A row becomes 'matched' only when

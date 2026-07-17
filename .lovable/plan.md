@@ -1,24 +1,38 @@
-## Goal
+## Problem
 
-Trim the punch-pad chrome on the active-shift view per the user's request.
+In staff dashboard "Needs Your Attention," the Fix Now button for an open (never clocked-out) shift currently routes to `/dashboard/timeclock` (the non-client General Time Clock). It should land the staff on the exact client's punch pad AND auto-open the "📋 Shift Verification & Medicaid Compliance Form" dialog for the active shift so they can complete goals + narrative and clock out.
 
-## Changes (all in `src/components/evv/punch-pad.tsx`)
+That dialog already exists inside `PunchPad` (`src/components/evv/punch-pad.tsx`, opened by `openCompliance()` at line 950). It only opens when there's an `active` shift. `useActiveShift()` will detect the open timesheet automatically once PunchPad mounts on the client's workspace.
 
-1. **Hide the "💼 Select Service Code" field while a shift is running.** Wrap the block at ~lines 2155–2183 in `{!isRunning && (...)}`. Pre-clock-in behavior unchanged.
-2. **Remove the "🕐 Timezone" field entirely.** Delete the block at ~lines 2185–2193. Continue passing the current `timezone` state value to `evv_timesheets` writes (default `America/Denver`) — no schema/data change, just no UI control.
-3. **Remove the "Entry origin: In-Chart / Sidebar Unscheduled" line** at ~lines 2240–2246.
-4. **Remove the "EVV · Utah DHHS" badge** in the header at ~lines 2035–2037.
-5. **Scope the GPS header badges (`GPS Live`, `Acquiring GPS`, `GPS Blocked`) to EVV-locked service codes only.** Gate them with `isEvvLockedCode(serviceCode)` (the helper already used elsewhere in this file). Non-EVV shifts show none of these badges. Underlying GPS capture logic is untouched — this is purely a display gate.
+## Fix
 
-## Non-goals / preserved
+1. **`src/components/evv/punch-pad.tsx`**
+   - Add an optional prop `autoOpenCompliance?: boolean` to `PunchPadProps`.
+   - Add a `useEffect` that, when `autoOpenCompliance` is true and `active` becomes available and no dialog is already open, calls `openCompliance()` exactly once (guarded by a `useRef` so it doesn't re-fire on renders or after the user closes the dialog).
 
-- The service code is still validated and stored on the active timesheet; hiding the picker doesn't change what's saved.
-- Timezone continues to be recorded on `evv_timesheets.timezone_setting`.
-- GPS is still captured passively for non-EVV codes; only the badge UI is hidden.
-- Locked-client banner, NECTAR pre-flight, GPS status strip (clock-in only), clock buttons, and clock-out compliance flow are untouched.
+2. **`src/routes/dashboard.workspace.$clientId.tsx`**
+   - Extend `workspaceSearch` to include `verify: z.string().optional()` (URL-safe string; treat any truthy value as "open the form").
+   - Read `verify` from `Route.useSearch()` and pass `autoOpenCompliance={verify === "1"}` to `<PunchPad …>` in the clock-in tab.
 
-## Verification
+3. **`src/routes/dashboard.index.tsx`** (`ComplianceInbox`, open-shifts row, line 96–100)
+   - Replace `navigate({ to: "/dashboard/timeclock" })` with:
+     ```
+     navigate({
+       to: "/dashboard/workspace/$clientId",
+       params: { clientId: s.client_id },
+       search: { tab: "clock-in", code: s.service_type_code, verify: "1" },
+     })
+     ```
+   - Rejected daily-log row is untouched.
 
-- With an active shift running: no Service Code select, no Timezone select, no "Entry origin" caption, no "EVV · Utah DHHS" badge, and no GPS badges when the shift code is non-EVV (e.g. DSI, RHS, SEI).
-- With an active EVV-locked shift (e.g. SLH, SLN, COM): GPS Live / Acquiring / Blocked badges still appear.
-- Pre-clock-in: Service Code picker still shown; Timezone no longer shown; EVV badge gone; GPS badges only when the currently-selected code is EVV-locked.
+## Behavior
+
+- Tapping Fix Now on an open shift → workspace opens on Clock In tab for the correct client → PunchPad detects the active timesheet → Shift Verification & Medicaid Compliance Form opens automatically, prefilled with that shift's live duration, so staff can complete PCSP goals, narrative, and submit clock-out (including a time-correction request if the recorded clock-in is wrong).
+- If for any reason there's no active shift when the page loads (edge case: someone else already closed it), the dialog simply doesn't open — no error, PunchPad renders normally.
+- The auto-open fires once per navigation (ref guard); closing the dialog won't reopen it on rerender.
+
+## Files touched
+
+- `src/components/evv/punch-pad.tsx` — add prop + one-shot auto-open effect
+- `src/routes/dashboard.workspace.$clientId.tsx` — extend `validateSearch`, pass prop
+- `src/routes/dashboard.index.tsx` — update Fix Now handler for open shifts

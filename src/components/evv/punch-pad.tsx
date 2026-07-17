@@ -1456,6 +1456,22 @@ export function PunchPad({
   }) {
     if (!user || !active) return;
 
+    // Flush the shift-med checklist into emar_logs BEFORE the timesheet commits.
+    // If any dose fails, abort — nothing partial ends up in the DB.
+    if (pendingMedDoses.length > 0) {
+      try {
+        const { logMedicationPass } = await import("@/lib/emar-pass.functions");
+        for (const dose of pendingMedDoses) {
+          await logMedicationPass({ data: dose });
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        toast.error(`Medication log failed: ${msg}`);
+        return;
+      }
+    }
+
+
     const selectedGoals = Object.entries(checkedGoals)
       .filter(([, v]) => v)
       .map(([k]) => k);

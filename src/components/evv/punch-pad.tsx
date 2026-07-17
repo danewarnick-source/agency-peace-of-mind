@@ -2226,13 +2226,6 @@ export function PunchPad({
           </>
         )}
 
-        <p className="mt-3 flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
-          <MapPin className="h-3 w-3" />
-          Entry origin:&nbsp;
-          <span className="font-mono">
-            {entryType === "Client_Profile_Pass" ? "In-Chart" : "Sidebar Unscheduled"}
-          </span>
-        </p>
 
         {/* ── NECTAR Procedural Q&A (embedded, plain-language) ── */}
         <NectarInfusionLock

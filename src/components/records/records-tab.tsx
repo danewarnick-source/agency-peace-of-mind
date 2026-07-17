@@ -82,10 +82,11 @@ type Derived = Row & {
   duration_min: number;
   exceptions: ReviewException[];
   is_evv_locked: boolean;
+  awaiting_staff_confirmation: boolean;
 };
 
 const SELECT_COLS =
-  "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, corrected_clock_in, corrected_clock_out, is_edited_by_admin, is_out_of_bounds, outside_geofence_reason, shift_note_text, goals_completed, review_status, status, incident_flag, denial_reason, utah_medicaid_member_id, clients:client_id(first_name, last_name, team_id)";
+  "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, corrected_clock_in, corrected_clock_out, is_edited_by_admin, is_out_of_bounds, outside_geofence_reason, shift_note_text, goals_completed, review_status, status, incident_flag, denial_reason, utah_medicaid_member_id, import_source, clients:client_id(first_name, last_name, team_id)";
 
 function fmtTs(iso: string | null): string {
   if (!iso) return "—";

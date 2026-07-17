@@ -1334,8 +1334,18 @@ export function IncidentReportDialog({
                           </p>
                           {narrativeReviewIssues.map((g, i) => {
                             if (g.severity !== "must_fix") return null;
-                            const answered = !!narrativeGapAnswers[i]?.trim();
+                            const answered = !!narrativeGapAnswers[i]?.trim() || narrativeGapNA[i] !== undefined;
                             const isYesNo = g.answer_type === "yes_no";
+                            const isGuardianQ = /guardian|authorized rep(resentative)?/i.test(g.question);
+                            const ownGuardianApplies = isGuardianQ && clientIsOwnGuardian === true;
+                            const clientFirst = (resolvedClientName || "").split(/\s+/)[0] || "the client";
+                            const naActive = narrativeGapNA[i] !== undefined;
+                            const naLabel = ownGuardianApplies
+                              ? `N/A — ${clientFirst} is their own guardian`
+                              : "Mark N/A";
+                            const naDefaultReason = ownGuardianApplies
+                              ? "Client is their own guardian — no separate notification required."
+                              : "Not applicable";
                             return (
                               <div key={i} className="rounded border border-amber-200 bg-background p-2 dark:border-amber-900">
                                 <div className="mb-2 flex items-start gap-2">
@@ -1343,9 +1353,10 @@ export function IncidentReportDialog({
                                   <p className="text-[11px] leading-snug">{g.question}</p>
                                 </div>
                                 {isYesNo ? (
-                                  <div className="flex gap-2">
+                                  <div className="flex flex-wrap gap-2">
                                     {(["Yes", "No"] as const).map((v) => (
                                       <Button key={v} type="button" size="sm"
+                                        disabled={naActive}
                                         variant={narrativeGapAnswers[i] === v ? "default" : "outline"}
                                         onClick={() => setNarrativeGapAnswers((s) => ({ ...s, [i]: v }))}>
                                         {v}
@@ -1355,11 +1366,40 @@ export function IncidentReportDialog({
                                 ) : (
                                   <Textarea
                                     rows={2}
+                                    disabled={naActive}
                                     value={narrativeGapAnswers[i] ?? ""}
                                     onChange={(e) => setNarrativeGapAnswers((s) => ({ ...s, [i]: e.target.value }))}
                                     placeholder="Type your answer in 1–2 sentences…"
                                     className="text-xs"
                                   />
+                                )}
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={naActive ? "default" : "outline"}
+                                    onClick={() => setNarrativeGapNA((s) => {
+                                      const next = { ...s };
+                                      if (naActive) delete next[i];
+                                      else next[i] = naDefaultReason;
+                                      return next;
+                                    })}
+                                  >
+                                    {naActive ? "Clear N/A" : naLabel}
+                                  </Button>
+                                  {naActive && (
+                                    <Input
+                                      className="h-7 flex-1 min-w-[180px] text-[11px]"
+                                      placeholder="Optional: add a reason"
+                                      value={narrativeGapNA[i] ?? ""}
+                                      onChange={(e) => setNarrativeGapNA((s) => ({ ...s, [i]: e.target.value }))}
+                                    />
+                                  )}
+                                </div>
+                                {ownGuardianApplies && (
+                                  <p className="mt-1 text-[10px] text-muted-foreground">
+                                    {clientFirst} is their own guardian — no guardian notification is required.
+                                  </p>
                                 )}
                                 {!answered && (
                                   <p className="mt-1 text-[10px] text-rose-700 dark:text-rose-300">

@@ -2017,24 +2017,21 @@ export function PunchPad({
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {gpsAcquiring && !hardwareDenied && (
+            {isEvvLockedCode(serviceCode) && gpsAcquiring && !hardwareDenied && (
               <Badge variant="outline" className="gap-1 text-[10px] text-amber-600 border-amber-400">
                 <Wifi className="h-3 w-3 animate-pulse" /> Acquiring GPS
               </Badge>
             )}
-            {!gpsAcquiring && livePos && (
+            {isEvvLockedCode(serviceCode) && !gpsAcquiring && livePos && (
               <Badge variant="outline" className="gap-1 text-[10px] text-emerald-600 border-emerald-400">
                 <MapPin className="h-3 w-3" /> GPS Live
               </Badge>
             )}
-            {hardwareDenied && (
+            {isEvvLockedCode(serviceCode) && hardwareDenied && (
               <Badge variant="outline" className="gap-1 text-[10px] text-rose-600 border-rose-400">
                 <AlertTriangle className="h-3 w-3" /> GPS Blocked
               </Badge>
             )}
-            <Badge variant="outline" className="font-mono text-[10px]">
-              EVV · Utah DHHS
-            </Badge>
           </div>
         </header>
 
@@ -2152,45 +2149,37 @@ export function PunchPad({
             </>
           )}
 
-          <div>
-            <label className="mb-1 block text-xs font-medium">💼 Select Service Code</label>
-            <Select
-              value={serviceCode}
-              onValueChange={setServiceCode}
-              disabled={isRunning || !clientForPunch || (lockServiceCode && !!presetServiceCode)}
-            >
-              <SelectTrigger className="h-12">
-                <SelectValue placeholder={clientForPunch ? "Select authorized code" : "Pick a client first"} />
-              </SelectTrigger>
-              <SelectContent>
-                {codesForClient.length === 0 ? (
-                  <SelectItem value="__none" disabled>No codes authorized</SelectItem>
-                ) : codesForClient.map((c) => (
-                  <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {lockServiceCode && presetServiceCode ? (
-              <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-accent">
-                <Lock className="h-3 w-3" />
-                Locked from today&apos;s schedule — prevents billing errors.
-              </p>
-            ) : clientForPunch?.authorizedCodes?.length ? (
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Restricted to authorizations on {clientForPunch.name}&apos;s profile.
-              </p>
-            ) : null}
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-medium">🕐 Timezone</label>
-            <Select value={timezone} onValueChange={setTimezone} disabled={isRunning}>
-              <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {TIMEZONES.map((t) => <SelectItem key={t.v} value={t.v}>{t.l}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
+          {!isRunning && (
+            <div>
+              <label className="mb-1 block text-xs font-medium">💼 Select Service Code</label>
+              <Select
+                value={serviceCode}
+                onValueChange={setServiceCode}
+                disabled={isRunning || !clientForPunch || (lockServiceCode && !!presetServiceCode)}
+              >
+                <SelectTrigger className="h-12">
+                  <SelectValue placeholder={clientForPunch ? "Select authorized code" : "Pick a client first"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {codesForClient.length === 0 ? (
+                    <SelectItem value="__none" disabled>No codes authorized</SelectItem>
+                  ) : codesForClient.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {lockServiceCode && presetServiceCode ? (
+                <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-accent">
+                  <Lock className="h-3 w-3" />
+                  Locked from today&apos;s schedule — prevents billing errors.
+                </p>
+              ) : clientForPunch?.authorizedCodes?.length ? (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Restricted to authorizations on {clientForPunch.name}&apos;s profile.
+                </p>
+              ) : null}
+            </div>
+          )}
         </div>
 
         {/* ── Elapsed timer ── */}
@@ -2237,13 +2226,6 @@ export function PunchPad({
           </>
         )}
 
-        <p className="mt-3 flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
-          <MapPin className="h-3 w-3" />
-          Entry origin:&nbsp;
-          <span className="font-mono">
-            {entryType === "Client_Profile_Pass" ? "In-Chart" : "Sidebar Unscheduled"}
-          </span>
-        </p>
 
         {/* ── NECTAR Procedural Q&A (embedded, plain-language) ── */}
         <NectarInfusionLock

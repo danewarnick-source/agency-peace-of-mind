@@ -41,23 +41,13 @@ import {
 
 type ParsedFile = { headers: string[]; rows: Record<string, string>[]; fileName: string };
 
-type FieldKey = "staff" | "client" | "date" | "narrative" | "goals";
-
-type Mapping = Record<FieldKey, string | null>;
-
-// Whole-file constants — used when the spreadsheet has NO column at all that
-// identifies the staff member or client, and the admin declares the entire
-// upload belongs to one person. Only staff and client are eligible.
-type WholeFile = { staffId: string | null; clientId: string | null };
-
-// NECTAR's per-field suggestion, surfaced so the admin sees WHY a column
-// was chosen (or why no column exists and a whole-file constant is needed).
-type FieldSuggestion = {
-  column: string | null;
-  confidence: "high" | "medium" | "low";
-  reason: string;
-  whole_file_needed: boolean;
-};
+// Fixed column headers from the required template. These are the ONLY
+// columns we read from the file — no header guessing, no column mapping.
+const COL_STAFF = "Staff Name";
+const COL_CLIENT = "Client Name";
+const COL_DATE = "Date";
+const COL_NARRATIVE = "Narrative";
+const COL_GOALS = "Goals Addressed";
 
 
 type Person = { id: string; label: string; norms: string[] };

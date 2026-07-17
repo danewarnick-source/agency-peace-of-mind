@@ -223,7 +223,14 @@ export const logMedicationPass = createServerFn({ method: "POST" })
       scheduled_time_label: data.scheduledTimeLabel ?? null,
       administered_at: wasTaken ? data.actualTakenAt : null,
       actual_taken_at: wasTaken ? data.actualTakenAt : null,
-      status: data.status,
+      // DB check constraint allows only: administered | refused | omitted | missed | held.
+      // Map the client-facing statuses used by the shift-med check to those values.
+      status:
+        data.status === "self_administered"
+          ? "administered"
+          : data.status === "loa"
+            ? "omitted"
+            : data.status,
       administrator_role: role,
       credential_id: data.credentialId ?? null,
       // route captured in validator for attestation copy; column does not exist on emar_logs

@@ -999,12 +999,13 @@ export function PunchPad({
     // Strip the one-shot ?verify param so reloads don't reopen the modal.
     navigate({
       to: ".",
-      search: (prev) => {
-        const { verify: _drop, ...rest } = prev as Record<string, unknown>;
+      search: (prev: Record<string, unknown>) => {
+        const { verify: _drop, ...rest } = prev;
         return rest;
       },
       replace: true,
     });
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpenCompliance, active, activeMatchesThisPad]);
 

@@ -2939,7 +2939,7 @@ export function PunchPad({
                       value={behaviorAnswers}
                       onChange={setBehaviorAnswers}
                       targetBehaviorOptions={targetBehaviorOptions}
-                      onOpenIncident={() => navigate({ to: "/dashboard/command-center" })}
+                      onOpenIncident={() => setIncidentDialogOpen(true)}
                     />
                   </BehaviorObservationsBoundary>
                 )}

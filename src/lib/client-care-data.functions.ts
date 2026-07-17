@@ -290,7 +290,24 @@ export const getClientCareData = createServerFn({ method: "GET" })
       discharge_date: row.discharge_date ?? null,
       medicaid_id: row.medicaid_id ?? null,
       status: row.account_status ?? null,
+      phone_number: row.phone_number ?? null,
+      is_own_guardian: row.is_own_guardian ?? null,
+      guardian_name: row.guardian_name ?? null,
+      guardian_phone: row.guardian_phone ?? null,
+      support_coordinator_name: row.support_coordinator_name ?? null,
+      support_coordinator_phone: row.support_coordinator_phone ?? null,
+      support_coordinator_email: row.support_coordinator_email ?? null,
+      has_abi: row.has_abi ?? null,
+      hr_applicable: row.hr_applicable ?? null,
+      dnr_applicable: row.dnr_applicable ?? null,
+      diagnoses: Array.isArray(row.diagnoses)
+        ? (row.diagnoses as unknown[]).map((s) => String(s ?? "").trim()).filter(Boolean)
+        : [],
+      primary_care_name: row.primary_care_name ?? null,
+      pcsp_expiration_date: row.pcsp_expiration_date ?? null,
+      special_directions: row.special_directions ?? null,
     };
+
 
     const flags: CareFlags = {
       self_admin_med_support: !!row.self_admin_med_support,

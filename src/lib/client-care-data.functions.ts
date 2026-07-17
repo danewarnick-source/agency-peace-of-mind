@@ -238,7 +238,7 @@ export const getClientCareData = createServerFn({ method: "GET" })
       admission_date: row.admission_date ?? null,
       discharge_date: row.discharge_date ?? null,
       medicaid_id: row.medicaid_id ?? null,
-      status: row.status ?? null,
+      status: row.account_status ?? null,
     };
 
     const flags: CareFlags = {

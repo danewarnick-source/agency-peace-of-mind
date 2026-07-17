@@ -11,7 +11,7 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import {
-  Download, MapPin, AlertTriangle, Clock, ShieldAlert,
+  Download, MapPin, AlertTriangle, Clock, Clock3, ShieldAlert,
   FileWarning, AlertCircle, ListChecks, CalendarRange, SlidersHorizontal,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -71,6 +71,7 @@ type Row = {
   incident_flag: boolean | null;
   denial_reason: string | null;
   utah_medicaid_member_id: string | null;
+  import_source: string | null;
   clients: { first_name: string; last_name: string; team_id: string | null } | null;
 };
 
@@ -81,10 +82,11 @@ type Derived = Row & {
   duration_min: number;
   exceptions: ReviewException[];
   is_evv_locked: boolean;
+  awaiting_staff_confirmation: boolean;
 };
 
 const SELECT_COLS =
-  "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, corrected_clock_in, corrected_clock_out, is_edited_by_admin, is_out_of_bounds, outside_geofence_reason, shift_note_text, goals_completed, review_status, status, incident_flag, denial_reason, utah_medicaid_member_id, clients:client_id(first_name, last_name, team_id)";
+  "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, corrected_clock_in, corrected_clock_out, is_edited_by_admin, is_out_of_bounds, outside_geofence_reason, shift_note_text, goals_completed, review_status, status, incident_flag, denial_reason, utah_medicaid_member_id, import_source, clients:client_id(first_name, last_name, team_id)";
 
 function fmtTs(iso: string | null): string {
   if (!iso) return "—";
@@ -286,7 +288,13 @@ export function RecordsTab() {
       const teamMap = new Map((teamOptionsQ.data ?? []).map((t) => [t.value, t.label]));
 
       const derivedAll: Derived[] = baseRows.map((r) => {
-        const exc = reviewExceptions(r);
+        const awaiting =
+          r.import_source === "historical_import" &&
+          r.status === "Pending_Staff_Confirmation";
+        // Skip the compliance-rule engine for entries that are simply
+        // waiting on the staff member's own sign-off — nothing here is
+        // actionable from the admin's side.
+        const exc = awaiting ? [] : reviewExceptions(r);
         const inTs = r.corrected_clock_in ?? r.clock_in_timestamp;
         const outTs = r.corrected_clock_out ?? r.clock_out_timestamp;
         return {
@@ -299,6 +307,7 @@ export function RecordsTab() {
           duration_min: durationMin(inTs, outTs),
           exceptions: exc,
           is_evv_locked: isEvvLockedCode(r.service_type_code),
+          awaiting_staff_confirmation: awaiting,
         };
       });
 
@@ -853,7 +862,14 @@ export function RecordsTab() {
                           )}
                         </td>
                         <td className="px-3 py-2">
-                          {r.exceptions.length > 0 ? (
+                          {r.awaiting_staff_confirmation ? (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600"
+                              title={`Imported from a historical spreadsheet — waiting for ${r.staff_name} to review and sign off at My historical timesheets. Nothing to fix here.`}
+                            >
+                              <Clock3 className="h-3 w-3" /> Awaiting staff confirmation
+                            </span>
+                          ) : r.exceptions.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
                               {r.exceptions.map((e) => <ReasonBadge key={e.code} ex={e} />)}
                             </div>

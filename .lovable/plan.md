@@ -1,29 +1,34 @@
-## Problem
+# Fix: Historical Daily Notes CSV/Excel upload stuck on "loading staff and clients"
 
-Historical-import timesheets are inserted with `import_source = 'historical_import'` and `status = 'Pending_Staff_Confirmation'` (`src/lib/smart-import-timesheets.functions.ts`). On the Documentation → Records page, `reviewExceptions()` (`src/lib/records-review-rules.ts`) doesn't know about that state, so those rows trip "Missing/short note", "PCSP goal not checked", and "No clock-out" and land in the red "Needs attention" queue — even though nothing is actionable from admin's side. The real next step is the staff member confirming the entry at `/dashboard/my-historical-timesheets`.
+## Root cause
+`DailyNotesImportWizard` loads the staff pool with a nested PostgREST embed:
 
-## Fix (records-tab UI only; no schema, no rule engine change)
+```ts
+supabase
+  .from("organization_members")
+  .select("user_id, profiles:profiles!inner(id, first_name, last_name, full_name)")
+  .eq("organization_id", ...)
+  .eq("active", true)
+```
 
-Edit `src/components/records/records-tab.tsx`:
+There is no foreign key between `organization_members` and `profiles` in this project (both tables key off `auth.users.id`). The embed silently errors, `peopleQ` never resolves with data, and every upload attempt hits the guard:
 
-1. Add `import_source` to `SELECT_COLS` and to the `Row` type.
-2. Extend `Derived` with `awaiting_staff_confirmation: boolean`, computed as `import_source === 'historical_import' && status === 'Pending_Staff_Confirmation'`.
-3. In the `derivedAll` mapper: when `awaiting_staff_confirmation` is true, set `exceptions = []` (skip `reviewExceptions()` entirely) so these rows do NOT enter the attention set and are not double-flagged as compliance problems.
-4. In the "Why flagged / Flags" cell:
-   - When `awaiting_staff_confirmation`, render a single neutral badge — slate/muted, `<Clock3 />` icon, label `Awaiting staff confirmation`, tooltip `Imported from a historical spreadsheet — waiting for {staff_name} to review and sign off at My historical timesheets. Nothing to fix here.`
-   - Otherwise keep existing `ReasonBadge` list.
-5. In the "In → Out" cell (or right after the caregiver name), keep the existing `edited` chip behavior. No other columns change.
+```ts
+if (!peopleQ.data) {
+  toast.error("Still loading staff and clients — try again in a moment.");
+  return;
+}
+```
 
-Effect: awaiting-confirmation rows disappear from the "Needs attention" tab and its count, still appear under "All records" with the clear neutral label, and admins can see who owes the sign-off without seeing false compliance red flags.
+So the file is never parsed and nothing uploads — exactly the symptom reported.
 
-## Files touched
+## Fix
+In `src/components/smart-import/daily-notes/daily-notes-import-wizard.tsx`, replace the embedded query with the same two-step pattern already used elsewhere in the app for this situation:
 
-- `src/components/records/records-tab.tsx` — SELECT, `Row`, `Derived`, `derivedAll` mapper, and the flags cell (~20 lines total).
+1. Query `organization_members` for `user_id` where `organization_id = org` and `active = true`.
+2. Query `profiles` with `.in("id", userIds)` for `id, first_name, last_name, full_name`.
+3. Join in JS to build the `staff: Person[]` array (same shape / `personNorms` output as today).
+4. Keep the clients query unchanged.
+5. Surface real errors from either query via `throw` so the existing `peopleQ.isError` toast has a useful message.
 
-No changes to `records-review-rules.ts`, no DB migration, no impact on EVV export logic (awaiting-confirmation rows keep their existing `is_evv_locked` classification).
-
-## Verification
-
-- Records → Needs attention: no historical-import rows with `Pending_Staff_Confirmation` remain in the list; attention count drops accordingly.
-- Records → All records: those rows show the "Awaiting staff confirmation" badge, no red exception chips, and the tooltip explains the next step.
-- Live (non-imported) shifts with real missing notes / no clock-out are unaffected.
+No other files change. No DB / RLS / template / server-fn changes. Parsing, matching, review UI, duplicate check, and commit flow are untouched — once the people pool actually loads, the existing CSV/XLSX parser (which already handles both formats correctly) runs normally.

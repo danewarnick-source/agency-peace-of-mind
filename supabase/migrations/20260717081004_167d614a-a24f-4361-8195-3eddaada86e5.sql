@@ -1,0 +1,2 @@
+ALTER TABLE public.import_jobs DROP CONSTRAINT import_jobs_mode_check;
+ALTER TABLE public.import_jobs ADD CONSTRAINT import_jobs_mode_check CHECK (mode = ANY (ARRAY['employee'::text, 'client'::text, 'timesheets'::text, 'daily_notes'::text]));

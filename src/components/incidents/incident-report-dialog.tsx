@@ -715,8 +715,10 @@ export function IncidentReportDialog({
         .map((g, i) => {
           if (g.severity !== "must_fix") return null;
           const ans = narrativeGapAnswers[i]?.trim();
-          if (!ans) return null;
-          return `Q: ${g.question}\nA: ${ans}`;
+          const na = narrativeGapNA[i];
+          if (ans) return `Q: ${g.question}\nA: ${ans}`;
+          if (na !== undefined) return `Q: ${g.question}\nA: N/A — ${na?.trim() || "not applicable"}`;
+          return null;
         })
         .filter((s): s is string => !!s);
       if (answered.length) {
@@ -733,6 +735,8 @@ export function IncidentReportDialog({
             severity: g.severity,
             question: g.question,
             answer: narrativeGapAnswers[i]?.trim() || null,
+            not_applicable: narrativeGapNA[i] !== undefined,
+            not_applicable_reason: narrativeGapNA[i] ?? null,
           })),
       }));
     }

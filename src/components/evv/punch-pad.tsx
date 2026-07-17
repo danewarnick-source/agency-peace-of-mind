@@ -2916,11 +2916,13 @@ export function PunchPad({
 
                 {/* Post-shift Behavior Observations (provider-toggled) */}
                 {behaviorEnabled && (
-                  <BehaviorObservationsBlock
-                    value={behaviorAnswers}
-                    onChange={setBehaviorAnswers}
-                    onOpenIncident={() => navigate({ to: "/dashboard/command-center" })}
-                  />
+                  <BehaviorObservationsBoundary answersSnapshot={behaviorAnswers}>
+                    <BehaviorObservationsBlock
+                      value={behaviorAnswers}
+                      onChange={setBehaviorAnswers}
+                      onOpenIncident={() => navigate({ to: "/dashboard/command-center" })}
+                    />
+                  </BehaviorObservationsBoundary>
                 )}
 
                 {/* Pre-submit medication check — routes staff into the real MAR */}

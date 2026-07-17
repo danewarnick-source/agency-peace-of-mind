@@ -104,23 +104,8 @@ export function AboutTab({ client }: { client: CaseloadClient }) {
     return d.getTime() - Date.now() < 30 * 24 * 3600 * 1000;
   })();
 
-  const specialDirections = identity?.special_directions ?? null;
-
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      {/* Clinical alert */}
-      {specialDirections && (
-        <div className="md:col-span-2 rounded-lg border border-amber-300 bg-amber-50 p-4">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-amber-600 flex-none mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-amber-800">Clinical Alert</div>
-              <p className="text-sm text-amber-900 mt-1 whitespace-pre-wrap">{specialDirections}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Identity header */}
       <Card className="p-5 md:col-span-2">
         <div className="flex flex-col items-start gap-4 md:flex-row md:items-center">

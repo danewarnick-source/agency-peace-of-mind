@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 import { gatewayFetch } from "@/lib/ai-bedrock.server";
@@ -64,6 +65,10 @@ async function callAI(system: string, user: string): Promise<string> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured.");
 
+  // Forward the incoming request's abort signal so a client-side cancellation
+  // (e.g. the 20s incident-report timeout) actually stops the Bedrock call
+  // instead of letting it run to completion in the background and burn one
+  // of our 10 req/min against the org-wide Bedrock cap.
   const res = await gatewayFetch({
       model: "bedrock",
       messages: [
@@ -71,7 +76,7 @@ async function callAI(system: string, user: string): Promise<string> {
         { role: "user", content: user },
       ],
       response_format: { type: "json_object" },
-    });
+    }, { signal: getRequest()?.signal });
 
   if (res.status === 429) throw new Error("AI rate limit reached. Please retry in a moment.");
   if (res.status === 402) throw new Error("AI workspace credits exhausted. Please add credits.");
@@ -631,7 +636,7 @@ export const reviewIncidentReport = createServerFn({ method: "POST" })
         response_format: { type: "json_object" },
         max_tokens: 800,
         temperature: 0.1,
-      } as Parameters<typeof gatewayFetch>[0]);
+      } as Parameters<typeof gatewayFetch>[0], { signal: getRequest()?.signal });
 
       if (!aiRes.ok) {
         const t = await aiRes.text().catch(() => "");

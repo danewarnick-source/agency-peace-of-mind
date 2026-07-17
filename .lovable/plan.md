@@ -1,47 +1,106 @@
-The "Additional" rows on the staff About tab come from `custom_field_definitions` rows in your database. They were seeded by earlier smart-import / onboarding passes before the admin About form had first-class inputs for the same concepts. The admin panel still shows them (under the "Custom fields" collapsible at the bottom of each section), but they duplicate real columns you're already editing above — so from the admin side they look absent while they still leak into the staff About tab as "Additional" rows.
+## Goal
 
-## What we found in your org
+Replace the 7-tab staff medications experience (MarEmarTab) with a single, simple, read-only-plus-log screen on the two staff-facing surfaces. Admin keeps MarEmarTab untouched.
 
-**Group A — pure duplicates of real `clients` columns.** The canonical data already lives on `clients.*`; the custom field is redundant.
+## Scope
 
-- `support_coordinator_name` → `clients.support_coordinator_name`
-- `support_coordinator_phone` → `clients.support_coordinator_phone`
-- `support_coordinator_email` → `clients.support_coordinator_email`
-- `prescriber_name` → `clients.prescriber_name`
-- `emergency_medical_treatment_authorization` → `clients.emergency_medical_treatment_authorization`
-- `preferred_name` → `clients.preferred_name`
-- `diagnoses` → `clients.diagnoses` (array)
-- `allergies` → `clients.allergies` (array/text)
+- **Replace on staff surfaces:**
+  - `src/routes/dashboard.workspace.$clientId.tsx` — swap `<MarEmarTab .../>` → new `<StaffMedicationsPanel .../>`
+  - `src/routes/dashboard.hhs-hub.$clientId.tsx` — same swap
+- **Do not touch admin surface:**
+  - `src/routes/dashboard.clients.$clientId.tsx` continues to render `<MarEmarTab .../>` as today.
+- `MarEmarTab` component itself is left in place (still imported by admin).
 
-**Group B — duplicate custom-field keys** (same concept, two definitions):
+## New file: `src/components/medications/staff-medications-panel.tsx`
 
-- `support_coordinator` (bare) — duplicates `support_coordinator_name`
-- `financial_rep_payee` — duplicates `representative_payee`
-- `plan_effective_date` — duplicates `pcsp_effective_start`
-- `plan_end_date` — duplicates `pcsp_review_date`
+Single presentational component. Props: `{ clientId, clientName, serviceContext? }`.
 
-**Group C — orphaned lowercase `goal_*` keys.** These were meant for the CST goals table, not client-level fields. They surface once per client but describe a single goal, which is meaningless.
+### 1. Client header card
 
-- `goal_domain`, `goal_current_status`, `goal_strengths`, `goal_barriers`, `goal_success_criteria`
+- Small card, bold client name.
+- Below in smaller muted text:
+  - Allergies: read `clients.allergies` (existing column). If empty → "No known allergies".
+  - Self-administration support status in plain words. Read from `clients` — reuse whatever `MarEmarTab` currently reads (e.g. `self_administration_status` / `self_admin_support_level` — will confirm exact column when writing). Render as human sentence, e.g. "Self-administers with support".
+- No edit buttons, no admin actions.
 
-## Plan
+### 2. "Due today" list
 
-1. Write a single migration that deletes the definitions in Groups A + B + C for your organization. Because `custom_field_values` has an FK to `custom_field_definitions`, the values delete via cascade (or we delete values first if there's no cascade — the migration handles both).
-2. Nothing else changes. The admin's first-class inputs stay the same, and the staff About tab's "Additional" list will only show fields we don't already surface elsewhere.
+- Heading "Due today".
+- Data source: `useShiftMedDueStatus` (already used by `shift-med-due-check`) with a windowStart = today 00:00 local, windowEnd = today 23:59 local. This is the same expansion of `client_medications.scheduled_times` that admin MAR uses, joined against `emar_logs`.
+- Additionally load PRN meds (`is_prn = true`) from `client_medications` and append them as rows labeled "PRN" (no scheduled time).
+- Each row:
+  - Left: **medication name** (bold) + muted `dose · route · HH:MM AM/PM` (or "PRN").
+  - Right: if `logged === false` → single `<Button>Log</Button>`; if logged → colored `<Badge>` with EMAR_STATUS_LABELS mapping (Observed / Refused / Missed / LOA / Omitted) followed by "· 8:04 PM" formatted from `emar_logs.administered_at ?? scheduled_for`. To get the recorded status+time, extend the query (or add a small sibling query) to return the matched log row for each scheduled dose.
+- Empty state: "Nothing due right now."
 
-## What we will NOT touch (asking first)
+### 3. "View full medication list" disclosure
 
-These aren't duplicates but also aren't editable as first-class fields anywhere in the admin UI today. Deleting them would lose data:
+- Small underlined muted button below the list. Toggles between "View full medication list" / "Hide full medication list".
+- When open, plain list of every active `client_medications` row: name, dose, route, schedule (`scheduled_times` joined with ", " or "PRN" / frequency). Read-only. No action buttons.
 
-- `secondary_phone`, `county`, `day_program_name`, `transportation_notes`, `funding_source`
-- `pcsp_author_name`, `pcsp_meeting_date`, `pcsp_signed_by_client`, `pcsp_signed_by_guardian`
-- `representative_payee`
-- `dspt_person_id`, `host_home_provider`, `provider_name`, `support_team_roster`
-- `rights_restrictions`, `communication_dictionary`, `typical_daily_routine`, `risk_assessment`, `client_preferences_strengths_notes`
+### 4. Log dialog
 
-If any of these are also legacy and can be dropped, tell me which and I'll add them to the same migration.
+New component `LogDoseDialog` inside the same file (or sibling). Opens from a row's "Log" button.
 
-## Acceptance
+- Title: `Log {medication_name}`.
+- 2×2 grid of toggle buttons: **Observed**, **Refused**, **Missed**, **LOA**. Single-select via local state. Selected button gets `variant="default"`, others `variant="outline"`.
+- **Time observed**: `<Input type="time">` initialized to current time on open. Editable. Combined with today's date to form ISO for `actualTakenAt`.
+- **Note**: `<Textarea>`. Required if status ≠ Observed.
+- **Attestation sentence**: live-computed string, e.g.
+  - Observed → "I attest that {med} was observed being self-administered at {time}, as recorded above."
+  - Refused → "I attest that {med} was refused at {time}, as recorded above."
+  - Missed → "I attest that {med} was missed at {time}, as recorded above."
+  - LOA → "I attest that {med} was sent with the Person during an approved leave at {time}, as recorded above."
+- **Type your full name to confirm**: `<Input>` starting empty on every open (reset via a `key` on the dialog or explicit reset in `onOpenChange`). NOT prefilled — even though we know the user's name server-side.
+- Buttons: `Cancel` (discard + close), `Save`.
 
-- The "Additional" section on the staff About tab no longer repeats the Support Coordinator name/phone/email, prescriber, diagnoses, allergies, preferred name, or the duplicate PCSP/plan/rep-payee entries.
-- Admin edit screens continue to work with the first-class columns as before.
+### 5. Save behavior — client-side validation then server call
+
+Order of validation (each failure shows a `toast.error` and aborts):
+
+1. Status selected.
+2. Time value present.
+3. If status ≠ Observed → note non-empty (trimmed).
+4. Typed name non-empty (trimmed).
+
+Then invoke existing server fn `logMedicationPass` from `@/lib/emar-pass.functions` via `useServerFn`, mapping:
+
+| Field | Value |
+|---|---|
+| `clientId` | prop |
+| `medicationId` | row.medication_id |
+| `scheduledFor` | row.scheduled_for_iso (for PRN: use current ISO) |
+| `scheduledTimeLabel` | row.time_label (null for PRN) |
+| `status` | Observed→`self_administered`, Refused→`refused`, Missed→`missed`, LOA→`loa` |
+| `administratorRole` | `staff_observed` for Observed; `self` for the exception statuses (matches existing exception flows and avoids the hands-on gate) |
+| `route` | row.route ?? "PO" |
+| `actualTakenAt` | ISO from time picker |
+| `exceptionReason` | note (only for non-Observed) |
+| `notes` | note if Observed and provided; else null |
+| `signatureDataUrl` | small inline SVG data URL rendering typed name — satisfies server's `min(10)` signature requirement and preserves the typed-name evidence: `data:image/svg+xml;utf8,<svg …><text>{typedName}</text></svg>` (URL-encoded) |
+| `serviceContext` | prop (e.g. "HHS", active shift's service code if available) |
+| `isMedicationError` | false |
+
+The server fn already:
+- Writes a canonical `signature_attestation` string with staff full name and timestamp.
+- Enforces PRN/rescue/controlled requirements (staff Log flow will see server errors surfaced via toast if a PRN/rescue/controlled med is logged without required extras — acceptable; those flows already require the full MAR UI and are out of scope for this simplification. If a Log click hits one, we surface the server error message).
+- Writes to `emar_logs`, the same table the admin eMAR reads.
+
+On success: `toast.success`, close dialog, invalidate the due-status query (`queryClient.invalidateQueries({ queryKey: ["shift-med-due-status", ...] })`) so the row flips to the logged badge.
+
+## Data / query notes
+
+- Extend or wrap `useShiftMedDueStatus` locally so each dose also carries the matched `emar_logs.status` + `administered_at` when `logged === true`. Simplest: add a second small `useQuery` in the panel that fetches `emar_logs` for the window and joins in JS by `medication_id + scheduled_for`.
+- All queries use the browser `supabase` client + existing RLS. No schema changes, no migrations.
+
+## Out of scope
+
+- Admin MarEmarTab, EmarChart, EmarNectarPanel, EmarOpsPanel — unchanged.
+- Refills, transfers, compliance audit tools, "Add Medication", "Upload MAR/Order" — removed from staff view entirely (by virtue of not being on the new panel).
+- PRN reason capture / rescue seizure fields / controlled counts UI — not added to the staff Log dialog (server will reject with a clear message on the rare staff PRN/controlled tap; those meds are typically handled from the admin MAR).
+
+## Files touched
+
+- **Create:** `src/components/medications/staff-medications-panel.tsx`
+- **Edit:** `src/routes/dashboard.workspace.$clientId.tsx` (swap import + JSX)
+- **Edit:** `src/routes/dashboard.hhs-hub.$clientId.tsx` (swap import + JSX)

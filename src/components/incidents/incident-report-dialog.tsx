@@ -258,8 +258,6 @@ export function IncidentReportDialog({
   const [aiNA, setAiNA] = useState<Record<number, string>>({});
   const [aiReviewing, setAiReviewing] = useState(false);
   const [aiAttempted, setAiAttempted] = useState(false);
-  const [completenessIssues, setCompletenessIssues] = useState<AiIssue[] | null>(null);
-  const [completenessBusy, setCompletenessBusy] = useState(false);
 
   // ── In-step NECTAR review on the narrative step ─────────────────────────
   // Gates Next on the narrative step until staff click "Review with NECTAR"
@@ -344,7 +342,6 @@ export function IncidentReportDialog({
     setShorthand(""); setNectarDraft(null); setNectarDraftGaps([]); setGapAnswers({}); setGapNA({}); setDraftSkipped(false); setDraftBusy(false);
     setAiIssues(null); setAiStatus(null); setAiAnswers({}); setAiNA({});
     setAiReviewing(false); setAiAttempted(false);
-    setCompletenessIssues(null); setCompletenessBusy(false);
     setNarrativeReviewStatus("idle"); setNarrativeReviewIssues([]);
     setNarrativeGapAnswers({}); setNarrativeGapNA({}); setReviewedDescription("");
     setStep(0); setStepError(null);
@@ -820,31 +817,6 @@ export function IncidentReportDialog({
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentKey, aiEnabled, aiAttempted]);
-
-  // ── Completeness Check on Review step (copies shift-note pattern)
-  async function runCompletenessCheck() {
-    setCompletenessBusy(true);
-    try {
-      const draft = buildDraft();
-      const r = await withAiTimeout(reviewFn({ data: { draft } }));
-      if (!r || typeof r.complete !== "boolean" || r.skipped) {
-        setCompletenessIssues([]); setAiStatus("skipped");
-        setDetails((d) => ({ ...d, ai_review_skipped: true }));
-        toast.message("Nectar review unavailable — submitting with standard checks.");
-        return;
-      }
-      const issues = Array.isArray(r.issues) ? (r.issues as AiIssue[]) : [];
-      setCompletenessIssues(issues);
-      if (issues.length === 0) toast.success("NECTAR: no remaining gaps.");
-      else toast.warning(`NECTAR found ${issues.length} remaining item(s) to address.`);
-    } catch {
-      setCompletenessIssues([]); setAiStatus("skipped");
-      setDetails((d) => ({ ...d, ai_review_skipped: true }));
-      toast.message("Nectar didn't respond in 20s — you can still submit.");
-    } finally {
-      setCompletenessBusy(false);
-    }
-  }
 
   const contradictions = useMemo(
     () => (currentKey === "review" ? findContradictions(buildDraft()) : []),

@@ -970,6 +970,16 @@ export function IncidentReportDialog({
     const q = aiIssues?.[idx];
     if (!q) return null;
     const answered = !!(aiAnswers[idx]?.trim() || aiNA[idx]?.trim());
+    const isGuardianQ = /guardian|authorized rep(resentative)?/i.test(q.question);
+    const ownGuardianApplies = isGuardianQ && clientIsOwnGuardian === true;
+    const clientFirst = (resolvedClientName || "").split(/\s+/)[0] || "the client";
+    const naActive = aiNA[idx] !== undefined;
+    const naLabel = ownGuardianApplies
+      ? `Not applicable — ${clientFirst} is their own guardian`
+      : "Mark N/A";
+    const naDefaultReason = ownGuardianApplies
+      ? "Client is their own guardian — no separate notification required."
+      : "Not applicable";
     return (
       <div className="space-y-3">
         <div className="flex items-center gap-2 text-xs text-violet-700 dark:text-violet-300">
@@ -983,6 +993,11 @@ export function IncidentReportDialog({
         <div className="rounded-md border border-violet-300 bg-violet-50/50 p-3 text-sm dark:bg-violet-950/30 dark:border-violet-800">
           <p className="text-[11px] uppercase tracking-wide text-violet-700 dark:text-violet-300">Nectar's question — generated from what you wrote</p>
           <p className="mt-1 font-medium">{q.question}</p>
+          {ownGuardianApplies && (
+            <p className="mt-2 text-[11px] text-violet-800 dark:text-violet-200">
+              {clientFirst} is their own guardian — no guardian notification is required.
+            </p>
+          )}
         </div>
         <div>
           <Label className="text-xs">Your answer</Label>
@@ -990,30 +1005,32 @@ export function IncidentReportDialog({
             rows={3}
             value={aiAnswers[idx] ?? ""}
             onChange={(e) => setAiAnswers((s) => ({ ...s, [idx]: e.target.value }))}
-            disabled={aiNA[idx] !== undefined}
+            disabled={naActive}
             placeholder="Answer in 1–2 sentences."
           />
         </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id={`ai-na-${idx}`}
-            checked={aiNA[idx] !== undefined}
-            onChange={(e) => setAiNA((s) => {
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={naActive ? "default" : "outline"}
+            onClick={() => setAiNA((s) => {
               const next = { ...s };
-              if (e.target.checked) next[idx] = "";
-              else delete next[idx];
+              if (naActive) delete next[idx];
+              else next[idx] = naDefaultReason;
               return next;
             })}
-          />
-          <Label htmlFor={`ai-na-${idx}`} className="text-[11px]">Not applicable — reason:</Label>
-          <Input
-            className="h-7 text-[11px]"
-            placeholder="Why this question doesn't apply"
-            value={aiNA[idx] ?? ""}
-            onChange={(e) => setAiNA((s) => ({ ...s, [idx]: e.target.value }))}
-            disabled={aiNA[idx] === undefined}
-          />
+          >
+            {naActive ? "Clear N/A" : naLabel}
+          </Button>
+          {naActive && (
+            <Input
+              className="h-8 flex-1 min-w-[200px] text-[11px]"
+              placeholder="Optional: add a reason"
+              value={aiNA[idx] ?? ""}
+              onChange={(e) => setAiNA((s) => ({ ...s, [idx]: e.target.value }))}
+            />
+          )}
         </div>
       </div>
     );

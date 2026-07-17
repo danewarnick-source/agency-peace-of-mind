@@ -497,10 +497,13 @@ GAPS RULES (the "gaps" array):
 OUTPUT FORMAT — STRICT JSON only, no markdown, no code fences:
 {"draft":"<the narrative paragraph(s) — only facts that are actually known>","gaps":[{"field":"...","severity":"...","question":"...","answer_type":"yes_no"|"text"}]}`;
 
+    const formatLocalTime = (v: string | null) =>
+      v ? `${v.replace("T", " ")} (local time)` : "(unknown)";
+
     const user = `INDIVIDUAL: ${data.clientName}
 INCIDENT CATEGORY: ${data.category || "(unspecified)"}
-OCCURRED AT: ${data.occurredAt ?? "(unknown)"}
-DISCOVERED AT: ${data.discoveredAt ?? "(unknown)"}
+OCCURRED AT: ${formatLocalTime(data.occurredAt)}
+DISCOVERED AT: ${formatLocalTime(data.discoveredAt)}
 KNOWN FACTS (already captured on the form): ${data.knownFacts ?? "(none)"}
 
 STAFF SHORTHAND:

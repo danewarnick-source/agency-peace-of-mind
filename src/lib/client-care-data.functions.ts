@@ -241,7 +241,19 @@ export const getClientCareData = createServerFn({ method: "GET" })
         .select("definition_id, value_text, value_number, value_boolean, value_date")
         .eq("entity_kind", "client")
         .eq("entity_id", clientId),
+      supabase
+        .from("client_target_behaviors")
+        .select("id, behavior_name, description")
+        .eq("client_id", clientId)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("client_emergency_contacts")
+        .select("id, name, phone, relationship")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: true }),
     ]);
+
 
     if (clientRes.error) throw clientRes.error;
     if (!clientRes.data) throw new Error("Client not found");

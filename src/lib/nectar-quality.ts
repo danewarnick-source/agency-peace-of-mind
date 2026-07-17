@@ -89,11 +89,6 @@ const PEER_TERMS = [
   "other client", "another client", "peer", "resident",
   "roommate", "assault", "hit", "attacked", "fought",
 ];
-const INJURY_TERMS = [
-  "bruise", "bleeding", "injury", "injured", "hurt",
-  "hit", "bit", "fell",
-];
-const MEDICAL_TERMS = ["911", "ambulance", "er ", "e.r.", "hospital"];
 
 function hasAny(haystack: string, terms: string[]): boolean {
   const h = haystack.toLowerCase();
@@ -109,8 +104,6 @@ export function findContradictions(draft: Draft): string[] {
   const problems: string[] = [];
   const narrative = strField(draft, "description");
   const people = strField(draft, "people_involved");
-  const injuries = strField(draft, "injuries");
-  const medical = strField(draft, "medical_attention");
 
   // Combine narrative + other free-text so a mention anywhere counts.
   const combined = [
@@ -126,13 +119,9 @@ export function findContradictions(draft: Draft): string[] {
     }
   }
 
-  if (hasAny(combined, INJURY_TERMS) && isNonAnswer(injuries)) {
-    problems.push("You mentioned a possible injury — describe it or confirm none.");
-  }
-
-  if (hasAny(combined, MEDICAL_TERMS) && isNonAnswer(medical)) {
-    problems.push("Medical help was mentioned — record what was provided.");
-  }
+  // Injury and medical-care detail is captured by the narrative itself and by
+  // Nectar's follow-up questions on the narrative step, so no keyword-based
+  // contradiction check is run here.
 
   return problems;
 }

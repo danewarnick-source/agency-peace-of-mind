@@ -1,35 +1,29 @@
 ## Problem
 
-On My Caseload (staff view), a shift that's been open a long time appears twice:
-- **TodayHero** always renders the green "Shift in progress — Return to shift" card while an EVV punch is open.
-- **ComplianceInbox** *also* lists it under "Needs Your Attention → Open shift · never clocked out" once the clock-in is older than 16 hours.
+At the review step, `findContradictions()` (src/lib/nectar-quality.ts) runs a keyword scan on the narrative and shows two warnings that block Submit:
 
-They should be one card. When the currently active shift has been running >12 hours, the TodayHero card itself should switch into an attention state that still reads "Shift in progress" but visibly prompts the staff member to clock out, with a "Clock out now" (Fix Now) button.
+- "You mentioned a possible injury — describe it or confirm none."
+- "Medical help was mentioned — record what was provided."
 
-## Fix
+These fire whenever the narrative contains any of the trigger words (`hit`, `hurt`, `fell`, `bruise`, `injury`, `bit`, or `911`, `ambulance`, `er`, `hospital`) AND the internal `injuries` / `medical_attention` fields look "empty" to the heuristic. They produce false positives because:
 
-### 1. Expose clock-in time on the active timesheet
-- `src/hooks/use-today-shift.tsx`: add `clock_in_timestamp: string` to `ActiveTimesheet` and select it in `activeQuery`.
+1. Not every incident category adds the dedicated Injuries / Medical Attention steps, so those two fields stay blank even on a fully filled report.
+2. The narrative itself and Nectar's follow-up questions already capture that detail — the redundant keyword check has no way to see it.
+3. `submitBlocked` treats any contradiction as a hard block, so the user cannot submit.
 
-### 2. TodayHero: promote the active-shift card to an attention state past 12h
-- `src/components/staff-mobile/today-hero.tsx`: in the `if (active)` branch, compute `hoursOpen = (Date.now() - Date.parse(active.clock_in_timestamp)) / 3_600_000`.
-- When `hoursOpen >= 12`:
-  - Swap border/background from green (`#15a06a`) to amber (`border-amber-400/60 bg-amber-500/10`) and use an `AlertTriangle` icon.
-  - Eyebrow text: **"Shift in progress · Needs your attention"**.
-  - Headline: **"You've been on the clock for {N}h — clock out now"** (round to whole hours).
-  - Sub-line: "This shift started {date/time}. Open it and clock out to keep your timesheet accurate."
-  - CTA label changes from "Return to shift" to **"Clock out now"**; keep the same link (`/dashboard/workspace/$clientId?tab=clock-in`).
-- Under 12h: unchanged (green "Shift in progress / Return to shift").
+Nectar's AI follow-up questions on the narrative step (which the user confirmed are working well and must stay) already surface real gaps about injuries and medical care, so this second deterministic check is redundant.
 
-### 3. ComplianceInbox: stop double-listing the currently active shift
-- `src/routes/dashboard.index.tsx`: filter `openShifts` to exclude the row whose `id` matches the current `active` timesheet (fetched via `useTodayShift`). Only truly-orphaned open shifts (e.g. a second forgotten punch from a prior day that is not the active one) remain listed there.
-- If after that filter both `rejectedLogs` and `openShifts` are empty, the whole "Needs Your Attention" card hides — the existing `totalItems === 0` guard already handles that.
+## Change
 
-### Out of scope
-- No changes to the admin view, no changes to the underlying `evv_timesheets` schema, no auto-clock-out behavior. The staff still has to open the workspace and clock out themselves — the card only nudges them.
-- The 16h cutoff in the ComplianceInbox query stays as-is for detecting long-forgotten prior shifts; deduplication is done in-memory against the active punch.
+Edit `src/lib/nectar-quality.ts`:
 
-## Files touched
-- `src/hooks/use-today-shift.tsx`
-- `src/components/staff-mobile/today-hero.tsx`
-- `src/routes/dashboard.index.tsx`
+- Remove the injury keyword branch (INJURY_TERMS + the "possible injury" push).
+- Remove the medical keyword branch (MEDICAL_TERMS + the "Medical help was mentioned" push).
+- Keep the peer / "another person" contradiction check as-is — that one keys off `people_involved`, which is a required field on every category, and doesn't produce the same false positives.
+- Drop the now-unused `INJURY_TERMS` and `MEDICAL_TERMS` constants.
+
+No changes to `incident-report-dialog.tsx`: `findContradictions` still runs, `submitBlocked` still respects it, and the Nectar follow-up flow / narrative drafting are untouched.
+
+## Result
+
+Reports where the narrative mentions an injury or medical care no longer block Submit on the review step. Nectar follow-up questions continue to catch real gaps.

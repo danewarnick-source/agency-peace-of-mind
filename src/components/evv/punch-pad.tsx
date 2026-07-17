@@ -33,6 +33,9 @@ import {
   validateBehaviorAnswers,
   type BehaviorAnswers,
 } from "@/components/evv/behavior-observations-block";
+import { BehaviorObservationsBoundary } from "@/components/evv/behavior-observations-boundary";
+import {
+} from "@/components/evv/behavior-observations-block";
 import { useShiftBehaviorSetting } from "@/hooks/use-shift-behavior-setting";
 import { getPendingTrackingForms } from "@/lib/forms.functions";
 import { PendingTrackingFormsDialog, type PendingForm } from "@/components/evv/pending-tracking-forms-dialog";

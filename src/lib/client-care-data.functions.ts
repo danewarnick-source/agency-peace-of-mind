@@ -346,13 +346,19 @@ export const getClientCareData = createServerFn({ method: "GET" })
     // Custom fields inherit their section's toggle — no per-field key.
     const customFieldsStaff = custom_fields.filter((f) => sections[f.section]);
 
-    // goalsForStaff also applies the shift-service-code filter (existing).
+    // goalsForStaff — shift-time compliance list. Intentionally bypasses
+    // the `sections.care_plan` toggle so PCSP goals tagged for the active
+    // shift's service code always appear on the punch pad / clock-out
+    // attestation. Per-goal field visibility switches are still honored
+    // so admins can hide a specific goal.
     const codeUpper = shiftServiceCode ? shiftServiceCode.toUpperCase() : null;
-    const goalsForStaff = goalsStaffAll.filter((g) => {
-      if (!g.is_complete) return false;
-      if (!codeUpper) return true;
-      return g.job_codes.some((c) => c.toUpperCase() === codeUpper);
-    });
+    const goalsForStaff = goals
+      .filter((g) => g.is_complete)
+      .filter((g) => isFieldVisible(visibilityRow, fieldKey("care_plan", "goal", g.id)))
+      .filter((g) => {
+        if (!codeUpper) return true;
+        return g.job_codes.some((c) => c.toUpperCase() === codeUpper);
+      });
 
     const visibility: ClientCareVisibility = {
       goalsForStaff,

@@ -996,8 +996,18 @@ export function PunchPad({
     if (!active || !activeMatchesThisPad) return;
     autoOpenedRef.current = true;
     openCompliance();
+    // Strip the one-shot ?verify param so reloads don't reopen the modal.
+    navigate({
+      to: ".",
+      search: (prev) => {
+        const { verify: _drop, ...rest } = prev as Record<string, unknown>;
+        return rest;
+      },
+      replace: true,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpenCompliance, active, activeMatchesThisPad]);
+
 
 
 

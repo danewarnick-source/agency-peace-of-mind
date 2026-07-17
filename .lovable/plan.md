@@ -1,58 +1,36 @@
-## Problem
+## Add "Draft with NECTAR" to historical timesheets (only when shift note is missing)
 
-On the final "review" step of the incident report wizard, the panel always shows:
+Mirror the time-clock Draft-with-NECTAR pattern inside each pending historical-timesheet card, but ONLY show the panel when the entry has no shift note yet.
 
-> Review before submitting
-> Fix any red items below. Submit becomes available once everything is resolved.
+### File to change
+`src/routes/dashboard.my-historical-timesheets.tsx` — `EntryCard` only. No new server functions, no schema changes.
 
-…even when there is nothing red to fix. Two things are wrong:
+### Visibility rule
+Render the NECTAR panel only when the shift note is missing:
+- `!row.shift_note_text?.trim() && !note.trim()`
+- Once the user accepts a draft (or types anything into the note), the panel hides.
 
-1. The header is written as if problems always exist. When `contradictions` is empty and no `must_fix` Nectar question is unanswered, the user sees a warning with nothing under it and no way to act on it.
-2. The review step never renders a summary of the report. The user has no confirmation of what they're about to submit — just a header and (sometimes) red boxes.
-3. When Submit is disabled, nothing on-screen tells the user *why*. `submitBlocked` can be true from `aiReviewing`, an unanswered `must_fix` question earlier in the flow, or a contradiction — but only contradictions render on this step, so an invisible block leaves Submit greyed out with no explanation.
+### Behavior (identical to punch-pad flow)
+1. Above the existing "Shift note" textarea, render a NECTAR Infusion-locked amber dashed panel: "NECTAR Infusion / Draft with NECTAR" header + short helper text.
+2. Panel contents:
+   - Shorthand textarea (rows=3, maxLength 4000, same placeholder as punch-pad).
+   - "Draft with NECTAR" button (disabled until 3+ chars, spinner while busy).
+   - "Speak shorthand / Stop voice" mic button, only when `SpeechRecognition` / `webkitSpeechRecognition` is available.
+3. On click, call the existing `draftShiftNote` server fn with:
+   - `shorthand`: textarea text
+   - `goals`: `[]` (historical rows have no live PCSP goal picker)
+   - `clientFirstName`: `row.clients?.first_name` (fallback "the client")
+4. Returned draft renders in a "NECTAR draft — review before confirming" card with:
+   - **Use draft & edit below** → sets `note` state to the draft (marks dirty; user still clicks Save note, then Confirm).
+   - **Discard draft** → clears the draft panel and shorthand.
+5. Show an "AI-drafted — your review required" chip next to the "Shift note" label while a draft has been accepted but not yet edited, matching punch-pad's `nectarUsed` badge.
+6. Errors surface via toast using the server fn's message (credits, rate limit, etc. already handled).
 
-## Change
+### Gating
+Wrap the panel in `<NectarInfusionLock featureName="Draft with NECTAR" benefit="…same copy as punch-pad…">` so tenants without the add-on see the same upsell.
 
-Edit `src/components/incidents/incident-report-dialog.tsx`, review-step block only (around lines 1566–1593). No changes to `submitBlocked` logic, `findContradictions`, Nectar review, or submit mutation.
-
-**1. Conditional header**
-
-Compute `hasBlockers = contradictions.length > 0 || unresolvedMustFix.length > 0 || aiReviewing`.
-
-- When `hasBlockers` is true: keep the current "Fix any red items below…" copy (amber/rose tone).
-- When `hasBlockers` is false: show a green "Ready to submit — review the summary below and click Submit incident report."
-
-**2. Report summary card**
-
-Always render a read-only summary card on the review step showing the key fields the reviewer is about to save:
-
-- Individual (client name)
-- Category + severity
-- Occurred at / Discovered at (formatted)
-- Location
-- Witnessed directly? / Reported by (if applicable)
-- People involved, Witnesses (if provided)
-- Narrative (full text, in a scrollable block, capped ~400px)
-- Injuries / Medical attention / Immediate actions (only rows with content)
-- Prevention strategies (if abuse category)
-- Category-specific `details` block: iterate `block.fields` and show label → value for any non-empty field (covers behavior/restraint, medication, elopement, etc. without hard-coding each)
-- Photo count if any uploaded
-- Small "Edit" link on each section that jumps back to the matching wizard step via `setStep(stepKeys.indexOf(...))`
-
-Styling: plain `rounded-md border bg-card p-3` sections with `text-xs` labels and `text-sm` values, matching the existing dialog look. No new dependencies.
-
-**3. Surface unresolved must_fix questions on review**
-
-When `unresolvedMustFix.length > 0` on the review step, render each as a rose-bordered row (same visual language as contradictions) with an "Answer question" button that jumps to that Nectar question step (`stepKeys.indexOf("nectar-q-<idx>")` or equivalent — reuse the existing question step key pattern already used in `stepKeys`). This gives the user something clickable when Submit is disabled by a Nectar block that isn't a contradiction.
-
-**4. Nothing else changes**
-
-- `submitBlocked` still gates the Submit button.
-- No changes to autosave, Nectar, contradiction logic, or the submit path.
-- No new files, no new deps.
-
-## Result
-
-- Clean summary of the incident report on the final step.
-- Green "ready to submit" header when there is nothing wrong; red header only when there is.
-- Every reason Submit is disabled shows up on the review step with a jump-to-fix link, so the button is never mysteriously greyed out.
+### Out of scope
+- No changes to save / flag / confirm logic.
+- No goals selection UI.
+- No changes to `draftShiftNote` or any other server function.
+- No DB migration.

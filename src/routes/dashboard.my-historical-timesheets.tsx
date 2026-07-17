@@ -5,15 +5,17 @@
 // explicitly submitted to them (rows land here only after the admin's
 // Stage 3 submit action).
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CheckCircle2, Flag, Loader2, Save, X, Archive, Info } from "lucide-react";
+import { CheckCircle2, Flag, Loader2, Save, X, Archive, Info, Sparkles, Hexagon, Mic, MicOff, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { HistoricalTimesheetBadge } from "@/components/smart-import/timesheets/historical-timesheet-badge";
+import { NectarInfusionLock } from "@/components/nectar/nectar-infusion-lock";
+import { draftShiftNote } from "@/lib/ai-coach.functions";
 import {
   listMyPendingHistoricalTimesheets,
   updateMyHistoricalTimesheetNote,

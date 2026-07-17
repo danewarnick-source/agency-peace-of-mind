@@ -1811,16 +1811,61 @@ export function IncidentReportDialog({
                         <p className="mt-2 text-[11px] text-emerald-800 dark:text-emerald-200">No remaining gaps. You can submit.</p>
                       )}
                       {completenessIssues && completenessIssues.length > 0 && (
-                        <ul className="mt-2 space-y-1 text-[11px]">
-                          {completenessIssues.map((q, i) => (
-                            <li key={i} className={`flex items-start gap-2 rounded border p-2 ${q.severity === "must_fix" ? "border-rose-300 bg-rose-50" : "border-amber-300 bg-amber-50"}`}>
-                              <Badge variant={q.severity === "must_fix" ? "destructive" : "outline"} className="text-[10px]">
-                                {q.severity === "must_fix" ? "Must address" : "Suggested"}
-                              </Badge>
-                              <span>{q.question}</span>
-                            </li>
-                          ))}
+                        <ul className="mt-2 space-y-2 text-[11px]">
+                          {completenessIssues.map((q, i) => {
+                            const itemStatus = completenessItemStatus[q.question];
+                            const answerVal = completenessAnswers[q.question] ?? "";
+                            const checking = itemStatus?.kind === "checking";
+                            const needsMore = itemStatus?.kind === "needs_more";
+                            return (
+                              <li
+                                key={`${q.question}-${i}`}
+                                className={`rounded border p-2 ${q.severity === "must_fix" ? "border-rose-300 bg-rose-50" : "border-amber-300 bg-amber-50"}`}
+                              >
+                                <div className="flex items-start gap-2">
+                                  <Badge variant={q.severity === "must_fix" ? "destructive" : "outline"} className="text-[10px]">
+                                    {q.severity === "must_fix" ? "Must address" : "Suggested"}
+                                  </Badge>
+                                  <span className="flex-1">{q.question}</span>
+                                </div>
+                                <div className="mt-2 space-y-1">
+                                  <Textarea
+                                    value={answerVal}
+                                    onChange={(e) =>
+                                      setCompletenessAnswers((a) => ({ ...a, [q.question]: e.target.value }))
+                                    }
+                                    placeholder="Type your answer or correction here…"
+                                    className="min-h-[60px] text-[12px]"
+                                    disabled={checking}
+                                  />
+                                  {needsMore && itemStatus?.note && (
+                                    <p className="text-[11px] text-rose-800 dark:text-rose-200">
+                                      Needs more detail: {itemStatus.note}
+                                    </p>
+                                  )}
+                                  <div className="flex justify-end">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => checkCompletenessAnswer(q.question)}
+                                      disabled={checking || !answerVal.trim() || !aiEnabled}
+                                    >
+                                      {checking ? (
+                                        <><Loader2 className="mr-1 h-3 w-3 animate-spin" />Checking…</>
+                                      ) : needsMore ? "Save & re-check" : "Save"}
+                                    </Button>
+                                  </div>
+                                </div>
+                              </li>
+                            );
+                          })}
                         </ul>
+                      )}
+                      {completenessApproved.length > 0 && (
+                        <p className="mt-2 text-[11px] text-emerald-800 dark:text-emerald-200">
+                          {completenessApproved.length} answer{completenessApproved.length === 1 ? "" : "s"} approved and added to the report.
+                        </p>
                       )}
                     </div>
 

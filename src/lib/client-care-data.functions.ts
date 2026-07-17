@@ -112,6 +112,19 @@ export type CustomFieldWithValue = {
   value: CustomFieldValue;
 };
 
+export type CareTargetBehavior = {
+  id: string;
+  behavior_name: string;
+  description: string;
+};
+
+export type CareEmergencyContact = {
+  id: string;
+  name: string;
+  phone: string | null;
+  relationship: string | null;
+};
+
 export type ClientCareVisibility = {
   /** Goals that a staff member should see during the given shift.
    *  Rule: is_complete AND per-goal visible AND care_plan section on AND
@@ -135,6 +148,12 @@ export type ClientCareVisibility = {
      *  Custom fields have no per-field visibility switch — they inherit
      *  their section's toggle exclusively. */
     custom_fields: CustomFieldWithValue[];
+    /** Always mirrors admin — no visibility gating. */
+    target_behaviors: CareTargetBehavior[];
+    /** Always mirrors admin — no visibility gating. */
+    emergency_contacts: CareEmergencyContact[];
+    /** Always mirrors admin — no visibility gating. */
+    preferred_activities: string[];
   };
 };
 
@@ -150,10 +169,14 @@ export type ClientCareData = {
   /** All custom fields (admin view). Staff view uses
    *  `visibility.staffCare.custom_fields` (filtered by section toggle). */
   custom_fields: CustomFieldWithValue[];
+  target_behaviors: CareTargetBehavior[];
+  emergency_contacts: CareEmergencyContact[];
+  preferred_activities: string[];
   /** Raw visibility row (as stored). Admin toggle UIs read this. */
   visibilityRow: ClientVisibilityRow;
   visibility: ClientCareVisibility;
 };
+
 
 // ── Server function ─────────────────────────────────────────────────────────
 

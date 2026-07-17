@@ -224,7 +224,7 @@ export function PunchPad({
   const [selectedFacility, setSelectedFacility] = useState(lockedClient?.facility ?? "");
   const [timezone, setTimezone]                 = useState("America/Denver");
   const [busy, setBusy]                         = useState(false);
-  const [now, setNow]                           = useState(() => Date.now());
+  const [now, setNow]                           = useState(0);
 
   // ── Clock-in variance state ─────────────────────────────────────────────────
   const [variance, setVariance] = useState<null | {
@@ -452,7 +452,8 @@ export function PunchPad({
     return null;
   }
 
-  // Live elapsed timer
+  // Live elapsed timer — setNow happens only in the browser after hydration,
+  // keeping the initial render deterministic (SSR and client agree on now=0).
   useEffect(() => {
     if (!activeMatchesThisPad) return;
     setNow(Date.now());

@@ -649,7 +649,9 @@ export function IncidentReportDialog({
         if (narrativeReviewStatus === "needs_answers") {
           const unresolved = narrativeReviewIssues
             .map((g, i) => ({ g, i }))
-            .filter(({ g, i }) => g.severity === "must_fix" && !narrativeGapAnswers[i]?.trim());
+            .filter(({ g, i }) => g.severity === "must_fix"
+              && !narrativeGapAnswers[i]?.trim()
+              && narrativeGapNA[i] === undefined);
           if (unresolved.length) {
             return "Answer every required NECTAR follow-up before continuing.";
           }

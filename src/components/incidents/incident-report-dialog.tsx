@@ -907,6 +907,66 @@ export function IncidentReportDialog({
     }
   }
 
+  // ── Per-item completeness answer check.
+  // The person types their answer inline under a flagged item and hits Save.
+  // We re-run reviewFn with the enriched draft (all previously-approved
+  // completeness answers + this new one) and check whether the same
+  // question still surfaces as must_fix. If it doesn't, the item is
+  // approved, removed from the list, and folded into the report.
+  // AI outage / timeout must never leave the person stuck — accept the
+  // answer and let them proceed, mirroring how the rest of this form
+  // treats Nectar unavailability.
+  async function checkCompletenessAnswer(question: string) {
+    const answer = (completenessAnswers[question] ?? "").trim();
+    if (!answer) return;
+    if (reviewInFlightRef.current) return;
+    reviewInFlightRef.current = true;
+    setCompletenessItemStatus((s) => ({ ...s, [question]: { kind: "checking" } }));
+    const acceptAndClear = (note?: string) => {
+      setCompletenessApproved((a) => [...a, { question, answer }]);
+      setCompletenessIssues((prev) => (prev ?? []).filter((q) => q.question !== question));
+      setCompletenessItemStatus((s) => { const n = { ...s }; delete n[question]; return n; });
+      setCompletenessAnswers((a) => { const n = { ...a }; delete n[question]; return n; });
+      if (note) toast.message(note); else toast.success("NECTAR approved your answer.");
+    };
+    try {
+      const base = buildDraft();
+      const extras = [...completenessApproved, { question, answer }];
+      const draft = {
+        ...base,
+        details: {
+          ...(base.details as Record<string, unknown>),
+          nectar_completeness_answers: extras,
+        },
+      };
+      const r = await withAiTimeout((signal) => reviewFn({ data: { draft }, signal }));
+      if (!r || typeof r.complete !== "boolean" || r.skipped) {
+        acceptAndClear("NECTAR unavailable — your answer was accepted.");
+        return;
+      }
+      const issues = Array.isArray(r.issues) ? (r.issues as AiIssue[]) : [];
+      const still = issues.find((q) => q.question === question && q.severity === "must_fix");
+      if (still) {
+        setCompletenessItemStatus((s) => ({
+          ...s,
+          [question]: {
+            kind: "needs_more",
+            note:
+              still.question && still.question !== question
+                ? still.question
+                : "Add more specific detail (who, what, when, or how) to fully resolve this concern.",
+          },
+        }));
+      } else {
+        acceptAndClear();
+      }
+    } catch {
+      acceptAndClear("NECTAR didn't respond in 20s — your answer was accepted.");
+    } finally {
+      reviewInFlightRef.current = false;
+    }
+  }
+
 
   const contradictions = useMemo(
     () => (currentKey === "review" ? findContradictions(buildDraft()) : []),

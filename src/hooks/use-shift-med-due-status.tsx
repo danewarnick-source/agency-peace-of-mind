@@ -131,8 +131,26 @@ export function useShiftMedDueStatus(args: {
         });
       }
 
-      doses.sort((a, b) => a.scheduled_for_iso.localeCompare(b.scheduled_for_iso));
-      return { scheduledDoses: doses };
+      // Dedupe by medication_id + time_label — the [-1,0,1] day expansion above
+      // can match the same scheduled time on multiple calendar days when the
+      // shift window is long or straddles midnight. Keep the occurrence whose
+      // scheduled_for_iso is closest to the window midpoint.
+      const midMs = (wsMs + weMs) / 2;
+      const bestByKey = new Map<string, ScheduledDose>();
+      for (const d of doses) {
+        const key = `${d.medication_id}|${d.time_label}`;
+        const existing = bestByKey.get(key);
+        if (!existing) {
+          bestByKey.set(key, d);
+          continue;
+        }
+        const distNew = Math.abs(new Date(d.scheduled_for_iso).getTime() - midMs);
+        const distOld = Math.abs(new Date(existing.scheduled_for_iso).getTime() - midMs);
+        if (distNew < distOld) bestByKey.set(key, d);
+      }
+      const deduped = Array.from(bestByKey.values());
+      deduped.sort((a, b) => a.scheduled_for_iso.localeCompare(b.scheduled_for_iso));
+      return { scheduledDoses: deduped };
     },
   });
 

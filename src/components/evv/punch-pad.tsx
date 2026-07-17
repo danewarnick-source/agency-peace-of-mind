@@ -2149,45 +2149,37 @@ export function PunchPad({
             </>
           )}
 
-          <div>
-            <label className="mb-1 block text-xs font-medium">💼 Select Service Code</label>
-            <Select
-              value={serviceCode}
-              onValueChange={setServiceCode}
-              disabled={isRunning || !clientForPunch || (lockServiceCode && !!presetServiceCode)}
-            >
-              <SelectTrigger className="h-12">
-                <SelectValue placeholder={clientForPunch ? "Select authorized code" : "Pick a client first"} />
-              </SelectTrigger>
-              <SelectContent>
-                {codesForClient.length === 0 ? (
-                  <SelectItem value="__none" disabled>No codes authorized</SelectItem>
-                ) : codesForClient.map((c) => (
-                  <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {lockServiceCode && presetServiceCode ? (
-              <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-accent">
-                <Lock className="h-3 w-3" />
-                Locked from today&apos;s schedule — prevents billing errors.
-              </p>
-            ) : clientForPunch?.authorizedCodes?.length ? (
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Restricted to authorizations on {clientForPunch.name}&apos;s profile.
-              </p>
-            ) : null}
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-medium">🕐 Timezone</label>
-            <Select value={timezone} onValueChange={setTimezone} disabled={isRunning}>
-              <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {TIMEZONES.map((t) => <SelectItem key={t.v} value={t.v}>{t.l}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
+          {!isRunning && (
+            <div>
+              <label className="mb-1 block text-xs font-medium">💼 Select Service Code</label>
+              <Select
+                value={serviceCode}
+                onValueChange={setServiceCode}
+                disabled={isRunning || !clientForPunch || (lockServiceCode && !!presetServiceCode)}
+              >
+                <SelectTrigger className="h-12">
+                  <SelectValue placeholder={clientForPunch ? "Select authorized code" : "Pick a client first"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {codesForClient.length === 0 ? (
+                    <SelectItem value="__none" disabled>No codes authorized</SelectItem>
+                  ) : codesForClient.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {lockServiceCode && presetServiceCode ? (
+                <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-accent">
+                  <Lock className="h-3 w-3" />
+                  Locked from today&apos;s schedule — prevents billing errors.
+                </p>
+              ) : clientForPunch?.authorizedCodes?.length ? (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Restricted to authorizations on {clientForPunch.name}&apos;s profile.
+                </p>
+              ) : null}
+            </div>
+          )}
         </div>
 
         {/* ── Elapsed timer ── */}

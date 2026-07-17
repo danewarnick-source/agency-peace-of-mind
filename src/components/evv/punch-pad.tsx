@@ -899,6 +899,12 @@ export function PunchPad({
     return rows.map((g) => g.goal.trim()).filter((s) => s.length > 0);
   }, [careData.data]);
 
+  // Temporary diagnostic log — safe to remove once goal filtering is verified.
+  useEffect(() => {
+    console.log("[DIAGNOSTIC care data]", careData.data);
+  }, [careData.data]);
+
+
 
   const wordCount = useMemo(() => {
     const t = narrative.trim();

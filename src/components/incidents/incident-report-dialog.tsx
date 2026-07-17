@@ -487,8 +487,8 @@ export function IncidentReportDialog({
           shorthand: text,
           category: category || "",
           clientName: resolvedClientName || "the individual",
-          occurredAt: occurredAt ? new Date(occurredAt).toISOString() : null,
-          discoveredAt: discoveredAt ? new Date(discoveredAt).toISOString() : null,
+          occurredAt: occurredAt ?? null,
+          discoveredAt: discoveredAt ?? null,
           knownFacts: [
             location ? `Location: ${location}` : "",
             witnessedDirectly === "no" && reportedBy ? `Reported by: ${reportedBy}` : "",
@@ -520,8 +520,8 @@ export function IncidentReportDialog({
   function buildDraft() {
     return {
       category, description: description.trim(), location,
-      occurred_at: occurredAt ? new Date(occurredAt).toISOString() : null,
-      discovered_at: discoveredAt ? new Date(discoveredAt).toISOString() : null,
+      occurred_at: occurredAt ?? null,
+      discovered_at: discoveredAt ?? null,
       people_involved: peopleInvolved, witnesses, injuries,
       medical_attention: medicalAttention, immediate_actions: immediateActions,
       is_abuse_neglect: isAbuse, prevention_strategies: preventionStrategies,
@@ -653,8 +653,8 @@ export function IncidentReportDialog({
           shorthand: shorthand.trim(),
           category: category || "",
           clientName: resolvedClientName || "the individual",
-          occurredAt: occurredAt ? new Date(occurredAt).toISOString() : null,
-          discoveredAt: discoveredAt ? new Date(discoveredAt).toISOString() : null,
+          occurredAt: occurredAt ?? null,
+          discoveredAt: discoveredAt ?? null,
           knownFacts: baseFacts || null,
         },
       }));

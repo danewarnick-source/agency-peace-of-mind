@@ -37,10 +37,10 @@ export function AboutTab({ client }: { client: CaseloadClient }) {
   const identitySectionOn = sections?.identity ?? true;
   const carePlanSectionOn = sections?.care_plan ?? true;
 
-  const goals =
-    carePlanSectionOn
-      ? (staffCare?.goals ?? []).map((g) => g.goal).filter(Boolean)
-      : [];
+  // PCSP goals always mirror admin — server already applies per-goal
+  // visibility switches; the care_plan section toggle does not hide the list.
+  const goals = (staffCare?.goals ?? []).map((g) => g.goal).filter(Boolean);
+
 
   const medicaidId = identitySectionOn
     ? staffCare?.identity.medicaid_id ?? client.medicaid_id

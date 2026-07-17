@@ -1,35 +1,35 @@
-## Defer med logging until Submit Timeclock + orange enabled state
+Replace the optional "File Incident Report" button in the shift-end compliance form with a required Yes/No question so staff cannot skip it without making a deliberate choice. Keep the existing `IncidentReportDialog` exactly as-is — only its trigger changes.
 
-### 1. Shift-med section becomes a draft, not a live writer
+### What we will change
+File: `src/components/evv/punch-pad.tsx`
 
-`src/components/medications/shift-med-due-check.tsx`
+1. **Add explicit incident-answer state**
+   - Introduce `incidentAnswer: 'yes' | 'no' | null` state.
+   - Reset it to `null` in `openCompliance()` alongside the other form fields.
 
-- Remove the `useMutation` that calls `logMedicationPass` on click and the "Log N doses" button.
-- Add a new prop `onPendingDosesChange(pending: PendingDose[] | null) => void`. `PendingDose` = the same payload we currently pass to `logMedicationPass` (clientId, medicationId, scheduledFor, scheduledTimeLabel, status, actualTakenAt, exceptionReason, notes, signatureDataUrl), minus anything the parent will fill in.
-- Replace the submit button with a **Save** button. Save is enabled under the same validity rules as today (at least one checked dose with a valid outcome/note, typed name, attestation ticked). "No" / "Not scheduled" also count as valid, and emit `onPendingDosesChange([])`.
-- After Save, the section collapses into a read-only summary ("3 doses ready to log — signed by <name>") with an **Edit** button that reopens the form and clears the parent's resolved state until Save is pressed again.
-- `onResolvedChange(true)` fires only after Save (or after "No" / "Not scheduled"). Reopening via Edit sets it back to `false`.
+2. **Make the question a hard compliance gate**
+   - Add `incidentAnswer !== null` to the `canSubmitCompliance` expression.
+   - This forces staff to choose Yes or No before the Submit Timeclock button becomes active.
 
-### 2. Parent stores pending doses and flushes on shift submit
+3. **Replace the single button with a Yes/No question block**
+   - Replace the current "Something happen this shift? File the §1.27 Incident Report now" + button row with a clear question such as:  
+     **"Did anything happen this shift that needs an incident report?"**
+   - Render two pill-style buttons using the existing `selectedPill` / `unselectedPill` classes.
+   - **No**: record `incidentAnswer = 'no'`, `incidentFlag = false`, and close the dialog. The answer is stored in the timesheet update as `incident_flag: false` for auditability.
+   - **Yes**: record `incidentAnswer = 'yes'`, `incidentFlag = true`, and call `setIncidentDialogOpen(true)` exactly as the current button does.
+   - If `incidentReportIds.length > 0`, lock the answer to Yes and show a "Incident report filed" summary, while still allowing the staff to open the dialog again to add another report if needed.
 
-`src/components/evv/punch-pad.tsx`
+4. **Preserve existing incident-report hard gate on submit**
+   - The existing `if (incidentFlag && incidentReportIds.length === 0)` block stays unchanged: it blocks the timesheet if they chose Yes but never submitted a report, and reopens the dialog.
+   - The existing `onSubmitted` callback for the dialog continues to append the report ID and set `incidentFlag = true`.
 
-- Add state `pendingMedDoses: PendingDose[] | null` (default `null`) alongside `medDosesResolved`.
-- Wire the `ShiftMedDueCheckSlot` → `ShiftMedDueCheck` `onPendingDosesChange` up to `setPendingMedDoses`.
-- In `submitCompliance` / `handleClockOut`, after all existing gates pass but before the timesheet update commits, iterate `pendingMedDoses ?? []` and `await logMedicationPass({ data })` for each entry (status-mapping already lives in `emar-pass.functions.ts`). If any dose insert throws, `toast.error(...)` and abort the timeclock submit so nothing partially commits.
-- Reset `pendingMedDoses` in `openCompliance()` alongside the other resets.
-- Existing gate `medDosesResolved` stays exactly as-is — it becomes true only after the user clicks Save in the med section.
+### What we will NOT change
+- `IncidentReportDialog` component, its props, or its open/close behavior.
+- Any database schema or server functions; the existing `incident_flag` boolean column is used to record the answer.
+- Nectar NoteTriggerPrompt behavior — it can still open the incident dialog independently when a narrative trigger is detected.
 
-### 3. Submit Timeclock button — orange when ready
-
-Same file, existing Submit Timeclock button:
-
-- When `canSubmitCompliance && !aiBusy` → orange (`bg-amber-500 hover:bg-amber-600 text-white`), so staff visually see it "wake up" once every section is filled.
-- Correction-path variant stays amber (unchanged in meaning).
-- Disabled state stays muted.
-- Copy stays "💾 Submit Timeclock".
-
-### Out of scope
-
-- `emar_logs` schema and the standalone MAR page — unchanged.
-- The HHS daily-note usage of `ShiftMedDueCheck` — it'll get the new Save/Edit UI too, but since that flow has its own submit path, its parent will simply flush `pendingMedDoses` on its own submit (same pattern) in a follow-up if needed. For this change we keep the HHS caller working by defaulting `onPendingDosesChange` to a no-op and continuing to log inline there. (If you'd prefer the HHS flow updated in the same change, say the word.)
+### Acceptance criteria
+- The shift-end form shows a clear Yes/No incident question instead of a single optional button.
+- Selecting No resolves the section and lets the user submit the timeclock when other sections are complete.
+- Selecting Yes opens the existing incident report dialog and the user cannot submit the timeclock until a report is actually filed.
+- The Submit Timeclock button is disabled until an answer is selected.

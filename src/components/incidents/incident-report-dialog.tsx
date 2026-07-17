@@ -884,8 +884,18 @@ export function IncidentReportDialog({
     if (reviewInFlightRef.current) return;
     reviewInFlightRef.current = true;
     setCompletenessBusy(true);
+    setCompletenessItemStatus({});
     try {
-      const draft = buildDraft();
+      const base = buildDraft();
+      const draft = completenessApproved.length
+        ? {
+            ...base,
+            details: {
+              ...(base.details as Record<string, unknown>),
+              nectar_completeness_answers: completenessApproved,
+            },
+          }
+        : base;
       const r = await withAiTimeout((signal) => reviewFn({ data: { draft }, signal }));
       if (!r || typeof r.complete !== "boolean" || r.skipped) {
         setCompletenessIssues([]); setNectarStatus("skipped");

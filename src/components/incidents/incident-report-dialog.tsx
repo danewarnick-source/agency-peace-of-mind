@@ -389,6 +389,7 @@ export function IncidentReportDialog({
     setNectarIssues(null); setNectarAnswers({}); setNectarNA({});
     setNectarStatus(null); setNectarReviewing(false); setLastReviewedDescription("");
     setCompletenessIssues(null); setCompletenessBusy(false);
+    setCompletenessAnswers({}); setCompletenessItemStatus({}); setCompletenessApproved([]);
     setStep(0); setStepError(null);
   }, [open, clientId, initialDiscovered]);
 

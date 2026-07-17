@@ -1,35 +1,47 @@
-Replace the optional "File Incident Report" button in the shift-end compliance form with a required Yes/No question so staff cannot skip it without making a deliberate choice. Keep the existing `IncidentReportDialog` exactly as-is — only its trigger changes.
+The "Additional" rows on the staff About tab come from `custom_field_definitions` rows in your database. They were seeded by earlier smart-import / onboarding passes before the admin About form had first-class inputs for the same concepts. The admin panel still shows them (under the "Custom fields" collapsible at the bottom of each section), but they duplicate real columns you're already editing above — so from the admin side they look absent while they still leak into the staff About tab as "Additional" rows.
 
-### What we will change
-File: `src/components/evv/punch-pad.tsx`
+## What we found in your org
 
-1. **Add explicit incident-answer state**
-   - Introduce `incidentAnswer: 'yes' | 'no' | null` state.
-   - Reset it to `null` in `openCompliance()` alongside the other form fields.
+**Group A — pure duplicates of real `clients` columns.** The canonical data already lives on `clients.*`; the custom field is redundant.
 
-2. **Make the question a hard compliance gate**
-   - Add `incidentAnswer !== null` to the `canSubmitCompliance` expression.
-   - This forces staff to choose Yes or No before the Submit Timeclock button becomes active.
+- `support_coordinator_name` → `clients.support_coordinator_name`
+- `support_coordinator_phone` → `clients.support_coordinator_phone`
+- `support_coordinator_email` → `clients.support_coordinator_email`
+- `prescriber_name` → `clients.prescriber_name`
+- `emergency_medical_treatment_authorization` → `clients.emergency_medical_treatment_authorization`
+- `preferred_name` → `clients.preferred_name`
+- `diagnoses` → `clients.diagnoses` (array)
+- `allergies` → `clients.allergies` (array/text)
 
-3. **Replace the single button with a Yes/No question block**
-   - Replace the current "Something happen this shift? File the §1.27 Incident Report now" + button row with a clear question such as:  
-     **"Did anything happen this shift that needs an incident report?"**
-   - Render two pill-style buttons using the existing `selectedPill` / `unselectedPill` classes.
-   - **No**: record `incidentAnswer = 'no'`, `incidentFlag = false`, and close the dialog. The answer is stored in the timesheet update as `incident_flag: false` for auditability.
-   - **Yes**: record `incidentAnswer = 'yes'`, `incidentFlag = true`, and call `setIncidentDialogOpen(true)` exactly as the current button does.
-   - If `incidentReportIds.length > 0`, lock the answer to Yes and show a "Incident report filed" summary, while still allowing the staff to open the dialog again to add another report if needed.
+**Group B — duplicate custom-field keys** (same concept, two definitions):
 
-4. **Preserve existing incident-report hard gate on submit**
-   - The existing `if (incidentFlag && incidentReportIds.length === 0)` block stays unchanged: it blocks the timesheet if they chose Yes but never submitted a report, and reopens the dialog.
-   - The existing `onSubmitted` callback for the dialog continues to append the report ID and set `incidentFlag = true`.
+- `support_coordinator` (bare) — duplicates `support_coordinator_name`
+- `financial_rep_payee` — duplicates `representative_payee`
+- `plan_effective_date` — duplicates `pcsp_effective_start`
+- `plan_end_date` — duplicates `pcsp_review_date`
 
-### What we will NOT change
-- `IncidentReportDialog` component, its props, or its open/close behavior.
-- Any database schema or server functions; the existing `incident_flag` boolean column is used to record the answer.
-- Nectar NoteTriggerPrompt behavior — it can still open the incident dialog independently when a narrative trigger is detected.
+**Group C — orphaned lowercase `goal_*` keys.** These were meant for the CST goals table, not client-level fields. They surface once per client but describe a single goal, which is meaningless.
 
-### Acceptance criteria
-- The shift-end form shows a clear Yes/No incident question instead of a single optional button.
-- Selecting No resolves the section and lets the user submit the timeclock when other sections are complete.
-- Selecting Yes opens the existing incident report dialog and the user cannot submit the timeclock until a report is actually filed.
-- The Submit Timeclock button is disabled until an answer is selected.
+- `goal_domain`, `goal_current_status`, `goal_strengths`, `goal_barriers`, `goal_success_criteria`
+
+## Plan
+
+1. Write a single migration that deletes the definitions in Groups A + B + C for your organization. Because `custom_field_values` has an FK to `custom_field_definitions`, the values delete via cascade (or we delete values first if there's no cascade — the migration handles both).
+2. Nothing else changes. The admin's first-class inputs stay the same, and the staff About tab's "Additional" list will only show fields we don't already surface elsewhere.
+
+## What we will NOT touch (asking first)
+
+These aren't duplicates but also aren't editable as first-class fields anywhere in the admin UI today. Deleting them would lose data:
+
+- `secondary_phone`, `county`, `day_program_name`, `transportation_notes`, `funding_source`
+- `pcsp_author_name`, `pcsp_meeting_date`, `pcsp_signed_by_client`, `pcsp_signed_by_guardian`
+- `representative_payee`
+- `dspt_person_id`, `host_home_provider`, `provider_name`, `support_team_roster`
+- `rights_restrictions`, `communication_dictionary`, `typical_daily_routine`, `risk_assessment`, `client_preferences_strengths_notes`
+
+If any of these are also legacy and can be dropped, tell me which and I'll add them to the same migration.
+
+## Acceptance
+
+- The "Additional" section on the staff About tab no longer repeats the Support Coordinator name/phone/email, prescriber, diagnoses, allergies, preferred name, or the duplicate PCSP/plan/rep-payee entries.
+- Admin edit screens continue to work with the first-class columns as before.

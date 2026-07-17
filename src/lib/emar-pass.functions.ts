@@ -226,7 +226,7 @@ export const logMedicationPass = createServerFn({ method: "POST" })
       status: data.status,
       administrator_role: role,
       credential_id: data.credentialId ?? null,
-      route: data.route ?? null,
+      // route captured in validator for attestation copy; column does not exist on emar_logs
       exception_reason: wasTaken ? null : (data.exceptionReason ?? null),
       notes: data.notes ?? null,
       staff_id: userId,

@@ -344,20 +344,7 @@ export function PunchPad({
   const { data: behaviorSetting } = useShiftBehaviorSetting();
   const behaviorEnabled = behaviorSetting?.enabled ?? true;
   const [behaviorAnswers, setBehaviorAnswers] = useState<BehaviorAnswers>(emptyBehaviorAnswers);
-  const listTargetBehaviorsFn = useServerFn(listClientTargetBehaviors);
-  const { data: targetBehaviorRows = [] } = useQuery({
-    queryKey: ["client-target-behaviors", active?.client_id],
-    queryFn: () =>
-      listTargetBehaviorsFn({
-        data: {
-          organization_id: org!.organization_id,
-          client_id: active!.client_id,
-        },
-      }),
-    enabled: behaviorEnabled && !!active?.client_id && !!org?.organization_id,
-    staleTime: 5 * 60_000,
-  });
-  const targetBehaviorOptions = targetBehaviorRows.map((b) => b.behavior_name);
+  // Target behaviors query lives below, after `active` is in scope.
 
   // ── Pre-submit medication check (reads real emar_logs, no shadow store) ───
   const [medDosesResolved, setMedDosesResolved] = useState(true);

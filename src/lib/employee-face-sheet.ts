@@ -91,10 +91,16 @@ type HrDocRow = {
 
 async function loadEmployeeSheetData(sb: SupabaseClient, staffId: string) {
   // 1) Member + profile — reveals org + all identity fields.
+  //    Scope to the caller's current org so users who belong to multiple orgs
+  //    don't blow up maybeSingle() with "multiple rows returned".
+  const { data: currentOrgId, error: orgErr } = await sb.rpc("get_current_org_id");
+  if (orgErr) throw new Error(orgErr.message);
+  if (!currentOrgId) throw new Error("No active organization");
   const { data: member, error: mErr } = await sb
     .from("organization_members")
     .select("id, role, active, organization_id")
     .eq("user_id", staffId)
+    .eq("organization_id", currentOrgId as string)
     .maybeSingle();
   if (mErr) throw new Error(mErr.message);
   if (!member) throw new Error("Employee not found in your organization");

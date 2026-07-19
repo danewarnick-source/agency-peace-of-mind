@@ -31,6 +31,7 @@ const BUCKET = "employee-docs";
 
 export type EmployeeFaceSheetArgs = {
   staffId: string;
+  organizationId: string;
   supabaseClient?: SupabaseClient;
 };
 
@@ -89,18 +90,16 @@ type HrDocRow = {
   status: string | null;
 };
 
-async function loadEmployeeSheetData(sb: SupabaseClient, staffId: string) {
+async function loadEmployeeSheetData(sb: SupabaseClient, staffId: string, organizationId: string) {
   // 1) Member + profile — reveals org + all identity fields.
-  //    Scope to the caller's current org so users who belong to multiple orgs
-  //    don't blow up maybeSingle() with "multiple rows returned".
-  const { data: currentOrgId, error: orgErr } = await sb.rpc("get_current_org_id");
-  if (orgErr) throw new Error(orgErr.message);
-  if (!currentOrgId) throw new Error("No active organization");
+  //    The profile page passes the active org explicitly, which keeps multi-org
+  //    users from tripping object-mode queries with multiple memberships.
   const { data: member, error: mErr } = await sb
     .from("organization_members")
     .select("id, role, active, organization_id")
     .eq("user_id", staffId)
-    .eq("organization_id", currentOrgId as string)
+    .eq("organization_id", organizationId)
+    .limit(1)
     .maybeSingle();
   if (mErr) throw new Error(mErr.message);
   if (!member) throw new Error("Employee not found in your organization");
@@ -113,6 +112,7 @@ async function loadEmployeeSheetData(sb: SupabaseClient, staffId: string) {
       "id, full_name, first_name, last_name, email, username, phone, employee_id, position, positions, department, hire_date, account_status, worker_type, team_id, photo_path, staff_type_keys, emergency_contact_name, emergency_contact_relationship, emergency_contact_phone",
     )
     .eq("id", staffId)
+    .limit(1)
     .maybeSingle();
   if (pErr) throw new Error(pErr.message);
 
@@ -121,18 +121,20 @@ async function loadEmployeeSheetData(sb: SupabaseClient, staffId: string) {
     .from("organizations")
     .select("id, name, legal_name, dba_name")
     .eq("id", orgId)
+    .limit(1)
     .maybeSingle();
   const { data: branding } = await sb
     .from("organization_branding")
     .select("logo_path, org_address, org_phone")
     .eq("organization_id", orgId)
+    .limit(1)
     .maybeSingle();
 
   // 3) Team (if assigned).
   const teamId = (profile as { team_id: string | null } | null)?.team_id ?? null;
   let team: { team_name: string | null } | null = null;
   if (teamId) {
-    const { data } = await sb.from("teams").select("team_name").eq("id", teamId).maybeSingle();
+    const { data } = await sb.from("teams").select("team_name").eq("id", teamId).limit(1).maybeSingle();
     team = (data as { team_name: string | null } | null) ?? null;
   }
 
@@ -357,7 +359,7 @@ export async function generateEmployeeFaceSheet(
   args: EmployeeFaceSheetArgs,
 ): Promise<EmployeeFaceSheetResult> {
   const sb = args.supabaseClient ?? defaultSupabase;
-  const d = await loadEmployeeSheetData(sb, args.staffId);
+  const d = await loadEmployeeSheetData(sb, args.staffId, args.organizationId);
   const p = d.profile;
   const name =
     (p.full_name && String(p.full_name).trim()) ||
@@ -626,9 +628,9 @@ export async function shipEmployeeFaceSheet(
 
   const displayName = `Employee Face Sheet — ${report.periodLabel}.pdf`;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: inserted, error: insErr } = await (sb as any)
+  const { data: insertedRows, error: insErr } = await (sb as any)
     .from("employee_documents")
-    .insert({
+    .insert([{
       organization_id: report.organizationId,
       staff_id: report.staffId,
       kind: "face_sheet",
@@ -638,10 +640,12 @@ export async function shipEmployeeFaceSheet(
       mime_type: "application/pdf",
       size_bytes: report.bytes.byteLength,
       uploaded_by: uid,
-    })
+    }])
     .select("id")
-    .single();
+    .limit(1);
   if (insErr) throw new Error(insErr.message);
+  const inserted = Array.isArray(insertedRows) ? insertedRows[0] : null;
+  if (!inserted) throw new Error("Face sheet saved, but the HR document record could not be confirmed.");
 
   return {
     ...report,

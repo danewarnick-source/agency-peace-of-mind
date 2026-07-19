@@ -1,28 +1,11 @@
-## Diagnosis
+I found the previous fix was too narrow: the Face Sheet generator still has several `.maybeSingle()` / `.single()` calls that can throw the same “JSON object requested, multiple (or no) rows returned” error if supporting data is missing or duplicated. The live data for Jake confirms he belongs to two organizations, and the current-org server helper is not available as expected, so relying on that helper is not enough.
 
-The toast "JSON object requested, multiple (or no) rows returned" is a PostgREST error from `.maybeSingle()` when the query returns more than one row. In `src/lib/employee-face-sheet.ts` (lines 94-98), the loader does:
-
-```ts
-sb.from("organization_members")
-  .select("id, role, active, organization_id")
-  .eq("user_id", staffId)
-  .maybeSingle();
-```
-
-There is no organization filter. Jake Probert (and any admin/staff who belongs to more than one org — TNS FAKE plus other tenants they've been added to) has multiple `organization_members` rows for the same `user_id`, so `maybeSingle()` throws and the PDF never builds. The dropdown Preview / Download / Print / Ship all funnel through this same `loadEmployeeSheetData` path, so every action from the Face Sheet button fails the same way.
-
-## Fix
-
-Scope the `organization_members` query to the caller's current organization before calling `maybeSingle()`.
-
-1. In `src/lib/employee-face-sheet.ts` `loadEmployeeSheetData`, resolve the caller's current org id via the existing `get_current_org_id()` RPC (already used elsewhere in the codebase for this exact "which org am I acting in" question).
-2. Add `.eq("organization_id", currentOrgId)` to the `organization_members` lookup, keeping `.maybeSingle()`. This guarantees at most one row and enforces that the face sheet only builds for an employee in the org the user is currently viewing — matching the RLS scope the rest of the employee profile already uses.
-3. Keep the existing "Employee not found in your organization" error for the null case.
-
-No other code paths change. The client Face Sheet is unaffected (different query shape).
-
-## Verification
-
-- Reopen Jake Probert's profile in TNS FAKE and click Face Sheet → Preview: the PDF should open in a new tab with no toast.
-- Try Download, Print, and Ship to HR docs from the same dropdown to confirm all four actions succeed.
-- Spot-check a single-org employee to confirm nothing regressed.
+Plan:
+1. Update the Face Sheet server function input to include the active `organizationId` from the employee profile page.
+2. Pass `orgId` from `src/routes/dashboard.employees.$staffId.tsx` into `EmployeeFaceSheetButton`, and from the button into `generateEmployeeFaceSheetFn`.
+3. Update `src/lib/employee-face-sheet.ts` so it uses that explicit organization id for the employee membership lookup instead of calling the current-org RPC.
+4. Make the single-row reads resilient:
+   - use `.limit(1)` on organization, branding, profile, and team reads where duplicates/missing rows should not block PDF generation;
+   - keep “employee membership in this org” as the only required lookup;
+   - change ship-to-file insert to tolerate a normal single returned id without surfacing the PostgREST object error.
+5. Verify the Face Sheet path by loading Jake’s employee page and clicking Preview/Download where possible, confirming the previous toast no longer appears.

@@ -76,6 +76,8 @@ export type ReportParams = {
   spaceId?: string;
   /** Employee/staff id for employee-scoped reports (e.g. Employee Face Sheet). */
   staffId?: string;
+  /** Organization scope for employee-scoped reports. */
+  organizationId?: string;
   /** "YYYY-MM" or "YYYY-MM-DD" for budget. */
   periodMonth?: string;
   /** Any date within the target week for meal reports. */
@@ -319,6 +321,7 @@ export async function generateClientReport(
     case "employee_face_sheet": {
       const args: EmployeeFaceSheetArgs = {
         staffId: requireField(params.staffId, "staffId"),
+        organizationId: requireField(params.organizationId, "organizationId"),
         supabaseClient: params.supabaseClient,
       };
       const r = await generateEmployeeFaceSheet(args);
@@ -452,6 +455,7 @@ export async function shipClientReport(
     case "employee_face_sheet": {
       const args: EmployeeFaceSheetArgs = {
         staffId: requireField(params.staffId, "staffId"),
+        organizationId: requireField(params.organizationId, "organizationId"),
         supabaseClient: params.supabaseClient,
       };
       const r: ShippedEmployeeFaceSheet = await shipEmployeeFaceSheet(args);

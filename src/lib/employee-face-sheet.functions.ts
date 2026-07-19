@@ -16,6 +16,7 @@ import {
 
 const Input = z.object({
   staffId: z.string().uuid(),
+  organizationId: z.string().uuid(),
   ship: z.boolean().optional(),
 });
 
@@ -45,14 +46,22 @@ export const generateEmployeeFaceSheetFn = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<EmployeeFaceSheetFnOutput> => {
     const { supabase } = context;
     if (data.ship) {
-      const r = await shipEmployeeFaceSheet({ staffId: data.staffId, supabaseClient: supabase });
+      const r = await shipEmployeeFaceSheet({
+        staffId: data.staffId,
+        organizationId: data.organizationId,
+        supabaseClient: supabase,
+      });
       return {
         pdfBase64: bytesToBase64(r.bytes),
         filename: r.filename,
         shipped: { documentId: r.documentId, storagePath: r.storagePath },
       };
     }
-    const r = await generateEmployeeFaceSheet({ staffId: data.staffId, supabaseClient: supabase });
+    const r = await generateEmployeeFaceSheet({
+      staffId: data.staffId,
+      organizationId: data.organizationId,
+      supabaseClient: supabase,
+    });
     return {
       pdfBase64: bytesToBase64(r.bytes),
       filename: r.filename,

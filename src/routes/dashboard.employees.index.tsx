@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { createEmployeeManually, adminResetEmployeePassword } from "@/lib/employees.functions";
 import { listStaffPii, updateStaffPii, type StaffPii } from "@/lib/hr-staff.functions";
+import { createInvitation } from "@/lib/invitations.functions";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -91,6 +92,7 @@ export function EmployeesPage() {
   const resetPwFn = useServerFn(adminResetEmployeePassword);
   const fetchStaffPii = useServerFn(listStaffPii);
   const updatePiiFn = useServerFn(updateStaffPii);
+  const createInviteFn = useServerFn(createInvitation);
 
   const { data: tracks } = useQuery({
     enabled: !!org,
@@ -173,13 +175,23 @@ export function EmployeesPage() {
 
   const inviteMutation = useMutation({
     mutationFn: async (input: { email: string; role: Role }) => {
-      const { error } = await supabase.from("invitations").insert({
-        organization_id: org!.organization_id, email: input.email, role: input.role, invited_by: user!.id,
+      return await createInviteFn({
+        data: {
+          organization_id: org!.organization_id,
+          email: input.email,
+          role: input.role,
+          site_origin: window.location.origin,
+        },
       });
-      if (error) throw error;
     },
-    onSuccess: () => {
-      toast.success("Invitation created — share the join link from the pending list");
+    onSuccess: (res) => {
+      if (res.email_sent) {
+        toast.success(`Invitation emailed to ${res.invitation.email}`);
+      } else {
+        toast.warning(
+          `Invitation created, but the email couldn't be sent (${res.email_error ?? "unknown error"}). Share the join link from the pending list instead.`,
+        );
+      }
       qc.invalidateQueries({ queryKey: ["invites"] });
       setInviteOpen(false);
     },
@@ -370,13 +382,24 @@ export function EmployeesPage() {
       {!!invites?.length && (
         <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
           <h3 className="text-sm font-semibold">Pending invitations</h3>
+          <p className="text-xs text-muted-foreground">An email was sent to each address below. If it didn't arrive, copy the link and share it manually.</p>
           <ul className="mt-3 divide-y divide-border">
-            {invites.map((i) => (
-              <li key={i.id} className="flex items-center justify-between py-3 text-sm">
-                <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground" /> {i.email} <span className="text-xs text-muted-foreground">· {i.role}</span></div>
-                <code className="rounded bg-secondary px-2 py-0.5 text-xs">{`${typeof window !== "undefined" ? window.location.origin : ""}/signup?invite=${i.token}`}</code>
-              </li>
-            ))}
+            {invites.map((i) => {
+              const link = `${typeof window !== "undefined" ? window.location.origin : ""}/signup?invite=${i.token}`;
+              return (
+                <li key={i.id} className="flex items-center justify-between gap-3 py-3 text-sm">
+                  <div className="flex items-center gap-2 truncate"><Mail className="h-4 w-4 shrink-0 text-muted-foreground" /> <span className="truncate">{i.email}</span> <span className="shrink-0 text-xs text-muted-foreground">· {i.role}</span></div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { navigator.clipboard.writeText(link); toast.success("Invite link copied"); }}
+                  >
+                    <Copy className="mr-1 h-3.5 w-3.5" /> Copy link
+                  </Button>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

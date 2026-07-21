@@ -32,3 +32,6 @@ verify_jwt = true
 
 [functions.detect-doc-dates]
 verify_jwt = true
+
+[functions.auth-send-email]
+verify_jwt = false

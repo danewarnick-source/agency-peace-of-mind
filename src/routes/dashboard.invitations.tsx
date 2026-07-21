@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
-import { useAuth } from "@/hooks/use-auth";
 import { RequirePermission } from "@/components/rbac-guard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Mail, UserPlus, Copy, RefreshCcw, Ban, AlertTriangle } from "lucide-react";
+import { Mail, UserPlus, Copy, RefreshCcw, Ban, Send } from "lucide-react";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
+import { createInvitation, resendInvitation } from "@/lib/invitations.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/invitations")({
@@ -28,10 +29,11 @@ export const Route = createFileRoute("/dashboard/invitations")({
 type InviteRole = "admin" | "manager" | "employee";
 
 function InvitationsPage() {
-  const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const createInviteFn = useServerFn(createInvitation);
+  const resendInviteFn = useServerFn(resendInvitation);
 
   const { data: invites, isLoading } = useQuery({
     enabled: !!org,
@@ -56,16 +58,23 @@ function InvitationsPage() {
       );
       if (existing) throw new Error("A pending invitation already exists for this email");
 
-      const { error } = await supabase.from("invitations").insert({
-        organization_id: org!.organization_id,
-        email,
-        role: input.role,
-        invited_by: user!.id,
+      return await createInviteFn({
+        data: {
+          organization_id: org!.organization_id,
+          email,
+          role: input.role,
+          site_origin: window.location.origin,
+        },
       });
-      if (error) throw error;
     },
-    onSuccess: () => {
-      toast.success("Invitation created — share the link with your employee");
+    onSuccess: (res) => {
+      if (res.email_sent) {
+        toast.success(`Invitation emailed to ${res.invitation.email}`);
+      } else {
+        toast.warning(
+          `Invitation created, but the email couldn't be sent (${res.email_error ?? "unknown error"}). Share the link manually instead.`,
+        );
+      }
       qc.invalidateQueries({ queryKey: ["invitations"] });
       setOpen(false);
     },
@@ -74,15 +83,22 @@ function InvitationsPage() {
 
   const resendInvite = useMutation({
     mutationFn: async (id: string) => {
-      const expires = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-      const { error } = await supabase
-        .from("invitations")
-        .update({ expires_at: expires, status: "pending" })
-        .eq("id", id);
-      if (error) throw error;
+      return await resendInviteFn({
+        data: {
+          organization_id: org!.organization_id,
+          invitation_id: id,
+          site_origin: window.location.origin,
+        },
+      });
     },
-    onSuccess: () => {
-      toast.success("Invitation refreshed — expires in 14 days");
+    onSuccess: (res) => {
+      if (res.email_sent) {
+        toast.success(`Invitation re-emailed to ${res.invitation.email} — expires in 14 days`);
+      } else {
+        toast.warning(
+          `Invitation refreshed, but the email couldn't be sent (${res.email_error ?? "unknown error"}). Share the link manually instead.`,
+        );
+      }
       qc.invalidateQueries({ queryKey: ["invitations"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -166,11 +182,11 @@ function InvitationsPage() {
         </Dialog>
       </div>
 
-      <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
-        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+      <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+        <Send className="mt-0.5 h-4 w-4 shrink-0" />
         <div>
-          <strong>Email delivery:</strong> To automatically email invitations, set up a sender domain in Lovable Cloud → Emails.
-          Until then, copy the invite link below and send it manually — the link is signed, expires in 14 days, and is locked to the invitee's email.
+          <strong className="text-foreground">Email delivery:</strong> Invitations are emailed automatically when created or resent.
+          If a message doesn't arrive, copy the invite link below and send it manually — it's signed, expires in 14 days, and is locked to the invitee's email.
         </div>
       </div>
 
@@ -243,7 +259,7 @@ function InvitationsPage() {
                           variant="ghost" size="sm"
                           onClick={() => resendInvite.mutate(inv.id)}
                           disabled={resendInvite.isPending}
-                          title="Extend expiration"
+                          title="Resend invitation email"
                         >
                           <RefreshCcw className="h-3.5 w-3.5" />
                         </Button>

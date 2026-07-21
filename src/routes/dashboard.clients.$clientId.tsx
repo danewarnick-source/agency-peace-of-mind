@@ -28,7 +28,8 @@ import { previewClientUpdateFromDocument, applySelectedClientFields } from "@/li
 import { reclaimExternalCodesAsOurs } from "@/lib/client-billing-fix.functions";
 import { AddCodesControl } from "@/components/clients/add-codes-control";
 import { BillingCodesDetail } from "@/components/clients/billing-codes-detail";
-import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
 
 import { ClientBudgetPanel } from "@/components/clients/client-budget-panel";
 import { ClientMealPlannerMount } from "@/components/clients/client-meal-planner-mount";

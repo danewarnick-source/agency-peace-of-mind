@@ -2917,6 +2917,7 @@ export function PunchPad({
                       <Button
                         type="button"
                         size="sm"
+                        variant="outline"
                         onClick={() => {
                           setIncidentAnswer("yes");
                           setIncidentFlag(true);

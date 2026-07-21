@@ -6259,7 +6259,11 @@ export type Database = {
           followup_form_types: string[] | null
           geofence_variance_justification: string | null
           goals_completed: Json
+          gps_in_bypass_reason: string | null
+          gps_in_bypassed: boolean
           gps_in_coordinates: Json
+          gps_out_bypass_reason: string | null
+          gps_out_bypassed: boolean
           gps_out_coordinates: Json | null
           gps_validated: boolean
           id: string
@@ -6269,6 +6273,10 @@ export type Database = {
           is_edited_by_admin: boolean
           is_out_of_bounds: boolean
           late_submission_reason: string | null
+          manager_note_at: string | null
+          manager_note_by: string | null
+          manager_note_by_name: string | null
+          manager_note_text: string | null
           matched_approved_location_id: string | null
           matched_approved_location_label: string | null
           nectar_drafted: boolean
@@ -6335,7 +6343,11 @@ export type Database = {
           followup_form_types?: string[] | null
           geofence_variance_justification?: string | null
           goals_completed?: Json
+          gps_in_bypass_reason?: string | null
+          gps_in_bypassed?: boolean
           gps_in_coordinates: Json
+          gps_out_bypass_reason?: string | null
+          gps_out_bypassed?: boolean
           gps_out_coordinates?: Json | null
           gps_validated?: boolean
           id?: string
@@ -6345,6 +6357,10 @@ export type Database = {
           is_edited_by_admin?: boolean
           is_out_of_bounds?: boolean
           late_submission_reason?: string | null
+          manager_note_at?: string | null
+          manager_note_by?: string | null
+          manager_note_by_name?: string | null
+          manager_note_text?: string | null
           matched_approved_location_id?: string | null
           matched_approved_location_label?: string | null
           nectar_drafted?: boolean
@@ -6411,7 +6427,11 @@ export type Database = {
           followup_form_types?: string[] | null
           geofence_variance_justification?: string | null
           goals_completed?: Json
+          gps_in_bypass_reason?: string | null
+          gps_in_bypassed?: boolean
           gps_in_coordinates?: Json
+          gps_out_bypass_reason?: string | null
+          gps_out_bypassed?: boolean
           gps_out_coordinates?: Json | null
           gps_validated?: boolean
           id?: string
@@ -6421,6 +6441,10 @@ export type Database = {
           is_edited_by_admin?: boolean
           is_out_of_bounds?: boolean
           late_submission_reason?: string | null
+          manager_note_at?: string | null
+          manager_note_by?: string | null
+          manager_note_by_name?: string | null
+          manager_note_text?: string | null
           matched_approved_location_id?: string | null
           matched_approved_location_label?: string | null
           nectar_drafted?: boolean

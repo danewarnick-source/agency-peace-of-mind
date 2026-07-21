@@ -101,8 +101,13 @@ type Derived = Row & {
   awaiting_staff_confirmation: boolean;
 };
 
-const SELECT_COLS =
-  "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, corrected_clock_in, corrected_clock_out, rounded_clock_in, rounded_clock_out, is_edited_by_admin, is_out_of_bounds, outside_geofence_reason, gps_in_bypassed, gps_in_bypass_reason, gps_out_bypassed, gps_out_bypass_reason, shift_note_text, goals_completed, review_status, status, incident_flag, denial_reason, utah_medicaid_member_id, import_source, shift_entry_type, edited_by_admin_name, edited_at, edit_audit_history_log, manager_note_text, manager_note_by_name, manager_note_at, clients:client_id(first_name, last_name, team_id)";
+const BASE_SELECT_COLS =
+  "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, corrected_clock_in, corrected_clock_out, rounded_clock_in, rounded_clock_out, is_edited_by_admin, is_out_of_bounds, outside_geofence_reason, gps_in_bypassed, gps_in_bypass_reason, gps_out_bypassed, gps_out_bypass_reason, shift_note_text, goals_completed, review_status, status, incident_flag, denial_reason, utah_medicaid_member_id, import_source, shift_entry_type, edited_by_admin_name, edited_at, edit_audit_history_log, clients:client_id(first_name, last_name, team_id)";
+// manager_note_* columns ship in docs/SQL_HANDOFF.md #10 — until that's run
+// against the live DB, selecting them 42703s the whole query. Try the full
+// select first; if it fails on an undefined column, fall back to the base
+// set so the records list keeps working while the migration is pending.
+const SELECT_COLS = `${BASE_SELECT_COLS.replace(", clients:", ", manager_note_text, manager_note_by_name, manager_note_at, clients:")}`;
 
 function fmtTs(iso: string | null): string {
   if (!iso) return "—";
@@ -284,20 +289,27 @@ export function RecordsTab() {
       const fromIso = new Date(`${from}T00:00:00`).toISOString();
       const toIso = new Date(`${to}T23:59:59.999`).toISOString();
 
-      let q = supabase
-        .from("evv_timesheets")
-        .select(SELECT_COLS)
-        .eq("organization_id", orgId!)
-        .gte("clock_in_timestamp", fromIso)
-        .lte("clock_in_timestamp", toIso)
-        .order("clock_in_timestamp", { ascending: false })
-        .limit(FETCH_CAP);
+      const buildQuery = (cols: string) => {
+        let qb = supabase
+          .from("evv_timesheets")
+          .select(cols)
+          .eq("organization_id", orgId!)
+          .gte("clock_in_timestamp", fromIso)
+          .lte("clock_in_timestamp", toIso)
+          .order("clock_in_timestamp", { ascending: false })
+          .limit(FETCH_CAP);
+        if (staff.length) qb = qb.in("staff_id", staff);
+        if (codeFilter.length) qb = qb.in("service_type_code", codeFilter);
+        if (clientIds.length) qb = qb.in("client_id", clientIds);
+        return qb;
+      };
 
-      if (staff.length) q = q.in("staff_id", staff);
-      if (codeFilter.length) q = q.in("service_type_code", codeFilter);
-      if (clientIds.length) q = q.in("client_id", clientIds);
-
-      const { data, error } = await q;
+      let { data, error } = await buildQuery(SELECT_COLS);
+      if (error && (error.code === "42703" || /column .* does not exist/i.test(error.message))) {
+        // manager_note_* columns not live yet (SQL_HANDOFF #10 not run) —
+        // fall back so the list still loads; those fields just render empty.
+        ({ data, error } = await buildQuery(BASE_SELECT_COLS));
+      }
       if (error) throw error;
       const baseRows = (data as unknown as Row[]) ?? [];
 

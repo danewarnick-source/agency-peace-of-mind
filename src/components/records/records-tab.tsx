@@ -32,6 +32,7 @@ import { ResidentialDailyTab } from "@/components/residential/residential-daily-
 import { TimeCorrectionReviewSection } from "@/components/records/time-correction-review-section";
 import { RecordDetailSheet } from "@/components/records/record-detail-sheet";
 import { ManualTimesheetDialog } from "@/components/records/manual-timesheet-dialog";
+import { RecordsExportDialog, type ExportRow } from "@/components/records/records-export-dialog";
 
 import { UtahExportDialog } from "@/components/evv/utah-export-dialog";
 import { toast } from "sonner";
@@ -164,6 +165,7 @@ export function RecordsTab() {
   const [from, setFrom] = useState<string>(defaultFrom());
   const [to, setTo] = useState<string>(defaultTo());
   const [utahDialogOpen, setUtahDialogOpen] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState<any | null>(null);
   const [selectedRow, setSelectedRow] = useState<Derived | null>(null);
@@ -427,59 +429,45 @@ export function RecordsTab() {
   const allEvvLocked = rows.length > 0 && rows.every((r) => r.is_evv_locked);
   const canDhhsExport = allEvvLocked;
 
-  const handleMasterCsv = () => {
-    if (visibleSet.length === 0) {
-      toast.info("Nothing to export — adjust filters first.");
-      return;
-    }
-    const header = [
-      "Caregiver", "Client", "Member ID", "Service code", "Date",
-      "Clock in", "Clock out", "Duration (min)", "Edited by admin",
-      "Geofence", "Exceptions", "Home/Team",
-    ];
-    const esc = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
-    const body = [header.join(",")].concat(
-      visibleSet.map((r) => [
-        r.staff_name, r.client_name, r.utah_medicaid_member_id ?? "",
-        r.service_type_code, fmtDate(r.clock_in_timestamp),
-        fmtTs(r.corrected_clock_in ?? r.clock_in_timestamp),
-        fmtTs(r.corrected_clock_out ?? r.clock_out_timestamp),
-        String(r.duration_min),
-        r.is_edited_by_admin ? "yes" : "no",
-        r.is_out_of_bounds ? "out-of-bounds" : "in-bounds",
-        r.exceptions.map((e) => e.label).join("; "),
-        r.team_name ?? "",
-      ].map((v) => esc(String(v))).join(",")),
-    ).join("\r\n");
-    downloadCsv(`agency-records_${from}_${to}.csv`, body);
-  };
-
-  const handleHoursExport = (option: "total" | "billable" | "non_billable") => {
-    const esc = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
-    const header = ["Caregiver", "Type", "Category/Code", "Date", "Clock in", "Clock out", "Hours"];
-    const billableRows = visibleSet.map((r) => [
-      r.staff_name, "Billable", r.service_type_code,
-      fmtDate(r.clock_in_timestamp),
-      fmtTs(r.corrected_clock_in ?? r.clock_in_timestamp),
-      fmtTs(r.corrected_clock_out ?? r.clock_out_timestamp),
-      (r.duration_min / 60).toFixed(2),
-    ]);
-    const nonBillableRows = (generalQ.data ?? []).map((g) => [
-      g.staff_name, "Non-billable", g.category,
-      fmtDate(g.clock_in_timestamp),
-      fmtTs(g.clock_in_timestamp),
-      fmtTs(g.clock_out_timestamp),
-      (g.duration_min / 60).toFixed(2),
-    ]);
-    const dataRows = option === "billable" ? billableRows
-      : option === "non_billable" ? nonBillableRows
-      : [...billableRows, ...nonBillableRows];
-    if (dataRows.length === 0) { toast.info("Nothing to export — adjust filters first."); return; }
-    const body = [header.join(",")].concat(
-      dataRows.map((row) => row.map((v) => esc(String(v))).join(","))
-    ).join("\r\n");
-    downloadCsv(`hours-${option}_${from}_${to}.csv`, body);
-  };
+  // Unified export row set — respects whatever filters are already active
+  // (visibleSet / generalQ.data are both filter-derived above). Billable
+  // rows are included whenever the client-records query is in play; non-
+  // billable rows whenever the non-billable query is in play (type === "all"
+  // or "non_billable") — same scoping the old two buttons used.
+  const exportRows: ExportRow[] = [
+    ...visibleSet.map((r): ExportRow => ({
+      recordType: "Billable",
+      staffName: r.staff_name,
+      clientName: r.client_name,
+      memberId: r.utah_medicaid_member_id ?? "",
+      serviceCode: r.service_type_code,
+      date: fmtDate(r.clock_in_timestamp),
+      clockIn: fmtTs(r.corrected_clock_in ?? r.clock_in_timestamp),
+      clockOut: fmtTs(r.corrected_clock_out ?? r.clock_out_timestamp),
+      durationMin: r.duration_min,
+      editedByAdmin: r.is_edited_by_admin,
+      editedByAdminName: r.edited_by_admin_name ?? "",
+      geofence: r.is_out_of_bounds ? "out-of-bounds" : "in-bounds",
+      exceptions: r.exceptions.map((e) => e.label).join("; "),
+      teamName: r.team_name ?? "",
+    })),
+    ...(type === "non_billable" || type === "all" ? (generalQ.data ?? []) : []).map((g): ExportRow => ({
+      recordType: "Non-billable",
+      staffName: g.staff_name,
+      clientName: "",
+      memberId: "",
+      serviceCode: g.category,
+      date: fmtDate(g.clock_in_timestamp),
+      clockIn: fmtTs(g.clock_in_timestamp),
+      clockOut: fmtTs(g.clock_out_timestamp),
+      durationMin: g.duration_min,
+      editedByAdmin: false,
+      editedByAdminName: "",
+      geofence: "n/a",
+      exceptions: "",
+      teamName: "",
+    })),
+  ];
 
   const reDownloadBatch = async (batch: any) => {
     const { data: recs, error: e1 } = await supabase
@@ -783,48 +771,15 @@ export function RecordsTab() {
                   <ShieldAlert className="h-4 w-4" /> Export Utah DHHS EVV CSV
                 </Button>
               )}
-              {type !== "non_billable" && (
-                <Button
-                  type="button" size="sm" variant="outline"
-                  onClick={handleMasterCsv}
-                  disabled={rowsQ.isLoading || total === 0}
-                  title={total === 0 ? "No records in the current view to export" : undefined}
-                  className="gap-2"
-                >
-                  <Download className="h-4 w-4" /> Export Master Agency Ledger CSV
-                </Button>
-              )}
-              {/* Export hours — separate from the DHHS export, payroll-shaped CSV */}
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button type="button" size="sm" variant="outline" className="gap-2">
-                    <Download className="h-4 w-4" /> Export hours
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="end" className="w-[200px] p-1">
-                  <button
-                    type="button"
-                    onClick={() => handleHoursExport("total")}
-                    className="w-full rounded px-3 py-2 text-left text-sm hover:bg-accent"
-                  >
-                    Total (billable + non-billable)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleHoursExport("billable")}
-                    className="w-full rounded px-3 py-2 text-left text-sm hover:bg-accent"
-                  >
-                    Billable only
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleHoursExport("non_billable")}
-                    className="w-full rounded px-3 py-2 text-left text-sm hover:bg-accent"
-                  >
-                    Non-billable only
-                  </button>
-                </PopoverContent>
-              </Popover>
+              <Button
+                type="button" size="sm" variant="outline"
+                onClick={() => setExportDialogOpen(true)}
+                disabled={rowsQ.isLoading || generalQ.isLoading || exportRows.length === 0}
+                title={exportRows.length === 0 ? "No records in the current view to export" : undefined}
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" /> Export
+              </Button>
             </div>
           </div>
 
@@ -1004,6 +959,14 @@ export function RecordsTab() {
         row={selectedRow}
         organizationId={orgId}
         onClose={() => setSelectedRow(null)}
+      />
+
+      <RecordsExportDialog
+        open={exportDialogOpen}
+        onClose={() => setExportDialogOpen(false)}
+        rows={exportRows}
+        from={from}
+        to={to}
       />
 
       {utahDialogOpen && canDhhsExport && orgId && (

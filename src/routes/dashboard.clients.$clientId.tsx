@@ -1262,19 +1262,6 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
 
 function BillingCodesPanel({ clientId }: { clientId: string }) {
   const qc = useQueryClient();
-  const q = useQuery({
-    queryKey: ["client-profile-codes", clientId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("client_billing_codes")
-        .select("id, service_code, annual_unit_authorization, weekly_cap_units, monthly_max_units, unit_type, rate_per_unit, service_start_date, service_end_date")
-        .eq("client_id", clientId)
-        .order("service_start_date", { ascending: false });
-      if (error) throw error;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (data ?? []) as any[];
-    },
-  });
 
   // Safety net: surface external-service rows whose codes should probably be
   // ours (e.g. Smart Import misclassified the provider name). One-click
@@ -1308,257 +1295,57 @@ function BillingCodesPanel({ clientId }: { clientId: string }) {
       qc.invalidateQueries({ queryKey: ["client-reclaimable-codes", clientId] });
       qc.invalidateQueries({ queryKey: ["client-profile-codes", clientId] });
       qc.invalidateQueries({ queryKey: ["client-profile"] });
-      q.refetch();
+      qc.invalidateQueries({ queryKey: ["all-client-billing-codes"] });
+      qc.invalidateQueries({ queryKey: ["client-billing-codes"] });
+      qc.invalidateQueries({ queryKey: ["client-budget"] });
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to reclaim"),
   });
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle className="text-base">Authorized codes (1056)</CardTitle>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Staff can only see a code here once they're assigned to work it. Assign or swap staff per code below.
-          </p>
+    <div className="space-y-3">
+      {reclaimableCodes && reclaimableCodes.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-50/60 px-4 py-2.5 text-xs text-amber-900 dark:bg-amber-950/20 dark:text-amber-200">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+          <span className="min-w-0">
+            {reclaimableCodes.length} code{reclaimableCodes.length === 1 ? "" : "s"} from this client's PCSP {reclaimableCodes.length === 1 ? "isn't" : "aren't"} authorized here:{" "}
+            <span className="font-medium">{reclaimableCodes.join(", ")}</span>. Smart Import may have filed {reclaimableCodes.length === 1 ? "it" : "them"} as another provider's.
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            className="h-7 ml-auto"
+            disabled={reclaimMut.isPending}
+            onClick={() => reclaimMut.mutate(reclaimableCodes)}
+          >
+            {reclaimMut.isPending ? "Reclaiming…" : "Reclaim as ours"}
+          </Button>
         </div>
-        <Button asChild variant="outline" size="sm">
-          <Link to="/dashboard/billing/$clientId" params={{ clientId }}>Open billing detail</Link>
-        </Button>
-      </CardHeader>
-      <CardContent className="p-0">
-        {reclaimableCodes && reclaimableCodes.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-border bg-amber-50/60 px-4 py-2.5 text-xs text-amber-900 dark:bg-amber-950/20 dark:text-amber-200">
-            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-            <span className="min-w-0">
-              {reclaimableCodes.length} code{reclaimableCodes.length === 1 ? "" : "s"} from this client's PCSP {reclaimableCodes.length === 1 ? "isn't" : "aren't"} authorized here:{" "}
-              <span className="font-medium">{reclaimableCodes.join(", ")}</span>. Smart Import may have filed {reclaimableCodes.length === 1 ? "it" : "them"} as another provider's.
-            </span>
-            <Button
-              type="button"
-              size="sm"
-              className="h-7 ml-auto"
-              disabled={reclaimMut.isPending}
-              onClick={() => reclaimMut.mutate(reclaimableCodes)}
-            >
-              {reclaimMut.isPending ? "Reclaiming…" : "Reclaim as ours"}
-            </Button>
-          </div>
-        )}
-        <EditableBillingCodesTable
-          clientId={clientId}
-          loading={q.isLoading}
-          rows={q.data ?? []}
-          onSaved={() => {
-            q.refetch();
-            qc.invalidateQueries({ queryKey: ["client-billing-codes"] });
-            qc.invalidateQueries({ queryKey: ["all-client-billing-codes"] });
-            qc.invalidateQueries({ queryKey: ["client-budget"] });
-          }}
-        />
-        <div className="border-t border-border p-4">
-          <p className="mb-2 text-xs font-medium text-muted-foreground">Add a new authorized code</p>
+      )}
+      <BillingCodesDetail clientId={clientId} />
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Add a new authorized code</CardTitle>
+        </CardHeader>
+        <CardContent>
           <AddCodesControl
             clientId={clientId}
             compact
             onAdded={() => {
-              q.refetch();
               qc.invalidateQueries({ queryKey: ["client-reclaimable-codes", clientId] });
+              qc.invalidateQueries({ queryKey: ["client-profile-codes", clientId] });
               qc.invalidateQueries({ queryKey: ["client-profile"] });
+              qc.invalidateQueries({ queryKey: ["all-client-billing-codes"] });
+              qc.invalidateQueries({ queryKey: ["client-billing-codes"] });
+              qc.invalidateQueries({ queryKey: ["client-budget"] });
             }}
           />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// Row shape returned by BillingCodesPanel's "client-profile-codes" query.
-type BillingCodeTableRow = {
-  id: string;
-  service_code: string;
-  annual_unit_authorization: number | null;
-  unit_type: string | null;
-  rate_per_unit: number | null;
-  service_start_date: string | null;
-  service_end_date: string | null;
-};
-
-function EditableBillingCodesTable({
-  clientId, rows, loading, onSaved,
-}: { clientId: string; rows: BillingCodeTableRow[]; loading?: boolean; onSaved: () => void }) {
-  if (loading) {
-    return <div className="py-10 text-center text-sm text-muted-foreground">Loading…</div>;
-  }
-  if (!rows.length) {
-    return <div className="py-10 text-center text-sm text-muted-foreground">No billing codes authorized.</div>;
-  }
-  return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Code</TableHead>
-            <TableHead>Unit</TableHead>
-            <TableHead>Annual auth</TableHead>
-            <TableHead>Rate</TableHead>
-            <TableHead>Effective</TableHead>
-            <TableHead>Assigned staff</TableHead>
-            <TableHead></TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((r) => (
-            <EditableBillingCodeRow key={r.id} clientId={clientId} row={r} onSaved={onSaved} />
-          ))}
-        </TableBody>
-      </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-function EditableBillingCodeRow({
-  clientId, row, onSaved,
-}: { clientId: string; row: BillingCodeTableRow; onSaved: () => void }) {
-  const { data: org } = useCurrentOrg();
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [draft, setDraft] = useState({
-    unit_type: row.unit_type ?? "Q",
-    annual_unit_authorization: String(row.annual_unit_authorization ?? 0),
-    rate_per_unit: String(row.rate_per_unit ?? 0),
-    service_start_date: row.service_start_date ?? "",
-    service_end_date: row.service_end_date ?? "",
-  });
-
-  function startEdit() {
-    setDraft({
-      unit_type: row.unit_type ?? "Q",
-      annual_unit_authorization: String(row.annual_unit_authorization ?? 0),
-      rate_per_unit: String(row.rate_per_unit ?? 0),
-      service_start_date: row.service_start_date ?? "",
-      service_end_date: row.service_end_date ?? "",
-    });
-    setEditing(true);
-  }
-
-  async function save() {
-    if (!org?.organization_id) return;
-    const annual = Number(draft.annual_unit_authorization);
-    const rate = Number(draft.rate_per_unit);
-    if (!isFinite(annual) || annual < 0) return toast.error("Annual auth must be a non-negative number");
-    if (!isFinite(rate) || rate < 0) return toast.error("Rate must be a non-negative number");
-    if (
-      draft.service_start_date &&
-      draft.service_end_date &&
-      new Date(draft.service_end_date) <= new Date(draft.service_start_date)
-    ) {
-      return toast.error("Effective end date must be after the start date");
-    }
-    setSaving(true);
-    const { error } = await supabase
-      .from("client_billing_codes")
-      .update({
-        unit_type: draft.unit_type,
-        annual_unit_authorization: annual,
-        rate_per_unit: rate,
-        service_start_date: draft.service_start_date || null,
-        service_end_date: draft.service_end_date || null,
-      })
-      .eq("id", row.id)
-      .eq("organization_id", org.organization_id);
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success(`${row.service_code} updated`);
-    setEditing(false);
-    onSaved();
-  }
-
-  return (
-    <TableRow>
-      <TableCell><code className="font-mono">{row.service_code}</code></TableCell>
-      <TableCell>
-        {editing ? (
-          <select
-            value={draft.unit_type}
-            onChange={(e) => setDraft((d) => ({ ...d, unit_type: e.target.value }))}
-            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-          >
-            {UNIT_TYPE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.letter} — {o.label}</option>
-            ))}
-          </select>
-        ) : (
-          <span className="font-mono text-xs font-semibold" title={row.unit_type ?? undefined}>
-            {unitTypeLetter(row.unit_type, row.service_code)}
-          </span>
-        )}
-      </TableCell>
-      <TableCell>
-        {editing ? (
-          <Input
-            type="number" min={0} value={draft.annual_unit_authorization}
-            onChange={(e) => setDraft((d) => ({ ...d, annual_unit_authorization: e.target.value }))}
-            className="h-8 w-24 font-mono text-xs"
-          />
-        ) : (
-          row.annual_unit_authorization ?? "—"
-        )}
-      </TableCell>
-      <TableCell>
-        {editing ? (
-          <Input
-            type="number" min={0} step="0.01" value={draft.rate_per_unit}
-            onChange={(e) => setDraft((d) => ({ ...d, rate_per_unit: e.target.value }))}
-            className="h-8 w-24 font-mono text-xs"
-          />
-        ) : row.rate_per_unit != null ? (
-          `$${Number(row.rate_per_unit).toFixed(2)}`
-        ) : (
-          "—"
-        )}
-      </TableCell>
-      <TableCell>
-        {editing ? (
-          <div className="flex items-center gap-1">
-            <Input
-              type="date" value={draft.service_start_date}
-              onChange={(e) => setDraft((d) => ({ ...d, service_start_date: e.target.value }))}
-              className="h-8 w-36 text-xs"
-            />
-            <span className="text-muted-foreground">→</span>
-            <Input
-              type="date" value={draft.service_end_date}
-              onChange={(e) => setDraft((d) => ({ ...d, service_end_date: e.target.value }))}
-              className="h-8 w-36 text-xs"
-            />
-          </div>
-        ) : (
-          `${row.service_start_date ?? "—"} → ${row.service_end_date ?? "open"}`
-        )}
-      </TableCell>
-      <TableCell>
-        <CodeAssignedStaff clientId={clientId} code={row.service_code} />
-      </TableCell>
-      <TableCell>
-        {editing ? (
-          <div className="flex items-center gap-1">
-            <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={saving} className="h-7 gap-1 text-xs">
-              <X className="h-3.5 w-3.5" /> Cancel
-            </Button>
-            <Button size="sm" onClick={save} disabled={saving} className="h-7 gap-1 text-xs">
-              <CheckCircle2 className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Save"}
-            </Button>
-          </div>
-        ) : (
-          <Button size="sm" variant="ghost" onClick={startEdit} className="h-7 gap-1 text-xs">
-            <Pencil className="h-3.5 w-3.5" /> Edit
-          </Button>
-        )}
-      </TableCell>
-    </TableRow>
-  );
-}
 
 function ShiftsPanel({ clientId, orgId }: { clientId: string; orgId?: string }) {
   const q = useQuery({

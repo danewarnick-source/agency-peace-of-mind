@@ -19,11 +19,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import {
   Pencil,
-  Check,
   X,
   ExternalLink,
   IdCard,
@@ -33,6 +42,8 @@ import {
   Upload,
   Sparkles,
   FileText,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import { isDailyServiceCode } from "@/lib/service-billing";
 import { isVariableRateCode } from "@/lib/variable-rate-codes";
@@ -43,6 +54,15 @@ import {
 } from "@/lib/billing-budget-parse.functions";
 import { getAuthStatus, AuthStatusBadge } from "@/lib/billing-auth-status";
 import { ChevronDown, ChevronRight } from "lucide-react";
+
+type Draft = { annual: string; rate: string; endDate: string };
+function draftFromCode(c: { annual_unit_authorization: number | null; rate_per_unit: number | null; service_end_date: string | null }): Draft {
+  return {
+    annual: String(c.annual_unit_authorization ?? 0),
+    rate: String(c.rate_per_unit ?? 0),
+    endDate: c.service_end_date ?? "",
+  };
+}
 
 type Props = {
   clientId: string;

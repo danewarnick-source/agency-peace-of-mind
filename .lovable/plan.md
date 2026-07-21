@@ -1,14 +1,15 @@
-# Fix incident Yes/No default-state color
-
-## Cause
-The two incident buttons in `src/components/evv/punch-pad.tsx` (lines ~2903 and ~2916) use the shadcn `<Button>` component with no `variant` prop, so they inherit the default `variant="default"` styling (solid primary fill). The `unselectedPill` class (`bg-background`) is appended via `className`, but the default variant's background utilities win due to `cn` merge order, so both buttons render solid orange until one is picked.
-
-The Yes/No pair in `behavior-observations-block.tsx` doesn't have this problem because it uses plain `<button>` elements.
-
 ## Change
-In `src/components/evv/punch-pad.tsx`, add `variant="outline"` to both incident buttons. That drops the primary fill so `unselectedPill` (white/background with border) shows correctly, and `selectedPill` (solid orange) still applies when picked.
 
-Scope: presentation only, two prop additions, no logic changes.
+Remove the explanatory span message **"DHHS EVV export hidden (mixed/non-EVV codes in result)"** that appears in the Documentation Records page (`src/components/records/records-tab.tsx`) when the current filtered results contain mixed EVV/non-EVV codes. The button will simply show/not show the Utah DHHS EVV export option without the extra explanation text.
 
-## Files
-- `src/components/evv/punch-pad.tsx` — add `variant="outline"` to the No and Yes `<Button>` elements in the incident question block.
+## Export button differences
+
+- **Export Master Agency Ledger CSV** — one row per visible shift/case. Columns: Caregiver, Client, Member ID, Service code, Date, Clock in/out, Duration (min), Edited by admin, Geofence status, Exceptions, Home/Team. This is the agency's internal audit ledger.
+- **Export Hours** — a payroll-shaped CSV focused on caregiver hours. Opens a popover with three options:
+  - Total (billable + non-billable)
+  - Billable only
+  - Non-billable only
+  Columns: Caregiver, Type (Billable/Non-billable), Category/Code, Date, Clock in/out, Hours.
+
+## File to change
+- `src/components/records/records-tab.tsx`

@@ -34,6 +34,25 @@ export function fromLocalInput(v: string): string | null {
   return Number.isFinite(d.getTime()) ? d.toISOString() : null;
 }
 
+// clock_in_timestamp/clock_out_timestamp round-trip through a minute-precision
+// <input type="datetime-local"> in the inline editor, so the original value
+// (which usually carries real seconds/ms) never equals the round-tripped
+// value even when the user didn't touch it. Compare these fields at minute
+// precision so an unedited round-trip isn't reported as a change.
+const MINUTE_PRECISION_FIELDS = new Set(["clock_in_timestamp", "clock_out_timestamp"]);
+
+function toComparableValue(field: string, v: unknown): string {
+  if (v == null || v === "") return "";
+  if (MINUTE_PRECISION_FIELDS.has(field)) {
+    const d = new Date(String(v));
+    if (Number.isFinite(d.getTime())) {
+      d.setSeconds(0, 0);
+      return d.toISOString();
+    }
+  }
+  return String(v);
+}
+
 export function diffVal(field: string, v: unknown): string {
   if (v == null || v === "") return "(empty)";
   if (field.includes("clock_")) return new Date(String(v)).toLocaleString();
@@ -58,8 +77,8 @@ export async function saveRecordFields(params: {
   const audit: AuditEntry[] = [];
   for (const [field, newV] of Object.entries(updates)) {
     const oldV = row[field];
-    const a = oldV == null ? "" : String(oldV);
-    const b = newV == null ? "" : String(newV);
+    const a = toComparableValue(field, oldV);
+    const b = toComparableValue(field, newV);
     if (a !== b) {
       audit.push({
         timestamp: nowIso,

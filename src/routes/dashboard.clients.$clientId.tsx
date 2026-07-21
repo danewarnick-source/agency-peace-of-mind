@@ -27,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { previewClientUpdateFromDocument, applySelectedClientFields } from "@/lib/import-checklist.functions";
 import { reclaimExternalCodesAsOurs } from "@/lib/client-billing-fix.functions";
 import { AddCodesControl } from "@/components/clients/add-codes-control";
+import { UNIT_TYPE_OPTIONS, unitTypeLetter } from "@/lib/service-billing";
 
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -45,7 +46,7 @@ import { FieldVisibilityToggle } from "@/components/clients/visibility-toggles";
 import { CodeAssignedStaff } from "@/components/clients/code-assigned-staff";
 import { CustomFieldsForSection } from "@/components/clients/custom-fields-panel";
 import { TargetBehaviorsPanel } from "@/components/clients/target-behaviors-panel";
-import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, Pill, RefreshCw, Sparkles, Trash2, Upload, UserCircle2, Target, ShieldCheck, GraduationCap, HeartHandshake, Users, UtensilsCrossed, ListChecks, UserCircle, FileUp, Clock, FileText, AlertOctagon, ClipboardList, Home as HomeIcon, CalendarClock, Wallet, FolderOpen } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, Pill, RefreshCw, Sparkles, Trash2, Upload, UserCircle2, Target, ShieldCheck, GraduationCap, HeartHandshake, Users, UtensilsCrossed, ListChecks, UserCircle, FileUp, Clock, FileText, AlertOctagon, ClipboardList, Home as HomeIcon, CalendarClock, Wallet, FolderOpen, X } from "lucide-react";
 import { clientFeatureVisible, useClientFeature } from "@/lib/client-features";
 import { MarEmarTab } from "@/components/workspace/mar-emar-tab";
 import {
@@ -1344,21 +1345,16 @@ function BillingCodesPanel({ clientId }: { clientId: string }) {
             </Button>
           </div>
         )}
-        <ReadOnlyTable
+        <EditableBillingCodesTable
+          clientId={clientId}
           loading={q.isLoading}
-          empty="No billing codes authorized."
           rows={q.data ?? []}
-          columns={[
-            { header: "Code", cell: (r) => <code className="font-mono">{r.service_code}</code> },
-            { header: "Unit", cell: (r) => r.unit_type ?? "—" },
-            { header: "Annual auth", cell: (r) => r.annual_unit_authorization ?? "—" },
-            { header: "Rate", cell: (r) => (r.rate_per_unit != null ? `$${Number(r.rate_per_unit).toFixed(2)}` : "—") },
-            { header: "Effective", cell: (r) => `${r.service_start_date ?? "—"} → ${r.service_end_date ?? "open"}` },
-            {
-              header: "Assigned staff",
-              cell: (r) => <CodeAssignedStaff clientId={clientId} code={r.service_code} />,
-            },
-          ]}
+          onSaved={() => {
+            q.refetch();
+            qc.invalidateQueries({ queryKey: ["client-billing-codes"] });
+            qc.invalidateQueries({ queryKey: ["all-client-billing-codes"] });
+            qc.invalidateQueries({ queryKey: ["client-budget"] });
+          }}
         />
         <div className="border-t border-border p-4">
           <p className="mb-2 text-xs font-medium text-muted-foreground">Add a new authorized code</p>
@@ -1374,6 +1370,193 @@ function BillingCodesPanel({ clientId }: { clientId: string }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// Row shape returned by BillingCodesPanel's "client-profile-codes" query.
+type BillingCodeTableRow = {
+  id: string;
+  service_code: string;
+  annual_unit_authorization: number | null;
+  unit_type: string | null;
+  rate_per_unit: number | null;
+  service_start_date: string | null;
+  service_end_date: string | null;
+};
+
+function EditableBillingCodesTable({
+  clientId, rows, loading, onSaved,
+}: { clientId: string; rows: BillingCodeTableRow[]; loading?: boolean; onSaved: () => void }) {
+  if (loading) {
+    return <div className="py-10 text-center text-sm text-muted-foreground">Loading…</div>;
+  }
+  if (!rows.length) {
+    return <div className="py-10 text-center text-sm text-muted-foreground">No billing codes authorized.</div>;
+  }
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Code</TableHead>
+            <TableHead>Unit</TableHead>
+            <TableHead>Annual auth</TableHead>
+            <TableHead>Rate</TableHead>
+            <TableHead>Effective</TableHead>
+            <TableHead>Assigned staff</TableHead>
+            <TableHead></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((r) => (
+            <EditableBillingCodeRow key={r.id} clientId={clientId} row={r} onSaved={onSaved} />
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+function EditableBillingCodeRow({
+  clientId, row, onSaved,
+}: { clientId: string; row: BillingCodeTableRow; onSaved: () => void }) {
+  const { data: org } = useCurrentOrg();
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState({
+    unit_type: row.unit_type ?? "Q",
+    annual_unit_authorization: String(row.annual_unit_authorization ?? 0),
+    rate_per_unit: String(row.rate_per_unit ?? 0),
+    service_start_date: row.service_start_date ?? "",
+    service_end_date: row.service_end_date ?? "",
+  });
+
+  function startEdit() {
+    setDraft({
+      unit_type: row.unit_type ?? "Q",
+      annual_unit_authorization: String(row.annual_unit_authorization ?? 0),
+      rate_per_unit: String(row.rate_per_unit ?? 0),
+      service_start_date: row.service_start_date ?? "",
+      service_end_date: row.service_end_date ?? "",
+    });
+    setEditing(true);
+  }
+
+  async function save() {
+    if (!org?.organization_id) return;
+    const annual = Number(draft.annual_unit_authorization);
+    const rate = Number(draft.rate_per_unit);
+    if (!isFinite(annual) || annual < 0) return toast.error("Annual auth must be a non-negative number");
+    if (!isFinite(rate) || rate < 0) return toast.error("Rate must be a non-negative number");
+    if (
+      draft.service_start_date &&
+      draft.service_end_date &&
+      new Date(draft.service_end_date) <= new Date(draft.service_start_date)
+    ) {
+      return toast.error("Effective end date must be after the start date");
+    }
+    setSaving(true);
+    const { error } = await supabase
+      .from("client_billing_codes")
+      .update({
+        unit_type: draft.unit_type,
+        annual_unit_authorization: annual,
+        rate_per_unit: rate,
+        service_start_date: draft.service_start_date || null,
+        service_end_date: draft.service_end_date || null,
+      })
+      .eq("id", row.id)
+      .eq("organization_id", org.organization_id);
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success(`${row.service_code} updated`);
+    setEditing(false);
+    onSaved();
+  }
+
+  return (
+    <TableRow>
+      <TableCell><code className="font-mono">{row.service_code}</code></TableCell>
+      <TableCell>
+        {editing ? (
+          <select
+            value={draft.unit_type}
+            onChange={(e) => setDraft((d) => ({ ...d, unit_type: e.target.value }))}
+            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+          >
+            {UNIT_TYPE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.letter} — {o.label}</option>
+            ))}
+          </select>
+        ) : (
+          <span className="font-mono text-xs font-semibold" title={row.unit_type ?? undefined}>
+            {unitTypeLetter(row.unit_type, row.service_code)}
+          </span>
+        )}
+      </TableCell>
+      <TableCell>
+        {editing ? (
+          <Input
+            type="number" min={0} value={draft.annual_unit_authorization}
+            onChange={(e) => setDraft((d) => ({ ...d, annual_unit_authorization: e.target.value }))}
+            className="h-8 w-24 font-mono text-xs"
+          />
+        ) : (
+          row.annual_unit_authorization ?? "—"
+        )}
+      </TableCell>
+      <TableCell>
+        {editing ? (
+          <Input
+            type="number" min={0} step="0.01" value={draft.rate_per_unit}
+            onChange={(e) => setDraft((d) => ({ ...d, rate_per_unit: e.target.value }))}
+            className="h-8 w-24 font-mono text-xs"
+          />
+        ) : row.rate_per_unit != null ? (
+          `$${Number(row.rate_per_unit).toFixed(2)}`
+        ) : (
+          "—"
+        )}
+      </TableCell>
+      <TableCell>
+        {editing ? (
+          <div className="flex items-center gap-1">
+            <Input
+              type="date" value={draft.service_start_date}
+              onChange={(e) => setDraft((d) => ({ ...d, service_start_date: e.target.value }))}
+              className="h-8 w-36 text-xs"
+            />
+            <span className="text-muted-foreground">→</span>
+            <Input
+              type="date" value={draft.service_end_date}
+              onChange={(e) => setDraft((d) => ({ ...d, service_end_date: e.target.value }))}
+              className="h-8 w-36 text-xs"
+            />
+          </div>
+        ) : (
+          `${row.service_start_date ?? "—"} → ${row.service_end_date ?? "open"}`
+        )}
+      </TableCell>
+      <TableCell>
+        <CodeAssignedStaff clientId={clientId} code={row.service_code} />
+      </TableCell>
+      <TableCell>
+        {editing ? (
+          <div className="flex items-center gap-1">
+            <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={saving} className="h-7 gap-1 text-xs">
+              <X className="h-3.5 w-3.5" /> Cancel
+            </Button>
+            <Button size="sm" onClick={save} disabled={saving} className="h-7 gap-1 text-xs">
+              <CheckCircle2 className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        ) : (
+          <Button size="sm" variant="ghost" onClick={startEdit} className="h-7 gap-1 text-xs">
+            <Pencil className="h-3.5 w-3.5" /> Edit
+          </Button>
+        )}
+      </TableCell>
+    </TableRow>
   );
 }
 

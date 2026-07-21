@@ -500,13 +500,14 @@ function BillingCodesEditor({ value, onSave }: { value: { codes?: StateBillingCo
               <th className="px-2 py-1 text-left">Code</th>
               <th className="px-2 py-1 text-left">Service name</th>
               <th className="px-2 py-1 text-left">Unit type</th>
+              <th className="px-2 py-1 text-left">Std. rate ($)</th>
               <th className="px-2 py-1 text-center">EVV?</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {s.value.codes.length === 0 ? (
-              <tr><td colSpan={5} className="px-2 py-3 text-center text-muted-foreground">No codes yet.</td></tr>
+              <tr><td colSpan={6} className="px-2 py-3 text-center text-muted-foreground">No codes yet.</td></tr>
             ) : s.value.codes.map((c, i) => (
               <tr key={i} className="border-t border-border">
                 <td className="px-2 py-1"><input value={c.code} onChange={(e) => update(i, { code: e.target.value })} className="min-h-[36px] w-28 rounded-md border border-border bg-background px-2 font-mono text-xs" /></td>
@@ -517,6 +518,14 @@ function BillingCodesEditor({ value, onSave }: { value: { codes?: StateBillingCo
                     <option value="hourly">hourly</option>
                     <option value="daily">daily</option>
                   </select>
+                </td>
+                <td className="px-2 py-1">
+                  <input
+                    type="number" min={0} step="0.01" placeholder="—"
+                    value={c.rate ?? ""}
+                    onChange={(e) => update(i, { rate: e.target.value === "" ? null : Number(e.target.value) })}
+                    className="min-h-[36px] w-24 rounded-md border border-border bg-background px-2 text-xs"
+                  />
                 </td>
                 <td className="px-2 py-1 text-center">
                   <input type="checkbox" checked={!!c.evv_required} onChange={(e) => update(i, { evv_required: e.target.checked })} className="h-4 w-4" />
@@ -533,7 +542,7 @@ function BillingCodesEditor({ value, onSave }: { value: { codes?: StateBillingCo
         </table>
       </div>
       <button
-        onClick={() => s.update({ codes: [...s.value.codes, { code: "", name: "", unit_type: "15min", evv_required: true }] })}
+        onClick={() => s.update({ codes: [...s.value.codes, { code: "", name: "", unit_type: "15min", evv_required: true, rate: null }] })}
         className="mt-2 inline-flex min-h-[36px] items-center gap-1 rounded-md border border-dashed border-border px-3 text-xs text-muted-foreground hover:bg-muted"
       >
         <Plus className="h-3 w-3" /> Add billing code

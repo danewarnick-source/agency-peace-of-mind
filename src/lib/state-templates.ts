@@ -37,6 +37,10 @@ export interface StateBillingCode {
   name: string;
   unit_type: "15min" | "hourly" | "daily" | string;
   evv_required: boolean;
+  /** Published standard rate per unit, when the state has one. Optional —
+   *  an org's actual contracted rate (client_billing_codes.rate_per_unit)
+   *  can differ and always takes precedence once set. */
+  rate?: number | null;
 }
 export interface StateBillingCodesSection {
   codes: StateBillingCode[];

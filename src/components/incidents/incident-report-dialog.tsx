@@ -293,6 +293,15 @@ export function IncidentReportDialog({
 
   const [completenessIssues, setCompletenessIssues] = useState<AiIssue[] | null>(null);
   const [completenessBusy, setCompletenessBusy] = useState(false);
+  // Per-item inline "answer + re-check" state for the completeness list.
+  // Keyed by the issue's question text so state survives list reshuffles.
+  const [completenessAnswers, setCompletenessAnswers] = useState<Record<string, string>>({});
+  const [completenessItemStatus, setCompletenessItemStatus] = useState<
+    Record<string, { kind: "checking" | "needs_more"; note?: string }>
+  >({});
+  const [completenessApproved, setCompletenessApproved] = useState<
+    Array<{ question: string; answer: string }>
+  >([]);
 
   const [orgAiEnabled, setOrgAiEnabled] = useState<boolean | null>(null);
   useEffect(() => {
@@ -380,6 +389,7 @@ export function IncidentReportDialog({
     setNectarIssues(null); setNectarAnswers({}); setNectarNA({});
     setNectarStatus(null); setNectarReviewing(false); setLastReviewedDescription("");
     setCompletenessIssues(null); setCompletenessBusy(false);
+    setCompletenessAnswers({}); setCompletenessItemStatus({}); setCompletenessApproved([]);
     setStep(0); setStepError(null);
   }, [open, clientId, initialDiscovered]);
 
@@ -874,8 +884,18 @@ export function IncidentReportDialog({
     if (reviewInFlightRef.current) return;
     reviewInFlightRef.current = true;
     setCompletenessBusy(true);
+    setCompletenessItemStatus({});
     try {
-      const draft = buildDraft();
+      const base = buildDraft();
+      const draft = completenessApproved.length
+        ? {
+            ...base,
+            details: {
+              ...(base.details as Record<string, unknown>),
+              nectar_completeness_answers: completenessApproved,
+            },
+          }
+        : base;
       const r = await withAiTimeout((signal) => reviewFn({ data: { draft }, signal }));
       if (!r || typeof r.complete !== "boolean" || r.skipped) {
         setCompletenessIssues([]); setNectarStatus("skipped");
@@ -894,6 +914,66 @@ export function IncidentReportDialog({
     } finally {
       reviewInFlightRef.current = false;
       setCompletenessBusy(false);
+    }
+  }
+
+  // ── Per-item completeness answer check.
+  // The person types their answer inline under a flagged item and hits Save.
+  // We re-run reviewFn with the enriched draft (all previously-approved
+  // completeness answers + this new one) and check whether the same
+  // question still surfaces as must_fix. If it doesn't, the item is
+  // approved, removed from the list, and folded into the report.
+  // AI outage / timeout must never leave the person stuck — accept the
+  // answer and let them proceed, mirroring how the rest of this form
+  // treats Nectar unavailability.
+  async function checkCompletenessAnswer(question: string) {
+    const answer = (completenessAnswers[question] ?? "").trim();
+    if (!answer) return;
+    if (reviewInFlightRef.current) return;
+    reviewInFlightRef.current = true;
+    setCompletenessItemStatus((s) => ({ ...s, [question]: { kind: "checking" } }));
+    const acceptAndClear = (note?: string) => {
+      setCompletenessApproved((a) => [...a, { question, answer }]);
+      setCompletenessIssues((prev) => (prev ?? []).filter((q) => q.question !== question));
+      setCompletenessItemStatus((s) => { const n = { ...s }; delete n[question]; return n; });
+      setCompletenessAnswers((a) => { const n = { ...a }; delete n[question]; return n; });
+      if (note) toast.message(note); else toast.success("NECTAR approved your answer.");
+    };
+    try {
+      const base = buildDraft();
+      const extras = [...completenessApproved, { question, answer }];
+      const draft = {
+        ...base,
+        details: {
+          ...(base.details as Record<string, unknown>),
+          nectar_completeness_answers: extras,
+        },
+      };
+      const r = await withAiTimeout((signal) => reviewFn({ data: { draft }, signal }));
+      if (!r || typeof r.complete !== "boolean" || r.skipped) {
+        acceptAndClear("NECTAR unavailable — your answer was accepted.");
+        return;
+      }
+      const issues = Array.isArray(r.issues) ? (r.issues as AiIssue[]) : [];
+      const still = issues.find((q) => q.question === question && q.severity === "must_fix");
+      if (still) {
+        setCompletenessItemStatus((s) => ({
+          ...s,
+          [question]: {
+            kind: "needs_more",
+            note:
+              still.question && still.question !== question
+                ? still.question
+                : "Add more specific detail (who, what, when, or how) to fully resolve this concern.",
+          },
+        }));
+      } else {
+        acceptAndClear();
+      }
+    } catch {
+      acceptAndClear("NECTAR didn't respond in 20s — your answer was accepted.");
+    } finally {
+      reviewInFlightRef.current = false;
     }
   }
 
@@ -982,6 +1062,7 @@ export function IncidentReportDialog({
       const detailsOut: Record<string, unknown> = {
         ...details,
         nectar_followups: finalIssues ?? [],
+        nectar_completeness_answers: completenessApproved,
       };
       if (aiSkipped) detailsOut.ai_review_skipped = true;
 
@@ -1741,16 +1822,61 @@ export function IncidentReportDialog({
                         <p className="mt-2 text-[11px] text-emerald-800 dark:text-emerald-200">No remaining gaps. You can submit.</p>
                       )}
                       {completenessIssues && completenessIssues.length > 0 && (
-                        <ul className="mt-2 space-y-1 text-[11px]">
-                          {completenessIssues.map((q, i) => (
-                            <li key={i} className={`flex items-start gap-2 rounded border p-2 ${q.severity === "must_fix" ? "border-rose-300 bg-rose-50" : "border-amber-300 bg-amber-50"}`}>
-                              <Badge variant={q.severity === "must_fix" ? "destructive" : "outline"} className="text-[10px]">
-                                {q.severity === "must_fix" ? "Must address" : "Suggested"}
-                              </Badge>
-                              <span>{q.question}</span>
-                            </li>
-                          ))}
+                        <ul className="mt-2 space-y-2 text-[11px]">
+                          {completenessIssues.map((q, i) => {
+                            const itemStatus = completenessItemStatus[q.question];
+                            const answerVal = completenessAnswers[q.question] ?? "";
+                            const checking = itemStatus?.kind === "checking";
+                            const needsMore = itemStatus?.kind === "needs_more";
+                            return (
+                              <li
+                                key={`${q.question}-${i}`}
+                                className={`rounded border p-2 ${q.severity === "must_fix" ? "border-rose-300 bg-rose-50" : "border-amber-300 bg-amber-50"}`}
+                              >
+                                <div className="flex items-start gap-2">
+                                  <Badge variant={q.severity === "must_fix" ? "destructive" : "outline"} className="text-[10px]">
+                                    {q.severity === "must_fix" ? "Must address" : "Suggested"}
+                                  </Badge>
+                                  <span className="flex-1">{q.question}</span>
+                                </div>
+                                <div className="mt-2 space-y-1">
+                                  <Textarea
+                                    value={answerVal}
+                                    onChange={(e) =>
+                                      setCompletenessAnswers((a) => ({ ...a, [q.question]: e.target.value }))
+                                    }
+                                    placeholder="Type your answer or correction here…"
+                                    className="min-h-[60px] text-[12px]"
+                                    disabled={checking}
+                                  />
+                                  {needsMore && itemStatus?.note && (
+                                    <p className="text-[11px] text-rose-800 dark:text-rose-200">
+                                      Needs more detail: {itemStatus.note}
+                                    </p>
+                                  )}
+                                  <div className="flex justify-end">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => checkCompletenessAnswer(q.question)}
+                                      disabled={checking || !answerVal.trim() || !aiEnabled}
+                                    >
+                                      {checking ? (
+                                        <><Loader2 className="mr-1 h-3 w-3 animate-spin" />Checking…</>
+                                      ) : needsMore ? "Save & re-check" : "Save"}
+                                    </Button>
+                                  </div>
+                                </div>
+                              </li>
+                            );
+                          })}
                         </ul>
+                      )}
+                      {completenessApproved.length > 0 && (
+                        <p className="mt-2 text-[11px] text-emerald-800 dark:text-emerald-200">
+                          {completenessApproved.length} answer{completenessApproved.length === 1 ? "" : "s"} approved and added to the report.
+                        </p>
                       )}
                     </div>
 

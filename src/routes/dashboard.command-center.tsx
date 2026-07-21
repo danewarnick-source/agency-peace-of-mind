@@ -1291,9 +1291,9 @@ function CommandCenterInner({ orgId }: { orgId: string }) {
                               {Math.floor(hoursAgo(s.clock_in_timestamp))}h open with no clock-out
                             </p>
                           </div>
-                          <Link to="/dashboard/compliance-desk"
+                          <Link to="/dashboard/hub/documentation" search={{ tab: "records" }}
                             className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-500/20 dark:text-amber-300">
-                            Manage in EVV Desk →
+                            Manage in Records →
                           </Link>
                         </div>
                       </Card>

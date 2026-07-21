@@ -31,6 +31,7 @@ const BUCKET = "employee-docs";
 
 export type EmployeeFaceSheetArgs = {
   staffId: string;
+  organizationId: string;
   supabaseClient?: SupabaseClient;
 };
 
@@ -89,12 +90,16 @@ type HrDocRow = {
   status: string | null;
 };
 
-async function loadEmployeeSheetData(sb: SupabaseClient, staffId: string) {
+async function loadEmployeeSheetData(sb: SupabaseClient, staffId: string, organizationId: string) {
   // 1) Member + profile — reveals org + all identity fields.
+  //    The profile page passes the active org explicitly, which keeps multi-org
+  //    users from tripping object-mode queries with multiple memberships.
   const { data: member, error: mErr } = await sb
     .from("organization_members")
     .select("id, role, active, organization_id")
     .eq("user_id", staffId)
+    .eq("organization_id", organizationId)
+    .limit(1)
     .maybeSingle();
   if (mErr) throw new Error(mErr.message);
   if (!member) throw new Error("Employee not found in your organization");
@@ -107,6 +112,7 @@ async function loadEmployeeSheetData(sb: SupabaseClient, staffId: string) {
       "id, full_name, first_name, last_name, email, username, phone, employee_id, position, positions, department, hire_date, account_status, worker_type, team_id, photo_path, staff_type_keys, emergency_contact_name, emergency_contact_relationship, emergency_contact_phone",
     )
     .eq("id", staffId)
+    .limit(1)
     .maybeSingle();
   if (pErr) throw new Error(pErr.message);
 
@@ -115,18 +121,20 @@ async function loadEmployeeSheetData(sb: SupabaseClient, staffId: string) {
     .from("organizations")
     .select("id, name, legal_name, dba_name")
     .eq("id", orgId)
+    .limit(1)
     .maybeSingle();
   const { data: branding } = await sb
     .from("organization_branding")
     .select("logo_path, org_address, org_phone")
     .eq("organization_id", orgId)
+    .limit(1)
     .maybeSingle();
 
   // 3) Team (if assigned).
   const teamId = (profile as { team_id: string | null } | null)?.team_id ?? null;
   let team: { team_name: string | null } | null = null;
   if (teamId) {
-    const { data } = await sb.from("teams").select("team_name").eq("id", teamId).maybeSingle();
+    const { data } = await sb.from("teams").select("team_name").eq("id", teamId).limit(1).maybeSingle();
     team = (data as { team_name: string | null } | null) ?? null;
   }
 
@@ -268,40 +276,83 @@ async function loadEmployeeSheetData(sb: SupabaseClient, staffId: string) {
 const INK = rgb(0.08, 0.09, 0.12);
 const MUTED = rgb(0.42, 0.45, 0.5);
 const BORDER = rgb(0.82, 0.84, 0.88);
-const ACCENT = rgb(0.08, 0.35, 0.6);
+const ZEBRA = rgb(0.975, 0.98, 0.99);
+const ACCENT = rgb(0.06, 0.28, 0.5);
 const PAGE_W = 612;
 const PAGE_H = 792;
-const M = 36;
+const M = 40;
+const LH = 1.3; // line-height multiplier
 
 function wrap(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
-  const words = text.split(/\s+/);
-  const lines: string[] = [];
-  let line = "";
-  for (const w of words) {
-    const test = line ? `${line} ${w}` : w;
-    if (font.widthOfTextAtSize(test, size) <= maxWidth) {
-      line = test;
-    } else {
-      if (line) lines.push(line);
-      line = w;
+  // Respect explicit newlines, then word-wrap each segment.
+  const out: string[] = [];
+  for (const segment of String(text).split(/\n/)) {
+    const words = segment.split(/\s+/).filter(Boolean);
+    if (words.length === 0) {
+      out.push("");
+      continue;
     }
+    let line = "";
+    for (const w of words) {
+      const test = line ? `${line} ${w}` : w;
+      if (font.widthOfTextAtSize(test, size) <= maxWidth) {
+        line = test;
+      } else {
+        if (line) out.push(line);
+        line = w;
+      }
+    }
+    if (line) out.push(line);
   }
-  if (line) lines.push(line);
-  return lines.length ? lines : [""];
+  return out.length ? out : [""];
 }
 
+function wrapClamp(
+  text: string,
+  font: PDFFont,
+  size: number,
+  maxWidth: number,
+  maxLines: number,
+): string[] {
+  const lines = wrap(text, font, size, maxWidth);
+  if (lines.length <= maxLines) return lines;
+  const kept = lines.slice(0, maxLines);
+  const last = kept[maxLines - 1];
+  // Trim last line and append ellipsis so it fits.
+  let s = last;
+  while (s.length > 0 && font.widthOfTextAtSize(s + "…", size) > maxWidth) {
+    s = s.slice(0, -1);
+  }
+  kept[maxLines - 1] = s + "…";
+  return kept;
+}
+
+/** Draws text and returns the y-position immediately below the block. */
 function drawText(
   page: PDFPage,
   text: string,
   x: number,
   y: number,
-  opts: { font: PDFFont; size: number; color?: ReturnType<typeof rgb>; maxWidth?: number },
+  opts: {
+    font: PDFFont;
+    size: number;
+    color?: ReturnType<typeof rgb>;
+    maxWidth?: number;
+    maxLines?: number;
+    align?: "left" | "right";
+  },
 ): number {
-  const { font, size, color = INK, maxWidth } = opts;
-  const lines = maxWidth ? wrap(text, font, size, maxWidth) : [text];
-  const lineHeight = size * 1.25;
+  const { font, size, color = INK, maxWidth, maxLines, align = "left" } = opts;
+  const lines = maxWidth
+    ? (maxLines ? wrapClamp(text, font, size, maxWidth, maxLines) : wrap(text, font, size, maxWidth))
+    : [text];
+  const lineHeight = size * LH;
   for (let i = 0; i < lines.length; i++) {
-    page.drawText(lines[i], { x, y: y - i * lineHeight, font, size, color });
+    const line = lines[i];
+    const dx = align === "right" && maxWidth
+      ? x + maxWidth - font.widthOfTextAtSize(line, size)
+      : x;
+    page.drawText(line, { x: dx, y: y - (i + 1) * lineHeight + lineHeight * 0.25, font, size, color });
   }
   return y - lines.length * lineHeight;
 }
@@ -316,16 +367,59 @@ function drawKV(
   helv: PDFFont,
   helvB: PDFFont,
 ): number {
-  page.drawText(label, { x, y, size: 7.5, font: helvB, color: MUTED });
-  const yVal = y - 11;
-  const end = drawText(page, value, x, yVal, { font: helv, size: 9.5, color: INK, maxWidth: colW });
-  return end - 6;
+  // Label (small, uppercase-ish muted)
+  page.drawText(label.toUpperCase(), {
+    x, y: y - 8, size: 6.8, font: helvB, color: MUTED,
+  });
+  const yVal = y - 8 - 12;
+  const end = drawText(page, value, x, yVal + 9.5 * LH * 0.75, {
+    font: helv, size: 9.5, color: INK, maxWidth: colW,
+  });
+  return end - 8;
 }
 
-function sectionHeader(page: PDFPage, title: string, x: number, y: number, w: number, helvB: PDFFont): number {
-  page.drawRectangle({ x, y: y - 14, width: w, height: 14, color: rgb(0.94, 0.96, 0.98) });
-  page.drawText(title.toUpperCase(), { x: x + 6, y: y - 10, size: 8, font: helvB, color: ACCENT });
-  return y - 20;
+/** Two-line KV variant that renders line2 in muted style (used for emergency contact). */
+function drawKV2(
+  page: PDFPage,
+  label: string,
+  line1: string,
+  line2: string | null,
+  x: number,
+  y: number,
+  colW: number,
+  helv: PDFFont,
+  helvB: PDFFont,
+): number {
+  page.drawText(label.toUpperCase(), {
+    x, y: y - 8, size: 6.8, font: helvB, color: MUTED,
+  });
+  let cursor = y - 8 - 12 + 9.5 * LH * 0.75;
+  cursor = drawText(page, line1, x, cursor, {
+    font: helv, size: 9.5, color: INK, maxWidth: colW,
+  });
+  if (line2) {
+    cursor = drawText(page, line2, x, cursor, {
+      font: helv, size: 9, color: MUTED, maxWidth: colW,
+    });
+  }
+  return cursor - 8;
+}
+
+function sectionHeader(
+  page: PDFPage,
+  title: string,
+  x: number,
+  y: number,
+  w: number,
+  helvB: PDFFont,
+): number {
+  const barH = 16;
+  page.drawRectangle({ x, y: y - barH, width: w, height: barH, color: rgb(0.945, 0.96, 0.975) });
+  page.drawRectangle({ x, y: y - barH, width: 2.5, height: barH, color: ACCENT });
+  page.drawText(title.toUpperCase(), {
+    x: x + 10, y: y - barH + 5.5, size: 7.8, font: helvB, color: ACCENT,
+  });
+  return y - barH - 6;
 }
 
 function hr(page: PDFPage, y: number): void {
@@ -351,7 +445,7 @@ export async function generateEmployeeFaceSheet(
   args: EmployeeFaceSheetArgs,
 ): Promise<EmployeeFaceSheetResult> {
   const sb = args.supabaseClient ?? defaultSupabase;
-  const d = await loadEmployeeSheetData(sb, args.staffId);
+  const d = await loadEmployeeSheetData(sb, args.staffId, args.organizationId);
   const p = d.profile;
   const name =
     (p.full_name && String(p.full_name).trim()) ||
@@ -377,35 +471,45 @@ export async function generateEmployeeFaceSheet(
 
   // ── Header ────────────────────────────────────────────────────────────
   const headerTop = PAGE_H - M;
+  let leftBottom = headerTop;
   if (logoImg) {
-    const maxH = 48;
+    const maxH = 44;
     const scale = maxH / logoImg.height;
-    const w = Math.min(180, logoImg.width * scale);
+    const w = Math.min(170, logoImg.width * scale);
     const h = logoImg.height * (w / logoImg.width);
     page.drawImage(logoImg, { x: M, y: headerTop - h, width: w, height: h });
+    leftBottom = headerTop - h;
   } else {
-    drawText(page, orgName, M, headerTop - 14, { font: helvB, size: 20, color: INK, maxWidth: 340 });
+    const end = drawText(page, orgName, M, headerTop, {
+      font: helvB, size: 18, color: INK, maxWidth: 320, maxLines: 1,
+    });
+    leftBottom = end;
   }
+
   const rightColW = 220;
   const rightX = PAGE_W - M - rightColW;
-  drawText(page, orgName, rightX, headerTop - 8, {
-    font: helvB, size: 9, color: INK, maxWidth: rightColW,
+  let ry = headerTop;
+  ry = drawText(page, orgName, rightX, ry, {
+    font: helvB, size: 9.5, color: INK, maxWidth: rightColW, maxLines: 1, align: "right",
   });
-  drawText(page, field(d.branding?.org_address), rightX, headerTop - 22, {
-    font: helv, size: 8.5, color: MUTED, maxWidth: rightColW,
+  ry -= 2;
+  ry = drawText(page, field(d.branding?.org_address), rightX, ry, {
+    font: helv, size: 8.5, color: MUTED, maxWidth: rightColW, maxLines: 2, align: "right",
   });
-  drawText(page, field(d.branding?.org_phone), rightX, headerTop - 46, {
-    font: helv, size: 8.5, color: MUTED, maxWidth: rightColW,
+  ry -= 1;
+  ry = drawText(page, field(d.branding?.org_phone), rightX, ry, {
+    font: helv, size: 8.5, color: MUTED, maxWidth: rightColW, maxLines: 1, align: "right",
   });
 
-  let y = headerTop - 60;
+  let y = Math.min(leftBottom, ry) - 14;
   hr(page, y);
-  y -= 12;
+  y -= 16;
 
   // ── Identity band ─────────────────────────────────────────────────────
-  const photoBoxSize = 96;
+  const photoBoxSize = 92;
   const photoX = PAGE_W - M - photoBoxSize;
-  const photoY = y - photoBoxSize;
+  const identityTop = y;
+  const photoY = identityTop - photoBoxSize;
   page.drawRectangle({
     x: photoX, y: photoY, width: photoBoxSize, height: photoBoxSize,
     borderColor: BORDER, borderWidth: 0.75,
@@ -415,52 +519,67 @@ export async function generateEmployeeFaceSheet(
     const scale = Math.max(box / photoImg.width, box / photoImg.height);
     const w = photoImg.width * scale;
     const h = photoImg.height * scale;
+    // Clip via a second rectangle mask isn't available in pdf-lib; center-crop by
+    // drawing scaled image inside the box bounds via image scaling only.
     page.drawImage(photoImg, {
       x: photoX + (photoBoxSize - w) / 2,
       y: photoY + (photoBoxSize - h) / 2,
       width: w, height: h,
     });
   } else {
-    drawText(page, "No photo\non file", photoX + 22, photoY + 56, { font: helv, size: 9, color: MUTED });
+    drawText(page, "No photo on file", photoX, photoY + photoBoxSize / 2 + 4, {
+      font: helv, size: 8.5, color: MUTED, maxWidth: photoBoxSize, align: "left",
+    });
   }
 
-  const idW = PAGE_W - M - M - photoBoxSize - 16;
-  drawText(page, "EMPLOYEE FACE SHEET", M, y, { font: helvB, size: 9, color: ACCENT });
-  y -= 14;
-  drawText(page, name, M, y, { font: helvB, size: 20, color: INK, maxWidth: idW });
-  y -= 24;
-  // Org title tier (from staff types) + HIVE role/status
+  const idW = photoX - M - 20;
+  let iy = identityTop;
+  iy = drawText(page, "EMPLOYEE FACE SHEET", M, iy, {
+    font: helvB, size: 8, color: ACCENT, maxWidth: idW,
+  });
+  iy -= 4;
+  iy = drawText(page, name, M, iy, {
+    font: helvB, size: 22, color: INK, maxWidth: idW, maxLines: 2,
+  });
+  iy -= 4;
   const orgTitle = d.staffTypeLabels.length
     ? (d.staffTypeLabels.length <= 3
         ? d.staffTypeLabels.join(" / ")
         : `${d.staffTypeLabels[0]} and ${d.staffTypeLabels.length - 1} more`)
     : EMPTY;
-  drawText(page, orgTitle, M, y, { font: helv, size: 10, color: INK, maxWidth: idW });
-  y -= 14;
-  const roleLine = `${String(d.member.role ?? "").toUpperCase()} · ${d.member.active ? "Active" : "Deactivated"}`;
-  drawText(page, roleLine, M, y, { font: helvB, size: 8, color: ACCENT, maxWidth: idW });
-  y -= 12;
+  iy = drawText(page, orgTitle, M, iy, {
+    font: helv, size: 10.5, color: INK, maxWidth: idW, maxLines: 1,
+  });
+  iy -= 2;
+  const roleLine = `${String(d.member.role ?? "").toUpperCase()}  ·  ${d.member.active ? "Active" : "Deactivated"}`;
+  iy = drawText(page, roleLine, M, iy, {
+    font: helvB, size: 7.8, color: ACCENT, maxWidth: idW, maxLines: 1,
+  });
 
-  y = Math.min(y, photoY - 8);
+  y = Math.min(iy, photoY) - 14;
   hr(page, y);
-  y -= 12;
+  y -= 14;
 
   // ── Two-column identity / employment ─────────────────────────────────
-  const colW = (PAGE_W - M * 2 - 16) / 2;
-  const rightXCol = M + colW + 16;
+  const colGap = 20;
+  const colW = (PAGE_W - M * 2 - colGap) / 2;
+  const rightXCol = M + colW + colGap;
 
   let yL = y;
   yL = sectionHeader(page, "Identity & contact", M, yL, colW, helvB);
   yL = drawKV(page, "Email", field(p.email), M, yL, colW, helv, helvB);
   yL = drawKV(page, "Phone", field(p.phone), M, yL, colW, helv, helvB);
   yL = drawKV(page, "Employee ID", field(p.employee_id), M, yL, colW, helv, helvB);
-  yL = drawKV(page, "Emergency contact",
-    [
-      field(p.emergency_contact_name),
-      field(p.emergency_contact_relationship) !== EMPTY ? `(${p.emergency_contact_relationship})` : "",
-      field(p.emergency_contact_phone) !== EMPTY ? `\nPhone: ${p.emergency_contact_phone}` : "",
-    ].filter(Boolean).join(" ").trim() || EMPTY,
-    M, yL, colW, helv, helvB);
+  {
+    const nm = field(p.emergency_contact_name);
+    const rel = field(p.emergency_contact_relationship);
+    const ph = field(p.emergency_contact_phone);
+    const line1 = nm === EMPTY && rel === EMPTY
+      ? EMPTY
+      : (rel !== EMPTY ? `${nm} (${rel})` : nm);
+    const line2 = ph !== EMPTY ? `Phone: ${ph}` : null;
+    yL = drawKV2(page, "Emergency contact", line1, line2, M, yL, colW, helv, helvB);
+  }
 
   let yR = y;
   yR = sectionHeader(page, "Employment", rightXCol, yR, colW, helvB);
@@ -478,27 +597,64 @@ export async function generateEmployeeFaceSheet(
 
   y = Math.min(yL, yR) - 4;
   hr(page, y);
-  y -= 12;
+  y -= 14;
 
   // ── Table renderer with page-break support ────────────────────────────
   function ensureSpace(needed: number): void {
     if (y - needed < 60) {
-      // footer margin
       page = pdf.addPage([PAGE_W, PAGE_H]);
       y = PAGE_H - M;
     }
   }
 
-  function drawRow(cells: string[], widths: number[], bold = false): void {
-    ensureSpace(16);
+  let rowIndex = 0;
+  function resetRows(): void { rowIndex = 0; }
+
+  function drawRow(
+    cells: string[],
+    widths: number[],
+    aligns: Array<"left" | "right">,
+    opts: { header?: boolean } = {},
+  ): void {
+    const header = !!opts.header;
+    const font = header ? helvB : helv;
+    const size = header ? 7.8 : 9;
+    const color = header ? MUTED : INK;
+    const padX = 8;
+    const padY = 6;
+
+    // Pre-wrap all cells to compute row height.
+    const wrapped = cells.map((c, i) => wrap(c, font, size, widths[i] - padX * 2));
+    const lineCount = Math.max(...wrapped.map((w) => w.length));
+    const rowH = lineCount * size * LH + padY * 2;
+
+    ensureSpace(rowH + 2);
+
+    if (header) {
+      page.drawRectangle({
+        x: M, y: y - rowH, width: PAGE_W - M * 2, height: rowH, color: rgb(0.95, 0.955, 0.965),
+      });
+    } else if (rowIndex % 2 === 1) {
+      page.drawRectangle({
+        x: M, y: y - rowH, width: PAGE_W - M * 2, height: rowH, color: ZEBRA,
+      });
+    }
+
     let x = M;
-    const rowH = 12;
-    const font = bold ? helvB : helv;
-    const size = bold ? 8.5 : 9;
     for (let i = 0; i < cells.length; i++) {
-      const lines = wrap(cells[i], font, size, widths[i] - 6);
-      const first = lines[0] ?? "";
-      page.drawText(first, { x: x + 3, y: y - 9, font, size, color: bold ? MUTED : INK });
+      const lines = wrapped[i];
+      const align = aligns[i];
+      for (let li = 0; li < lines.length; li++) {
+        const line = lines[li];
+        const dx = align === "right"
+          ? x + widths[i] - padX - font.widthOfTextAtSize(line, size)
+          : x + padX;
+        page.drawText(line, {
+          x: dx,
+          y: y - padY - (li + 1) * size * LH + size * LH * 0.25,
+          font, size, color,
+        });
+      }
       x += widths[i];
     }
     y -= rowH;
@@ -506,83 +662,112 @@ export async function generateEmployeeFaceSheet(
       start: { x: M, y }, end: { x: PAGE_W - M, y },
       thickness: 0.25, color: BORDER,
     });
+    if (!header) rowIndex++;
   }
 
   // ── Certifications & trainings ────────────────────────────────────────
-  ensureSpace(40);
+  ensureSpace(48);
   y = sectionHeader(page, "Certifications & trainings", M, y, PAGE_W - M * 2, helvB);
-  const certW = [PAGE_W - M * 2 - 90 - 90 - 90, 90, 90, 90];
-  drawRow(["Credential", "Source", "Issued", "Expires"], certW, true);
-  if (d.certs.length === 0) {
-    ensureSpace(14);
-    drawText(page, EMPTY, M + 3, y - 10, { font: helv, size: 9, color: MUTED });
-    y -= 14;
-  } else {
-    for (const c of d.certs) {
-      drawRow([c.label, c.source, fmtDate(c.issued), fmtDate(c.expires)], certW);
+  {
+    const dateW = 78;
+    const sourceW = 108;
+    const labelW = PAGE_W - M * 2 - sourceW - dateW * 2;
+    const widths = [labelW, sourceW, dateW, dateW];
+    const aligns: Array<"left" | "right"> = ["left", "left", "right", "right"];
+    resetRows();
+    drawRow(["Credential", "Source", "Issued", "Expires"], widths, aligns, { header: true });
+    if (d.certs.length === 0) {
+      ensureSpace(18);
+      drawText(page, EMPTY, M + 8, y, { font: helv, size: 9, color: MUTED });
+      y -= 18;
+    } else {
+      for (const c of d.certs) {
+        drawRow([c.label, c.source, fmtDate(c.issued), fmtDate(c.expires)], widths, aligns);
+      }
     }
   }
-  y -= 6;
+  y -= 10;
 
   // ── Deadlines (next 90 days) ─────────────────────────────────────────
-  ensureSpace(40);
+  ensureSpace(48);
   y = sectionHeader(page, "Deadlines · next 90 days", M, y, PAGE_W - M * 2, helvB);
-  const dlW = [PAGE_W - M * 2 - 100 - 100, 100, 100];
-  drawRow(["Item", "Source", "Expires"], dlW, true);
-  if (d.deadlines.length === 0) {
-    ensureSpace(14);
-    drawText(page, "No credentials expiring in the next 90 days.", M + 3, y - 10, {
-      font: helv, size: 9, color: MUTED,
-    });
-    y -= 14;
-  } else {
-    for (const dl of d.deadlines) {
-      drawRow([dl.label, dl.source, fmtDate(dl.expires)], dlW);
+  {
+    const dateW = 90;
+    const sourceW = 120;
+    const labelW = PAGE_W - M * 2 - sourceW - dateW;
+    const widths = [labelW, sourceW, dateW];
+    const aligns: Array<"left" | "right"> = ["left", "left", "right"];
+    resetRows();
+    drawRow(["Item", "Source", "Expires"], widths, aligns, { header: true });
+    if (d.deadlines.length === 0) {
+      ensureSpace(18);
+      drawText(page, "No credentials expiring in the next 90 days.", M + 8, y, {
+        font: helv, size: 9, color: MUTED,
+      });
+      y -= 18;
+    } else {
+      for (const dl of d.deadlines) {
+        drawRow([dl.label, dl.source, fmtDate(dl.expires)], widths, aligns);
+      }
     }
   }
-  y -= 6;
+  y -= 10;
 
   // ── HR documents ─────────────────────────────────────────────────────
-  ensureSpace(40);
+  ensureSpace(48);
   y = sectionHeader(page, "HR documents on file", M, y, PAGE_W - M * 2, helvB);
-  const docW = [PAGE_W - M * 2 - 90 - 90 - 90, 90, 90, 90];
-  drawRow(["Document", "Kind", "Uploaded", "Status"], docW, true);
-  if (d.hrDocs.length === 0) {
-    ensureSpace(14);
-    drawText(page, "No HR documents on file.", M + 3, y - 10, {
-      font: helv, size: 9, color: MUTED,
-    });
-    y -= 14;
-  } else {
-    for (const doc of d.hrDocs) {
-      drawRow(
-        [
-          doc.title ?? doc.file_name ?? "(untitled)",
-          field(doc.kind),
-          fmtDate(doc.uploaded_at),
-          field(doc.status ?? "current"),
-        ],
-        docW,
-      );
+  {
+    const dateW = 78;
+    const kindW = 96;
+    const statusW = 80;
+    const labelW = PAGE_W - M * 2 - kindW - dateW - statusW;
+    const widths = [labelW, kindW, dateW, statusW];
+    const aligns: Array<"left" | "right"> = ["left", "left", "right", "left"];
+    resetRows();
+    drawRow(["Document", "Kind", "Uploaded", "Status"], widths, aligns, { header: true });
+    if (d.hrDocs.length === 0) {
+      ensureSpace(18);
+      drawText(page, "No HR documents on file.", M + 8, y, {
+        font: helv, size: 9, color: MUTED,
+      });
+      y -= 18;
+    } else {
+      for (const doc of d.hrDocs) {
+        drawRow(
+          [
+            doc.title ?? doc.file_name ?? "(untitled)",
+            field(doc.kind),
+            fmtDate(doc.uploaded_at),
+            field(doc.status ?? "current"),
+          ],
+          widths,
+          aligns,
+        );
+      }
     }
   }
 
   // ── Footer on every page ─────────────────────────────────────────────
   const pages = pdf.getPages();
+  const genStr = generatedAt.toLocaleString("en-US", {
+    year: "numeric", month: "short", day: "numeric",
+    hour: "numeric", minute: "2-digit",
+  });
   for (let i = 0; i < pages.length; i++) {
     const pg = pages[i];
-    const footerY = 30;
+    const footerY = 34;
     pg.drawLine({
-      start: { x: M, y: footerY + 10 }, end: { x: PAGE_W - M, y: footerY + 10 },
+      start: { x: M, y: footerY + 14 }, end: { x: PAGE_W - M, y: footerY + 14 },
       thickness: 0.5, color: BORDER,
     });
-    drawText(
-      pg,
-      `Employee Face Sheet — ${name} · ${orgName} · Generated ${generatedAt.toLocaleString("en-US")} · Empty values render as "—" — no data is inferred. Page ${i + 1} of ${pages.length}`,
-      M,
-      footerY,
-      { font: helv, size: 7, color: MUTED, maxWidth: PAGE_W - M * 2 },
-    );
+    pg.drawText(`Employee Face Sheet  ·  ${name}  ·  ${orgName}`, {
+      x: M, y: footerY + 4, size: 7.5, font: helvB, color: INK,
+    });
+    const meta = `Generated ${genStr}   ·   Page ${i + 1} of ${pages.length}`;
+    const metaW = helv.widthOfTextAtSize(meta, 7.5);
+    pg.drawText(meta, {
+      x: PAGE_W - M - metaW, y: footerY + 4, size: 7.5, font: helv, color: MUTED,
+    });
   }
 
   const bytes = await pdf.save();
@@ -620,9 +805,9 @@ export async function shipEmployeeFaceSheet(
 
   const displayName = `Employee Face Sheet — ${report.periodLabel}.pdf`;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: inserted, error: insErr } = await (sb as any)
+  const { data: insertedRows, error: insErr } = await (sb as any)
     .from("employee_documents")
-    .insert({
+    .insert([{
       organization_id: report.organizationId,
       staff_id: report.staffId,
       kind: "face_sheet",
@@ -632,10 +817,12 @@ export async function shipEmployeeFaceSheet(
       mime_type: "application/pdf",
       size_bytes: report.bytes.byteLength,
       uploaded_by: uid,
-    })
+    }])
     .select("id")
-    .single();
+    .limit(1);
   if (insErr) throw new Error(insErr.message);
+  const inserted = Array.isArray(insertedRows) ? insertedRows[0] : null;
+  if (!inserted) throw new Error("Face sheet saved, but the HR document record could not be confirmed.");
 
   return {
     ...report,

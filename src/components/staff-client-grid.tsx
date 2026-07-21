@@ -204,6 +204,7 @@ function ClientDetail({
           <Link
             to={daily ? "/dashboard/hhs-hub/$clientId" : "/dashboard/workspace/$clientId"}
             params={{ clientId: c.id }}
+            search={daily ? undefined : { tab: "clock-in", code: selected }}
           >
             {daily && !isOnTheClock ? <Home /> : <Clock />}
             {isOnTheClock

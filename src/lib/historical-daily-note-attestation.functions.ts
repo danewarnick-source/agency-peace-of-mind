@@ -65,11 +65,23 @@ export const updateMyHistoricalDailyNote = createServerFn({ method: "POST" })
 
 export const attestMyHistoricalDailyNote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: string; narrative?: string; pcsp_goals_addressed?: string[] }) =>
+  .inputValidator((d: {
+    id: string;
+    narrative?: string;
+    pcsp_goals_addressed?: string[];
+    attested: boolean;
+    attestation_text: string;
+    attestation_version: string;
+  }) =>
     z.object({
       id: z.string().uuid(),
       narrative: z.string().min(1).max(8000).optional(),
       pcsp_goals_addressed: z.array(z.string().max(500)).max(50).optional(),
+      attested: z.literal(true, {
+        errorMap: () => ({ message: "You must check the attestation box before signing." }),
+      }),
+      attestation_text: z.string().min(20).max(8000),
+      attestation_version: z.string().min(1).max(64),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -82,6 +94,8 @@ export const attestMyHistoricalDailyNote = createServerFn({ method: "POST" })
       approved_by: userId,
       staff_attested_at: now,
       staff_attested_by: userId,
+      historical_attestation_text: data.attestation_text,
+      historical_attestation_version: data.attestation_version,
     };
     if (data.narrative) patch.narrative = data.narrative;
     if (data.pcsp_goals_addressed) patch.pcsp_goals_addressed = data.pcsp_goals_addressed;

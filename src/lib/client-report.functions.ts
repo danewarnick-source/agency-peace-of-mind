@@ -30,6 +30,7 @@ export interface PullClientReportInput {
     clientId?: string;
     spaceId?: string;
     staffId?: string;
+      organizationId?: string;
     periodMonth?: string;
     weekStart?: string; // ISO date
     weeksCount?: number;
@@ -79,6 +80,7 @@ function validate(input: unknown): PullClientReportInput {
   if (p.clientId && !UUID_RE.test(p.clientId)) throw new Error("Invalid clientId");
   if (p.spaceId && !UUID_RE.test(p.spaceId)) throw new Error("Invalid spaceId");
   if (p.staffId && !UUID_RE.test(p.staffId)) throw new Error("Invalid staffId");
+  if (p.organizationId && !UUID_RE.test(p.organizationId)) throw new Error("Invalid organizationId");
   if (p.weeksCount !== undefined) {
     const n = Number(p.weeksCount);
     if (!Number.isFinite(n) || n < 1 || n > 12) throw new Error("weeksCount must be 1..12");
@@ -91,7 +93,7 @@ async function resolveScopeOrg(
   supabase: import("@supabase/supabase-js").SupabaseClient,
   input: PullClientReportInput,
 ): Promise<string> {
-  const { clientId, spaceId, staffId } = input.params;
+  const { clientId, spaceId, staffId, organizationId } = input.params;
   if (clientId) {
     const { data, error } = await supabase
       .from("clients")
@@ -115,10 +117,13 @@ async function resolveScopeOrg(
     return orgId;
   }
   if (staffId) {
-    const { data, error } = await supabase
+    let q = supabase
       .from("organization_members")
       .select("organization_id")
-      .eq("user_id", staffId)
+      .eq("user_id", staffId);
+    if (organizationId) q = q.eq("organization_id", organizationId);
+    const { data, error } = await q
+      .limit(1)
       .maybeSingle();
     if (error) throw error;
     const orgId = (data as { organization_id: string } | null)?.organization_id;
@@ -156,10 +161,12 @@ export const pullClientReport = createServerFn({ method: "POST" })
     const out = data.ship
       ? await shipClientReport(data.reportType, {
           ...data.params,
+          organizationId: orgId,
           supabaseClient: supabase,
         })
       : await generateClientReport(data.reportType, {
           ...data.params,
+          organizationId: orgId,
           supabaseClient: supabase,
         });
 

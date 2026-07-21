@@ -25,16 +25,18 @@ import { generateEmployeeFaceSheetFn } from "@/lib/employee-face-sheet.functions
  */
 export function EmployeeFaceSheetButton({
   staffId,
+  organizationId,
   variant = "default",
 }: {
   staffId: string;
+  organizationId: string;
   variant?: "default" | "pill";
 }) {
   const gen = useServerFn(generateEmployeeFaceSheetFn);
   const [busy, setBusy] = useState<null | "preview" | "download" | "print" | "ship">(null);
 
   async function build(ship: boolean): Promise<{ blob: Blob; filename: string; shipped: boolean }> {
-    const { pdfBase64, filename, shipped } = await gen({ data: { staffId, ship } });
+    const { pdfBase64, filename, shipped } = await gen({ data: { staffId, organizationId, ship } });
     const bin = atob(pdfBase64);
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);

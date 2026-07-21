@@ -2,7 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "./use-org";
 import { useAllClientBillingCodes, type ClientBillingCode } from "./use-client-billing-codes";
-import { computeEntryUnits, unitsToHours, UNITS_PER_HOUR } from "@/lib/billing-units";
+import {
+  computeEntryUnits,
+  isBillableForReview,
+  unitsToHours,
+  UNITS_PER_HOUR,
+} from "@/lib/billing-units";
 import { isDailyServiceCode } from "@/lib/service-billing";
 
 /**
@@ -109,7 +114,7 @@ export function useClientBudget(clientId: string | undefined) {
         } else {
           for (const r of (tsRows ?? []) as Array<{
             service_type_code: string | null;
-            clock_in_timestamp: string;
+            clock_in_timestamp: string | null;
             clock_out_timestamp: string | null;
             rounded_clock_in: string | null;
             rounded_clock_out: string | null;
@@ -117,10 +122,9 @@ export function useClientBudget(clientId: string | undefined) {
             corrected_clock_out: string | null;
             review_status: string | null;
           }>) {
-            if (!r.clock_out_timestamp || r.service_type_code !== code.service_code) continue;
-            const inT = new Date(r.clock_in_timestamp);
-            if (inT < period_start) continue;
-            if (period_end && inT > period_end) continue;
+            if (r.service_type_code !== code.service_code) continue;
+            // needs_review/rejected are excluded until a supervisor approves.
+            if (!isBillableForReview(r)) continue;
             // Same authoritative-time precedence as records-tab.tsx: approved
             // correction, else the rounded (nearest-quarter-hour) punch, else
             // raw as a last resort. Never derived back into the raw/corrected
@@ -131,8 +135,12 @@ export function useClientBudget(clientId: string | undefined) {
             const billOut = (r.review_status === "approved" && r.corrected_clock_out)
               ? r.corrected_clock_out
               : (r.rounded_clock_out ?? r.clock_out_timestamp);
+            if (!billIn || !billOut) continue;
+            const inT = new Date(billIn);
+            if (inT < period_start) continue;
+            if (period_end && inT > period_end) continue;
             const hrs =
-              (new Date(billOut).getTime() - new Date(billIn).getTime()) / 3_600_000;
+              (new Date(billOut).getTime() - inT.getTime()) / 3_600_000;
             if (hrs > 0 && isFinite(hrs)) {
               used_hours += hrs;
               // Per-entry rounding; the bucket sums entry units, never re-rounds.

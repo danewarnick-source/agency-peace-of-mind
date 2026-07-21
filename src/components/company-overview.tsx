@@ -251,7 +251,7 @@ function KpiStrip({ metrics, raw, isLoading }: { metrics: HealthMetrics | null; 
     {
       icon: MapPin, label: "EVV match", value: metrics.evv,
       nextAction: evvOut ? `Investigate ${evvOut} clock-in${evvOut === 1 ? "" : "s"}` : "Open EVV & timesheets",
-      to: "/dashboard/compliance-desk", search: { focus: "evv-out-of-bounds" },
+      to: "/dashboard/hub/documentation", search: { tab: "records", focus: "evv-out-of-bounds" },
     },
     {
       icon: FileCheck2, label: "Documentation", value: metrics.docs,
@@ -268,7 +268,7 @@ function KpiStrip({ metrics, raw, isLoading }: { metrics: HealthMetrics | null; 
     {
       icon: Activity, label: "Overall compliance", value: metrics.overall,
       nextAction: "Open compliance overview",
-      to: "/dashboard/compliance-desk", search: { focus: "compliance-overview" },
+      to: "/dashboard/hub/documentation", search: { tab: "records", focus: "compliance-overview" },
     },
   ];
   return (
@@ -363,7 +363,7 @@ function BillingSnapshotCard({ claimsReadyAmount, payrollGross }: { claimsReadyA
             Open Billing <ArrowRight className="h-3 w-3" />
           </p>
         </Link>
-        <Link to="/dashboard/compliance-desk" search={{ focus: "payroll-review" }} className="cursor-pointer rounded-lg border border-border bg-background p-4 transition hover:border-primary/40">
+        <Link to="/dashboard/hub/documentation" search={{ tab: "records", focus: "payroll-review" }} className="cursor-pointer rounded-lg border border-border bg-background p-4 transition hover:border-primary/40">
           <p className="text-xs font-medium text-muted-foreground">Payroll this period (gross)</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums">{fmtUSD(payrollGross)}</p>
           <p className="mt-1 inline-flex items-center gap-1 text-xs text-primary">

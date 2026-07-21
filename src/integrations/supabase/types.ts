@@ -4980,6 +4980,8 @@ export type Database = {
           denied_at: string | null
           denied_by: string | null
           followup_form_types: string[] | null
+          historical_attestation_text: string | null
+          historical_attestation_version: string | null
           id: string
           import_job_id: string | null
           import_source: string | null
@@ -5017,6 +5019,8 @@ export type Database = {
           denied_at?: string | null
           denied_by?: string | null
           followup_form_types?: string[] | null
+          historical_attestation_text?: string | null
+          historical_attestation_version?: string | null
           id?: string
           import_job_id?: string | null
           import_source?: string | null
@@ -5054,6 +5058,8 @@ export type Database = {
           denied_at?: string | null
           denied_by?: string | null
           followup_form_types?: string[] | null
+          historical_attestation_text?: string | null
+          historical_attestation_version?: string | null
           id?: string
           import_job_id?: string | null
           import_source?: string | null

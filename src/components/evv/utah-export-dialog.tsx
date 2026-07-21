@@ -20,6 +20,7 @@ import { isEvvLockedCode, padMemberId, evvServiceLabel } from "@/lib/evv-codes";
 import {
   buildUtahCsv, downloadCsv, defaultPreviousWeek, isValidIso, type UtahExportLine,
 } from "@/lib/utah-evv-export";
+import { isBillableForReview } from "@/lib/billing-units";
 
 type Coord = { latitude: number; longitude: number } | null;
 interface TsRow {
@@ -75,7 +76,7 @@ interface CategorizedRow {
   row: TsRow;
   address: string;
   memberId: string;
-  excludeReason: null | "missing_member_id" | "out_of_bounds" | "already_exported" | "no_clock_out";
+  excludeReason: null | "missing_member_id" | "out_of_bounds" | "already_exported" | "no_clock_out" | "not_reviewed";
   addressBlank: boolean;
   gpsAbsent: boolean;
 }
@@ -88,6 +89,7 @@ function categorize(rows: TsRow[], exportedIds: Set<string>, addressMap: Map<str
     let excludeReason: CategorizedRow["excludeReason"] = null;
     if (!effOut(r)) excludeReason = "no_clock_out";
     else if (exportedIds.has(r.id)) excludeReason = "already_exported";
+    else if (!isBillableForReview(r)) excludeReason = "not_reviewed";
     else if (!memberId) excludeReason = "missing_member_id";
     else if (
       r.outside_geofence_reason &&
@@ -143,7 +145,6 @@ export function UtahExportDialog({ open, onClose, organizationId, staffNameMap }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .select("id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, corrected_clock_in, corrected_clock_out, review_status, reviewed_at, status, outside_geofence_reason, reconciliation_status, gps_in_coordinates, gps_out_coordinates, staff_id, matched_approved_location_id, clients(first_name, last_name, physical_address, medicaid_id)" as any)
         .eq("organization_id", organizationId)
-        .eq("status", "Approved")
         .gte("clock_in_timestamp", fromIso)
         .lte("clock_in_timestamp", toIso)
         .order("clock_in_timestamp", { ascending: true });
@@ -258,6 +259,7 @@ export function UtahExportDialog({ open, onClose, organizationId, staffNameMap }
   const outOfBounds = categorized.filter((c) => c.excludeReason === "out_of_bounds");
   const noClockOut = categorized.filter((c) => c.excludeReason === "no_clock_out");
   const alreadyExported = categorized.filter((c) => c.excludeReason === "already_exported");
+  const notReviewed = categorized.filter((c) => c.excludeReason === "not_reviewed");
   const addressBlankCount = eligible.filter((c) => c.addressBlank).length;
   const gpsAbsentCount = eligible.filter((c) => c.gpsAbsent).length;
 
@@ -467,6 +469,9 @@ export function UtahExportDialog({ open, onClose, organizationId, staffNameMap }
               <li className="text-muted-foreground">{missingMember.length} excluded · missing Member ID</li>
               <li className="text-muted-foreground">{outOfBounds.length} excluded · out-of-bounds without an accepted reason</li>
               <li className="text-muted-foreground">{noClockOut.length} excluded · no clock-out yet</li>
+              {notReviewed.length > 0 && (
+                <li className="text-amber-600">{notReviewed.length} excluded · not yet confirmed/reviewed</li>
+              )}
               {addressBlankCount > 0 && (
                 <li className="text-amber-600">{addressBlankCount} row{addressBlankCount === 1 ? "" : "s"} with blank address — city/state/zip will be empty (state may flag)</li>
               )}

@@ -1,24 +1,16 @@
-## Authorized Codes: one Edit-all button + per-row Delete
+## Problem
 
-Replace the per-row Edit buttons on the client Billing → Authorized Codes list with a single **Edit** button on the card header that flips the whole list into edit mode. Keep the per-row Delete action.
+There are two authorized-codes UIs. My earlier change updated `BillingCodesDetail` (used on `/dashboard/billing/$clientId`), but the client profile Billing tab (`/dashboard/clients/$clientId?tab=billing`) — where you're looking — still renders a legacy inline table in `src/routes/dashboard.clients.$clientId.tsx`:
 
-### Where
-`src/components/clients/billing-codes-detail.tsx`
+- `BillingCodesPanel` (line 1263) → `EditableBillingCodesTable` (line 1387) → `EditableBillingCodeRow` (line 1420), which has a per-row **Edit** button and no Delete.
 
-### Changes
-- **Remove** the per-row Edit / Manual override button in `CodeRow` (around line 609). Rows no longer own their own edit state.
-- **Card header** (active authorizations section) gets:
-  - `Edit` button (ghost, pencil icon) — enters bulk-edit mode.
-  - In bulk mode it swaps to `Save all` (primary) + `Cancel` (ghost) with a small `N changed` counter.
-- **Bulk edit mode**:
-  - Every non-readonly row renders its Annual units, Rate/unit, and Service end date inputs inline (reuse the existing input UI already in `CodeRow`).
-  - Draft state lives at the parent as `Map<codeId, { annual, rate, endDate }>`, seeded from current values; unchanged entries are skipped on save.
-  - Per-row validation (non-negative numbers, end date after start date) mirrors current single-row rules; invalid rows highlight and block `Save all`.
-  - `Save all` runs `client_billing_codes` updates in parallel (`Promise.all`) scoped to `organization_id`, then invalidates: `all-client-billing-codes`, `client-billing-codes`, `client-budget`, `client-codes-summary`, `client-readiness`, `caseload`, `scheduler-data`. Toast summarizes `Updated X of Y codes`; failed rows keep their drafts with inline error text.
-  - `Cancel` discards drafts and exits bulk mode.
-- **Per-row Delete** (from prior plan) stays: Trash2 icon button on each active row, confirm dialog, extra warning when `usedUnits > 0`, deletes the `client_billing_codes` row and strips the code from `clients.authorized_dspd_codes` / `job_code`, then invalidates the same query keys. Hidden while bulk-edit mode is active to avoid competing actions.
-- Read-only "Previous authorizations" panel is unchanged.
+## Fix
 
-### Notes
-- No schema changes; no server function needed — reuses the browser `supabase` client and existing RLS.
-- No dedicated full-page editor route (dropped per feedback).
+In `src/routes/dashboard.clients.$clientId.tsx`:
+
+1. Replace the `<EditableBillingCodesTable …>` call inside `BillingCodesPanel` with the updated `<BillingCodesDetail clientId={clientId} />` (single header **Edit** button, per-row **Delete** with confirm, bulk Save all / Cancel).
+2. Keep the reclaim banner and the "Add a new authorized code" `AddCodesControl` block wrapping it.
+3. Delete the now-unused `EditableBillingCodesTable`, `EditableBillingCodeRow`, and `BillingCodeTableRow` type, plus any imports that become unused (`Pencil`, `X`, `CheckCircle2`, `Table*`, `UNIT_TYPE_OPTIONS`, `unitTypeLetter`) — only remove ones with no remaining references in the file.
+4. Add `import { BillingCodesDetail } from "@/components/clients/billing-codes-detail"`.
+
+No schema or business-logic changes.

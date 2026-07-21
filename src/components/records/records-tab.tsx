@@ -43,7 +43,10 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const PAGE_SIZE = 100;
-const FETCH_CAP = 2000;
+// Server-side page size for exhaustively paginating through all matching
+// rows (not a cap on total results — see the while loops around .range()
+// below, which keep fetching until a page comes back short).
+const FETCH_PAGE_SIZE = 1000;
 
 type Mode = "attention" | "all";
 type RecordType = "all" | "evv" | "non_evv" | "hhs_daily" | "non_billable";
@@ -306,7 +309,7 @@ export function RecordsTab() {
       const fromIso = new Date(`${from}T00:00:00`).toISOString();
       const toIso = new Date(`${to}T23:59:59.999`).toISOString();
 
-      const buildQuery = (cols: string) => {
+      const buildQuery = (cols: string, rangeFrom: number, rangeTo: number) => {
         let qb = supabase
           .from("evv_timesheets")
           .select(cols)
@@ -314,30 +317,45 @@ export function RecordsTab() {
           .gte("clock_in_timestamp", fromIso)
           .lte("clock_in_timestamp", toIso)
           .order("clock_in_timestamp", { ascending: false })
-          .limit(FETCH_CAP);
+          .range(rangeFrom, rangeTo);
         if (staff.length) qb = qb.in("staff_id", staff);
         if (codeFilter.length) qb = qb.in("service_type_code", codeFilter);
         if (clientIds.length) qb = qb.in("client_id", clientIds);
         return qb;
       };
 
+      // Probe a single row first to resolve which optional columns are live
+      // on this DB (self-healing against pending migrations — see
+      // OPTIONAL_SELECT_COLS comment above), without paying for it on every
+      // page of the full fetch below.
       let pendingOptional = [...OPTIONAL_SELECT_COLS];
-      let data: unknown = null;
-      let error: { code?: string; message: string } | null = null;
+      let probeError: { code?: string; message: string } | null = null;
       for (let attempt = 0; attempt <= OPTIONAL_SELECT_COLS.length; attempt++) {
         const cols = [CORE_SELECT_COLS, ...pendingOptional, "clients:client_id(first_name, last_name, team_id)"].join(", ");
-        const res = await buildQuery(cols);
-        data = res.data;
-        error = res.error;
-        if (!error) break;
-        const isUndefinedColumn = error.code === "42703" || /column .* does not exist/i.test(error.message);
+        const res = await buildQuery(cols, 0, 0);
+        probeError = res.error;
+        if (!probeError) break;
+        const isUndefinedColumn = probeError.code === "42703" || /column .* does not exist/i.test(probeError.message);
         if (!isUndefinedColumn) break;
-        const missing = pendingOptional.find((c) => error!.message.includes(c));
+        const missing = pendingOptional.find((c) => probeError!.message.includes(c));
         if (!missing) break; // couldn't identify which optional column failed — stop retrying
         pendingOptional = pendingOptional.filter((c) => c !== missing);
       }
-      if (error) throw error;
-      const baseRows = (data as unknown as Row[]) ?? [];
+      if (probeError) throw probeError;
+      const cols = [CORE_SELECT_COLS, ...pendingOptional, "clients:client_id(first_name, last_name, team_id)"].join(", ");
+
+      // Fetch every matching row, not just the first page — a large date
+      // range or broad filter can easily exceed a single page, and silently
+      // truncating would mean the table, the exports, and the Needs
+      // Attention counts all disagree with what's actually in the org's data.
+      const baseRows: Row[] = [];
+      for (let offset = 0; ; offset += FETCH_PAGE_SIZE) {
+        const res = await buildQuery(cols, offset, offset + FETCH_PAGE_SIZE - 1);
+        if (res.error) throw res.error;
+        const chunk = (res.data as unknown as Row[]) ?? [];
+        baseRows.push(...chunk);
+        if (chunk.length < FETCH_PAGE_SIZE) break;
+      }
 
       const staffMap = new Map((staffOptionsQ.data ?? []).map((s) => [s.value, s.label]));
       const teamMap = new Map((teamOptionsQ.data ?? []).map((t) => [t.value, t.label]));
@@ -386,17 +404,27 @@ export function RecordsTab() {
       const fromIso = new Date(`${from}T00:00:00`).toISOString();
       const toIso = new Date(`${to}T23:59:59.999`).toISOString();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let q = (supabase as any)
-        .from("general_shifts")
-        .select("id, user_id, category, note, clock_in_timestamp, clock_out_timestamp")
-        .eq("organization_id", orgId!)
-        .gte("clock_in_timestamp", fromIso)
-        .lte("clock_in_timestamp", toIso)
-        .order("clock_in_timestamp", { ascending: false })
-        .limit(FETCH_CAP);
-      if (staff.length) q = q.in("user_id", staff);
-      const { data, error } = await q;
-      if (error) throw error;
+      const buildQuery = (rangeFrom: number, rangeTo: number) => {
+        let q = (supabase as any)
+          .from("general_shifts")
+          .select("id, user_id, category, note, clock_in_timestamp, clock_out_timestamp")
+          .eq("organization_id", orgId!)
+          .gte("clock_in_timestamp", fromIso)
+          .lte("clock_in_timestamp", toIso)
+          .order("clock_in_timestamp", { ascending: false })
+          .range(rangeFrom, rangeTo);
+        if (staff.length) q = q.in("user_id", staff);
+        return q;
+      };
+      // Fetch every matching row — see the equivalent loop in the evv_timesheets
+      // query above for why a hard cap is unacceptable here.
+      const data: unknown[] = [];
+      for (let offset = 0; ; offset += FETCH_PAGE_SIZE) {
+        const { data: chunk, error } = await buildQuery(offset, offset + FETCH_PAGE_SIZE - 1);
+        if (error) throw error;
+        data.push(...(chunk ?? []));
+        if ((chunk ?? []).length < FETCH_PAGE_SIZE) break;
+      }
       const staffMap = new Map((staffOptionsQ.data ?? []).map((s) => [s.value, s.label]));
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return ((data ?? []) as any[]).map((g): GeneralRow => ({

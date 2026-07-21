@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { createEmployeeManually, adminResetEmployeePassword } from "@/lib/employees.functions";
 import { listStaffPii, updateStaffPii, type StaffPii } from "@/lib/hr-staff.functions";
-import { createInvitation } from "@/lib/invitations.functions";
+import { createInvitation, revokeInvitation } from "@/lib/invitations.functions";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Mail, UserPlus, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Pencil, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal } from "lucide-react";
+import { Mail, UserPlus, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Pencil, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal, Ban } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { OnboardingReturnBar } from "@/components/onboarding/onboarding-return-bar";
@@ -93,6 +93,7 @@ export function EmployeesPage() {
   const fetchStaffPii = useServerFn(listStaffPii);
   const updatePiiFn = useServerFn(updateStaffPii);
   const createInviteFn = useServerFn(createInvitation);
+  const revokeInviteFn = useServerFn(revokeInvitation);
 
   const { data: tracks } = useQuery({
     enabled: !!org,
@@ -198,7 +199,18 @@ export function EmployeesPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-
+  const revokeInviteMutation = useMutation({
+    mutationFn: async (invitationId: string) => {
+      return await revokeInviteFn({
+        data: { organization_id: org!.organization_id, invitation_id: invitationId },
+      });
+    },
+    onSuccess: (res) => {
+      toast.success(`Invitation revoked for ${res.invitation.email}`);
+      qc.invalidateQueries({ queryKey: ["invites"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const manualMutation = useMutation({
     mutationFn: async (input: {
@@ -389,14 +401,30 @@ export function EmployeesPage() {
               return (
                 <li key={i.id} className="flex items-center justify-between gap-3 py-3 text-sm">
                   <div className="flex items-center gap-2 truncate"><Mail className="h-4 w-4 shrink-0 text-muted-foreground" /> <span className="truncate">{i.email}</span> <span className="shrink-0 text-xs text-muted-foreground">· {i.role}</span></div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => { navigator.clipboard.writeText(link); toast.success("Invite link copied"); }}
-                  >
-                    <Copy className="mr-1 h-3.5 w-3.5" /> Copy link
-                  </Button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { navigator.clipboard.writeText(link); toast.success("Invite link copied"); }}
+                    >
+                      <Copy className="mr-1 h-3.5 w-3.5" /> Copy link
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      disabled={revokeInviteMutation.isPending}
+                      onClick={() => {
+                        if (confirm(`Uninvite ${i.email}? This link will stop working.`)) {
+                          revokeInviteMutation.mutate(i.id);
+                        }
+                      }}
+                    >
+                      <Ban className="mr-1 h-3.5 w-3.5" /> Uninvite
+                    </Button>
+                  </div>
                 </li>
               );
             })}

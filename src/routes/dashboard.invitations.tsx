@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Mail, UserPlus, Copy, RefreshCcw, Ban, Send } from "lucide-react";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
-import { createInvitation, resendInvitation } from "@/lib/invitations.functions";
+import { createInvitation, resendInvitation, revokeInvitation } from "@/lib/invitations.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/invitations")({
@@ -34,6 +34,7 @@ function InvitationsPage() {
   const [open, setOpen] = useState(false);
   const createInviteFn = useServerFn(createInvitation);
   const resendInviteFn = useServerFn(resendInvitation);
+  const revokeInviteFn = useServerFn(revokeInvitation);
 
   const { data: invites, isLoading } = useQuery({
     enabled: !!org,
@@ -106,14 +107,12 @@ function InvitationsPage() {
 
   const revokeInvite = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("invitations")
-        .update({ status: "revoked" })
-        .eq("id", id);
-      if (error) throw error;
+      return await revokeInviteFn({
+        data: { organization_id: org!.organization_id, invitation_id: id },
+      });
     },
-    onSuccess: () => {
-      toast.success("Invitation revoked");
+    onSuccess: (res) => {
+      toast.success(`Invitation revoked for ${res.invitation.email}`);
       qc.invalidateQueries({ queryKey: ["invitations"] });
     },
     onError: (e: Error) => toast.error(e.message),

@@ -213,3 +213,37 @@ export const resendInvitation = createServerFn({ method: "POST" })
       email_error: emailResult.ok ? null : (emailResult.error ?? "Email send failed"),
     };
   });
+
+export const revokeInvitation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { organization_id: string; invitation_id: string }) =>
+    z
+      .object({
+        organization_id: ORG_ID,
+        invitation_id: z.string().uuid(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await requirePermission(
+      supabase as unknown as SupabaseClient,
+      userId,
+      data.organization_id,
+      "invite_users",
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: invite, error } = await (supabase as any)
+      .from("invitations")
+      .update({ status: "revoked" })
+      .eq("id", data.invitation_id)
+      .eq("organization_id", data.organization_id)
+      .eq("status", "pending")
+      .select("id, email")
+      .single();
+    if (error) throw new Error(error.message);
+    if (!invite) throw new Error("Invitation not found or already resolved");
+
+    return { invitation: invite as { id: string; email: string } };
+  });

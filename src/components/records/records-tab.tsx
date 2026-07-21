@@ -101,13 +101,23 @@ type Derived = Row & {
   awaiting_staff_confirmation: boolean;
 };
 
-const BASE_SELECT_COLS =
-  "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, corrected_clock_in, corrected_clock_out, rounded_clock_in, rounded_clock_out, is_edited_by_admin, is_out_of_bounds, outside_geofence_reason, gps_in_bypassed, gps_in_bypass_reason, gps_out_bypassed, gps_out_bypass_reason, shift_note_text, goals_completed, review_status, status, incident_flag, denial_reason, utah_medicaid_member_id, import_source, shift_entry_type, edited_by_admin_name, edited_at, edit_audit_history_log, clients:client_id(first_name, last_name, team_id)";
-// manager_note_* columns ship in docs/SQL_HANDOFF.md #10 — until that's run
-// against the live DB, selecting them 42703s the whole query. Try the full
-// select first; if it fails on an undefined column, fall back to the base
-// set so the records list keeps working while the migration is pending.
-const SELECT_COLS = `${BASE_SELECT_COLS.replace(", clients:", ", manager_note_text, manager_note_by_name, manager_note_at, clients:")}`;
+// Columns that have been live on evv_timesheets since well before today
+// (already read/written elsewhere, e.g. dashboard.compliance-desk.tsx) —
+// safe to always select.
+const CORE_SELECT_COLS =
+  "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, corrected_clock_in, corrected_clock_out, rounded_clock_in, rounded_clock_out, is_edited_by_admin, is_out_of_bounds, outside_geofence_reason, shift_note_text, goals_completed, review_status, status, incident_flag, denial_reason, utah_medicaid_member_id, import_source, shift_entry_type, edited_by_admin_name, edited_at, edit_audit_history_log";
+// Columns that ship via docs/SQL_HANDOFF.md #9 and #10 (both 2026-07-21) —
+// each requires the human to run its ALTER TABLE in Lovable's SQL editor
+// before it exists on the live DB. Selecting a column that isn't live yet
+// 42703s the *entire* query, so these are appended and, on an
+// undefined-column error, dropped one at a time (self-healing) until the
+// query succeeds — the list keeps working no matter which of the two
+// pending migrations have been applied.
+const OPTIONAL_SELECT_COLS = [
+  "gps_in_bypassed", "gps_in_bypass_reason", "gps_out_bypassed", "gps_out_bypass_reason",
+  "manager_note_text", "manager_note_by_name", "manager_note_at",
+];
+const SELECT_COLS = `${CORE_SELECT_COLS}, ${OPTIONAL_SELECT_COLS.join(", ")}, clients:client_id(first_name, last_name, team_id)`;
 
 function fmtTs(iso: string | null): string {
   if (!iso) return "—";
@@ -304,11 +314,20 @@ export function RecordsTab() {
         return qb;
       };
 
-      let { data, error } = await buildQuery(SELECT_COLS);
-      if (error && (error.code === "42703" || /column .* does not exist/i.test(error.message))) {
-        // manager_note_* columns not live yet (SQL_HANDOFF #10 not run) —
-        // fall back so the list still loads; those fields just render empty.
-        ({ data, error } = await buildQuery(BASE_SELECT_COLS));
+      let pendingOptional = [...OPTIONAL_SELECT_COLS];
+      let data: unknown = null;
+      let error: { code?: string; message: string } | null = null;
+      for (let attempt = 0; attempt <= OPTIONAL_SELECT_COLS.length; attempt++) {
+        const cols = [CORE_SELECT_COLS, ...pendingOptional, "clients:client_id(first_name, last_name, team_id)"].join(", ");
+        const res = await buildQuery(cols);
+        data = res.data;
+        error = res.error;
+        if (!error) break;
+        const isUndefinedColumn = error.code === "42703" || /column .* does not exist/i.test(error.message);
+        if (!isUndefinedColumn) break;
+        const missing = pendingOptional.find((c) => error!.message.includes(c));
+        if (!missing) break; // couldn't identify which optional column failed — stop retrying
+        pendingOptional = pendingOptional.filter((c) => c !== missing);
       }
       if (error) throw error;
       const baseRows = (data as unknown as Row[]) ?? [];

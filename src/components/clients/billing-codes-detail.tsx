@@ -66,9 +66,10 @@ function draftFromCode(c: { annual_unit_authorization: number | null; rate_per_u
 
 type Props = {
   clientId: string;
-  clientName: string;
-  medicaidId: string | null;
+  clientName?: string;
+  medicaidId?: string | null;
 };
+
 
 function fmtMoney(n: number): string {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD" });

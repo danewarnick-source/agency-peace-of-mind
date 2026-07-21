@@ -27,6 +27,8 @@ import { buildUtahCsv, downloadCsv, isValidIso, type UtahExportLine } from "@/li
 import { reviewExceptions, type ReviewException } from "@/lib/records-review-rules";
 import { ResidentialDailyTab } from "@/components/residential/residential-daily-tab";
 import { TimeCorrectionReviewSection } from "@/components/records/time-correction-review-section";
+import { RecordDetailSheet, type AuditEntry } from "@/components/records/record-detail-sheet";
+import { ManualTimesheetDialog } from "@/components/records/manual-timesheet-dialog";
 
 import { UtahExportDialog } from "@/components/evv/utah-export-dialog";
 import { toast } from "sonner";
@@ -68,7 +70,9 @@ type Row = {
   is_out_of_bounds: boolean | null;
   outside_geofence_reason: string | null;
   gps_in_bypassed: boolean | null;
+  gps_in_bypass_reason: string | null;
   gps_out_bypassed: boolean | null;
+  gps_out_bypass_reason: string | null;
   shift_note_text: string | null;
   goals_completed: string[] | null;
   review_status: string | null;
@@ -77,6 +81,13 @@ type Row = {
   denial_reason: string | null;
   utah_medicaid_member_id: string | null;
   import_source: string | null;
+  shift_entry_type: string | null;
+  edited_by_admin_name: string | null;
+  edited_at: string | null;
+  edit_audit_history_log: AuditEntry[] | null;
+  manager_note_text: string | null;
+  manager_note_by_name: string | null;
+  manager_note_at: string | null;
   clients: { first_name: string; last_name: string; team_id: string | null } | null;
 };
 
@@ -91,7 +102,7 @@ type Derived = Row & {
 };
 
 const SELECT_COLS =
-  "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, corrected_clock_in, corrected_clock_out, rounded_clock_in, rounded_clock_out, is_edited_by_admin, is_out_of_bounds, outside_geofence_reason, gps_in_bypassed, gps_out_bypassed, shift_note_text, goals_completed, review_status, status, incident_flag, denial_reason, utah_medicaid_member_id, import_source, clients:client_id(first_name, last_name, team_id)";
+  "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, corrected_clock_in, corrected_clock_out, rounded_clock_in, rounded_clock_out, is_edited_by_admin, is_out_of_bounds, outside_geofence_reason, gps_in_bypassed, gps_in_bypass_reason, gps_out_bypassed, gps_out_bypass_reason, shift_note_text, goals_completed, review_status, status, incident_flag, denial_reason, utah_medicaid_member_id, import_source, shift_entry_type, edited_by_admin_name, edited_at, edit_audit_history_log, manager_note_text, manager_note_by_name, manager_note_at, clients:client_id(first_name, last_name, team_id)";
 
 function fmtTs(iso: string | null): string {
   if (!iso) return "—";
@@ -124,7 +135,7 @@ export function RecordsTab() {
   const orgId = org?.organization_id;
   const isAdmin = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
 
-  const [mode, setMode] = useState<Mode>("attention");
+  const [mode, setMode] = useState<Mode>("all");
   const [type, setType] = useState<RecordType>("all");
   const [staff, setStaff] = useState<string[]>([]);
   const [client, setClient] = useState<string[]>([]);
@@ -135,6 +146,7 @@ export function RecordsTab() {
   const [utahDialogOpen, setUtahDialogOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState<any | null>(null);
+  const [selectedRow, setSelectedRow] = useState<Derived | null>(null);
 
   // ── Option sources ──────────────────────────────────────────────────────
   const staffOptionsQ = useQuery({
@@ -611,7 +623,7 @@ export function RecordsTab() {
         <div>
           <h3 className="text-base font-semibold text-[#0B1126]">Records</h3>
           <p className="text-xs text-muted-foreground">
-            Every work record in one place. Default view is the exception queue; switch to All records to search the archive.
+            Every work record in one place. Click any row to view and edit every field. Switch to Needs attention to work the exception queue.
           </p>
         </div>
       </div>
@@ -719,6 +731,13 @@ export function RecordsTab() {
               {type !== "non_billable" && total > PAGE_SIZE && ` — showing first ${PAGE_SIZE}`}
             </span>
             <div className="flex flex-wrap items-center gap-2">
+              {orgId && (
+                <ManualTimesheetDialog
+                  mode="admin"
+                  organizationId={orgId}
+                  staffOptions={staffOptionsQ.data ?? []}
+                />
+              )}
               {type !== "non_billable" && (canDhhsExport ? (
                 <Button
                   type="button" size="sm" variant="default"
@@ -843,13 +862,18 @@ export function RecordsTab() {
                     const inTs = r.corrected_clock_in ?? r.clock_in_timestamp;
                     const outTs = r.corrected_clock_out ?? r.clock_out_timestamp;
                     return (
-                      <tr key={r.id} className="border-t border-border hover:bg-accent/40">
+                      <tr
+                        key={r.id}
+                        onClick={() => setSelectedRow(r)}
+                        className="cursor-pointer border-t border-border hover:bg-accent/40"
+                      >
                         <td className="px-3 py-2">{r.staff_name}</td>
                         <td className="px-3 py-2">
                           <Link
                             to="/dashboard/shift/$shiftId"
                             params={{ shiftId: r.id }}
                             target="_blank"
+                            onClick={(e) => e.stopPropagation()}
                             className="text-[#137182] hover:underline"
                           >
                             {r.client_name}
@@ -864,6 +888,9 @@ export function RecordsTab() {
                           {fmtTs(inTs)} → {fmtTs(outTs)}
                           {r.is_edited_by_admin && (
                             <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-amber-700">edited</span>
+                          )}
+                          {r.shift_entry_type === "Manual_Entry" && (
+                            <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-[#137182]">manual</span>
                           )}
                         </td>
                         <td className="px-3 py-2 tabular-nums">{fmtDur(r.duration_min)}</td>
@@ -955,6 +982,12 @@ export function RecordsTab() {
           </div>
         )}
       </section>
+
+      <RecordDetailSheet
+        row={selectedRow}
+        organizationId={orgId}
+        onClose={() => setSelectedRow(null)}
+      />
 
       {utahDialogOpen && canDhhsExport && orgId && (
         <UtahExportDialog

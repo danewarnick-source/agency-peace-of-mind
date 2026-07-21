@@ -31,6 +31,7 @@ import {
   Lock,
   FolderArchive,
   CalendarClock,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,6 +43,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -56,13 +58,19 @@ import { SectionPanel, SectionGroup } from "@/components/clients/section-panel";
 
 import { RequirePermission } from "@/components/rbac-guard";
 import { StaffTypeEditor } from "@/components/hr/staff-type-editor";
+import { TrainingRequirementField } from "@/components/hr/training-requirement-field";
+import { POSITIONS, type Position } from "@/lib/employee-positions";
 import { EmployeeDocumentsCard } from "@/components/employees/employee-documents-card";
 import { EmployeeFaceSheetButton } from "@/components/employees/employee-face-sheet-button";
 import { StaffHrChecklistCard } from "@/components/hr/staff-hr-checklist-card";
+import { CustomAttributesSection } from "@/components/custom-attributes-section";
+import { LifecyclePanel } from "@/components/lifecycle-panel";
+import { SuggestedTopicsInput } from "@/components/ce/suggested-topics-input";
 import {
   getStaffChecklist,
   getStaffPii,
   updateStaffPii,
+  getStaffTrainingRiskFlags,
   createHrDocumentUploadUrl,
   getHrDocumentUrl,
   upsertChecklistCompletion,
@@ -120,7 +128,7 @@ function StaffProfilePage() {
       const { data: p, error: pErr } = await supabase
         .from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, employee_id, position, positions, department, hire_date, account_status, worker_type, team_id, photo_path, photo_updated_at, phone, emergency_contact_name, emergency_contact_relationship, emergency_contact_phone, staff_type_keys" as any)
+        .select("id, full_name, email, username, employee_id, position, positions, department, hire_date, start_date, end_date, account_status, worker_type, team_id, photo_path, photo_updated_at, phone, emergency_contact_name, emergency_contact_relationship, emergency_contact_phone, staff_type_keys, ce_suggested_topics, requires_deescalation, requires_abi" as any)
         .eq("id", staffId)
         .maybeSingle();
       if (pErr) throw pErr;
@@ -466,12 +474,40 @@ function StaffProfilePage() {
               />
             </SectionPanel>
           </SectionGroup>
+
+          <SectionGroup label="Custom attributes" hint="Extra fields imported or added manually" divider>
+            <SectionPanel icon={ClipboardList} accent="sky">
+              <CustomAttributesSection
+                organizationId={orgId}
+                entityKind="employee"
+                entityId={staffId}
+              />
+            </SectionPanel>
+          </SectionGroup>
         </TabsContent>
 
 
         {/* ----- CERTS & TRAININGS ----- */}
         <TabsContent value="requirements" className="mt-4 space-y-10">
-          <SectionGroup label="Certifications & training" hint="Current status and history">
+          <SectionGroup label="Training requirement settings" hint="Required / Exempt & suggested CE focus">
+            <SectionPanel icon={ShieldAlert} accent="rose">
+              <BehaviorTrainingRequirementsCard
+                organizationId={orgId}
+                staffId={staffId}
+                requiresDeescalation={(p?.requires_deescalation as boolean | null | undefined) !== false}
+                requiresAbi={(p?.requires_abi as boolean | null | undefined) !== false}
+                onSaved={invalidateProfile}
+              />
+            </SectionPanel>
+            <SectionPanel icon={Sparkles} accent="violet">
+              <CeSuggestedTopicsCard
+                staffId={staffId}
+                topics={((p?.ce_suggested_topics as string[] | null) ?? [])}
+                onSaved={invalidateProfile}
+              />
+            </SectionPanel>
+          </SectionGroup>
+          <SectionGroup label="Certifications & training" hint="Current status and history" divider>
             <SectionPanel icon={GraduationCap} accent="amber">
               <CertsTab organizationId={orgId} staffId={staffId} staffName={name} caseload={caseloadQ.data ?? []} orgRole={org?.role} />
             </SectionPanel>
@@ -520,6 +556,18 @@ function StaffProfilePage() {
               <StaffHrDocsPanel organizationId={orgId} staffId={staffId} />
             </SectionPanel>
           </SectionGroup>
+          <SectionGroup label="Danger zone" hint="Archive or permanently delete this record" divider>
+            <SectionPanel icon={AlertTriangle} accent="rose">
+              <LifecyclePanel
+                kind="employee"
+                id={staffId}
+                fullName={name}
+                organizationId={orgId}
+                onDone={() => router.navigate({ to: "/dashboard/hub/employees" })}
+                onDeleted={() => router.navigate({ to: "/dashboard/hub/employees" })}
+              />
+            </SectionPanel>
+          </SectionGroup>
         </TabsContent>
 
         {/* ----- DEADLINES ----- */}
@@ -566,23 +614,37 @@ function ContactCard({
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({
+    full_name: "",
+    email: "",
     phone: "",
     employee_id: "",
     department: "",
-    worker_type: "w2_employee",
-    hire_date: "",
+    worker_type: "w2",
+    start_date: "",
+    end_date: "",
+    positions: [] as Position[],
+    role: "employee",
+    active: true,
     emergency_contact_name: "",
     emergency_contact_relationship: "",
     emergency_contact_phone: "",
   });
 
   const startEdit = () => {
+    const positionsArr = ((p?.positions as string[] | null) ?? []).filter(Boolean);
+    const initialPositions = positionsArr.filter((x): x is Position => POSITIONS.includes(x as Position));
     setDraft({
+      full_name: p?.full_name ?? "",
+      email: p?.email ?? "",
       phone: p?.phone ?? "",
       employee_id: p?.employee_id ?? "",
       department: p?.department ?? "",
-      worker_type: p?.worker_type ?? "w2_employee",
-      hire_date: p?.hire_date ?? "",
+      worker_type: p?.worker_type === "1099" ? "1099" : "w2",
+      start_date: p?.start_date ?? p?.hire_date ?? "",
+      end_date: p?.end_date ?? "",
+      positions: initialPositions.length ? initialPositions : (p?.position ? [p.position as Position] : []),
+      role: m.role,
+      active: m.active,
       emergency_contact_name: p?.emergency_contact_name ?? "",
       emergency_contact_relationship: p?.emergency_contact_relationship ?? "",
       emergency_contact_phone: p?.emergency_contact_phone ?? "",
@@ -592,21 +654,38 @@ function ContactCard({
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      if (draft.start_date && draft.end_date && draft.end_date < draft.start_date) {
+        throw new Error("End date must be on or after Start date.");
+      }
       const { error } = await supabase
         .from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .update({
+          full_name: draft.full_name,
+          email: draft.email || null,
           phone: draft.phone || null,
           employee_id: draft.employee_id || null,
           department: draft.department || null,
-          worker_type: draft.worker_type || null,
-          hire_date: draft.hire_date || null,
+          worker_type: draft.worker_type,
+          position: draft.positions[0] ?? null,
+          positions: draft.positions,
+          start_date: draft.start_date || null,
+          end_date: draft.end_date || null,
+          // Kept in sync with start_date — there is no independent "hire date"
+          // concept elsewhere in the product (onboarding only asks for Start date).
+          hire_date: draft.start_date || null,
           emergency_contact_name: draft.emergency_contact_name || null,
           emergency_contact_relationship: draft.emergency_contact_relationship || null,
           emergency_contact_phone: draft.emergency_contact_phone || null,
         } as any)
         .eq("id", staffId);
       if (error) throw new Error(error.message);
+
+      const { error: mErr } = await supabase
+        .from("organization_members")
+        .update({ role: draft.role, active: draft.active })
+        .eq("id", m.id);
+      if (mErr) throw new Error(mErr.message);
     },
     onSuccess: () => {
       toast.success("Saved");
@@ -636,14 +715,17 @@ function ContactCard({
       <CardContent>
         {!editing ? (
           <div className="space-y-0">
+            <Row label="Full name" value={p?.full_name ?? "—"} />
             <Row label="Email" value={p?.email ?? "—"} />
             <Row label="Phone" value={p?.phone ?? "—"} />
             <Row label="Employee ID" value={p?.employee_id ?? "—"} />
             <Row label="Position" value={positions.length ? positions.join(", ") : "—"} />
+            <Row label="System role" value={m.role} />
             <Row label="Worker type" value={p?.worker_type === "1099" ? "1099 contractor" : "W-2 employee"} />
             <Row label="Status" value={m.active ? "Active" : "Deactivated"} />
             <Row label="Department" value={p?.department ?? "—"} />
-            <Row label="Hire date" value={p?.hire_date ?? "—"} />
+            <Row label="Start date" value={p?.start_date ?? p?.hire_date ?? "—"} />
+            <Row label="End date" value={p?.end_date ?? "—"} />
             <div className="pt-2 mt-2 border-t border-border/60">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Emergency contact</div>
               <Row label="Name" value={p?.emergency_contact_name ?? "—"} />
@@ -653,6 +735,24 @@ function ContactCard({
           </div>
         ) : (
           <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Full name</Label>
+              <Input
+                type="text"
+                value={draft.full_name}
+                onChange={(e) => setDraft({ ...draft, full_name: e.target.value })}
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Email</Label>
+              <Input
+                type="email"
+                value={draft.email}
+                onChange={(e) => setDraft({ ...draft, email: e.target.value })}
+                className="text-sm"
+              />
+            </div>
             <div className="space-y-1">
               <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Phone</Label>
               <Input
@@ -674,6 +774,61 @@ function ContactCard({
               />
             </div>
             <div className="space-y-1">
+              <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Agency position</Label>
+              <p className="text-[11px] text-muted-foreground">Select one or more.</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {POSITIONS.map((pos) => {
+                  const checked = draft.positions.includes(pos);
+                  const id = `staff-position-${pos.replace(/\s+/g, "-").toLowerCase()}`;
+                  return (
+                    <label
+                      key={pos}
+                      htmlFor={id}
+                      className="flex min-h-[40px] cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-3 py-2 hover:bg-muted/40"
+                    >
+                      <Checkbox
+                        id={id}
+                        checked={checked}
+                        onCheckedChange={(v) =>
+                          setDraft((d) => ({
+                            ...d,
+                            positions: v
+                              ? Array.from(new Set([...d.positions, pos]))
+                              : d.positions.filter((x) => x !== pos),
+                          }))
+                        }
+                      />
+                      <span className="text-sm">{pos}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">System role</Label>
+              <Select value={draft.role} onValueChange={(v) => setDraft({ ...draft, role: v })}>
+                <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="employee">Staff</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Employment status</Label>
+              <Select
+                value={draft.active ? "true" : "false"}
+                onValueChange={(v) => setDraft({ ...draft, active: v === "true" })}
+              >
+                <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Active</SelectItem>
+                  <SelectItem value="false">Deactivated</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
               <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Department</Label>
               <Input
                 type="text"
@@ -693,19 +848,32 @@ function ContactCard({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="w2_employee">W-2 employee</SelectItem>
+                  <SelectItem value="w2">W-2 employee</SelectItem>
                   <SelectItem value="1099">1099 contractor</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
-              <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Hire date</Label>
-              <Input
-                type="date"
-                value={draft.hire_date}
-                onChange={(e) => setDraft({ ...draft, hire_date: e.target.value })}
-                className="text-sm"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Start date</Label>
+                <Input
+                  type="date"
+                  value={draft.start_date}
+                  onChange={(e) => setDraft({ ...draft, start_date: e.target.value })}
+                  className="text-sm"
+                />
+                <p className="text-[10px] text-muted-foreground">Drives Continuing Education eligibility & year window.</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">End date (optional)</Label>
+                <Input
+                  type="date"
+                  value={draft.end_date}
+                  onChange={(e) => setDraft({ ...draft, end_date: e.target.value })}
+                  className="text-sm"
+                />
+                <p className="text-[10px] text-muted-foreground">Blank for active employees. Pauses new CE; history retained.</p>
+              </div>
             </div>
             <div className="pt-2 mt-2 border-t border-border/60 space-y-3">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Emergency contact</div>
@@ -746,6 +914,128 @@ function ContactCard({
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
             </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ======================================================================
+ * Behavior-related training requirements — explicit Required/Exempt
+ * setting per staffer, with a compliance-risk warning before exempting
+ * someone currently assigned to a behavior-coded or ABI client.
+ * ====================================================================*/
+function BehaviorTrainingRequirementsCard({
+  organizationId,
+  staffId,
+  requiresDeescalation,
+  requiresAbi,
+  onSaved,
+}: {
+  organizationId: string;
+  staffId: string;
+  requiresDeescalation: boolean;
+  requiresAbi: boolean;
+  onSaved: () => void;
+}) {
+  const fetchRiskFlags = useServerFn(getStaffTrainingRiskFlags);
+  const riskFlagsQ = useQuery({
+    queryKey: ["staff-training-risk", organizationId, staffId],
+    queryFn: () => fetchRiskFlags({ data: { organization_id: organizationId, staff_id: staffId } }),
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async (next: { requires_deescalation?: boolean; requires_abi?: boolean }) => {
+      const { error } = await supabase
+        .from("profiles")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update(next as any)
+        .eq("id", staffId);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      toast.success("Saved");
+      onSaved();
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Behavior-related training requirements</CardTitle>
+      </CardHeader>
+      <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <TrainingRequirementField
+          label="De-escalation training"
+          hint="Typically required for staff assigned to a behavior-coded client (BC1/2/3) or a client with a Behavior Support Plan."
+          value={requiresDeescalation}
+          onChange={(v) => saveMutation.mutate({ requires_deescalation: v })}
+          atRisk={!!riskFlagsQ.data?.has_behavior_client}
+          warningText="Are you sure? This staff member is assigned to a client with behavior supports. De-escalation training is typically required for staff working with this code. Marking this exempt without proper justification could cause compliance issues in an audit."
+        />
+        <TrainingRequirementField
+          label="ABI training"
+          hint="Typically required for staff assigned to a client with an ABI (acquired brain injury) designation."
+          value={requiresAbi}
+          onChange={(v) => saveMutation.mutate({ requires_abi: v })}
+          atRisk={!!riskFlagsQ.data?.has_abi_client}
+          warningText="Are you sure? This staff member is assigned to a client with an ABI designation. ABI training is typically required for staff working with this client. Marking this exempt without proper justification could cause compliance issues in an audit."
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ======================================================================
+ * Suggested CE focus topics — steers Nectar's monthly CE review for
+ * this staffer.
+ * ====================================================================*/
+function CeSuggestedTopicsCard({
+  staffId,
+  topics,
+  onSaved,
+}: {
+  staffId: string;
+  topics: string[];
+  onSaved: () => void;
+}) {
+  const [draft, setDraft] = useState<string[]>(topics);
+  const [dirty, setDirty] = useState(false);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("profiles")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update({ ce_suggested_topics: draft } as any)
+        .eq("id", staffId);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      toast.success("Saved");
+      setDirty(false);
+      onSaved();
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  return (
+    <Card>
+      <CardContent className="pt-6 space-y-3">
+        <SuggestedTopicsInput
+          value={draft}
+          onChange={(next) => { setDraft(next); setDirty(true); }}
+        />
+        {dirty && (
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+              Save
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => { setDraft(topics); setDirty(false); }}>
+              Cancel
+            </Button>
           </div>
         )}
       </CardContent>

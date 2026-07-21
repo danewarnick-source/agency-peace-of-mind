@@ -6,12 +6,6 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { createEmployeeManually, adminResetEmployeePassword } from "@/lib/employees.functions";
-import {
-  listStaffPii,
-  updateStaffPii,
-  getStaffTrainingRiskFlags,
-  type StaffPii,
-} from "@/lib/hr-staff.functions";
 import { createInvitation, revokeInvitation } from "@/lib/invitations.functions";
 
 import { Button } from "@/components/ui/button";
@@ -22,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Mail, UserPlus, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Pencil, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal, Ban } from "lucide-react";
+import { Mail, UserPlus, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal, Ban } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { OnboardingReturnBar } from "@/components/onboarding/onboarding-return-bar";
@@ -30,13 +24,12 @@ import { OnboardingGuidanceBanner } from "@/components/onboarding/onboarding-gui
 
 import { RequirePermission } from "@/components/rbac-guard";
 // Smart Import replaces the legacy NECTAR Bulk Importer dialog.
-import { CustomAttributesSection } from "@/components/custom-attributes-section";
-import { LifecyclePanel } from "@/components/lifecycle-panel";
-import { SuggestedTopicsInput } from "@/components/ce/suggested-topics-input";
 import { getRosterTrainingStatus } from "@/lib/hive-training-roster.functions";
 import { PersonAvatar } from "@/components/person/person-avatar";
 import { useEntitlements } from "@/hooks/use-entitlements";
 import { StaffTrainingStrip, type StaffTrainingStatus } from "@/components/training/staff-training-strip";
+import { TrainingRequirementField } from "@/components/hr/training-requirement-field";
+import type { Position } from "@/lib/employee-positions";
 
 function genPassword(len = 14) {
   const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
@@ -55,68 +48,6 @@ export const Route = createFileRoute("/dashboard/employees/")({
 
 type Role = "admin" | "manager" | "employee";
 
-type Position = "Direct Care" | "Host Staff" | "Office Staff" | "Admin";
-const POSITIONS: Position[] = ["Direct Care", "Host Staff", "Office Staff", "Admin"];
-
-type WorkerType = "w2" | "1099";
-
-type EditableMember = {
-  membershipId: string;
-  userId: string;
-  fullName: string;
-  email: string;
-  employeeId: string;
-  role: Role;
-  active: boolean;
-  position: Position | "";
-  positions: Position[];
-  workerType: WorkerType;
-  hourlyRate: string;
-  dailyRate: string;
-  startDate: string;
-  endDate: string;
-  ceSuggestedTopics: string[];
-  requiresDeescalation: boolean;
-  requiresAbi: boolean;
-};
-
-/**
- * Explicit Required / Exempt picker for the de-escalation & ABI training
- * requirements. Warns before allowing Exempt when the staffer is currently
- * assigned to a client the setting is typically required for.
- */
-function TrainingRequirementField({
-  label, hint, value, onChange, atRisk, warningText,
-}: {
-  label: string;
-  hint: string;
-  value: boolean;
-  onChange: (next: boolean) => void;
-  atRisk: boolean;
-  warningText: string;
-}) {
-  return (
-    <div className="grid gap-2">
-      <Label>{label}</Label>
-      <Select
-        value={value ? "required" : "exempt"}
-        onValueChange={(v) => {
-          const next = v === "required";
-          if (!next && atRisk && !window.confirm(warningText)) return;
-          onChange(next);
-        }}
-      >
-        <SelectTrigger><SelectValue /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="required">Required</SelectItem>
-          <SelectItem value="exempt">Not required / Exempt</SelectItem>
-        </SelectContent>
-      </Select>
-      <p className="text-xs text-muted-foreground">{hint}</p>
-    </div>
-  );
-}
-
 export function EmployeesPage() {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
@@ -126,25 +57,16 @@ export function EmployeesPage() {
   const [resetUser, setResetUser] = useState<{ id: string; name: string } | null>(null);
   const [tempPassword, setTempPassword] = useState(() => genPassword());
   const [credentialsShown, setCredentialsShown] = useState<{ identifier: string; password: string } | null>(null);
-  const [editingMember, setEditingMember] = useState<EditableMember | null>(null);
-  const [editTopics, setEditTopics] = useState<string[]>([]);
-  const [editPositions, setEditPositions] = useState<Position[]>([]);
-  const [editDirty, setEditDirty] = useState(false);
   const [caseloadFor, setCaseloadFor] = useState<{ id: string; name: string; role: string } | null>(null);
   // Manual "add employee" onboarding form: de-escalation / ABI requirement
   // defaults to Required until the admin deliberately reviews it.
   const [manualRequiresDeescalation, setManualRequiresDeescalation] = useState(true);
   const [manualRequiresAbi, setManualRequiresAbi] = useState(true);
-  const [editRequiresDeescalation, setEditRequiresDeescalation] = useState(true);
-  const [editRequiresAbi, setEditRequiresAbi] = useState(true);
 
   const createManual = useServerFn(createEmployeeManually);
   const resetPwFn = useServerFn(adminResetEmployeePassword);
-  const fetchStaffPii = useServerFn(listStaffPii);
-  const updatePiiFn = useServerFn(updateStaffPii);
   const createInviteFn = useServerFn(createInvitation);
   const revokeInviteFn = useServerFn(revokeInvitation);
-  const fetchTrainingRiskFlags = useServerFn(getStaffTrainingRiskFlags);
 
   const { data: tracks } = useQuery({
     enabled: !!org,
@@ -166,7 +88,7 @@ export function EmployeesPage() {
       const ids = (data ?? []).map((m) => m.user_id);
       const { data: profs } = await supabase.from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, must_change_password, department, hire_date, start_date, end_date, employee_id, position, positions, account_status, worker_type, ce_suggested_topics, photo_path, photo_updated_at, requires_deescalation, requires_abi" as any)
+        .select("id, full_name, email, username, must_change_password, department, hire_date, start_date, employee_id, position, account_status, worker_type, photo_path, photo_updated_at" as any)
         .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const profMap = new Map(((profs ?? []) as any[]).map((p) => [p.id as string, p]));
@@ -177,33 +99,6 @@ export function EmployeesPage() {
         .filter((m) => (m.profile?.account_status ?? "active") !== "archived");
     },
   });
-  // Gated rate lookup: server-side `list_staff_pii` returns only staff the
-  // caller may view (admin / team-manager-of-staff / self). Direct selects
-  // of hourly_rate / daily_rate against `profiles` are REVOKEd.
-  const { data: staffPii } = useQuery({
-    enabled: !!org,
-    queryKey: ["staff-pii", org?.organization_id],
-    queryFn: async (): Promise<StaffPii[]> =>
-      await fetchStaffPii({ data: { organization_id: org!.organization_id } }),
-  });
-  const piiByStaff = useMemo(() => {
-    const m = new Map<string, StaffPii>();
-    for (const row of staffPii ?? []) m.set(row.staff_id, row);
-    return m;
-  }, [staffPii]);
-
-  // Risk flags for the confirmation warning shown when exempting the staffer
-  // currently being edited. Existing staff only — a brand-new hire can't yet
-  // be assigned to any client, so there's nothing to warn about.
-  const { data: editRiskFlags } = useQuery({
-    enabled: !!org && !!editingMember,
-    queryKey: ["staff-training-risk", org?.organization_id, editingMember?.userId],
-    queryFn: async () =>
-      await fetchTrainingRiskFlags({
-        data: { organization_id: org!.organization_id, staff_id: editingMember!.userId },
-      }),
-  });
-
   const fetchTrainingStatus = useServerFn(getRosterTrainingStatus);
   const { hasAddon } = useEntitlements();
   const hiveTrainingEnabled = hasAddon("hive_training");
@@ -330,79 +225,6 @@ export function EmployeesPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const editMemberMutation = useMutation({
-    mutationFn: async (input: EditableMember) => {
-      if (input.startDate && input.endDate && input.endDate < input.startDate) {
-        throw new Error("End date must be on or after Start date.");
-      }
-      const { data: pRows, error: pErr } = await supabase
-        .from("profiles")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .update({
-          full_name: input.fullName,
-          email: input.email || null,
-          employee_id: input.employeeId || null,
-          position: input.positions[0] ?? input.position ?? null,
-          positions: input.positions ?? [],
-          worker_type: input.workerType,
-          start_date: input.startDate || null,
-          end_date: input.endDate || null,
-          hire_date: input.startDate || null,
-          ce_suggested_topics: input.ceSuggestedTopics ?? [],
-          requires_deescalation: input.requiresDeescalation,
-          requires_abi: input.requiresAbi,
-        } as any)
-        .eq("id", input.userId)
-        // Return the exact columns we wrote so a silent partial-write
-        // (RLS column restriction, wrong id) is visible instead of a false "Saved" toast.
-        .select("id, full_name, email, employee_id, position, positions, worker_type, start_date, end_date, hire_date, requires_deescalation, requires_abi");
-      if (pErr) throw pErr;
-      if (!pRows || pRows.length === 0) {
-        throw new Error("Profile not updated — record not found or you don't have permission to edit it.");
-      }
-      const saved = pRows[0] as { full_name: string | null; email: string | null };
-      if ((input.fullName ?? "") && saved.full_name !== input.fullName) {
-        throw new Error("Name did not persist. Your role may not allow editing this profile column.");
-      }
-
-      // Rates are PII-gated: route through the server fn so the
-      // can_view_staff_pii() check applies on writes too.
-      await updatePiiFn({
-        data: {
-          organization_id: org!.organization_id,
-          staff_id: input.userId,
-          hourly_rate: input.hourlyRate === "" ? null : Number(input.hourlyRate),
-          daily_rate: input.dailyRate === "" ? null : Number(input.dailyRate),
-        },
-      });
-
-      const { data: mRows, error: mErr } = await supabase
-        .from("organization_members")
-        .update({ role: input.role, active: input.active })
-        .eq("id", input.membershipId)
-        .select("id");
-      if (mErr) throw mErr;
-      if (!mRows || mRows.length === 0) {
-        throw new Error("Membership not updated — record not found or you don't have permission to change role/status.");
-      }
-      return { staffId: input.userId };
-    },
-    onSuccess: (res) => {
-      toast.success("Employee updated");
-      // Refresh both list and the profile-page query so navigating to the
-      // staff profile shows the newly-saved values without a hard reload.
-      qc.invalidateQueries({ queryKey: ["members"] });
-      qc.invalidateQueries({ queryKey: ["staff-pii"] });
-      qc.invalidateQueries({ queryKey: ["staff-profile"] });
-      if (res?.staffId) {
-        qc.invalidateQueries({ queryKey: ["staff-profile", org?.organization_id, res.staffId] });
-      }
-      setEditingMember(null);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-
   return (
     <div className="space-y-6">
       <OnboardingReturnBar />
@@ -522,43 +344,6 @@ export function EmployeesPage() {
                 const openProfile = () => {
                   window.location.href = `/dashboard/employees/${m.user_id}`;
                 };
-                const openEdit = () => {
-                  const topics = ((m.profile as { ce_suggested_topics?: string[] | null } | undefined)?.ce_suggested_topics ?? []) as string[];
-                  setEditTopics(topics);
-                  const positionsArr = ((m.profile as { positions?: string[] | null } | undefined)?.positions ?? []) as string[];
-                  const initialPositions = positionsArr.filter((x): x is Position => POSITIONS.includes(x as Position));
-                  setEditPositions(initialPositions.length ? initialPositions : (position ? [position as Position] : []));
-                  const profRequiresDeescalation =
-                    (m.profile as { requires_deescalation?: boolean | null } | undefined)?.requires_deescalation;
-                  const profRequiresAbi =
-                    (m.profile as { requires_abi?: boolean | null } | undefined)?.requires_abi;
-                  setEditRequiresDeescalation(profRequiresDeescalation !== false);
-                  setEditRequiresAbi(profRequiresAbi !== false);
-                  setEditingMember({
-                    membershipId: m.id,
-                    userId: m.user_id,
-                    fullName: m.profile?.full_name ?? "",
-                    email: m.profile?.email ?? "",
-                    employeeId: m.profile?.employee_id ?? "",
-                    role: m.role as Role,
-                    active: m.active,
-                    position,
-                    positions: (() => {
-                      const arr = ((m.profile as { positions?: string[] | null } | undefined)?.positions ?? []) as string[];
-                      const list = arr.filter((x): x is Position => POSITIONS.includes(x as Position));
-                      if (list.length) return list;
-                      return position ? [position as Position] : [];
-                    })(),
-                    workerType: (m.profile?.worker_type === "1099" ? "1099" : "w2") as WorkerType,
-                    hourlyRate: piiByStaff.get(m.user_id)?.hourly_rate != null ? String(piiByStaff.get(m.user_id)!.hourly_rate) : "",
-                    dailyRate: piiByStaff.get(m.user_id)?.daily_rate != null ? String(piiByStaff.get(m.user_id)!.daily_rate) : "",
-                    startDate: (m.profile?.start_date ?? m.profile?.hire_date ?? "") as string,
-                    endDate: (m.profile?.end_date ?? "") as string,
-                    ceSuggestedTopics: topics,
-                    requiresDeescalation: profRequiresDeescalation !== false,
-                    requiresAbi: profRequiresAbi !== false,
-                  });
-                };
                 const trainings = trainingByStaff.get(m.user_id) ?? [];
                 return (
                   <React.Fragment key={m.id}>
@@ -628,9 +413,6 @@ export function EmployeesPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={openEdit}>
-                              <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
-                            </DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => setResetUser({ id: m.user_id, name })}>
                               <KeyRound className="mr-2 h-3.5 w-3.5" /> Reset password
                             </DropdownMenuItem>
@@ -822,243 +604,6 @@ export function EmployeesPage() {
             </div>
           )}
           <DialogFooter><Button onClick={() => setCredentialsShown(null)}>Done</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit employee */}
-      <Dialog
-        open={!!editingMember}
-        onOpenChange={(o) => {
-          if (o) return;
-          if (editDirty && !window.confirm("Discard unsaved changes?")) return;
-          setEditingMember(null);
-          setEditDirty(false);
-        }}
-      >
-        <DialogContent className="flex max-h-[100dvh] w-[calc(100%-1rem)] max-w-lg flex-col gap-0 p-0 sm:max-h-[90vh] sm:w-full">
-          <DialogHeader className="shrink-0 border-b border-border px-4 py-3 sm:px-6 sm:py-4">
-            <DialogTitle className="pr-8">Edit employee</DialogTitle>
-            <DialogDescription className="text-xs sm:text-sm">
-              Update profile, role, and employment status. Changes save when you tap Save.
-            </DialogDescription>
-          </DialogHeader>
-          {editingMember && (
-            <form
-              id="edit-employee-form"
-              onChange={() => { if (!editDirty) setEditDirty(true); }}
-              onSubmit={(e) => {
-                e.preventDefault();
-                const fd = new FormData(e.currentTarget);
-                editMemberMutation.mutate({
-                  membershipId: editingMember.membershipId,
-                  userId: editingMember.userId,
-                  fullName: String(fd.get("full_name") || "").trim(),
-                  email: String(fd.get("email") || "").trim(),
-                  employeeId: String(fd.get("employee_id") || "").trim(),
-                  role: String(fd.get("role") || "employee") as Role,
-                  active: String(fd.get("active") || "true") === "true",
-                  position: (editPositions[0] ?? "") as Position | "",
-                  positions: editPositions,
-                  workerType: (String(fd.get("worker_type") || "w2") as WorkerType),
-                  hourlyRate: String(fd.get("hourly_rate") || "").trim(),
-                  dailyRate: String(fd.get("daily_rate") || "").trim(),
-                  startDate: String(fd.get("start_date") || "").trim(),
-                  endDate: String(fd.get("end_date") || "").trim(),
-                  ceSuggestedTopics: editTopics,
-                  requiresDeescalation: editRequiresDeescalation,
-                  requiresAbi: editRequiresAbi,
-                });
-                setEditDirty(false);
-              }}
-              className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 sm:px-6"
-            >
-              <div className="grid gap-2"><Label htmlFor="full_name">Full name</Label><Input id="full_name" name="full_name" defaultValue={editingMember.fullName} required /></div>
-              <div className="grid gap-2"><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" defaultValue={editingMember.email} /></div>
-              <div className="grid gap-2"><Label htmlFor="employee_id">Employee ID</Label><Input id="employee_id" name="employee_id" defaultValue={editingMember.employeeId} placeholder="e.g. EMP-1042" /></div>
-              <div className="grid gap-2">
-                <Label>Agency Position</Label>
-                <p className="text-[11px] text-muted-foreground">Select one or more.</p>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {POSITIONS.map((p) => {
-                    const checked = editPositions.includes(p);
-                    const id = `edit-position-${p.replace(/\s+/g, "-").toLowerCase()}`;
-                    return (
-                      <label
-                        key={p}
-                        htmlFor={id}
-                        className="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-3 py-2 hover:bg-muted/40"
-                      >
-                        <Checkbox
-                          id={id}
-                          checked={checked}
-                          onCheckedChange={(v) => {
-                            setEditDirty(true);
-                            setEditPositions((prev) =>
-                              v ? Array.from(new Set([...prev, p])) : prev.filter((x) => x !== p),
-                            );
-                          }}
-                        />
-                        <span className="text-sm">{p}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-role">System role</Label>
-                  <Select name="role" defaultValue={editingMember.role}>
-                    <SelectTrigger id="edit-role"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="employee">Staff</SelectItem>
-                      <SelectItem value="manager">Manager</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-active">Employment status</Label>
-                  <Select name="active" defaultValue={editingMember.active ? "true" : "false"}>
-                    <SelectTrigger id="edit-active"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="true">Active</SelectItem>
-                      <SelectItem value="false">Deactivated</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="start_date">Start date</Label>
-                  <Input id="start_date" name="start_date" type="date" defaultValue={editingMember.startDate || ""} />
-                  <p className="text-[10px] text-muted-foreground">Drives Continuing Education eligibility & year window.</p>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="end_date">End date (optional)</Label>
-                  <Input id="end_date" name="end_date" type="date" defaultValue={editingMember.endDate || ""} />
-                  <p className="text-[10px] text-muted-foreground">Blank for active employees. Pauses new CE; history retained.</p>
-                </div>
-              </div>
-
-
-              <div className="rounded-xl border border-border bg-muted/30 p-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Pay & classification
-                </p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  Used by NECTAR to estimate gross pay each pay period (pre-tax).
-                </p>
-                <div className="mt-3 grid gap-3">
-                  <div className="grid gap-2">
-                    <Label htmlFor="edit-worker-type">Worker type</Label>
-                    <Select name="worker_type" defaultValue={editingMember.workerType}>
-                      <SelectTrigger id="edit-worker-type"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="w2">W-2 employee</SelectItem>
-                        <SelectItem value="1099">1099 contractor</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="grid gap-2">
-                      <Label htmlFor="hourly_rate">Hourly rate ($)</Label>
-                      <Input
-                        id="hourly_rate"
-                        name="hourly_rate"
-                        type="number"
-                        inputMode="decimal"
-                        step="0.01"
-                        min="0"
-                        defaultValue={editingMember.hourlyRate}
-                        placeholder="e.g. 18.50"
-                      />
-                      <p className="text-[10px] text-muted-foreground">Applies to hourly service codes (EVV punches).</p>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="daily_rate">Daily rate ($)</Label>
-                      <Input
-                        id="daily_rate"
-                        name="daily_rate"
-                        type="number"
-                        inputMode="decimal"
-                        step="0.01"
-                        min="0"
-                        defaultValue={editingMember.dailyRate}
-                        placeholder="e.g. 120.00"
-                      />
-                      <p className="text-[10px] text-muted-foreground">Applies to daily codes (HHS, RHS, DSG, RL6, RP3–RP5).</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-border bg-muted/30 p-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Behavior-related training requirements
-                </p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  Revisitable at any time — change this if the employee's client assignments change after hire.
-                </p>
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <TrainingRequirementField
-                    label="De-escalation training"
-                    hint="Typically required for staff assigned to a behavior-coded client (BC1/2/3) or a client with a Behavior Support Plan."
-                    value={editRequiresDeescalation}
-                    onChange={(v) => { setEditRequiresDeescalation(v); setEditDirty(true); }}
-                    atRisk={!!editRiskFlags?.has_behavior_client}
-                    warningText="Are you sure? This staff member is assigned to a client with behavior supports. De-escalation training is typically required for staff working with this code. Marking this exempt without proper justification could cause compliance issues in an audit."
-                  />
-                  <TrainingRequirementField
-                    label="ABI training"
-                    hint="Typically required for staff assigned to a client with an ABI (acquired brain injury) designation."
-                    value={editRequiresAbi}
-                    onChange={(v) => { setEditRequiresAbi(v); setEditDirty(true); }}
-                    atRisk={!!editRiskFlags?.has_abi_client}
-                    warningText="Are you sure? This staff member is assigned to a client with an ABI designation. ABI training is typically required for staff working with this client. Marking this exempt without proper justification could cause compliance issues in an audit."
-                  />
-                </div>
-              </div>
-
-              <SuggestedTopicsInput
-                value={editTopics}
-                onChange={(next) => { setEditTopics(next); if (!editDirty) setEditDirty(true); }}
-              />
-              <CustomAttributesSection
-                organizationId={org?.organization_id}
-                entityKind="employee"
-                entityId={editingMember.userId}
-              />
-              {/* HR checklist + PII live on the staff profile page (HR tab). */}
-              <LifecyclePanel
-                kind="employee"
-                id={editingMember.userId}
-                fullName={editingMember.fullName}
-                organizationId={org?.organization_id}
-                onDone={() => { setEditingMember(null); setEditDirty(false); }}
-              />
-            </form>
-          )}
-          <div className="shrink-0 border-t border-border bg-background px-4 py-3 sm:px-6 sm:py-4">
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  if (editDirty && !window.confirm("Discard unsaved changes?")) return;
-                  setEditingMember(null);
-                  setEditDirty(false);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                form="edit-employee-form"
-                disabled={editMemberMutation.isPending}
-                className="bg-amber-500 text-amber-950 hover:bg-amber-400"
-              >
-                {editMemberMutation.isPending ? "Saving…" : "Save changes"}
-              </Button>
-            </div>
-          </div>
         </DialogContent>
       </Dialog>
 

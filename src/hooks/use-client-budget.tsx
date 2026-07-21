@@ -2,7 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "./use-org";
 import { useAllClientBillingCodes, type ClientBillingCode } from "./use-client-billing-codes";
-import { computeEntryUnits, unitsToHours, UNITS_PER_HOUR } from "@/lib/billing-units";
+import {
+  computeBillableEntryUnits,
+  effectiveBillingTimes,
+  unitsToHours,
+  UNITS_PER_HOUR,
+} from "@/lib/billing-units";
 import { isDailyServiceCode } from "@/lib/service-billing";
 
 /**
@@ -68,7 +73,9 @@ export function useClientBudget(clientId: string | undefined) {
       // Pull all completed punches for this client in the widest window.
       const { data: tsRows, error: tsErr } = await supabase
         .from("evv_timesheets")
-        .select("service_type_code, clock_in_timestamp, clock_out_timestamp")
+        .select(
+          "service_type_code, clock_in_timestamp, clock_out_timestamp, review_status, corrected_clock_in, corrected_clock_out",
+        )
         .eq("organization_id", org!.organization_id)
         .eq("client_id", clientId!)
         .gte("clock_in_timestamp", earliestStart.toISOString());
@@ -109,19 +116,25 @@ export function useClientBudget(clientId: string | undefined) {
         } else {
           for (const r of (tsRows ?? []) as Array<{
             service_type_code: string | null;
-            clock_in_timestamp: string;
+            clock_in_timestamp: string | null;
             clock_out_timestamp: string | null;
+            review_status: string | null;
+            corrected_clock_in: string | null;
+            corrected_clock_out: string | null;
           }>) {
-            if (!r.clock_out_timestamp || r.service_type_code !== code.service_code) continue;
-            const inT = new Date(r.clock_in_timestamp);
+            if (r.service_type_code !== code.service_code) continue;
+            // Honor review_status + corrections: approved-with-corrections
+            // bills the corrected window; needs_review/rejected are excluded.
+            const eff = effectiveBillingTimes(r);
+            if (!eff) continue;
+            const inT = new Date(eff.in);
             if (inT < period_start) continue;
             if (period_end && inT > period_end) continue;
-            const hrs =
-              (new Date(r.clock_out_timestamp).getTime() - inT.getTime()) / 3_600_000;
+            const hrs = (new Date(eff.out).getTime() - inT.getTime()) / 3_600_000;
             if (hrs > 0 && isFinite(hrs)) {
               used_hours += hrs;
               // Per-entry rounding; the bucket sums entry units, never re-rounds.
-              used_entry_units += computeEntryUnits(r.clock_in_timestamp, r.clock_out_timestamp);
+              used_entry_units += computeBillableEntryUnits(r);
             }
           }
         }

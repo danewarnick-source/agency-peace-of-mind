@@ -153,7 +153,10 @@ export type ClientCareVisibility = {
   /** Filtered projection staff-facing surfaces should render. Admin
    *  surfaces read the raw `identity` / `goals` / `medications` /
    *  `authorized_codes` fields — this block enforces the two-level
-   *  section+field visibility. */
+   *  section+field visibility (identity/care_plan) and, for
+   *  `authorized_codes`, staff_assignments-based visibility: a staff
+   *  member sees a code iff they're assigned to work it (no separate
+   *  toggle). */
   staffCare: {
     identity: CareIdentity;
     goals: CareGoal[];
@@ -211,8 +214,9 @@ export const getClientCareData = createServerFn({ method: "GET" })
   .handler(async ({ data, context }): Promise<ClientCareData> => {
     const { clientId, shiftServiceCode } = data;
     const supabase = context.supabase as any;
+    const userId = context.userId as string;
 
-    const [clientRes, cstRes, medsRes, codesRes, visRes, cfDefsRes, cfValsRes, tbRes, ecRes] =
+    const [clientRes, cstRes, medsRes, codesRes, visRes, cfDefsRes, cfValsRes, tbRes, ecRes, myAssignRes] =
       await Promise.all([
       supabase
         .from("clients")
@@ -267,6 +271,12 @@ export const getClientCareData = createServerFn({ method: "GET" })
         .select("id, name, phone, relationship")
         .eq("client_id", clientId)
         .order("created_at", { ascending: true }),
+      supabase
+        .from("staff_assignments")
+        .select("service_codes")
+        .eq("client_id", clientId)
+        .eq("staff_id", userId)
+        .maybeSingle(),
     ]);
 
 
@@ -388,9 +398,18 @@ export const getClientCareData = createServerFn({ method: "GET" })
     const medicationsStaff = sections.care_plan
       ? medications.filter((m) => isFieldVisible(visibilityRow, fieldKey("care_plan", "medication", m.id)))
       : [];
-    const authorizedCodesStaff = sections.billing
-      ? authorized_codes.filter((c) => isFieldVisible(visibilityRow, fieldKey("billing", "code", c.id)))
-      : [];
+
+    // Authorized codes have no visibility toggle — assignment IS visibility.
+    // A staff member sees a code here iff they're assigned (via
+    // staff_assignments) to work that code for this client. NULL
+    // service_codes on their assignment row means "all of the client's
+    // authorized codes"; no row means no codes are visible to them.
+    const myCodeScope = (myAssignRes?.data as { service_codes: string[] | null } | null) ?? null;
+    const authorizedCodesStaff = myCodeScope === null
+      ? []
+      : myCodeScope.service_codes === null
+        ? authorized_codes
+        : authorized_codes.filter((c) => myCodeScope.service_codes!.includes(c.service_code));
 
     // ── Custom fields ────────────────────────────────────────────────────
     // Scope defs to the client's own org (cross-org rows would be blocked

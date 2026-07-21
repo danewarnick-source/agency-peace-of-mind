@@ -140,6 +140,142 @@ export const setClientCaseload = createServerFn({ method: "POST" })
   });
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Setup tool A2 — single (staff, client, code) additive/subtractive edits.
+// Used by the per-code "+ Add staff" control on the client profile's
+// Authorized Codes section and by the intake add-codes prompt. Unlike
+// setClientCaseload (which replaces the client's full desired state), these
+// touch exactly one staff/code pairing and leave every other assignment on
+// the client untouched.
+// ──────────────────────────────────────────────────────────────────────────────
+async function loadClientAuthorizedCodes(supabase: any, clientId: string): Promise<Set<string>> {
+  const { data: clientRow } = await supabase
+    .from("clients")
+    .select("authorized_dspd_codes, job_code")
+    .eq("id", clientId)
+    .maybeSingle();
+  return new Set<string>(
+    [
+      ...(((clientRow as { authorized_dspd_codes?: string[] } | null)?.authorized_dspd_codes) ?? []),
+      ...(((clientRow as { job_code?: string[] } | null)?.job_code) ?? []),
+    ].filter(Boolean),
+  );
+}
+
+export const addStaffToClientCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    organization_id: string;
+    client_id: string;
+    staff_id: string;
+    service_code: string;
+  }) =>
+    z.object({
+      organization_id: z.string().uuid(),
+      client_id: z.string().uuid(),
+      staff_id: z.string().uuid(),
+      service_code: z.string().min(1),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { supabase } = context as any;
+    const code = data.service_code.toUpperCase();
+
+    const allCodes = await loadClientAuthorizedCodes(supabase, data.client_id);
+    if (!allCodes.has(code)) {
+      throw new Error(`Service code not authorized for this client: ${code}`);
+    }
+
+    const { data: existing, error: rErr } = await supabase
+      .from("staff_assignments")
+      .select("id, service_codes")
+      .eq("organization_id", data.organization_id)
+      .eq("client_id", data.client_id)
+      .eq("staff_id", data.staff_id)
+      .maybeSingle();
+    if (rErr) throw rErr;
+
+    if (!existing) {
+      const { error: iErr } = await supabase.from("staff_assignments").insert({
+        organization_id: data.organization_id,
+        client_id: data.client_id,
+        staff_id: data.staff_id,
+        is_group_home_assignment: false,
+        service_codes: [code],
+      });
+      if (iErr) throw iErr;
+      return { ok: true };
+    }
+
+    const scopes = (existing as { service_codes: string[] | null }).service_codes;
+    if (scopes === null) return { ok: true }; // already scoped to all codes
+    if (scopes.includes(code)) return { ok: true }; // already assigned
+
+    let next: string[] | null = Array.from(new Set([...scopes, code]));
+    if (allCodes.size > 0 && next.length === allCodes.size) next = null; // collapse to "all"
+    const { error: uErr } = await supabase
+      .from("staff_assignments")
+      .update({ service_codes: next })
+      .eq("id", (existing as { id: string }).id);
+    if (uErr) throw uErr;
+    return { ok: true };
+  });
+
+export const removeStaffFromClientCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    organization_id: string;
+    client_id: string;
+    staff_id: string;
+    service_code: string;
+  }) =>
+    z.object({
+      organization_id: z.string().uuid(),
+      client_id: z.string().uuid(),
+      staff_id: z.string().uuid(),
+      service_code: z.string().min(1),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { supabase } = context as any;
+    const code = data.service_code.toUpperCase();
+
+    const { data: existing, error: rErr } = await supabase
+      .from("staff_assignments")
+      .select("id, service_codes")
+      .eq("organization_id", data.organization_id)
+      .eq("client_id", data.client_id)
+      .eq("staff_id", data.staff_id)
+      .maybeSingle();
+    if (rErr) throw rErr;
+    if (!existing) return { ok: true };
+
+    const scopes = (existing as { service_codes: string[] | null }).service_codes;
+    const id = (existing as { id: string }).id;
+
+    let remaining: string[];
+    if (scopes === null) {
+      const allCodes = await loadClientAuthorizedCodes(supabase, data.client_id);
+      remaining = Array.from(allCodes).filter((c) => c !== code);
+    } else {
+      remaining = scopes.filter((c) => c !== code);
+    }
+
+    if (remaining.length === 0) {
+      const { error: dErr } = await supabase.from("staff_assignments").delete().eq("id", id);
+      if (dErr) throw dErr;
+    } else {
+      const { error: uErr } = await supabase
+        .from("staff_assignments")
+        .update({ service_codes: remaining })
+        .eq("id", id);
+      if (uErr) throw uErr;
+    }
+    return { ok: true };
+  });
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Open shift — staff "take" with conflict pre-check.
 // Sets staff_id + status='accepted' atomically when no conflict; otherwise
 // throws a friendly error the UI surfaces as a pop-up.

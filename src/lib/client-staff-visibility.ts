@@ -7,8 +7,13 @@
  *   1. SECTION toggle (hard override). One switch per section — if off,
  *      nothing in that section reaches staff, no per-field override.
  *   2. FIELD toggle. Inside a section that is on, each individual field
- *      (fixed identity field, PCSP goal, medication, authorized code,
- *      custom field) can be individually hidden. Missing key = visible.
+ *      (fixed identity field, PCSP goal, medication, custom field) can be
+ *      individually hidden. Missing key = visible.
+ *
+ *   Authorized DSPD codes are NOT part of this model. A staff member sees
+ *   a code iff they're assigned (via staff_assignments) to work it for
+ *   that client — assignment IS visibility, no separate toggle. See
+ *   getClientCareData in client-care-data.functions.ts.
  *
  * Section defaults:
  *   identity, care_plan, operations → ON

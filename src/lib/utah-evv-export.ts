@@ -70,21 +70,43 @@ function csvEscape(s: string) {
 
 /**
  * Parse a US address string into components for separate CSV columns.
- * Expected format: "123 Main St, Salt Lake City, UT 84101"
- * Falls back gracefully: if fewer than 3 comma-separated parts, puts everything in street.
+ * Handles two formats:
+ *   "123 Main St, Salt Lake City, UT 84101"  (two commas — street, city, state+zip)
+ *   "123 Main St City, ST 12345"             (one comma — street+city run together, then state+zip)
+ * Falls back gracefully: if the format can't be confidently parsed, puts everything in street.
  */
 export function parseUsAddress(address: string): { street: string; city: string; state: string; zip: string } {
   const parts = address.split(",").map((p) => p.trim()).filter(Boolean);
-  if (parts.length < 3) {
-    return { street: address.trim(), city: "", state: "", zip: "" };
+
+  if (parts.length >= 3) {
+    // Last part: "UT 84101" → state + zip
+    const stateZipTokens = parts[parts.length - 1].split(/\s+/);
+    const state = stateZipTokens[0] ?? "";
+    const zip = stateZipTokens[1] ?? "";
+    const city = parts[parts.length - 2];
+    const street = parts.slice(0, parts.length - 2).join(", ");
+    return { street, city, state, zip };
   }
-  // Last part: "UT 84101" → state + zip
-  const stateZipTokens = parts[parts.length - 1].split(/\s+/);
-  const state = stateZipTokens[0] ?? "";
-  const zip = stateZipTokens[1] ?? "";
-  const city = parts[parts.length - 2];
-  const street = parts.slice(0, parts.length - 2).join(", ");
-  return { street, city, state, zip };
+
+  if (parts.length === 2) {
+    // One-comma format: street and city run together before the comma; the
+    // zip is the last whitespace token after it, state the token before that.
+    const stateZipTokens = parts[1].split(/\s+/).filter(Boolean);
+    const zip = stateZipTokens[stateZipTokens.length - 1] ?? "";
+    const state = stateZipTokens[stateZipTokens.length - 2] ?? "";
+    const streetCityWords = parts[0].split(/\s+/).filter(Boolean);
+    const zipLooksValid = /^\d{5}(-\d{4})?$/.test(zip);
+    const stateLooksValid = /^[A-Za-z]{2}$/.test(state);
+
+    if (zipLooksValid && stateLooksValid && streetCityWords.length >= 2) {
+      // City is the word immediately before the state; everything before it is the street.
+      const city = streetCityWords[streetCityWords.length - 1];
+      const street = streetCityWords.slice(0, -1).join(" ");
+      return { street, city, state, zip };
+    }
+  }
+
+  return { street: address.trim(), city: "", state: "", zip: "" };
 }
 
 /**

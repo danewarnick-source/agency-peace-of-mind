@@ -30,14 +30,13 @@ import {
 } from "@/components/ui/sheet";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
 import { toast } from "sonner";
+import {
+  saveRecordFields, saveManagerNote as saveManagerNoteFields,
+  toLocalInput, fromLocalInput,
+  type AuditEntry,
+} from "@/lib/records-edit";
 
-export type AuditEntry = {
-  timestamp: string;
-  admin: string;
-  field_changed: string;
-  old_value: string;
-  new_value: string;
-};
+export type { AuditEntry };
 
 export type RecordDetailRow = {
   id: string;
@@ -78,25 +77,6 @@ export type RecordDetailRow = {
 
 const STATUS_OPTIONS = ["Active", "Pending", "Approved", "Rejected", "Pending_Staff_Confirmation"];
 const REVIEW_STATUS_OPTIONS = ["clean", "needs_review", "approved", "rejected"];
-
-function toLocalInput(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (!Number.isFinite(d.getTime())) return "";
-  const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-function fromLocalInput(v: string): string | null {
-  if (!v) return null;
-  const d = new Date(v);
-  return Number.isFinite(d.getTime()) ? d.toISOString() : null;
-}
-function diffVal(field: string, v: unknown): string {
-  if (v == null || v === "") return "(empty)";
-  if (field.includes("clock_")) return new Date(String(v)).toLocaleString();
-  if (typeof v === "boolean") return v ? "true" : "false";
-  return String(v);
-}
 
 export function RecordDetailSheet({
   row, organizationId, onClose,
@@ -160,7 +140,6 @@ export function RecordDetailSheet({
     mutationFn: async () => {
       if (!row) return;
       const adminName = (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Administrator";
-      const nowIso = new Date().toISOString();
 
       const newClockIn = fromLocalInput(clockIn) ?? row.clock_in_timestamp;
       const newClockOut = fromLocalInput(clockOut);
@@ -170,46 +149,9 @@ export function RecordDetailSheet({
       const newCorrectedOut = fromLocalInput(correctedOut);
       const newGoals = goals.split(",").map((g) => g.trim()).filter(Boolean);
 
-      const audit: AuditEntry[] = [];
-      const push = (field: string, oldV: unknown, newV: unknown) => {
-        const a = oldV == null ? "" : String(oldV);
-        const b = newV == null ? "" : String(newV);
-        if (a !== b) {
-          audit.push({ timestamp: nowIso, admin: adminName, field_changed: field, old_value: diffVal(field, oldV), new_value: diffVal(field, newV) });
-        }
-      };
-
-      push("service_type_code", row.service_type_code, svc);
-      push("clock_in_timestamp", row.clock_in_timestamp, newClockIn);
-      push("clock_out_timestamp", row.clock_out_timestamp, newClockOut);
-      push("rounded_clock_in", row.rounded_clock_in, newRoundedIn);
-      push("rounded_clock_out", row.rounded_clock_out, newRoundedOut);
-      push("corrected_clock_in", row.corrected_clock_in, newCorrectedIn);
-      push("corrected_clock_out", row.corrected_clock_out, newCorrectedOut);
-      push("status", row.status, status);
-      push("review_status", row.review_status, reviewStatus);
-      push("incident_flag", row.incident_flag, incidentFlag);
-      push("is_out_of_bounds", row.is_out_of_bounds, outOfBounds);
-      push("outside_geofence_reason", row.outside_geofence_reason, geofenceReason || null);
-      push("gps_in_bypassed", row.gps_in_bypassed, gpsInBypassed);
-      push("gps_in_bypass_reason", row.gps_in_bypass_reason, gpsInBypassReason || null);
-      push("gps_out_bypassed", row.gps_out_bypassed, gpsOutBypassed);
-      push("gps_out_bypass_reason", row.gps_out_bypass_reason, gpsOutBypassReason || null);
-      push("denial_reason", row.denial_reason, denialReason || null);
-      push("utah_medicaid_member_id", row.utah_medicaid_member_id, memberId);
-      push("shift_note_text", row.shift_note_text, shiftNote || null);
-      push("goals_completed", (row.goals_completed ?? []).join(", "), newGoals.join(", "));
-
-      if (audit.length === 0) {
-        toast.info("No changes to save.");
-        return;
-      }
-
-      const history = [...(row.edit_audit_history_log ?? []), ...audit];
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from("evv_timesheets") as any)
-        .update({
+      const result = await saveRecordFields({
+        row,
+        updates: {
           service_type_code: svc,
           clock_in_timestamp: newClockIn,
           clock_out_timestamp: newClockOut,
@@ -230,16 +172,18 @@ export function RecordDetailSheet({
           utah_medicaid_member_id: memberId,
           shift_note_text: shiftNote || null,
           goals_completed: newGoals,
-          is_edited_by_admin: true,
-          edited_by: user?.id ?? null,
-          edited_by_admin_name: adminName,
-          edited_at: nowIso,
-          edit_audit_history_log: history,
-        })
-        .eq("id", row.id);
-      if (error) throw error;
+        },
+        adminName,
+        userId: user?.id ?? null,
+      });
+      if (!result) {
+        toast.info("No changes to save.");
+        return "no_changes";
+      }
+      return "saved";
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (result === "no_changes") return;
       toast.success("Record updated. Edit tracked with your name and timestamp.");
       qc.invalidateQueries({ queryKey: ["records"] });
       onClose();
@@ -251,17 +195,12 @@ export function RecordDetailSheet({
     mutationFn: async () => {
       if (!row) return;
       const adminName = (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Administrator";
-      const nowIso = new Date().toISOString();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from("evv_timesheets") as any)
-        .update({
-          manager_note_text: managerNote || null,
-          manager_note_by: user?.id ?? null,
-          manager_note_by_name: adminName,
-          manager_note_at: nowIso,
-        })
-        .eq("id", row.id);
-      if (error) throw error;
+      await saveManagerNoteFields({
+        rowId: row.id,
+        managerNote,
+        adminName,
+        userId: user?.id ?? null,
+      });
     },
     onSuccess: () => {
       toast.success("Manager note saved.");

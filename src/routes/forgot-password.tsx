@@ -32,7 +32,7 @@ function ForgotPassword() {
   return (
     <AuthShell title="Reset your password" subtitle="We'll send you a secure link to set a new password.">
       {sent ? (
-        <div className="rounded-lg border border-border bg-card p-4 text-sm">
+        <div className="rounded-lg border border-border bg-card p-4 text-sm text-card-foreground">
           We've sent a password reset link to your email. It will expire in 1 hour.
         </div>
       ) : (

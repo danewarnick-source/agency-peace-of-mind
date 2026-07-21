@@ -5,6 +5,8 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
+  Eye,
+  EyeOff,
   Hexagon,
   Loader2,
   Mail,
@@ -327,6 +329,8 @@ function Step1Account({
   const [emailErr, setEmailErr] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const lenOk = form.password.length >= 8;
   const numOk = /\d/.test(form.password);
@@ -425,14 +429,25 @@ function Step1Account({
         </Field>
 
         <Field label="Password">
-          <input
-            type="password"
-            autoComplete="new-password"
-            value={form.password}
-            onChange={(e) => update("password", e.target.value)}
-            className="flex h-12 w-full rounded-lg px-3 py-2 text-base outline-none focus:border-[#f4a93a]/60 focus:ring-2 focus:ring-[#f4a93a]/40"
-            style={inputStyle}
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              autoComplete="new-password"
+              value={form.password}
+              onChange={(e) => update("password", e.target.value)}
+              className="flex h-12 w-full rounded-lg px-3 py-2 pr-10 text-base outline-none focus:border-[#f4a93a]/60 focus:ring-2 focus:ring-[#f4a93a]/40"
+              style={inputStyle}
+            />
+            <button
+              type="button"
+              tabIndex={-1}
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-white/50 hover:text-white/80"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
         </Field>
 
         <ul className="-mt-1 grid gap-1 text-xs">
@@ -441,14 +456,25 @@ function Step1Account({
         </ul>
 
         <Field label="Confirm password" error={!matchOk && form.confirm ? "Passwords don't match." : null}>
-          <input
-            type="password"
-            autoComplete="new-password"
-            value={form.confirm}
-            onChange={(e) => update("confirm", e.target.value)}
-            className="flex h-12 w-full rounded-lg px-3 py-2 text-base outline-none focus:border-[#f4a93a]/60 focus:ring-2 focus:ring-[#f4a93a]/40"
-            style={inputStyle}
-          />
+          <div className="relative">
+            <input
+              type={showConfirm ? "text" : "password"}
+              autoComplete="new-password"
+              value={form.confirm}
+              onChange={(e) => update("confirm", e.target.value)}
+              className="flex h-12 w-full rounded-lg px-3 py-2 pr-10 text-base outline-none focus:border-[#f4a93a]/60 focus:ring-2 focus:ring-[#f4a93a]/40"
+              style={inputStyle}
+            />
+            <button
+              type="button"
+              tabIndex={-1}
+              onClick={() => setShowConfirm((v) => !v)}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-white/50 hover:text-white/80"
+              aria-label={showConfirm ? "Hide password" : "Show password"}
+            >
+              {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
         </Field>
       </div>
 

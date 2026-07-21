@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ShieldCheck, AlertTriangle } from "lucide-react";
+import { ShieldCheck, AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -25,6 +25,8 @@ function SetPasswordPage() {
   const [status, setStatus] = useState<Status>("verifying");
   const [errorMsg, setErrorMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,17 +145,41 @@ function SetPasswordPage() {
             </p>
             <label className="block">
               <span className="text-xs font-medium text-muted-foreground">New password</span>
-              <input
-                type="password" name="password" required minLength={8} autoComplete="new-password"
-                className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-[#0f1b3d] focus:outline-none"
-              />
+              <div className="relative mt-1">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password" required minLength={8} autoComplete="new-password"
+                  className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 py-2 pr-10 text-sm focus:border-[#0f1b3d] focus:outline-none"
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </label>
             <label className="block">
               <span className="text-xs font-medium text-muted-foreground">Confirm password</span>
-              <input
-                type="password" name="confirm" required minLength={8} autoComplete="new-password"
-                className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-[#0f1b3d] focus:outline-none"
-              />
+              <div className="relative mt-1">
+                <input
+                  type={showConfirm ? "text" : "password"}
+                  name="confirm" required minLength={8} autoComplete="new-password"
+                  className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 py-2 pr-10 text-sm focus:border-[#0f1b3d] focus:outline-none"
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowConfirm((v) => !v)}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                  aria-label={showConfirm ? "Hide password" : "Show password"}
+                >
+                  {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </label>
             <button
               type="submit" disabled={busy}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Lock, ShieldCheck } from "lucide-react";
+import { Lock, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
@@ -43,6 +43,8 @@ export function IdlePinLock() {
   const [pinInput, setPinInput] = useState("");
   const [confirmInput, setConfirmInput] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [showPin, setShowPin] = useState(false);
+  const [showConfirmPin, setShowConfirmPin] = useState(false);
   const timerRef = useRef<number | null>(null);
 
   // Decide which flow to show whenever we lock.
@@ -134,43 +136,65 @@ export function IdlePinLock() {
             <span className="mb-1 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
               {mode === "set" ? "New PIN" : "PIN"}
             </span>
-            <input
-              autoFocus
-              type="password"
-              inputMode="numeric"
-              pattern="\d{4}"
-              maxLength={4}
-              value={pinInput}
-              onChange={(e) => {
-                setError(null);
-                setPinInput(e.target.value.replace(/\D/g, "").slice(0, 4));
-              }}
-              className="h-12 w-full rounded-lg border border-input bg-background text-center font-mono text-2xl tracking-[0.6em] outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
-              placeholder="••••"
-              aria-label="4-digit PIN"
-            />
+            <div className="relative">
+              <input
+                autoFocus
+                type={showPin ? "text" : "password"}
+                inputMode="numeric"
+                pattern="\d{4}"
+                maxLength={4}
+                value={pinInput}
+                onChange={(e) => {
+                  setError(null);
+                  setPinInput(e.target.value.replace(/\D/g, "").slice(0, 4));
+                }}
+                className="h-12 w-full rounded-lg border border-input bg-background pr-10 text-center font-mono text-2xl tracking-[0.6em] outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+                placeholder="••••"
+                aria-label="4-digit PIN"
+              />
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => setShowPin((v) => !v)}
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                aria-label={showPin ? "Hide PIN" : "Show PIN"}
+              >
+                {showPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </label>
           {mode === "set" && (
             <label className="block">
               <span className="mb-1 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Confirm PIN
               </span>
-              <input
-                type="password"
-                inputMode="numeric"
-                pattern="\d{4}"
-                maxLength={4}
-                value={confirmInput}
-                onChange={(e) => {
-                  setError(null);
-                  setConfirmInput(
-                    e.target.value.replace(/\D/g, "").slice(0, 4),
-                  );
-                }}
-                className="h-12 w-full rounded-lg border border-input bg-background text-center font-mono text-2xl tracking-[0.6em] outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
-                placeholder="••••"
-                aria-label="Confirm 4-digit PIN"
-              />
+              <div className="relative">
+                <input
+                  type={showConfirmPin ? "text" : "password"}
+                  inputMode="numeric"
+                  pattern="\d{4}"
+                  maxLength={4}
+                  value={confirmInput}
+                  onChange={(e) => {
+                    setError(null);
+                    setConfirmInput(
+                      e.target.value.replace(/\D/g, "").slice(0, 4),
+                    );
+                  }}
+                  className="h-12 w-full rounded-lg border border-input bg-background pr-10 text-center font-mono text-2xl tracking-[0.6em] outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+                  placeholder="••••"
+                  aria-label="Confirm 4-digit PIN"
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowConfirmPin((v) => !v)}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                  aria-label={showConfirmPin ? "Hide PIN" : "Show PIN"}
+                >
+                  {showConfirmPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </label>
           )}
           {error && (

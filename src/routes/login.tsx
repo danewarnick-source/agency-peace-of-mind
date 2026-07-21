@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate, useRouterState } from "@tanstack/re
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { ArrowRight, Hexagon, Sparkles } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Hexagon, Sparkles } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
@@ -84,6 +84,7 @@ function LoginPage() {
   const navigate = useNavigate();
   const { session, loading } = useAuth();
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const signIn = useServerFn(signInWithUsername);
   const execCheck = useServerFn(checkHiveExecutive);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -262,15 +263,26 @@ function LoginPage() {
                       Forgot?
                     </Link>
                   </div>
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    autoComplete="current-password"
-                    required
-                    className="flex h-12 w-full rounded-lg px-3 py-2 text-base outline-none transition placeholder:text-white/35 focus:border-[#f4a93a]/60 focus:ring-2 focus:ring-[#f4a93a]/40"
-                    style={inputStyle}
-                  />
+                  <div className="relative">
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="current-password"
+                      required
+                      className="flex h-12 w-full rounded-lg px-3 py-2 pr-10 text-base outline-none transition placeholder:text-white/35 focus:border-[#f4a93a]/60 focus:ring-2 focus:ring-[#f4a93a]/40"
+                      style={inputStyle}
+                    />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute inset-y-0 right-0 flex items-center px-3 text-white/50 hover:text-white/80"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <Button

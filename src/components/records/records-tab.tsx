@@ -12,7 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import {
   Download, MapPin, AlertTriangle, Clock, Clock3, ShieldAlert,
-  FileWarning, AlertCircle, ListChecks, CalendarRange, SlidersHorizontal,
+  FileWarning, AlertCircle, ListChecks, CalendarRange, SlidersHorizontal, Zap,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -67,6 +67,8 @@ type Row = {
   is_edited_by_admin: boolean;
   is_out_of_bounds: boolean | null;
   outside_geofence_reason: string | null;
+  gps_in_bypassed: boolean | null;
+  gps_out_bypassed: boolean | null;
   shift_note_text: string | null;
   goals_completed: string[] | null;
   review_status: string | null;
@@ -89,7 +91,7 @@ type Derived = Row & {
 };
 
 const SELECT_COLS =
-  "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, corrected_clock_in, corrected_clock_out, rounded_clock_in, rounded_clock_out, is_edited_by_admin, is_out_of_bounds, outside_geofence_reason, shift_note_text, goals_completed, review_status, status, incident_flag, denial_reason, utah_medicaid_member_id, import_source, clients:client_id(first_name, last_name, team_id)";
+  "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, corrected_clock_in, corrected_clock_out, rounded_clock_in, rounded_clock_out, is_edited_by_admin, is_out_of_bounds, outside_geofence_reason, gps_in_bypassed, gps_out_bypassed, shift_note_text, goals_completed, review_status, status, incident_flag, denial_reason, utah_medicaid_member_id, import_source, clients:client_id(first_name, last_name, team_id)";
 
 function fmtTs(iso: string | null): string {
   if (!iso) return "—";
@@ -866,15 +868,25 @@ export function RecordsTab() {
                         </td>
                         <td className="px-3 py-2 tabular-nums">{fmtDur(r.duration_min)}</td>
                         <td className="px-3 py-2">
-                          {r.is_out_of_bounds ? (
-                            <span className="inline-flex items-center gap-1 text-xs text-amber-700">
-                              <AlertTriangle className="h-3 w-3" /> out
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                              <MapPin className="h-3 w-3" /> in
-                            </span>
-                          )}
+                          <div className="flex flex-wrap items-center gap-1">
+                            {r.is_out_of_bounds ? (
+                              <span className="inline-flex items-center gap-1 text-xs text-amber-700">
+                                <AlertTriangle className="h-3 w-3" /> out
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                                <MapPin className="h-3 w-3" /> in
+                              </span>
+                            )}
+                            {(r.gps_in_bypassed || r.gps_out_bypassed) && (
+                              <span
+                                className="inline-flex items-center gap-1 rounded-full bg-[#137182]/12 px-1.5 py-0.5 text-[10px] font-medium text-[#137182]"
+                                title="GPS could not be captured — staff proceeded with a confirmed reason and the record uses the client's on-file address instead."
+                              >
+                                <Zap className="h-3 w-3" /> GPS bypassed — address used
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-3 py-2">
                           {r.awaiting_staff_confirmation ? (

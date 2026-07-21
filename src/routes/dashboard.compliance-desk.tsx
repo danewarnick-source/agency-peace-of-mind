@@ -123,6 +123,30 @@ function GeofenceBadge({ row }: { row: Pick<Row, "outside_geofence_reason" | "ma
   );
 }
 
+// GPS was entirely unavailable at clock-in and/or clock-out (denied/no
+// signal) — staff proceeded with a confirmed reason and the EVV record uses
+// the client's on-file address instead of GPS coordinates for that end of
+// the visit. Distinct from GeofenceBadge (which covers GPS-present-but-
+// outside-geofence variances).
+function GpsBypassBadge({ row }: { row: Pick<Row, "gps_in_bypassed" | "gps_in_bypass_reason" | "gps_out_bypassed" | "gps_out_bypass_reason"> }) {
+  if (!row.gps_in_bypassed && !row.gps_out_bypassed) return null;
+  const parts: string[] = [];
+  if (row.gps_in_bypassed) parts.push(`Clock-in: ${row.gps_in_bypass_reason ?? "no reason on file"}`);
+  if (row.gps_out_bypassed) parts.push(`Clock-out: ${row.gps_out_bypass_reason ?? "no reason on file"}`);
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-[#137182]/12 px-2 py-0.5 text-[13px] font-medium leading-none text-[#137182]">
+            <Zap className="h-3.5 w-3.5" /> GPS BYPASSED — ADDRESS USED
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs text-xs">{parts.join(" · ")}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 export const Route = createFileRoute("/dashboard/compliance-desk")({
   head: () => ({ meta: [{ title: "EVV & Timesheet Control — HIVE" }] }),
   validateSearch: (s: Record<string, unknown>) => ({
@@ -166,6 +190,10 @@ type Row = {
   gps_in_coordinates: Coord;
   gps_out_coordinates: Coord | null;
   outside_geofence_reason: string | null;
+  gps_in_bypassed: boolean | null;
+  gps_in_bypass_reason: string | null;
+  gps_out_bypassed: boolean | null;
+  gps_out_bypass_reason: string | null;
   status: string;
   shift_note_text: string | null;
   goals_completed: string[] | null;
@@ -399,7 +427,7 @@ function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
 
 
 
-const SELECT_COLS = "id, staff_id, client_id, utah_medicaid_provider_id, utah_medicaid_member_id, service_type_code, shift_entry_type, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, gps_in_coordinates, gps_out_coordinates, outside_geofence_reason, status, shift_note_text, goals_completed, is_edited_by_admin, edited_by_admin_name, edit_audit_history_log, ai_compliance_status, ai_coaching_iterations, ai_compliance_feedback, matched_approved_location_id, matched_approved_location_label, reconciliation_status, reconciliation_attestation, reconciliation_review_notes, reconciliation_reviewed_by, reconciliation_reviewed_at, review_status, attested_accurate, corrected_clock_in, corrected_clock_out, edit_reason, edited_by, edited_at, incident_flag, reviewed_by, reviewed_at, review_note, clients(first_name,last_name,physical_address,medicaid_id,team_id)";
+const SELECT_COLS = "id, staff_id, client_id, utah_medicaid_provider_id, utah_medicaid_member_id, service_type_code, shift_entry_type, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, gps_in_coordinates, gps_out_coordinates, outside_geofence_reason, gps_in_bypassed, gps_in_bypass_reason, gps_out_bypassed, gps_out_bypass_reason, status, shift_note_text, goals_completed, is_edited_by_admin, edited_by_admin_name, edit_audit_history_log, ai_compliance_status, ai_coaching_iterations, ai_compliance_feedback, matched_approved_location_id, matched_approved_location_label, reconciliation_status, reconciliation_attestation, reconciliation_review_notes, reconciliation_reviewed_by, reconciliation_reviewed_at, review_status, attested_accurate, corrected_clock_in, corrected_clock_out, edit_reason, edited_by, edited_at, incident_flag, reviewed_by, reviewed_at, review_note, clients(first_name,last_name,physical_address,medicaid_id,team_id)";
 
 async function hydrateStaff(list: Row[]) {
   const ids = Array.from(new Set(list.map((r) => r.staff_id)));
@@ -1088,7 +1116,10 @@ function UnifiedSearchResults({
                       onClick={(e) => { e.stopPropagation(); if (r.outside_geofence_reason) onReason(r); }}
                       className={r.outside_geofence_reason ? "cursor-pointer" : ""}
                     >
-                      <GeofenceBadge row={r} />
+                      <div className="flex flex-wrap items-center gap-1">
+                        <GeofenceBadge row={r} />
+                        <GpsBypassBadge row={r} />
+                      </div>
                     </TableCell>
                     <TableCell className="text-right" onClick={stopRowToggle}>
                       <div className="flex justify-end gap-1.5">
@@ -1207,7 +1238,10 @@ function PendingTable({
                   </Button>
                 </TableCell>
                 <TableCell onClick={(e) => { e.stopPropagation(); if (r.outside_geofence_reason) onReason(r); }} className={r.outside_geofence_reason ? "cursor-pointer" : ""}>
-                  <GeofenceBadge row={r} />
+                  <div className="flex flex-wrap items-center gap-1">
+                    <GeofenceBadge row={r} />
+                    <GpsBypassBadge row={r} />
+                  </div>
                 </TableCell>
                 <TableCell className="text-right" onClick={stopRowToggle}>
                   <div className="flex justify-end gap-1.5">
@@ -1851,7 +1885,10 @@ function ArchiveTable({
                     </Button>
                   </TableCell>
                   <TableCell>
-                    <GeofenceBadge row={r} />
+                    <div className="flex flex-wrap items-center gap-1">
+                      <GeofenceBadge row={r} />
+                      <GpsBypassBadge row={r} />
+                    </div>
                   </TableCell>
                   {showBillingCol && (
                     <TableCell>
@@ -2265,7 +2302,12 @@ function ReconcileTable({
                       <MapPin /> View
                     </Button>
                   </TableCell>
-                  <TableCell><GeofenceBadge row={r} /></TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <GeofenceBadge row={r} />
+                      <GpsBypassBadge row={r} />
+                    </div>
+                  </TableCell>
                   <TableCell className="max-w-xs truncate text-xs text-muted-foreground" title={r.outside_geofence_reason ?? ""}>
                     {r.outside_geofence_reason ?? "—"}
                   </TableCell>
@@ -2465,6 +2507,21 @@ function ReviewReconciliationDialog({ row, onClose }: { row: Row | null; onClose
                 <div className="mt-2 text-muted-foreground">No approved location coordinates on file — distance can't be computed.</div>
               )}
             </div>
+
+            {(row.gps_in_bypassed || row.gps_out_bypassed) && (
+              <div className="rounded-lg border border-[#137182]/40 bg-[#137182]/10 p-3 text-xs">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#137182]">
+                  <Zap className="h-3.5 w-3.5" /> GPS bypassed — address used
+                </div>
+                {row.gps_in_bypassed && (
+                  <p className="mt-1 text-foreground/90">Clock-in: {row.gps_in_bypass_reason || "(no reason on file)"}</p>
+                )}
+                {row.gps_out_bypassed && (
+                  <p className="mt-1 text-foreground/90">Clock-out: {row.gps_out_bypass_reason || "(no reason on file)"}</p>
+                )}
+                <p className="mt-1 text-muted-foreground">GPS could not be captured; the client's on-file address was used for location evidence at export.</p>
+              </div>
+            )}
 
             {isReadOnly ? (
               <div className="rounded-lg border border-border bg-muted/20 p-3 text-xs">

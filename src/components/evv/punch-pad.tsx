@@ -247,8 +247,9 @@ export function PunchPad({
   // ── Clock-out variance state ────────────────────────────────────────────────
   const [outVariance, setOutVariance] = useState<null | {
     distanceFeet?: number;
-    limitFeet: number;
-    pos: { lat: number; lng: number; acc: number };
+    limitFeet?: number;
+    pos: { lat: number; lng: number; acc: number } | null;
+    frameBlocked?: boolean;
   }>(null);
   const [outVarianceReason, setOutVarianceReason] = useState("");
 
@@ -626,10 +627,12 @@ export function PunchPad({
   async function writeShift(args: {
     pos: { lat: number; lng: number; acc: number } | null;
     outsideReason?: string;
+    gpsBypassReason?: string;
   }) {
     if (!user || !org || !clientForPunch) return;
     const nowIso = new Date().toISOString();
     const isOutOfBounds = !!args.outsideReason;
+    const isGpsBypass = !!args.gpsBypassReason;
     const matched =
       args.pos && isFinite(args.pos.acc) && args.pos.acc <= MAX_GPS_ACCURACY_METERS
         ? matchApprovedLocation({ lat: args.pos.lat, lng: args.pos.lng })
@@ -649,7 +652,7 @@ export function PunchPad({
       status:                          "Active",
       timezone_setting:                timezone,
       outside_geofence_reason:         args.outsideReason ?? null,
-      gps_validated:                   !isOutOfBounds,
+      gps_validated:                   !isOutOfBounds && !isGpsBypass,
       is_out_of_bounds:                isOutOfBounds,
       geofence_variance_justification: args.outsideReason ?? null,
       // Enroll out-of-bounds punches into the EVV Reconciliation queue so an
@@ -659,6 +662,12 @@ export function PunchPad({
       rounded_clock_in:                roundToQuarterHourISO(nowIso),
       matched_approved_location_id:    matched?.id ?? null,
       matched_approved_location_label: matched?.label ?? null,
+      // GPS entirely unavailable at clock-in (denied/no fix), distinct from an
+      // out-of-bounds geofence variance: staff proceeds with a reason and the
+      // EVV record falls back to the client's on-file address for location
+      // evidence (Utah UEVV accepts address OR GPS at begin/end of visit).
+      gps_in_bypassed:                 isGpsBypass,
+      gps_in_bypass_reason:            args.gpsBypassReason ?? null,
     };
 
     // ── Staff-prerequisite gate: block clock-in if the staff lacks a required
@@ -843,6 +852,9 @@ export function PunchPad({
       toast.error("Please type at least 10 characters of justification.");
       return;
     }
+    // Truly no GPS (denied/no fix) → GPS-bypass path (address fallback at
+    // export time), distinct from a geofence out-of-bounds variance.
+    const isBypass = !!variance.frameBlocked;
     setBusy(true);
     try {
       // Stage 5 — same front-guard for variance clock-in path. Fail-open.
@@ -857,7 +869,7 @@ export function PunchPad({
             setPendingFormsDialog(null);
             setBusy(true);
             try {
-              await writeShift({ pos, outsideReason: outside });
+              await writeShift(isBypass ? { pos, gpsBypassReason: outside } : { pos, outsideReason: outside });
               setVariance(null);
               setVarianceReason("");
             } finally { setBusy(false); }
@@ -868,7 +880,7 @@ export function PunchPad({
               setPendingFormsDialog(null);
               setBusy(true);
               try {
-                await writeShift({ pos, outsideReason: outside });
+                await writeShift(isBypass ? { pos, gpsBypassReason: outside } : { pos, outsideReason: outside });
                 setVariance(null);
                 setVarianceReason("");
               } finally { setBusy(false); }
@@ -880,7 +892,7 @@ export function PunchPad({
         return;
       }
 
-      await writeShift({ pos: variance.pos, outsideReason: reason });
+      await writeShift(isBypass ? { pos: variance.pos, gpsBypassReason: reason } : { pos: variance.pos, outsideReason: reason });
       setVariance(null);
       setVarianceReason("");
     } catch (e) {
@@ -1269,7 +1281,7 @@ export function PunchPad({
           serviceCode:  serviceCode || null,
           clientFirstName: clientFirst,
           phase,
-          frameBlocked: phase === "clock_in" ? !!variance?.frameBlocked : false,
+          frameBlocked: phase === "clock_in" ? !!variance?.frameBlocked : !!outVariance?.frameBlocked,
         },
       });
       if (phase === "clock_in") {
@@ -1449,6 +1461,7 @@ export function PunchPad({
   async function finalizeClockOut(args: {
     pos: { lat: number; lng: number; acc: number } | null;
     outsideReason?: string;
+    gpsBypassReason?: string;
     aiStatus?: "Verified" | "Flagged" | "Exception";
     aiFeedback?: string;
     aiIterationCount?: number;
@@ -1502,6 +1515,12 @@ export function PunchPad({
       update.nectar_drafted_confirmed_by = user.id;
     }
     if (args.outsideReason) update.outside_geofence_reason = args.outsideReason;
+    if (args.gpsBypassReason) {
+      // GPS entirely unavailable at clock-out — proceed with a reason and
+      // fall back to the client's on-file address for location evidence.
+      update.gps_out_bypassed = true;
+      update.gps_out_bypass_reason = args.gpsBypassReason;
+    }
     if (incidentAnswer === "no") {
       update.incident_flag = false;
     } else if (incidentFlag || incidentReportIds.length > 0) {
@@ -1864,30 +1883,8 @@ export function PunchPad({
     try {
       const isEvv = isEvvLockedCode(active.service_type_code);
 
-      // Sequence GPS acquisition: never block a non-EVV clock-out on a fix.
-      let pos = livePosRef.current ?? livePos;
-      if (!pos && isEvv) {
-        if (hardwareDenied) {
-          toast.error("Location access blocked. Check that location permission is enabled, then try again.");
-          return;
-        }
-        setAwaitingGps(true);
-        try {
-          const deadline = Date.now() + 15_000;
-          while (Date.now() < deadline) {
-            await new Promise((r) => setTimeout(r, 250));
-            if (livePosRef.current) { pos = livePosRef.current; break; }
-          }
-        } finally {
-          setAwaitingGps(false);
-        }
-        if (!pos) {
-          toast.error("Couldn't get a location fix. Check that location permission is enabled, then try again.");
-          return;
-        }
-      }
-
-      // Symmetric geofence check on clock-out — EVV-locked codes only.
+      // Computed up front (no pos dependency) so the GPS-unavailable bypass
+      // path below can offer the same radius context as the geofence dialog.
       const refClient = lockedClient ?? (() => {
         const c = caseload.find((x) => x.id === active.client_id);
         if (!c) return null;
@@ -1902,6 +1899,35 @@ export function PunchPad({
       const lng    = refClient?.homeLng;
       const radius = refClient?.geofenceRadiusFeet ?? 1000;
 
+      // Sequence GPS acquisition: never block a non-EVV clock-out on a fix.
+      // If GPS is truly unavailable (denied or no fix after waiting), staff
+      // is never hard-blocked — they proceed via the GPS-bypass dialog with a
+      // reason, and the EVV record falls back to the client's on-file address.
+      let pos = livePosRef.current ?? livePos;
+      if (!pos && isEvv) {
+        if (hardwareDenied) {
+          setOutVariance({ frameBlocked: true, pos: null, limitFeet: radius });
+          setOutVarianceReason("");
+          return;
+        }
+        setAwaitingGps(true);
+        try {
+          const deadline = Date.now() + 15_000;
+          while (Date.now() < deadline) {
+            await new Promise((r) => setTimeout(r, 250));
+            if (livePosRef.current) { pos = livePosRef.current; break; }
+          }
+        } finally {
+          setAwaitingGps(false);
+        }
+        if (!pos) {
+          setOutVariance({ frameBlocked: true, pos: null, limitFeet: radius });
+          setOutVarianceReason("");
+          return;
+        }
+      }
+
+      // Symmetric geofence check on clock-out — EVV-locked codes only.
       if (
         pos &&
         isEvv &&
@@ -1992,6 +2018,9 @@ export function PunchPad({
       toast.error("Please provide a variance justification.");
       return;
     }
+    // Truly no GPS (denied/no fix) → GPS-bypass path (address fallback at
+    // export time), distinct from a geofence out-of-bounds variance.
+    const isBypass = !!outVariance.frameBlocked;
     setBusy(true);
     try {
       // Stage 5 — fail-open clock-out guard for the variance path too.
@@ -2005,7 +2034,8 @@ export function PunchPad({
         if (pendingOut.length) {
           const pos = outVariance.pos;
           const outside = reason;
-          const finalize = () => finalizeClockOut({ pos, outsideReason: outside });
+          const finalize = () =>
+            finalizeClockOut(isBypass ? { pos, gpsBypassReason: outside } : { pos, outsideReason: outside });
           setPendingFormsDialog({
             mode: "clockout",
             pending: pendingOut,
@@ -2034,7 +2064,11 @@ export function PunchPad({
         }
       }
 
-      await finalizeClockOut({ pos: outVariance.pos, outsideReason: reason });
+      await finalizeClockOut(
+        isBypass
+          ? { pos: outVariance.pos, gpsBypassReason: reason }
+          : { pos: outVariance.pos, outsideReason: reason },
+      );
     } catch (e) {
       toast.error((e as Error).message || "Could not end shift.");
     } finally {
@@ -2406,11 +2440,11 @@ export function PunchPad({
           <DialogContent className="max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                ⚠️ Geofence Variance Notice
+                {variance?.frameBlocked ? "📡 GPS Unavailable" : "⚠️ Geofence Variance Notice"}
               </DialogTitle>
               <DialogDescription>
                 {variance?.frameBlocked
-                  ? "Our system cannot verify your exact proximity to the approved client perimeter because mobile location access is restricted or unavailable. To proceed, state compliance requires a written location justification."
+                  ? "GPS could not be captured — location access is restricted or no signal is available. Confirm a reason to proceed; this shift's EVV record will use the client's on-file address for location evidence instead of GPS coordinates."
                   : "Our system detects you are starting your shift outside the approved client home perimeter. Please provide a brief justification (e.g., Community outing, medical transit, network latency)."}
               </DialogDescription>
             </DialogHeader>
@@ -2453,13 +2487,19 @@ export function PunchPad({
               </div>
             </NectarInfusionLock>
             <div className="grid gap-2">
-              <Label htmlFor="variance-reason">Location variance justification</Label>
+              <Label htmlFor="variance-reason">
+                {variance?.frameBlocked ? "GPS unavailable — reason" : "Location variance justification"}
+              </Label>
               <Textarea
                 id="variance-reason"
                 rows={4}
                 value={varianceReason}
                 onChange={(e) => setVarianceReason(e.target.value)}
-                placeholder="Describe your location or device situation (e.g., Device location permissions restricted, starting shift at community job site, bad cell reception)."
+                placeholder={
+                  variance?.frameBlocked
+                    ? "e.g., GPS unavailable — no signal indoors, location permission off, device error."
+                    : "Describe your location or device situation (e.g., Device location permissions restricted, starting shift at community job site, bad cell reception)."
+                }
                 maxLength={500}
               />
               <p className="text-[11px] text-muted-foreground">
@@ -2484,26 +2524,27 @@ export function PunchPad({
           <DialogContent className="max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                📍 Out-of-Bounds EVV Exception Alert
+                {outVariance?.frameBlocked ? "📡 GPS Unavailable" : "📍 Out-of-Bounds EVV Exception Alert"}
               </DialogTitle>
               <DialogDescription>
-                You are located outside the authorized radius for this client. A written
-                justification is required to submit this clock-out.
+                {outVariance?.frameBlocked
+                  ? "GPS could not be captured — location access is restricted or no signal is available. Confirm a reason to proceed; this shift's EVV record will use the client's on-file address for location evidence instead of GPS coordinates."
+                  : "You are located outside the authorized radius for this client. A written justification is required to submit this clock-out."}
               </DialogDescription>
             </DialogHeader>
-            {outVariance && (
+            {outVariance && !outVariance.frameBlocked && (
               <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
                 {typeof outVariance.distanceFeet === "number" ? (
                   <>
                     Measured distance:{" "}
                     <span className="font-mono font-semibold">{outVariance.distanceFeet.toLocaleString()} ft</span>
                     {" "}· Allowed:{" "}
-                    <span className="font-mono font-semibold">{outVariance.limitFeet.toLocaleString()} ft</span>
+                    <span className="font-mono font-semibold">{(outVariance.limitFeet ?? 0).toLocaleString()} ft</span>
                   </>
                 ) : (
                   <>
                     GPS accuracy too low to confirm location. A written variance is required. · Allowed:{" "}
-                    <span className="font-mono font-semibold">{outVariance.limitFeet.toLocaleString()} ft</span>
+                    <span className="font-mono font-semibold">{(outVariance.limitFeet ?? 0).toLocaleString()} ft</span>
                   </>
                 )}
               </div>
@@ -2539,13 +2580,19 @@ export function PunchPad({
               </div>
             </NectarInfusionLock>
             <div className="grid gap-2">
-              <Label htmlFor="out-variance-reason">Variance justification</Label>
+              <Label htmlFor="out-variance-reason">
+                {outVariance?.frameBlocked ? "GPS unavailable — reason" : "Variance justification"}
+              </Label>
               <Textarea
                 id="out-variance-reason"
                 rows={4}
                 value={outVarianceReason}
                 onChange={(e) => setOutVarianceReason(e.target.value)}
-                placeholder="e.g., Completed community outing and clocked out at the destination."
+                placeholder={
+                  outVariance?.frameBlocked
+                    ? "e.g., GPS unavailable — no signal indoors, location permission off, device error."
+                    : "e.g., Completed community outing and clocked out at the destination."
+                }
                 maxLength={500}
               />
             </div>

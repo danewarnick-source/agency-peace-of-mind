@@ -6,7 +6,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { format, parseISO } from "date-fns";
-import { Download, MapPin, AlertTriangle, CheckCircle2, Circle } from "lucide-react";
+import { Download, MapPin, AlertTriangle, CheckCircle2, Circle, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,8 @@ type Row = {
   is_edited_by_admin: boolean;
   is_out_of_bounds: boolean;
   gps_validated: boolean;
+  gps_in_bypassed: boolean | null;
+  gps_out_bypassed: boolean | null;
   review_status: string;
   incident_flag: boolean;
   denial_reason: string | null;
@@ -459,15 +461,25 @@ export function EvvArchivePage() {
                   </td>
                   <td className="px-3 py-2 tabular-nums">{fmtDur(r.duration_min)}</td>
                   <td className="px-3 py-2">
-                    {r.is_out_of_bounds ? (
-                      <span className="inline-flex items-center gap-1 text-xs text-amber-700">
-                        <AlertTriangle className="h-3 w-3" /> out
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="h-3 w-3" /> in
-                      </span>
-                    )}
+                    <div className="flex flex-wrap items-center gap-1">
+                      {r.is_out_of_bounds ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-amber-700">
+                          <AlertTriangle className="h-3 w-3" /> out
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          <MapPin className="h-3 w-3" /> in
+                        </span>
+                      )}
+                      {(r.gps_in_bypassed || r.gps_out_bypassed) && (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full bg-[#137182]/12 px-1.5 py-0.5 text-[10px] font-medium text-[#137182]"
+                          title="GPS could not be captured — staff proceeded with a confirmed reason and the record uses the client's on-file address instead."
+                        >
+                          <Zap className="h-3 w-3" /> GPS bypassed
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-3 py-2"><BillingBadge value={r.billing} /></td>
                 </tr>
@@ -583,7 +595,7 @@ async function fetchArchive(args: {
   let q = supabase
     .from("evv_timesheets")
     .select(
-      "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, raw_clock_in, raw_clock_out, corrected_clock_in, corrected_clock_out, is_edited_by_admin, is_out_of_bounds, gps_validated, review_status, incident_flag, denial_reason, utah_medicaid_member_id, clients:client_id(first_name, last_name, team_id)",
+      "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, raw_clock_in, raw_clock_out, corrected_clock_in, corrected_clock_out, is_edited_by_admin, is_out_of_bounds, gps_validated, gps_in_bypassed, gps_out_bypassed, review_status, incident_flag, denial_reason, utah_medicaid_member_id, clients:client_id(first_name, last_name, team_id)",
       { count: "exact" },
     )
     .eq("organization_id", args.orgId)
@@ -684,7 +696,7 @@ async function fetchArchiveForExport(args: {
     let q = supabase
       .from("evv_timesheets")
       .select(
-        "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, raw_clock_in, raw_clock_out, corrected_clock_in, corrected_clock_out, is_edited_by_admin, is_out_of_bounds, gps_validated, review_status, incident_flag, denial_reason, utah_medicaid_member_id, clients:client_id(first_name, last_name, team_id)",
+        "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, raw_clock_in, raw_clock_out, corrected_clock_in, corrected_clock_out, is_edited_by_admin, is_out_of_bounds, gps_validated, gps_in_bypassed, gps_out_bypassed, review_status, incident_flag, denial_reason, utah_medicaid_member_id, clients:client_id(first_name, last_name, team_id)",
       )
       .eq("organization_id", args.orgId)
       .eq("status", "Approved")

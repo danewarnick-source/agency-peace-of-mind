@@ -6,7 +6,12 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { createEmployeeManually, adminResetEmployeePassword } from "@/lib/employees.functions";
-import { listStaffPii, updateStaffPii, type StaffPii } from "@/lib/hr-staff.functions";
+import {
+  listStaffPii,
+  updateStaffPii,
+  getStaffTrainingRiskFlags,
+  type StaffPii,
+} from "@/lib/hr-staff.functions";
 import { createInvitation, revokeInvitation } from "@/lib/invitations.functions";
 
 import { Button } from "@/components/ui/button";
@@ -71,7 +76,46 @@ type EditableMember = {
   startDate: string;
   endDate: string;
   ceSuggestedTopics: string[];
+  requiresDeescalation: boolean;
+  requiresAbi: boolean;
 };
+
+/**
+ * Explicit Required / Exempt picker for the de-escalation & ABI training
+ * requirements. Warns before allowing Exempt when the staffer is currently
+ * assigned to a client the setting is typically required for.
+ */
+function TrainingRequirementField({
+  label, hint, value, onChange, atRisk, warningText,
+}: {
+  label: string;
+  hint: string;
+  value: boolean;
+  onChange: (next: boolean) => void;
+  atRisk: boolean;
+  warningText: string;
+}) {
+  return (
+    <div className="grid gap-2">
+      <Label>{label}</Label>
+      <Select
+        value={value ? "required" : "exempt"}
+        onValueChange={(v) => {
+          const next = v === "required";
+          if (!next && atRisk && !window.confirm(warningText)) return;
+          onChange(next);
+        }}
+      >
+        <SelectTrigger><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="required">Required</SelectItem>
+          <SelectItem value="exempt">Not required / Exempt</SelectItem>
+        </SelectContent>
+      </Select>
+      <p className="text-xs text-muted-foreground">{hint}</p>
+    </div>
+  );
+}
 
 export function EmployeesPage() {
   const { user } = useAuth();
@@ -87,6 +131,12 @@ export function EmployeesPage() {
   const [editPositions, setEditPositions] = useState<Position[]>([]);
   const [editDirty, setEditDirty] = useState(false);
   const [caseloadFor, setCaseloadFor] = useState<{ id: string; name: string; role: string } | null>(null);
+  // Manual "add employee" onboarding form: de-escalation / ABI requirement
+  // defaults to Required until the admin deliberately reviews it.
+  const [manualRequiresDeescalation, setManualRequiresDeescalation] = useState(true);
+  const [manualRequiresAbi, setManualRequiresAbi] = useState(true);
+  const [editRequiresDeescalation, setEditRequiresDeescalation] = useState(true);
+  const [editRequiresAbi, setEditRequiresAbi] = useState(true);
 
   const createManual = useServerFn(createEmployeeManually);
   const resetPwFn = useServerFn(adminResetEmployeePassword);
@@ -94,6 +144,7 @@ export function EmployeesPage() {
   const updatePiiFn = useServerFn(updateStaffPii);
   const createInviteFn = useServerFn(createInvitation);
   const revokeInviteFn = useServerFn(revokeInvitation);
+  const fetchTrainingRiskFlags = useServerFn(getStaffTrainingRiskFlags);
 
   const { data: tracks } = useQuery({
     enabled: !!org,
@@ -115,7 +166,7 @@ export function EmployeesPage() {
       const ids = (data ?? []).map((m) => m.user_id);
       const { data: profs } = await supabase.from("profiles")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, full_name, email, username, must_change_password, department, hire_date, start_date, end_date, employee_id, position, positions, account_status, worker_type, ce_suggested_topics, photo_path, photo_updated_at" as any)
+        .select("id, full_name, email, username, must_change_password, department, hire_date, start_date, end_date, employee_id, position, positions, account_status, worker_type, ce_suggested_topics, photo_path, photo_updated_at, requires_deescalation, requires_abi" as any)
         .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const profMap = new Map(((profs ?? []) as any[]).map((p) => [p.id as string, p]));
@@ -140,6 +191,18 @@ export function EmployeesPage() {
     for (const row of staffPii ?? []) m.set(row.staff_id, row);
     return m;
   }, [staffPii]);
+
+  // Risk flags for the confirmation warning shown when exempting the staffer
+  // currently being edited. Existing staff only — a brand-new hire can't yet
+  // be assigned to any client, so there's nothing to warn about.
+  const { data: editRiskFlags } = useQuery({
+    enabled: !!org && !!editingMember,
+    queryKey: ["staff-training-risk", org?.organization_id, editingMember?.userId],
+    queryFn: async () =>
+      await fetchTrainingRiskFlags({
+        data: { organization_id: org!.organization_id, staff_id: editingMember!.userId },
+      }),
+  });
 
   const fetchTrainingStatus = useServerFn(getRosterTrainingStatus);
   const { hasAddon } = useEntitlements();
@@ -286,11 +349,13 @@ export function EmployeesPage() {
           end_date: input.endDate || null,
           hire_date: input.startDate || null,
           ce_suggested_topics: input.ceSuggestedTopics ?? [],
+          requires_deescalation: input.requiresDeescalation,
+          requires_abi: input.requiresAbi,
         } as any)
         .eq("id", input.userId)
         // Return the exact columns we wrote so a silent partial-write
         // (RLS column restriction, wrong id) is visible instead of a false "Saved" toast.
-        .select("id, full_name, email, employee_id, position, positions, worker_type, start_date, end_date, hire_date");
+        .select("id, full_name, email, employee_id, position, positions, worker_type, start_date, end_date, hire_date, requires_deescalation, requires_abi");
       if (pErr) throw pErr;
       if (!pRows || pRows.length === 0) {
         throw new Error("Profile not updated — record not found or you don't have permission to edit it.");
@@ -358,7 +423,7 @@ export function EmployeesPage() {
             </Link>
           </Button>
 
-          <Button variant="outline" onClick={() => { setTempPassword(genPassword()); setManualOpen(true); }}>
+          <Button variant="outline" onClick={() => { setTempPassword(genPassword()); setManualRequiresDeescalation(true); setManualRequiresAbi(true); setManualOpen(true); }}>
             <ShieldPlus className="mr-2 h-4 w-4" /> Add manually
           </Button>
           <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
@@ -463,6 +528,12 @@ export function EmployeesPage() {
                   const positionsArr = ((m.profile as { positions?: string[] | null } | undefined)?.positions ?? []) as string[];
                   const initialPositions = positionsArr.filter((x): x is Position => POSITIONS.includes(x as Position));
                   setEditPositions(initialPositions.length ? initialPositions : (position ? [position as Position] : []));
+                  const profRequiresDeescalation =
+                    (m.profile as { requires_deescalation?: boolean | null } | undefined)?.requires_deescalation;
+                  const profRequiresAbi =
+                    (m.profile as { requires_abi?: boolean | null } | undefined)?.requires_abi;
+                  setEditRequiresDeescalation(profRequiresDeescalation !== false);
+                  setEditRequiresAbi(profRequiresAbi !== false);
                   setEditingMember({
                     membershipId: m.id,
                     userId: m.user_id,
@@ -484,6 +555,8 @@ export function EmployeesPage() {
                     startDate: (m.profile?.start_date ?? m.profile?.hire_date ?? "") as string,
                     endDate: (m.profile?.end_date ?? "") as string,
                     ceSuggestedTopics: topics,
+                    requiresDeescalation: profRequiresDeescalation !== false,
+                    requiresAbi: profRequiresAbi !== false,
                   });
                 };
                 const trainings = trainingByStaff.get(m.user_id) ?? [];
@@ -618,8 +691,8 @@ export function EmployeesPage() {
 
               trackIds,
               password: String(fd.get("password") || tempPassword),
-              requiresDeescalation: fd.get("requires_deescalation") === "on",
-              requiresAbi: fd.get("requires_abi") === "on",
+              requiresDeescalation: manualRequiresDeescalation,
+              requiresAbi: manualRequiresAbi,
             });
           }} className="grid gap-4">
 
@@ -659,26 +732,26 @@ export function EmployeesPage() {
               <div className="grid gap-2"><Label htmlFor="end_date">End date (optional)</Label><Input id="end_date" name="end_date" type="date" /></div>
             </div>
 
-            <div className="grid gap-2 rounded-md border border-border bg-muted/30 p-3">
-              <label className="flex items-start gap-2 text-sm">
-                <input type="checkbox" name="requires_deescalation" className="mt-1 rounded" />
-                <span>
-                  <span className="font-medium">Works with behavior clients?</span>
-                  <span className="block text-xs text-muted-foreground">
-                    Check if this employee works with clients who have behavior codes (BC1, BC2, BC3) or a Behavior Support Plan.
-                    De-escalation Certification will be required.
-                  </span>
-                </span>
-              </label>
-              <label className="flex items-start gap-2 text-sm">
-                <input type="checkbox" name="requires_abi" className="mt-1 rounded" />
-                <span>
-                  <span className="font-medium">Works with ABI clients?</span>
-                  <span className="block text-xs text-muted-foreground">
-                    Check if this employee works with ABI (acquired brain injury) clients. ABI Training will be required.
-                  </span>
-                </span>
-              </label>
+            <div className="grid gap-3 rounded-md border border-border bg-muted/30 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Behavior-related training requirements
+              </p>
+              <TrainingRequirementField
+                label="De-escalation training"
+                hint="Typically required for staff assigned to a behavior-coded client (BC1/2/3) or a client with a Behavior Support Plan."
+                value={manualRequiresDeescalation}
+                onChange={setManualRequiresDeescalation}
+                atRisk={false}
+                warningText=""
+              />
+              <TrainingRequirementField
+                label="ABI training"
+                hint="Typically required for staff assigned to a client with an ABI (acquired brain injury) designation."
+                value={manualRequiresAbi}
+                onChange={setManualRequiresAbi}
+                atRisk={false}
+                warningText=""
+              />
             </div>
 
 
@@ -792,6 +865,8 @@ export function EmployeesPage() {
                   startDate: String(fd.get("start_date") || "").trim(),
                   endDate: String(fd.get("end_date") || "").trim(),
                   ceSuggestedTopics: editTopics,
+                  requiresDeescalation: editRequiresDeescalation,
+                  requiresAbi: editRequiresAbi,
                 });
                 setEditDirty(false);
               }}
@@ -912,6 +987,33 @@ export function EmployeesPage() {
                       <p className="text-[10px] text-muted-foreground">Applies to daily codes (HHS, RHS, DSG, RL6, RP3–RP5).</p>
                     </div>
                   </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border bg-muted/30 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Behavior-related training requirements
+                </p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Revisitable at any time — change this if the employee's client assignments change after hire.
+                </p>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <TrainingRequirementField
+                    label="De-escalation training"
+                    hint="Typically required for staff assigned to a behavior-coded client (BC1/2/3) or a client with a Behavior Support Plan."
+                    value={editRequiresDeescalation}
+                    onChange={(v) => { setEditRequiresDeescalation(v); setEditDirty(true); }}
+                    atRisk={!!editRiskFlags?.has_behavior_client}
+                    warningText="Are you sure? This staff member is assigned to a client with behavior supports. De-escalation training is typically required for staff working with this code. Marking this exempt without proper justification could cause compliance issues in an audit."
+                  />
+                  <TrainingRequirementField
+                    label="ABI training"
+                    hint="Typically required for staff assigned to a client with an ABI (acquired brain injury) designation."
+                    value={editRequiresAbi}
+                    onChange={(v) => { setEditRequiresAbi(v); setEditDirty(true); }}
+                    atRisk={!!editRiskFlags?.has_abi_client}
+                    warningText="Are you sure? This staff member is assigned to a client with an ABI designation. ABI training is typically required for staff working with this client. Marking this exempt without proper justification could cause compliance issues in an audit."
+                  />
                 </div>
               </div>
 

@@ -18,8 +18,8 @@ const CreateEmployeeInput = z.object({
   startDate: z.string().optional().or(z.literal("")),
   endDate: z.string().optional().or(z.literal("")),
   trackIds: z.array(z.string().uuid()).max(50).default([]),
-  requiresDeescalation: z.boolean().default(false),
-  requiresAbi: z.boolean().default(false),
+  requiresDeescalation: z.boolean().default(true),
+  requiresAbi: z.boolean().default(true),
 });
 
 

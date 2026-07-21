@@ -41,6 +41,7 @@ import { ClientProfileTab } from "@/components/clients/profile-tab";
 import { FaceSheetButton } from "@/components/clients/face-sheet-button";
 import { SectionsView, ClientSpecificTrainingCard, GoalsEditor, PublishConfirmDialog } from "@/components/clients/client-specific-training-card";
 import { FieldVisibilityToggle } from "@/components/clients/visibility-toggles";
+import { CodeAssignedStaff } from "@/components/clients/code-assigned-staff";
 import { CustomFieldsForSection } from "@/components/clients/custom-fields-panel";
 import { TargetBehaviorsPanel } from "@/components/clients/target-behaviors-panel";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, Pill, RefreshCw, Sparkles, Trash2, Upload, UserCircle2, Target, ShieldCheck, GraduationCap, HeartHandshake, Users, UtensilsCrossed, ListChecks, UserCircle, FileUp, Clock, FileText, AlertOctagon, ClipboardList, Home as HomeIcon, CalendarClock, Wallet, FolderOpen } from "lucide-react";
@@ -1410,7 +1411,12 @@ function BillingCodesPanel({ clientId }: { clientId: string }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base">Billing authorizations (1056)</CardTitle>
+        <div>
+          <CardTitle className="text-base">Authorized codes (1056)</CardTitle>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Staff can only see a code here once they're assigned to work it. Assign or swap staff per code below.
+          </p>
+        </div>
         <Button asChild variant="outline" size="sm">
           <Link to="/dashboard/billing/$clientId" params={{ clientId }}>Open billing detail</Link>
         </Button>
@@ -1427,16 +1433,8 @@ function BillingCodesPanel({ clientId }: { clientId: string }) {
             { header: "Rate", cell: (r) => (r.rate_per_unit != null ? `$${Number(r.rate_per_unit).toFixed(2)}` : "—") },
             { header: "Effective", cell: (r) => `${r.service_start_date ?? "—"} → ${r.service_end_date ?? "open"}` },
             {
-              header: "Staff view",
-              cell: (r) => (
-                <FieldVisibilityToggle
-                  clientId={clientId}
-                  section="billing"
-                  kind="code"
-                  id={String(r.id)}
-                  label={`code ${r.service_code}`}
-                />
-              ),
+              header: "Assigned staff",
+              cell: (r) => <CodeAssignedStaff clientId={clientId} code={r.service_code} />,
             },
           ]}
         />

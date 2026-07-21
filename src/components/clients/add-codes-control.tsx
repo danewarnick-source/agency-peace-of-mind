@@ -16,6 +16,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { FEATURE_CODES } from "@/lib/client-features";
 import { addClientBillingCodes } from "@/lib/finish-onboarding.functions";
+import { CodeAssignedStaff } from "@/components/clients/code-assigned-staff";
+import { UserPlus } from "lucide-react";
 
 const ALL_CODES: string[] = Array.from(
   new Set(Object.values(FEATURE_CODES).flat() as string[]),
@@ -32,6 +34,7 @@ export function AddCodesControl({
 }) {
   const qc = useQueryClient();
   const [picked, setPicked] = useState<string[]>([]);
+  const [justAdded, setJustAdded] = useState<string[]>([]);
 
   const existingQ = useQuery({
     queryKey: ["client-codes-summary", clientId],
@@ -71,6 +74,7 @@ export function AddCodesControl({
     mutationFn: () => addFn({ data: { clientId, codes: picked } }),
     onSuccess: (r) => {
       toast.success(`Added ${r.added} billing code${r.added === 1 ? "" : "s"}.`);
+      setJustAdded(picked);
       setPicked([]);
       qc.invalidateQueries({ queryKey: ["client-codes-summary", clientId] });
       qc.invalidateQueries({ queryKey: ["client-billing-codes"] });
@@ -89,25 +93,40 @@ export function AddCodesControl({
   }
 
   return (
-    <div className={compact ? "flex flex-col gap-2 sm:flex-row sm:items-start" : "space-y-2"}>
-      <div className="min-w-0 flex-1">
-        <CheckboxMultiSelect
-          value={picked}
-          onChange={setPicked}
-          options={options}
-          placeholder="Pick DSPD service codes…"
-          searchPlaceholder="Filter codes…"
-          emptyLabel={options.length === 0 ? "Client already has every known code." : "No matches"}
-          chipMonospace
-        />
+    <div className="space-y-3">
+      <div className={compact ? "flex flex-col gap-2 sm:flex-row sm:items-start" : "space-y-2"}>
+        <div className="min-w-0 flex-1">
+          <CheckboxMultiSelect
+            value={picked}
+            onChange={setPicked}
+            options={options}
+            placeholder="Pick DSPD service codes…"
+            searchPlaceholder="Filter codes…"
+            emptyLabel={options.length === 0 ? "Client already has every known code." : "No matches"}
+            chipMonospace
+          />
+        </div>
+        <Button
+          size="sm"
+          onClick={() => m.mutate()}
+          disabled={m.isPending || picked.length === 0}
+        >
+          {m.isPending ? "Adding…" : `Add${picked.length ? ` ${picked.length}` : ""}`}
+        </Button>
       </div>
-      <Button
-        size="sm"
-        onClick={() => m.mutate()}
-        disabled={m.isPending || picked.length === 0}
-      >
-        {m.isPending ? "Adding…" : `Add${picked.length ? ` ${picked.length}` : ""}`}
-      </Button>
+      {justAdded.length > 0 && (
+        <div className="space-y-2 rounded-md border border-dashed border-border bg-muted/30 p-2.5">
+          <div className="flex items-center gap-1.5 text-xs font-medium">
+            <UserPlus className="h-3.5 w-3.5" /> Who should work these codes?
+          </div>
+          {justAdded.map((code) => (
+            <div key={code} className="flex flex-wrap items-center gap-2">
+              <code className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px]">{code}</code>
+              <CodeAssignedStaff clientId={clientId} code={code} />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

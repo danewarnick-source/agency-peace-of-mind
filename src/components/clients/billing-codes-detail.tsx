@@ -80,6 +80,8 @@ function fmtDate(d: Date | null): string {
 
 export function BillingCodesDetail({ clientId, clientName, medicaidId }: Props) {
   const { data: budgets, isLoading } = useClientBudget(clientId);
+  const { data: org } = useCurrentOrg();
+  const qc = useQueryClient();
 
   const planYear = useMemo(() => {
     if (!budgets || budgets.length === 0) return { start: null as Date | null, end: null as Date | null };
@@ -91,6 +93,105 @@ export function BillingCodesDetail({ clientId, clientName, medicaidId }: Props) 
     }
     return { start, end };
   }, [budgets]);
+
+  const current = useMemo(
+    () =>
+      (budgets ?? []).filter(
+        (b) => getAuthStatus(b.code.service_start_date, b.code.service_end_date) !== "expired",
+      ),
+    [budgets],
+  );
+  const previous = useMemo(
+    () =>
+      (budgets ?? []).filter(
+        (b) => getAuthStatus(b.code.service_start_date, b.code.service_end_date) === "expired",
+      ),
+    [budgets],
+  );
+
+  const [bulkEdit, setBulkEdit] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [saving, setSaving] = useState(false);
+
+  function enterBulk() {
+    const seed: Record<string, Draft> = {};
+    for (const b of current) seed[b.code.id] = draftFromCode(b.code);
+    setDrafts(seed);
+    setBulkEdit(true);
+  }
+  function cancelBulk() {
+    setDrafts({});
+    setBulkEdit(false);
+  }
+  function updateDraft(id: string, patch: Partial<Draft>) {
+    setDrafts((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+  }
+
+  const changedIds = useMemo(() => {
+    const out: string[] = [];
+    for (const b of current) {
+      const d = drafts[b.code.id];
+      if (!d) continue;
+      const base = draftFromCode(b.code);
+      if (d.annual !== base.annual || d.rate !== base.rate || d.endDate !== base.endDate) {
+        out.push(b.code.id);
+      }
+    }
+    return out;
+  }, [drafts, current]);
+
+  async function saveAll() {
+    if (!org?.organization_id) return;
+    // Validate
+    for (const id of changedIds) {
+      const d = drafts[id];
+      const a = Number(d.annual);
+      const r = Number(d.rate);
+      if (!isFinite(a) || a < 0) return toast.error("Annual units must be non-negative");
+      if (!isFinite(r) || r < 0) return toast.error("Rate must be non-negative");
+      const b = current.find((x) => x.code.id === id);
+      if (d.endDate && b?.code.service_start_date && new Date(d.endDate) <= new Date(b.code.service_start_date)) {
+        return toast.error(`${b.code.service_code}: end date must be after start date`);
+      }
+    }
+    setSaving(true);
+    const results = await Promise.all(
+      changedIds.map(async (id) => {
+        const d = drafts[id];
+        const payload: Record<string, unknown> = {
+          annual_unit_authorization: Number(d.annual),
+          rate_per_unit: Number(d.rate),
+          rate_source: "Manual override",
+          rate_source_plan_number: null,
+          rate_source_document_id: null,
+          rate_source_at: new Date().toISOString(),
+        };
+        if (d.endDate) payload.service_end_date = d.endDate;
+        const { error } = await supabase
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .from("client_billing_codes" as any)
+          .update(payload)
+          .eq("id", id)
+          .eq("organization_id", org.organization_id!);
+        return { id, error };
+      }),
+    );
+    setSaving(false);
+    const failed = results.filter((r) => r.error);
+    const ok = results.length - failed.length;
+    if (ok > 0) toast.success(`Updated ${ok} of ${results.length} codes`);
+    if (failed.length > 0) toast.error(`${failed.length} update${failed.length === 1 ? "" : "s"} failed`);
+    qc.invalidateQueries({ queryKey: ["all-client-billing-codes"] });
+    qc.invalidateQueries({ queryKey: ["client-billing-codes"] });
+    qc.invalidateQueries({ queryKey: ["client-budget"] });
+    qc.invalidateQueries({ queryKey: ["client-codes-summary", clientId] });
+    qc.invalidateQueries({ queryKey: ["client-readiness", clientId] });
+    qc.invalidateQueries({ queryKey: ["caseload"] });
+    qc.invalidateQueries({ queryKey: ["scheduler-data"] });
+    if (failed.length === 0) cancelBulk();
+  }
+
+  const hasCurrent = current.length > 0;
 
   return (
     <Card className="border-amber-500/20 bg-card/60 backdrop-blur">
@@ -105,7 +206,25 @@ export function BillingCodesDetail({ clientId, clientName, medicaidId }: Props) 
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {/* Per-section budget upload removed — use NECTAR Bulk Import (AI PDF mode) to populate authorized billing codes from a PCSP. */}
+            {hasCurrent && !bulkEdit && (
+              <Button size="sm" variant="outline" onClick={enterBulk} className="h-8 gap-1.5 text-xs">
+                <Pencil className="h-3.5 w-3.5" /> Edit
+              </Button>
+            )}
+            {bulkEdit && (
+              <>
+                <span className="text-[11px] text-muted-foreground">
+                  {changedIds.length} changed
+                </span>
+                <Button size="sm" variant="ghost" onClick={cancelBulk} disabled={saving} className="h-8 gap-1 text-xs">
+                  <X className="h-3.5 w-3.5" /> Cancel
+                </Button>
+                <Button size="sm" onClick={saveAll} disabled={saving || changedIds.length === 0} className="h-8 gap-1 text-xs">
+                  {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  {saving ? "Saving…" : "Save all"}
+                </Button>
+              </>
+            )}
             <Button asChild size="sm" variant="outline" className="gap-1.5 text-xs">
               <Link to="/dashboard/billing/$clientId" params={{ clientId }}>
                 <ExternalLink className="h-3.5 w-3.5" /> Full billing editor
@@ -150,36 +269,32 @@ export function BillingCodesDetail({ clientId, clientName, medicaidId }: Props) 
             </Button>
           </div>
         ) : (
-          (() => {
-            const current = budgets.filter(
-              (b) =>
-                getAuthStatus(b.code.service_start_date, b.code.service_end_date) !== "expired",
-            );
-            const previous = budgets.filter(
-              (b) =>
-                getAuthStatus(b.code.service_start_date, b.code.service_end_date) === "expired",
-            );
-            return (
-              <div className="space-y-4">
-                <div className="space-y-3">
-                  {current.length === 0 && (
-                    <div className="rounded-xl border border-dashed border-border bg-background/40 p-4 text-center text-xs text-muted-foreground">
-                      No active authorizations. See Previous authorizations below.
-                    </div>
-                  )}
-                  {current.map((b) => (
-                    <CodeRow key={b.code.id} clientId={clientId} budget={b} />
-                  ))}
+          <div className="space-y-4">
+            <div className="space-y-3">
+              {current.length === 0 && (
+                <div className="rounded-xl border border-dashed border-border bg-background/40 p-4 text-center text-xs text-muted-foreground">
+                  No active authorizations. See Previous authorizations below.
                 </div>
-                {previous.length > 0 && <PreviousAuthorizations clientId={clientId} budgets={previous} />}
-              </div>
-            );
-          })()
+              )}
+              {current.map((b) => (
+                <CodeRow
+                  key={b.code.id}
+                  clientId={clientId}
+                  budget={b}
+                  bulkEdit={bulkEdit}
+                  draft={drafts[b.code.id]}
+                  onDraftChange={(patch) => updateDraft(b.code.id, patch)}
+                />
+              ))}
+            </div>
+            {previous.length > 0 && <PreviousAuthorizations clientId={clientId} budgets={previous} />}
+          </div>
         )}
       </CardContent>
     </Card>
   );
 }
+
 
 function Field({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
   return (

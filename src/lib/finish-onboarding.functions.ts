@@ -491,14 +491,55 @@ export const addClientBillingCodes = createServerFn({ method: "POST" })
     );
     if (codes.length === 0) return { ok: true, added: 0 };
 
-    const rows = codes.map((code) => ({
-      organization_id: client.organization_id,
-      client_id: data.clientId,
-      service_code: code,
-      unit_type: isDailyServiceCode(code) ? "day" : "unit",
-      annual_unit_authorization: 0,
-      rate_per_unit: 0,
-    }));
+    // Auto-fill unit type (and, where published, a suggested standard rate)
+    // from the org's published state template so a newly added code doesn't
+    // land with a blank/guessed unit type. Falls back to the daily/quarter-
+    // hour heuristic when the template has no entry for a code.
+    const { data: org } = await sb
+      .from("organizations")
+      .select("state_code")
+      .eq("id", client.organization_id)
+      .maybeSingle();
+    const stateCode = (org as { state_code?: string | null } | null)?.state_code ?? null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const templateCodeByCode = new Map<string, any>();
+    if (stateCode) {
+      const { data: tpl } = await sb
+        .from("state_templates")
+        .select("billing_codes")
+        .eq("state_code", stateCode)
+        .not("published_at", "is", null)
+        .maybeSingle();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tplCodes = (tpl as any)?.billing_codes?.codes ?? [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const c of tplCodes as any[]) {
+        if (c?.code) templateCodeByCode.set(String(c.code).toUpperCase(), c);
+      }
+    }
+
+    const STATE_UNIT_TYPE_TO_STORED: Record<string, string> = {
+      "15min": "Q",
+      hourly: "hourly",
+      daily: "day",
+    };
+
+    const rows = codes.map((code) => {
+      const tplCode = templateCodeByCode.get(code);
+      const unit_type =
+        (tplCode?.unit_type && STATE_UNIT_TYPE_TO_STORED[tplCode.unit_type]) ||
+        (isDailyServiceCode(code) ? "day" : "Q");
+      const rate_per_unit =
+        typeof tplCode?.rate === "number" && tplCode.rate > 0 ? tplCode.rate : 0;
+      return {
+        organization_id: client.organization_id,
+        client_id: data.clientId,
+        service_code: code,
+        unit_type,
+        annual_unit_authorization: 0,
+        rate_per_unit,
+      };
+    });
     const { data: upserted, error: uErr } = await sb
       .from("client_billing_codes")
       .upsert(rows, { onConflict: "organization_id,client_id,service_code" })

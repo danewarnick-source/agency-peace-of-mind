@@ -23,6 +23,30 @@ export function billingUnitLabel(code: string | null | undefined): "Hourly" | "D
   return isDailyServiceCode(code) ? "Daily" : "Hourly";
 }
 
+// Short letter code for a stored client_billing_codes.unit_type value, for
+// display only — never write the letter back as the stored value except via
+// the canonical UNIT_TYPE_OPTIONS values below. Tolerant of the historical
+// variants that exist across write paths ("unit", "Q", "day", "daily", "15min").
+export type UnitTypeLetter = "Q" | "D" | "H";
+
+export const UNIT_TYPE_OPTIONS: ReadonlyArray<{ value: string; label: string; letter: UnitTypeLetter }> = [
+  { value: "Q", label: "Quarter-hour (15 min)", letter: "Q" },
+  { value: "day", label: "Daily", letter: "D" },
+  { value: "hourly", label: "Hourly", letter: "H" },
+];
+
+export function unitTypeLetter(
+  unitType: string | null | undefined,
+  code?: string | null,
+): UnitTypeLetter {
+  const v = (unitType ?? "").trim().toLowerCase();
+  if (["day", "daily", "d"].includes(v)) return "D";
+  if (["hour", "hourly", "h"].includes(v)) return "H";
+  if (["unit", "q", "15min", "15 min", "quarter", "quarter-hour", "quarter_hour"].includes(v)) return "Q";
+  if (code) return isDailyServiceCode(code) ? "D" : "Q";
+  return "Q";
+}
+
 // Codes that staff CAN clock in on for payroll/evidence capture even though
 // they may also have a daily-rate component (e.g. RHS — residential staff
 // clock for payroll even though the client billing is daily; DSG/RL6/RP4/

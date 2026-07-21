@@ -14,14 +14,14 @@ import {
   type CheckboxMultiSelectOption,
 } from "@/components/ui/checkbox-multi-select";
 import { supabase } from "@/integrations/supabase/client";
-import { FEATURE_CODES } from "@/lib/client-features";
+import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
 import { addClientBillingCodes } from "@/lib/finish-onboarding.functions";
 import { CodeAssignedStaff } from "@/components/clients/code-assigned-staff";
 import { UserPlus } from "lucide-react";
 
-const ALL_CODES: string[] = Array.from(
-  new Set(Object.values(FEATURE_CODES).flat() as string[]),
-).sort();
+// Full DSPD code catalog (EVV_SERVICE_CODES is the canonical registry —
+// includes every real code, not just the ones with a feature-area mapping).
+const ALL_CODE_DEFS = [...EVV_SERVICE_CODES].sort((a, b) => a.code.localeCompare(b.code));
 
 export function AddCodesControl({
   clientId,
@@ -63,9 +63,10 @@ export function AddCodesControl({
 
   const options: CheckboxMultiSelectOption[] = useMemo(() => {
     const existing = existingQ.data ?? new Set<string>();
-    return ALL_CODES.filter((c) => !existing.has(c)).map((c) => ({
-      value: c,
-      label: c,
+    return ALL_CODE_DEFS.filter((c) => !existing.has(c.code)).map((c) => ({
+      value: c.code,
+      label: c.code,
+      sublabel: c.label.replace(`${c.code} — `, ""),
     }));
   }, [existingQ.data]);
 

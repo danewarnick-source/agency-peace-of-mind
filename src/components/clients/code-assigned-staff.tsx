@@ -11,7 +11,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { CheckboxMultiSelect } from "@/components/ui/checkbox-multi-select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Plus, X, UserPlus } from "lucide-react";
 import { addStaffToClientCode, removeStaffFromClientCode } from "@/lib/scheduler/setup.functions";
@@ -41,23 +41,30 @@ export function CodeAssignedStaff({
   const { data: org } = useCurrentOrg();
   const { staffForCode, unassignedForCode, isLoading } = useClientCodeAssignments(clientId);
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const [picked, setPicked] = useState<string[]>([]);
 
   const addFn = useServerFn(addStaffToClientCode);
   const removeFn = useServerFn(removeStaffFromClientCode);
 
   const addM = useMutation({
-    mutationFn: (staff_id: string) =>
-      addFn({
-        data: {
-          organization_id: org!.organization_id,
-          client_id: clientId,
-          staff_id,
-          service_code: code,
-        },
-      }),
-    onSuccess: () => {
+    mutationFn: (staffIds: string[]) =>
+      Promise.all(
+        staffIds.map((staff_id) =>
+          addFn({
+            data: {
+              organization_id: org!.organization_id,
+              client_id: clientId,
+              staff_id,
+              service_code: code,
+            },
+          }),
+        ),
+      ),
+    onSuccess: (_result, staffIds) => {
       invalidateAssignmentQueries(qc, clientId);
+      toast.success(`Added ${staffIds.length} staff member${staffIds.length === 1 ? "" : "s"} to ${code}`);
+      setPicked([]);
+      setOpen(false);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -79,9 +86,8 @@ export function CodeAssignedStaff({
   });
 
   const assigned = staffForCode(code);
-  const candidates = unassignedForCode(code).filter((s) =>
-    s.name.toLowerCase().includes(search.trim().toLowerCase()),
-  );
+  const candidates = unassignedForCode(code);
+  const candidateOptions = candidates.map((s) => ({ value: s.id, label: s.name }));
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
@@ -105,47 +111,47 @@ export function CodeAssignedStaff({
           </Badge>
         ))
       )}
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover
+        open={open}
+        onOpenChange={(o) => {
+          setOpen(o);
+          if (!o) setPicked([]);
+        }}
+      >
         <PopoverTrigger asChild>
           <Button type="button" variant="outline" size="sm" className="h-6 gap-1 px-2 text-[11px]" disabled={!org?.organization_id}>
             <Plus className="h-3 w-3" /> Add staff
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-64 p-2" align="start">
-          <div className="mb-1 flex items-center gap-1.5 px-1 text-xs font-medium">
+        <PopoverContent className="w-72 p-2" align="start">
+          <div className="mb-2 flex items-center gap-1.5 px-1 text-xs font-medium">
             <UserPlus className="h-3.5 w-3.5" /> Assign staff to {code}
           </div>
-          <Input
-            placeholder="Filter staff…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="mb-2 h-8 text-xs"
-          />
-          <div className="max-h-56 space-y-0.5 overflow-y-auto">
-            {candidates.length === 0 ? (
-              <div className="px-2 py-2 text-xs text-muted-foreground">
-                {unassignedForCode(code).length === 0
-                  ? "All active staff are already assigned to this code."
-                  : "No matches."}
-              </div>
-            ) : (
-              candidates.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  disabled={addM.isPending}
-                  className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs hover:bg-muted"
-                  onClick={() => {
-                    addM.mutate(s.id);
-                    setSearch("");
-                  }}
-                >
-                  <span className="truncate">{s.name}</span>
-                  <Plus className="h-3 w-3 shrink-0 text-muted-foreground" />
-                </button>
-              ))
-            )}
-          </div>
+          {candidates.length === 0 ? (
+            <div className="px-2 py-2 text-xs text-muted-foreground">
+              All active staff are already assigned to this code.
+            </div>
+          ) : (
+            <>
+              <CheckboxMultiSelect
+                value={picked}
+                onChange={setPicked}
+                options={candidateOptions}
+                placeholder="Pick staff…"
+                searchPlaceholder="Filter staff…"
+                emptyLabel="No matches"
+              />
+              <Button
+                type="button"
+                size="sm"
+                className="mt-2 w-full"
+                disabled={picked.length === 0 || addM.isPending}
+                onClick={() => addM.mutate(picked)}
+              >
+                {addM.isPending ? "Adding…" : `Add${picked.length ? ` ${picked.length}` : ""}`}
+              </Button>
+            </>
+          )}
         </PopoverContent>
       </Popover>
     </div>

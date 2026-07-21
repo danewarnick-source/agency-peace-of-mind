@@ -7,8 +7,7 @@
 //   • src/components/residential/residential-daily-tab.tsx — HHS daily logs
 //   • src/components/nectar/nectar-search-bar.tsx — semantic search above table
 import { useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import {
   Download, MapPin, AlertTriangle, Clock, Clock3, ShieldAlert,
@@ -19,15 +18,19 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { CheckboxMultiSelect } from "@/components/ui/checkbox-multi-select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { EVV_SERVICE_CODES, isEvvLockedCode, padMemberId } from "@/lib/evv-codes";
 import { buildUtahCsv, downloadCsv, isValidIso, type UtahExportLine } from "@/lib/utah-evv-export";
 import { reviewExceptions, type ReviewException } from "@/lib/records-review-rules";
+import {
+  saveRecordFields, saveManagerNote, toLocalInput, fromLocalInput, type AuditEntry,
+} from "@/lib/records-edit";
 import { ResidentialDailyTab } from "@/components/residential/residential-daily-tab";
 import { TimeCorrectionReviewSection } from "@/components/records/time-correction-review-section";
-import { RecordDetailSheet, type AuditEntry } from "@/components/records/record-detail-sheet";
+import { RecordDetailSheet } from "@/components/records/record-detail-sheet";
 import { ManualTimesheetDialog } from "@/components/records/manual-timesheet-dialog";
 
 import { UtahExportDialog } from "@/components/evv/utah-export-dialog";
@@ -147,6 +150,8 @@ function defaultTo(): string { return new Date().toISOString().slice(0, 10); }
 export function RecordsTab() {
   const { data: org } = useCurrentOrg();
   const { user } = useAuth();
+  const qc = useQueryClient();
+  const adminName = (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Administrator";
   const orgId = org?.organization_id;
   const isAdmin = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
 
@@ -663,8 +668,17 @@ export function RecordsTab() {
       <div className="inline-flex overflow-hidden rounded-md border border-border">
         <button
           type="button"
-          onClick={() => setMode("attention")}
+          onClick={() => setMode("all")}
           className={`flex min-h-[36px] items-center gap-2 px-3 py-1.5 text-xs font-medium transition ${
+            mode === "all" ? "bg-[#137182] text-white" : "bg-card text-muted-foreground hover:bg-accent"
+          }`}
+        >
+          <ListChecks className="h-3.5 w-3.5" /> All records
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("attention")}
+          className={`flex min-h-[36px] items-center gap-2 border-l border-border px-3 py-1.5 text-xs font-medium transition ${
             mode === "attention" ? "bg-[#137182] text-white" : "bg-card text-muted-foreground hover:bg-accent"
           }`}
         >
@@ -672,15 +686,6 @@ export function RecordsTab() {
           <span className={`rounded px-1.5 py-0.5 text-[10px] ${mode === "attention" ? "bg-white/20" : "bg-muted text-foreground"}`}>
             {attentionCount}
           </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("all")}
-          className={`flex min-h-[36px] items-center gap-2 border-l border-border px-3 py-1.5 text-xs font-medium transition ${
-            mode === "all" ? "bg-[#137182] text-white" : "bg-card text-muted-foreground hover:bg-accent"
-          }`}
-        >
-          <ListChecks className="h-3.5 w-3.5" /> All records
         </button>
       </div>
 
@@ -830,6 +835,52 @@ export function RecordsTab() {
             </div>
           </div>
 
+          {/* EVV Export Batches — only relevant alongside the Utah DHHS EVV
+              export button above, so it's scoped to the EVV timesheets tab. */}
+          {type === "evv" && (
+            <section className="rounded-xl border border-border bg-card p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-semibold text-[#0B1126]">EVV Export Batches</h3>
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+                  Show archived
+                </label>
+              </div>
+              {batches.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No EVV batches exported yet.</p>
+              ) : (
+                <div className="divide-y divide-border">
+                  {batches.map((b) => (
+                    <div key={b.id} className="flex items-center justify-between py-2 text-sm">
+                      <div>
+                        <div className="font-medium">
+                          Batch #{b.batch_number}
+                          {b.archived_at && (
+                            <Badge variant="outline" className="ml-1 text-[10px]">
+                              Archived {format(parseISO(b.archived_at), "MMM d, yyyy")}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {b.range_start} → {b.range_end} · {b.row_count} records · {format(parseISO(b.created_at), "MMM d, yyyy")}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => reDownloadBatch(b)}>Re-download</Button>
+                        {isAdmin && !b.archived_at && (
+                          <Button variant="outline" size="sm" className="text-red-600" onClick={() => setConfirmArchive(b)}>Archive</Button>
+                        )}
+                        {isAdmin && b.archived_at && (
+                          <Button variant="outline" size="sm" onClick={() => unarchiveBatch(b)}>Unarchive</Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
           {/* Results table — non-billable (general_shifts) */}
           {type === "non_billable" ? (
             <div className="overflow-x-auto rounded-lg border border-border bg-card">
@@ -876,22 +927,21 @@ export function RecordsTab() {
                     <th className="px-3 py-2">Date</th>
                     <th className="px-3 py-2">In → Out</th>
                     <th className="px-3 py-2">Duration</th>
+                    <th className="px-3 py-2">Manager note</th>
                     <th className="px-3 py-2">Geofence</th>
                     <th className="px-3 py-2">{mode === "attention" ? "Why flagged" : "Flags"}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rowsQ.isLoading && (
-                    <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
+                    <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
                   )}
                   {!rowsQ.isLoading && rows.length === 0 && (
-                    <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
+                    <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">
                       {mode === "attention" ? "No exceptions — everything is clean for these filters." : "No records match these filters."}
                     </td></tr>
                   )}
                   {rows.map((r) => {
-                    const inTs = r.corrected_clock_in ?? r.clock_in_timestamp;
-                    const outTs = r.corrected_clock_out ?? r.clock_out_timestamp;
                     return (
                       <tr
                         key={r.id}
@@ -899,32 +949,17 @@ export function RecordsTab() {
                         className="cursor-pointer border-t border-border hover:bg-accent/40"
                       >
                         <td className="px-3 py-2">{r.staff_name}</td>
-                        <td className="px-3 py-2">
-                          <Link
-                            to="/dashboard/shift/$shiftId"
-                            params={{ shiftId: r.id }}
-                            target="_blank"
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-[#137182] hover:underline"
-                          >
-                            {r.client_name}
-                          </Link>
+                        <td className="px-3 py-2 text-black">
+                          {r.client_name}
                           {r.team_name && (
                             <span className="ml-1 text-xs text-muted-foreground">· {r.team_name}</span>
                           )}
                         </td>
                         <td className="px-3 py-2 font-mono text-xs">{r.service_type_code}</td>
                         <td className="px-3 py-2">{fmtDate(r.clock_in_timestamp)}</td>
-                        <td className="px-3 py-2">
-                          {fmtTs(inTs)} → {fmtTs(outTs)}
-                          {r.is_edited_by_admin && (
-                            <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-amber-700">edited</span>
-                          )}
-                          {r.shift_entry_type === "Manual_Entry" && (
-                            <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-[#137182]">manual</span>
-                          )}
-                        </td>
+                        <InlineTimeCell row={r} adminName={adminName} userId={user?.id ?? null} qc={qc} />
                         <td className="px-3 py-2 tabular-nums">{fmtDur(r.duration_min)}</td>
+                        <InlineManagerNoteCell row={r} adminName={adminName} userId={user?.id ?? null} qc={qc} />
                         <td className="px-3 py-2">
                           <div className="flex flex-wrap items-center gap-1">
                             {r.is_out_of_bounds ? (
@@ -971,48 +1006,6 @@ export function RecordsTab() {
           )}
         </>
       )}
-
-      <section className="rounded-xl border border-border bg-card p-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold text-[#0B1126]">EVV Export Batches</h3>
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
-            Show archived
-          </label>
-        </div>
-        {batches.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No EVV batches exported yet.</p>
-        ) : (
-          <div className="divide-y divide-border">
-            {batches.map((b) => (
-              <div key={b.id} className="flex items-center justify-between py-2 text-sm">
-                <div>
-                  <div className="font-medium">
-                    Batch #{b.batch_number}
-                    {b.archived_at && (
-                      <Badge variant="outline" className="ml-1 text-[10px]">
-                        Archived {format(parseISO(b.archived_at), "MMM d, yyyy")}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {b.range_start} → {b.range_end} · {b.row_count} records · {format(parseISO(b.created_at), "MMM d, yyyy")}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => reDownloadBatch(b)}>Re-download</Button>
-                  {isAdmin && !b.archived_at && (
-                    <Button variant="outline" size="sm" className="text-red-600" onClick={() => setConfirmArchive(b)}>Archive</Button>
-                  )}
-                  {isAdmin && b.archived_at && (
-                    <Button variant="outline" size="sm" onClick={() => unarchiveBatch(b)}>Unarchive</Button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
 
       <RecordDetailSheet
         row={selectedRow}
@@ -1071,5 +1064,155 @@ function ReasonBadge({ ex }: { ex: ReviewException }) {
     <Badge variant="outline" className="gap-1 border-orange-300 text-orange-800">
       <FileWarning className="h-3 w-3" /> {ex.label}
     </Badge>
+  );
+}
+
+// Inline quick-edit cells — clicking in lets an admin edit right in the
+// table without opening the full record detail sheet. Both call the exact
+// same save paths (src/lib/records-edit.ts) as record-detail-sheet.tsx, so
+// edits made here carry identical edited-by/edited-at (or manager-note-by/
+// manager-note-at) audit tracking. Fields that need a reason attached
+// (service code, exceptions, out-of-bounds, denial reason) are deliberately
+// NOT here — they stay behind the full detail view.
+function InlineTimeCell({
+  row, adminName, userId, qc,
+}: {
+  row: Derived;
+  adminName: string;
+  userId: string | null;
+  qc: ReturnType<typeof useQueryClient>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [inVal, setInVal] = useState("");
+  const [outVal, setOutVal] = useState("");
+
+  const mutation = useMutation({
+    mutationFn: () => {
+      const newIn = fromLocalInput(inVal) ?? row.clock_in_timestamp;
+      const newOut = fromLocalInput(outVal);
+      return saveRecordFields({
+        row,
+        updates: { clock_in_timestamp: newIn, clock_out_timestamp: newOut },
+        adminName,
+        userId,
+      });
+    },
+    onSuccess: (result) => {
+      if (result) {
+        toast.success("Time updated. Edit tracked with your name and timestamp.");
+      } else {
+        toast.info("No changes to save.");
+      }
+      qc.invalidateQueries({ queryKey: ["records"] });
+      setEditing(false);
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  if (editing) {
+    return (
+      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-col gap-1">
+          <Input type="datetime-local" value={inVal} onChange={(e) => setInVal(e.target.value)} className="h-7 text-xs" />
+          <Input type="datetime-local" value={outVal} onChange={(e) => setOutVal(e.target.value)} className="h-7 text-xs" />
+          <div className="flex gap-1">
+            <Button type="button" size="sm" className="h-6 px-2 text-[10px]" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+              Save
+            </Button>
+            <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setEditing(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </td>
+    );
+  }
+
+  const inTs = row.corrected_clock_in ?? row.clock_in_timestamp;
+  const outTs = row.corrected_clock_out ?? row.clock_out_timestamp;
+  return (
+    <td
+      className="cursor-text px-3 py-2 hover:bg-accent/60"
+      onClick={(e) => {
+        e.stopPropagation();
+        setInVal(toLocalInput(row.clock_in_timestamp));
+        setOutVal(toLocalInput(row.clock_out_timestamp));
+        setEditing(true);
+      }}
+      title="Click to edit clock in/out"
+    >
+      {fmtTs(inTs)} → {fmtTs(outTs)}
+      {row.is_edited_by_admin && (
+        <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-amber-700">edited</span>
+      )}
+      {row.shift_entry_type === "Manual_Entry" && (
+        <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-[#137182]">manual</span>
+      )}
+    </td>
+  );
+}
+
+function InlineManagerNoteCell({
+  row, adminName, userId, qc,
+}: {
+  row: Derived;
+  adminName: string;
+  userId: string | null;
+  qc: ReturnType<typeof useQueryClient>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(row.manager_note_text ?? "");
+
+  const mutation = useMutation({
+    mutationFn: () => saveManagerNote({ rowId: row.id, managerNote: value, adminName, userId }),
+    onSuccess: () => {
+      toast.success("Manager note saved.");
+      qc.invalidateQueries({ queryKey: ["records"] });
+      setEditing(false);
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  if (editing) {
+    return (
+      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-col gap-1">
+          <Textarea
+            autoFocus
+            rows={2}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="text-xs"
+            placeholder="Anything you want on file about this record…"
+          />
+          <div className="flex gap-1">
+            <Button type="button" size="sm" className="h-6 px-2 text-[10px]" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+              Save
+            </Button>
+            <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setEditing(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </td>
+    );
+  }
+
+  return (
+    <td
+      className="max-w-[200px] cursor-text px-3 py-2 align-top hover:bg-accent/60"
+      onClick={(e) => {
+        e.stopPropagation();
+        setValue(row.manager_note_text ?? "");
+        setEditing(true);
+      }}
+      title="Click to edit manager note"
+    >
+      {row.manager_note_text ? (
+        <p className="line-clamp-2 text-xs text-muted-foreground">{row.manager_note_text}</p>
+      ) : (
+        <span className="text-xs text-muted-foreground/60">— add note —</span>
+      )}
+    </td>
   );
 }

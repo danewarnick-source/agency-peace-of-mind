@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getAuditPackageData, type AuditPackagePayload } from "@/lib/audit-package-data";
+import { assertOrgAdmin, assertPackageAccess, assertPackageAccessViaChild } from "@/lib/audit-package-access";
 
 // ============================================================
 // Types
@@ -78,34 +79,6 @@ export const getAuditorContext = createServerFn({ method: "GET" })
 // ============================================================
 // Org-side: package management (admin/manager only via RLS)
 // ============================================================
-
-async function assertOrgAdmin(
-  supabase: unknown,
-  organizationId: string,
-  userId: string,
-): Promise<void> {
-  const sb = supabase as {
-    from: (t: string) => {
-      select: (c: string) => {
-        eq: (c: string, v: string) => {
-          eq: (c: string, v: string) => {
-            in: (c: string, v: string[]) => {
-              maybeSingle: () => Promise<{ data: unknown }>;
-            };
-          };
-        };
-      };
-    };
-  };
-  const { data } = await sb
-    .from("organization_members")
-    .select("role")
-    .eq("organization_id", organizationId)
-    .eq("user_id", userId)
-    .in("role", ["super_admin", "admin", "manager"])
-    .maybeSingle();
-  if (!data) throw new Error("Forbidden — org admin/manager only");
-}
 
 export const listOrgAuditPackages = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -195,7 +168,8 @@ export const addPackageSubject = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await assertPackageAccess(supabase, userId, data.auditPackageId);
     const { error } = await supabase
       .from("audit_package_subjects")
       .upsert(
@@ -215,7 +189,9 @@ export const removePackageSubject = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ subjectRowId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
-    const { error } = await context.supabase
+    const { supabase, userId } = context;
+    await assertPackageAccessViaChild(supabase, userId, "audit_package_subjects", data.subjectRowId);
+    const { error } = await supabase
       .from("audit_package_subjects")
       .delete()
       .eq("id", data.subjectRowId);
@@ -227,7 +203,9 @@ export const releaseAuditPackage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ auditPackageId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
-    const { error } = await context.supabase
+    const { supabase, userId } = context;
+    await assertPackageAccess(supabase, userId, data.auditPackageId);
+    const { error } = await supabase
       .from("audit_packages")
       .update({ status: "released", released_at: new Date().toISOString() })
       .eq("id", data.auditPackageId);
@@ -246,6 +224,17 @@ export const grantAuditorAccess = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
     const { supabase, userId } = context;
+    const { organizationId } = await assertPackageAccess(supabase, userId, data.auditPackageId);
+
+    const { data: auditorRow } = await supabase
+      .from("auditor_accounts")
+      .select("id, organization_id")
+      .eq("id", data.auditorAccountId)
+      .maybeSingle();
+    if (!auditorRow || (auditorRow as { organization_id: string | null }).organization_id !== organizationId) {
+      throw new Error("Forbidden — that auditor account does not belong to this organization");
+    }
+
     const { error } = await supabase
       .from("audit_package_access")
       .upsert(
@@ -281,7 +270,9 @@ export const revokeAuditorAccess = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ accessRowId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
-    const { error } = await context.supabase
+    const { supabase, userId } = context;
+    await assertPackageAccessViaChild(supabase, userId, "audit_package_access", data.accessRowId);
+    const { error } = await supabase
       .from("audit_package_access")
       .update({ revoked_at: new Date().toISOString() })
       .eq("id", data.accessRowId);
@@ -298,7 +289,8 @@ export const getPackageBuilderDetail = createServerFn({ method: "GET" })
     access: AuditPackageAccessRow[];
     availableAuditors: Array<{ id: string; email: string; full_name: string; agency_name: string }>;
   }> => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await assertPackageAccess(supabase, userId, data.auditPackageId);
 
     const { data: pkg, error: pkgErr } = await supabase
       .from("audit_packages")
@@ -463,7 +455,8 @@ export const getAuditorPackageView = createServerFn({ method: "GET" })
     };
     payload: AuditPackagePayload;
   }> => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await assertPackageAccess(supabase, userId, data.auditPackageId, { allowAuditor: true });
 
     // RLS enforces: auditor can only see released/closed granted packages.
     const { data: pkg, error } = await supabase
@@ -530,7 +523,9 @@ export const listPackageFolders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ auditPackageId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<AuditPackageFolderRow[]> => {
-    const { data: rows, error } = await context.supabase
+    const { supabase, userId } = context;
+    await assertPackageAccess(supabase, userId, data.auditPackageId, { allowAuditor: true });
+    const { data: rows, error } = await supabase
       .from("audit_package_folders")
       .select("id, name, created_at")
       .eq("audit_package_id", data.auditPackageId)
@@ -549,6 +544,7 @@ export const createPackageFolder = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<{ id: string }> => {
     const { supabase, userId } = context;
+    await assertPackageAccess(supabase, userId, data.auditPackageId);
     const { data: row, error } = await (supabase as unknown as {
       from: (t: string) => {
         insert: (v: Record<string, unknown>) => {
@@ -572,7 +568,9 @@ export const deletePackageFolder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ folderId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
-    const { error } = await context.supabase
+    const { supabase, userId } = context;
+    await assertPackageAccessViaChild(supabase, userId, "audit_package_folders", data.folderId);
+    const { error } = await supabase
       .from("audit_package_folders")
       .delete()
       .eq("id", data.folderId);
@@ -584,7 +582,9 @@ export const listPackageFiles = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ auditPackageId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<AuditPackageFileRow[]> => {
-    const { data: rows, error } = await context.supabase
+    const { supabase, userId } = context;
+    await assertPackageAccess(supabase, userId, data.auditPackageId, { allowAuditor: true });
+    const { data: rows, error } = await supabase
       .from("audit_package_files")
       .select("id, folder_id, file_name, content_type, size_bytes, uploaded_by, created_at")
       .eq("audit_package_id", data.auditPackageId)
@@ -613,16 +613,8 @@ export const createPackageFileUpload = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<{ fileId: string; path: string; token: string; bucket: string }> => {
     const { supabase, userId } = context;
-
-    // Verify the caller can insert into audit_package_files for this package
-    // (RLS covers this — the insert will fail if they're not org admin/manager).
-    const { data: pkg, error: pkgErr } = await supabase
-      .from("audit_packages")
-      .select("id, organization_id")
-      .eq("id", data.auditPackageId)
-      .single();
-    if (pkgErr || !pkg) throw new Error("Package not found or forbidden");
-    const p = pkg as { id: string; organization_id: string };
+    const { organizationId } = await assertPackageAccess(supabase, userId, data.auditPackageId);
+    const p = { organization_id: organizationId };
 
     const bucket = "audit-files";
     const fileId = (globalThis.crypto?.randomUUID?.() ??
@@ -671,14 +663,15 @@ export const getPackageFileDownloadUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ fileId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<{ url: string; fileName: string }> => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
     const { data: row, error } = await supabase
       .from("audit_package_files")
-      .select("id, storage_bucket, storage_path, file_name")
+      .select("id, audit_package_id, storage_bucket, storage_path, file_name")
       .eq("id", data.fileId)
       .maybeSingle();
     if (error || !row) throw new Error("File not found or forbidden");
-    const f = row as { storage_bucket: string; storage_path: string; file_name: string };
+    const f = row as { audit_package_id: string; storage_bucket: string; storage_path: string; file_name: string };
+    await assertPackageAccess(supabase, userId, f.audit_package_id, { allowAuditor: true });
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: signed, error: sErr } = await supabaseAdmin.storage
@@ -692,14 +685,15 @@ export const deletePackageFile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ fileId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
     const { data: row, error } = await supabase
       .from("audit_package_files")
-      .select("id, storage_bucket, storage_path")
+      .select("id, audit_package_id, storage_bucket, storage_path")
       .eq("id", data.fileId)
       .maybeSingle();
     if (error || !row) throw new Error("File not found or forbidden");
-    const f = row as { storage_bucket: string; storage_path: string };
+    const f = row as { audit_package_id: string; storage_bucket: string; storage_path: string };
+    await assertPackageAccess(supabase, userId, f.audit_package_id);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Best-effort storage delete first; row delete is RLS-checked

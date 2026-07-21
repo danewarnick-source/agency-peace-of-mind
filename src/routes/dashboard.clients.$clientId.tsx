@@ -29,6 +29,8 @@ import { reclaimExternalCodesAsOurs } from "@/lib/client-billing-fix.functions";
 import { AddCodesControl } from "@/components/clients/add-codes-control";
 import { BillingCodesDetail } from "@/components/clients/billing-codes-detail";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
+
 
 
 import { ClientBudgetPanel } from "@/components/clients/client-budget-panel";

@@ -27,12 +27,9 @@ import { Label } from "@/components/ui/label";
 import { previewClientUpdateFromDocument, applySelectedClientFields } from "@/lib/import-checklist.functions";
 import { reclaimExternalCodesAsOurs } from "@/lib/client-billing-fix.functions";
 import { AddCodesControl } from "@/components/clients/add-codes-control";
-import { UNIT_TYPE_OPTIONS, unitTypeLetter } from "@/lib/service-billing";
-
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { BillingCodesDetail } from "@/components/clients/billing-codes-detail";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
+
 import { ClientBudgetPanel } from "@/components/clients/client-budget-panel";
 import { ClientMealPlannerMount } from "@/components/clients/client-meal-planner-mount";
 import { ChoreChartForClient } from "@/components/chores/chore-chart-mount";

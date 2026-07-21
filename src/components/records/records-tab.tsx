@@ -774,7 +774,7 @@ export function RecordsTab() {
                   staffOptions={staffOptionsQ.data ?? []}
                 />
               )}
-              {type !== "non_billable" && (canDhhsExport ? (
+              {type !== "non_billable" && canDhhsExport && (
                 <Button
                   type="button" size="sm" variant="default"
                   onClick={() => setUtahDialogOpen(true)}
@@ -782,14 +782,7 @@ export function RecordsTab() {
                 >
                   <ShieldAlert className="h-4 w-4" /> Export Utah DHHS EVV CSV
                 </Button>
-              ) : (
-                <span
-                  className="text-[11px] text-muted-foreground"
-                  title="DHHS EVV export is available only when every visible row is an EVV-locked code."
-                >
-                  DHHS EVV export hidden (mixed/non-EVV codes in result)
-                </span>
-              ))}
+              )}
               {type !== "non_billable" && (
                 <Button
                   type="button" size="sm" variant="outline"

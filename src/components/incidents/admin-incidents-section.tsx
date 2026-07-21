@@ -23,7 +23,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, CheckCircle2, Skull, Clock, Phone, FileCheck2, MessageSquare, UserCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Skull, Clock, Phone, FileCheck2, MessageSquare, UserCheck, ChevronDown, ChevronUp } from "lucide-react";
 import { LogScRequestDialog, RespondScRequestDialog } from "./sc-request-dialogs";
 import { IncidentTrendsStrip, type TrendFilter } from "./incident-trends-strip";
 import { AttestationDialog, type AttestationSignature } from "./attestation-dialog";
@@ -374,6 +374,7 @@ function IncidentCard({
 }) {
   const { can } = usePermissions();
   const canManageIncidents = can("manage_incidents");
+  const [expanded, setExpanded] = useState(false);
   const discovered = ir.discovered_at ? new Date(ir.discovered_at) : new Date(ir.created_at);
   const upiDeadline = new Date(discovered.getTime() + 24 * 3_600_000);
   const guardianDeadline = new Date(discovered.getTime() + 24 * 3_600_000);
@@ -403,12 +404,38 @@ function IncidentCard({
               {ir.location ? ` · ${ir.location}` : ""}
             </p>
           </div>
-          <div className="text-right text-[10px] text-muted-foreground">
-            Discovered {fmtDate(ir.discovered_at)}
-            <ActorNames ids={[ir.reported_by]} actors={actors} />
+          <div className="flex items-start gap-2">
+            <div className="text-right text-[10px] text-muted-foreground">
+              Discovered {fmtDate(ir.discovered_at)}
+              <ActorNames ids={[ir.reported_by]} actors={actors} />
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2"
+              onClick={() => setExpanded((v) => !v)}
+            >
+              {expanded ? (
+                <>Hide <ChevronUp className="ml-1 h-3.5 w-3.5" /></>
+              ) : (
+                <>Expand <ChevronDown className="ml-1 h-3.5 w-3.5" /></>
+              )}
+            </Button>
           </div>
         </div>
       </CardHeader>
+      {!expanded && (
+        <CardContent className="pt-0 pb-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {ir.is_abuse_neglect && !ir.aps_notified_at && (
+              <Badge className="bg-rose-600 text-white">APS-PENDING</Badge>
+            )}
+            {!ir.upi_initiated_at && <Badge variant="outline">UPI not initiated</Badge>}
+            {closed && openSc.length === 0 && <Badge className="bg-slate-600 text-white">Closed</Badge>}
+          </div>
+        </CardContent>
+      )}
+      {expanded && (
       <CardContent className="space-y-3 pt-1">
         {ir.description && (
           <p className="whitespace-pre-wrap rounded-md bg-muted/40 px-3 py-2 text-xs">{ir.description}</p>
@@ -553,6 +580,7 @@ function IncidentCard({
           <p className="text-xs text-muted-foreground">View only — you don't have permission to edit incidents.</p>
         )}
       </CardContent>
+      )}
     </Card>
   );
 }

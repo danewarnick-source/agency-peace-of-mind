@@ -18,7 +18,7 @@ import { Download, AlertTriangle, Loader2, History } from "lucide-react";
 import { toast } from "sonner";
 import { isEvvLockedCode, padMemberId, evvServiceLabel } from "@/lib/evv-codes";
 import {
-  buildUtahCsv, downloadCsv, defaultPreviousWeek, isValidIso, type UtahExportLine,
+  buildUtahCsv, downloadCsv, defaultPreviousWeek, isValidIso, parseUsAddress, type UtahExportLine,
 } from "@/lib/utah-evv-export";
 import { isBillableForReview } from "@/lib/billing-units";
 
@@ -76,29 +76,38 @@ interface CategorizedRow {
   row: TsRow;
   address: string;
   memberId: string;
-  excludeReason: null | "missing_member_id" | "out_of_bounds" | "already_exported" | "no_clock_out" | "not_reviewed";
+  excludeReason: null | "missing_member_id" | "missing_location" | "out_of_bounds" | "already_exported" | "no_clock_out" | "not_reviewed";
   addressBlank: boolean;
   gpsAbsent: boolean;
 }
 
+// Utah UEVV spec requires, for BOTH the begin and end of service, either a
+// usable street address + city OR GPS lat/lng. A row lacking both pairs at
+// both ends has nothing the state can key location off of and will be
+// rejected — flag it before export rather than silently emitting blanks.
 function categorize(rows: TsRow[], exportedIds: Set<string>, addressMap: Map<string, string>): CategorizedRow[] {
   return rows.map((r) => {
     const memberId = padMemberId(r.clients?.medicaid_id ?? "");
     const locAddr = r.matched_approved_location_id ? (addressMap.get(r.matched_approved_location_id) ?? "") : "";
     const address = (locAddr || r.clients?.physical_address || "").trim();
+    const parsedAddress = parseUsAddress(address);
+    const hasUsableAddress = !!(parsedAddress.street && parsedAddress.city);
+    const beginGpsAbsent = !r.gps_in_coordinates?.latitude && !r.gps_in_coordinates?.longitude;
+    const endGpsAbsent = !r.gps_out_coordinates?.latitude && !r.gps_out_coordinates?.longitude;
+    const missingLocation = !hasUsableAddress && beginGpsAbsent && endGpsAbsent;
     let excludeReason: CategorizedRow["excludeReason"] = null;
     if (!effOut(r)) excludeReason = "no_clock_out";
     else if (exportedIds.has(r.id)) excludeReason = "already_exported";
     else if (!isBillableForReview(r)) excludeReason = "not_reviewed";
     else if (!memberId) excludeReason = "missing_member_id";
+    else if (missingLocation) excludeReason = "missing_location";
     else if (
       r.outside_geofence_reason &&
       r.outside_geofence_reason.trim().length > 0 &&
       r.reconciliation_status !== "accepted" &&
       r.reconciliation_status !== "corrected"
     ) excludeReason = "out_of_bounds";
-    const gpsAbsent = !r.gps_in_coordinates?.latitude && !r.gps_in_coordinates?.longitude;
-    return { row: r, address, memberId, excludeReason, addressBlank: !address, gpsAbsent };
+    return { row: r, address, memberId, excludeReason, addressBlank: !address, gpsAbsent: beginGpsAbsent };
   });
 }
 
@@ -256,6 +265,7 @@ export function UtahExportDialog({ open, onClose, organizationId, staffNameMap }
   // Pre-export counts
   const eligible = categorized.filter((c) => c.excludeReason === null);
   const missingMember = categorized.filter((c) => c.excludeReason === "missing_member_id");
+  const missingLocation = categorized.filter((c) => c.excludeReason === "missing_location");
   const outOfBounds = categorized.filter((c) => c.excludeReason === "out_of_bounds");
   const noClockOut = categorized.filter((c) => c.excludeReason === "no_clock_out");
   const alreadyExported = categorized.filter((c) => c.excludeReason === "already_exported");
@@ -467,6 +477,9 @@ export function UtahExportDialog({ open, onClose, organizationId, staffNameMap }
               <li><strong>{eligible.length}</strong> exportable row{eligible.length === 1 ? "" : "s"}</li>
               <li className="text-muted-foreground">{alreadyExported.length} excluded · already exported in a prior batch</li>
               <li className="text-muted-foreground">{missingMember.length} excluded · missing Member ID</li>
+              {missingLocation.length > 0 && (
+                <li className="text-destructive">{missingLocation.length} excluded · missing location data (no address/city and no GPS at begin or end)</li>
+              )}
               <li className="text-muted-foreground">{outOfBounds.length} excluded · out-of-bounds without an accepted reason</li>
               <li className="text-muted-foreground">{noClockOut.length} excluded · no clock-out yet</li>
               {notReviewed.length > 0 && (
@@ -490,6 +503,19 @@ export function UtahExportDialog({ open, onClose, organizationId, staffNameMap }
             <summary className="cursor-pointer font-semibold text-warning-foreground">Missing Member ID ({missingMember.length})</summary>
             <ul className="mt-2 space-y-0.5">
               {missingMember.slice(0, 30).map((c) => (
+                <li key={c.row.id}>
+                  {c.row.clients?.first_name} {c.row.clients?.last_name} · {new Date(effIn(c.row)).toLocaleDateString()} · {c.row.service_type_code}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+
+        {missingLocation.length > 0 && (
+          <details className="rounded-lg border border-destructive/40 bg-destructive/5 p-2 text-xs">
+            <summary className="cursor-pointer font-semibold text-destructive">Missing location data ({missingLocation.length})</summary>
+            <ul className="mt-2 space-y-0.5">
+              {missingLocation.slice(0, 30).map((c) => (
                 <li key={c.row.id}>
                   {c.row.clients?.first_name} {c.row.clients?.last_name} · {new Date(effIn(c.row)).toLocaleDateString()} · {c.row.service_type_code}
                 </li>

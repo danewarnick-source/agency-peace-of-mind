@@ -52,8 +52,18 @@ function fmtTimeHMSAmPm(iso: string): string | null {
   return `${h}:${pad2(m)}:${pad2(s)} ${ampm}`;
 }
 
+// Utah UEVV spec: these characters are forbidden in plain-text CSV fields and
+// must be removed before submission (semicolons, angle brackets, curly
+// braces, backslashes, ampersands, hash signs, apostrophes). Apostrophes are
+// common in real names (O'Brien, D'Angelo), so this can't be skipped.
+const UEVV_FORBIDDEN_CHARS = /[;<>{}\\&#']/g;
+
+function sanitizeUevvText(s: string): string {
+  return s.replace(UEVV_FORBIDDEN_CHARS, "");
+}
+
 function csvEscape(s: string) {
-  const v = s ?? "";
+  const v = sanitizeUevvText(s ?? "");
   if (v.includes(",") || v.includes('"') || v.includes("\n")) return `"${v.replace(/"/g, '""')}"`;
   return v;
 }
@@ -63,7 +73,7 @@ function csvEscape(s: string) {
  * Expected format: "123 Main St, Salt Lake City, UT 84101"
  * Falls back gracefully: if fewer than 3 comma-separated parts, puts everything in street.
  */
-function parseUsAddress(address: string): { street: string; city: string; state: string; zip: string } {
+export function parseUsAddress(address: string): { street: string; city: string; state: string; zip: string } {
   const parts = address.split(",").map((p) => p.trim()).filter(Boolean);
   if (parts.length < 3) {
     return { street: address.trim(), city: "", state: "", zip: "" };

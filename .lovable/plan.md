@@ -1,33 +1,22 @@
 
 ## What's wrong
 
-For Justin Hesse / DSI, the Billing Codes Detail page shows **1,382 used units** but the documented, accurate total is **486 units (121.5 hrs)** — off by ~2.84×.
+In the "My caseload" list (`src/components/staff-client-grid.tsx`), expanding a client lets the user pick a service code and shows "Open Time Clock" (or "Open Client Hub" for daily codes). The button `<Link>` currently passes only `params={{ clientId: c.id }}` — no `search`. So the destination (`/dashboard/workspace/$clientId`) opens on the default "About" tab with no preselected code, and the staff member has to re-pick the code inside the punch pad.
 
-I traced the discrepancy directly. All 26 "clean" DSI timesheets sum to 111.75 h. One additional row (`c344f737…`) has:
-
-- raw clock-in: `2026-07-07 15:12`
-- raw clock-out: `2026-07-17 08:59` (10 days later — bad punch)
-- **corrected** clock-in: `2026-07-07 15:12`, **corrected** clock-out: `2026-07-08 01:00`
-- `review_status`: `approved`
-
-Effective billable time for that shift is ~9.8 h, but the budget hook is summing the **raw** 233.79 h, which drives the total to 345.5 h × 4 = **1,382 units**.
-
-The bug is in `src/hooks/use-client-budget.tsx`: the hourly-code loop reads `r.clock_in_timestamp` / `r.clock_out_timestamp` directly and never checks `corrected_clock_in/out` or `review_status`. The canonical helpers `effectiveBillingTimes` and `computeBillableEntryUnits` in `src/lib/billing-units.ts` already implement the correct rule ("approved with corrections → use corrected times; needs_review / rejected → exclude") and are used by the rest of the billing math.
+The workspace route already accepts `?tab=clock-in&code=XYZ` (`workspaceSearch` in `dashboard.workspace.$clientId.tsx`) and forwards `code` to `PunchPad` as `presetServiceCode` + `lockServiceCode`, which correctly handles EVV vs non-EVV under the hood. The caseload row just isn't sending it.
 
 ## Fix
 
-Update `useClientBudget` (`src/hooks/use-client-budget.tsx`) only:
+Edit `src/components/staff-client-grid.tsx`, `ClientDetail` "Open Time Clock" button only:
 
-1. Extend the `evv_timesheets` select to also pull `review_status`, `corrected_clock_in`, `corrected_clock_out`.
-2. In the hourly-code accumulator, replace direct `clock_in_timestamp` / `clock_out_timestamp` usage with `effectiveBillingTimes(row)` and `computeBillableEntryUnits(row)` from `@/lib/billing-units`.
-   - Skip the row when `effectiveBillingTimes` returns `null` (excluded by review status or missing times).
-   - Compute `used_hours` from the effective (in, out) pair, and add `computeBillableEntryUnits(row)` to `used_entry_units`.
-3. Leave the daily-code branch untouched (already sourced from `hhs_daily_records_v.billable`).
-
-No UI, no schema, no data change. After the fix, Justin/DSI recomputes to 121.5 h × 4 = 486 units, matching Documentation > Records.
+- For the hourly / clockable path (`!daily`), change the `<Link>` to include:
+  - `search={{ tab: "clock-in", code: selected }}`
+- For the daily path (HHS hub), keep params only — that hub has no code selector and no clock (matches current behavior).
+- No other changes: the pill selector, EVV/daily/payroll-only badge, and disabled-while-on-clock behavior stay as-is. PunchPad already routes EVV vs non-EVV logic from the code.
 
 ## Verification
 
-- Re-open Billing Codes Detail for Justin Hesse → DSI shows ~486 used units, remaining reflects the true balance.
-- Spot-check one other client/code with an `approved` corrected timesheet: used units match Records.
-- Confirm clients with only `clean` shifts are unchanged (helper returns raw times when no corrections).
+- Expand a caseload client, pick an EVV code (e.g., COM), click Open Time Clock → workspace opens directly on Clock-In tab with that code preselected and locked in the punch pad.
+- Repeat with a non-EVV clockable code (e.g., SEI) → same behavior; PunchPad shows the non-EVV clock-in path.
+- Pick a daily code (HHS) → button still says "Open Client Hub" and lands on `/dashboard/hhs-hub/$clientId` unchanged.
+- Already-on-clock client → button still says "Continue Time Clock" and lands on the workspace (no code override; PunchPad picks up the active shift's code).

@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -139,8 +139,8 @@ function ResetPassword() {
   return (
     <AuthShell title="Set a new password" subtitle="Choose a strong password you don't use elsewhere.">
       <form onSubmit={onSubmit} className="grid gap-4">
-        <div className="grid gap-2"><Label htmlFor="password">New password</Label><Input id="password" name="password" type="password" minLength={8} required /></div>
-        <div className="grid gap-2"><Label htmlFor="confirm">Confirm password</Label><Input id="confirm" name="confirm" type="password" minLength={8} required /></div>
+        <div className="grid gap-2"><Label htmlFor="password">New password</Label><PasswordInput id="password" name="password" minLength={8} required /></div>
+        <div className="grid gap-2"><Label htmlFor="confirm">Confirm password</Label><PasswordInput id="confirm" name="confirm" minLength={8} required /></div>
         <Button type="submit" disabled={busy} className="bg-[image:var(--gradient-brand)] text-primary-foreground">
           {busy ? "Saving…" : "Update password"}
         </Button>

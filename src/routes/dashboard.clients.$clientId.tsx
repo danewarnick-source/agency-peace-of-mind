@@ -26,6 +26,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { previewClientUpdateFromDocument, applySelectedClientFields } from "@/lib/import-checklist.functions";
 import { reclaimExternalCodesAsOurs } from "@/lib/client-billing-fix.functions";
+import { AddCodesControl } from "@/components/clients/add-codes-control";
 
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -413,9 +414,6 @@ function TrainingSetupBadge({ clientId }: { clientId: string }) {
 function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; clientId: string; orgId?: string }) {
   const qc = useQueryClient();
   const codes = Array.isArray(client?.authorized_dspd_codes) ? (client!.authorized_dspd_codes as string[]) : [];
-  const [editingCodes, setEditingCodes] = useState(false);
-  const [codeDraft, setCodeDraft] = useState<string[]>(codes);
-  const [addingCode, setAddingCode] = useState("");
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -442,36 +440,6 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
     staleTime: 30_000,
   });
 
-  // Safety net: surface external-service rows whose codes should probably be
-  // ours (e.g. Smart Import misclassified the provider name). One-click
-  // "Reclaim" moves them back to authorized codes + pending billing stubs.
-  const { data: reclaimableCodes } = useQuery({
-    queryKey: ["client-reclaimable-codes", clientId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("client_external_services")
-        .select("service_code")
-        .eq("client_id", clientId);
-      if (error) throw error;
-      const known = new Set((codes ?? []).map((c) => c.toUpperCase()));
-      const missing = Array.from(
-        new Set((data ?? []).map((r) => String(r.service_code ?? "").toUpperCase()).filter(Boolean)),
-      ).filter((c) => !known.has(c));
-      return missing;
-    },
-    staleTime: 30_000,
-  });
-  const reclaimFn = useServerFn(reclaimExternalCodesAsOurs);
-  const reclaimMut = useMutation({
-    mutationFn: async (list: string[]) => reclaimFn({ data: { clientId, codes: list } }),
-    onSuccess: (res) => {
-      toast.success(`Reclaimed ${res.moved} code${res.moved === 1 ? "" : "s"} as yours`);
-      qc.invalidateQueries({ queryKey: ["client-reclaimable-codes", clientId] });
-      qc.invalidateQueries({ queryKey: ["client-profile", orgId, clientId] });
-      qc.invalidateQueries({ queryKey: ["client", clientId] });
-    },
-    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to reclaim"),
-  });
   const extractedGoals = ((cstData?.training as { goals?: CSTGoal[] } | null)?.goals ?? []) as CSTGoal[];
   const goalIsIncomplete = (g: CSTGoal) => !g.supports?.trim() || !g.details?.trim();
   const missingLabel = (g: CSTGoal) => {
@@ -517,30 +485,6 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
     setEditingGoals(true);
   }
 
-
-  const codesMut = useMutation({
-    mutationFn: async () => {
-      const cleaned = codeDraft.map((c) => c.trim().toUpperCase()).filter(Boolean);
-      const { data, error } = await supabase
-        .from("clients")
-        .update({ authorized_dspd_codes: cleaned })
-        .eq("id", clientId)
-        .select("id");
-      if (error) throw error;
-      if (!data || data.length === 0) {
-        throw new Error("Codes not saved — record not found or you don't have permission.");
-      }
-      return cleaned;
-    },
-    onSuccess: (cleaned) => {
-      toast.success("DSPD codes saved");
-      setCodeDraft(cleaned);
-      setEditingCodes(false);
-      qc.invalidateQueries({ queryKey: ["client-profile", orgId, clientId] });
-      qc.invalidateQueries({ queryKey: ["client", clientId] });
-    },
-    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to save codes"),
-  });
 
   async function syncFlatGoals() {
     const res = await getCST({ data: { clientId } });
@@ -791,101 +735,22 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">Authorized DSPD codes</CardTitle>
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            aria-label="Edit codes"
-            onClick={() => setEditingCodes((v) => !v)}
-          >
-            <Pencil className="h-4 w-4" />
+          <Button asChild variant="ghost" size="sm">
+            <Link to="/dashboard/clients/$clientId" params={{ clientId }} search={{ tab: "billing" }}>
+              Manage in Billing →
+            </Link>
           </Button>
         </CardHeader>
-        {editingCodes ? (
-          <CardContent className="space-y-3 text-sm">
-            <div className="flex flex-wrap gap-1.5">
-              {codeDraft.length === 0 ? (
-                <span className="text-muted-foreground">None.</span>
-              ) : codeDraft.map((c, i) => (
-                <Badge key={`${c}-${i}`} variant="outline" className="gap-1">
-                  {c}
-                  <button
-                    type="button"
-                    aria-label={`Remove ${c}`}
-                    className="ml-1 text-muted-foreground hover:text-destructive"
-                    onClick={() => setCodeDraft((d) => d.filter((_, idx) => idx !== i))}
-                  >
-                    ×
-                  </button>
-                </Badge>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Add code…"
-                value={addingCode}
-                onChange={(e) => setAddingCode(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    const v = addingCode.trim().toUpperCase();
-                    if (v) {
-                      setCodeDraft((d) => [...d, v]);
-                      setAddingCode("");
-                    }
-                  }
-                }}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  const v = addingCode.trim().toUpperCase();
-                  if (!v) return;
-                  setCodeDraft((d) => [...d, v]);
-                  setAddingCode("");
-                }}
-                disabled={!addingCode.trim()}
-              >
-                Add
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => codesMut.mutate()}
-                disabled={codesMut.isPending}
-              >
-                {codesMut.isPending ? "Saving…" : "Save codes"}
-              </Button>
-            </div>
-          </CardContent>
-        ) : (
-          <CardContent className="space-y-2 text-sm">
-            {reclaimableCodes && reclaimableCodes.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-300/60 bg-amber-50/60 dark:bg-amber-950/20 px-2.5 py-2 text-xs text-amber-900 dark:text-amber-200">
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                <span className="min-w-0">
-                  {reclaimableCodes.length} code{reclaimableCodes.length === 1 ? "" : "s"} from this client's PCSP {reclaimableCodes.length === 1 ? "isn't" : "aren't"} authorized here:{" "}
-                  <span className="font-medium">{reclaimableCodes.join(", ")}</span>. Smart Import may have filed {reclaimableCodes.length === 1 ? "it" : "them"} as another provider's.
-                </span>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="h-7 ml-auto"
-                  disabled={reclaimMut.isPending}
-                  onClick={() => reclaimMut.mutate(reclaimableCodes)}
-                >
-                  {reclaimMut.isPending ? "Reclaiming…" : "Reclaim as ours"}
-                </Button>
-              </div>
-            )}
-            <div className="flex flex-wrap gap-1.5">
-              {codes.length === 0 ? (
-                <span className="text-muted-foreground">None.</span>
-              ) : codes.map((c) => <Badge key={c} variant="outline">{c}</Badge>)}
-            </div>
-          </CardContent>
-        )}
+        <CardContent className="space-y-2 text-sm">
+          <p className="text-xs text-muted-foreground">
+            Read-only reference. Codes, rates, dates, and staff assignments are managed on the Billing tab.
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {codes.length === 0 ? (
+              <span className="text-muted-foreground">None.</span>
+            ) : codes.map((c) => <Badge key={c} variant="outline">{c}</Badge>)}
+          </div>
+        </CardContent>
       </Card>
     </div>
   );
@@ -1395,6 +1260,7 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
 }
 
 function BillingCodesPanel({ clientId }: { clientId: string }) {
+  const qc = useQueryClient();
   const q = useQuery({
     queryKey: ["client-profile-codes", clientId],
     queryFn: async () => {
@@ -1408,6 +1274,44 @@ function BillingCodesPanel({ clientId }: { clientId: string }) {
       return (data ?? []) as any[];
     },
   });
+
+  // Safety net: surface external-service rows whose codes should probably be
+  // ours (e.g. Smart Import misclassified the provider name). One-click
+  // "Reclaim" moves them back to authorized codes + pending billing stubs.
+  const { data: reclaimableCodes } = useQuery({
+    queryKey: ["client-reclaimable-codes", clientId],
+    queryFn: async () => {
+      const [{ data: client, error: cErr }, { data: ext, error: eErr }] = await Promise.all([
+        supabase.from("clients").select("authorized_dspd_codes").eq("id", clientId).maybeSingle(),
+        supabase.from("client_external_services").select("service_code").eq("client_id", clientId),
+      ]);
+      if (cErr) throw cErr;
+      if (eErr) throw eErr;
+      const known = new Set(
+        (Array.isArray(client?.authorized_dspd_codes) ? (client!.authorized_dspd_codes as string[]) : []).map((c) =>
+          c.toUpperCase(),
+        ),
+      );
+      const missing = Array.from(
+        new Set((ext ?? []).map((r) => String(r.service_code ?? "").toUpperCase()).filter(Boolean)),
+      ).filter((c) => !known.has(c));
+      return missing;
+    },
+    staleTime: 30_000,
+  });
+  const reclaimFn = useServerFn(reclaimExternalCodesAsOurs);
+  const reclaimMut = useMutation({
+    mutationFn: async (list: string[]) => reclaimFn({ data: { clientId, codes: list } }),
+    onSuccess: (res) => {
+      toast.success(`Reclaimed ${res.moved} code${res.moved === 1 ? "" : "s"} as yours`);
+      qc.invalidateQueries({ queryKey: ["client-reclaimable-codes", clientId] });
+      qc.invalidateQueries({ queryKey: ["client-profile-codes", clientId] });
+      qc.invalidateQueries({ queryKey: ["client-profile"] });
+      q.refetch();
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to reclaim"),
+  });
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -1422,6 +1326,24 @@ function BillingCodesPanel({ clientId }: { clientId: string }) {
         </Button>
       </CardHeader>
       <CardContent className="p-0">
+        {reclaimableCodes && reclaimableCodes.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-border bg-amber-50/60 px-4 py-2.5 text-xs text-amber-900 dark:bg-amber-950/20 dark:text-amber-200">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0">
+              {reclaimableCodes.length} code{reclaimableCodes.length === 1 ? "" : "s"} from this client's PCSP {reclaimableCodes.length === 1 ? "isn't" : "aren't"} authorized here:{" "}
+              <span className="font-medium">{reclaimableCodes.join(", ")}</span>. Smart Import may have filed {reclaimableCodes.length === 1 ? "it" : "them"} as another provider's.
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              className="h-7 ml-auto"
+              disabled={reclaimMut.isPending}
+              onClick={() => reclaimMut.mutate(reclaimableCodes)}
+            >
+              {reclaimMut.isPending ? "Reclaiming…" : "Reclaim as ours"}
+            </Button>
+          </div>
+        )}
         <ReadOnlyTable
           loading={q.isLoading}
           empty="No billing codes authorized."
@@ -1438,6 +1360,18 @@ function BillingCodesPanel({ clientId }: { clientId: string }) {
             },
           ]}
         />
+        <div className="border-t border-border p-4">
+          <p className="mb-2 text-xs font-medium text-muted-foreground">Add a new authorized code</p>
+          <AddCodesControl
+            clientId={clientId}
+            compact
+            onAdded={() => {
+              q.refetch();
+              qc.invalidateQueries({ queryKey: ["client-reclaimable-codes", clientId] });
+              qc.invalidateQueries({ queryKey: ["client-profile"] });
+            }}
+          />
+        </div>
       </CardContent>
     </Card>
   );

@@ -2903,6 +2903,7 @@ export function PunchPad({
                       <Button
                         type="button"
                         size="sm"
+                        variant="outline"
                         disabled={incidentReportIds.length > 0}
                         onClick={() => {
                           setIncidentAnswer("no");

@@ -61,6 +61,8 @@ type Row = {
   clock_out_timestamp: string | null;
   corrected_clock_in: string | null;
   corrected_clock_out: string | null;
+  rounded_clock_in: string | null;
+  rounded_clock_out: string | null;
   is_edited_by_admin: boolean;
   is_out_of_bounds: boolean | null;
   outside_geofence_reason: string | null;
@@ -86,7 +88,7 @@ type Derived = Row & {
 };
 
 const SELECT_COLS =
-  "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, corrected_clock_in, corrected_clock_out, is_edited_by_admin, is_out_of_bounds, outside_geofence_reason, shift_note_text, goals_completed, review_status, status, incident_flag, denial_reason, utah_medicaid_member_id, import_source, clients:client_id(first_name, last_name, team_id)";
+  "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, corrected_clock_in, corrected_clock_out, rounded_clock_in, rounded_clock_out, is_edited_by_admin, is_out_of_bounds, outside_geofence_reason, shift_note_text, goals_completed, review_status, status, incident_flag, denial_reason, utah_medicaid_member_id, import_source, clients:client_id(first_name, last_name, team_id)";
 
 function fmtTs(iso: string | null): string {
   if (!iso) return "—";
@@ -295,8 +297,16 @@ export function RecordsTab() {
         // waiting on the staff member's own sign-off — nothing here is
         // actionable from the admin's side.
         const exc = awaiting ? [] : reviewExceptions(r);
-        const inTs = r.corrected_clock_in ?? r.clock_in_timestamp;
-        const outTs = r.corrected_clock_out ?? r.clock_out_timestamp;
+        // Duration reflects the authoritative billing time: approved
+        // correction, else the rounded (nearest-quarter-hour) punch, else
+        // raw as a last resort — same precedence as reDownloadBatch below.
+        // Never derived back into the raw/corrected columns themselves.
+        const billIn = (r.review_status === "approved" && r.corrected_clock_in)
+          ? r.corrected_clock_in
+          : (r.rounded_clock_in ?? r.clock_in_timestamp);
+        const billOut = (r.review_status === "approved" && r.corrected_clock_out)
+          ? r.corrected_clock_out
+          : (r.rounded_clock_out ?? r.clock_out_timestamp);
         return {
           ...r,
           staff_name: staffMap.get(r.staff_id) ?? r.staff_id.slice(0, 8),
@@ -304,7 +314,7 @@ export function RecordsTab() {
             ? `${r.clients.first_name ?? ""} ${r.clients.last_name ?? ""}`.trim()
             : r.client_id.slice(0, 8),
           team_name: r.clients?.team_id ? teamMap.get(r.clients.team_id) ?? null : null,
-          duration_min: durationMin(inTs, outTs),
+          duration_min: durationMin(billIn, billOut),
           exceptions: exc,
           is_evv_locked: isEvvLockedCode(r.service_type_code),
           awaiting_staff_confirmation: awaiting,

@@ -68,7 +68,7 @@ export function useClientBudget(clientId: string | undefined) {
       // Pull all completed punches for this client in the widest window.
       const { data: tsRows, error: tsErr } = await supabase
         .from("evv_timesheets")
-        .select("service_type_code, clock_in_timestamp, clock_out_timestamp")
+        .select("service_type_code, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, corrected_clock_in, corrected_clock_out, review_status")
         .eq("organization_id", org!.organization_id)
         .eq("client_id", clientId!)
         .gte("clock_in_timestamp", earliestStart.toISOString());
@@ -111,17 +111,32 @@ export function useClientBudget(clientId: string | undefined) {
             service_type_code: string | null;
             clock_in_timestamp: string;
             clock_out_timestamp: string | null;
+            rounded_clock_in: string | null;
+            rounded_clock_out: string | null;
+            corrected_clock_in: string | null;
+            corrected_clock_out: string | null;
+            review_status: string | null;
           }>) {
             if (!r.clock_out_timestamp || r.service_type_code !== code.service_code) continue;
             const inT = new Date(r.clock_in_timestamp);
             if (inT < period_start) continue;
             if (period_end && inT > period_end) continue;
+            // Same authoritative-time precedence as records-tab.tsx: approved
+            // correction, else the rounded (nearest-quarter-hour) punch, else
+            // raw as a last resort. Never derived back into the raw/corrected
+            // columns — only used to compute used units/hours here.
+            const billIn = (r.review_status === "approved" && r.corrected_clock_in)
+              ? r.corrected_clock_in
+              : (r.rounded_clock_in ?? r.clock_in_timestamp);
+            const billOut = (r.review_status === "approved" && r.corrected_clock_out)
+              ? r.corrected_clock_out
+              : (r.rounded_clock_out ?? r.clock_out_timestamp);
             const hrs =
-              (new Date(r.clock_out_timestamp).getTime() - inT.getTime()) / 3_600_000;
+              (new Date(billOut).getTime() - new Date(billIn).getTime()) / 3_600_000;
             if (hrs > 0 && isFinite(hrs)) {
               used_hours += hrs;
               // Per-entry rounding; the bucket sums entry units, never re-rounds.
-              used_entry_units += computeEntryUnits(r.clock_in_timestamp, r.clock_out_timestamp);
+              used_entry_units += computeEntryUnits(billIn, billOut);
             }
           }
         }

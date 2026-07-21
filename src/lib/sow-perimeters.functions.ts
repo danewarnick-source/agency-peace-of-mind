@@ -5,17 +5,17 @@
  * silently assumed satisfied. Numbers (e.g. 24h incident deadline) come from
  * the database (`state_submission_deadline`) — NOT hardcoded here.
  *
- * R1 — ABI training       — staff assigned to a client with disability_category "ABI" + no current "abi" training
- *                           (profiles.requires_abi honored as manual fallback)
- * R2 — De-escalation cert — profiles.requires_deescalation OR assigned to a
- *                           behavior_support_client + no current "deescalation" training
+ * R1 — ABI training       — profiles.requires_abi (explicit provider setting) + no current "abi" training
+ * R2 — De-escalation cert — profiles.requires_deescalation (explicit provider setting) + no current "deescalation" training
  * R3 — 30-day training    — active org member + no current "thirty_day" training
  * R4 — Incident timeframe — incident_reports past state_submission_deadline
  * R5 — Generic SOW        — nectar_requirements with unmet tracking cadence
  *
- * NOTE: R1 derives the ABI requirement from clients.disability_category = 'ABI'
- * via staff_assignments (set automatically during PCSP import). profiles.requires_abi
- * is honored as a manual fallback so existing data is not broken.
+ * NOTE: R1/R2 used to also auto-detect from client caseload (ABI disability
+ * category / behavior_support_client assignment). That's gone — de-escalation
+ * and ABI training are now a plain Required/Exempt setting the provider sets
+ * per staff member (onboarding + employee profile), so these alerts follow
+ * whatever the provider explicitly decided, nothing more.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -95,8 +95,6 @@ export const computeSowAlerts = createServerFn({ method: "POST" })
     const [
       profilesRes,
       trainingsRes,
-      assignmentsRes,
-      behaviorClientsRes,
       incidentsRes,
       requirementsRes,
       clientsRes,
@@ -106,12 +104,6 @@ export const computeSowAlerts = createServerFn({ method: "POST" })
         .in("id", memberIds),
       sb.from("staff_baseline_training_completions")
         .select("staff_id, training_key, completed_date, expires_at")
-        .eq("organization_id", orgId),
-      sb.from("staff_assignments")
-        .select("staff_id, client_id")
-        .eq("organization_id", orgId),
-      sb.from("behavior_support_clients")
-        .select("client_id")
         .eq("organization_id", orgId),
       sb.from("incident_reports")
         .select("id, report_number, client_id, state_submission_deadline, status")
@@ -123,22 +115,17 @@ export const computeSowAlerts = createServerFn({ method: "POST" })
         .select("id, title, review_status, metadata")
         .eq("organization_id", orgId),
       sb.from("clients")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, first_name, last_name, disability_category" as any)
+        .select("id, first_name, last_name")
         .eq("organization_id", orgId),
     ]);
 
     type Profile = { id: string; full_name: string | null; requires_abi: boolean; requires_deescalation: boolean; is_active: boolean };
     type Incident = { id: string; report_number: string; client_id: string; state_submission_deadline: string };
     type Requirement = { id: string; title: string; review_status: string | null; metadata: Record<string, unknown> | null };
-    type ClientRow = { id: string; first_name: string; last_name: string; disability_category?: string | null };
+    type ClientRow = { id: string; first_name: string; last_name: string };
 
     const profiles = ((profilesRes.data ?? []) as Profile[]).filter((p) => p.is_active);
     const trainings = (trainingsRes.data ?? []) as TrainingRow[];
-    const assignments = (assignmentsRes.data ?? []) as Array<{ staff_id: string; client_id: string }>;
-    const behaviorClientIds = new Set(
-      ((behaviorClientsRes.data ?? []) as Array<{ client_id: string }>).map((b) => b.client_id),
-    );
     const incidents = (incidentsRes.data ?? []) as Incident[];
     const requirements = (requirementsRes.data ?? []) as Requirement[];
     const clientList = (clientsRes.data ?? []) as ClientRow[];
@@ -151,19 +138,11 @@ export const computeSowAlerts = createServerFn({ method: "POST" })
     };
 
     // ── R1 — ABI training ────────────────────────────────────────────────────
-    // Staff needs ABI training if: admin set requires_abi on their profile
-    // OR they're assigned to a client whose disability_category is "ABI".
-    const abiClientIds = new Set(
-      clientList
-        .filter((c) => c.disability_category === "ABI")
-        .map((c) => c.id),
-    );
+    // Staff needs ABI training when the provider has explicitly set
+    // requires_abi on their profile — no client-caseload auto-detection.
     const staffNeedingAbi = new Set<string>(
       profiles.filter((p) => p.requires_abi).map((p) => p.id),
     );
-    for (const a of assignments) {
-      if (abiClientIds.has(a.client_id)) staffNeedingAbi.add(a.staff_id);
-    }
     for (const staffId of staffNeedingAbi) {
       if (!isTrainingCurrent(trainings, staffId, SOW_TRAINING_KEYS.ABI, today)) {
         const name = staffName(staffId);
@@ -180,13 +159,10 @@ export const computeSowAlerts = createServerFn({ method: "POST" })
     }
 
     // ── R2 — De-escalation cert ──────────────────────────────────────────────
-    const staffNeedingDeesc = new Set<string>();
-    for (const p of profiles) {
-      if (p.requires_deescalation) staffNeedingDeesc.add(p.id);
-    }
-    for (const a of assignments) {
-      if (behaviorClientIds.has(a.client_id)) staffNeedingDeesc.add(a.staff_id);
-    }
+    // Explicit provider setting only — no client-caseload auto-detection.
+    const staffNeedingDeesc = new Set<string>(
+      profiles.filter((p) => p.requires_deescalation).map((p) => p.id),
+    );
     for (const staffId of staffNeedingDeesc) {
       if (!isTrainingCurrent(trainings, staffId, SOW_TRAINING_KEYS.DEESCALATION, today)) {
         const name = staffName(staffId);

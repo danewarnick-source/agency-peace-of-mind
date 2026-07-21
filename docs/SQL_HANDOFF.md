@@ -6,6 +6,34 @@ it worked before moving on.
 
 ---
 
+## -1. De-escalation / ABI training now defaults to Required (2026-07-21)
+
+De-escalation and ABI training requirements are no longer auto-detected from
+a staffer's client caseload — they're now a plain, explicit Required / Exempt
+setting the provider sets per staff member (onboarding + employee profile).
+Every staffer must default to **Required** until an admin deliberately
+reviews them and marks them Exempt. The `requires_deescalation` /
+`requires_abi` columns already exist (added 2026-06-21) but defaulted to
+`false` under the old "add an extra requirement on top of auto-detection"
+model — that default no longer means anything now that auto-detection is
+gone, so every existing row needs to be corrected to `true`.
+
+```sql
+ALTER TABLE public.profiles
+  ALTER COLUMN requires_deescalation SET DEFAULT true,
+  ALTER COLUMN requires_abi SET DEFAULT true;
+
+UPDATE public.profiles
+  SET requires_deescalation = true, requires_abi = true;
+```
+
+**What you'll see:** `ALTER TABLE`, then `UPDATE` with the total row count in
+`profiles`. Every staffer is now flagged Required for both trainings; admins
+revisit this per-staffer from the employee edit screen or new-hire form going
+forward.
+
+---
+
 ## 0. Add `phone` column to `profiles` (Employee Profile v2 — 2026-06-23)
 
 Required for the contact card edit mode on the employee profile page.

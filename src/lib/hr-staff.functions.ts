@@ -170,8 +170,6 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
       { data: comp, error: compErr },
       { data: prof },
       { data: baselineComp },
-      { data: behaviorClients },
-      { data: assignedClientIds },
     ] = await Promise.all([
       sb.rpc("get_hr_staff_checklist_base", { _org: data.organization_id }),
       sb
@@ -189,16 +187,6 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
         .select("*")
         .eq("organization_id", data.organization_id)
         .eq("staff_id", data.staff_id),
-      sb
-        .from("behavior_support_clients")
-        .select("client_id")
-        .eq("organization_id", data.organization_id)
-        .eq("features_enabled", true),
-      sb
-        .from("staff_assignments")
-        .select("client_id")
-        .eq("organization_id", data.organization_id)
-        .eq("staff_id", data.staff_id),
     ]);
     if (baseErr) throw new Error(baseErr.message);
     if (compErr) throw new Error(compErr.message);
@@ -210,33 +198,14 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
       (prof?.hire_date as string | null) ??
       null;
     const hireDate = hireDateStr ? new Date(`${hireDateStr}T00:00:00Z`) : null;
-    const behaviorClientIds = new Set<string>(
-      (behaviorClients ?? []).map((r: { client_id: string }) => r.client_id),
-    );
-    const myClientIds: string[] = (assignedClientIds ?? []).map(
-      (r: { client_id: string }) => r.client_id,
-    );
-    const hasBehaviorClient = myClientIds.some((id) =>
-      behaviorClientIds.has(id),
-    );
-    // ABI: OR in the per-client `has_abi` flag — any assigned client with
-    // ABI triggers the ABI training requirement for this staff member.
-    let hasAbiClient = false;
-    if (myClientIds.length > 0) {
-      const { data: abiClients } = await sb
-        .from("clients")
-        .select("id")
-        .eq("organization_id", data.organization_id)
-        .in("id", myClientIds)
-        .eq("has_abi", true)
-        .limit(1);
-      hasAbiClient = (abiClients ?? []).length > 0;
-    }
+    // Explicit, provider-decided setting only — no auto-detection from client
+    // caseload. Defaults to Required at the DB level; an admin must
+    // deliberately flip a staffer to Exempt (see getStaffTrainingRiskFlags
+    // for the compliance-risk warning shown when they do).
     const requiresDeescalation =
-      (prof?.requires_deescalation as boolean | undefined) === true ||
-      hasBehaviorClient;
+      (prof?.requires_deescalation as boolean | undefined) !== false;
     const requiresAbi =
-      (prof?.requires_abi as boolean | undefined) === true || hasAbiClient;
+      (prof?.requires_abi as boolean | undefined) !== false;
 
     const compMap = new Map<string, Record<string, unknown>>();
     for (const c of comp ?? []) compMap.set(c.requirement_id as string, c);
@@ -413,6 +382,64 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
 
 
 
+
+// --- De-escalation / ABI exemption risk check -------------------------------
+//
+// The De-escalation and ABI training requirements are now a plain, explicit
+// per-staff Required/Exempt setting (see requires_deescalation / requires_abi
+// on `profiles`) — the system no longer infers the requirement from caseload.
+// This lookup exists ONLY to power the admin-facing confirmation warning
+// shown when someone tries to mark a staffer Exempt while they're currently
+// assigned to a behavior-coded or ABI client; it never changes what's
+// required on its own.
+
+export interface StaffTrainingRiskFlags {
+  has_behavior_client: boolean;
+  has_abi_client: boolean;
+}
+
+export const getStaffTrainingRiskFlags = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => orgStaff.parse(d))
+  .handler(async ({ data, context }): Promise<StaffTrainingRiskFlags> => {
+    const { supabase, userId } = context;
+    await requireOrgMembership(supabase, userId, data.organization_id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+
+    const { data: assignedClientIds } = await sb
+      .from("staff_assignments")
+      .select("client_id")
+      .eq("organization_id", data.organization_id)
+      .eq("staff_id", data.staff_id);
+    const myClientIds: string[] = (assignedClientIds ?? []).map(
+      (r: { client_id: string }) => r.client_id,
+    );
+    if (myClientIds.length === 0) {
+      return { has_behavior_client: false, has_abi_client: false };
+    }
+
+    const [{ data: behaviorClients }, { data: abiClients }] = await Promise.all([
+      sb
+        .from("behavior_support_clients")
+        .select("client_id")
+        .eq("organization_id", data.organization_id)
+        .eq("features_enabled", true)
+        .in("client_id", myClientIds),
+      sb
+        .from("clients")
+        .select("id")
+        .eq("organization_id", data.organization_id)
+        .in("id", myClientIds)
+        .eq("has_abi", true)
+        .limit(1),
+    ]);
+
+    return {
+      has_behavior_client: (behaviorClients ?? []).length > 0,
+      has_abi_client: (abiClients ?? []).length > 0,
+    };
+  });
 
 // --- Mutations -------------------------------------------------------------
 

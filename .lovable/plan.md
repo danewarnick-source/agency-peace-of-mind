@@ -1,22 +1,21 @@
+# Fully-orange selected state for shift-verification pills
 
-## What's wrong
+## What's happening now
+Both the "Did anything happen this shift…" Yes/No (in `punch-pad.tsx`) and the "Any behaviors of concern observed…" Yes/No (in `behavior-observations-block.tsx`) already share the same `selectedPill` / `unselectedPill` classes from `src/components/evv/toggle-styles.ts`. But `selectedPill` today is only a pale amber tint (`bg-[color:var(--amber-100)]` with a darker border), so the selected state looks washed out instead of clearly "on."
 
-In the "My caseload" list (`src/components/staff-client-grid.tsx`), expanding a client lets the user pick a service code and shows "Open Time Clock" (or "Open Client Hub" for daily codes). The button `<Link>` currently passes only `params={{ clientId: c.id }}` — no `search`. So the destination (`/dashboard/workspace/$clientId`) opens on the default "About" tab with no preselected code, and the staff member has to re-pick the code inside the punch pad.
+## Change
+Update the two shared constants in `src/components/evv/toggle-styles.ts` so a picked option renders as a solid orange chip with strong contrast, and unselected stays neutral:
 
-The workspace route already accepts `?tab=clock-in&code=XYZ` (`workspaceSearch` in `dashboard.workspace.$clientId.tsx`) and forwards `code` to `PunchPad` as `presetServiceCode` + `lockServiceCode`, which correctly handles EVV vs non-EVV under the hood. The caseload row just isn't sending it.
+- `selectedPill` → solid amber-600 fill, white text, matching border, and a subtle ring so it reads as bold and confidently "picked":
+  `border-[color:var(--amber-600)] bg-[color:var(--amber-600)] text-white hover:bg-[color:var(--amber-600)]`
+- `unselectedPill` → unchanged neutral chip.
 
-## Fix
+Because both Yes/No pairs (incident question + behavior question) already funnel through these constants and are already sized identically (`min-h-[44px]`, flex-1 in the behavior block; equivalent width in the incident block), a single token change lands consistently on both. Yes and No end up visually identical when selected — same fill, same text color, same border — differing only by label.
 
-Edit `src/components/staff-client-grid.tsx`, `ClientDetail` "Open Time Clock" button only:
+## Scope
+Frontend/presentation only. No logic, data, or state changes. The other clock-out dialog controls that already reuse `selectedPill` (baseline check, recording toggle, behavior frequency, reportable incident, trend, long-shift ack) will also render in the same solid orange when picked, which matches the "clean and organized look" the user asked for.
 
-- For the hourly / clockable path (`!daily`), change the `<Link>` to include:
-  - `search={{ tab: "clock-in", code: selected }}`
-- For the daily path (HHS hub), keep params only — that hub has no code selector and no clock (matches current behavior).
-- No other changes: the pill selector, EVV/daily/payroll-only badge, and disabled-while-on-clock behavior stay as-is. PunchPad already routes EVV vs non-EVV logic from the code.
+## Files
+- `src/components/evv/toggle-styles.ts` — update the two class strings.
 
-## Verification
-
-- Expand a caseload client, pick an EVV code (e.g., COM), click Open Time Clock → workspace opens directly on Clock-In tab with that code preselected and locked in the punch pad.
-- Repeat with a non-EVV clockable code (e.g., SEI) → same behavior; PunchPad shows the non-EVV clock-in path.
-- Pick a daily code (HHS) → button still says "Open Client Hub" and lands on `/dashboard/hhs-hub/$clientId` unchanged.
-- Already-on-clock client → button still says "Continue Time Clock" and lands on the workspace (no code override; PunchPad picks up the active shift's code).
+No other files need edits; `punch-pad.tsx` and `behavior-observations-block.tsx` already consume these constants.

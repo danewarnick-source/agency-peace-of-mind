@@ -392,3 +392,25 @@ CREATE INDEX idx_ctb_org    ON public.client_target_behaviors(organization_id);
 
 **What you'll see:** `CREATE TABLE`, two `GRANT`, `ALTER TABLE`, two
 `CREATE POLICY`, `CREATE TRIGGER`, two `CREATE INDEX`.
+
+---
+
+## 9. GPS-bypass columns on `evv_timesheets` (EVV GPS-unavailable fallback — 2026-07-21)
+
+Utah's UEVV rule accepts either GPS coordinates OR a street address + city for
+both the begin and end of a visit — GPS is not mandatory. Today, when GPS
+can't be captured on an EVV-locked code, staff can (clock-in) or previously
+could NOT (clock-out) proceed by confirming a reason; the EVV record then
+falls back to the client's on-file address for location evidence. These
+columns let admins see, distinctly from a geofence out-of-bounds variance,
+that a punch used this fallback.
+
+```sql
+ALTER TABLE public.evv_timesheets
+  ADD COLUMN IF NOT EXISTS gps_in_bypassed      boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS gps_in_bypass_reason text,
+  ADD COLUMN IF NOT EXISTS gps_out_bypassed      boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS gps_out_bypass_reason text;
+```
+
+**What you'll see:** one `ALTER TABLE` adding four columns.

@@ -40,6 +40,8 @@ interface TsRow {
   reconciliation_status: string | null;
   gps_in_coordinates: Coord;
   gps_out_coordinates: Coord;
+  gps_in_bypassed: boolean | null;
+  gps_out_bypassed: boolean | null;
   staff_id: string;
   matched_approved_location_id: string | null;
   clients: { first_name: string; last_name: string; physical_address: string | null; medicaid_id: string | null } | null;
@@ -79,6 +81,7 @@ interface CategorizedRow {
   excludeReason: null | "missing_member_id" | "missing_location" | "out_of_bounds" | "already_exported" | "no_clock_out" | "not_reviewed";
   addressBlank: boolean;
   gpsAbsent: boolean;
+  gpsBypassed: boolean;
 }
 
 // Utah UEVV spec requires, for BOTH the begin and end of service, either a
@@ -107,7 +110,15 @@ function categorize(rows: TsRow[], exportedIds: Set<string>, addressMap: Map<str
       r.reconciliation_status !== "accepted" &&
       r.reconciliation_status !== "corrected"
     ) excludeReason = "out_of_bounds";
-    return { row: r, address, memberId, excludeReason, addressBlank: !address, gpsAbsent: beginGpsAbsent };
+    return {
+      row: r,
+      address,
+      memberId,
+      excludeReason,
+      addressBlank: !address,
+      gpsAbsent: beginGpsAbsent,
+      gpsBypassed: !!(r.gps_in_bypassed || r.gps_out_bypassed),
+    };
   });
 }
 
@@ -152,7 +163,7 @@ export function UtahExportDialog({ open, onClose, organizationId, staffNameMap }
       const { data, error } = await supabase
         .from("evv_timesheets")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, corrected_clock_in, corrected_clock_out, review_status, reviewed_at, status, outside_geofence_reason, reconciliation_status, gps_in_coordinates, gps_out_coordinates, staff_id, matched_approved_location_id, clients(first_name, last_name, physical_address, medicaid_id)" as any)
+        .select("id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, corrected_clock_in, corrected_clock_out, review_status, reviewed_at, status, outside_geofence_reason, reconciliation_status, gps_in_coordinates, gps_out_coordinates, gps_in_bypassed, gps_out_bypassed, staff_id, matched_approved_location_id, clients(first_name, last_name, physical_address, medicaid_id)" as any)
         .eq("organization_id", organizationId)
         .gte("clock_in_timestamp", fromIso)
         .lte("clock_in_timestamp", toIso)
@@ -233,7 +244,7 @@ export function UtahExportDialog({ open, onClose, organizationId, staffNameMap }
       const { data: tsRows, error: e2 } = await supabase
         .from("evv_timesheets")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, corrected_clock_in, corrected_clock_out, review_status, reviewed_at, status, outside_geofence_reason, reconciliation_status, gps_in_coordinates, gps_out_coordinates, staff_id, matched_approved_location_id, clients(first_name, last_name, physical_address, medicaid_id)" as any)
+        .select("id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, corrected_clock_in, corrected_clock_out, review_status, reviewed_at, status, outside_geofence_reason, reconciliation_status, gps_in_coordinates, gps_out_coordinates, gps_in_bypassed, gps_out_bypassed, staff_id, matched_approved_location_id, clients(first_name, last_name, physical_address, medicaid_id)" as any)
         .eq("organization_id", organizationId)
         .in("id", candidateTsIds);
       if (e2) throw e2;
@@ -272,6 +283,7 @@ export function UtahExportDialog({ open, onClose, organizationId, staffNameMap }
   const notReviewed = categorized.filter((c) => c.excludeReason === "not_reviewed");
   const addressBlankCount = eligible.filter((c) => c.addressBlank).length;
   const gpsAbsentCount = eligible.filter((c) => c.gpsAbsent).length;
+  const gpsBypassedCount = eligible.filter((c) => c.gpsBypassed).length;
 
   const [selectedCorrections, setSelectedCorrections] = useState<Set<string>>(new Set());
   const toggleCorrection = (id: string) =>
@@ -491,6 +503,9 @@ export function UtahExportDialog({ open, onClose, organizationId, staffNameMap }
               {gpsAbsentCount > 0 && (
                 <li className="text-amber-600">{gpsAbsentCount} row{gpsAbsentCount === 1 ? "" : "s"} with no GPS — lat/lng will be blank (state may flag)</li>
               )}
+              {gpsBypassedCount > 0 && (
+                <li className="text-[#137182]">{gpsBypassedCount} row{gpsBypassedCount === 1 ? "" : "s"} · GPS bypassed by staff — exporting with the client's on-file address instead of GPS</li>
+              )}
             </ul>
           )}
           <div className="mt-2 text-[11px] text-muted-foreground">
@@ -673,7 +688,7 @@ export function EvvExportArchiveStrip({
       const { data: tsRows, error: e3 } = await supabase
         .from("evv_timesheets")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, corrected_clock_in, corrected_clock_out, review_status, reviewed_at, outside_geofence_reason, reconciliation_status, gps_in_coordinates, gps_out_coordinates, staff_id, matched_approved_location_id, clients(first_name, last_name, physical_address, medicaid_id)" as any)
+        .select("id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, corrected_clock_in, corrected_clock_out, review_status, reviewed_at, outside_geofence_reason, reconciliation_status, gps_in_coordinates, gps_out_coordinates, gps_in_bypassed, gps_out_bypassed, staff_id, matched_approved_location_id, clients(first_name, last_name, physical_address, medicaid_id)" as any)
         .in("id", tsIds);
       if (e3) throw e3;
       const tsMap = new Map<string, TsRow>();

@@ -609,7 +609,21 @@ function PreviousAuthorizations({ clientId, budgets }: { clientId: string; budge
   );
 }
 
-function CodeRow({ clientId: _clientId, budget, readOnly = false }: { clientId: string; budget: Budget; readOnly?: boolean }) {
+function CodeRow({
+  clientId: _clientId,
+  budget,
+  readOnly = false,
+  bulkEdit = false,
+  draft,
+  onDraftChange,
+}: {
+  clientId: string;
+  budget: Budget;
+  readOnly?: boolean;
+  bulkEdit?: boolean;
+  draft?: Draft;
+  onDraftChange?: (patch: Partial<Draft>) => void;
+}) {
   const qc = useQueryClient();
   const { data: org } = useCurrentOrg();
   const code = budget.code as Budget["code"] & {
@@ -620,14 +634,12 @@ function CodeRow({ clientId: _clientId, budget, readOnly = false }: { clientId: 
   const isVariable = isVariableRateCode(code.service_code);
   const status = getAuthStatus(code.service_start_date, code.service_end_date);
 
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [annual, setAnnual] = useState<string>(String(code.annual_unit_authorization ?? 0));
-  const [rate, setRate] = useState<string>(String(code.rate_per_unit ?? 0));
   const [endDateDraft, setEndDateDraft] = useState<string>("");
   const [savingEnd, setSavingEnd] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-
+  const editing = bulkEdit && !readOnly;
   const usedUnits = budget.used_units;
   const annualUnits = code.annual_unit_authorization ?? 0;
   const rateNum = Number(code.rate_per_unit ?? 0);
@@ -639,41 +651,9 @@ function CodeRow({ clientId: _clientId, budget, readOnly = false }: { clientId: 
   const exhausted = annualUnits > 0 && usedUnits >= annualUnits;
   const isEmpty = usedUnits === 0;
 
-  async function handleSave() {
-    if (!org?.organization_id) return;
-    const a = Number(annual);
-    const r = Number(rate);
-    if (!isFinite(a) || a < 0) return toast.error("Annual units must be a non-negative number");
-    if (!isFinite(r) || r < 0) return toast.error("Rate must be a non-negative number");
-    setSaving(true);
-    const { error } = await supabase
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .from("client_billing_codes" as any)
-      .update({
-        annual_unit_authorization: a,
-        rate_per_unit: r,
-        // Manual override clears the source attribution.
-        rate_source: "Manual override",
-        rate_source_plan_number: null,
-        rate_source_document_id: null,
-        rate_source_at: new Date().toISOString(),
-      })
-      .eq("id", code.id)
-      .eq("organization_id", org.organization_id);
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success(`${code.service_code} updated`);
-    setEditing(false);
-    qc.invalidateQueries({ queryKey: ["all-client-billing-codes"] });
-    qc.invalidateQueries({ queryKey: ["client-billing-codes"] });
-    qc.invalidateQueries({ queryKey: ["client-budget"] });
-  }
-
-  function handleCancel() {
-    setAnnual(String(code.annual_unit_authorization ?? 0));
-    setRate(String(code.rate_per_unit ?? 0));
-    setEditing(false);
-  }
+  const annualVal = editing ? (draft?.annual ?? String(annualUnits)) : String(annualUnits);
+  const rateVal = editing ? (draft?.rate ?? String(rateNum)) : String(rateNum);
+  const endDateVal = editing ? (draft?.endDate ?? (code.service_end_date ?? "")) : (code.service_end_date ?? "");
 
   async function handleSaveEndDate() {
     if (!org?.organization_id) return;
@@ -694,6 +674,51 @@ function CodeRow({ clientId: _clientId, budget, readOnly = false }: { clientId: 
     qc.invalidateQueries({ queryKey: ["all-client-billing-codes"] });
     qc.invalidateQueries({ queryKey: ["client-billing-codes"] });
     qc.invalidateQueries({ queryKey: ["client-budget"] });
+  }
+
+  async function handleDelete() {
+    if (!org?.organization_id) return;
+    setDeleting(true);
+    // Delete the billing code row
+    const { error: delErr } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .from("client_billing_codes" as any)
+      .delete()
+      .eq("id", code.id)
+      .eq("organization_id", org.organization_id);
+    if (delErr) {
+      setDeleting(false);
+      return toast.error(delErr.message);
+    }
+    // Strip code (case-insensitive) from clients.authorized_dspd_codes and job_code
+    const { data: clientRow } = await supabase
+      .from("clients")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .select("authorized_dspd_codes, job_code" as any)
+      .eq("id", _clientId)
+      .maybeSingle();
+    if (clientRow) {
+      const targetUpper = code.service_code.toUpperCase();
+      const authorized = ((clientRow as unknown as { authorized_dspd_codes?: string[] | null }).authorized_dspd_codes ?? [])
+        .filter((c) => (c ?? "").toUpperCase() !== targetUpper);
+      const jobCodes = ((clientRow as unknown as { job_code?: string[] | null }).job_code ?? [])
+        .filter((c) => (c ?? "").toUpperCase() !== targetUpper);
+      await supabase
+        .from("clients")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update({ authorized_dspd_codes: authorized, job_code: jobCodes } as any)
+        .eq("id", _clientId);
+    }
+    setDeleting(false);
+    setConfirmDelete(false);
+    toast.success(`Removed ${code.service_code}`);
+    qc.invalidateQueries({ queryKey: ["all-client-billing-codes"] });
+    qc.invalidateQueries({ queryKey: ["client-billing-codes"] });
+    qc.invalidateQueries({ queryKey: ["client-budget"] });
+    qc.invalidateQueries({ queryKey: ["client-codes-summary", _clientId] });
+    qc.invalidateQueries({ queryKey: ["client-readiness", _clientId] });
+    qc.invalidateQueries({ queryKey: ["caseload"] });
+    qc.invalidateQueries({ queryKey: ["scheduler-data"] });
   }
 
   const unitLabel = isDaily ? "days" : "units";
@@ -731,18 +756,16 @@ function CodeRow({ clientId: _clientId, budget, readOnly = false }: { clientId: 
           )}
           <AuthStatusBadge status={status} />
         </div>
-        {readOnly ? null : editing ? (
-          <div className="flex items-center gap-1">
-            <Button size="sm" variant="ghost" onClick={handleCancel} disabled={saving} className="h-7 gap-1 text-xs">
-              <X className="h-3.5 w-3.5" /> Cancel
-            </Button>
-            <Button size="sm" onClick={handleSave} disabled={saving} className="h-7 gap-1 text-xs">
-              <Check className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Save"}
-            </Button>
-          </div>
-        ) : (
-          <Button size="sm" variant="ghost" onClick={() => setEditing(true)} className="h-7 gap-1 text-xs">
-            <Pencil className="h-3.5 w-3.5" /> {isVariable ? "Manual override" : "Edit"}
+        {!readOnly && !bulkEdit && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setConfirmDelete(true)}
+            className="h-7 gap-1 px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+            title={`Remove ${code.service_code}`}
+            aria-label={`Remove ${code.service_code}`}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
           </Button>
         )}
       </div>
@@ -750,7 +773,13 @@ function CodeRow({ clientId: _clientId, budget, readOnly = false }: { clientId: 
       <div className="mt-3 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Stat label={`Annual ${unitLabel}`}>
           {editing ? (
-            <Input type="number" min={0} value={annual} onChange={(e) => setAnnual(e.target.value)} className="h-8 font-mono text-sm" />
+            <Input
+              type="number"
+              min={0}
+              value={annualVal}
+              onChange={(e) => onDraftChange?.({ annual: e.target.value })}
+              className="h-8 font-mono text-sm"
+            />
           ) : (
             <span className="font-mono text-sm font-semibold tabular-nums">{annualUnits.toLocaleString()}</span>
           )}
@@ -763,7 +792,14 @@ function CodeRow({ clientId: _clientId, budget, readOnly = false }: { clientId: 
         </Stat>
         <Stat label="Rate / unit">
           {editing ? (
-            <Input type="number" min={0} step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} className="h-8 font-mono text-sm" />
+            <Input
+              type="number"
+              min={0}
+              step="0.01"
+              value={rateVal}
+              onChange={(e) => onDraftChange?.({ rate: e.target.value })}
+              className="h-8 font-mono text-sm"
+            />
           ) : (
             <span className="font-mono text-sm font-semibold tabular-nums">{fmtMoney(rateNum)}</span>
           )}
@@ -792,6 +828,20 @@ function CodeRow({ clientId: _clientId, budget, readOnly = false }: { clientId: 
         </Stat>
       </div>
 
+      {editing && (
+        <div className="mt-3">
+          <Stat label="Service end date">
+            <Input
+              type="date"
+              value={endDateVal}
+              min={code.service_start_date ?? undefined}
+              onChange={(e) => onDraftChange?.({ endDate: e.target.value })}
+              className="h-8 w-48 text-sm"
+            />
+          </Stat>
+        </div>
+      )}
+
       {/* Rate source attribution */}
       {code.rate_source && !editing && (
         <p className="mt-2 text-[10px] text-muted-foreground">
@@ -806,7 +856,7 @@ function CodeRow({ clientId: _clientId, budget, readOnly = false }: { clientId: 
         </p>
       )}
 
-      {status === "end-needed" && !readOnly && (
+      {status === "end-needed" && !readOnly && !editing && (
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2">
           <span className="text-[11px] font-medium text-amber-800 dark:text-amber-200">
             <AlertTriangle className="mr-1 inline h-3 w-3" />
@@ -848,9 +898,40 @@ function CodeRow({ clientId: _clientId, budget, readOnly = false }: { clientId: 
           </p>
         </div>
       )}
+
+      <AlertDialog open={confirmDelete} onOpenChange={(o) => !deleting && setConfirmDelete(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {code.service_code}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the authorization for <span className="font-mono">{code.service_code}</span>. Past billing entries are not deleted.
+              {usedUnits > 0 && (
+                <span className="mt-2 block rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-amber-800 dark:text-amber-200">
+                  <AlertTriangle className="mr-1 inline h-3 w-3" />
+                  {usedUnits.toLocaleString()} {unitLabel} have already been billed against this authorization.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void handleDelete();
+              }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Removing…" : usedUnits > 0 ? "Remove anyway" : "Remove"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+
 
 function Stat({ label, children }: { label: string; children: React.ReactNode }) {
   return (

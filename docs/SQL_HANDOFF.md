@@ -414,3 +414,45 @@ ALTER TABLE public.evv_timesheets
 ```
 
 **What you'll see:** one `ALTER TABLE` adding four columns.
+
+---
+
+## 10. Manager notes, manual timesheet entries, and admin-on-behalf inserts on `evv_timesheets` (Records detail view — 2026-07-21)
+
+Supports the Documentation > Records detail/edit view: (a) a manager/admin-only
+note field kept fully separate from the caregiver's own `shift_note_text` —
+never merged, never overwritten by one another; (b) a `Manual_Entry` marker on
+`shift_entry_type` so a record entered by hand (missed clock-in/out, or an
+admin adding one on a staff member's behalf) is never confused with a normal
+EVV punch; (c) an INSERT policy letting an admin/manager create a timesheet
+row for another staff member (today only `staff_id = auth.uid()` may insert —
+see policy `"staff insert own evv"`). Editor/timestamp tracking for edits and
+manual entries reuses the existing (previously unpopulated) `edited_by` /
+`edited_at` / `edited_by_admin_name` / `is_edited_by_admin` columns — no new
+columns needed for that part.
+
+```sql
+ALTER TABLE public.evv_timesheets
+  ADD COLUMN IF NOT EXISTS manager_note_text    text,
+  ADD COLUMN IF NOT EXISTS manager_note_by      uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS manager_note_by_name text,
+  ADD COLUMN IF NOT EXISTS manager_note_at      timestamptz;
+
+ALTER TABLE public.evv_timesheets DROP CONSTRAINT IF EXISTS evv_timesheets_shift_entry_type_check;
+ALTER TABLE public.evv_timesheets ADD CONSTRAINT evv_timesheets_shift_entry_type_check
+  CHECK (shift_entry_type = ANY (ARRAY[
+    'Client_Profile_Pass'::text,
+    'General_Sidebar_Unscheduled'::text,
+    'Day_Program_Attendance'::text,
+    'Historical_Import'::text,
+    'Manual_Entry'::text
+  ]));
+
+CREATE POLICY "admin insert evv for staff"
+  ON public.evv_timesheets FOR INSERT TO authenticated
+  WITH CHECK (public.is_org_admin_or_manager(organization_id, auth.uid()));
+```
+
+**What you'll see:** one `ALTER TABLE` adding four columns, `DROP CONSTRAINT` /
+`ADD CONSTRAINT` on the `shift_entry_type` check, and one `CREATE POLICY`. No
+rows are changed by this block.

@@ -9,7 +9,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Clock, CheckCircle2, XCircle, Loader2, Info, Timer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useCurrentOrg } from "@/hooks/use-org";
 import { Badge } from "@/components/ui/badge";
+import { ManualTimesheetDialog } from "@/components/records/manual-timesheet-dialog";
 
 export const Route = createFileRoute("/dashboard/my-time-corrections")({
   head: () => ({ meta: [{ title: "My time corrections — HIVE" }] }),
@@ -64,6 +66,7 @@ function statusBadge(s: string | null) {
 
 function MyTimeCorrectionsPage() {
   const { user } = useAuth();
+  const { data: org } = useCurrentOrg();
   const q = useQuery({
     enabled: !!user?.id,
     queryKey: ["my-time-corrections", user?.id],
@@ -88,16 +91,25 @@ function MyTimeCorrectionsPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-4 p-4 md:p-6">
       <header className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Clock className="h-5 w-5 text-amber-700" />
-          <h1 className="text-xl font-semibold">My time corrections</h1>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-amber-700" />
+            <h1 className="text-xl font-semibold">My time corrections</h1>
+          </div>
+          {org?.organization_id && user?.id && (
+            <ManualTimesheetDialog
+              mode="staff"
+              organizationId={org.organization_id}
+              currentStaffId={user.id}
+            />
+          )}
         </div>
         <p className="text-sm text-muted-foreground">
           Every time-correction request you submit from the Submit Final Timesheet screen shows up here with its current status. When a supervisor approves, the corrected times replace the recorded times for billing; if denied, you'll see their note explaining why.
         </p>
         <div className="flex items-start gap-2 rounded-md border border-border bg-muted/30 p-3 text-[11px] text-muted-foreground">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>Only you can see your own list. The recorded (original) clock-in/clock-out are always preserved on the record — corrections live alongside them.</span>
+          <span>Only you can see your own list. The recorded (original) clock-in/clock-out are always preserved on the record — corrections live alongside them. Forgot to clock in or out entirely? Use "Log a missed timesheet" above.</span>
         </div>
       </header>
 

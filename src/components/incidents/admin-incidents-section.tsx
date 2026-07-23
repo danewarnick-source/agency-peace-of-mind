@@ -224,11 +224,16 @@ function FollowupNotesField({
   canEdit: boolean;
 }) {
   const qc = useQueryClient();
+  const { data: org } = useCurrentOrg();
   const fn = useServerFn(updateIncidentFollowupNotes);
   const [notes, setNotes] = useState(initialNotes ?? "");
   const [dirty, setDirty] = useState(false);
   const m = useMutation({
-    mutationFn: () => fn({ data: { id: incidentId, followup_notes: notes.trim() || null } }),
+    mutationFn: () => {
+      if (!org?.organization_id) throw new Error("No active organization.");
+      return fn({ data: { organization_id: org.organization_id, id: incidentId, followup_notes: notes.trim() || null } });
+    },
+
     onSuccess: () => {
       toast.success("Follow-up notes saved.");
       setDirty(false);

@@ -1066,9 +1066,12 @@ export function IncidentReportDialog({
       };
       if (aiSkipped) detailsOut.ai_review_skipped = true;
 
+      if (!org?.organization_id) throw new Error("No active organization.");
       return createFn({
         data: {
+          organization_id: org.organization_id,
           client_id: pickedClientId,
+
           occurred_at: occurredIso,
           discovered_at: discoveredIso,
           location: location.trim() || null,

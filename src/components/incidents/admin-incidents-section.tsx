@@ -10,7 +10,9 @@ import {
 } from "@/lib/incidents.functions";
 import { INCIDENT_CATEGORIES, GUARDIAN_METHODS, type GuardianMethod } from "./incident-categories";
 import { useCaseload } from "@/hooks/use-caseload";
+import { useCurrentOrg } from "@/hooks/use-org";
 import { usePermissions } from "@/hooks/use-permissions";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -115,6 +117,7 @@ function ActorNames({ ids, actors }: { ids: Array<string | null | undefined>; ac
 
 function SubmitUpiDialog({ incidentId, onClose }: { incidentId: string | null; onClose: () => void }) {
   const qc = useQueryClient();
+  const { data: org } = useCurrentOrg();
   const fn = useServerFn(submitToUpi);
   const [guardianContacted, setGuardianContacted] = useState(true);
   const [method, setMethod] = useState<GuardianMethod>("phone");
@@ -128,9 +131,10 @@ function SubmitUpiDialog({ incidentId, onClose }: { incidentId: string | null; o
 
   const m = useMutation({
     mutationFn: async (sig: AttestationSignature) => {
-      if (!incidentId) return;
+      if (!incidentId || !org?.organization_id) return;
       return fn({
         data: {
+          organization_id: org.organization_id,
           id: incidentId,
           guardian_contacted: guardianContacted,
           guardian_method: guardianContacted ? method : null,
@@ -139,6 +143,7 @@ function SubmitUpiDialog({ incidentId, onClose }: { incidentId: string | null; o
         },
       });
     },
+
     onSuccess: () => {
       toast.success("Submitted to UPI — incident closed.");
       qc.invalidateQueries({ queryKey: ["incidents"] });
@@ -219,11 +224,16 @@ function FollowupNotesField({
   canEdit: boolean;
 }) {
   const qc = useQueryClient();
+  const { data: org } = useCurrentOrg();
   const fn = useServerFn(updateIncidentFollowupNotes);
   const [notes, setNotes] = useState(initialNotes ?? "");
   const [dirty, setDirty] = useState(false);
   const m = useMutation({
-    mutationFn: () => fn({ data: { id: incidentId, followup_notes: notes.trim() || null } }),
+    mutationFn: () => {
+      if (!org?.organization_id) throw new Error("No active organization.");
+      return fn({ data: { organization_id: org.organization_id, id: incidentId, followup_notes: notes.trim() || null } });
+    },
+
     onSuccess: () => {
       toast.success("Follow-up notes saved.");
       setDirty(false);
@@ -392,8 +402,11 @@ export function AdminIncidentsSection({
   initialClientId?: string | null;
   initialView?: "queue" | "log";
 } = {}) {
+  const { data: org } = useCurrentOrg();
+  const activeOrgId = org?.organization_id ?? null;
   const listFn = useServerFn(listIncidents);
   const actorsFn = useServerFn(getIncidentActors);
+
 
   const [view, setView] = useState<"queue" | "log">(initialView ?? "queue");
   const [status, setStatus] = useState<"open" | "closed" | "all">("all");
@@ -412,10 +425,12 @@ export function AdminIncidentsSection({
 
   const { data: caseload = [] } = useCaseload();
   const { data, isLoading } = useQuery({
-    queryKey: ["incidents", view, status, filterCategory, filterClient, from, to],
+    enabled: !!activeOrgId,
+    queryKey: ["incidents", activeOrgId, view, status, filterCategory, filterClient, from, to],
     queryFn: () =>
       listFn({
         data: {
+          organization_id: activeOrgId!,
           status: view === "queue" ? "open" : status,
           category: filterCategory === "all" ? null : filterCategory,
           client_id: filterClient === "all" ? null : filterClient,
@@ -425,6 +440,7 @@ export function AdminIncidentsSection({
         },
       }),
   });
+
   const incidents = (data?.incidents ?? []) as Incident[];
 
   const sorted = useMemo(() => {
@@ -447,10 +463,11 @@ export function AdminIncidentsSection({
     return [...s];
   }, [incidents]);
   const { data: actorsData } = useQuery({
-    enabled: actorIds.length > 0,
-    queryKey: ["incident-actors", actorIds.join(",")],
-    queryFn: () => actorsFn({ data: { user_ids: actorIds } }),
+    enabled: actorIds.length > 0 && !!activeOrgId,
+    queryKey: ["incident-actors", activeOrgId, actorIds.join(",")],
+    queryFn: () => actorsFn({ data: { organization_id: activeOrgId!, user_ids: actorIds } }),
   });
+
   const actorMap = useMemo(() => {
     const m = new Map<string, string>();
     for (const p of (actorsData?.profiles ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null }>) {

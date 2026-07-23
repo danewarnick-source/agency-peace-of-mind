@@ -21,24 +21,32 @@ import { z } from "zod";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
 
-async function getMembership(supabase: AnySupabase, userId: string) {
+async function getMembership(
+  supabase: AnySupabase,
+  userId: string,
+  organizationId: string,
+) {
   const { data, error } = await supabase
     .from("organization_members")
     .select("organization_id, role, active")
     .eq("user_id", userId)
+    .eq("organization_id", organizationId)
     .eq("active", true)
     .limit(1)
     .maybeSingle();
-  if (error || !data) throw new Error("No active organization membership.");
+  if (error || !data) throw new Error("Not an active member of this organization.");
   return data as { organization_id: string; role: string; active: boolean };
 }
+
 
 function isManager(role: string | undefined) {
   return !!role && ["admin", "manager", "super_admin"].includes(role);
 }
 
 const createInput = z.object({
+  organization_id: z.string().uuid(),
   client_id: z.string().uuid(),
+
   occurred_at: z.string().datetime().nullable().optional(),
   discovered_at: z.string().datetime(),
   location: z.string().max(300).optional().nullable(),
@@ -78,7 +86,8 @@ export const createIncident = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => createInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
-    const m = await getMembership(supabase, userId);
+    const m = await getMembership(supabase, userId, data.organization_id);
+
     if (data.is_abuse_neglect && !(data.prevention_strategies?.trim())) {
       throw new Error("Prevention strategies are required for abuse/neglect/exploitation incidents.");
     }
@@ -159,6 +168,7 @@ export const createIncident = createServerFn({ method: "POST" })
   });
 
 const filtersInput = z.object({
+  organization_id: z.string().uuid(),
   status: z.enum(["open", "closed", "all"]).default("open"),
   client_id: z.string().uuid().optional().nullable(),
   category: z.string().max(120).optional().nullable(),
@@ -172,7 +182,8 @@ export const listIncidents = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => filtersInput.parse(d ?? {}))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
-    const m = await getMembership(supabase, userId);
+    const m = await getMembership(supabase, userId, data.organization_id);
+
 
     let q = supabase
       .from("incident_reports")
@@ -201,13 +212,14 @@ export const incidentTrends = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z.object({
+      organization_id: z.string().uuid(),
       from: z.string().datetime().optional().nullable(),
       to: z.string().datetime().optional().nullable(),
     }).parse(d ?? {}),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
-    const m = await requireManager(supabase, userId);
+    const m = await requireManager(supabase, userId, data.organization_id);
 
     // Trailing-6-month window for the bar chart (always); the caller-supplied
     // [from..to] only filters the per-client table.
@@ -226,11 +238,16 @@ export const incidentTrends = createServerFn({ method: "GET" })
   });
 
 
-async function requireManager(supabase: AnySupabase, userId: string) {
-  const m = await getMembership(supabase, userId);
+async function requireManager(
+  supabase: AnySupabase,
+  userId: string,
+  organizationId: string,
+) {
+  const m = await getMembership(supabase, userId, organizationId);
   if (!isManager(m.role)) throw new Error("Admin or manager access required.");
   return m;
 }
+
 
 /** Shared attestation/signature input for the combined UPI-submission duty. */
 const attestation = z.object({
@@ -250,6 +267,7 @@ export const submitToUpi = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     attestation.extend({
+      organization_id: z.string().uuid(),
       id: z.string().uuid(),
       guardian_contacted: z.boolean(),
       guardian_method: z.enum(["phone", "email", "face-to-face"]).optional().nullable(),
@@ -258,7 +276,8 @@ export const submitToUpi = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
-    await requireManager(supabase, userId);
+    await requireManager(supabase, userId, data.organization_id);
+
     if (data.guardian_contacted && !data.guardian_method) {
       throw new Error("Guardian contact method is required when the guardian was contacted.");
     }
@@ -287,13 +306,15 @@ export const updateIncidentFollowupNotes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z.object({
+      organization_id: z.string().uuid(),
       id: z.string().uuid(),
       followup_notes: z.string().max(8000).optional().nullable(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
-    await requireManager(supabase, userId);
+    await requireManager(supabase, userId, data.organization_id);
+
     const { error } = await supabase
       .from("incident_reports")
       .update({ followup_notes: data.followup_notes?.trim() || null })
@@ -305,10 +326,14 @@ export const updateIncidentFollowupNotes = createServerFn({ method: "POST" })
 /** Resolve reporter / actor names for the attestation trail. */
 export const getIncidentActors = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ user_ids: z.array(z.string().uuid()).max(200) }).parse(d))
+  .inputValidator((d: unknown) => z.object({
+    organization_id: z.string().uuid(),
+    user_ids: z.array(z.string().uuid()).max(200),
+  }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
-    await getMembership(supabase, userId);
+    await getMembership(supabase, userId, data.organization_id);
+
     if (!data.user_ids.length) return { profiles: [] };
     const { data: rows } = await supabase
       .from("profiles")
@@ -327,13 +352,15 @@ export const hasSubmittedIncidentForClientDate = createServerFn({ method: "GET" 
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z.object({
+      organization_id: z.string().uuid(),
       client_id: z.string().uuid(),
       date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
-    const m = await getMembership(supabase, userId);
+    const m = await getMembership(supabase, userId, data.organization_id);
+
     const start = new Date(`${data.date}T00:00:00`).toISOString();
     const end = new Date(`${data.date}T23:59:59.999`).toISOString();
     const { data: rows, error } = await supabase
@@ -354,11 +381,15 @@ export const hasSubmittedIncidentForClientDate = createServerFn({ method: "GET" 
 export const signIncidentPhotos = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
-    z.object({ paths: z.array(z.string().min(1)).max(50) }).parse(d),
+    z.object({
+      organization_id: z.string().uuid(),
+      paths: z.array(z.string().min(1)).max(50),
+    }).parse(d),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
-    await getMembership(supabase, userId);
+    await getMembership(supabase, userId, data.organization_id);
+
     if (!data.paths.length) return { urls: {} as Record<string, string> };
     const out: Record<string, string> = {};
     for (const p of data.paths) {

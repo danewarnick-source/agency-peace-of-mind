@@ -33,6 +33,7 @@ import { TimeCorrectionReviewSection } from "@/components/records/time-correctio
 import { RecordDetailSheet } from "@/components/records/record-detail-sheet";
 import { ManualTimesheetDialog } from "@/components/records/manual-timesheet-dialog";
 import { RecordsExportDialog, type ExportRow } from "@/components/records/records-export-dialog";
+import { HistoricalRecordBadge } from "@/components/shared/historical-record-badge";
 
 import { UtahExportDialog } from "@/components/evv/utah-export-dialog";
 import { toast } from "sonner";
@@ -930,6 +931,9 @@ export function RecordsTab() {
                           {r.client_name}
                           {r.team_name && (
                             <span className="ml-1 text-xs text-muted-foreground">· {r.team_name}</span>
+                          )}
+                          {r.import_source === "historical_import" && (
+                            <span className="ml-1 inline-block align-middle"><HistoricalRecordBadge /></span>
                           )}
                         </td>
                         <td className="px-3 py-2 font-mono text-xs">{r.service_type_code}</td>

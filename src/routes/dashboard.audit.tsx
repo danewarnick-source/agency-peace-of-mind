@@ -74,6 +74,9 @@ type Item = {
   evidence_count: number;
   notes: string | null;
   position: number;
+  period_start: string | null;
+  period_end: string | null;
+  is_disclosure: boolean;
 };
 
 const statusMeta: Record<Item["status"], { label: string; cls: string; icon: typeof CheckCircle2 }> = {
@@ -416,9 +419,12 @@ function PacketDetail({
     },
   });
 
+  const disclosureItem = useMemo(() => (items ?? []).find((it) => it.is_disclosure) ?? null, [items]);
+  const checklistItems = useMemo(() => (items ?? []).filter((it) => !it.is_disclosure), [items]);
+
   const counts = useMemo(() => {
     const c = { total: 0, missing: 0, needs_review: 0, auto_filled: 0, confirmed: 0 };
-    (items ?? []).forEach((it) => {
+    checklistItems.forEach((it) => {
       c.total++;
       if (it.status === "missing") c.missing++;
       else if (it.status === "needs_review") c.needs_review++;
@@ -426,13 +432,28 @@ function PacketDetail({
       else if (it.status === "confirmed") c.confirmed++;
     });
     return c;
-  }, [items]);
+  }, [checklistItems]);
 
   const grouped = useMemo(() => {
     const g: Record<Item["sub_folder"], Item[]> = { staff: [], client: [], admin: [], other: [] };
-    (items ?? []).forEach((it) => g[it.sub_folder].push(it));
+    checklistItems.forEach((it) => g[it.sub_folder].push(it));
     return g;
-  }, [items]);
+  }, [checklistItems]);
+
+  const itemPeriodLabel = (it: Item) => {
+    const start = it.period_start ?? packet?.timeline_start ?? null;
+    const end = it.period_end ?? packet?.timeline_end ?? null;
+    if (!start && !end) return null;
+    const fmt = (d: string) => {
+      try {
+        return format(new Date(d), "MMM d, yyyy");
+      } catch {
+        return d;
+      }
+    };
+    if (start && end) return `${fmt(start)} – ${fmt(end)}`;
+    return fmt(start ?? end!);
+  };
 
   return (
     <div className="space-y-5">
@@ -462,6 +483,20 @@ function PacketDetail({
         </div>
       </div>
 
+      {disclosureItem && (
+        <div className="flex items-start gap-3 rounded-lg border-2 border-amber-400 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/40">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+              {disclosureItem.title}
+            </div>
+            <p className="mt-1 text-sm text-amber-900/90 dark:text-amber-200/90">
+              {disclosureItem.description}
+            </p>
+          </div>
+        </div>
+      )}
+
       <Card className="bg-card/60 backdrop-blur border-[color:var(--border-light)]">
         <CardHeader>
           <CardTitle className="text-base">Audit Overview</CardTitle>
@@ -479,12 +514,6 @@ function PacketDetail({
               <span className="font-medium text-foreground">Expectations: </span>
               {packet.expectations_summary}
             </p>
-          )}
-          {packet?.predates_go_live_note && (
-            <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{packet.predates_go_live_note}</span>
-            </div>
           )}
         </CardContent>
       </Card>
@@ -518,6 +547,7 @@ function PacketDetail({
                       <div className="text-xs text-muted-foreground mt-1">{it.description}</div>
                     )}
                     <div className="text-xs text-muted-foreground mt-1">
+                      {itemPeriodLabel(it) && <span>Period: {itemPeriodLabel(it)} · </span>}
                       {it.source_hint && <span>Source: {it.source_hint} · </span>}
                       {it.evidence_count > 0 && <span>{it.evidence_count} record(s) on platform</span>}
                     </div>

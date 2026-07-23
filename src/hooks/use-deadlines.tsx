@@ -19,7 +19,8 @@ export type DeadlineSource =
   | "incident"
   | "billing_code"
   | "sow_perimeter"
-  | "pcsp_support_strategies";
+  | "pcsp_support_strategies"
+  | "hrc_restriction_review";
 
 export type DeadlineItem = {
   key: string;
@@ -268,6 +269,25 @@ export function useDeadlines() {
     },
   });
 
+  // 11. Active HRC rights-restriction records — the re-review date from
+  // element (g) becomes a real deadline.
+  const hrcRestrictionsQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "hrc_restrictions", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("hrc_restriction_records" as never)
+        .select("id, client_id, restriction_title, next_review_date, active")
+        .eq("organization_id", orgId!)
+        .eq("active", true)
+        .not("next_review_date", "is", null);
+      if (error) throw error;
+      return (data ?? []) as unknown as Array<{
+        id: string; client_id: string; restriction_title: string; next_review_date: string; active: boolean;
+      }>;
+    },
+  });
+
   const items = useMemo<DeadlineItem[]>(() => {
     if (!orgId) return [];
     const now = new Date();
@@ -415,6 +435,22 @@ export function useDeadlines() {
       });
     }
 
+    // HRC rights-restriction re-review dates.
+    for (const r of hrcRestrictionsQ.data ?? []) {
+      const due = new Date(`${r.next_review_date}T23:59:59`);
+      out.push({
+        key: `hrc:${r.id}`,
+        source: "hrc_restriction_review",
+        title: `Rights restriction re-review due — ${r.restriction_title}`,
+        subject: nameOf(r.client_id),
+        subjectKind: "client",
+        dueAt: due,
+        status: bucketStatus(due, now),
+        href: `/dashboard/hrc`,
+        clientId: r.client_id,
+      });
+    }
+
     out.sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
     return out;
   }, [
@@ -429,6 +465,7 @@ export function useDeadlines() {
     bcQ.data,
     sowQ.data,
     ssApprovalsQ.data,
+    hrcRestrictionsQ.data,
   ]);
 
   return {
@@ -439,6 +476,6 @@ export function useDeadlines() {
     isLoading:
       summariesQ.isLoading || clientsQ.isLoading || hhsQ.isLoading ||
       certsQ.isLoading || incidentsQ.isLoading || bcQ.isLoading || hhCertsQ.isLoading ||
-      sowQ.isLoading,
+      sowQ.isLoading || hrcRestrictionsQ.isLoading,
   };
 }

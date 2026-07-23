@@ -11,9 +11,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Scale, CalendarDays, ClipboardList, Users, UserPlus, ShieldAlert } from "lucide-react";
+import { Scale, CalendarDays, ClipboardList, Users, UserPlus, ShieldAlert, CheckCircle2, Circle } from "lucide-react";
 import { toast } from "sonner";
 import type { Role } from "@/lib/rbac";
+import {
+  RESTRICTION_ELEMENTS,
+  computeRestrictionCompletion,
+  type RestrictionRecord,
+} from "@/lib/hrc-restrictions";
 
 export const Route = createFileRoute("/dashboard/hrc")({
   head: () => ({ meta: [{ title: "Human Rights Committee (HRC) — HIVE" }] }),
@@ -68,16 +73,14 @@ export function HrcPage() {
                 <ShieldAlert className="h-4 w-4 text-amber-700" /> Clients with rights restrictions
               </CardTitle>
               <CardDescription>
-                Clients flagged with an active rights restriction will appear here for committee review.
+                Each active restriction must document all 8 required elements (SOW §1.20 / HCBS
+                Settings Rule) before it counts as fully documented.
               </CardDescription>
             </div>
-            <ScaffoldNotice />
           </div>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border border-dashed border-border bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground">
-            No clients currently flagged for review.
-          </div>
+          <RestrictionsPanel canManage={canManage} orgId={org?.organization_id ?? null} />
         </CardContent>
       </Card>
 
@@ -161,6 +164,309 @@ export function HrcPage() {
         </Card>
       )}
     </div>
+  );
+}
+
+/* ---------- Rights restrictions (8-element documentation) ---------- */
+
+type ClientLite = { id: string; first_name: string; last_name: string };
+
+function RestrictionsPanel({ canManage, orgId }: { canManage: boolean; orgId: string | null }) {
+  const qc = useQueryClient();
+  const [addOpen, setAddOpen] = useState(false);
+  const [editing, setEditing] = useState<RestrictionRecord | null>(null);
+  const [newClientId, setNewClientId] = useState("");
+  const [newTitle, setNewTitle] = useState("");
+
+  const { data: clients } = useQuery({
+    enabled: !!orgId,
+    queryKey: ["hrc-clients", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, first_name, last_name")
+        .eq("organization_id", orgId!)
+        .order("first_name", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as ClientLite[];
+    },
+  });
+
+  const { data: restrictions, isLoading } = useQuery({
+    enabled: !!orgId,
+    queryKey: ["hrc-restrictions", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("hrc_restriction_records" as never)
+        .select("*")
+        .eq("organization_id", orgId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as RestrictionRecord[];
+    },
+  });
+
+  const nameOf = (clientId: string) => {
+    const c = (clients ?? []).find((x) => x.id === clientId);
+    return c ? `${c.first_name} ${c.last_name}` : "Unknown client";
+  };
+
+  const create = useMutation({
+    mutationFn: async (values: { client_id: string; restriction_title: string }) => {
+      if (!values.client_id) throw new Error("Pick a client first.");
+      if (!values.restriction_title.trim()) throw new Error("Restriction title is required.");
+      const { error } = await supabase.from("hrc_restriction_records" as never).insert({
+        organization_id: orgId!,
+        client_id: values.client_id,
+        restriction_title: values.restriction_title.trim(),
+        active: true,
+      } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Restriction added");
+      qc.invalidateQueries({ queryKey: ["hrc-restrictions", orgId] });
+      setAddOpen(false);
+      setNewClientId("");
+      setNewTitle("");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const active = (restrictions ?? []).filter((r) => r.active);
+
+  return (
+    <div className="space-y-3">
+      {isLoading ? (
+        <div className="text-sm text-muted-foreground">Loading…</div>
+      ) : !active.length ? (
+        <div className="rounded-md border border-dashed border-border bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground">
+          No clients currently flagged for review.
+        </div>
+      ) : (
+        <ul className="divide-y divide-border rounded-md border border-border">
+          {active.map((r) => {
+            const completion = computeRestrictionCompletion(r);
+            return (
+              <li key={r.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                <div className="min-w-0">
+                  <div className="font-medium truncate">{nameOf(r.client_id)}</div>
+                  <div className="text-xs text-muted-foreground truncate">{r.restriction_title}</div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Badge
+                    variant={completion.isComplete ? "default" : "outline"}
+                    className={completion.isComplete ? "bg-emerald-600 hover:bg-emerald-600" : "border-amber-400 text-amber-800"}
+                  >
+                    {completion.completedCount}/{completion.total} documented
+                  </Badge>
+                  <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>
+                    {canManage ? "Edit" : "View"}
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {canManage && (
+        <>
+          <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
+            Add restriction
+          </Button>
+          <Dialog open={addOpen} onOpenChange={setAddOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Flag a new rights restriction</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label>Client</Label>
+                  <Select value={newClientId} onValueChange={setNewClientId}>
+                    <SelectTrigger><SelectValue placeholder="Select a client" /></SelectTrigger>
+                    <SelectContent>
+                      {(clients ?? []).map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.first_name} {c.last_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Restriction</Label>
+                  <Input
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    placeholder="e.g. Restricted access to kitchen after 9pm"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setAddOpen(false)}>Cancel</Button>
+                <Button
+                  disabled={create.isPending}
+                  onClick={() => create.mutate({ client_id: newClientId, restriction_title: newTitle })}
+                >
+                  Add restriction
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
+      {editing && (
+        <RestrictionEditDialog
+          record={editing}
+          clientName={nameOf(editing.client_id)}
+          canManage={canManage}
+          orgId={orgId}
+          onClose={() => setEditing(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function RestrictionEditDialog({
+  record,
+  clientName,
+  canManage,
+  orgId,
+  onClose,
+}: {
+  record: RestrictionRecord;
+  clientName: string;
+  canManage: boolean;
+  orgId: string | null;
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const [fields, setFields] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    for (const def of RESTRICTION_ELEMENTS) {
+      init[def.textField as string] = (record[def.textField] as string | null) ?? "";
+      if (def.dateField) init[def.dateField as string] = (record[def.dateField] as string | null) ?? "";
+    }
+    return init;
+  });
+  const [active, setActive] = useState(record.active);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const patch: Record<string, string | boolean | null> = { active };
+      for (const def of RESTRICTION_ELEMENTS) {
+        patch[def.textField as string] = fields[def.textField as string]?.trim() || null;
+        if (def.dateField) patch[def.dateField as string] = fields[def.dateField as string] || null;
+      }
+      const { error } = await supabase
+        .from("hrc_restriction_records" as never)
+        .update(patch as never)
+        .eq("id", record.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Restriction updated");
+      qc.invalidateQueries({ queryKey: ["hrc-restrictions", orgId] });
+      qc.invalidateQueries({ queryKey: ["client-restrictions", record.client_id] });
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const previewRecord: RestrictionRecord = { ...record, active };
+  for (const def of RESTRICTION_ELEMENTS) {
+    (previewRecord as unknown as Record<string, string | null>)[def.textField as string] =
+      fields[def.textField as string] || null;
+    if (def.dateField) {
+      (previewRecord as unknown as Record<string, string | null>)[def.dateField as string] =
+        fields[def.dateField as string] || null;
+    }
+  }
+  const completion = computeRestrictionCompletion(previewRecord);
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {record.restriction_title} — {clientName}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2">
+          <span className="text-sm font-medium">
+            {completion.isComplete ? "Fully documented" : "Incomplete documentation"}
+          </span>
+          <Badge
+            variant={completion.isComplete ? "default" : "outline"}
+            className={completion.isComplete ? "bg-emerald-600 hover:bg-emerald-600" : "border-amber-400 text-amber-800"}
+          >
+            {completion.completedCount}/{completion.total}
+          </Badge>
+        </div>
+        <div className="space-y-4">
+          {RESTRICTION_ELEMENTS.map((def) => {
+            const isComplete = completion.elements.find((e) => e.def.key === def.key)?.complete ?? false;
+            return (
+              <div key={def.key} className="space-y-2 rounded-md border border-border p-3">
+                <div className="flex items-start gap-2">
+                  {isComplete ? (
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                  ) : (
+                    <Circle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                  )}
+                  <div>
+                    <div className="text-sm font-medium">
+                      ({def.letter}) {def.label}
+                    </div>
+                    <div className="text-xs text-muted-foreground">{def.description}</div>
+                  </div>
+                </div>
+                <Textarea
+                  disabled={!canManage}
+                  rows={2}
+                  value={fields[def.textField as string] ?? ""}
+                  onChange={(e) =>
+                    setFields((f) => ({ ...f, [def.textField as string]: e.target.value }))
+                  }
+                  placeholder={`Describe ${def.label.toLowerCase()}…`}
+                />
+                {def.dateField && (
+                  <div className="max-w-[220px] space-y-1">
+                    <Label className="text-xs">{def.dateLabel}</Label>
+                    <Input
+                      disabled={!canManage}
+                      type="date"
+                      value={fields[def.dateField as string] ?? ""}
+                      onChange={(e) =>
+                        setFields((f) => ({ ...f, [def.dateField as string]: e.target.value }))
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {canManage && (
+            <div className="flex items-center gap-2">
+              <Label htmlFor="restriction-active" className="text-sm">Restriction still active</Label>
+              <input
+                id="restriction-active"
+                type="checkbox"
+                checked={active}
+                onChange={(e) => setActive(e.target.checked)}
+              />
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Close</Button>
+          {canManage && (
+            <Button disabled={save.isPending} onClick={() => save.mutate()}>
+              Save
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

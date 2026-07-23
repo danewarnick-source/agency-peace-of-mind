@@ -51,12 +51,16 @@ export function IncidentTrendsStrip({
   onPick: (f: TrendFilter) => void;
 }) {
   const fn = useServerFn(incidentTrends);
+  const { data: org } = useCurrentOrg();
+  const activeOrgId = org?.organization_id ?? null;
   const { data, isLoading } = useQuery({
-    queryKey: ["incident-trends"],
-    queryFn: () => fn({ data: {} }),
+    enabled: !!activeOrgId,
+    queryKey: ["incident-trends", activeOrgId],
+    queryFn: () => fn({ data: { organization_id: activeOrgId! } }),
     staleTime: 60_000,
   });
   const rows = (data?.rows ?? []) as Row[];
+
 
   const now = new Date();
   const months = useMemo(() => {

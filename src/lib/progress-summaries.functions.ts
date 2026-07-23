@@ -69,6 +69,22 @@ export const ensureCurrentSummaryPeriods = createServerFn({ method: "POST" })
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
 
     const today = new Date().toISOString().slice(0, 10);
+
+    // Org-wide floor: a period that closed before this org actually started
+    // using HIVE should never be generated, even if a client's own
+    // service_start_date would otherwise allow it — HIVE has no records from
+    // before it was adopted. Defaults to created_at when unset (conservative:
+    // never assumes pre-adoption documentation exists).
+    const { data: orgRow, error: orgErr } = await supabase
+      .from("organizations")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .select("go_live_date, created_at" as any)
+      .eq("id", data.organizationId)
+      .maybeSingle();
+    if (orgErr) throw new Error(orgErr.message);
+    const org = orgRow as unknown as { go_live_date: string | null; created_at: string } | null;
+    const goLiveDate = (org?.go_live_date ?? org?.created_at ?? "").slice(0, 10);
+
     const { data: codes, error: codesErr } = await supabase
       .from("client_billing_codes")
       .select("client_id, service_code, service_start_date, service_end_date")
@@ -104,8 +120,11 @@ export const ensureCurrentSummaryPeriods = createServerFn({ method: "POST" })
     if (byClient.size === 0) return { ensured: 0 };
 
     const now = new Date();
-    const quarterly = recentQuarterlyPeriods(now);
-    const monthly = recentMonthlyPeriods(now);
+    // Org-wide go-live floor applies before any per-client filtering below —
+    // a period closing before the org went live on HIVE is dropped for
+    // every client, not just clients whose own service predates it.
+    const quarterly = recentQuarterlyPeriods(now).filter((p) => !goLiveDate || p.period_end >= goLiveDate);
+    const monthly = recentMonthlyPeriods(now).filter((p) => !goLiveDate || p.period_end >= goLiveDate);
 
     type Insert = {
       organization_id: string;

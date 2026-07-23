@@ -95,6 +95,25 @@ export const parseAndProduceAuditPacket = createServerFn({ method: "POST" })
       extraction.fiscal_year ?? data.fallback_fiscal_year ?? `FY${String(new Date().getFullYear() % 100).padStart(2, "0")}`;
     const packetName = `${fiscalYear} — ${data.provider_name}`;
 
+    // If the requested timeline reaches back before this org went live on
+    // HIVE, surface a clear disclosure — those records were never captured
+    // in HIVE and must be sourced from the provider's prior system. Snapshot
+    // the note at creation time so it doesn't silently change if go_live_date
+    // is edited later.
+    const { data: orgRow, error: orgErr } = await supabase
+      .from("organizations")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .select("go_live_date, created_at" as any)
+      .eq("id", data.organization_id)
+      .maybeSingle();
+    if (orgErr) throw new Error(orgErr.message);
+    const org = orgRow as unknown as { go_live_date: string | null; created_at: string } | null;
+    const goLiveDate = (org?.go_live_date ?? org?.created_at ?? "").slice(0, 10);
+    const predatesGoLiveNote =
+      extraction.timeline_start && goLiveDate && extraction.timeline_start < goLiveDate
+        ? `This audit period predates your Hive go-live date of ${goLiveDate}. Records from before that date were not captured in Hive and may need to be sourced from your prior system.`
+        : null;
+
     const { data: packet, error: pkErr } = await supabase
       .from("audit_packets")
       .insert({
@@ -109,7 +128,9 @@ export const parseAndProduceAuditPacket = createServerFn({ method: "POST" })
         audit_letter_text: data.letter_text,
         status: "draft",
         created_by: userId,
-      })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        predates_go_live_note: predatesGoLiveNote,
+      } as any)
       .select("*")
       .single();
     if (pkErr) throw new Error(pkErr.message);

@@ -60,6 +60,7 @@ type Packet = {
   audit_letter_path: string | null;
   status: "draft" | "compiled" | "submitted" | "closed";
   created_at: string;
+  predates_go_live_note: string | null;
 };
 
 type Item = {
@@ -478,6 +479,12 @@ function PacketDetail({
               <span className="font-medium text-foreground">Expectations: </span>
               {packet.expectations_summary}
             </p>
+          )}
+          {packet?.predates_go_live_note && (
+            <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{packet.predates_go_live_note}</span>
+            </div>
           )}
         </CardContent>
       </Card>

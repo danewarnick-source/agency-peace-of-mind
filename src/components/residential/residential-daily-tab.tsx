@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Plus, Home as HomeIcon, Users as UsersIcon, Calendar as CalendarIcon } from "lucide-react";
 
-type Program = "all" | "HHS" | "RHS";
+type Program = "HHS";
 
 function monthBounds(yyyymm: string): { start: string; end: string } {
   const [y, m] = yyyymm.split("-").map(Number);
@@ -37,15 +37,20 @@ function thisMonth(): string {
 
 /**
  * Residential / Daily admin tab. Single source of truth for HHS host-home
- * and RHS staffed-residence billable-day surveillance for a selectable
- * month. Daily-rate revenue is computed from hhs_daily_records_v.billable
- * — RHS punches NEVER contribute billable units (see src/lib/accrual.ts).
+ * billable-day surveillance for a selectable month. Daily-rate revenue is
+ * computed from hhs_daily_records_v.billable.
+ *
+ * HHS only: it's the one service code with no time clock, so its
+ * single-entry-per-day daily-note model applies. Every other daily-rate
+ * code (RHS, DSG, and the rest) is documented through the normal
+ * clocked-shift + shift-note flow instead — see useClientBudget for how
+ * those billable days are determined.
  *
  * Scope shipped this pass:
- *  • day ledger (HHS + RHS, billable yes/no, reason)
+ *  • day ledger (HHS, billable yes/no, reason)
  *  • Direct Support hours bar (HHS) vs clients.hhs_monthly_support_hours
  *  • Host supervision contacts list + "Log supervision contact" dialog
- *  • month + program filter
+ *  • month filter
  *
  * Deferred to a follow-up (data already exists, UI surface only): eMAR
  * exception rollup, monthly cert / quarterly summary status row, and the
@@ -61,12 +66,12 @@ export function ResidentialDailyTab({
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id ?? "";
   const [month, setMonth] = useState<string>(thisMonth());
-  const [program, setProgram] = useState<Program>("all");
+  const program: Program = "HHS";
   const [logFor, setLogFor] = useState<{ clientId: string; clientName: string } | null>(null);
 
   const { start, end } = useMemo(() => monthBounds(month), [month]);
 
-  // Residential clients = anyone with an active HHS or RHS billing code.
+  // Residential clients = anyone with an active HHS billing code.
   const clientsQ = useQuery({
     enabled: !!orgId,
     queryKey: ["res-daily-clients", orgId, program],
@@ -77,10 +82,9 @@ export function ResidentialDailyTab({
         .select("client_id, service_code, monthly_max_units")
         .eq("organization_id", orgId);
       if (error) throw error;
-      const wanted = program === "all" ? ["HHS", "RHS"] : [program];
       const byClient = new Map<string, { codes: string[]; cap: number | null }>();
       for (const r of (codes ?? []) as Array<{ client_id: string; service_code: string; monthly_max_units: number | null }>) {
-        if (!wanted.includes(r.service_code)) continue;
+        if (r.service_code !== program) continue;
         const prev = byClient.get(r.client_id) ?? { codes: [], cap: null };
         prev.codes.push(r.service_code);
         if (r.monthly_max_units != null) prev.cap = (prev.cap ?? 0) + Number(r.monthly_max_units);
@@ -112,7 +116,7 @@ export function ResidentialDailyTab({
   const clients = clientsQ.data ?? [];
   const clientIds = clients.map((c) => c.id);
 
-  // Daily records for the month (HHS view also feeds RHS billable day counts).
+  // Daily records for the month (HHS host-home billable day counts).
   const dailyQ = useQuery({
     enabled: clientIds.length > 0,
     queryKey: ["res-daily-records", orgId, start, end, clientIds.join(",")],
@@ -235,8 +239,9 @@ export function ResidentialDailyTab({
       else row.missingDays += 1;
     }
     // Direct Support hours = sum of HOURLY (non-daily-rate) punches passing
-    // review. RHS punches are daily-rate ⇒ skipped automatically by the
-    // isDailyServiceCode guard, which IS the RHS billing firewall.
+    // review. HHS has no clock component, so this only ever sums agency
+    // staff visits into the host home — skipped via the isDailyServiceCode
+    // guard for any daily-rate code.
     for (const t of punchQ.data ?? []) {
       if (!t.service_type_code || isDailyServiceCode(t.service_type_code)) continue;
       if (!isBillableForReview(t)) continue;
@@ -279,17 +284,6 @@ export function ResidentialDailyTab({
             className="h-9 w-[160px]"
           />
         </div>
-        <div>
-          <Label className="text-xs">Program</Label>
-          <Select value={program} onValueChange={(v) => setProgram(v as Program)}>
-            <SelectTrigger className="h-9 w-[140px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">HHS + RHS</SelectItem>
-              <SelectItem value="HHS">HHS only</SelectItem>
-              <SelectItem value="RHS">RHS only</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       {clientsQ.isLoading ? (
@@ -297,7 +291,7 @@ export function ResidentialDailyTab({
       ) : !summary.length ? (
         <Card>
           <CardContent className="py-8 text-center text-sm text-muted-foreground">
-            No clients with an active {program === "all" ? "HHS or RHS" : program} billing code.
+            No clients with an active {program} billing code.
           </CardContent>
         </Card>
       ) : (

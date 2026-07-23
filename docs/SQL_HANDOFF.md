@@ -484,3 +484,180 @@ CREATE POLICY "admin insert evv for staff"
 **What you'll see:** one `ALTER TABLE` adding four columns, `DROP CONSTRAINT` /
 `ADD CONSTRAINT` on the `shift_entry_type` check, and one `CREATE POLICY`. No
 rows are changed by this block.
+
+---
+
+## 11. Simplify incident closing — single "Submit to UPI" action (2026-07-23)
+
+Per SOW §1.27, closing an incident only requires: initiate the UPI entry
+within 24 hours (UPI notifies the Support Coordinator automatically), notify
+the guardian within 24 hours, and complete the detailed UPI report within 5
+business days. The app previously tracked these as three separate signed
+attestations plus a separate "Log SC update" attestation. All four are now
+one signed "Submit to UPI" action, done once, that also asks a simple
+guardian question (contacted vs. self-guardian/not applicable) instead of
+depending on the client's `is_own_guardian` flag. "Log SC information
+request" (with its own 5-business-day clock) is also gone — it's now a plain
+optional `followup_notes` field that never blocks closing.
+
+```sql
+ALTER TABLE public.incident_reports
+  ADD COLUMN IF NOT EXISTS upi_submitted_at timestamptz,
+  ADD COLUMN IF NOT EXISTS upi_submitted_by uuid REFERENCES auth.users(id),
+  ADD COLUMN IF NOT EXISTS upi_submitted_attestation_text text,
+  ADD COLUMN IF NOT EXISTS upi_submitted_signed_name text,
+  ADD COLUMN IF NOT EXISTS upi_submitted_signed_title text,
+  ADD COLUMN IF NOT EXISTS guardian_notified_details text;
+```
+
+**What you'll see:** one `ALTER TABLE` adding six columns. No rows changed.
+The old per-duty columns (`upi_initiated_*`, `upi_completed_*`,
+`guardian_attestation_text`, `guardian_signed_*`, `sc_update_*`) and the
+`incident_sc_requests` table are left in place untouched — the app simply
+stops reading/writing them going forward, so no existing data is lost.
+Incidents that were already closed under the old three-timestamp rule keep
+their `State_Confirmed` status; only new closes go through the combined
+action.
+
+---
+
+## 12. Populate `profiles.first_name`/`last_name` at signup + backfill existing NULLs (2026-07-23)
+
+`handle_new_user()` (the trigger that fires on every signup) has only ever
+inserted `id, email, full_name, agency_name` into `profiles` — `first_name`/
+`last_name` were added later as plain nullable columns and the trigger was
+never updated to populate them. Every account created via signup therefore
+has permanently NULL `first_name`/`last_name` unless an admin manually edited
+the profile afterward. This is why some staff show up as a truncated user ID
+(e.g. `a3f9c1b2`) instead of a name in displays like the incident "Discovered
+by" line. No signup path in the app (main signup form, admin-invited exec
+accounts, auditor provisioning) ever passes separate first/last-name fields
+in `raw_user_meta_data` — only a single combined `full_name` — so this splits
+`full_name` on the first space: everything before it becomes `first_name`,
+everything after becomes `last_name` (NULL if there's no space at all). The
+one exception, `createEmployeeManually` (manual-admin-created staff), already
+writes correct `first_name`/`last_name` directly right after the trigger
+fires, so it's unaffected either way.
+
+**This is a best-effort split, not a guarantee of correctness** — a
+`full_name` like "Mary Jane Smith" becomes first_name "Mary", last_name "Jane
+Smith"; "Jean-Paul Martinez" splits cleanly (no space in "Jean-Paul") but a
+single-token name like an email-local-part fallback (e.g. "jdoe123") becomes
+first_name "jdoe123", last_name NULL. Block 12b below flags every row whose
+`full_name` isn't exactly two words so you can hand-correct the ones that
+matter.
+
+### 12a. Update the trigger (fixes all future signups)
+
+```sql
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  new_org_id UUID;
+  org_name TEXT;
+  v_full_name TEXT;
+  v_first_name TEXT;
+  v_last_name TEXT;
+  v_space_pos INT;
+BEGIN
+  v_full_name := NULLIF(btrim(NEW.raw_user_meta_data->>'full_name'), '');
+  IF v_full_name IS NOT NULL THEN
+    v_space_pos := position(' ' IN v_full_name);
+    IF v_space_pos > 0 THEN
+      v_first_name := btrim(substring(v_full_name FROM 1 FOR v_space_pos - 1));
+      v_last_name := NULLIF(btrim(substring(v_full_name FROM v_space_pos + 1)), '');
+    ELSE
+      v_first_name := v_full_name;
+      v_last_name := NULL;
+    END IF;
+  END IF;
+
+  INSERT INTO public.profiles (id, email, full_name, agency_name, first_name, last_name)
+  VALUES (NEW.id, NEW.email, v_full_name, NEW.raw_user_meta_data->>'agency_name', v_first_name, v_last_name)
+  ON CONFLICT (id) DO NOTHING;
+
+  org_name := COALESCE(NEW.raw_user_meta_data->>'agency_name', split_part(NEW.email, '@', 1) || '''s workspace');
+
+  INSERT INTO public.organizations (name, slug, created_by)
+  VALUES (org_name, lower(regexp_replace(org_name || '-' || substr(NEW.id::text, 1, 6), '[^a-z0-9]+', '-', 'g')), NEW.id)
+  RETURNING id INTO new_org_id;
+
+  INSERT INTO public.organization_members (organization_id, user_id, role)
+  VALUES (new_org_id, NEW.id, 'admin');
+
+  RETURN NEW;
+END;
+$$;
+```
+
+**What you'll see:** `CREATE FUNCTION`. No rows change — this only affects
+signups from this point forward.
+
+### 12b. Backfill existing profiles where `first_name` is NULL
+
+```sql
+WITH split AS (
+  SELECT
+    id,
+    btrim(full_name) AS fn,
+    position(' ' IN btrim(full_name)) AS sp
+  FROM public.profiles
+  WHERE first_name IS NULL
+    AND full_name IS NOT NULL
+    AND btrim(full_name) <> ''
+)
+UPDATE public.profiles p
+SET
+  first_name = CASE WHEN s.sp > 0 THEN btrim(substring(s.fn FROM 1 FOR s.sp - 1)) ELSE s.fn END,
+  last_name  = CASE WHEN s.sp > 0 THEN NULLIF(btrim(substring(s.fn FROM s.sp + 1)), '') ELSE NULL END
+FROM split s
+WHERE p.id = s.id;
+```
+
+**What you'll see:** `UPDATE` with the row count of previously-NULL profiles
+that got a name split. Rows where `full_name` itself is NULL/blank are left
+alone (still NULL — there's nothing to split).
+
+### 12c. Flag ambiguous splits for manual review
+
+Rows whose `full_name` isn't exactly two words (single-token names, or three
+or more words/suffixes) got a best-effort split in 12b that may not be
+right. Run this and eyeball it — fix any wrong ones directly on the
+Employee Profile page.
+
+```sql
+SELECT string_agg(
+  full_name || '  →  first: ' || COALESCE(first_name, '∅') || ' / last: ' || COALESCE(last_name, '∅'),
+  E'\n' ORDER BY full_name
+)
+FROM public.profiles
+WHERE full_name IS NOT NULL
+  AND btrim(full_name) <> ''
+  AND array_length(regexp_split_to_array(btrim(full_name), '\s+'), 1) <> 2;
+```
+
+**What you'll see:** one text blob, one line per ambiguous name, e.g.
+`Mary Jane Smith  →  first: Mary / last: Jane Smith`. Anything that looks
+wrong, fix by hand on that person's Employee Profile page.
+
+### 12d. Verification sample — please paste this back
+
+I don't have direct database access in this environment, so I can't confirm
+12b's results myself. Please run this and paste the output back so I can
+review real before/after splits (not just "the UPDATE ran"):
+
+```sql
+SELECT string_agg(
+  full_name || '  →  first: ' || COALESCE(first_name, '∅') || ' / last: ' || COALESCE(last_name, '∅'),
+  E'\n' ORDER BY full_name
+)
+FROM (
+  SELECT full_name, first_name, last_name
+  FROM public.profiles
+  WHERE full_name IS NOT NULL AND btrim(full_name) <> ''
+  ORDER BY full_name
+  LIMIT 20
+) t;
+```
+
+**What you'll see:** up to 20 lines, each `full_name  →  first: … / last: …`.

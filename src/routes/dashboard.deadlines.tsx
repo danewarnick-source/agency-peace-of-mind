@@ -39,6 +39,7 @@ const sourceLabel: Record<DeadlineItem["source"], string> = {
   billing_code: "Billing-code deliverable",
   sow_perimeter: "SOW perimeter",
   pcsp_support_strategies: "Support Strategies renewal",
+  hrc_restriction_review: "HRC restriction review",
 };
 
 function fmtDue(d: Date): string {

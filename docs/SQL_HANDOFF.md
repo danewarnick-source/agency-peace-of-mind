@@ -1049,3 +1049,76 @@ WHERE c.id = r.client_id
 run, updates zero or more rows in place — no rows are deleted or created,
 only the `organization_id` column is corrected to match the client's real
 org.
+
+---
+
+## 18. Legacy `incident_reports.status` values orphaned by the UPI-flow simplification (2026-07-23)
+
+Bug: Justin Hesse's incident shows up in the Incidents tab trends bar chart
+(`incidentTrends`, which reads every row unconditionally) but not in either
+the "Open queue" or "Log / filter" list views, under any status filter.
+Cause: block 11 above (2026-07-23) replaced the old multi-step UPI closing
+flow with a single "Submit to UPI" action, but `listIncidents`
+(`src/lib/incidents.functions.ts`) still only recognizes two states —
+`.eq("status","State_Confirmed")` for closed and `.neq("status",
+"State_Confirmed")` for open. Any row whose `status` is a leftover
+intermediary value from the old flow (e.g. `In_Progress`, `Pending_UPI`) is
+neither equal to nor cleanly "not equal to" in the way the open filter's
+callers expect — in practice such rows should always have matched
+`.neq("status","State_Confirmed")`, so the actual gap here is `status IS
+NULL`: Postgres's `<>` never matches `NULL`, so a null-status row fails
+*both* `.eq(...)` and `.neq(...)` and falls through every list view while
+still being read by the trends query. The app-side fix (this commit) changes
+the open filter to `.or("status.neq.State_Confirmed,status.is.null")` so
+null and any legacy value are caught. This block is the data-side half:
+correct any stored legacy status values so they reflect reality instead of
+a stale intermediate step.
+
+### 18a. Find affected rows (read-only — run first and eyeball)
+
+```sql
+SELECT
+  r.id,
+  r.report_number,
+  c.first_name,
+  c.last_name,
+  r.status AS current_status,
+  r.upi_submitted_at,
+  CASE WHEN r.upi_submitted_at IS NOT NULL THEN 'State_Confirmed' ELSE NULL END AS status_after_fix
+FROM public.incident_reports r
+LEFT JOIN public.clients c ON c.id = r.client_id
+WHERE r.status IS NOT NULL
+  AND r.status <> ''
+  AND r.status <> 'State_Confirmed'
+ORDER BY r.report_number;
+```
+
+**What you'll see:** zero or more rows — every incident whose `status` isn't
+`State_Confirmed`, null, or empty. Justin Hesse's incident should be in
+here. Confirm `status_after_fix` looks right for each row before running 18b.
+
+### 18b. Correct the legacy values
+
+```sql
+UPDATE public.incident_reports
+SET status = CASE WHEN upi_submitted_at IS NOT NULL THEN 'State_Confirmed' ELSE NULL END
+WHERE status IS NOT NULL
+  AND status <> ''
+  AND status <> 'State_Confirmed';
+```
+
+**What you'll see:** `UPDATE` with the row count that changed (should match
+18a's row count). Incidents that were actually submitted to UPI
+(`upi_submitted_at` populated) become `State_Confirmed` and appear in the
+closed/completed view; everything else becomes `status = NULL` and appears
+in the open queue. No `discovered_at`/`created_at`/content columns are
+touched — only `status`.
+
+### 18c. Verify no rows remain in the gap
+
+```sql
+SELECT count(*) FROM public.incident_reports
+WHERE status IS NOT NULL AND status <> '' AND status <> 'State_Confirmed';
+```
+
+**What you'll see:** `0`.

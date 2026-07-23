@@ -117,6 +117,7 @@ function ActorNames({ ids, actors }: { ids: Array<string | null | undefined>; ac
 
 function SubmitUpiDialog({ incidentId, onClose }: { incidentId: string | null; onClose: () => void }) {
   const qc = useQueryClient();
+  const { data: org } = useCurrentOrg();
   const fn = useServerFn(submitToUpi);
   const [guardianContacted, setGuardianContacted] = useState(true);
   const [method, setMethod] = useState<GuardianMethod>("phone");
@@ -130,9 +131,10 @@ function SubmitUpiDialog({ incidentId, onClose }: { incidentId: string | null; o
 
   const m = useMutation({
     mutationFn: async (sig: AttestationSignature) => {
-      if (!incidentId) return;
+      if (!incidentId || !org?.id) return;
       return fn({
         data: {
+          organization_id: org.id,
           id: incidentId,
           guardian_contacted: guardianContacted,
           guardian_method: guardianContacted ? method : null,
@@ -141,6 +143,7 @@ function SubmitUpiDialog({ incidentId, onClose }: { incidentId: string | null; o
         },
       });
     },
+
     onSuccess: () => {
       toast.success("Submitted to UPI — incident closed.");
       qc.invalidateQueries({ queryKey: ["incidents"] });

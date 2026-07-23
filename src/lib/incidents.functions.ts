@@ -381,11 +381,15 @@ export const hasSubmittedIncidentForClientDate = createServerFn({ method: "GET" 
 export const signIncidentPhotos = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
-    z.object({ paths: z.array(z.string().min(1)).max(50) }).parse(d),
+    z.object({
+      organization_id: z.string().uuid(),
+      paths: z.array(z.string().min(1)).max(50),
+    }).parse(d),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
-    await getMembership(supabase, userId);
+    await getMembership(supabase, userId, data.organization_id);
+
     if (!data.paths.length) return { urls: {} as Record<string, string> };
     const out: Record<string, string> = {};
     for (const p of data.paths) {

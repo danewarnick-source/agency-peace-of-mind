@@ -771,3 +771,86 @@ ALTER TABLE public.audit_packets
 columns are nullable so every existing org/packet is unaffected until an
 admin sets `go_live_date` (Settings → Organization details) or a new packet
 is generated.
+
+---
+
+## 15. `hrc_restriction_records` — 8-element rights-restriction documentation (2026-07-23)
+
+The state audit tool (SOW §1.20, HCBS Settings Rule) requires eight specific,
+individually-verifiable elements for every rights restriction in place for a
+client — a single freeform note can't prove these. This adds a table with one
+named column per element (informed consent, assessed need, prior positive
+interventions, less-intrusive methods tried, condition description, data
+review + last-review date, time limits + next-review date, no-harm
+assurance) so the HRC page can show real per-element completion instead of a
+paragraph of notes. Until this table exists, the HRC page's restriction
+checklist UI and the client-profile completion badge both render an amber
+"Pending database update" notice; the existing `hrc_reviews` freeform flow is
+unaffected either way. The `next_review_date` from element (g) is picked up
+by the Deadlines feed the same way PCSP/cert dates already are — no separate
+deadlines table to insert into.
+
+```sql
+CREATE TABLE public.hrc_restriction_records (
+  id                          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id             uuid        NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  client_id                   uuid        NOT NULL REFERENCES public.clients(id)       ON DELETE CASCADE,
+  restriction_title           text        NOT NULL CHECK (char_length(restriction_title) BETWEEN 1 AND 200),
+  active                      boolean     NOT NULL DEFAULT true,
+
+  consent_text                text,
+  consent_signed_date         date,
+
+  assessed_need_text          text,
+
+  positive_interventions_text text,
+
+  less_intrusive_methods_text text,
+
+  condition_description_text  text,
+
+  data_review_text            text,
+  last_review_date            date,
+
+  time_limits_text            text,
+  next_review_date            date,
+
+  no_harm_text                text,
+
+  created_by                  uuid        REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at                  timestamptz NOT NULL DEFAULT now(),
+  updated_at                  timestamptz NOT NULL DEFAULT now()
+);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.hrc_restriction_records TO authenticated;
+GRANT ALL                            ON public.hrc_restriction_records TO service_role;
+
+ALTER TABLE public.hrc_restriction_records ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "hrr_read" ON public.hrc_restriction_records
+  FOR SELECT TO authenticated
+  USING (
+    public.is_org_member(organization_id, auth.uid())
+    OR public.is_hrc_committee_member(organization_id, auth.uid())
+  );
+
+CREATE POLICY "hrr_write" ON public.hrc_restriction_records
+  FOR ALL TO authenticated
+  USING  (public.is_org_admin_or_manager(organization_id, auth.uid()))
+  WITH CHECK (public.is_org_admin_or_manager(organization_id, auth.uid()));
+
+CREATE TRIGGER trg_hrr_updated
+  BEFORE UPDATE ON public.hrc_restriction_records
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE INDEX idx_hrr_org               ON public.hrc_restriction_records(organization_id);
+CREATE INDEX idx_hrr_client            ON public.hrc_restriction_records(client_id);
+CREATE INDEX idx_hrr_active_next_review ON public.hrc_restriction_records(next_review_date) WHERE active = true;
+```
+
+**What you'll see:** `CREATE TABLE`, two `GRANT`, `ALTER TABLE`, two
+`CREATE POLICY`, `CREATE TRIGGER`, three `CREATE INDEX`. This relies on the
+`is_org_member`, `is_hrc_committee_member`, `is_org_admin_or_manager`, and
+`update_updated_at_column` helpers already created by earlier migrations
+(the `hrc_meetings`/`hrc_reviews` migration and the general RLS setup) — if
+this errors on an undefined function, those need to exist first.

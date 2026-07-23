@@ -62,9 +62,12 @@ import {
   draftClientSpecificTrainingBlank,
   createPersonCenteredProfile,
   type CSTContent,
+  type CSTSection,
   type CSTGoal,
   type CSTReviewQuestion,
 } from "@/lib/client-specific-training.functions";
+import { useClientBillingCodes } from "@/hooks/use-client-billing-codes";
+import { computeSupportStrategyCoverage } from "@/lib/support-strategy-coverage";
 
 type ProfileTab = "identity" | "care-plan" | "billing" | "files" | "activity" | "operations" | "compliance";
 
@@ -1091,10 +1094,15 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
               Upload a PCSP to get started — editing and publishing are disabled until a PCSP is on file (add it from the client's Files tab).
             </div>
           )}
+          {training.status === "published" && (
+            <SupportStrategyCoveragePanel clientId={clientId} sections={content.sections} />
+          )}
           <SectionsView
             content={workingContent}
             editing={editing}
             onChange={setDraftContent}
+            clientId={clientId}
+            showJobCodes
           />
         </CardContent>
         )}
@@ -1110,6 +1118,39 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
         publishAsync={() => publishMut.mutateAsync(training.id)}
       />
     </>
+  );
+}
+
+// SOW §1.24(5): every active, non-exempt billing code must be covered by at
+// least one published Support Strategy section's job_codes.
+function SupportStrategyCoveragePanel({ clientId, sections }: { clientId: string; sections: CSTSection[] }) {
+  const { data: billingCodes } = useClientBillingCodes(clientId);
+  const coverage = useMemo(
+    () => computeSupportStrategyCoverage((billingCodes ?? []).map((c) => c.service_code), sections),
+    [billingCodes, sections],
+  );
+  if (coverage.covered.length === 0 && coverage.gaps.length === 0) return null;
+  return (
+    <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-2">
+      <p className="text-xs font-medium text-muted-foreground">Service code coverage (SOW §1.24(5))</p>
+      <div className="flex flex-wrap gap-1.5">
+        {coverage.covered.map((c) => (
+          <span key={c} className="inline-flex items-center gap-1 rounded bg-emerald-100 text-emerald-800 px-1.5 py-0.5 text-xs font-mono">
+            <CheckCircle2 className="h-3 w-3" />{c}
+          </span>
+        ))}
+        {coverage.gaps.map((c) => (
+          <span key={c} className="inline-flex items-center gap-1 rounded bg-red-100 text-red-800 px-1.5 py-0.5 text-xs font-mono">
+            <AlertTriangle className="h-3 w-3" />{c}
+          </span>
+        ))}
+      </div>
+      {coverage.gaps.length > 0 && (
+        <p className="text-xs text-red-700">
+          {coverage.gaps.join(", ")} {coverage.gaps.length === 1 ? "is" : "are"} not covered by any support strategy.
+        </p>
+      )}
+    </div>
   );
 }
 

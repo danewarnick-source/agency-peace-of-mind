@@ -439,9 +439,19 @@ export function ClientSpecificTrainingCard({ clientId }: { clientId: string }) {
 
 // ── Sections rendering & edit controls ─────────────────────────────────────
 export function SectionsView({
-  content, editing, onChange,
-}: { content: CSTContent; editing: boolean; onChange: (next: CSTContent) => void }) {
+  content, editing, onChange, clientId, showJobCodes,
+}: {
+  content: CSTContent;
+  editing: boolean;
+  onChange: (next: CSTContent) => void;
+  /** When set together with showJobCodes, enables the per-section service
+   *  code picker (support strategies coverage — SOW §1.24(5)). */
+  clientId?: string;
+  showJobCodes?: boolean;
+}) {
   const sections = content.sections ?? [];
+  const { data: billingCodes } = useClientBillingCodes(showJobCodes ? clientId : undefined);
+  const availableCodes = (billingCodes ?? []).map((r) => r.service_code);
 
   function update(next: CSTSection[]) { onChange({ sections: next }); }
   function moveSection(idx: number, dir: -1 | 1) {
@@ -461,6 +471,11 @@ export function SectionsView({
     const next = [...sections];
     next[idx] = { ...next[idx], ...patch };
     update(next);
+  }
+  function toggleSectionCode(idx: number, code: string) {
+    const current = sections[idx].job_codes ?? [];
+    const next = current.includes(code) ? current.filter((c) => c !== code) : [...current, code];
+    patchSection(idx, { job_codes: next });
   }
 
   return (
@@ -506,6 +521,46 @@ export function SectionsView({
               <Button variant="outline" size="sm" onClick={() => patchSection(idx, { items: [...sec.items, { kind: "text", label: "Note", value: "" }] })}>
                 <Plus className="mr-1.5 h-3.5 w-3.5" />Add note
               </Button>
+            )}
+            {showJobCodes && (
+              <div className="space-y-1 pt-1">
+                <span className="text-xs font-medium text-muted-foreground">Service codes covered</span>
+                {editing ? (
+                  availableCodes.length === 0 ? (
+                    <p className="text-xs text-amber-700 bg-amber-50/70 border border-amber-200 rounded px-2 py-1.5">
+                      No authorized service codes on file for this client.
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {availableCodes.map((code) => {
+                        const selected = (sec.job_codes ?? []).includes(code);
+                        return (
+                          <button
+                            key={code}
+                            type="button"
+                            onClick={() => toggleSectionCode(idx, code)}
+                            className={`rounded px-2 py-0.5 text-xs font-mono border transition-colors ${
+                              selected
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-muted text-muted-foreground border-border hover:border-primary/60 hover:text-foreground"
+                            }`}
+                          >
+                            {code}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )
+                ) : (sec.job_codes ?? []).length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {(sec.job_codes ?? []).map((c) => (
+                      <span key={c} className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">{c}</span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">No codes assigned</p>
+                )}
+              </div>
             )}
           </div>
         </section>

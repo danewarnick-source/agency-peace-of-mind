@@ -50,7 +50,14 @@ export type CSTItem =
   | { kind: "link"; label: string; links: Array<{ label: string; href: string | null }> }
   | { kind: "note"; label: string; value: string };
 
-export type CSTSection = { id: string; title: string; items: CSTItem[] };
+export type CSTSection = {
+  id: string;
+  title: string;
+  items: CSTItem[];
+  /** Service/job code(s) this strategy section covers (support_strategies
+   *  training only — SOW §1.24(5) coverage check reads this). */
+  job_codes?: string[];
+};
 export type CSTContent = { sections: CSTSection[] };
 
 // In-depth PCSP goal — verbatim from the PCSP, admin-reviewed. Training-local
@@ -86,7 +93,12 @@ const ItemSchema: z.ZodType<CSTItem> = z.union([
   z.object({ kind: z.literal("link"), label: z.string(), links: z.array(z.object({ label: z.string(), href: z.string().nullable() })) }),
   z.object({ kind: z.literal("note"), label: z.string(), value: z.string() }),
 ]);
-const SectionSchema = z.object({ id: z.string(), title: z.string().min(1).max(200), items: z.array(ItemSchema).max(50) });
+const SectionSchema = z.object({
+  id: z.string(),
+  title: z.string().min(1).max(200),
+  items: z.array(ItemSchema).max(50),
+  job_codes: z.array(z.string()).optional(),
+});
 const ContentSchema = z.object({ sections: z.array(SectionSchema).max(30) });
 const GoalSchema = z.object({
   id: z.string(),

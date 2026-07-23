@@ -684,7 +684,7 @@ function ContactCard({
 
       const { error: mErr } = await supabase
         .from("organization_members")
-        .update({ role: draft.role, active: draft.active })
+        .update({ role: draft.role as "admin" | "committee_member" | "employee" | "manager" | "super_admin", active: draft.active })
         .eq("id", m.id);
       if (mErr) throw new Error(mErr.message);
     },

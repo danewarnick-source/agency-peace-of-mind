@@ -19,8 +19,13 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { HistoricalRecordBadge } from "@/components/shared/historical-record-badge";
+import { downloadCsv } from "@/lib/utah-evv-export";
 import { toast } from "sonner";
-import { Plus, Home as HomeIcon, Users as UsersIcon, Calendar as CalendarIcon, CalendarRange } from "lucide-react";
+import {
+  Plus, Home as HomeIcon, Users as UsersIcon, Calendar as CalendarIcon, CalendarRange,
+  Download, ChevronDown, ChevronUp,
+} from "lucide-react";
 
 type Program = "HHS";
 
@@ -52,7 +57,8 @@ function thisMonth(): string {
  *  • day ledger (HHS, billable yes/no, reason)
  *  • Direct Support hours bar (HHS) vs clients.hhs_monthly_support_hours
  *  • Host supervision contacts list + "Log supervision contact" dialog
- *  • Records-tab-parity filters: date range, staff, client, home/team
+ *  • Records-tab-parity filters: date range, staff, client (no home/team —
+ *    HHS is a one-staff-one-client relationship with no team structure)
  *
  * Deferred to a follow-up (data already exists, UI surface only): eMAR
  * exception rollup, monthly cert / quarterly summary status row, and the
@@ -75,7 +81,6 @@ export function ResidentialDailyTab({
   const [to, setTo] = useState<string>(initialRange.end);
   const [staff, setStaff] = useState<string[]>([]);
   const [clientFilter, setClientFilter] = useState<string[]>([]);
-  const [team, setTeam] = useState<string[]>([]);
   const start = from;
   const end = to;
 
@@ -134,20 +139,6 @@ export function ResidentialDailyTab({
     },
   });
 
-  const teamOptionsQ = useQuery({
-    enabled: !!orgId,
-    queryKey: ["res-daily-teams", orgId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("teams")
-        .select("id, team_name")
-        .eq("organization_id", orgId)
-        .eq("active", true)
-        .order("team_name");
-      return (data ?? []).map((t) => ({ value: t.id, label: t.team_name }));
-    },
-  });
-
   // Residential clients = anyone with an active HHS billing code.
   const allClientsQ = useQuery({
     enabled: !!orgId,
@@ -202,15 +193,22 @@ export function ResidentialDailyTab({
     () => (allClientsQ.data ?? []).map((c) => ({ value: c.id, label: c.name })),
     [allClientsQ.data],
   );
+  const staffMap = useMemo(
+    () => new Map((staffOptionsQ.data ?? []).map((s) => [s.value, s.label])),
+    [staffOptionsQ.data],
+  );
+  const clientMap = useMemo(
+    () => new Map((allClientsQ.data ?? []).map((c) => [c.id, c.name])),
+    [allClientsQ.data],
+  );
 
   // Client/home filters narrow which clients are shown and which client_ids
   // feed every query below — matches Records tab's filter semantics.
   const clients = useMemo(() => {
     let list = allClientsQ.data ?? [];
     if (clientFilter.length) list = list.filter((c) => clientFilter.includes(c.id));
-    if (team.length) list = list.filter((c) => c.teamId && team.includes(c.teamId));
     return list;
-  }, [allClientsQ.data, clientFilter, team]);
+  }, [allClientsQ.data, clientFilter]);
   const clientIds = clients.map((c) => c.id);
 
   // Daily records for the range (HHS host-home billable day counts).
@@ -244,18 +242,19 @@ export function ResidentialDailyTab({
       let q = supabase
         .from("daily_logs")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("client_id, log_date, import_source, staff_attested_at, user_id" as any)
+        .select("id, client_id, log_date, import_source, staff_attested_at, user_id, narrative" as any)
         .eq("organization_id", orgId)
         .eq("import_source", "historical_import")
         .not("staff_attested_at", "is", null)
         .gte("log_date", start)
         .lte("log_date", end)
-        .in("client_id", clientIds);
+        .in("client_id", clientIds)
+        .order("log_date", { ascending: false });
       if (staff.length) q = q.in("user_id", staff);
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as unknown as Array<{
-        client_id: string; log_date: string; import_source: string | null; staff_attested_at: string | null; user_id: string;
+        id: string; client_id: string; log_date: string; import_source: string | null; staff_attested_at: string | null; user_id: string; narrative: string;
       }>;
     },
   });
@@ -452,14 +451,6 @@ export function ResidentialDailyTab({
             placeholder="All clients" searchPlaceholder="Filter clients…"
           />
         </div>
-        <div className="min-w-[150px]">
-          <Label className="text-xs">Home / team</Label>
-          <CheckboxMultiSelect
-            value={team} onChange={setTeam}
-            options={teamOptionsQ.data ?? []}
-            placeholder="All homes/teams"
-          />
-        </div>
         <div>
           <Label className="text-xs">Date range</Label>
           <Popover>
@@ -565,7 +556,7 @@ export function ResidentialDailyTab({
                   )}
                   {row.historicalDocumented > 0 && (
                     <div className="text-xs text-sky-700 dark:text-sky-300">
-                      {row.historicalDocumented} historical day{row.historicalDocumented === 1 ? "" : "s"} on file from before go-live (attested — not flagged as missing).
+                      {row.historicalDocumented} historical day{row.historicalDocumented === 1 ? "" : "s"} on file from before go-live (attested — not flagged as missing; see Historical daily notes below).
                     </div>
                   )}
 
@@ -629,11 +620,145 @@ export function ResidentialDailyTab({
         </div>
       )}
 
+      <HistoricalDailyNotesSection
+        notes={historicalLogsQ.data ?? []}
+        isLoading={historicalLogsQ.isLoading}
+        staffMap={staffMap}
+        clientMap={clientMap}
+        from={from}
+        to={to}
+      />
+
       <LogSupervisionDialog
         target={logFor}
         orgId={orgId}
         onClose={() => setLogFor(null)}
       />
+    </div>
+  );
+}
+
+function fmtLogDate(iso: string): string {
+  try {
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", {
+      month: "short", day: "numeric", year: "numeric", timeZone: "UTC",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function historicalNotesCsv(
+  notes: Array<{ id: string; client_id: string; log_date: string; user_id: string; narrative: string }>,
+  staffMap: Map<string, string>,
+  clientMap: Map<string, string>,
+): string {
+  const esc = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+  const header = ["Staff", "Client", "Date", "Note"];
+  const body = notes.map((n) => [
+    staffMap.get(n.user_id) ?? n.user_id.slice(0, 8),
+    clientMap.get(n.client_id) ?? n.client_id.slice(0, 8),
+    n.log_date,
+    n.narrative,
+  ].map(esc).join(","));
+  return [header.join(",")].concat(body).join("\r\n");
+}
+
+/** Individual attested historical daily notes for the current filters —
+ *  each is a real record (staff, client, date, note content), not just a
+ *  count. Every row is import_source='historical_import' by construction
+ *  (historicalLogsQ only fetches that source), so the badge always applies. */
+function HistoricalDailyNotesSection({
+  notes, isLoading, staffMap, clientMap, from, to,
+}: {
+  notes: Array<{ id: string; client_id: string; log_date: string; user_id: string; narrative: string }>;
+  isLoading: boolean;
+  staffMap: Map<string, string>;
+  clientMap: Map<string, string>;
+  from: string;
+  to: string;
+}) {
+  const handleExport = () => {
+    if (notes.length === 0) {
+      toast.info("No historical daily notes in the current filters to export.");
+      return;
+    }
+    downloadCsv(`historical-daily-notes_${from}_${to}.csv`, historicalNotesCsv(notes, staffMap, clientMap));
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-[#0B1126]">Historical daily notes</h3>
+        <Button
+          type="button" size="sm" variant="outline"
+          onClick={handleExport}
+          disabled={isLoading || notes.length === 0}
+          className="gap-2"
+        >
+          <Download className="h-4 w-4" /> Export
+        </Button>
+      </div>
+      <div className="rounded-lg border border-border bg-card">
+        {isLoading ? (
+          <p className="px-3 py-6 text-center text-sm text-muted-foreground">Loading historical notes…</p>
+        ) : notes.length === 0 ? (
+          <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+            No attested historical daily notes match these filters.
+          </p>
+        ) : (
+          <div className="divide-y divide-border">
+            {notes.map((n) => (
+              <HistoricalDailyNoteRow
+                key={n.id}
+                note={n}
+                staffName={staffMap.get(n.user_id) ?? n.user_id.slice(0, 8)}
+                clientName={clientMap.get(n.client_id) ?? n.client_id.slice(0, 8)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HistoricalDailyNoteRow({
+  note, staffName, clientName,
+}: {
+  note: { id: string; log_date: string; narrative: string };
+  staffName: string;
+  clientName: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="px-3 py-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+            <span className="font-medium text-foreground">{staffName}</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="text-foreground">{clientName}</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="tabular-nums text-muted-foreground">{fmtLogDate(note.log_date)}</span>
+            <HistoricalRecordBadge />
+          </div>
+          <p className={expanded ? "mt-1 whitespace-pre-wrap text-sm text-foreground" : "mt-1 line-clamp-2 text-sm text-muted-foreground"}>
+            {note.narrative}
+          </p>
+        </div>
+        <Button
+          type="button" size="sm" variant="ghost" className="h-7 shrink-0 px-2"
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? (
+            <>Hide <ChevronUp className="ml-1 h-3.5 w-3.5" /></>
+          ) : (
+            <>Expand <ChevronDown className="ml-1 h-3.5 w-3.5" /></>
+          )}
+        </Button>
+      </div>
     </div>
   );
 }

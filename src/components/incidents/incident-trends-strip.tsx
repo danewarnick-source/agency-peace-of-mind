@@ -6,6 +6,8 @@ import {
 } from "recharts";
 import { Card, CardContent } from "@/components/ui/card";
 import { incidentTrends } from "@/lib/incidents.functions";
+import { useCurrentOrg } from "@/hooks/use-org";
+
 
 type Row = {
   id: string;

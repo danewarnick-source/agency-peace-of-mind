@@ -71,6 +71,26 @@ export function ResidentialDailyTab({
 
   const { start, end } = useMemo(() => monthBounds(month), [month]);
 
+  // Org go-live floor: days before this org started documenting in Hive are
+  // never real gaps — those records simply weren't captured in Hive.
+  // Defaults to created_at when unset (conservative: never assumes
+  // pre-adoption documentation exists).
+  const orgGoLiveQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["res-daily-org-golive", orgId],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from("organizations")
+        .select("go_live_date, created_at")
+        .eq("id", orgId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { go_live_date: string | null; created_at: string } | null;
+    },
+  });
+  const orgGoLive = (orgGoLiveQ.data?.go_live_date ?? orgGoLiveQ.data?.created_at ?? "").slice(0, 10);
+
   // Residential clients = anyone with an active HHS billing code.
   const clientsQ = useQuery({
     enabled: !!orgId,
@@ -79,15 +99,20 @@ export function ResidentialDailyTab({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: codes, error } = await (supabase as any)
         .from("client_billing_codes")
-        .select("client_id, service_code, monthly_max_units")
+        .select("client_id, service_code, monthly_max_units, service_start_date")
         .eq("organization_id", orgId);
       if (error) throw error;
-      const byClient = new Map<string, { codes: string[]; cap: number | null }>();
-      for (const r of (codes ?? []) as Array<{ client_id: string; service_code: string; monthly_max_units: number | null }>) {
+      const byClient = new Map<string, { codes: string[]; cap: number | null; serviceStart: string | null }>();
+      for (const r of (codes ?? []) as Array<{
+        client_id: string; service_code: string; monthly_max_units: number | null; service_start_date: string | null;
+      }>) {
         if (r.service_code !== program) continue;
-        const prev = byClient.get(r.client_id) ?? { codes: [], cap: null };
+        const prev = byClient.get(r.client_id) ?? { codes: [], cap: null, serviceStart: null };
         prev.codes.push(r.service_code);
         if (r.monthly_max_units != null) prev.cap = (prev.cap ?? 0) + Number(r.monthly_max_units);
+        if (r.service_start_date && (!prev.serviceStart || r.service_start_date < prev.serviceStart)) {
+          prev.serviceStart = r.service_start_date;
+        }
         byClient.set(r.client_id, prev);
       }
       const ids = [...byClient.keys()];
@@ -108,6 +133,7 @@ export function ResidentialDailyTab({
           name: `${row.first_name} ${row.last_name}`.trim(),
           codes: cc.codes,
           monthlyCap: cc.cap,
+          serviceStart: cc.serviceStart,
           supportHoursTarget: row.hhs_monthly_support_hours ?? null,
         };
       });
@@ -207,6 +233,7 @@ export function ResidentialDailyTab({
       codes: string[];
       monthlyCap: number | null;
       supportHoursTarget: number | null;
+      needsNoteFrom: string;
       billableDays: number;
       missingDays: number;
       supportHoursDelivered: number;
@@ -217,12 +244,18 @@ export function ResidentialDailyTab({
     };
     const map = new Map<string, Row>();
     for (const c of clients) {
+      // "Days that need a note" starts from whichever is later: the
+      // client's own HHS service start, or the org's Hive go-live date.
+      // Never flag a day before either as missing.
+      const needsNoteFrom =
+        c.serviceStart && c.serviceStart > orgGoLive ? c.serviceStart : orgGoLive;
       map.set(c.id, {
         id: c.id,
         name: c.name,
         codes: c.codes,
         monthlyCap: c.monthlyCap,
         supportHoursTarget: c.supportHoursTarget,
+        needsNoteFrom,
         billableDays: 0,
         missingDays: 0,
         supportHoursDelivered: 0,
@@ -235,8 +268,10 @@ export function ResidentialDailyTab({
     for (const r of dailyRows) {
       const row = map.get(r.client_id);
       if (!row) continue;
+      // A documented (billable) day always counts, even if it predates the
+      // go-live floor — an imported/attested record still shows as done.
       if (r.billable) row.billableDays += 1;
-      else row.missingDays += 1;
+      else if (!row.needsNoteFrom || r.record_date >= row.needsNoteFrom) row.missingDays += 1;
     }
     // Direct Support hours = sum of HOURLY (non-daily-rate) punches passing
     // review. HHS has no clock component, so this only ever sums agency
@@ -264,7 +299,7 @@ export function ResidentialDailyTab({
       if (ir.is_fatality) row.fatalityThisMonth = true;
     }
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [clients, dailyRows, punchQ.data, supervisionQ.data, incidentsQ.data]);
+  }, [clients, dailyRows, punchQ.data, supervisionQ.data, incidentsQ.data, orgGoLive]);
 
   // Amber under 75% with <1 week left; red when month closed under target.
   const now = new Date();

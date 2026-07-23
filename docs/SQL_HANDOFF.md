@@ -743,3 +743,31 @@ described above (expected) or something else. **Do not delete or update
 anything based on this block alone** — report the counts back and we'll
 decide the cleanup (delete vs. a `not_applicable` status) together before
 touching existing data.
+
+---
+
+## 14. `go_live_date` — when did this org actually start on HIVE (2026-07-23)
+
+There was no concept anywhere of when an org started using HIVE, so the
+deadline generator, audit packets, and the HHS daily-note completeness view
+couldn't tell "this never happened" from "this happened before we were on
+HIVE" — producing false compliance gaps for any period before adoption.
+
+Adds `organizations.go_live_date` (nullable — code treats NULL as
+"defaults to `organizations.created_at`", never as "no floor at all"), plus
+a snapshot disclosure column on `audit_packets` so a packet's pre-go-live
+note doesn't silently change if `go_live_date` is edited after the packet
+was built.
+
+```sql
+ALTER TABLE public.organizations
+  ADD COLUMN IF NOT EXISTS go_live_date date;
+
+ALTER TABLE public.audit_packets
+  ADD COLUMN IF NOT EXISTS predates_go_live_note text;
+```
+
+**What you'll see:** two `ALTER TABLE` statements, no rows changed. Both
+columns are nullable so every existing org/packet is unaffected until an
+admin sets `go_live_date` (Settings → Organization details) or a new packet
+is generated.

@@ -30,6 +30,8 @@ function SettingsPage() {
   const [dhhsProviderId, setDhhsProviderId] = useState("");
   const [evvVendorName, setEvvVendorName] = useState("Hive");
   const [incidentAiEnabled, setIncidentAiEnabled] = useState(true);
+  const [goLiveDate, setGoLiveDate] = useState("");
+  const [orgCreatedAt, setOrgCreatedAt] = useState("");
   const [busy, setBusy] = useState(false);
 
   if (pathname !== "/dashboard/settings") {
@@ -47,15 +49,23 @@ function SettingsPage() {
       void supabase
         .from("organizations")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("dhhs_provider_id, evv_vendor_name, incident_ai_review_enabled" as any)
+        .select("dhhs_provider_id, evv_vendor_name, incident_ai_review_enabled, go_live_date, created_at" as any)
         .eq("id", org.organization_id)
         .maybeSingle()
         .then(({ data }) => {
-          const d = (data ?? null) as { dhhs_provider_id: string | null; evv_vendor_name: string | null; incident_ai_review_enabled: boolean | null } | null;
+          const d = (data ?? null) as {
+            dhhs_provider_id: string | null;
+            evv_vendor_name: string | null;
+            incident_ai_review_enabled: boolean | null;
+            go_live_date: string | null;
+            created_at: string;
+          } | null;
           if (d) {
             setDhhsProviderId(d.dhhs_provider_id ?? "");
             setEvvVendorName(d.evv_vendor_name ?? "Hive");
             setIncidentAiEnabled(d.incident_ai_review_enabled !== false);
+            setOrgCreatedAt((d.created_at ?? "").slice(0, 10));
+            setGoLiveDate(d.go_live_date ?? "");
           }
         });
     }
@@ -86,6 +96,7 @@ function SettingsPage() {
         dhhs_provider_id: dhhsProviderId.trim() || null,
         evv_vendor_name: evvVendorName.trim() || "Hive",
         incident_ai_review_enabled: incidentAiEnabled,
+        go_live_date: goLiveDate || null,
       } as any)
       .eq("id", org.organization_id);
     setBusy(false);
@@ -137,6 +148,21 @@ function SettingsPage() {
                   <div className="grid gap-2"><Label htmlFor="display_acronym">Display acronym</Label><Input id="display_acronym" value={displayAcronym} onChange={(e) => setDisplayAcronym(e.target.value)} placeholder="e.g. ACME" maxLength={12} /></div>
                   <div className="grid gap-2"><Label htmlFor="dhhs_provider_id">DHHS Provider ID</Label><Input id="dhhs_provider_id" value={dhhsProviderId} onChange={(e) => setDhhsProviderId(e.target.value)} placeholder="Required for Utah EVV export" /></div>
                   <div className="grid gap-2"><Label htmlFor="evv_vendor_name">EVV Vendor name</Label><Input id="evv_vendor_name" value={evvVendorName} onChange={(e) => setEvvVendorName(e.target.value)} placeholder="Hive" /></div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="go_live_date">Hive go-live date</Label>
+                    <Input
+                      id="go_live_date"
+                      type="date"
+                      value={goLiveDate}
+                      onChange={(e) => setGoLiveDate(e.target.value)}
+                      placeholder={orgCreatedAt}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      When your team actually started documenting in Hive. Deadlines and audit
+                      packets never flag periods before this date as missing.
+                      {orgCreatedAt && !goLiveDate ? ` Defaults to your account creation date (${orgCreatedAt}) until set.` : ""}
+                    </p>
+                  </div>
                 </div>
                 <label className="mt-3 flex items-start gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm">
                   <input

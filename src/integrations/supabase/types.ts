@@ -598,9 +598,12 @@ export type Database = {
           evidence_count: number
           evidence_refs: Json
           id: string
+          is_disclosure: boolean
           notes: string | null
           organization_id: string
           packet_id: string
+          period_end: string | null
+          period_start: string | null
           position: number
           required: boolean
           reviewed_at: string | null
@@ -617,9 +620,12 @@ export type Database = {
           evidence_count?: number
           evidence_refs?: Json
           id?: string
+          is_disclosure?: boolean
           notes?: string | null
           organization_id: string
           packet_id: string
+          period_end?: string | null
+          period_start?: string | null
           position?: number
           required?: boolean
           reviewed_at?: string | null
@@ -636,9 +642,12 @@ export type Database = {
           evidence_count?: number
           evidence_refs?: Json
           id?: string
+          is_disclosure?: boolean
           notes?: string | null
           organization_id?: string
           packet_id?: string
+          period_end?: string | null
+          period_start?: string | null
           position?: number
           required?: boolean
           reviewed_at?: string | null
@@ -670,6 +679,7 @@ export type Database = {
           id: string
           name: string
           organization_id: string
+          predates_go_live_note: string | null
           provider_name: string
           status: string
           timeline_end: string | null
@@ -686,6 +696,7 @@ export type Database = {
           id?: string
           name: string
           organization_id: string
+          predates_go_live_note?: string | null
           provider_name: string
           status?: string
           timeline_end?: string | null
@@ -702,6 +713,7 @@ export type Database = {
           id?: string
           name?: string
           organization_id?: string
+          predates_go_live_note?: string | null
           provider_name?: string
           status?: string
           timeline_end?: string | null
@@ -9492,6 +9504,87 @@ export type Database = {
           },
         ]
       }
+      hrc_restriction_records: {
+        Row: {
+          active: boolean
+          assessed_need_text: string | null
+          client_id: string
+          condition_description_text: string | null
+          consent_signed_date: string | null
+          consent_text: string | null
+          created_at: string
+          created_by: string | null
+          data_review_text: string | null
+          id: string
+          last_review_date: string | null
+          less_intrusive_methods_text: string | null
+          next_review_date: string | null
+          no_harm_text: string | null
+          organization_id: string
+          positive_interventions_text: string | null
+          restriction_title: string
+          time_limits_text: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          assessed_need_text?: string | null
+          client_id: string
+          condition_description_text?: string | null
+          consent_signed_date?: string | null
+          consent_text?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_review_text?: string | null
+          id?: string
+          last_review_date?: string | null
+          less_intrusive_methods_text?: string | null
+          next_review_date?: string | null
+          no_harm_text?: string | null
+          organization_id: string
+          positive_interventions_text?: string | null
+          restriction_title: string
+          time_limits_text?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          assessed_need_text?: string | null
+          client_id?: string
+          condition_description_text?: string | null
+          consent_signed_date?: string | null
+          consent_text?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_review_text?: string | null
+          id?: string
+          last_review_date?: string | null
+          less_intrusive_methods_text?: string | null
+          next_review_date?: string | null
+          no_harm_text?: string | null
+          organization_id?: string
+          positive_interventions_text?: string | null
+          restriction_title?: string
+          time_limits_text?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hrc_restriction_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hrc_restriction_records_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hrc_reviews: {
         Row: {
           client_id: string | null
@@ -12988,6 +13081,7 @@ export type Database = {
           dhhs_provider_id: string | null
           display_acronym: string | null
           evv_vendor_name: string
+          go_live_date: string | null
           id: string
           incident_ai_review_enabled: boolean
           is_demo: boolean
@@ -12995,6 +13089,7 @@ export type Database = {
           logo_url: string | null
           name: string
           nectar_profile_saved_at: string | null
+          predates_go_live_note: string | null
           services_offered: string[] | null
           slug: string
           specializations: string | null
@@ -13015,6 +13110,7 @@ export type Database = {
           dhhs_provider_id?: string | null
           display_acronym?: string | null
           evv_vendor_name?: string
+          go_live_date?: string | null
           id?: string
           incident_ai_review_enabled?: boolean
           is_demo?: boolean
@@ -13022,6 +13118,7 @@ export type Database = {
           logo_url?: string | null
           name: string
           nectar_profile_saved_at?: string | null
+          predates_go_live_note?: string | null
           services_offered?: string[] | null
           slug: string
           specializations?: string | null
@@ -13042,6 +13139,7 @@ export type Database = {
           dhhs_provider_id?: string | null
           display_acronym?: string | null
           evv_vendor_name?: string
+          go_live_date?: string | null
           id?: string
           incident_ai_review_enabled?: boolean
           is_demo?: boolean
@@ -13049,6 +13147,7 @@ export type Database = {
           logo_url?: string | null
           name?: string
           nectar_profile_saved_at?: string | null
+          predates_go_live_note?: string | null
           services_offered?: string[] | null
           slug?: string
           specializations?: string | null
@@ -13279,9 +13378,6 @@ export type Database = {
         }
         Relationships: []
       }
-      // Hand-added ahead of the real migration (supabase/migrations/
-      // 20260723150000_provider_policy_signatures.sql) — see docs/SQL_HANDOFF.md.
-      // Remove this comment once a real `supabase gen types` run replaces it.
       policy_signatures: {
         Row: {
           archived_at: string | null

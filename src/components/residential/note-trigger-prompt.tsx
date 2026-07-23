@@ -61,6 +61,8 @@ export function NoteTriggerPrompt({
   });
   const dismissFn = useServerFn(dismissUiPref);
   const hasFn = useServerFn(hasSubmittedIncidentForClientDate);
+  const { data: org } = useCurrentOrg();
+  const activeOrgId = org?.organization_id ?? null;
   const qc = useQueryClient();
 
   // Reset opened/dismissed when the (client, date) target changes.
@@ -73,13 +75,14 @@ export function NoteTriggerPrompt({
   // Poll: did the user actually submit an IR for this client+date? Only
   // poll while there's an unresolved incident hit, so we don't burn calls.
   const submittedQ = useQuery({
-    enabled: incidentHit && !!clientId && !!date && !dismissed.incident,
-    queryKey: ["incident-submitted-for", clientId, date],
-    queryFn: () => hasFn({ data: { client_id: clientId, date } }),
+    enabled: incidentHit && !!clientId && !!date && !dismissed.incident && !!activeOrgId,
+    queryKey: ["incident-submitted-for", activeOrgId, clientId, date],
+    queryFn: () => hasFn({ data: { organization_id: activeOrgId!, client_id: clientId, date } }),
     refetchInterval: 5_000,
     refetchOnWindowFocus: true,
     staleTime: 0,
   });
+
   const submittedIr = submittedQ.data?.incident ?? null;
 
   const isResolved = (kind: TriggerKind): boolean => {

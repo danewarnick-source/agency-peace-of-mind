@@ -28,6 +28,7 @@ const sourceIcon: Record<DeadlineItem["source"], typeof AlarmClock> = {
   billing_code: AlarmClock,
   sow_perimeter: ShieldCheck,
   pcsp_support_strategies: FileSignature,
+  hrc_restriction_review: ShieldCheck,
 };
 
 const sourceLabel: Record<DeadlineItem["source"], string> = {

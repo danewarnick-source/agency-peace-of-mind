@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { CheckboxMultiSelect } from "@/components/ui/checkbox-multi-select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -18,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Home as HomeIcon, Users as UsersIcon, Calendar as CalendarIcon } from "lucide-react";
+import { Plus, Home as HomeIcon, Users as UsersIcon, Calendar as CalendarIcon, CalendarRange } from "lucide-react";
 
 type Program = "HHS";
 
@@ -37,8 +39,8 @@ function thisMonth(): string {
 
 /**
  * Residential / Daily admin tab. Single source of truth for HHS host-home
- * billable-day surveillance for a selectable month. Daily-rate revenue is
- * computed from hhs_daily_records_v.billable.
+ * billable-day surveillance for a selectable date range. Daily-rate revenue
+ * is computed from hhs_daily_records_v.billable.
  *
  * HHS only: it's the one service code with no time clock, so its
  * single-entry-per-day daily-note model applies. Every other daily-rate
@@ -50,7 +52,7 @@ function thisMonth(): string {
  *  • day ledger (HHS, billable yes/no, reason)
  *  • Direct Support hours bar (HHS) vs clients.hhs_monthly_support_hours
  *  • Host supervision contacts list + "Log supervision contact" dialog
- *  • month filter
+ *  • Records-tab-parity filters: date range, staff, client, home/team
  *
  * Deferred to a follow-up (data already exists, UI surface only): eMAR
  * exception rollup, monthly cert / quarterly summary status row, and the
@@ -65,11 +67,17 @@ export function ResidentialDailyTab({
 } = {}) {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id ?? "";
-  const [month, setMonth] = useState<string>(thisMonth());
   const program: Program = "HHS";
   const [logFor, setLogFor] = useState<{ clientId: string; clientName: string } | null>(null);
 
-  const { start, end } = useMemo(() => monthBounds(month), [month]);
+  const initialRange = useMemo(() => monthBounds(thisMonth()), []);
+  const [from, setFrom] = useState<string>(initialRange.start);
+  const [to, setTo] = useState<string>(initialRange.end);
+  const [staff, setStaff] = useState<string[]>([]);
+  const [clientFilter, setClientFilter] = useState<string[]>([]);
+  const [team, setTeam] = useState<string[]>([]);
+  const start = from;
+  const end = to;
 
   // Org go-live floor: days before this org started documenting in Hive are
   // never real gaps — those records simply weren't captured in Hive.
@@ -91,8 +99,57 @@ export function ResidentialDailyTab({
   });
   const orgGoLive = (orgGoLiveQ.data?.go_live_date ?? orgGoLiveQ.data?.created_at ?? "").slice(0, 10);
 
+  // ── Filter option sources (same pattern as Records tab) ─────────────────
+  const staffOptionsQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["res-daily-staff", orgId],
+    queryFn: async () => {
+      // Two-step lookup: organization_members has no FK to profiles, so a
+      // nested embed silently returns null. Fetch ids first, then names
+      // from the org_member_directory view, and merge in JS.
+      const { data: members } = await supabase
+        .from("organization_members")
+        .select("user_id")
+        .eq("organization_id", orgId)
+        .eq("active", true);
+      const userIds = Array.from(
+        new Set(((members ?? []) as Array<{ user_id: string }>).map((m) => m.user_id)),
+      );
+      if (userIds.length === 0) return [];
+      const { data: directory } = await supabase
+        .from("org_member_directory")
+        .select("id, full_name")
+        .in("id", userIds);
+      const nameMap = new Map(
+        ((directory ?? []) as Array<{ id: string; full_name: string | null }>).map(
+          (d) => [d.id, (d.full_name ?? "").trim()],
+        ),
+      );
+      return userIds
+        .map((uid) => {
+          const name = nameMap.get(uid) ?? "";
+          return { value: uid, label: name || uid.slice(0, 8) };
+        })
+        .sort((a, b) => a.label.localeCompare(b.label));
+    },
+  });
+
+  const teamOptionsQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["res-daily-teams", orgId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("teams")
+        .select("id, team_name")
+        .eq("organization_id", orgId)
+        .eq("active", true)
+        .order("team_name");
+      return (data ?? []).map((t) => ({ value: t.id, label: t.team_name }));
+    },
+  });
+
   // Residential clients = anyone with an active HHS billing code.
-  const clientsQ = useQuery({
+  const allClientsQ = useQuery({
     enabled: !!orgId,
     queryKey: ["res-daily-clients", orgId, program],
     queryFn: async () => {
@@ -117,14 +174,14 @@ export function ResidentialDailyTab({
       }
       const ids = [...byClient.keys()];
       if (!ids.length) return [];
-      const { data: clients } = await supabase
+      const { data: clientsData } = await supabase
         .from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, first_name, last_name, hhs_monthly_support_hours" as any)
+        .select("id, first_name, last_name, hhs_monthly_support_hours, team_id" as any)
         .eq("organization_id", orgId)
         .in("id", ids);
-      const rows = (clients ?? []) as unknown as Array<{
-        id: string; first_name: string; last_name: string; hhs_monthly_support_hours: number | null;
+      const rows = (clientsData ?? []) as unknown as Array<{
+        id: string; first_name: string; last_name: string; hhs_monthly_support_hours: number | null; team_id: string | null;
       }>;
       return rows.map((row) => {
         const cc = byClient.get(row.id)!;
@@ -135,14 +192,28 @@ export function ResidentialDailyTab({
           monthlyCap: cc.cap,
           serviceStart: cc.serviceStart,
           supportHoursTarget: row.hhs_monthly_support_hours ?? null,
+          teamId: row.team_id,
         };
       });
     },
   });
-  const clients = clientsQ.data ?? [];
+
+  const clientOptions = useMemo(
+    () => (allClientsQ.data ?? []).map((c) => ({ value: c.id, label: c.name })),
+    [allClientsQ.data],
+  );
+
+  // Client/home filters narrow which clients are shown and which client_ids
+  // feed every query below — matches Records tab's filter semantics.
+  const clients = useMemo(() => {
+    let list = allClientsQ.data ?? [];
+    if (clientFilter.length) list = list.filter((c) => clientFilter.includes(c.id));
+    if (team.length) list = list.filter((c) => c.teamId && team.includes(c.teamId));
+    return list;
+  }, [allClientsQ.data, clientFilter, team]);
   const clientIds = clients.map((c) => c.id);
 
-  // Daily records for the month (HHS host-home billable day counts).
+  // Daily records for the range (HHS host-home billable day counts).
   const dailyQ = useQuery({
     enabled: clientIds.length > 0,
     queryKey: ["res-daily-records", orgId, start, end, clientIds.join(",")],
@@ -161,12 +232,40 @@ export function ResidentialDailyTab({
   });
   const dailyRows = dailyQ.data ?? [];
 
-  // Hourly punches for the month — used for HHS Direct Support hours.
+  // Historical, attested daily notes — used to show pre-go-live records as
+  // "documented" even when hhs_daily_records_v.billable is false (e.g. no
+  // matching attendance row was ever imported for that historical day).
+  // Never affects on/after-go-live dates; those keep the normal billable/
+  // missing flow above unchanged.
+  const historicalLogsQ = useQuery({
+    enabled: clientIds.length > 0,
+    queryKey: ["res-daily-historical-logs", orgId, start, end, clientIds.join(","), staff.join(",")],
+    queryFn: async () => {
+      let q = supabase
+        .from("daily_logs")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select("client_id, log_date, import_source, staff_attested_at, user_id" as any)
+        .eq("organization_id", orgId)
+        .eq("import_source", "historical_import")
+        .not("staff_attested_at", "is", null)
+        .gte("log_date", start)
+        .lte("log_date", end)
+        .in("client_id", clientIds);
+      if (staff.length) q = q.in("user_id", staff);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as unknown as Array<{
+        client_id: string; log_date: string; import_source: string | null; staff_attested_at: string | null; user_id: string;
+      }>;
+    },
+  });
+
+  // Hourly punches for the range — used for HHS Direct Support hours.
   const punchQ = useQuery({
     enabled: clientIds.length > 0,
-    queryKey: ["res-daily-punches", orgId, start, end, clientIds.join(",")],
+    queryKey: ["res-daily-punches", orgId, start, end, clientIds.join(","), staff.join(",")],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("evv_timesheets")
         .select(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -176,6 +275,8 @@ export function ResidentialDailyTab({
         .gte("clock_in_timestamp", `${start}T00:00:00`)
         .lte("clock_in_timestamp", `${end}T23:59:59`)
         .in("client_id", clientIds);
+      if (staff.length) q = q.in("staff_id", staff);
+      const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as unknown as Array<{
         client_id: string;
@@ -191,23 +292,24 @@ export function ResidentialDailyTab({
 
   const supervisionQ = useQuery({
     enabled: clientIds.length > 0,
-    queryKey: ["res-supervision", orgId, start, end, clientIds.join(",")],
+    queryKey: ["res-supervision", orgId, start, end, clientIds.join(","), staff.join(",")],
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
+      let q = supabase
         .from("host_supervision_contacts")
-        .select("id, client_id, contact_date, contact_type, summary")
+        .select("id, client_id, contact_date, contact_type, summary, conducted_by")
         .eq("organization_id", orgId)
         .gte("contact_date", start)
         .lte("contact_date", end)
         .in("client_id", clientIds)
         .order("contact_date", { ascending: false });
+      if (staff.length) q = q.in("conducted_by", staff);
+      const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; client_id: string; contact_date: string; contact_type: string; summary: string | null }>;
+      return (data ?? []) as Array<{ id: string; client_id: string; contact_date: string; contact_type: string; summary: string | null; conducted_by: string | null }>;
     },
   });
 
-  // §1.27 incident counts for the month — feeds the per-client "Incidents"
+  // §1.27 incident counts for the range — feeds the per-client "Incidents"
   // chip and matches the admin Incidents queue / log filters exactly.
   const incidentsQ = useQuery({
     enabled: clientIds.length > 0,
@@ -236,6 +338,7 @@ export function ResidentialDailyTab({
       needsNoteFrom: string;
       billableDays: number;
       missingDays: number;
+      historicalDocumented: number;
       supportHoursDelivered: number;
       supervisionContacts: number;
       incidentsOpen: number;
@@ -246,7 +349,8 @@ export function ResidentialDailyTab({
     for (const c of clients) {
       // "Days that need a note" starts from whichever is later: the
       // client's own HHS service start, or the org's Hive go-live date.
-      // Never flag a day before either as missing.
+      // Never flag a day before either as missing — that's the
+      // go-live floor for OBLIGATION generation only, not visibility.
       const needsNoteFrom =
         c.serviceStart && c.serviceStart > orgGoLive ? c.serviceStart : orgGoLive;
       map.set(c.id, {
@@ -258,6 +362,7 @@ export function ResidentialDailyTab({
         needsNoteFrom,
         billableDays: 0,
         missingDays: 0,
+        historicalDocumented: 0,
         supportHoursDelivered: 0,
         supervisionContacts: 0,
         incidentsOpen: 0,
@@ -265,13 +370,30 @@ export function ResidentialDailyTab({
         fatalityThisMonth: false,
       });
     }
+    const billableDateKeys = new Set<string>();
     for (const r of dailyRows) {
       const row = map.get(r.client_id);
       if (!row) continue;
       // A documented (billable) day always counts, even if it predates the
       // go-live floor — an imported/attested record still shows as done.
-      if (r.billable) row.billableDays += 1;
-      else if (!row.needsNoteFrom || r.record_date >= row.needsNoteFrom) row.missingDays += 1;
+      if (r.billable) {
+        row.billableDays += 1;
+        billableDateKeys.add(`${r.client_id}|${r.record_date}`);
+      } else if (!row.needsNoteFrom || r.record_date >= row.needsNoteFrom) {
+        row.missingDays += 1;
+      }
+      // else: before go-live and not billable per the view — never flagged
+      // missing; picked up below if an attested historical note exists.
+    }
+    // Attested historical daily notes for pre-go-live dates that the view
+    // didn't already mark billable (e.g. no matching imported attendance
+    // row) still count as "on file" — visible, not hidden, not missing.
+    for (const n of historicalLogsQ.data ?? []) {
+      const row = map.get(n.client_id);
+      if (!row) continue;
+      if (row.needsNoteFrom && n.log_date >= row.needsNoteFrom) continue; // on/after go-live: normal flow above already covers it
+      if (billableDateKeys.has(`${n.client_id}|${n.log_date}`)) continue; // already counted
+      row.historicalDocumented += 1;
     }
     // Direct Support hours = sum of HOURLY (non-daily-rate) punches passing
     // review. HHS has no clock component, so this only ever sums agency
@@ -299,34 +421,70 @@ export function ResidentialDailyTab({
       if (ir.is_fatality) row.fatalityThisMonth = true;
     }
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [clients, dailyRows, punchQ.data, supervisionQ.data, incidentsQ.data, orgGoLive]);
+  }, [clients, dailyRows, historicalLogsQ.data, punchQ.data, supervisionQ.data, incidentsQ.data, orgGoLive]);
 
-  // Amber under 75% with <1 week left; red when month closed under target.
+  // Amber under 75% with <1 week left; red when the range's end has passed
+  // under target. (Only meaningful when the range approximates "this month";
+  // harmless no-op tone for arbitrary historical ranges.)
   const now = new Date();
-  const monthEnd = new Date(end + "T23:59:59");
-  const daysLeft = Math.max(0, Math.ceil((monthEnd.getTime() - now.getTime()) / 86_400_000));
-  const monthClosed = now > monthEnd;
+  const rangeEnd = new Date(end + "T23:59:59");
+  const daysLeft = Math.max(0, Math.ceil((rangeEnd.getTime() - now.getTime()) / 86_400_000));
+  const rangeClosed = now > rangeEnd;
+
+  const dateLabel = `${from} – ${to}`;
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-3">
-        <div>
-          <Label className="text-xs">Month</Label>
-          <Input
-            type="month"
-            value={month}
-            onChange={(e) => setMonth(e.target.value || thisMonth())}
-            className="h-9 w-[160px]"
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-[150px]">
+          <Label className="text-xs">Staff</Label>
+          <CheckboxMultiSelect
+            value={staff} onChange={setStaff}
+            options={staffOptionsQ.data ?? []}
+            placeholder="All staff" searchPlaceholder="Filter staff…"
           />
+        </div>
+        <div className="min-w-[150px]">
+          <Label className="text-xs">Client</Label>
+          <CheckboxMultiSelect
+            value={clientFilter} onChange={setClientFilter}
+            options={clientOptions}
+            placeholder="All clients" searchPlaceholder="Filter clients…"
+          />
+        </div>
+        <div className="min-w-[150px]">
+          <Label className="text-xs">Home / team</Label>
+          <CheckboxMultiSelect
+            value={team} onChange={setTeam}
+            options={teamOptionsQ.data ?? []}
+            placeholder="All homes/teams"
+          />
+        </div>
+        <div>
+          <Label className="text-xs">Date range</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button type="button" variant="outline" size="sm" className="h-9 gap-2 font-normal">
+                <CalendarRange className="h-4 w-4" />
+                {dateLabel}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-[260px] space-y-2 p-3">
+              <label className="block text-[11px] font-medium uppercase tracking-wider text-muted-foreground">From</label>
+              <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+              <label className="block text-[11px] font-medium uppercase tracking-wider text-muted-foreground">To</label>
+              <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
-      {clientsQ.isLoading ? (
+      {allClientsQ.isLoading ? (
         <p className="text-sm text-muted-foreground">Loading residential clients…</p>
       ) : !summary.length ? (
         <Card>
           <CardContent className="py-8 text-center text-sm text-muted-foreground">
-            No clients with an active {program} billing code.
+            No clients with an active {program} billing code match these filters.
           </CardContent>
         </Card>
       ) : (
@@ -339,7 +497,7 @@ export function ResidentialDailyTab({
             const supportTone =
               pct == null
                 ? "muted"
-                : monthClosed && pct < 100
+                : rangeClosed && pct < 100
                   ? "red"
                   : pct < 75 && daysLeft < 7
                     ? "amber"
@@ -402,7 +560,12 @@ export function ResidentialDailyTab({
                 <CardContent className="space-y-3 pt-1">
                   {row.missingDays > 0 && (
                     <div className="text-xs text-amber-700 dark:text-amber-300">
-                      {row.missingDays} day{row.missingDays === 1 ? "" : "s"} this month did not bill — open the client hub to see what's missing.
+                      {row.missingDays} day{row.missingDays === 1 ? "" : "s"} in range did not bill — open the client hub to see what's missing.
+                    </div>
+                  )}
+                  {row.historicalDocumented > 0 && (
+                    <div className="text-xs text-sky-700 dark:text-sky-300">
+                      {row.historicalDocumented} historical day{row.historicalDocumented === 1 ? "" : "s"} on file from before go-live (attested — not flagged as missing).
                     </div>
                   )}
 
@@ -447,7 +610,7 @@ export function ResidentialDailyTab({
                             Supervised ✓ · {row.supervisionContacts} contact{row.supervisionContacts === 1 ? "" : "s"}
                           </span>
                         ) : (
-                          <span className="text-amber-700 dark:text-amber-300">No supervision contact logged this month</span>
+                          <span className="text-amber-700 dark:text-amber-300">No supervision contact logged in range</span>
                         )}
                       </div>
                       <Button

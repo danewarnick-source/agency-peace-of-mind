@@ -88,6 +88,7 @@ type Row = {
   denial_reason: string | null;
   utah_medicaid_member_id: string | null;
   import_source: string | null;
+  staff_confirmed_at: string | null;
   shift_entry_type: string | null;
   edited_by_admin_name: string | null;
   edited_at: string | null;
@@ -112,7 +113,7 @@ type Derived = Row & {
 // (already read/written elsewhere, e.g. dashboard.compliance-desk.tsx) —
 // safe to always select.
 const CORE_SELECT_COLS =
-  "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, corrected_clock_in, corrected_clock_out, rounded_clock_in, rounded_clock_out, is_edited_by_admin, is_out_of_bounds, outside_geofence_reason, shift_note_text, goals_completed, review_status, status, incident_flag, denial_reason, utah_medicaid_member_id, import_source, shift_entry_type, edited_by_admin_name, edited_at, edit_audit_history_log";
+  "id, staff_id, client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, corrected_clock_in, corrected_clock_out, rounded_clock_in, rounded_clock_out, is_edited_by_admin, is_out_of_bounds, outside_geofence_reason, shift_note_text, goals_completed, review_status, status, incident_flag, denial_reason, utah_medicaid_member_id, import_source, staff_confirmed_at, shift_entry_type, edited_by_admin_name, edited_at, edit_audit_history_log";
 // Columns that ship via docs/SQL_HANDOFF.md #9 and #10 (both 2026-07-21) —
 // each requires the human to run its ALTER TABLE in Lovable's SQL editor
 // before it exists on the live DB. Selecting a column that isn't live yet

@@ -22,6 +22,7 @@ export interface ReviewRuleInput {
   clock_out_timestamp: string | null;
   service_type_code: string;
   import_source: string | null;
+  staff_confirmed_at: string | null;
 }
 
 /** Codes where a PCSP goal must be checked for the shift to bill clean. */
@@ -52,15 +53,19 @@ export function reviewExceptions(r: ReviewRuleInput, now: Date = new Date()): Re
     const goalsEmpty = !r.goals_completed || r.goals_completed.length === 0;
 
     // Historical imports predate Hive's goal tracking — the original shift
-    // never had a PCSP goal to check. Once a staff member has attested a
-    // real, substantive note through the Historical Records flow, the
-    // record is documented; flagging it forever for goal data that could
-    // never have existed is noise, not a compliance gap.
-    const isHistoricalImport = r.import_source === "historical_import";
+    // never had a PCSP goal to check, and often predate Hive's note-length
+    // conventions too. Once a staff member has actually attested the record
+    // (staff_confirmed_at populated) through the Historical Records flow,
+    // it's on file, signed, and retrievable for an auditor — flagging it
+    // forever for note/goal data that could never have existed is noise,
+    // not a compliance gap. An import still awaiting attestation is not
+    // exempt; it surfaces separately as "Awaiting staff confirmation".
+    const isAttestedHistoricalImport =
+      r.import_source === "historical_import" && !!r.staff_confirmed_at;
 
-    if (noteBad) {
+    if (noteBad && !isAttestedHistoricalImport) {
       out.push({ code: "missing_note", label: "Missing/short note" });
-    } else if (requiresGoal && goalsEmpty && !isHistoricalImport) {
+    } else if (requiresGoal && goalsEmpty && !isAttestedHistoricalImport) {
       out.push({ code: "missing_note", label: "PCSP goal not checked" });
     }
   }

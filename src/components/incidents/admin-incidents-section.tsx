@@ -131,10 +131,10 @@ function SubmitUpiDialog({ incidentId, onClose }: { incidentId: string | null; o
 
   const m = useMutation({
     mutationFn: async (sig: AttestationSignature) => {
-      if (!incidentId || !org?.id) return;
+      if (!incidentId || !org?.organization_id) return;
       return fn({
         data: {
-          organization_id: org.id,
+          organization_id: org.organization_id,
           id: incidentId,
           guardian_contacted: guardianContacted,
           guardian_method: guardianContacted ? method : null,

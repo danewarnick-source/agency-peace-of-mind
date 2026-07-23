@@ -134,8 +134,14 @@ function baselinePhaseFor(key: string): string | null {
     case "thirty_day":
     case "cpr_first_aid":
     case "deescalation":
+    case "background_screening":
+    case "medicaid_fraud_exclusion":
+    case "dhhs_code_of_conduct":
       return "within_30_days";
     case "abi":
+    case "acre_usu_workplace_support":
+    case "bcba_credential":
+    case "rn_lpn_license":
       return "within_180_days";
     case "annual_12h":
       return "annual";
@@ -170,6 +176,7 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
       { data: comp, error: compErr },
       { data: prof },
       { data: baselineComp },
+      { data: assignments },
     ] = await Promise.all([
       sb.rpc("get_hr_staff_checklist_base", { _org: data.organization_id }),
       sb
@@ -187,9 +194,23 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
         .select("*")
         .eq("organization_id", data.organization_id)
         .eq("staff_id", data.staff_id),
+      sb
+        .from("staff_assignments")
+        .select("service_codes")
+        .eq("organization_id", data.organization_id)
+        .eq("staff_id", data.staff_id),
     ]);
     if (baseErr) throw new Error(baseErr.message);
     if (compErr) throw new Error(compErr.message);
+
+    const assignedCodes: string[] = Array.from(
+      new Set(
+        ((assignments ?? []) as Array<{ service_codes: string[] | null }>)
+          .flatMap((a) => a.service_codes ?? [])
+          .filter(Boolean)
+          .map((c) => c.toUpperCase()),
+      ),
+    );
 
     const staffTypeKeys: string[] =
       (prof?.staff_type_keys as string[] | null) ?? [];
@@ -292,6 +313,7 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
         hireDate,
         requiresDeescalation,
         requiresAbi,
+        assignedCodes,
       });
       const bc = baselineMap.get(t.key);
       const completedDate = (bc?.completed_date as string | null) ?? null;

@@ -9,7 +9,12 @@
  * Pure module — no DB, no server imports — safe to use from client or server.
  */
 
-export type ConditionalRule = "all" | "behavior" | "abi" | "after_year_one";
+export type ConditionalRule =
+  | "all"
+  | "behavior"
+  | "abi"
+  | "after_year_one"
+  | "codes";
 
 export interface BaselineValidationRule {
   /** Human-readable certificate type name Nectar expects to see. */
@@ -32,6 +37,12 @@ export interface BaselineTraining {
   default_validity_months: number | null;
   /** Who this training applies to. */
   conditional: ConditionalRule;
+  /**
+   * Service codes that trigger applicability when `conditional === "codes"`.
+   * Applies if the staffer is assigned (via staff_assignments.service_codes
+   * across their active caseload) to ANY of these codes.
+   */
+  applies_to_codes?: string[];
   /** Category used for grouping in the existing checklist UI. */
   category: string;
   /** Short hint shown in the UI. */
@@ -169,6 +180,154 @@ export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
       requires_expiration_date: false,
     },
   },
+  {
+    key: "background_screening",
+    title: "Background Screening",
+    due_days: 14,
+    tracks_expiration: true,
+    default_validity_months: 12,
+    conditional: "all",
+    category: "Required trainings",
+    hint: "Required for every staff member. Renews annually from hire date.",
+    validation: {
+      cert_type_label: "Background Screening Approval",
+      required_keyword_groups: [
+        {
+          label: "Background screening wording",
+          any_of: [
+            "background screening",
+            "background check",
+            "criminal history",
+            "bci",
+            "screening approval",
+          ],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: false,
+    },
+  },
+  {
+    key: "medicaid_fraud_exclusion",
+    title: "Medicaid Fraud Exclusion Check",
+    due_days: 14,
+    tracks_expiration: true,
+    default_validity_months: 12,
+    conditional: "all",
+    category: "Required trainings",
+    hint: "Required for every staff member. Checked annually — OIG search result + signed attestation.",
+    validation: {
+      cert_type_label: "Medicaid Fraud Exclusion Check",
+      required_keyword_groups: [
+        {
+          label: "OIG / exclusion list wording",
+          any_of: [
+            "oig",
+            "exclusion",
+            "medicaid fraud",
+            "leie",
+            "excluded individuals",
+          ],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: false,
+    },
+  },
+  {
+    key: "dhhs_code_of_conduct",
+    title: "DHHS Code of Conduct",
+    due_days: 30,
+    tracks_expiration: false,
+    default_validity_months: null,
+    conditional: "codes",
+    applies_to_codes: ["SLN", "SLH", "PPS", "HHS"],
+    category: "Required trainings",
+    hint: "One-time on hire, on file permanently. Applies to staff assigned to SLN, SLH, PPS, or HHS.",
+    validation: {
+      cert_type_label: "DHHS Code of Conduct",
+      required_keyword_groups: [
+        {
+          label: "Code of Conduct wording",
+          any_of: ["code of conduct", "dhhs"],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: false,
+    },
+  },
+  {
+    key: "acre_usu_workplace_support",
+    title: "ACRE / USU Workplace Support Training",
+    due_days: 90,
+    tracks_expiration: false,
+    default_validity_months: null,
+    conditional: "codes",
+    applies_to_codes: ["EPR", "SED", "SEE", "SEI"],
+    category: "Required trainings",
+    hint: "One-time. Applies to staff assigned to EPR, SED, SEE, or SEI.",
+    validation: {
+      cert_type_label: "ACRE / USU Workplace Support Training",
+      required_keyword_groups: [
+        {
+          label: "ACRE / USU / Workplace Support wording",
+          any_of: ["acre", "usu", "workplace support"],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: false,
+    },
+  },
+  {
+    key: "bcba_credential",
+    title: "BCBA Credential",
+    due_days: 90,
+    tracks_expiration: true,
+    default_validity_months: null,
+    conditional: "codes",
+    applies_to_codes: ["BC1", "BC2", "BC3"],
+    category: "Required trainings",
+    hint: "Applies to staff assigned to BC1, BC2, or BC3. Renewal tracks the credential's own expiration date — Nectar-verified.",
+    validation: {
+      cert_type_label: "BCBA Credential",
+      required_keyword_groups: [
+        {
+          label: "BCBA / Board Certified Behavior Analyst wording",
+          any_of: ["bcba", "board certified behavior analyst"],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: true,
+    },
+  },
+  {
+    key: "rn_lpn_license",
+    title: "RN/LPN License",
+    due_days: 90,
+    tracks_expiration: true,
+    default_validity_months: null,
+    conditional: "codes",
+    applies_to_codes: ["PN1", "PN2", "PM1", "PM2"],
+    category: "Required trainings",
+    hint: "Applies to staff assigned to PN1, PN2, PM1, or PM2. Renewal tracks the license's own expiration date — Nectar-verified.",
+    validation: {
+      cert_type_label: "RN/LPN License",
+      required_keyword_groups: [
+        {
+          label: "RN / LPN license wording",
+          any_of: [
+            "registered nurse",
+            "licensed practical nurse",
+            "rn license",
+            "lpn license",
+            "nursing license",
+          ],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: true,
+    },
+  },
 ];
 
 /** Lookup helper. */
@@ -190,6 +349,8 @@ export interface ApplicabilityContext {
   hireDate: Date | null;
   requiresDeescalation: boolean;
   requiresAbi: boolean;
+  /** Service codes the staffer is currently assigned to (from their active caseload). */
+  assignedCodes?: string[];
   now?: Date;
 }
 
@@ -201,6 +362,12 @@ export function isBaselineApplicable(
   if (t.conditional === "all") return true;
   if (t.conditional === "behavior") return ctx.requiresDeescalation;
   if (t.conditional === "abi") return ctx.requiresAbi;
+  if (t.conditional === "codes") {
+    const codes = t.applies_to_codes ?? [];
+    if (codes.length === 0) return false;
+    const assigned = (ctx.assignedCodes ?? []).map((c) => c.toUpperCase());
+    return codes.some((c) => assigned.includes(c.toUpperCase()));
+  }
   if (t.conditional === "after_year_one") {
     if (!ctx.hireDate) return false;
     const now = ctx.now ?? new Date();

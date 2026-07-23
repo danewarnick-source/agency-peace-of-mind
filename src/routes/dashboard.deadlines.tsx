@@ -28,6 +28,7 @@ const sourceIcon: Record<DeadlineItem["source"], typeof AlarmClock> = {
   billing_code: AlarmClock,
   sow_perimeter: ShieldCheck,
   pcsp_support_strategies: FileSignature,
+  hrc_restriction_review: ShieldCheck,
 };
 
 const sourceLabel: Record<DeadlineItem["source"], string> = {
@@ -38,6 +39,7 @@ const sourceLabel: Record<DeadlineItem["source"], string> = {
   billing_code: "Billing-code deliverable",
   sow_perimeter: "SOW perimeter",
   pcsp_support_strategies: "Support Strategies renewal",
+  hrc_restriction_review: "HRC restriction review",
 };
 
 function fmtDue(d: Date): string {

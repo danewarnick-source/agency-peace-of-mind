@@ -6,6 +6,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { dismissUiPref } from "@/lib/ui-dismissals.functions";
 import { hasSubmittedIncidentForClientDate } from "@/lib/incidents.functions";
+import { useCurrentOrg } from "@/hooks/use-org";
+
 import {
   scanNoteForTriggers,
   triggerLabel,

@@ -21,6 +21,7 @@ export interface ReviewRuleInput {
   clock_in_timestamp: string;
   clock_out_timestamp: string | null;
   service_type_code: string;
+  import_source: string | null;
 }
 
 /** Codes where a PCSP goal must be checked for the shift to bill clean. */
@@ -50,9 +51,16 @@ export function reviewExceptions(r: ReviewRuleInput, now: Date = new Date()): Re
     const requiresGoal = REQUIRES_PCSP_GOAL.has(r.service_type_code);
     const goalsEmpty = !r.goals_completed || r.goals_completed.length === 0;
 
+    // Historical imports predate Hive's goal tracking — the original shift
+    // never had a PCSP goal to check. Once a staff member has attested a
+    // real, substantive note through the Historical Records flow, the
+    // record is documented; flagging it forever for goal data that could
+    // never have existed is noise, not a compliance gap.
+    const isHistoricalImport = r.import_source === "historical_import";
+
     if (noteBad) {
       out.push({ code: "missing_note", label: "Missing/short note" });
-    } else if (requiresGoal && goalsEmpty) {
+    } else if (requiresGoal && goalsEmpty && !isHistoricalImport) {
       out.push({ code: "missing_note", label: "PCSP goal not checked" });
     }
   }

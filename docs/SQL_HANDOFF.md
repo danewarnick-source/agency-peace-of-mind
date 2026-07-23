@@ -1005,3 +1005,47 @@ hand-edited for this one — the app already reads/writes these three columns
 through `as any` casts (matching how `go_live_date` /
 `predates_go_live_note` from block 14 are handled), so nothing blocks the
 build ahead of this SQL landing.
+
+---
+
+## 17. Data check: `hrc_restriction_records.organization_id` drift vs. the client's actual org (2026-07-23)
+
+Bug: Justin Hesse's rights restrictions show up on his client profile page
+(which queries `hrc_restriction_records` by `client_id` only) but were
+missing from the HRC committee page (which queried by
+`organization_id`). The app-side fix (`src/routes/dashboard.hrc.tsx`) now
+scopes the HRC page's restrictions query by the org's client roster instead
+of trusting `organization_id` on the restriction row, so this no longer
+hides anything regardless of what's in the column. This query is optional
+data hygiene to find (and, if you choose, correct) any restriction rows
+whose stored `organization_id` doesn't match the org their own client
+belongs to — worth running since other places (e.g. the deadlines/Sentinel
+`next_review_date` reminder in `src/hooks/use-deadlines.tsx`) still filter
+by this column directly.
+
+```sql
+-- 1. Find drifted rows (read-only — run this first and eyeball the output).
+SELECT
+  r.id,
+  r.restriction_title,
+  r.organization_id AS restriction_org_id,
+  c.organization_id AS client_org_id,
+  c.first_name,
+  c.last_name
+FROM public.hrc_restriction_records r
+JOIN public.clients c ON c.id = r.client_id
+WHERE r.organization_id IS DISTINCT FROM c.organization_id;
+
+-- 2. Only if you're satisfied the drifted rows above should follow their
+--    client's current org, backfill them:
+UPDATE public.hrc_restriction_records r
+SET organization_id = c.organization_id
+FROM public.clients c
+WHERE c.id = r.client_id
+  AND r.organization_id IS DISTINCT FROM c.organization_id;
+```
+
+**What you'll see:** step 1 is read-only, just for eyeballing. Step 2, if
+run, updates zero or more rows in place — no rows are deleted or created,
+only the `organization_id` column is corrected to match the client's real
+org.

@@ -484,3 +484,37 @@ CREATE POLICY "admin insert evv for staff"
 **What you'll see:** one `ALTER TABLE` adding four columns, `DROP CONSTRAINT` /
 `ADD CONSTRAINT` on the `shift_entry_type` check, and one `CREATE POLICY`. No
 rows are changed by this block.
+
+---
+
+## 11. Simplify incident closing — single "Submit to UPI" action (2026-07-23)
+
+Per SOW §1.27, closing an incident only requires: initiate the UPI entry
+within 24 hours (UPI notifies the Support Coordinator automatically), notify
+the guardian within 24 hours, and complete the detailed UPI report within 5
+business days. The app previously tracked these as three separate signed
+attestations plus a separate "Log SC update" attestation. All four are now
+one signed "Submit to UPI" action, done once, that also asks a simple
+guardian question (contacted vs. self-guardian/not applicable) instead of
+depending on the client's `is_own_guardian` flag. "Log SC information
+request" (with its own 5-business-day clock) is also gone — it's now a plain
+optional `followup_notes` field that never blocks closing.
+
+```sql
+ALTER TABLE public.incident_reports
+  ADD COLUMN IF NOT EXISTS upi_submitted_at timestamptz,
+  ADD COLUMN IF NOT EXISTS upi_submitted_by uuid REFERENCES auth.users(id),
+  ADD COLUMN IF NOT EXISTS upi_submitted_attestation_text text,
+  ADD COLUMN IF NOT EXISTS upi_submitted_signed_name text,
+  ADD COLUMN IF NOT EXISTS upi_submitted_signed_title text,
+  ADD COLUMN IF NOT EXISTS guardian_notified_details text;
+```
+
+**What you'll see:** one `ALTER TABLE` adding six columns. No rows changed.
+The old per-duty columns (`upi_initiated_*`, `upi_completed_*`,
+`guardian_attestation_text`, `guardian_signed_*`, `sc_update_*`) and the
+`incident_sc_requests` table are left in place untouched — the app simply
+stops reading/writing them going forward, so no existing data is lost.
+Incidents that were already closed under the old three-timestamp rule keep
+their `State_Confirmed` status; only new closes go through the combined
+action.

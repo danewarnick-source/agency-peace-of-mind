@@ -5,12 +5,14 @@
  *   their caseload (or for any client if they are admin/manager).
  * - listIncidents: org-scoped list with optional filters used by the admin
  *   queue and the incident log.
- * - markUpiInitiated / markGuardianNotified / markUpiCompleted: admin/manager
- *   actions that write the attestation columns. Completing all three closes
- *   the incident.
+ * - submitToUpi: the single admin/manager attestation that closes the
+ *   incident — UPI entry (initiation + detailed report) and the guardian
+ *   notification duty, signed once.
  *
  * UPI is the state portal. Hive NEVER submits — these functions only record
- * the provider's attestation that they performed the manual UPI step.
+ * the provider's attestation that they performed the manual UPI step. UPI
+ * itself notifies the Support Coordinator, so Hive has no separate SC-update
+ * duty to track.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -175,16 +177,14 @@ export const listIncidents = createServerFn({ method: "GET" })
     let q = supabase
       .from("incident_reports")
       .select(
-        "id, report_number, client_id, reported_by, discovered_at, occurred_at, category, description, location, status, is_abuse_neglect, is_fatality, prevention_strategies, guardian_notified_at, guardian_notified_method, guardian_notified_by, guardian_attestation_text, guardian_signed_name, guardian_signed_title, guardian_signed_at, upi_initiated_at, upi_initiated_by, upi_initiated_attestation_text, upi_initiated_signed_name, upi_initiated_signed_title, upi_completed_at, upi_completed_by, upi_completed_attestation_text, upi_completed_signed_name, upi_completed_signed_title, sc_update_attestation_text, sc_update_signed_name, sc_update_signed_title, sc_update_signed_at, sc_update_signed_by, sc_update_notes, followup_notes, created_at, details, witnessed_directly, reported_to_reporter_by, restraint_used, aps_notified_at, aps_notified_by, aps_reference, ai_review_status, ai_review_issues, ai_review_at, clients:client_id(first_name,last_name,is_own_guardian,guardian_name,guardian_phone,guardian_relationship,guardian_email)",
+        "id, report_number, client_id, reported_by, discovered_at, occurred_at, category, description, location, status, is_abuse_neglect, is_fatality, prevention_strategies, guardian_notified_at, guardian_notified_method, guardian_notified_by, guardian_notified_details, upi_submitted_at, upi_submitted_by, upi_submitted_attestation_text, upi_submitted_signed_name, upi_submitted_signed_title, followup_notes, created_at, details, witnessed_directly, reported_to_reporter_by, restraint_used, aps_notified_at, aps_notified_by, aps_reference, ai_review_status, ai_review_issues, ai_review_at, clients:client_id(first_name,last_name)",
       )
       .eq("organization_id", m.organization_id)
       .order("discovered_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
       .limit(data.limit);
-    // For the "open queue" view we widen the SQL to include closed incidents
-    // too — the caller layers the "open SC request" re-surface rule client-side
-    // so a closed incident with an outstanding SC request still appears.
     if (data.status === "closed") q = q.eq("status", "State_Confirmed");
+    if (data.status === "open") q = q.neq("status", "State_Confirmed");
     if (data.client_id) q = q.eq("client_id", data.client_id);
     if (data.category) q = q.eq("category", data.category);
     if (data.from) q = q.gte("discovered_at", data.from);
@@ -192,89 +192,7 @@ export const listIncidents = createServerFn({ method: "GET" })
 
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
-
-    // Always include the SC requests for the returned incidents so the
-    // queue can re-surface a closed incident with an outstanding request.
-    const ids = (rows ?? []).map((r: { id: string }) => r.id);
-    let scRows: Array<{
-      id: string;
-      incident_id: string;
-      requested_at: string;
-      request_summary: string;
-      responded_at: string | null;
-      response_summary: string | null;
-      responded_by: string | null;
-    }> = [];
-    if (ids.length) {
-      const { data: scs, error: scErr } = await supabase
-        .from("incident_sc_requests")
-        .select("id, incident_id, requested_at, request_summary, responded_at, response_summary, responded_by")
-        .eq("organization_id", m.organization_id)
-        .in("incident_id", ids)
-        .order("requested_at", { ascending: false });
-      if (scErr) throw new Error(scErr.message);
-      scRows = (scs ?? []) as typeof scRows;
-    }
-    return { incidents: rows ?? [], sc_requests: scRows };
-  });
-
-const logScInput = z.object({
-  incident_id: z.string().uuid(),
-  request_summary: z.string().min(3).max(4000),
-  requested_at: z.string().datetime().optional(),
-});
-
-export const logScRequest = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => logScInput.parse(d))
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
-    const m = await requireManager(supabase, userId);
-    // Confirm the incident belongs to this org.
-    const { data: ir, error: irErr } = await supabase
-      .from("incident_reports")
-      .select("id, organization_id")
-      .eq("id", data.incident_id)
-      .maybeSingle();
-    if (irErr) throw new Error(irErr.message);
-    if (!ir || ir.organization_id !== m.organization_id) {
-      throw new Error("Incident not found.");
-    }
-    const { data: ins, error } = await supabase
-      .from("incident_sc_requests")
-      .insert({
-        organization_id: m.organization_id,
-        incident_id: data.incident_id,
-        requested_at: data.requested_at ?? new Date().toISOString(),
-        request_summary: data.request_summary.trim(),
-      })
-      .select("id")
-      .single();
-    if (error) throw new Error(error.message);
-    return ins as { id: string };
-  });
-
-export const respondScRequest = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
-    z.object({
-      id: z.string().uuid(),
-      response_summary: z.string().min(3).max(4000),
-    }).parse(d),
-  )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
-    await requireManager(supabase, userId);
-    const { error } = await supabase
-      .from("incident_sc_requests")
-      .update({
-        responded_at: new Date().toISOString(),
-        responded_by: userId,
-        response_summary: data.response_summary.trim(),
-      })
-      .eq("id", data.id);
-    if (error) throw new Error(error.message);
-    return { ok: true };
+    return { incidents: rows ?? [] };
   });
 
 /** Trends feed: monthly counts, category breakdown, per-client counts.
@@ -314,20 +232,7 @@ async function requireManager(supabase: AnySupabase, userId: string) {
   return m;
 }
 
-async function maybeClose(supabase: AnySupabase, id: string) {
-  const { data } = await supabase
-    .from("incident_reports")
-    .select("upi_initiated_at, upi_completed_at, guardian_notified_at, status")
-    .eq("id", id)
-    .maybeSingle();
-  if (!data) return;
-  if (data.status === "State_Confirmed") return;
-  if (data.upi_initiated_at && data.upi_completed_at && data.guardian_notified_at) {
-    await supabase.from("incident_reports").update({ status: "State_Confirmed" }).eq("id", id);
-  }
-}
-
-/** Shared attestation/signature input — every per-action duty requires it. */
+/** Shared attestation/signature input for the combined UPI-submission duty. */
 const attestation = z.object({
   attested: z.literal(true),
   signed_name: z.string().trim().min(2).max(120),
@@ -335,76 +240,53 @@ const attestation = z.object({
   attestation_text: z.string().min(10).max(2000),
 });
 
-export const markUpiInitiated = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
-    attestation.extend({ id: z.string().uuid() }).parse(d),
-  )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
-    await requireManager(supabase, userId);
-    const { error } = await supabase
-      .from("incident_reports")
-      .update({
-        upi_initiated_at: new Date().toISOString(),
-        upi_initiated_by: userId,
-        upi_initiated_attestation_text: data.attestation_text,
-        upi_initiated_signed_name: data.signed_name,
-        upi_initiated_signed_title: data.signed_title,
-      })
-      .eq("id", data.id);
-    if (error) throw new Error(error.message);
-    await maybeClose(supabase, data.id);
-    return { ok: true };
-  });
-
-export const markGuardianNotified = createServerFn({ method: "POST" })
+/**
+ * The single close action: attests UPI entry (initiation + detailed report)
+ * and records the guardian-notification duty in one signed step. UPI itself
+ * notifies the Support Coordinator, so there is no separate SC-update duty.
+ * Closes the incident immediately.
+ */
+export const submitToUpi = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     attestation.extend({
       id: z.string().uuid(),
-      method: z.enum(["phone", "email", "face-to-face"]),
-      notified_at: z.string().datetime().optional(),
+      guardian_contacted: z.boolean(),
+      guardian_method: z.enum(["phone", "email", "face-to-face"]).optional().nullable(),
+      guardian_details: z.string().max(2000).optional().nullable(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
     await requireManager(supabase, userId);
-    // Reject if the client is their own guardian — duty does not apply.
-    const { data: ir } = await supabase
-      .from("incident_reports")
-      .select("client_id, clients:client_id(is_own_guardian)")
-      .eq("id", data.id)
-      .maybeSingle();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((ir as any)?.clients?.is_own_guardian) {
-      throw new Error("Client is their own guardian — no guardian notification required.");
+    if (data.guardian_contacted && !data.guardian_method) {
+      throw new Error("Guardian contact method is required when the guardian was contacted.");
     }
-    const when = data.notified_at ?? new Date().toISOString();
+    const now = new Date().toISOString();
     const { error } = await supabase
       .from("incident_reports")
       .update({
-        guardian_notified_at: when,
-        guardian_notified_method: data.method,
+        upi_submitted_at: now,
+        upi_submitted_by: userId,
+        upi_submitted_attestation_text: data.attestation_text,
+        upi_submitted_signed_name: data.signed_name,
+        upi_submitted_signed_title: data.signed_title,
+        guardian_notified_at: now,
+        guardian_notified_method: data.guardian_contacted ? data.guardian_method : "self_guardian_na",
         guardian_notified_by: userId,
-        guardian_attestation_text: data.attestation_text,
-        guardian_signed_name: data.signed_name,
-        guardian_signed_title: data.signed_title,
-        guardian_signed_at: new Date().toISOString(),
-        // Legacy mirror — keep older "family_notified" surfaces in sync.
-        family_notified: true,
-        family_notified_at: when,
+        guardian_notified_details: data.guardian_contacted ? (data.guardian_details ?? null) : null,
+        status: "State_Confirmed",
       })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
-    await maybeClose(supabase, data.id);
     return { ok: true };
   });
 
-export const markUpiCompleted = createServerFn({ method: "POST" })
+/** Plain, optional free-text follow-up note. Never blocks closing. */
+export const updateIncidentFollowupNotes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
-    attestation.extend({
+    z.object({
       id: z.string().uuid(),
       followup_notes: z.string().max(8000).optional().nullable(),
     }).parse(d),
@@ -414,69 +296,10 @@ export const markUpiCompleted = createServerFn({ method: "POST" })
     await requireManager(supabase, userId);
     const { error } = await supabase
       .from("incident_reports")
-      .update({
-        upi_completed_at: new Date().toISOString(),
-        upi_completed_by: userId,
-        upi_completed_attestation_text: data.attestation_text,
-        upi_completed_signed_name: data.signed_name,
-        upi_completed_signed_title: data.signed_title,
-        followup_notes: data.followup_notes ?? null,
-      })
-      .eq("id", data.id);
-    if (error) throw new Error(error.message);
-    await maybeClose(supabase, data.id);
-    return { ok: true };
-  });
-
-/** Attest that the Support Coordinator was informed of this incident. */
-export const markScUpdated = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
-    attestation.extend({
-      id: z.string().uuid(),
-      notes: z.string().max(4000).optional().nullable(),
-    }).parse(d),
-  )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
-    await requireManager(supabase, userId);
-    const now = new Date().toISOString();
-    const { error } = await supabase
-      .from("incident_reports")
-      .update({
-        sc_update_attestation_text: data.attestation_text,
-        sc_update_signed_name: data.signed_name,
-        sc_update_signed_title: data.signed_title,
-        sc_update_signed_at: now,
-        sc_update_signed_by: userId,
-        sc_update_notes: data.notes ?? null,
-      })
+      .update({ followup_notes: data.followup_notes?.trim() || null })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
-  });
-
-/** Read a single client's guardian-of-record fields for the notification dialog. */
-export const getClientGuardianInfo = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ client_id: z.string().uuid() }).parse(d))
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
-    const m = await requireManager(supabase, userId);
-    const { data: c, error } = await supabase
-      .from("clients")
-      .select("id, first_name, last_name, is_own_guardian, guardian_name, guardian_phone, guardian_relationship, guardian_email")
-      .eq("id", data.client_id)
-      .eq("organization_id", m.organization_id)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!c) throw new Error("Client not found.");
-    return c as {
-      id: string; first_name: string; last_name: string;
-      is_own_guardian: boolean;
-      guardian_name: string | null; guardian_phone: string | null;
-      guardian_relationship: string | null; guardian_email: string | null;
-    };
   });
 
 /** Resolve reporter / actor names for the attestation trail. */

@@ -68,17 +68,17 @@ export function useDeadlines() {
     },
   });
 
-  // 2. Clients (for names + guardianship) — single org-wide fetch reused everywhere.
+  // 2. Clients (for names) — single org-wide fetch reused everywhere.
   const clientsQ = useQuery({
     enabled: !!orgId,
     queryKey: ["deadlines", "clients", orgId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, first_name, last_name, is_own_guardian, pcsp_expiration_date")
+        .select("id, first_name, last_name, pcsp_expiration_date")
         .eq("organization_id", orgId!);
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; first_name: string; last_name: string; is_own_guardian: boolean | null; pcsp_expiration_date: string | null }>;
+      return (data ?? []) as Array<{ id: string; first_name: string; last_name: string; pcsp_expiration_date: string | null }>;
     },
   });
 
@@ -130,7 +130,7 @@ export function useDeadlines() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("incident_reports")
-        .select("id, report_number, client_id, discovered_at, upi_initiated_at, upi_completed_at, guardian_notified_at, status")
+        .select("id, report_number, client_id, discovered_at, upi_submitted_at, status")
         .eq("organization_id", orgId!)
         .not("discovered_at", "is", null)
         .neq("status", "State_Confirmed")
@@ -139,8 +139,7 @@ export function useDeadlines() {
       if (error) throw error;
       return (data ?? []) as Array<{
         id: string; report_number: string; client_id: string;
-        discovered_at: string; upi_initiated_at: string | null; upi_completed_at: string | null;
-        guardian_notified_at: string | null; status: string;
+        discovered_at: string; upi_submitted_at: string | null; status: string;
       }>;
     },
   });
@@ -321,11 +320,7 @@ export function useDeadlines() {
 
     // Incident clocks
     for (const inc of incidentsQ.data ?? []) {
-      const client = (clientsQ.data ?? []).find((c) => c.id === inc.client_id);
-      const clocks = getIncidentOpenClocks({
-        ...inc,
-        client_is_own_guardian: !!client?.is_own_guardian,
-      });
+      const clocks = getIncidentOpenClocks(inc);
       for (const clock of clocks) {
         out.push({
           key: `inc:${inc.id}:${clock.kind}`,

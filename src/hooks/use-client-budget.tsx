@@ -9,6 +9,7 @@ import {
   UNITS_PER_HOUR,
 } from "@/lib/billing-units";
 import { isDailyServiceCode } from "@/lib/service-billing";
+import { isNonAnswer } from "@/lib/nectar-quality";
 
 /**
  * Live per-code budget ledger. For each authorized billing code we
@@ -73,7 +74,7 @@ export function useClientBudget(clientId: string | undefined) {
       // Pull all completed punches for this client in the widest window.
       const { data: tsRows, error: tsErr } = await supabase
         .from("evv_timesheets")
-        .select("service_type_code, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, corrected_clock_in, corrected_clock_out, review_status")
+        .select("service_type_code, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, corrected_clock_in, corrected_clock_out, review_status, shift_note_text")
         .eq("organization_id", org!.organization_id)
         .eq("client_id", clientId!)
         .gte("clock_in_timestamp", earliestStart.toISOString());
@@ -99,7 +100,48 @@ export function useClientBudget(clientId: string | undefined) {
         let used_hours = 0;
         let used_days = 0;
         let used_entry_units = 0;
-        if (is_daily) {
+        if (code.service_code === "RHS" || code.service_code === "DSG") {
+          // Shared residential setting: any staff member who clocked in/out
+          // with a real shift note for this client on a date makes that
+          // whole date billable — this is an aggregate check across every
+          // staff member who worked that date, not a single "the" daily
+          // note. RHS requires a substantive (50+ word) note; DSG only
+          // requires a complete clocked shift with a real (non-blank,
+          // non-placeholder) note — its SOW bar is start/end time on the
+          // documentation, not narrative depth.
+          const dates = new Set<string>();
+          for (const r of (tsRows ?? []) as Array<{
+            service_type_code: string | null;
+            clock_in_timestamp: string | null;
+            clock_out_timestamp: string | null;
+            rounded_clock_in: string | null;
+            rounded_clock_out: string | null;
+            corrected_clock_in: string | null;
+            corrected_clock_out: string | null;
+            review_status: string | null;
+            shift_note_text: string | null;
+          }>) {
+            if (r.service_type_code !== code.service_code) continue;
+            if (!isBillableForReview(r)) continue;
+            const billIn = (r.review_status === "approved" && r.corrected_clock_in)
+              ? r.corrected_clock_in
+              : (r.rounded_clock_in ?? r.clock_in_timestamp);
+            const billOut = (r.review_status === "approved" && r.corrected_clock_out)
+              ? r.corrected_clock_out
+              : (r.rounded_clock_out ?? r.clock_out_timestamp);
+            if (!billIn || !billOut) continue;
+            const inT = new Date(billIn);
+            if (inT < period_start) continue;
+            if (period_end && inT > period_end) continue;
+            const note = r.shift_note_text ?? "";
+            const qualifies = code.service_code === "RHS"
+              ? (!isNonAnswer(note) && note.trim().length >= 50)
+              : (!isNonAnswer(note) && note.trim().length > 0);
+            if (!qualifies) continue;
+            dates.add(billIn.slice(0, 10));
+          }
+          used_days = dates.size;
+        } else if (is_daily) {
           const dates = new Set<string>();
           for (const r of (dlRows ?? []) as Array<{ record_date: string | null; service_code: string | null }>) {
             if (!r.record_date) continue;

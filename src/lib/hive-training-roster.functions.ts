@@ -56,6 +56,24 @@ export const getRosterTrainingStatus = createServerFn({ method: "POST" })
       .in("id", ids);
     if (profErr) throw profErr;
 
+    // Assigned service codes per staffer — drives the "codes" conditional
+    // trainings (DHHS Code of Conduct, ACRE/USU, BCBA, RN/LPN).
+    const { data: assignmentRows, error: assignErr } = await supabase
+      .from("staff_assignments")
+      .select("staff_id, service_codes")
+      .eq("organization_id", data.organizationId)
+      .in("staff_id", ids);
+    if (assignErr) throw assignErr;
+    const codesByStaff = new Map<string, string[]>();
+    for (const a of (assignmentRows ?? []) as Array<{
+      staff_id: string;
+      service_codes: string[] | null;
+    }>) {
+      const list = codesByStaff.get(a.staff_id) ?? [];
+      for (const c of a.service_codes ?? []) if (c) list.push(c.toUpperCase());
+      codesByStaff.set(a.staff_id, list);
+    }
+
     // 2. Baseline-tagged courses (single source of truth for course_id lookup).
     const { data: courses, error: cErr } = await supabase
       .from("hive_training_courses")
@@ -115,6 +133,7 @@ export const getRosterTrainingStatus = createServerFn({ method: "POST" })
         hireDate: hire,
         requiresDeescalation: !!p.requires_deescalation,
         requiresAbi: !!p.requires_abi,
+        assignedCodes: codesByStaff.get(p.id) ?? [],
       };
       const trainings: StaffTrainingStatus[] = BASELINE_STAFF_TRAININGS
         .filter((t: BaselineTraining) => isBaselineApplicable(t, ctx))

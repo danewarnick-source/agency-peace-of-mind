@@ -1671,6 +1671,12 @@ function CertsTab({
     "cpr_first_aid",
     "annual_12h",
     "deescalation",
+    "background_screening",
+    "medicaid_fraud_exclusion",
+    "dhhs_code_of_conduct",
+    "acre_usu_workplace_support",
+    "bcba_credential",
+    "rn_lpn_license",
   ] as const;
 
   const BASELINE_DUPLICATE_TITLES_LC = new Set([
@@ -1910,6 +1916,38 @@ function CertsTab({
               title: "Behavior De-escalation",
               meta: "MANDT, SOAR, CPI, PART, or Safety Care · Due within 180 days of trigger · Renews every 12 mo",
             },
+            background_screening: {
+              title: "Background Screening",
+              meta: "Due within 14 days of hire · Renews every 12 mo · SOW §1.9(2), CST 72",
+            },
+            medicaid_fraud_exclusion: {
+              title: "Medicaid Fraud Exclusion Check",
+              meta: "Due within 14 days of hire · Renews every 12 mo · OIG search + signed attestation · SOW §1.9(7)",
+            },
+            dhhs_code_of_conduct: {
+              title: "DHHS Code of Conduct",
+              meta: "One-time, on file permanently · CST 76",
+            },
+            acre_usu_workplace_support: {
+              title: "ACRE / USU Workplace Support Training",
+              meta: "One-time · SOW §9.5, 28.4, 29.4, 30.5",
+            },
+            bcba_credential: {
+              title: "BCBA Credential",
+              meta: "Renewal tracks the credential's own expiration date · SOW §1.9(4)",
+            },
+            rn_lpn_license: {
+              title: "RN/LPN License",
+              meta: "Renewal tracks the license's own expiration date · SOW §1.9(4)",
+            },
+          };
+
+          const NOT_TRIGGERED_HINTS: Record<string, string> = {
+            deescalation: "no behavior-coded client currently assigned",
+            dhhs_code_of_conduct: "not assigned to SLN, SLH, PPS, or HHS",
+            acre_usu_workplace_support: "not assigned to EPR, SED, SEE, or SEI",
+            bcba_credential: "not assigned to BC1, BC2, or BC3",
+            rn_lpn_license: "not assigned to PN1, PN2, PM1, or PM2",
           };
 
           const display = metaByKey[key];
@@ -1931,10 +1969,11 @@ function CertsTab({
           const kind = rowStatusKind(row);
           if (!passesFilter(row)) return null;
 
-          // De-escalation: special handling when not triggered.
-          const isDeescalation = key === "deescalation";
-          const notTriggered = isDeescalation && row.applicable === false;
-          const notTriggeredMeta = notTriggered ? ` · Not triggered — no behavior-coded client currently assigned` : "";
+          // Conditional (code-triggered) requirements: special handling when not triggered.
+          const notTriggered = row.applicable === false;
+          const notTriggeredMeta = notTriggered
+            ? ` · Not triggered — ${NOT_TRIGGERED_HINTS[key] ?? "not currently applicable"}`
+            : "";
 
           const isAnnual12h = key === "annual_12h";
           const annualDetail = isAnnual12h ? ((annualHoursQ.data ?? [])[0] ?? null) : null;
@@ -1945,7 +1984,7 @@ function CertsTab({
               <div className="min-w-0 flex-1">
                 <div className="font-medium text-sm">{display.title}</div>
                 <div className="mt-0.5 text-[11px] text-muted-foreground">
-                  {display.meta}{isDeescalation ? notTriggeredMeta : ""}
+                  {display.meta}{notTriggeredMeta}
                 </div>
                 {isAnnual12h && annualHoursQ.isLoading && (
                   <div className="mt-2 text-[11px] text-muted-foreground">

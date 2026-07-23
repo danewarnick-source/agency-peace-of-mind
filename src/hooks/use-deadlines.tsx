@@ -131,7 +131,7 @@ export function useDeadlines() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("incident_reports")
-        .select("id, report_number, client_id, discovered_at, upi_submitted_at, status")
+        .select("id, report_number, client_id, discovered_at, upi_submitted_at:state_submitted_at, status")
         .eq("organization_id", orgId!)
         .not("discovered_at", "is", null)
         .neq("status", "State_Confirmed")

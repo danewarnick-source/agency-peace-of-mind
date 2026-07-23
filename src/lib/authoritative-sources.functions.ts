@@ -12,6 +12,7 @@ import {
   stripHtmlToText,
   extractRequirementsFromText,
   extractChunkWithRetry,
+  extractPolicySummary,
   chunkDocumentRanges,
   isTransientAIError,
   EXPLAIN_SYSTEM_PROMPT,
@@ -237,6 +238,52 @@ export const markAsAuthoritativeSource = createServerFn({ method: "POST" })
     const { error } = await supabase
       .from("nectar_documents")
       .update(update)
+      .eq("id", data.documentId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ---------- Provider policy config (requires_acknowledgment, who must sign,
+// cadence, app-access gate) — provider_policy documents only. ----------
+
+export const updatePolicyConfig = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        documentId: z.string().uuid(),
+        requiresAcknowledgment: z.boolean(),
+        policyAssignedGroups: z.array(z.string().min(1).max(80)).max(40).default([]),
+        policyAssignedUsers: z.array(z.string().uuid()).max(2000).default([]),
+        policyAckCadence: z.enum(["one_time", "annual", "every_2_years"]).default("one_time"),
+        gateAppAccess: z.boolean().default(false),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: docRow } = await supabase
+      .from("nectar_documents")
+      .select("organization_id, authoritative_kind")
+      .eq("id", data.documentId)
+      .maybeSingle();
+    if (!docRow?.organization_id) throw new Error("Document not found");
+    await requireOrgMembership(supabase, userId, docRow.organization_id as string, "manager");
+    if ((docRow.authoritative_kind as string) !== "provider_policy") {
+      throw new Error("Policy config only applies to provider_policy documents.");
+    }
+    // gate_app_access implies requires_acknowledgment — a document can't gate
+    // login on a signature it never asks staff to give.
+    const requiresAck = data.requiresAcknowledgment || data.gateAppAccess;
+    const { error } = await supabase
+      .from("nectar_documents")
+      .update({
+        requires_acknowledgment: requiresAck,
+        policy_assigned_groups: data.policyAssignedGroups,
+        policy_assigned_users: data.policyAssignedUsers,
+        policy_ack_cadence: data.policyAckCadence,
+        gate_app_access: data.gateAppAccess,
+      })
       .eq("id", data.documentId);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -1320,12 +1367,54 @@ export const startRequirementsDraft = createServerFn({ method: "POST" })
     if (!doc.is_authoritative_source)
       throw new Error("Document is not marked as an authoritative source.");
 
-    const meta = (doc.metadata ?? {}) as { ignored?: boolean };
+    const meta = (doc.metadata ?? {}) as { ignored?: boolean; policy_summary?: string[] };
     if (meta.ignored) {
       throw new Error(
         "This source is set aside (ignored). Reactivate it before drafting requirements.",
       );
     }
+
+    // provider_policy: distinct NECTAR task — summarize "what staff must
+    // know/do" instead of mining state-compliance obligations. Stored on
+    // metadata.policy_summary, no nectar_requirements rows created.
+    if ((doc.authoritative_kind as string) === "provider_policy") {
+      const rawTextForPolicy = ((doc.raw_text as string | null) ?? "").trim();
+      const letterCountP = (rawTextForPolicy.match(/[a-zA-Z]/g) ?? []).length;
+      if (rawTextForPolicy.length < 200 || letterCountP < 50) {
+        return {
+          jobId: null as string | null,
+          totalChunks: 0,
+          reason: "no_text" as const,
+          message:
+            "No readable text was extracted from this policy. You can still add the summary by hand once text is available.",
+        };
+      }
+      let bullets: string[];
+      try {
+        bullets = await extractPolicySummary(rawTextForPolicy);
+      } catch (err) {
+        throw new Error(
+          `NECTAR couldn't summarize this policy: ${(err as Error).message}`,
+        );
+      }
+      const nextMeta = { ...meta, policy_summary: bullets, policy_summary_at: new Date().toISOString() };
+      const { error: updErr } = await supabase
+        .from("nectar_documents")
+        .update({ metadata: nextMeta as unknown as Json })
+        .eq("id", doc.id);
+      if (updErr) throw new Error(updErr.message);
+      return {
+        jobId: null as string | null,
+        totalChunks: 0,
+        reason: "policy_summary_done" as const,
+        message:
+          bullets.length > 0
+            ? `NECTAR summarized this policy into ${bullets.length} staff must-know/must-do item${bullets.length === 1 ? "" : "s"}.`
+            : "NECTAR read the document but didn't find clear staff-facing instructions to summarize.",
+        policySummary: bullets,
+      };
+    }
+
     if (NON_OBLIGATION_KINDS.has((doc.authoritative_kind as string) ?? "")) {
       return {
         jobId: null as string | null,

@@ -6,6 +6,122 @@ it worked before moving on.
 
 ---
 
+## -2. Provider policy / procedure acknowledgments (2026-07-23)
+
+**What this is for:** Authoritative Sources gets a new document kind,
+"Provider policy / procedure" — the agency's own internal policies (handbook
+sections, procedures), as opposed to state/contract requirements. Unlike
+other kinds, NECTAR doesn't mine state-compliance obligations out of these;
+it summarizes "what staff must know/do" instead. Optionally, an admin can
+require staff to read and **sign** a policy (typed-name e-signature, same
+pattern as training completions), including gating app access at next login
+until they sign. This block adds the four config columns on
+`nectar_documents` and a new `policy_signatures` table that holds the real
+signed attestation records — modeled exactly on `training_completions`.
+
+Run this whole block in one paste (it's four statements: one `ALTER TABLE`,
+one `CREATE TABLE`, grants, and RLS policies).
+
+```sql
+-- 1) Per-document policy config (only meaningful when
+--    nectar_documents.authoritative_kind = 'provider_policy').
+ALTER TABLE public.nectar_documents
+  ADD COLUMN IF NOT EXISTS requires_acknowledgment boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS policy_assigned_groups  text[]  NOT NULL DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS policy_assigned_users    uuid[]  NOT NULL DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS policy_ack_cadence       text    NOT NULL DEFAULT 'one_time'
+    CHECK (policy_ack_cadence IN ('one_time', 'annual', 'every_2_years')),
+  ADD COLUMN IF NOT EXISTS gate_app_access          boolean NOT NULL DEFAULT false;
+
+-- 2) policy_signatures — one row per staff signature event. Never deleted;
+--    a new policy version that requires re-acknowledgment archives old rows
+--    (is_current = false, archived_at = now()) rather than removing them.
+CREATE TABLE public.policy_signatures (
+  id                   uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id      uuid        NOT NULL REFERENCES public.organizations(id)     ON DELETE CASCADE,
+  document_id          uuid        NOT NULL REFERENCES public.nectar_documents(id)  ON DELETE CASCADE,
+  document_version     int         NOT NULL,
+  user_id              uuid        NOT NULL REFERENCES auth.users(id)               ON DELETE CASCADE,
+  signer_full_name     text,
+  signer_email         text,
+  typed_signature      text        NOT NULL,
+  attestation_statement text,
+  consent_statement    text,
+  consent_accepted     boolean     NOT NULL DEFAULT true,
+  content_version      text,
+  content_hash         text,
+  ip_address           text,
+  user_agent           text,
+  time_zone            text,
+  signed_at            timestamptz NOT NULL DEFAULT now(),
+  is_current           boolean     NOT NULL DEFAULT true,
+  archived_at          timestamptz,
+  created_at           timestamptz NOT NULL DEFAULT now()
+);
+
+GRANT SELECT, INSERT, UPDATE ON public.policy_signatures TO authenticated;
+GRANT ALL                    ON public.policy_signatures TO service_role;
+
+ALTER TABLE public.policy_signatures ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "policy_signatures_select_own" ON public.policy_signatures
+  FOR SELECT TO authenticated
+  USING (
+    user_id = auth.uid()
+    AND public.is_org_member(organization_id, auth.uid())
+  );
+
+CREATE POLICY "policy_signatures_select_admin" ON public.policy_signatures
+  FOR SELECT TO authenticated
+  USING (public.is_org_admin_or_manager(organization_id, auth.uid()));
+
+CREATE POLICY "policy_signatures_insert_own" ON public.policy_signatures
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    user_id = auth.uid()
+    AND public.is_org_member(organization_id, auth.uid())
+  );
+
+CREATE POLICY "policy_signatures_update_admin" ON public.policy_signatures
+  FOR UPDATE TO authenticated
+  USING (public.is_org_admin_or_manager(organization_id, auth.uid()))
+  WITH CHECK (public.is_org_admin_or_manager(organization_id, auth.uid()));
+
+CREATE INDEX idx_policy_signatures_org           ON public.policy_signatures(organization_id);
+CREATE INDEX idx_policy_signatures_doc_current    ON public.policy_signatures(document_id, is_current);
+CREATE INDEX idx_policy_signatures_user_current   ON public.policy_signatures(user_id, is_current);
+```
+
+**What you'll see:** `ALTER TABLE`, then `CREATE TABLE`, two `GRANT`, `ALTER
+TABLE` (RLS enable), four `CREATE POLICY`, three `CREATE INDEX` — no rows
+returned, no errors. Existing `nectar_documents` rows all get
+`requires_acknowledgment = false` / `gate_app_access = false` / empty
+assignment arrays / `policy_ack_cadence = 'one_time'`, so nothing starts
+gating anyone until an admin explicitly turns it on for a specific policy
+document.
+
+**Verify:**
+
+```sql
+select string_agg(column_name, ', ' order by column_name)
+from information_schema.columns
+where table_schema = 'public' and table_name = 'nectar_documents'
+  and column_name in ('requires_acknowledgment','policy_assigned_groups','policy_assigned_users','policy_ack_cadence','gate_app_access');
+```
+
+**What you'll see:** exactly `gate_app_access, policy_ack_cadence,
+policy_assigned_groups, policy_assigned_users, requires_acknowledgment` (all
+five, comma-separated, alphabetical).
+
+**Note for the human:** `src/integrations/supabase/types.ts` was hand-edited
+to add the `policy_signatures` table and the four new `nectar_documents`
+columns ahead of this migration landing, so the app can build/type-check
+before you run the SQL above. Once you run it and regenerate types from the
+live DB, the two should match — diff them if you want to confirm, but no
+action is required unless they've drifted.
+
+---
+
 ## -1. De-escalation / ABI training now defaults to Required (2026-07-21)
 
 De-escalation and ABI training requirements are no longer auto-detected from

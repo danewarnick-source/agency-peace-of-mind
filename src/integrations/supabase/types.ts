@@ -11342,6 +11342,7 @@ export type Database = {
           file_name: string
           file_size_bytes: number | null
           fiscal_year: string | null
+          gate_app_access: boolean
           id: string
           is_authoritative_source: boolean
           is_current: boolean
@@ -11355,7 +11356,11 @@ export type Database = {
           parse_error: string | null
           parse_status: string
           parsed_at: string | null
+          policy_ack_cadence: string
+          policy_assigned_groups: string[]
+          policy_assigned_users: string[]
           raw_text: string | null
+          requires_acknowledgment: boolean
           source: string | null
           staff_id: string | null
           status: Database["public"]["Enums"]["doc_status"]
@@ -11389,6 +11394,7 @@ export type Database = {
           file_name: string
           file_size_bytes?: number | null
           fiscal_year?: string | null
+          gate_app_access?: boolean
           id?: string
           is_authoritative_source?: boolean
           is_current?: boolean
@@ -11402,7 +11408,11 @@ export type Database = {
           parse_error?: string | null
           parse_status?: string
           parsed_at?: string | null
+          policy_ack_cadence?: string
+          policy_assigned_groups?: string[]
+          policy_assigned_users?: string[]
           raw_text?: string | null
+          requires_acknowledgment?: boolean
           source?: string | null
           staff_id?: string | null
           status?: Database["public"]["Enums"]["doc_status"]
@@ -11436,6 +11446,7 @@ export type Database = {
           file_name?: string
           file_size_bytes?: number | null
           fiscal_year?: string | null
+          gate_app_access?: boolean
           id?: string
           is_authoritative_source?: boolean
           is_current?: boolean
@@ -11449,7 +11460,11 @@ export type Database = {
           parse_error?: string | null
           parse_status?: string
           parsed_at?: string | null
+          policy_ack_cadence?: string
+          policy_assigned_groups?: string[]
+          policy_assigned_users?: string[]
           raw_text?: string | null
+          requires_acknowledgment?: boolean
           source?: string | null
           staff_id?: string | null
           status?: Database["public"]["Enums"]["doc_status"]
@@ -13263,6 +13278,93 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      // Hand-added ahead of the real migration (supabase/migrations/
+      // 20260723150000_provider_policy_signatures.sql) — see docs/SQL_HANDOFF.md.
+      // Remove this comment once a real `supabase gen types` run replaces it.
+      policy_signatures: {
+        Row: {
+          archived_at: string | null
+          attestation_statement: string | null
+          consent_accepted: boolean
+          consent_statement: string | null
+          content_hash: string | null
+          content_version: string | null
+          created_at: string
+          document_id: string
+          document_version: number
+          id: string
+          ip_address: string | null
+          is_current: boolean
+          organization_id: string
+          signed_at: string
+          signer_email: string | null
+          signer_full_name: string | null
+          time_zone: string | null
+          typed_signature: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          archived_at?: string | null
+          attestation_statement?: string | null
+          consent_accepted?: boolean
+          consent_statement?: string | null
+          content_hash?: string | null
+          content_version?: string | null
+          created_at?: string
+          document_id: string
+          document_version: number
+          id?: string
+          ip_address?: string | null
+          is_current?: boolean
+          organization_id: string
+          signed_at?: string
+          signer_email?: string | null
+          signer_full_name?: string | null
+          time_zone?: string | null
+          typed_signature: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          archived_at?: string | null
+          attestation_statement?: string | null
+          consent_accepted?: boolean
+          consent_statement?: string | null
+          content_hash?: string | null
+          content_version?: string | null
+          created_at?: string
+          document_id?: string
+          document_version?: number
+          id?: string
+          ip_address?: string | null
+          is_current?: boolean
+          organization_id?: string
+          signed_at?: string
+          signer_email?: string | null
+          signer_full_name?: string | null
+          time_zone?: string | null
+          typed_signature?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "policy_signatures_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policy_signatures_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {

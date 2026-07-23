@@ -192,14 +192,21 @@ function RestrictionsPanel({ canManage, orgId }: { canManage: boolean; orgId: st
     },
   });
 
+  const clientIds = (clients ?? []).map((c) => c.id);
+
   const { data: restrictions, isLoading } = useQuery({
-    enabled: !!orgId,
-    queryKey: ["hrc-restrictions", orgId],
+    // Scope by the org's client roster (like the client-profile panel does)
+    // rather than trusting restriction_records.organization_id alone — older
+    // rows can carry a stale/incorrect org id and would otherwise vanish here
+    // while still showing up on the client's own profile page.
+    enabled: !!orgId && !!clients,
+    queryKey: ["hrc-restrictions", orgId, clientIds.join(",")],
     queryFn: async () => {
+      if (!clientIds.length) return [];
       const { data, error } = await supabase
         .from("hrc_restriction_records" as never)
         .select("*")
-        .eq("organization_id", orgId!)
+        .in("client_id", clientIds)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as unknown as RestrictionRecord[];

@@ -425,10 +425,12 @@ export function AdminIncidentsSection({
 
   const { data: caseload = [] } = useCaseload();
   const { data, isLoading } = useQuery({
-    queryKey: ["incidents", view, status, filterCategory, filterClient, from, to],
+    enabled: !!activeOrgId,
+    queryKey: ["incidents", activeOrgId, view, status, filterCategory, filterClient, from, to],
     queryFn: () =>
       listFn({
         data: {
+          organization_id: activeOrgId!,
           status: view === "queue" ? "open" : status,
           category: filterCategory === "all" ? null : filterCategory,
           client_id: filterClient === "all" ? null : filterClient,
@@ -438,6 +440,7 @@ export function AdminIncidentsSection({
         },
       }),
   });
+
   const incidents = (data?.incidents ?? []) as Incident[];
 
   const sorted = useMemo(() => {

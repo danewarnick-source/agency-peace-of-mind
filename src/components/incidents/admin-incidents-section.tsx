@@ -463,10 +463,11 @@ export function AdminIncidentsSection({
     return [...s];
   }, [incidents]);
   const { data: actorsData } = useQuery({
-    enabled: actorIds.length > 0,
-    queryKey: ["incident-actors", actorIds.join(",")],
-    queryFn: () => actorsFn({ data: { user_ids: actorIds } }),
+    enabled: actorIds.length > 0 && !!activeOrgId,
+    queryKey: ["incident-actors", activeOrgId, actorIds.join(",")],
+    queryFn: () => actorsFn({ data: { organization_id: activeOrgId!, user_ids: actorIds } }),
   });
+
   const actorMap = useMemo(() => {
     const m = new Map<string, string>();
     for (const p of (actorsData?.profiles ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null }>) {

@@ -3,7 +3,6 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import {
-  bucketCodes,
   clientNeedsGoalProgress,
   FINANCIAL_STATEMENT_CODES,
   MONTHLY_SUMMARY_CODES,
@@ -76,7 +75,13 @@ export const ensureCurrentSummaryPeriods = createServerFn({ method: "POST" })
       .eq("organization_id", data.organizationId);
     if (codesErr) throw new Error(codesErr.message);
 
-    const byClient = new Map<string, string[]>();
+    // Per code, keep its service_start_date so period generation below can
+    // skip any period that closed before the client's service for that code
+    // actually began — otherwise a client onboarded this month would get a
+    // full lookback window of periods marked overdue for service they never
+    // received.
+    type CodeEntry = { code: string; start: string | null };
+    const byClient = new Map<string, CodeEntry[]>();
     for (const row of (codes ?? []) as Array<{
       client_id: string;
       service_code: string;
@@ -92,7 +97,7 @@ export const ensureCurrentSummaryPeriods = createServerFn({ method: "POST" })
         !FINANCIAL_STATEMENT_CODES.has(code)
       ) continue;
       const arr = byClient.get(row.client_id) ?? [];
-      arr.push(code);
+      arr.push({ code, start: row.service_start_date ?? null });
       byClient.set(row.client_id, arr);
     }
 
@@ -117,69 +122,78 @@ export const ensureCurrentSummaryPeriods = createServerFn({ method: "POST" })
     };
     const inserts: Insert[] = [];
 
-    for (const [clientId, list] of byClient) {
-      const b = bucketCodes(list);
+    // Only create a period row for a client if at least one of the bucket's
+    // codes had already started (service_start_date <= period_end) by that
+    // period's close. A client whose service began mid-period still gets
+    // that period generated — nothing before their actual start date does.
+    const startedByPeriodEnd = (entries: CodeEntry[], periodEnd: string) =>
+      entries.filter((e) => !e.start || e.start <= periodEnd);
+
+    for (const [clientId, entries] of byClient) {
+      const quarterlyEntries = entries.filter((e) => QUARTERLY_SUMMARY_CODES.has(e.code));
+      const monthlyNarrativeEntries = entries.filter((e) => MONTHLY_SUMMARY_CODES.has(e.code));
+      const monthlyFinancialEntries = entries.filter((e) => FINANCIAL_STATEMENT_CODES.has(e.code));
 
       // Quarterly narrative.
-      if (b.quarterly.size > 0) {
-        const services = [...b.quarterly];
-        for (const p of quarterly) {
-          inserts.push({
-            organization_id: data.organizationId,
-            client_id: clientId,
-            period_kind: p.period_kind,
-            period_label: `${p.period_label}`,
-            period_start: p.period_start,
-            period_end: p.period_end,
-            due_date: p.due_date,
-            service_codes: services,
-            requires_upi_attestation: false,
-            summary_kind: "narrative",
-            include_goal_progress: clientNeedsGoalProgress(services),
-          });
-        }
+      for (const p of quarterly) {
+        const active = startedByPeriodEnd(quarterlyEntries, p.period_end);
+        if (active.length === 0) continue;
+        const services = [...new Set(active.map((e) => e.code))];
+        inserts.push({
+          organization_id: data.organizationId,
+          client_id: clientId,
+          period_kind: p.period_kind,
+          period_label: `${p.period_label}`,
+          period_start: p.period_start,
+          period_end: p.period_end,
+          due_date: p.due_date,
+          service_codes: services,
+          requires_upi_attestation: false,
+          summary_kind: "narrative",
+          include_goal_progress: clientNeedsGoalProgress(services),
+        });
       }
 
       // Monthly narrative (SEI / PN1 / PN2). Single row per month, even if
       // the client has multiple of them; UPI flag set if SEI is among them.
-      if (b.monthlyNarrative.size > 0) {
-        const services = [...b.monthlyNarrative];
-        for (const p of monthly) {
-          inserts.push({
-            organization_id: data.organizationId,
-            client_id: clientId,
-            period_kind: p.period_kind,
-            period_label: p.period_label,
-            period_start: p.period_start,
-            period_end: p.period_end,
-            due_date: p.due_date,
-            service_codes: services,
-            requires_upi_attestation: b.monthlyNarrative.has("SEI"),
-            summary_kind: "narrative",
-            include_goal_progress: clientNeedsGoalProgress(services),
-          });
-        }
+      for (const p of monthly) {
+        const active = startedByPeriodEnd(monthlyNarrativeEntries, p.period_end);
+        if (active.length === 0) continue;
+        const services = [...new Set(active.map((e) => e.code))];
+        inserts.push({
+          organization_id: data.organizationId,
+          client_id: clientId,
+          period_kind: p.period_kind,
+          period_label: p.period_label,
+          period_start: p.period_start,
+          period_end: p.period_end,
+          due_date: p.due_date,
+          service_codes: services,
+          requires_upi_attestation: active.some((e) => e.code === "SEI"),
+          summary_kind: "narrative",
+          include_goal_progress: clientNeedsGoalProgress(services),
+        });
       }
 
       // Monthly financial statement (PBA). Separate row with a distinct label
       // suffix so it does not collide with a co-existing narrative monthly row.
-      if (b.monthlyFinancial.size > 0) {
-        const services = [...b.monthlyFinancial];
-        for (const p of monthly) {
-          inserts.push({
-            organization_id: data.organizationId,
-            client_id: clientId,
-            period_kind: p.period_kind,
-            period_label: `${p.period_label}-FS`,
-            period_start: p.period_start,
-            period_end: p.period_end,
-            due_date: p.due_date,
-            service_codes: services,
-            requires_upi_attestation: false,
-            summary_kind: "financial_statement",
-            include_goal_progress: false,
-          });
-        }
+      for (const p of monthly) {
+        const active = startedByPeriodEnd(monthlyFinancialEntries, p.period_end);
+        if (active.length === 0) continue;
+        const services = [...new Set(active.map((e) => e.code))];
+        inserts.push({
+          organization_id: data.organizationId,
+          client_id: clientId,
+          period_kind: p.period_kind,
+          period_label: `${p.period_label}-FS`,
+          period_start: p.period_start,
+          period_end: p.period_end,
+          due_date: p.due_date,
+          service_codes: services,
+          requires_upi_attestation: false,
+          summary_kind: "financial_statement",
+          include_goal_progress: false,
+        });
       }
     }
 

@@ -661,3 +661,85 @@ FROM (
 ```
 
 **What you'll see:** up to 20 lines, each `full_name  →  first: … / last: …`.
+
+---
+
+## 13. Audit: `client_progress_summaries` rows generated before the client's actual service start (2026-07-23)
+
+`ensureCurrentSummaryPeriods()` used to generate every quarterly/monthly
+deadline in a fixed lookback window (last 4 quarters, last 6 months) for any
+client with a currently-active billing code — regardless of when that code's
+`service_start_date` actually was. That's now fixed to only generate a period
+when `service_start_date <= period_end`. This is a **read-only audit** of how
+many already-inserted rows violate that rule, so we can decide together
+whether to delete them or mark them not-applicable — **do not run any
+DELETE/UPDATE from this block**, it's SELECT-only.
+
+A row counts as "generated too early" if *none* of its `service_codes` had
+started (or the code has no `client_billing_codes` row at all) as of that
+row's `period_end`.
+
+### 13a. Count of affected rows
+
+```sql
+WITH summary_codes AS (
+  SELECT s.id, s.organization_id, s.client_id, s.period_kind, s.period_label,
+         s.period_end, s.completed_at, unnest(s.service_codes) AS service_code
+  FROM public.client_progress_summaries s
+),
+matched AS (
+  SELECT sc.id,
+         bool_or(cbc.service_start_date IS NULL OR cbc.service_start_date <= sc.period_end) AS has_started_code
+  FROM summary_codes sc
+  LEFT JOIN public.client_billing_codes cbc
+    ON cbc.client_id = sc.client_id
+   AND upper(cbc.service_code) = upper(sc.service_code)
+  GROUP BY sc.id
+)
+SELECT
+  count(*) AS bad_row_count,
+  count(*) FILTER (WHERE s.completed_at IS NOT NULL) AS bad_row_count_already_completed,
+  count(DISTINCT s.client_id) AS distinct_clients_affected
+FROM matched m
+JOIN public.client_progress_summaries s ON s.id = m.id
+WHERE m.has_started_code IS NOT TRUE;
+```
+
+**What you'll see:** one row — `bad_row_count`, how many of those were
+already marked completed (matters for the delete-vs-mark-N/A decision, since
+deleting a completed row loses real work), and how many distinct clients are
+affected.
+
+### 13b. Sample of affected rows (first 50, for a sanity check)
+
+```sql
+WITH summary_codes AS (
+  SELECT s.id, s.organization_id, s.client_id, s.period_kind, s.period_label,
+         s.period_end, s.status, s.completed_at, unnest(s.service_codes) AS service_code
+  FROM public.client_progress_summaries s
+),
+matched AS (
+  SELECT sc.id,
+         bool_or(cbc.service_start_date IS NULL OR cbc.service_start_date <= sc.period_end) AS has_started_code
+  FROM summary_codes sc
+  LEFT JOIN public.client_billing_codes cbc
+    ON cbc.client_id = sc.client_id
+   AND upper(cbc.service_code) = upper(sc.service_code)
+  GROUP BY sc.id
+)
+SELECT s.client_id, cl.first_name, cl.last_name, s.period_kind, s.period_label,
+       s.period_end, s.service_codes, s.status, s.completed_at
+FROM matched m
+JOIN public.client_progress_summaries s ON s.id = m.id
+LEFT JOIN public.clients cl ON cl.id = s.client_id
+WHERE m.has_started_code IS NOT TRUE
+ORDER BY s.client_id, s.period_end
+LIMIT 50;
+```
+
+**What you'll see:** up to 50 rows naming the client, period, and codes so we
+can eyeball whether these are the "onboarded mid-window" false-overdue rows
+described above (expected) or something else. **Do not delete or update
+anything based on this block alone** — report the counts back and we'll
+decide the cleanup (delete vs. a `not_applicable` status) together before
+touching existing data.

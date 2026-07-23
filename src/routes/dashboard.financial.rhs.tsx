@@ -43,11 +43,13 @@ function RhsPage() {
   const fnClients = useServerFn(getRhsClients);
   const fnDays = useServerFn(getRhsDays);
 
-  // RHS authorizations (one row per client × RHS code) — drives client list + rate
+  // RHS authorizations (one row per client × RHS code) — drives client list + rate.
+  // Scoped to the viewed month so codes that haven't started yet, or that
+  // already ended, don't linger on the page or win the rate lookup below.
   const rhsCodesQ = useQuery({
     enabled: !!org?.organization_id,
-    queryKey: ["rhs-codes", org?.organization_id],
-    queryFn: async () => fnCodes({ data: { organizationId: org!.organization_id } }),
+    queryKey: ["rhs-codes", org?.organization_id, monthStartIso, monthEndIso],
+    queryFn: async () => fnCodes({ data: { organizationId: org!.organization_id, monthStartIso, monthEndIso } }),
   });
 
   const clientIds = useMemo(

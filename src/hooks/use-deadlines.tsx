@@ -11,6 +11,8 @@ import {
   type ProgressSummaryRow,
 } from "@/lib/progress-summaries.functions";
 import { computeSowAlerts } from "@/lib/sow-perimeters.functions";
+import { computeSupportStrategyCoverage } from "@/lib/support-strategy-coverage";
+import type { CSTSection } from "@/lib/client-specific-training.functions";
 
 export type DeadlineSource =
   | "summary"
@@ -20,6 +22,7 @@ export type DeadlineSource =
   | "billing_code"
   | "sow_perimeter"
   | "pcsp_support_strategies"
+  | "support_strategy_gap"
   | "hrc_restriction_review";
 
 export type DeadlineItem = {
@@ -269,6 +272,50 @@ export function useDeadlines() {
     },
   });
 
+  // 11b. Support Strategy coverage gaps (SOW §1.24(5)) — every active,
+  // non-exempt billing code must be covered by ≥1 published Support
+  // Strategy's job_codes. Only computed for clients with a published row.
+  const ssCoverageQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "ss_coverage", orgId],
+    queryFn: async () => {
+      const [ssRes, codesRes] = await Promise.all([
+        supabase
+          .from("client_specific_trainings")
+          .select("client_id, content")
+          .eq("organization_id", orgId!)
+          .eq("training_type", "support_strategies")
+          .eq("status", "published"),
+        supabase
+          .from("client_billing_codes")
+          .select("client_id, service_code, service_start_date, service_end_date")
+          .eq("organization_id", orgId!),
+      ]);
+      if (ssRes.error) throw ssRes.error;
+      if (codesRes.error) throw codesRes.error;
+      const today = new Date().toISOString().slice(0, 10);
+      const activeCodesByClient = new Map<string, string[]>();
+      for (const row of (codesRes.data ?? []) as Array<{
+        client_id: string; service_code: string; service_start_date: string | null; service_end_date: string | null;
+      }>) {
+        const active = (!row.service_start_date || row.service_start_date <= today)
+          && (!row.service_end_date || row.service_end_date > today);
+        if (!active) continue;
+        const list = activeCodesByClient.get(row.client_id) ?? [];
+        list.push(row.service_code);
+        activeCodesByClient.set(row.client_id, list);
+      }
+      const gapsByClient = new Map<string, string[]>();
+      for (const row of (ssRes.data ?? []) as Array<{ client_id: string; content: { sections?: CSTSection[] } | null }>) {
+        const activeCodes = activeCodesByClient.get(row.client_id) ?? [];
+        if (activeCodes.length === 0) continue;
+        const coverage = computeSupportStrategyCoverage(activeCodes, row.content?.sections ?? []);
+        if (coverage.gaps.length > 0) gapsByClient.set(row.client_id, coverage.gaps);
+      }
+      return gapsByClient;
+    },
+  });
+
   // 11. Active HRC rights-restriction records — the re-review date from
   // element (g) becomes a real deadline.
   const hrcRestrictionsQ = useQuery({
@@ -435,6 +482,24 @@ export function useDeadlines() {
       });
     }
 
+    // Support Strategy coverage gaps (SOW §1.24(5)).
+    const dueImmediately = new Date(now.getTime() - DAY);
+    for (const [clientId, gaps] of ssCoverageQ.data ?? new Map<string, string[]>()) {
+      for (const code of gaps) {
+        out.push({
+          key: `ss-gap:${clientId}:${code}`,
+          source: "support_strategy_gap",
+          title: `Support Strategy gap — ${code} not covered for ${nameOf(clientId)}`,
+          subject: nameOf(clientId),
+          subjectKind: "client",
+          dueAt: dueImmediately,
+          status: bucketStatus(dueImmediately, now),
+          href: `/dashboard/clients/${clientId}?tab=care`,
+          clientId,
+        });
+      }
+    }
+
     // HRC rights-restriction re-review dates.
     for (const r of hrcRestrictionsQ.data ?? []) {
       const due = new Date(`${r.next_review_date}T23:59:59`);
@@ -465,6 +530,7 @@ export function useDeadlines() {
     bcQ.data,
     sowQ.data,
     ssApprovalsQ.data,
+    ssCoverageQ.data,
     hrcRestrictionsQ.data,
   ]);
 
@@ -476,6 +542,6 @@ export function useDeadlines() {
     isLoading:
       summariesQ.isLoading || clientsQ.isLoading || hhsQ.isLoading ||
       certsQ.isLoading || incidentsQ.isLoading || bcQ.isLoading || hhCertsQ.isLoading ||
-      sowQ.isLoading || hrcRestrictionsQ.isLoading,
+      sowQ.isLoading || ssCoverageQ.isLoading || hrcRestrictionsQ.isLoading,
   };
 }

@@ -28,6 +28,7 @@ const sourceIcon: Record<DeadlineItem["source"], typeof AlarmClock> = {
   billing_code: AlarmClock,
   sow_perimeter: ShieldCheck,
   pcsp_support_strategies: FileSignature,
+  support_strategy_gap: AlertTriangle,
   hrc_restriction_review: ShieldCheck,
 };
 
@@ -39,6 +40,7 @@ const sourceLabel: Record<DeadlineItem["source"], string> = {
   billing_code: "Billing-code deliverable",
   sow_perimeter: "SOW perimeter",
   pcsp_support_strategies: "Support Strategies renewal",
+  support_strategy_gap: "Support Strategy gap",
   hrc_restriction_review: "HRC restriction review",
 };
 

@@ -195,7 +195,7 @@ export const listIncidents = createServerFn({ method: "GET" })
       .order("created_at", { ascending: false })
       .limit(data.limit);
     if (data.status === "closed") q = q.eq("status", "State_Confirmed");
-    if (data.status === "open") q = q.neq("status", "State_Confirmed");
+    if (data.status === "open") q = q.or("status.neq.State_Confirmed,status.is.null");
     if (data.client_id) q = q.eq("client_id", data.client_id);
     if (data.category) q = q.eq("category", data.category);
     if (data.from) q = q.gte("discovered_at", data.from);

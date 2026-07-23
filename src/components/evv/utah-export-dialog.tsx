@@ -67,11 +67,11 @@ interface BatchRow {
 
 function effIn(r: TsRow) {
   if (r.review_status === "approved" && r.corrected_clock_in) return r.corrected_clock_in;
-  return r.rounded_clock_in ?? r.clock_in_timestamp;
+  return r.clock_in_timestamp;
 }
 function effOut(r: TsRow) {
   if (r.review_status === "approved" && r.corrected_clock_out) return r.corrected_clock_out;
-  return r.rounded_clock_out ?? r.clock_out_timestamp;
+  return r.clock_out_timestamp;
 }
 
 interface CategorizedRow {

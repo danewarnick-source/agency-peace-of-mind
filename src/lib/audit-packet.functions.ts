@@ -9,6 +9,8 @@ type ExtractedItem = {
   title: string;
   description?: string;
   source_hint?: string;
+  period_start?: string;
+  period_end?: string;
 };
 
 const SYSTEM_PROMPT = `You are a compliance analyst for a Utah DSPD provider audit (Division of Services for People with Disabilities). You will receive the text of an official audit notification letter from DHS / DSPD / the State.
@@ -16,8 +18,10 @@ const SYSTEM_PROMPT = `You are a compliance analyst for a Utah DSPD provider aud
 Your job is to extract:
 1. A short "expectations_summary" (2-4 sentences) describing the audit scope.
 2. The fiscal year referenced (e.g. "FY26").
-3. The audit timeline start/end dates if present (ISO yyyy-mm-dd).
+3. The overall audit timeline start/end dates if present (ISO yyyy-mm-dd) — the outermost date range that covers the whole request.
 4. A complete list of REQUIRED DOCUMENTS / ITEMS the provider must produce, grouped into one of four sub-folders: "staff", "client", "admin", "other".
+
+Real audit letters often request different document types for different, independently-random date windows within the same letter — e.g. "shift notes from May through July" and "incident reports from November through December" are two different windows, not one shared range. For each item, ALSO try to extract that item's OWN period_start/period_end (ISO yyyy-mm-dd) whenever the letter specifies a date range specific to that document type. Only set period_start/period_end on an item when the letter clearly gives it its own range — leave them null when the item is only covered by the letter's one overall timeline, so the packet-level timeline applies to it instead.
 
 For each item, set source_hint to one of these platform tables when the document is something HIVE typically tracks:
   evv_timesheets, billing_submissions, incident_reports, certifications, client_documents, profiles, courses, medications, pba_accounts, scheduled_shifts
@@ -30,7 +34,14 @@ const ItemSchema = z.object({
   title: z.string().min(1).max(300),
   description: z.string().max(2000).optional().nullable(),
   source_hint: z.string().max(80).optional().nullable(),
+  period_start: z.string().max(20).optional().nullable(),
+  period_end: z.string().max(20).optional().nullable(),
 });
+
+function normalizeIsoDate(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
 
 const ExtractionSchema = z.object({
   fiscal_year: z.string().max(20).optional().nullable(),
@@ -94,6 +105,8 @@ export const parseAndProduceAuditPacket = createServerFn({ method: "POST" })
     const fiscalYear =
       extraction.fiscal_year ?? data.fallback_fiscal_year ?? `FY${String(new Date().getFullYear() % 100).padStart(2, "0")}`;
     const packetName = `${fiscalYear} — ${data.provider_name}`;
+    const timelineStart = normalizeIsoDate(extraction.timeline_start);
+    const timelineEnd = normalizeIsoDate(extraction.timeline_end);
 
     // If the requested timeline reaches back before this org went live on
     // HIVE, surface a clear disclosure — those records were never captured
@@ -110,8 +123,8 @@ export const parseAndProduceAuditPacket = createServerFn({ method: "POST" })
     const org = orgRow as unknown as { go_live_date: string | null; created_at: string } | null;
     const goLiveDate = (org?.go_live_date ?? org?.created_at ?? "").slice(0, 10);
     const predatesGoLiveNote =
-      extraction.timeline_start && goLiveDate && extraction.timeline_start < goLiveDate
-        ? `This audit period predates your Hive go-live date of ${goLiveDate}. Records from before that date were not captured in Hive and may need to be sourced from your prior system.`
+      timelineStart && goLiveDate && timelineStart < goLiveDate
+        ? `Note: this audit period includes dates before ${data.provider_name} began using Hive (${goLiveDate}). Records from ${timelineStart} to ${goLiveDate} were not captured in Hive and must be sourced from your prior records system.`
         : null;
 
     const { data: packet, error: pkErr } = await supabase
@@ -121,8 +134,8 @@ export const parseAndProduceAuditPacket = createServerFn({ method: "POST" })
         fiscal_year: fiscalYear,
         provider_name: data.provider_name,
         name: packetName,
-        timeline_start: extraction.timeline_start ?? null,
-        timeline_end: extraction.timeline_end ?? null,
+        timeline_start: timelineStart,
+        timeline_end: timelineEnd,
         expectations_summary: extraction.expectations_summary ?? null,
         audit_letter_path: data.audit_letter_path ?? null,
         audit_letter_text: data.letter_text,
@@ -135,19 +148,43 @@ export const parseAndProduceAuditPacket = createServerFn({ method: "POST" })
       .single();
     if (pkErr) throw new Error(pkErr.message);
 
-    // Insert items with default status 'missing'
-    const itemRows = extraction.items.map((it, idx) => ({
-      packet_id: packet.id,
-      organization_id: data.organization_id,
-      sub_folder: it.sub_folder,
-      title: it.title,
-      description: it.description ?? null,
-      source_hint: it.source_hint ?? null,
-      status: "missing" as const,
-      position: idx,
-    }));
+    // Insert items with default status 'missing'. When the packet's timeline
+    // predates the org's Hive go-live date, a pinned disclosure item is
+    // inserted first so it is the very first checklist item a reviewer sees —
+    // not a dismissable banner, an actual item row.
+    const disclosureRows = predatesGoLiveNote
+      ? [
+          {
+            packet_id: packet.id,
+            organization_id: data.organization_id,
+            sub_folder: "admin" as const,
+            title: "Pre-Hive period disclosure",
+            description: predatesGoLiveNote,
+            source_hint: null,
+            status: "confirmed" as const,
+            position: -1,
+            is_disclosure: true,
+          },
+        ]
+      : [];
+    const itemRows = [
+      ...disclosureRows,
+      ...extraction.items.map((it, idx) => ({
+        packet_id: packet.id,
+        organization_id: data.organization_id,
+        sub_folder: it.sub_folder,
+        title: it.title,
+        description: it.description ?? null,
+        source_hint: it.source_hint ?? null,
+        status: "missing" as const,
+        position: idx,
+        period_start: normalizeIsoDate(it.period_start),
+        period_end: normalizeIsoDate(it.period_end),
+      })),
+    ];
     if (itemRows.length > 0) {
-      const { error: itErr } = await supabase.from("audit_packet_items").insert(itemRows);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: itErr } = await supabase.from("audit_packet_items").insert(itemRows as any);
       if (itErr) throw new Error(itErr.message);
     }
 
@@ -236,5 +273,5 @@ export const parseAndProduceAuditPacket = createServerFn({ method: "POST" })
       }
     }
 
-    return { packet_id: packet.id, items_created: itemRows.length };
+    return { packet_id: packet.id, items_created: extraction.items.length };
   });

@@ -970,3 +970,38 @@ CREATE INDEX idx_hrr_active_next_review ON public.hrc_restriction_records(next_r
 `update_updated_at_column` helpers already created by earlier migrations
 (the `hrc_meetings`/`hrc_reviews` migration and the general RLS setup) — if
 this errors on an undefined function, those need to exist first.
+
+---
+
+## 16. Per-item audit periods + pinned pre-Hive disclosure item (2026-07-23)
+
+Real state audit letters request different document types across
+independently-random date windows (e.g. "shift notes from May through July"
+and "incident reports from November through December" in the same letter) —
+one shared packet-level timeline can't represent that. Adds `period_start`/
+`period_end` on `audit_packet_items` so a checklist item can carry its own
+range, falling back to the packet's `timeline_start`/`timeline_end` when
+NULL (unchanged behavior for letters with one global range).
+
+Also adds `is_disclosure`, so the existing pre-Hive-period note (block 14,
+`audit_packets.predates_go_live_note`) is now additionally inserted as a
+pinned, non-dismissable checklist item — the first item in the packet —
+instead of only a summary banner.
+
+```sql
+ALTER TABLE public.audit_packet_items
+  ADD COLUMN IF NOT EXISTS period_start date,
+  ADD COLUMN IF NOT EXISTS period_end date,
+  ADD COLUMN IF NOT EXISTS is_disclosure boolean NOT NULL DEFAULT false;
+```
+
+**What you'll see:** one `ALTER TABLE` adding three columns, no rows
+changed. Existing items all get `is_disclosure = false` / NULL periods, so
+older packets keep behaving exactly as before until a new packet is
+produced.
+
+**Note for the human:** `src/integrations/supabase/types.ts` was not
+hand-edited for this one — the app already reads/writes these three columns
+through `as any` casts (matching how `go_live_date` /
+`predates_go_live_note` from block 14 are handled), so nothing blocks the
+build ahead of this SQL landing.

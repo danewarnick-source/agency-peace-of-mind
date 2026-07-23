@@ -235,8 +235,17 @@ function MonthlyGridPage() {
     const monthStartMs = monthStart.getTime();
     const monthEndMs = new Date(monthEndIso).getTime();
 
+    // Only authorizations whose window overlaps the viewed month — a code
+    // that hasn't started yet, or already ended, shouldn't show a row (and
+    // stale superseded codes shouldn't double up against the current one).
+    const activeInMonth = (b: (typeof codes)[number]) => {
+      const startOk = !b.service_start_date || b.service_start_date < monthEndIso;
+      const endOk = !b.service_end_date || b.service_end_date >= asOf;
+      return startOk && endOk;
+    };
+
     return clientsQ.data.flatMap((c) =>
-      codes.filter((b) => b.client_id === c.id).map((code): GridRow => {
+      codes.filter((b) => b.client_id === c.id && activeInMonth(b)).map((code): GridRow => {
         const isDaily = isDailyServiceCode(code.service_code);
         const yearStart = new Date(month.y, 0, 1);
 

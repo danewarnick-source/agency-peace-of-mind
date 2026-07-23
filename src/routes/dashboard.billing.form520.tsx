@@ -271,9 +271,19 @@ function Billing520Page() {
       return units;
     };
 
+    // Only authorizations whose window overlaps the selected billing period —
+    // otherwise an expired or not-yet-started authorization keeps showing a
+    // (zero-unit) line on every 520 forever.
+    const activeInPeriod = (b: (typeof codes)[number]) => {
+      const startOk = !b.service_start_date || b.service_start_date <= periodEndStr;
+      const endOk = !b.service_end_date || b.service_end_date >= periodStartStr;
+      return startOk && endOk;
+    };
+
     const out: Row[] = [];
     let line = 1;
     for (const b of codes) {
+      if (!activeInPeriod(b)) continue;
       const client = clientMap.get(b.client_id);
       if (!client) continue;
       let units = 0;

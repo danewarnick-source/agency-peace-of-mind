@@ -17,10 +17,15 @@ export const AUTH_KINDS = [
   "dhs_requirement",
   "public_record",
   "tool_template",
+  "provider_policy",
   "other",
 ] as const;
 
-export const NON_OBLIGATION_KINDS = new Set<string>(["tool_template"]);
+// Kinds NECTAR will NOT draft state-compliance requirements from — tools/
+// templates describe HOW someone reviews compliance, not WHAT the provider
+// must do; provider policies are internal staff-facing documents (own
+// summarization path below), not state/contract obligations.
+export const NON_OBLIGATION_KINDS = new Set<string>(["tool_template", "provider_policy"]);
 
 export function stripHtmlToText(html: string): { title: string | null; text: string } {
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
@@ -77,6 +82,75 @@ Content rules:
 - Keep every field concise. Do not echo large sections of the document text. The goal is a compact list.
 - Prefer fewer high-quality items over many vague ones.
 - If the text contains no requirement language at all, return {"requirements":[]}.`;
+
+// ---------- Provider policy / procedure summarization ----------
+// A distinct NECTAR task from obligation-mining: provider policies are the
+// agency's own internal documents (handbook sections, procedures). Rather
+// than mining state-compliance obligations into nectar_requirements rows,
+// NECTAR distills "what must staff know / do" into a short bullet list
+// stored on nectar_documents.metadata.policy_summary.
+export const POLICY_SUMMARY_SYSTEM_PROMPT = `You are NECTAR, reading an internal provider policy or procedure document (an agency's own handbook/procedure, NOT a state or contract requirement).
+
+Your job is to distill this into a short bullet list of what STAFF must know or do because of this policy — the practical, actionable takeaways a staff member would need to follow it.
+
+Return STRICT JSON only, shape:
+{ "bullets": ["short imperative bullet, <=180 chars", "..."] }
+
+Output rules (STRICT — the parser will reject anything else):
+- Return ONLY the raw JSON object. No markdown code fences. No prose before or after.
+- Single-line minified JSON.
+- 3 to 20 bullets. Prefer fewer, high-quality bullets over many vague ones.
+- Each bullet should be something staff must KNOW ("client belongings must never be..." ) or DO ("report any incident within 24 hours by..."), stated plainly.
+- Do not invent content not present in the document text. If the text contains no clear staff-facing instructions, return {"bullets":[]}.`;
+
+export const PolicySummaryExtraction = z.object({
+  bullets: z.array(z.string().min(1).max(400)).max(40).default([]),
+});
+
+/**
+ * Single-pass policy summarization. Provider policies are typically short
+ * enough that the whole document fits in one call; if longer than the
+ * chunk window we take the first window only (best-effort — a provider
+ * policy this long is unusual, and the admin can re-run after trimming).
+ */
+export async function extractPolicySummary(text: string): Promise<string[]> {
+  const windowText = text.slice(0, 60_000);
+  await acquireBedrockSlot();
+  const res = await gatewayFetch({
+    model: "bedrock",
+    messages: [
+      { role: "system", content: POLICY_SUMMARY_SYSTEM_PROMPT },
+      { role: "user", content: `DOCUMENT TEXT:\n\n${windowText}` },
+    ],
+    response_format: { type: "json_object" },
+    max_tokens: 4_000,
+  });
+  if (res.status === 429) throw new TransientAIError("AI rate limit reached. Try again in a moment.");
+  if (res.status === 402)
+    throw new Error("AI credits exhausted. Add funds in Settings → Workspace → Usage.");
+  if ([408, 500, 502, 503, 504].includes(res.status)) {
+    throw new TransientAIError(`AI temporarily unavailable (${res.status}). Try again.`);
+  }
+  if (!res.ok) throw new Error(`AI gateway error ${res.status}`);
+  const json = await res.json();
+  const usage = (json?.usage ?? {}) as { total_tokens?: number; input_tokens?: number; output_tokens?: number };
+  const totalTokens =
+    typeof usage.total_tokens === "number"
+      ? usage.total_tokens
+      : (Number(usage.input_tokens ?? 0) + Number(usage.output_tokens ?? 0));
+  if (totalTokens > 0) void recordBedrockTokens(totalTokens);
+  const content: string = json.choices?.[0]?.message?.content ?? "{}";
+  const repaired = repairJsonPayload(content);
+  let raw: unknown;
+  try {
+    raw = JSON.parse(repaired);
+  } catch {
+    throw new Error("model returned invalid JSON (after repair)");
+  }
+  const parsed = PolicySummaryExtraction.safeParse(raw);
+  if (!parsed.success) throw new Error("model output failed schema validation");
+  return parsed.data.bullets;
+}
 
 export const ReqItem = z.object({
   title: z.string().min(1).max(200),

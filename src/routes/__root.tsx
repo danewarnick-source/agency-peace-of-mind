@@ -79,6 +79,60 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     if (data?.must_change_password) {
       throw redirect({ to: "/reset-password" });
     }
+
+    // Gate app access on unsigned required provider policies. Exempted from
+    // itself the same way /reset-password is exempted. IMPORTANT: this only
+    // runs in beforeLoad, i.e. only on a route transition — never poll or
+    // re-check this on a mounted page, or it would forcibly interrupt an
+    // already-loaded session mid-shift.
+    if (location.pathname.startsWith("/sign-policy/")) return;
+    const { data: memberships } = await supabase
+      .from("organization_members")
+      .select("organization_id")
+      .eq("user_id", session.user.id)
+      .eq("active", true)
+      .limit(1);
+    const orgId = memberships?.[0]?.organization_id;
+    if (!orgId) return;
+    const { data: gatingDocs } = await supabase
+      .from("nectar_documents")
+      .select("id, policy_assigned_groups, policy_assigned_users")
+      .eq("organization_id", orgId)
+      .eq("authoritative_kind", "provider_policy")
+      .eq("is_current", true)
+      .eq("requires_acknowledgment", true)
+      .eq("gate_app_access", true);
+    if (gatingDocs && gatingDocs.length > 0) {
+      let staffTypeKeys: string[] | null = null;
+      for (const doc of gatingDocs) {
+        const groups = (doc.policy_assigned_groups as string[] | null) ?? [];
+        const users = (doc.policy_assigned_users as string[] | null) ?? [];
+        let inScope = users.includes(session.user.id);
+        if (!inScope && groups.includes("all_staff")) inScope = true;
+        if (!inScope && groups.length) {
+          if (staffTypeKeys === null) {
+            const { data: prof } = await supabase
+              .from("profiles")
+              .select("staff_type_keys")
+              .eq("id", session.user.id)
+              .maybeSingle();
+            staffTypeKeys = (prof?.staff_type_keys as string[] | null) ?? [];
+          }
+          inScope = staffTypeKeys.some((k) => groups.includes(k));
+        }
+        if (!inScope) continue;
+        const { data: sig } = await supabase
+          .from("policy_signatures")
+          .select("id")
+          .eq("user_id", session.user.id)
+          .eq("document_id", doc.id)
+          .eq("is_current", true)
+          .maybeSingle();
+        if (!sig) {
+          throw redirect({ to: "/sign-policy/$documentId", params: { documentId: doc.id } });
+        }
+      }
+    }
   },
   head: () => ({
     meta: [

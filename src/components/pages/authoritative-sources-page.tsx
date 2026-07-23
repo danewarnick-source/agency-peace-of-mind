@@ -76,7 +76,14 @@ import {
   listAttestations,
   ingestWebSource,
   explainRequirement,
+  updatePolicyConfig,
 } from "@/lib/authoritative-sources.functions";
+import {
+  listPolicySignatureStatus,
+  supersedePolicyVersion,
+} from "@/lib/policy-signatures.functions";
+import { AssignModal } from "@/components/forms/assign-modal";
+import { Switch } from "@/components/ui/switch";
 import {
   useDraftJobProgress,
   formatEta,
@@ -116,12 +123,15 @@ const AUTH_KINDS = [
   { value: "dhs_requirement", label: "DHS requirement doc" },
   { value: "public_record", label: "Other public-record requirement" },
   { value: "tool_template", label: "Tool / Template (review, audit, scoring form)" },
+  { value: "provider_policy", label: "Provider policy / procedure" },
   { value: "other", label: "Other" },
 ];
 
-// Kinds NECTAR will NOT draft requirements from — tools/templates describe
-// HOW someone reviews compliance, not WHAT the provider must do.
-const NON_OBLIGATION_KINDS = new Set<string>(["tool_template"]);
+// Kinds NECTAR will NOT draft state-compliance requirements from —
+// tools/templates describe HOW someone reviews compliance, not WHAT the
+// provider must do; provider policies get their own "what must staff
+// know/do" summarization task instead (see SourceRow's PolicyConfigPanel).
+const NON_OBLIGATION_KINDS = new Set<string>(["tool_template", "provider_policy"]);
 
 const KIND_LABEL: Record<string, string> = Object.fromEntries(
   AUTH_KINDS.map((k) => [k.value, k.label]),
@@ -452,7 +462,7 @@ function SourceRow({
   onJumpToRequirements,
   currentRole,
 }: {
-  source: { id: string; title: string; authoritative_kind: string | null; is_authoritative_source?: boolean | null; fiscal_year: string | null; effective_start: string | null; effective_end: string | null; file_name: string; uploaded_by_name: string | null; created_at: string; parse_status: string | null; metadata?: Record<string, unknown> | null };
+  source: { id: string; title: string; authoritative_kind: string | null; is_authoritative_source?: boolean | null; fiscal_year: string | null; effective_start: string | null; effective_end: string | null; file_name: string; uploaded_by_name: string | null; created_at: string; parse_status: string | null; metadata?: Record<string, unknown> | null; version?: number | null };
   orgId: string;
   stats:
     | {
@@ -522,7 +532,7 @@ function SourceRow({
       markFn({
         data: {
           documentId: source.id,
-          authoritativeKind: nextKind as "state_sow" | "provider_contract" | "dspd_requirement" | "dhs_requirement" | "public_record" | "tool_template" | "other",
+          authoritativeKind: nextKind as "state_sow" | "provider_contract" | "dspd_requirement" | "dhs_requirement" | "public_record" | "tool_template" | "provider_policy" | "other",
           isAuthoritative: true,
         },
       }),
@@ -551,6 +561,12 @@ function SourceRow({
       // jobId === null — surface immediately, no background work started.
       const start = r as { jobId: string | null; reason?: string; message?: string };
       if (!start.jobId) {
+        if (start.reason === "policy_summary_done") {
+          toast.success(start.message ?? "Policy summarized.", { duration: 7000 });
+          // Refresh metadata.policy_summary onto this row.
+          qc.invalidateQueries({ queryKey: ["auth-sources", orgId] });
+          return;
+        }
         toast.warning(
           start.message ??
             "NECTAR read the document but didn't find clear requirement language.",
@@ -777,7 +793,7 @@ function SourceRow({
             ) : (
               <Sparkles className="mr-1 h-3.5 w-3.5" />
             )}
-            {isDrafting ? draftingLabel : "Draft requirements"}
+            {isDrafting ? draftingLabel : kind === "provider_policy" ? "Summarize policy" : "Draft requirements"}
           </Button>
 
           {isDrafting && (
@@ -797,7 +813,372 @@ function SourceRow({
           )}
         </div>
       )}
+
+      {kind === "provider_policy" && (
+        <div className="mt-2 w-full basis-full">
+          <PolicyPanel
+            orgId={orgId}
+            documentId={source.id}
+            documentTitle={source.title}
+            version={source.version ?? 1}
+            metadata={source.metadata ?? {}}
+            canEdit={canDraft}
+          />
+        </div>
+      )}
     </li>
+  );
+}
+
+// ---------- Provider-policy config, summary, and signatures ----------
+
+type PolicyMeta = {
+  policy_summary?: string[];
+  policy_summary_at?: string;
+};
+
+function PolicyPanel({
+  orgId,
+  documentId,
+  documentTitle,
+  version,
+  metadata,
+  canEdit,
+}: {
+  orgId: string;
+  documentId: string;
+  documentTitle: string;
+  version: number;
+  metadata: Record<string, unknown>;
+  canEdit: boolean;
+}) {
+  const qc = useQueryClient();
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [tab, setTab] = useState<"config" | "signatures">("config");
+
+  // Live doc row for the four config columns (not present on the list
+  // payload's typed shape above, so read directly).
+  const { data: docRow } = useQuery({
+    queryKey: ["policy-doc-config", documentId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("nectar_documents")
+        .select(
+          "requires_acknowledgment, policy_assigned_groups, policy_assigned_users, policy_ack_cadence, gate_app_access",
+        )
+        .eq("id", documentId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as {
+        requires_acknowledgment: boolean;
+        policy_assigned_groups: string[];
+        policy_assigned_users: string[];
+        policy_ack_cadence: "one_time" | "annual" | "every_2_years";
+        gate_app_access: boolean;
+      } | null;
+    },
+  });
+
+  const requiresAck = docRow?.requires_acknowledgment ?? false;
+  const groups = docRow?.policy_assigned_groups ?? [];
+  const users = docRow?.policy_assigned_users ?? [];
+  const cadence = docRow?.policy_ack_cadence ?? "one_time";
+  const gate = docRow?.gate_app_access ?? false;
+
+  const updateFn = useServerFn(updatePolicyConfig);
+  const saveConfig = useMutation({
+    mutationFn: (patch: {
+      requiresAcknowledgment?: boolean;
+      policyAssignedGroups?: string[];
+      policyAssignedUsers?: string[];
+      policyAckCadence?: "one_time" | "annual" | "every_2_years";
+      gateAppAccess?: boolean;
+    }) =>
+      updateFn({
+        data: {
+          documentId,
+          requiresAcknowledgment: patch.requiresAcknowledgment ?? requiresAck,
+          policyAssignedGroups: patch.policyAssignedGroups ?? groups,
+          policyAssignedUsers: patch.policyAssignedUsers ?? users,
+          policyAckCadence: patch.policyAckCadence ?? cadence,
+          gateAppAccess: patch.gateAppAccess ?? gate,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Policy settings saved.");
+      qc.invalidateQueries({ queryKey: ["policy-doc-config", documentId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const meta = (metadata ?? {}) as PolicyMeta;
+  const bullets = meta.policy_summary ?? [];
+
+  const audienceLabel =
+    users.length === 0 && groups.length === 0
+      ? "No one assigned yet"
+      : groups.includes("all_staff")
+        ? "All staff"
+        : `${groups.length} group${groups.length === 1 ? "" : "s"}, ${users.length} individual${users.length === 1 ? "" : "s"}`;
+
+  return (
+    <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setTab("config")}
+          className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${tab === "config" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          Acknowledgment settings
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("signatures")}
+          className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${tab === "signatures" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          Signatures
+        </button>
+      </div>
+
+      {tab === "config" && (
+        <div className="space-y-3">
+          {bullets.length > 0 && (
+            <div className="rounded-lg border border-border/50 bg-background/70 p-2.5">
+              <p className="mb-1 text-[11px] font-semibold text-foreground">
+                What staff must know / do
+              </p>
+              <ul className="ml-4 list-disc space-y-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                {bullets.map((b, i) => (
+                  <li key={i}>{b}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <label className="flex items-center justify-between gap-2 text-xs">
+            <span className="font-medium">Requires staff acknowledgment</span>
+            <Switch
+              checked={requiresAck}
+              disabled={!canEdit || saveConfig.isPending}
+              onCheckedChange={(v) => saveConfig.mutate({ requiresAcknowledgment: v })}
+            />
+          </label>
+
+          {requiresAck && (
+            <>
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span>
+                  Who must acknowledge: <span className="text-muted-foreground">{audienceLabel}</span>
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-2 text-[11px]"
+                  disabled={!canEdit}
+                  onClick={() => setAssignOpen(true)}
+                >
+                  Assign…
+                </Button>
+              </div>
+              <AssignModal
+                open={assignOpen}
+                onOpenChange={setAssignOpen}
+                groups={groups}
+                users={users}
+                allClients={false}
+                clients={[]}
+                onChange={(g, u) =>
+                  saveConfig.mutate({ policyAssignedGroups: g, policyAssignedUsers: u })
+                }
+              />
+
+              <div className="space-y-1">
+                <Label className="text-[11px]">Re-acknowledgment cadence</Label>
+                <Select
+                  value={cadence}
+                  disabled={!canEdit || saveConfig.isPending}
+                  onValueChange={(v) =>
+                    saveConfig.mutate({ policyAckCadence: v as "one_time" | "annual" | "every_2_years" })
+                  }
+                >
+                  <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="one_time" className="text-xs">One time</SelectItem>
+                    <SelectItem value="annual" className="text-xs">Annual</SelectItem>
+                    <SelectItem value="every_2_years" className="text-xs">Every 2 years</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <label className="flex items-center justify-between gap-2 text-xs">
+                <span className="font-medium">Gate app access until signed</span>
+                <Switch
+                  checked={gate}
+                  disabled={!canEdit || saveConfig.isPending}
+                  onCheckedChange={(v) => saveConfig.mutate({ gateAppAccess: v })}
+                />
+              </label>
+              {gate && (
+                <p className="text-[10px] text-amber-700 dark:text-amber-300">
+                  In-scope staff will see a full-screen sign-first interstitial the next time they
+                  log in or navigate — never mid-shift on an already-open session.
+                </p>
+              )}
+            </>
+          )}
+
+          <PolicyVersionUpload orgId={orgId} oldDocumentId={documentId} documentTitle={documentTitle} version={version} canEdit={canEdit} />
+        </div>
+      )}
+
+      {tab === "signatures" && (
+        <PolicySignaturesTab documentId={documentId} requiresAck={requiresAck} />
+      )}
+    </div>
+  );
+}
+
+function PolicyVersionUpload({
+  orgId,
+  oldDocumentId,
+  documentTitle,
+  version,
+  canEdit,
+}: {
+  orgId: string;
+  oldDocumentId: string;
+  documentTitle: string;
+  version: number;
+  canEdit: boolean;
+}) {
+  const qc = useQueryClient();
+  const [file, setFile] = useState<File | null>(null);
+  const [requireReAck, setRequireReAck] = useState(true);
+  const fileInput = useRef<HTMLInputElement | null>(null);
+  const ingestFn = useServerFn(ingestDocument);
+  const markFn = useServerFn(markAsAuthoritativeSource);
+  const supersedeFn = useServerFn(supersedePolicyVersion);
+
+  const upload = useMutation({
+    mutationFn: async () => {
+      if (!file) throw new Error("Choose a replacement file");
+      const base64 = await fileToBase64(file);
+      const r = await ingestFn({
+        data: {
+          organizationId: orgId,
+          ownerKind: "company",
+          documentType: "other",
+          title: documentTitle,
+          fileName: file.name,
+          mimeType: file.type || "application/octet-stream",
+          fileBase64: base64,
+          tags: ["authoritative-source", "provider_policy"],
+          autoParse: true,
+        },
+      });
+      const doc = (r as { document?: { id?: string } }).document;
+      if (!doc?.id) throw new Error("Upload failed");
+      await markFn({
+        data: { documentId: doc.id, authoritativeKind: "provider_policy", isAuthoritative: true },
+      });
+      await supersedeFn({
+        data: { oldDocumentId, newDocumentId: doc.id, requireReAcknowledgment: requireReAck },
+      });
+      return doc.id;
+    },
+    onSuccess: () => {
+      toast.success(
+        requireReAck
+          ? "New version uploaded — staff will be asked to re-acknowledge."
+          : "New version uploaded.",
+      );
+      setFile(null);
+      if (fileInput.current) fileInput.current.value = "";
+      qc.invalidateQueries({ queryKey: ["auth-sources", orgId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <div className="space-y-1.5 rounded-lg border border-dashed border-border/60 p-2.5">
+      <p className="text-[11px] font-semibold">Upload new version (current: v{version})</p>
+      <Input
+        ref={fileInput}
+        type="file"
+        accept=".pdf,.txt,.md,.html,.htm,application/pdf,text/*"
+        disabled={!canEdit || upload.isPending}
+        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        className="h-8 text-xs"
+      />
+      <label className="flex items-start gap-2 text-[11px]">
+        <Checkbox
+          checked={requireReAck}
+          onCheckedChange={(v) => setRequireReAck(v === true)}
+          disabled={!canEdit || upload.isPending}
+        />
+        <span>Require re-acknowledgment of new version (resets pending status for all required staff)</span>
+      </label>
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 text-[11px]"
+        disabled={!canEdit || !file || upload.isPending}
+        onClick={() => upload.mutate()}
+      >
+        {upload.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+        {upload.isPending ? "Uploading…" : "Upload as new version"}
+      </Button>
+    </div>
+  );
+}
+
+function PolicySignaturesTab({ documentId, requiresAck }: { documentId: string; requiresAck: boolean }) {
+  const fetchFn = useServerFn(listPolicySignatureStatus);
+  const { data, isLoading } = useQuery({
+    queryKey: ["policy-signature-status", documentId],
+    queryFn: () => fetchFn({ data: { documentId } }),
+    enabled: requiresAck,
+  });
+
+  if (!requiresAck) {
+    return (
+      <p className="text-[11px] text-muted-foreground">
+        Turn on "Requires staff acknowledgment" to track signatures.
+      </p>
+    );
+  }
+  if (isLoading) {
+    return <p className="text-[11px] text-muted-foreground">Loading…</p>;
+  }
+  const staff = data?.staff ?? [];
+  if (staff.length === 0) {
+    return (
+      <p className="text-[11px] text-muted-foreground">
+        No staff assigned yet — use "Assign…" in Acknowledgment settings.
+      </p>
+    );
+  }
+  const signedCount = staff.filter((s) => s.signed).length;
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[11px] text-muted-foreground">
+        {signedCount} of {staff.length} signed
+      </p>
+      <ul className="divide-y divide-border/40">
+        {staff.map((s) => (
+          <li key={s.userId} className="flex items-center justify-between gap-2 py-1.5 text-xs">
+            <span className="min-w-0 truncate">{s.fullName ?? s.email ?? s.userId}</span>
+            {s.signed ? (
+              <span className="shrink-0 text-[10px] text-emerald-700 dark:text-emerald-300">
+                Signed {s.signedAt ? new Date(s.signedAt).toLocaleDateString() : ""}
+              </span>
+            ) : (
+              <span className="shrink-0 text-[10px] text-amber-700 dark:text-amber-300">Pending</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -861,7 +1242,7 @@ function UploadCard({
       await mark({
         data: {
           documentId: doc.id,
-          authoritativeKind: kind as "state_sow" | "provider_contract" | "dspd_requirement" | "dhs_requirement" | "public_record" | "other",
+          authoritativeKind: kind as "state_sow" | "provider_contract" | "dspd_requirement" | "dhs_requirement" | "public_record" | "provider_policy" | "other",
           isAuthoritative: true,
           assistedSetup,
         },
@@ -891,6 +1272,7 @@ function UploadCard({
             | "dspd_requirement"
             | "dhs_requirement"
             | "public_record"
+            | "provider_policy"
             | "other",
           fiscalYear: fiscalYear || null,
           effectiveStart: effectiveStart || null,

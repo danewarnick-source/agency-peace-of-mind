@@ -30,6 +30,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as AuditPortalIndexRouteImport } from './routes/audit-portal.index'
 import { Route as VerifyCodeRouteImport } from './routes/verify.$code'
+import { Route as SignPolicyDocumentIdRouteImport } from './routes/sign-policy.$documentId'
 import { Route as DashboardTracksRouteImport } from './routes/dashboard.tracks'
 import { Route as DashboardTimeclockRouteImport } from './routes/dashboard.timeclock'
 import { Route as DashboardTeamsRouteImport } from './routes/dashboard.teams'
@@ -196,6 +197,7 @@ import { Route as DashboardFormsFormIdSubmissionsRouteImport } from './routes/da
 import { Route as DashboardFormsFormIdFillRouteImport } from './routes/dashboard.forms.$formId.fill'
 import { Route as DashboardFormsFormIdEditRouteImport } from './routes/dashboard.forms.$formId.edit'
 import { Route as DashboardCoursesTopicTopicIdRouteImport } from './routes/dashboard.courses.topic.$topicId'
+import { Route as DashboardCoursesPolicyDocumentIdRouteImport } from './routes/dashboard.courses.policy.$documentId'
 import { Route as DashboardCoursesPersonModuleAssignmentIdRouteImport } from './routes/dashboard.courses.person-module.$assignmentId'
 import { Route as DashboardCoursesCourseIdEditRouteImport } from './routes/dashboard.courses.$courseId.edit'
 import { Route as ApiPublicWebhooksStripeRouteImport } from './routes/api/public/webhooks/stripe'
@@ -310,6 +312,11 @@ const AuditPortalIndexRoute = AuditPortalIndexRouteImport.update({
 const VerifyCodeRoute = VerifyCodeRouteImport.update({
   id: '/verify/$code',
   path: '/verify/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignPolicyDocumentIdRoute = SignPolicyDocumentIdRouteImport.update({
+  id: '/sign-policy/$documentId',
+  path: '/sign-policy/$documentId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardTracksRoute = DashboardTracksRouteImport.update({
@@ -1219,6 +1226,12 @@ const DashboardCoursesTopicTopicIdRoute =
     path: '/courses/topic/$topicId',
     getParentRoute: () => DashboardRoute,
   } as any)
+const DashboardCoursesPolicyDocumentIdRoute =
+  DashboardCoursesPolicyDocumentIdRouteImport.update({
+    id: '/courses/policy/$documentId',
+    path: '/courses/policy/$documentId',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardCoursesPersonModuleAssignmentIdRoute =
   DashboardCoursesPersonModuleAssignmentIdRouteImport.update({
     id: '/courses/person-module/$assignmentId',
@@ -1363,6 +1376,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/teams': typeof DashboardTeamsRoute
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
+  '/sign-policy/$documentId': typeof SignPolicyDocumentIdRoute
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal/': typeof AuditPortalIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -1465,6 +1479,7 @@ export interface FileRoutesByFullPath {
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
   '/dashboard/courses/person-module/$assignmentId': typeof DashboardCoursesPersonModuleAssignmentIdRoute
+  '/dashboard/courses/policy/$documentId': typeof DashboardCoursesPolicyDocumentIdRoute
   '/dashboard/courses/topic/$topicId': typeof DashboardCoursesTopicTopicIdRoute
   '/dashboard/forms/$formId/edit': typeof DashboardFormsFormIdEditRoute
   '/dashboard/forms/$formId/fill': typeof DashboardFormsFormIdFillRoute
@@ -1555,6 +1570,7 @@ export interface FileRoutesByTo {
   '/dashboard/teams': typeof DashboardTeamsRoute
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
+  '/sign-policy/$documentId': typeof SignPolicyDocumentIdRoute
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal': typeof AuditPortalIndexRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -1657,6 +1673,7 @@ export interface FileRoutesByTo {
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
   '/dashboard/courses/person-module/$assignmentId': typeof DashboardCoursesPersonModuleAssignmentIdRoute
+  '/dashboard/courses/policy/$documentId': typeof DashboardCoursesPolicyDocumentIdRoute
   '/dashboard/courses/topic/$topicId': typeof DashboardCoursesTopicTopicIdRoute
   '/dashboard/forms/$formId/edit': typeof DashboardFormsFormIdEditRoute
   '/dashboard/forms/$formId/fill': typeof DashboardFormsFormIdFillRoute
@@ -1755,6 +1772,7 @@ export interface FileRoutesById {
   '/dashboard/teams': typeof DashboardTeamsRoute
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
+  '/sign-policy/$documentId': typeof SignPolicyDocumentIdRoute
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal/': typeof AuditPortalIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -1857,6 +1875,7 @@ export interface FileRoutesById {
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
   '/dashboard/courses/$courseId/edit': typeof DashboardCoursesCourseIdEditRoute
   '/dashboard/courses/person-module/$assignmentId': typeof DashboardCoursesPersonModuleAssignmentIdRoute
+  '/dashboard/courses/policy/$documentId': typeof DashboardCoursesPolicyDocumentIdRoute
   '/dashboard/courses/topic/$topicId': typeof DashboardCoursesTopicTopicIdRoute
   '/dashboard/forms/$formId/edit': typeof DashboardFormsFormIdEditRoute
   '/dashboard/forms/$formId/fill': typeof DashboardFormsFormIdFillRoute
@@ -1956,6 +1975,7 @@ export interface FileRouteTypes {
     | '/dashboard/teams'
     | '/dashboard/timeclock'
     | '/dashboard/tracks'
+    | '/sign-policy/$documentId'
     | '/verify/$code'
     | '/audit-portal/'
     | '/dashboard/'
@@ -2058,6 +2078,7 @@ export interface FileRouteTypes {
     | '/api/public/webhooks/stripe'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/courses/person-module/$assignmentId'
+    | '/dashboard/courses/policy/$documentId'
     | '/dashboard/courses/topic/$topicId'
     | '/dashboard/forms/$formId/edit'
     | '/dashboard/forms/$formId/fill'
@@ -2148,6 +2169,7 @@ export interface FileRouteTypes {
     | '/dashboard/teams'
     | '/dashboard/timeclock'
     | '/dashboard/tracks'
+    | '/sign-policy/$documentId'
     | '/verify/$code'
     | '/audit-portal'
     | '/dashboard'
@@ -2250,6 +2272,7 @@ export interface FileRouteTypes {
     | '/api/public/webhooks/stripe'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/courses/person-module/$assignmentId'
+    | '/dashboard/courses/policy/$documentId'
     | '/dashboard/courses/topic/$topicId'
     | '/dashboard/forms/$formId/edit'
     | '/dashboard/forms/$formId/fill'
@@ -2347,6 +2370,7 @@ export interface FileRouteTypes {
     | '/dashboard/teams'
     | '/dashboard/timeclock'
     | '/dashboard/tracks'
+    | '/sign-policy/$documentId'
     | '/verify/$code'
     | '/audit-portal/'
     | '/dashboard/'
@@ -2449,6 +2473,7 @@ export interface FileRouteTypes {
     | '/api/public/webhooks/stripe'
     | '/dashboard/courses/$courseId/edit'
     | '/dashboard/courses/person-module/$assignmentId'
+    | '/dashboard/courses/policy/$documentId'
     | '/dashboard/courses/topic/$topicId'
     | '/dashboard/forms/$formId/edit'
     | '/dashboard/forms/$formId/fill'
@@ -2487,6 +2512,7 @@ export interface RootRouteChildren {
   AuditPortalPackageIdRoute: typeof AuditPortalPackageIdRoute
   AuditPortalSetPasswordRoute: typeof AuditPortalSetPasswordRoute
   CertificateCodeRoute: typeof CertificateCodeRoute
+  SignPolicyDocumentIdRoute: typeof SignPolicyDocumentIdRoute
   VerifyCodeRoute: typeof VerifyCodeRoute
   AuditPortalIndexRoute: typeof AuditPortalIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
@@ -2648,6 +2674,13 @@ declare module '@tanstack/react-router' {
       path: '/verify/$code'
       fullPath: '/verify/$code'
       preLoaderRoute: typeof VerifyCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-policy/$documentId': {
+      id: '/sign-policy/$documentId'
+      path: '/sign-policy/$documentId'
+      fullPath: '/sign-policy/$documentId'
+      preLoaderRoute: typeof SignPolicyDocumentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard/tracks': {
@@ -3812,6 +3845,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCoursesTopicTopicIdRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/courses/policy/$documentId': {
+      id: '/dashboard/courses/policy/$documentId'
+      path: '/courses/policy/$documentId'
+      fullPath: '/dashboard/courses/policy/$documentId'
+      preLoaderRoute: typeof DashboardCoursesPolicyDocumentIdRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/courses/person-module/$assignmentId': {
       id: '/dashboard/courses/person-module/$assignmentId'
       path: '/courses/person-module/$assignmentId'
@@ -4276,6 +4316,7 @@ interface DashboardRouteChildren {
   DashboardHiveTrainingIndexRoute: typeof DashboardHiveTrainingIndexRoute
   DashboardTrainingIndexRoute: typeof DashboardTrainingIndexRoute
   DashboardCoursesPersonModuleAssignmentIdRoute: typeof DashboardCoursesPersonModuleAssignmentIdRoute
+  DashboardCoursesPolicyDocumentIdRoute: typeof DashboardCoursesPolicyDocumentIdRoute
   DashboardCoursesTopicTopicIdRoute: typeof DashboardCoursesTopicTopicIdRoute
   DashboardHiveTrainingCourseAssignmentIdRoute: typeof DashboardHiveTrainingCourseAssignmentIdRoute
 }
@@ -4370,6 +4411,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardTrainingIndexRoute: DashboardTrainingIndexRoute,
   DashboardCoursesPersonModuleAssignmentIdRoute:
     DashboardCoursesPersonModuleAssignmentIdRoute,
+  DashboardCoursesPolicyDocumentIdRoute: DashboardCoursesPolicyDocumentIdRoute,
   DashboardCoursesTopicTopicIdRoute: DashboardCoursesTopicTopicIdRoute,
   DashboardHiveTrainingCourseAssignmentIdRoute:
     DashboardHiveTrainingCourseAssignmentIdRoute,
@@ -4404,6 +4446,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuditPortalPackageIdRoute: AuditPortalPackageIdRoute,
   AuditPortalSetPasswordRoute: AuditPortalSetPasswordRoute,
   CertificateCodeRoute: CertificateCodeRoute,
+  SignPolicyDocumentIdRoute: SignPolicyDocumentIdRoute,
   VerifyCodeRoute: VerifyCodeRoute,
   AuditPortalIndexRoute: AuditPortalIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,

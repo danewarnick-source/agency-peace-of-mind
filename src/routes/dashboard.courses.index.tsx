@@ -3,15 +3,26 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { GraduationCap, ShieldCheck, Users, ChevronRight, Sparkles, BookOpen, AlertTriangle, Calendar } from "lucide-react";
+import { useCurrentOrg } from "@/hooks/use-org";
+import { GraduationCap, ShieldCheck, Users, ChevronRight, Sparkles, BookOpen, AlertTriangle, Calendar, FileSignature } from "lucide-react";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { getMyOtherAssignmentsSummary } from "@/lib/other-assignments.functions";
 import { getMyCeStatus } from "@/lib/ce.functions";
+import { listMyPendingPolicies } from "@/lib/policy-signatures.functions";
 
 export const Route = createFileRoute("/dashboard/courses/")({ component: MyTrainings });
 
 function MyTrainings() {
   const { user } = useAuth();
+  const { data: org } = useCurrentOrg();
+
+  const fetchPendingPolicies = useServerFn(listMyPendingPolicies);
+  const { data: pendingPolicies } = useQuery({
+    enabled: !!user && !!org?.organization_id,
+    queryKey: ["my-pending-policies", org?.organization_id, user?.id],
+    queryFn: () => fetchPendingPolicies({ data: { organizationId: org!.organization_id } }),
+  });
+  const pending = pendingPolicies?.pending ?? [];
 
   const { data: coreCount } = useQuery({
     queryKey: ["training-topics-count"],
@@ -106,6 +117,30 @@ function MyTrainings() {
         </span>
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
       </Link>
+
+      {pending.length > 0 && (
+        <div className="rounded-2xl border border-amber-400/50 bg-amber-500/5 p-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-900 dark:text-amber-200">
+            <FileSignature className="h-4 w-4" /> Policy acknowledgment needed
+          </div>
+          <ul className="space-y-1.5">
+            {pending.map((p) => (
+              <li key={p.id}>
+                <Link
+                  to="/dashboard/courses/policy/$documentId"
+                  params={{ documentId: p.id }}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-amber-300/60 bg-background/60 px-3 py-2 text-sm transition hover:bg-amber-500/10"
+                >
+                  <span className="min-w-0 truncate font-medium">{p.title}</span>
+                  <span className="flex shrink-0 items-center gap-1 text-xs text-amber-700 dark:text-amber-300">
+                    Sign now <ChevronRight className="h-3.5 w-3.5" />
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Link

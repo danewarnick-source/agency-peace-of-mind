@@ -88,6 +88,7 @@ import {
   deleteStaffHoursEntry,
 } from "@/lib/hr-training-hours.functions";
 import { recordAttestation, listAttestations } from "@/lib/document-attestations.functions";
+import { listPolicyAcknowledgmentsForStaff } from "@/lib/policy-signatures.functions";
 
 export const Route = createFileRoute("/dashboard/employees/$staffId")({
   component: () => (
@@ -1532,6 +1533,66 @@ function CertSection({
   );
 }
 
+// Policy acknowledgments — structurally parallel to "Required trainings"
+// above. Note: this repo has no page literally named "Compliance Health";
+// this per-staff requirements checklist (with its existing
+// current/expiring/overdue/todo/na StatusKind + dotColor vocabulary) is the
+// closest real equivalent, so the "Met / At risk / Missing" status the task
+// spec describes is expressed here as current / expiring / overdue+todo.
+function PolicyAcknowledgmentsSection({
+  organizationId,
+  staffId,
+  dotColor,
+}: {
+  organizationId: string;
+  staffId: string;
+  dotColor: (kind: "current" | "expiring" | "overdue" | "todo" | "na") => string;
+}) {
+  const fetchFn = useServerFn(listPolicyAcknowledgmentsForStaff);
+  const { data, isLoading } = useQuery({
+    queryKey: ["policy-acknowledgments-for-staff", organizationId, staffId],
+    queryFn: () => fetchFn({ data: { organizationId, staffUserId: staffId } }),
+  });
+
+  const policies = data?.policies ?? [];
+  if (isLoading || policies.length === 0) return null;
+
+  const actionCount = policies.filter((p) => !p.signed).length;
+  const currentCount = policies.filter((p) => p.signed).length;
+
+  return (
+    <CertSection
+      title="Policy acknowledgments"
+      count={currentCount}
+      total={policies.length}
+      hasAction={actionCount > 0}
+      actionCount={actionCount}
+      defaultOpen={actionCount > 0}
+    >
+      <div>
+        {policies.map((p) => {
+          const kind: "current" | "todo" = p.signed ? "current" : "todo";
+          return (
+            <div key={p.documentId} className="flex items-start gap-3 border-b border-border/30 py-3 last:border-0">
+              <span className={`mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full ${dotColor(kind)}`} />
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-sm">{p.title}</div>
+                <div className="mt-0.5 text-[11px] text-muted-foreground">
+                  {p.gateAppAccess ? "Gates app access until signed · " : ""}
+                  {p.cadence === "annual" ? "Annual re-acknowledgment" : p.cadence === "every_2_years" ? "Re-acknowledgment every 2 years" : "One-time acknowledgment"}
+                </div>
+              </div>
+              <span className={`text-[11px] font-medium ${p.signed ? "text-emerald-700 dark:text-emerald-300" : "text-rose-600"}`}>
+                {p.signed ? `Signed ${p.signedAt ? new Date(p.signedAt).toLocaleDateString() : ""}` : "Not signed"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </CertSection>
+  );
+}
+
 function CertsTab({
   organizationId,
   staffId,
@@ -2154,6 +2215,8 @@ function CertsTab({
           </CertSection>
         );
       })()}
+
+      <PolicyAcknowledgmentsSection organizationId={organizationId} staffId={staffId} dotColor={dotColor} />
 
       {/* Other rows by category */}
       {Array.from(otherByCategory.entries())

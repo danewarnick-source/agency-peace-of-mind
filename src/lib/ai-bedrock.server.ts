@@ -52,6 +52,11 @@ function getClient(): BedrockRuntimeClient {
   const region = process.env.AWS_REGION;
   const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
   const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+  // Only set on Lambda, where AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY are reserved
+  // env vars auto-populated with the execution role's temporary credentials —
+  // those require the session token to authenticate. Undefined everywhere else
+  // (e.g. Cloudflare Workers with static long-lived creds), so this is a no-op there.
+  const sessionToken = process.env.AWS_SESSION_TOKEN;
   if (!region) throw new BedrockError(500, "AWS_REGION is not configured.");
   if (!accessKeyId || !secretAccessKey) {
     throw new BedrockError(
@@ -61,7 +66,7 @@ function getClient(): BedrockRuntimeClient {
   }
   return new BedrockRuntimeClient({
     region,
-    credentials: { accessKeyId, secretAccessKey },
+    credentials: { accessKeyId, secretAccessKey, sessionToken },
     requestHandler: new FetchHttpHandler(),
   });
 }

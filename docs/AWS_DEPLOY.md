@@ -148,6 +148,17 @@ selected when you use Bedrock. Also open
    - Origin domain: paste the Lambda Function URL host from Step 4.10
      (just the hostname, e.g. `abc123.lambda-url.REGION.on.aws`, no `https://`).
    - Protocol: **HTTPS only**.
+
+   > **If there's no "Add origin" option** (some accounts/regions only allow
+   > one origin in the creation wizard): finish creating the distribution
+   > with just Origin 1, then add Origin 2 afterward — open the distribution
+   > → **Origins** tab → **Create origin** → fill in the same Lambda
+   > Function URL host + **HTTPS only** as above → Save. Then go to the
+   > **Behaviors** tab → select **Default (\*)** → **Edit** → change its
+   > **Origin** dropdown to the SSR origin you just created, and set the
+   > Viewer protocol policy / allowed methods / cache policy / origin
+   > request policy from Step 5.5 below → Save changes. Continue with Step 6
+   > onward as written.
 5. **Default cache behavior** (this becomes the catch-all `*` behavior):
    - Origin: the **Lambda Function URL** origin.
    - Viewer protocol policy: **Redirect HTTP to HTTPS**.

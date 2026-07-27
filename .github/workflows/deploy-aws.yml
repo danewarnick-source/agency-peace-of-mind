@@ -5,6 +5,11 @@ name: Deploy AWS (parallel target)
 # Lovable's GitHub sync manages — it only runs `npm run build:aws` (a separate
 # nitro preset, see vite.config.ts) and ships that output to S3 + Lambda.
 # See docs/AWS_DEPLOY.md for the one-time AWS console setup this depends on.
+#
+# Trigger note: AWS_LAMBDA_FUNCTION_NAME/AWS_REGION secrets were corrected
+# after a prior run failed with ResourceNotFoundException on the Lambda
+# function name/region mismatch. This comment-only touch forces a fresh run
+# to confirm the fix.
 
 on:
   push:

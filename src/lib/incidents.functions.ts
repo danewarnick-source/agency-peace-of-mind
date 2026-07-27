@@ -188,7 +188,7 @@ export const listIncidents = createServerFn({ method: "GET" })
     let q = supabase
       .from("incident_reports")
       .select(
-        "id, report_number, client_id, reported_by, discovered_at, occurred_at, category, description, location, status, is_abuse_neglect, is_fatality, prevention_strategies, guardian_notified_at, guardian_notified_method, guardian_notified_by, guardian_notified_details, upi_submitted_at, upi_submitted_by, upi_submitted_attestation_text, upi_submitted_signed_name, upi_submitted_signed_title, followup_notes, created_at, details, witnessed_directly, reported_to_reporter_by, restraint_used, aps_notified_at, aps_notified_by, aps_reference, ai_review_status, ai_review_issues, ai_review_at, clients:client_id(first_name,last_name)",
+        "id, report_number, client_id, reported_by, discovered_at, category, status, is_abuse_neglect, is_fatality, guardian_notified_at, upi_submitted_at, followup_notes, clients:client_id(first_name,last_name)",
       )
       .eq("organization_id", m.organization_id)
       .order("discovered_at", { ascending: false, nullsFirst: false })
@@ -206,35 +206,70 @@ export const listIncidents = createServerFn({ method: "GET" })
     return { incidents: rows ?? [] };
   });
 
-/** Trends feed: monthly counts, category breakdown, per-client counts.
- *  Reads incident_reports directly; no aggregate tables. */
+/** Heavy fields deferred out of listIncidents — loaded once, on expand. */
+const detailInput = z.object({
+  organization_id: z.string().uuid(),
+  id: z.string().uuid(),
+});
+
+export const getIncidentDetail = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => detailInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const m = await getMembership(supabase, userId, data.organization_id);
+
+    const { data: row, error } = await supabase
+      .from("incident_reports")
+      .select(
+        "id, occurred_at, location, description, prevention_strategies, guardian_notified_method, guardian_notified_by, guardian_notified_details, upi_submitted_by, upi_submitted_attestation_text, upi_submitted_signed_name, upi_submitted_signed_title, created_at, details, witnessed_directly, reported_to_reporter_by, restraint_used, aps_notified_at, aps_notified_by, aps_reference, ai_review_status, ai_review_issues, ai_review_at",
+      )
+      .eq("organization_id", m.organization_id)
+      .eq("id", data.id)
+      .single();
+    if (error) throw new Error(error.message);
+    return { incident: row };
+  });
+
+/** Trends feed: monthly category counts (trailing 6 months, always) and
+ *  per-client counts (caller-supplied [from..to], defaults to the same
+ *  6-month window). Both are aggregated in the database via RPC — see
+ *  incident_monthly_category_counts / incident_client_counts in
+ *  docs/SQL_HANDOFF.md — instead of pulling raw rows and summing in JS. */
 export const incidentTrends = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z.object({
       organization_id: z.string().uuid(),
-      from: z.string().datetime().optional().nullable(),
-      to: z.string().datetime().optional().nullable(),
+      from: z.string().optional().nullable(),
+      to: z.string().optional().nullable(),
     }).parse(d ?? {}),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
-    const m = await requireManager(supabase, userId, data.organization_id);
+    const m = await getMembership(supabase, userId, data.organization_id);
+    if (!isManager(m.role)) throw new Error("Admin or manager access required.");
 
-    // Trailing-6-month window for the bar chart (always); the caller-supplied
-    // [from..to] only filters the per-client table.
     const now = new Date();
     const sixMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5, 1));
+    const rangeFrom = data.from ? new Date(data.from) : sixMonthStart;
+    const rangeTo = data.to ? new Date(new Date(data.to).getTime() + 86_399_999) : now;
 
-    const { data: rows, error } = await supabase
-      .from("incident_reports")
-      .select("id, client_id, discovered_at, category, created_at, clients:client_id(first_name,last_name)")
-      .eq("organization_id", m.organization_id)
-      .gte("discovered_at", sixMonthStart.toISOString())
-      .limit(5000);
-    if (error) throw new Error(error.message);
+    const [monthlyRes, perClientRes] = await Promise.all([
+      supabase.rpc("incident_monthly_category_counts", {
+        _org: m.organization_id,
+        _since: sixMonthStart.toISOString(),
+      }),
+      supabase.rpc("incident_client_counts", {
+        _org: m.organization_id,
+        _from: rangeFrom.toISOString(),
+        _to: rangeTo.toISOString(),
+      }),
+    ]);
+    if (monthlyRes.error) throw new Error(monthlyRes.error.message);
+    if (perClientRes.error) throw new Error(perClientRes.error.message);
 
-    return { rows: rows ?? [] };
+    return { monthly: monthlyRes.data ?? [], perClient: perClientRes.data ?? [] };
   });
 
 

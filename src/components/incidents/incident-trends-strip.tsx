@@ -9,18 +9,18 @@ import { incidentTrends } from "@/lib/incidents.functions";
 import { useCurrentOrg } from "@/hooks/use-org";
 
 
-type Row = {
-  id: string;
-  client_id: string;
-  discovered_at: string | null;
-  category: string | null;
-  created_at: string;
-  clients: { first_name: string; last_name: string } | null;
+type MonthlyCategoryRow = {
+  month_key: string;
+  category: string;
+  incident_count: number;
 };
 
-function monthKey(d: Date): string {
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-}
+type ClientCountRow = {
+  client_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  incident_count: number;
+};
 
 function monthLabel(key: string): string {
   const [y, m] = key.split("-").map(Number);
@@ -33,11 +33,12 @@ export type TrendFilter =
   | { kind: "client"; clientId: string };
 
 /**
- * Compact trends strip for the admin Incident Log. Reads incident_reports
- * for the trailing 6 months and derives three panels client-side:
- *   • monthly counts (bar chart)
- *   • current vs prior month category breakdown
- *   • per-client counts inside the caller-supplied [from..to] range
+ * Compact trends strip for the admin Incident Log. The server pre-aggregates
+ * both feeds via GROUP BY RPCs (see incidentTrends) — no raw incident rows
+ * are fetched here:
+ *   • monthly category counts, trailing 6 months → bar chart + category
+ *     breakdown (current vs prior month)
+ *   • per-client counts, filtered to the caller-supplied [from..to] range
  * Every segment / bar / row click hands a TrendFilter to onPick so the log
  * below it can pre-filter without a round-trip.
  */
@@ -55,19 +56,19 @@ export function IncidentTrendsStrip({
   const activeOrgId = org?.organization_id ?? null;
   const { data, isLoading } = useQuery({
     enabled: !!activeOrgId,
-    queryKey: ["incident-trends", activeOrgId],
-    queryFn: () => fn({ data: { organization_id: activeOrgId! } }),
+    queryKey: ["incident-trends", activeOrgId, rangeFrom, rangeTo],
+    queryFn: () => fn({ data: { organization_id: activeOrgId!, from: rangeFrom || null, to: rangeTo || null } }),
     staleTime: 60_000,
   });
-  const rows = (data?.rows ?? []) as Row[];
-
+  const monthlyRows = (data?.monthly ?? []) as MonthlyCategoryRow[];
+  const perClientRows = (data?.perClient ?? []) as ClientCountRow[];
 
   const now = new Date();
   const months = useMemo(() => {
     const out: { key: string; label: string }[] = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-      const k = monthKey(d);
+      const k = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
       out.push({ key: k, label: monthLabel(k) });
     }
     return out;
@@ -76,13 +77,11 @@ export function IncidentTrendsStrip({
 
   const monthly = useMemo(() => {
     const counts = new Map(months.map((m) => [m.key, 0]));
-    for (const r of rows) {
-      const ts = r.discovered_at ?? r.created_at;
-      const k = monthKey(new Date(ts));
-      if (counts.has(k)) counts.set(k, (counts.get(k) ?? 0) + 1);
+    for (const r of monthlyRows) {
+      if (counts.has(r.month_key)) counts.set(r.month_key, (counts.get(r.month_key) ?? 0) + r.incident_count);
     }
     return months.map((m) => ({ month: m.label, key: m.key, count: counts.get(m.key) ?? 0 }));
-  }, [months, rows]);
+  }, [months, monthlyRows]);
 
   const currentMonthKey = months[months.length - 1].key;
   const priorMonthKey = months[months.length - 2]?.key ?? currentMonthKey;
@@ -90,12 +89,9 @@ export function IncidentTrendsStrip({
   const categoryBreakdown = useMemo(() => {
     const cur = new Map<string, number>();
     const prev = new Map<string, number>();
-    for (const r of rows) {
-      const cat = r.category ?? "Uncategorized";
-      const ts = r.discovered_at ?? r.created_at;
-      const k = monthKey(new Date(ts));
-      if (k === currentMonthKey) cur.set(cat, (cur.get(cat) ?? 0) + 1);
-      else if (k === priorMonthKey) prev.set(cat, (prev.get(cat) ?? 0) + 1);
+    for (const r of monthlyRows) {
+      if (r.month_key === currentMonthKey) cur.set(r.category, (cur.get(r.category) ?? 0) + r.incident_count);
+      else if (r.month_key === priorMonthKey) prev.set(r.category, (prev.get(r.category) ?? 0) + r.incident_count);
     }
     const keys = new Set([...cur.keys(), ...prev.keys()]);
     return [...keys]
@@ -105,30 +101,22 @@ export function IncidentTrendsStrip({
         prior: prev.get(category) ?? 0,
       }))
       .sort((a, b) => b.current - a.current || b.prior - a.prior);
-  }, [rows, currentMonthKey, priorMonthKey]);
+  }, [monthlyRows, currentMonthKey, priorMonthKey]);
 
   const perClient = useMemo(() => {
-    const fromTs = rangeFrom ? new Date(rangeFrom).getTime() : 0;
-    const toTs = rangeTo ? new Date(rangeTo + "T23:59:59").getTime() : Number.POSITIVE_INFINITY;
-    const counts = new Map<string, { name: string; count: number }>();
-    for (const r of rows) {
-      const ts = new Date(r.discovered_at ?? r.created_at).getTime();
-      if (ts < fromTs || ts > toTs) continue;
-      const name = r.clients ? `${r.clients.first_name} ${r.clients.last_name}`.trim() : r.client_id.slice(0, 8);
-      const prev = counts.get(r.client_id) ?? { name, count: 0 };
-      prev.count += 1;
-      counts.set(r.client_id, prev);
-    }
-    return [...counts.entries()]
-      .map(([id, v]) => ({ id, ...v }))
-      .sort((a, b) => b.count - a.count)
+    return perClientRows
+      .map((r) => ({
+        id: r.client_id,
+        name: `${r.first_name ?? ""} ${r.last_name ?? ""}`.trim() || r.client_id.slice(0, 8),
+        count: r.incident_count,
+      }))
       .slice(0, 12);
-  }, [rows, rangeFrom, rangeTo]);
+  }, [perClientRows]);
 
   if (isLoading) {
     return <Card><CardContent className="py-6 text-xs text-muted-foreground">Loading incident trends…</CardContent></Card>;
   }
-  if (!rows.length) {
+  if (!monthlyRows.length && !perClientRows.length) {
     return (
       <Card>
         <CardContent className="py-6 text-xs text-muted-foreground">

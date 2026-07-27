@@ -79,8 +79,10 @@ jobs:
             --function-name "${{ secrets.AWS_LAMBDA_FUNCTION_NAME }}"
 
       - name: Invalidate CloudFront cache
-        if: ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID != '' }}
+        if: env.DISTRIBUTION_ID != ''
+        env:
+          DISTRIBUTION_ID: ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }}
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id "${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --distribution-id "$DISTRIBUTION_ID" \
             --paths "/*"

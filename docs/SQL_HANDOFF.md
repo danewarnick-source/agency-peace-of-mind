@@ -1122,3 +1122,94 @@ WHERE status IS NOT NULL AND status <> '' AND status <> 'State_Confirmed';
 ```
 
 **What you'll see:** `0`.
+
+---
+
+## 19. Incident trends aggregation RPCs (Incidents tab performance — 2026-07-27)
+
+**What this is for:** The Documentation > Incidents tab was taking 10-30s to
+load. Part of the fix was moving `incidentTrends`
+(`src/lib/incidents.functions.ts`) off a client-side aggregation over up to
+5,000 raw rows and onto two `GROUP BY` queries in the database. These are
+`SECURITY DEFINER` functions (same admin/manager-only gate as the app-side
+`isManager()` check) so they can run the aggregation without handing the
+client raw row access.
+
+```sql
+CREATE OR REPLACE FUNCTION public.incident_monthly_category_counts(
+  _org uuid,
+  _since timestamptz
+)
+RETURNS TABLE (
+  month_key text,
+  category text,
+  incident_count bigint
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.organization_members
+    WHERE organization_id = _org AND user_id = auth.uid() AND active
+      AND role IN ('admin', 'manager', 'super_admin')
+  ) THEN
+    RAISE EXCEPTION 'Admin or manager access required.';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    to_char(date_trunc('month', coalesce(r.discovered_at, r.created_at)), 'YYYY-MM') AS month_key,
+    coalesce(r.category, 'Uncategorized') AS category,
+    count(*) AS incident_count
+  FROM public.incident_reports r
+  WHERE r.organization_id = _org
+    AND coalesce(r.discovered_at, r.created_at) >= _since
+  GROUP BY 1, 2;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.incident_client_counts(
+  _org uuid,
+  _from timestamptz,
+  _to timestamptz
+)
+RETURNS TABLE (
+  client_id uuid,
+  first_name text,
+  last_name text,
+  incident_count bigint
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.organization_members
+    WHERE organization_id = _org AND user_id = auth.uid() AND active
+      AND role IN ('admin', 'manager', 'super_admin')
+  ) THEN
+    RAISE EXCEPTION 'Admin or manager access required.';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    r.client_id,
+    c.first_name,
+    c.last_name,
+    count(*) AS incident_count
+  FROM public.incident_reports r
+  LEFT JOIN public.clients c ON c.id = r.client_id
+  WHERE r.organization_id = _org
+    AND coalesce(r.discovered_at, r.created_at) >= _from
+    AND coalesce(r.discovered_at, r.created_at) <= _to
+  GROUP BY r.client_id, c.first_name, c.last_name
+  ORDER BY count(*) DESC
+  LIMIT 12;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.incident_monthly_category_counts(uuid, timestamptz) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.incident_client_counts(uuid, timestamptz, timestamptz) TO authenticated;
+```
+
+**What you'll see:** two `CREATE OR REPLACE FUNCTION` and two `GRANT
+EXECUTE`. No tables, columns, or existing rows are touched. Until this runs,
+the Incidents tab's trends strip (bar chart / category breakdown / per-client
+table) will error — the app code calls these two functions by name.

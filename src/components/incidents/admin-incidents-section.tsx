@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
   listIncidents,
+  getIncidentDetail,
   submitToUpi,
   updateIncidentFollowupNotes,
   getIncidentActors,
@@ -32,33 +33,42 @@ type ClientLite = {
   last_name: string;
 };
 
-type Incident = {
+/** Lean summary row — enough to render the collapsed card. Matches
+ *  listIncidents' select exactly; heavy fields live in IncidentDetail. */
+type IncidentSummary = {
   id: string;
   report_number: string;
   client_id: string;
   reported_by: string;
   discovered_at: string | null;
-  occurred_at: string | null;
   category: string | null;
-  description: string | null;
-  location: string | null;
   status: string;
   is_abuse_neglect: boolean;
   is_fatality: boolean;
-  prevention_strategies: string | null;
   guardian_notified_at: string | null;
+  upi_submitted_at: string | null;
+  followup_notes: string | null;
+  clients: ClientLite | null;
+};
+
+/** Heavy fields loaded once, on expand, via getIncidentDetail. */
+type IncidentDetail = {
+  occurred_at: string | null;
+  location: string | null;
+  description: string | null;
+  prevention_strategies: string | null;
   guardian_notified_method: string | null;
   guardian_notified_by: string | null;
   guardian_notified_details?: string | null;
-  upi_submitted_at: string | null;
   upi_submitted_by: string | null;
+  upi_submitted_attestation_text?: string | null;
   upi_submitted_signed_name?: string | null;
   upi_submitted_signed_title?: string | null;
-  followup_notes: string | null;
   created_at: string;
-  clients: ClientLite | null;
   restraint_used?: boolean | null;
   aps_notified_at?: string | null;
+  aps_notified_by?: string | null;
+  aps_reference?: string | null;
   ai_review_status?: string | null;
   ai_review_issues?: Array<{ field?: string | null; severity: string; question: string; answer?: string | null; not_applicable_reason?: string | null }> | null;
   ai_review_at?: string | null;
@@ -265,14 +275,48 @@ function IncidentCard({
   actors,
   onSubmitUpi,
 }: {
-  ir: Incident;
+  ir: IncidentSummary;
   actors: Map<string, string>;
   onSubmitUpi: (id: string) => void;
 }) {
   const { can } = usePermissions();
+  const { data: org } = useCurrentOrg();
   const canManageIncidents = can("manage_incidents");
   const [expanded, setExpanded] = useState(false);
-  const discovered = ir.discovered_at ? new Date(ir.discovered_at) : new Date(ir.created_at);
+  const detailFn = useServerFn(getIncidentDetail);
+  const { data: detailData, isLoading: detailLoading } = useQuery({
+    enabled: expanded && !!org?.organization_id,
+    queryKey: ["incident-detail", ir.id],
+    queryFn: () => detailFn({ data: { organization_id: org!.organization_id, id: ir.id } }),
+    staleTime: 60_000,
+  });
+  const detail = detailData?.incident as IncidentDetail | undefined;
+
+  // Reporter name comes from the parent's actor map (already resolved for
+  // the visible list). The UPI-submitter / guardian-notifier names only
+  // exist once the detail fetch resolves, so they're looked up separately,
+  // scoped to this card, instead of bloating the list-wide actor lookup.
+  const detailActorsFn = useServerFn(getIncidentActors);
+  const detailActorIds = useMemo(() => {
+    const s = new Set<string>();
+    if (detail?.upi_submitted_by) s.add(detail.upi_submitted_by);
+    if (detail?.guardian_notified_by) s.add(detail.guardian_notified_by);
+    return [...s];
+  }, [detail]);
+  const { data: detailActorsData } = useQuery({
+    enabled: detailActorIds.length > 0 && !!org?.organization_id,
+    queryKey: ["incident-actors-detail", ir.id, detailActorIds.join(",")],
+    queryFn: () => detailActorsFn({ data: { organization_id: org!.organization_id, user_ids: detailActorIds } }),
+  });
+  const detailActors = useMemo(() => {
+    const m = new Map(actors);
+    for (const p of (detailActorsData?.profiles ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null }>) {
+      m.set(p.id, `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.id.slice(0, 8));
+    }
+    return m;
+  }, [actors, detailActorsData]);
+
+  const discovered = ir.discovered_at ? new Date(ir.discovered_at) : new Date();
   const upiDeadline = new Date(discovered.getTime() + 24 * 3_600_000);
   const clientName = ir.clients ? `${ir.clients.first_name} ${ir.clients.last_name}` : "Client";
   const closed = ir.status === "State_Confirmed";
@@ -293,7 +337,7 @@ function IncidentCard({
             </CardTitle>
             <p className="text-xs text-muted-foreground">
               {ir.category ?? "Uncategorized"}
-              {ir.location ? ` · ${ir.location}` : ""}
+              {detail?.location ? ` · ${detail.location}` : ""}
             </p>
           </div>
           <div className="flex items-start gap-2">
@@ -319,8 +363,8 @@ function IncidentCard({
       {!expanded && (
         <CardContent className="pt-0 pb-3">
           <div className="flex flex-wrap items-center gap-2">
-            {ir.is_abuse_neglect && !ir.aps_notified_at && (
-              <Badge className="bg-rose-600 text-white">APS-PENDING</Badge>
+            {ir.is_abuse_neglect && (
+              <Badge className="bg-rose-600 text-white">Abuse/Neglect</Badge>
             )}
             {!ir.upi_submitted_at && <Badge variant="outline">UPI not submitted</Badge>}
             {closed && <Badge className="bg-emerald-600 text-white">Completed</Badge>}
@@ -329,22 +373,26 @@ function IncidentCard({
       )}
       {expanded && (
       <CardContent className="space-y-3 pt-1">
-        {ir.description && (
-          <p className="whitespace-pre-wrap rounded-md bg-muted/40 px-3 py-2 text-xs">{ir.description}</p>
+        {detailLoading || !detail ? (
+          <p className="text-xs text-muted-foreground">Loading incident details…</p>
+        ) : (
+        <>
+        {detail.description && (
+          <p className="whitespace-pre-wrap rounded-md bg-muted/40 px-3 py-2 text-xs">{detail.description}</p>
         )}
-        {ir.is_abuse_neglect && ir.prevention_strategies && (
+        {ir.is_abuse_neglect && detail.prevention_strategies && (
           <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs dark:bg-amber-950/30">
             <p className="font-semibold text-amber-800 dark:text-amber-100">Prevention strategies (§1.27(3))</p>
-            <p className="whitespace-pre-wrap text-amber-900 dark:text-amber-100">{ir.prevention_strategies}</p>
+            <p className="whitespace-pre-wrap text-amber-900 dark:text-amber-100">{detail.prevention_strategies}</p>
           </div>
         )}
 
         <div className="flex flex-wrap items-center gap-2">
           <CountdownPill deadline={upiDeadline} done={!!ir.upi_submitted_at} totalHours={24} label="UPI submission + guardian notice · 24h" />
-          {ir.is_abuse_neglect && !ir.aps_notified_at && (
+          {ir.is_abuse_neglect && !detail.aps_notified_at && (
             <Badge className="bg-rose-600 text-white">APS-PENDING</Badge>
           )}
-          {ir.restraint_used && (
+          {detail.restraint_used && (
             <Badge className="bg-amber-600 text-white">RESTRAINT</Badge>
           )}
           {closed && <Badge className="bg-emerald-600 text-white">Completed</Badge>}
@@ -355,21 +403,21 @@ function IncidentCard({
             {ir.upi_submitted_at && (
               <div>
                 Submitted to UPI {fmtDate(ir.upi_submitted_at)}
-                <ActorNames ids={[ir.upi_submitted_by]} actors={actors} />
-                {ir.upi_submitted_signed_name && (
-                  <span> · signed by {ir.upi_submitted_signed_name}{ir.upi_submitted_signed_title ? `, ${ir.upi_submitted_signed_title}` : ""}</span>
+                <ActorNames ids={[detail.upi_submitted_by]} actors={detailActors} />
+                {detail.upi_submitted_signed_name && (
+                  <span> · signed by {detail.upi_submitted_signed_name}{detail.upi_submitted_signed_title ? `, ${detail.upi_submitted_signed_title}` : ""}</span>
                 )}
               </div>
             )}
             {ir.guardian_notified_at && (
               <div>
-                {ir.guardian_notified_method === "self_guardian_na"
+                {detail.guardian_notified_method === "self_guardian_na"
                   ? "Self-guardian / guardian notification not applicable"
-                  : `Guardian notified (${ir.guardian_notified_method ?? "—"})`}
+                  : `Guardian notified (${detail.guardian_notified_method ?? "—"})`}
                 {" "}{fmtDate(ir.guardian_notified_at)}
-                <ActorNames ids={[ir.guardian_notified_by]} actors={actors} />
-                {ir.guardian_notified_details && (
-                  <div className="mt-0.5 whitespace-pre-wrap text-foreground">↳ {ir.guardian_notified_details}</div>
+                <ActorNames ids={[detail.guardian_notified_by]} actors={detailActors} />
+                {detail.guardian_notified_details && (
+                  <div className="mt-0.5 whitespace-pre-wrap text-foreground">↳ {detail.guardian_notified_details}</div>
                 )}
               </div>
             )}
@@ -388,6 +436,8 @@ function IncidentCard({
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">View only — you don't have permission to edit incidents.</p>
+        )}
+        </>
         )}
       </CardContent>
       )}
@@ -441,15 +491,13 @@ export function AdminIncidentsSection({
       }),
   });
 
-  const incidents = (data?.incidents ?? []) as Incident[];
+  const incidents = (data?.incidents ?? []) as IncidentSummary[];
 
   const sorted = useMemo(() => {
     return [...incidents].sort((a, b) => {
       if (a.is_fatality !== b.is_fatality) return a.is_fatality ? -1 : 1;
-      const aAps = a.is_abuse_neglect && !a.aps_notified_at;
-      const bAps = b.is_abuse_neglect && !b.aps_notified_at;
-      if (aAps !== bAps) return aAps ? -1 : 1;
-      return (b.discovered_at ?? b.created_at).localeCompare(a.discovered_at ?? a.created_at);
+      if (a.is_abuse_neglect !== b.is_abuse_neglect) return a.is_abuse_neglect ? -1 : 1;
+      return (b.discovered_at ?? "").localeCompare(a.discovered_at ?? "");
     });
   }, [incidents]);
 
@@ -457,8 +505,6 @@ export function AdminIncidentsSection({
     const s = new Set<string>();
     for (const ir of incidents) {
       if (ir.reported_by) s.add(ir.reported_by);
-      if (ir.upi_submitted_by) s.add(ir.upi_submitted_by);
-      if (ir.guardian_notified_by) s.add(ir.guardian_notified_by);
     }
     return [...s];
   }, [incidents]);
@@ -468,13 +514,20 @@ export function AdminIncidentsSection({
     queryFn: () => actorsFn({ data: { organization_id: activeOrgId!, user_ids: actorIds } }),
   });
 
+  // Pre-populate immediately from data already in hand (the listIncidents
+  // clients join) so names render before the async staff-profile lookup
+  // resolves; the lookup then fills in reporter/attestation names without
+  // blocking the initial list render.
   const actorMap = useMemo(() => {
     const m = new Map<string, string>();
+    for (const ir of incidents) {
+      if (ir.clients) m.set(ir.client_id, `${ir.clients.first_name} ${ir.clients.last_name}`.trim());
+    }
     for (const p of (actorsData?.profiles ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null }>) {
       m.set(p.id, `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.id.slice(0, 8));
     }
     return m;
-  }, [actorsData]);
+  }, [incidents, actorsData]);
 
   const [submitUpiFor, setSubmitUpiFor] = useState<string | null>(null);
 

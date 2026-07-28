@@ -8,10 +8,6 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
     return await next();
   } catch (error) {
     if (error != null && typeof error === "object" && "statusCode" in error) {
-      // TEMPORARY: always log, even for statusCode errors we re-throw —
-      // h3/nitro has been sanitizing these down to a generic "Internal
-      // Server Error" downstream with no way to see the real cause.
-      console.error("[errorMiddleware] statusCode error, re-throwing:", error);
       throw error;
     }
     console.error(error);

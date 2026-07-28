@@ -38,6 +38,13 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
 
     const { data, error } = await supabase.auth.getUser(token);
     if (error || !data?.user) {
+      // TEMPORARY: log full detail — h3/nitro on the AWS Lambda target
+      // sanitizes every thrown error down to a generic, detail-free
+      // "Internal Server Error" downstream, so this is the only place the
+      // real cause (expired token, Supabase reachability, wrong key, etc.)
+      // will actually show up in CloudWatch. Remove once the real cause
+      // here is found and fixed.
+      console.error('[requireSupabaseAuth] getUser failed:', error, 'hasUser:', !!data?.user);
       throw new Error('Unauthorized');
     }
 

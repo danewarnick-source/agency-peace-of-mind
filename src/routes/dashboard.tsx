@@ -1,4 +1,4 @@
-import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, isRedirect, Link, Outlet, redirect, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -66,61 +66,67 @@ export const Route = createFileRoute("/dashboard")({
   // Admins keep access to the billing/subscription page so they can pay.
   beforeLoad: async ({ location }) => {
     if (typeof window === "undefined") return; // SSR has no session
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user?.id) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) return;
 
-    // Realm mutual exclusion: auditor accounts can NEVER load /dashboard/*.
-    // They are a distinct account class (auditor_accounts row, no org
-    // membership). If somehow signed into the dashboard app, kick them
-    // out to the auditor portal.
-    const { data: auditor } = await supabase
-      .from("auditor_accounts")
-      .select("id, status")
-      .eq("user_id", session.user.id)
-      .eq("status", "active")
-      .maybeSingle();
-    if (auditor) {
-      throw redirect({ to: "/audit-portal" });
+      // Realm mutual exclusion: auditor accounts can NEVER load /dashboard/*.
+      // They are a distinct account class (auditor_accounts row, no org
+      // membership). If somehow signed into the dashboard app, kick them
+      // out to the auditor portal.
+      const { data: auditor } = await supabase
+        .from("auditor_accounts")
+        .select("id, status")
+        .eq("user_id", session.user.id)
+        .eq("status", "active")
+        .maybeSingle();
+      if (auditor) {
+        throw redirect({ to: "/audit-portal" });
+      }
+
+
+      // Resolve active org (matches use-org.ts contract).
+      let activeOrgId: string | null = null;
+      try { activeOrgId = window.localStorage.getItem("hive.activeOrgId"); } catch { /* ignore */ }
+
+      // Fetch the caller's memberships once — we need role too.
+      const { data: memberships } = await supabase
+        .from("organization_members")
+        .select("organization_id, role")
+        .eq("user_id", session.user.id)
+        .eq("active", true);
+      if (!memberships || memberships.length === 0) return;
+
+      const membership =
+        memberships.find((m) => m.organization_id === activeOrgId) ?? memberships[0];
+      const orgId = membership.organization_id;
+      const isAdmin = membership.role === "admin" || membership.role === "super_admin";
+
+      const { data: sub } = await supabase
+        .from("org_subscriptions")
+        .select("locked_at")
+        .eq("organization_id", orgId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!sub?.locked_at) return;
+
+      // Locked. Allow admins on the billing/subscription page so they can pay.
+      const path = location.pathname;
+      const billingAllowlist = [
+        "/dashboard/billing/subscription",
+        "/dashboard/settings/subscription",
+      ];
+      if (isAdmin && billingAllowlist.some((p) => path === p || path.startsWith(p + "/"))) {
+        return;
+      }
+      throw redirect({ to: "/billing-locked" });
+    } catch (err) {
+      if (isRedirect(err)) throw err;
+      console.error("dashboard beforeLoad error:", err);
+      return; // fail open — client handles auth redirect
     }
-
-
-    // Resolve active org (matches use-org.ts contract).
-    let activeOrgId: string | null = null;
-    try { activeOrgId = window.localStorage.getItem("hive.activeOrgId"); } catch { /* ignore */ }
-
-    // Fetch the caller's memberships once — we need role too.
-    const { data: memberships } = await supabase
-      .from("organization_members")
-      .select("organization_id, role")
-      .eq("user_id", session.user.id)
-      .eq("active", true);
-    if (!memberships || memberships.length === 0) return;
-
-    const membership =
-      memberships.find((m) => m.organization_id === activeOrgId) ?? memberships[0];
-    const orgId = membership.organization_id;
-    const isAdmin = membership.role === "admin" || membership.role === "super_admin";
-
-    const { data: sub } = await supabase
-      .from("org_subscriptions")
-      .select("locked_at")
-      .eq("organization_id", orgId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (!sub?.locked_at) return;
-
-    // Locked. Allow admins on the billing/subscription page so they can pay.
-    const path = location.pathname;
-    const billingAllowlist = [
-      "/dashboard/billing/subscription",
-      "/dashboard/settings/subscription",
-    ];
-    if (isAdmin && billingAllowlist.some((p) => path === p || path.startsWith(p + "/"))) {
-      return;
-    }
-    throw redirect({ to: "/billing-locked" });
   },
   component: DashboardLayout,
   errorComponent: DashboardShellError,

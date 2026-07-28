@@ -14,6 +14,7 @@ export const listClientAuthorizedCodes = createServerFn({ method: "POST" })
       clientId: z.string().uuid(),
     }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [];
     const today = new Date().toISOString().slice(0, 10);
     const { data: rows, error } = await context.supabase
       .from("client_billing_codes")

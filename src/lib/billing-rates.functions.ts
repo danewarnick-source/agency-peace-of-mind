@@ -19,6 +19,7 @@ export const getRateAsOf = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return null;
     const { data: rows, error } = await supabase.rpc("get_rate_as_of", {
       _client_id: data.clientId,
       _service_code: data.serviceCode,
@@ -56,6 +57,7 @@ export const listRateHistory = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<RateHistoryRow[]> => {
     const { supabase } = context;
+    if (!supabase) return [];
     const { data: rows, error } = await supabase
       .from("client_billing_code_rate_history")
       .select("id, rate_per_unit, unit_type, effective_start, effective_end, rate_source, rate_source_plan_number, superseded_at")

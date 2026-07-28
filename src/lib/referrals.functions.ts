@@ -26,6 +26,7 @@ export const listSupportCoordinators = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await requireAnyPermission(supabase, userId, data.organization_id, ["view_referrals", "manage_referrals"]);
     const { data: rows, error } = await supabase
       .from("support_coordinators")
@@ -49,6 +50,7 @@ export const createSupportCoordinator = createServerFn({ method: "POST" })
   .inputValidator((d) => createScInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
     const { data: row, error } = await supabase
       .from("support_coordinators")
@@ -97,6 +99,7 @@ export const listReferrals = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await requireAnyPermission(supabase, userId, data.organization_id, ["view_referrals", "manage_referrals"]);
     const { data: rows, error } = await supabase
       .from("referrals")
@@ -116,6 +119,7 @@ export const createReferral = createServerFn({ method: "POST" })
   .inputValidator((d) => createReferralInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
 
     const { data: row, error } = await supabase
@@ -159,6 +163,7 @@ export const findPossibleDuplicateReferral = createServerFn({ method: "POST" })
   .inputValidator((d) => dupCheckInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await requireAnyPermission(supabase, userId, data.organization_id, ["view_referrals", "manage_referrals"]);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: rows, error } = await (supabase as any).rpc(
@@ -222,6 +227,7 @@ export const updateReferralStage = createServerFn({ method: "POST" })
   .inputValidator((d) => updateStageInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
 
     const patch = {
@@ -262,6 +268,7 @@ export const addReferralActivity = createServerFn({ method: "POST" })
   .inputValidator((d) => addActivityInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
     const { data: row, error } = await supabase
       .from("referral_activities")
@@ -291,6 +298,7 @@ export const editReferralNote = createServerFn({ method: "POST" })
   .inputValidator((d) => editNoteInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
     const { data: orig, error: oErr } = await supabase
       .from("referral_activities")
@@ -325,6 +333,7 @@ export const listReferralActivities = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await requireAnyPermission(supabase, userId, data.organization_id, ["view_referrals", "manage_referrals"]);
     const { data: rows, error } = await supabase
       .from("referral_activities")
@@ -344,6 +353,9 @@ export const getReferralPipelineStats = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return { by_stage: {}, placed: 0, passed: 0, total: 0 };
+    }
     await requireAnyPermission(supabase, userId, data.organization_id, ["view_referrals", "manage_referrals"]);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: stats, error } = await (supabase as any).rpc(

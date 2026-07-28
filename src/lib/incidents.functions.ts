@@ -86,6 +86,7 @@ export const createIncident = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => createInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { id: null, report_number: null };
     const m = await getMembership(supabase, userId, data.organization_id);
 
     if (data.is_abuse_neglect && !(data.prevention_strategies?.trim())) {
@@ -182,6 +183,7 @@ export const listIncidents = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => filtersInput.parse(d ?? {}))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { incidents: [] };
     const m = await getMembership(supabase, userId, data.organization_id);
 
 
@@ -217,6 +219,7 @@ export const getIncidentDetail = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => detailInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { incident: null };
     const m = await getMembership(supabase, userId, data.organization_id);
 
     const { data: row, error } = await supabase
@@ -247,6 +250,7 @@ export const incidentTrends = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { monthly: [], perClient: [] };
     const m = await getMembership(supabase, userId, data.organization_id);
     if (!isManager(m.role)) throw new Error("Admin or manager access required.");
 
@@ -311,6 +315,7 @@ export const submitToUpi = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { ok: false };
     await requireManager(supabase, userId, data.organization_id);
 
     if (data.guardian_contacted && !data.guardian_method) {
@@ -348,6 +353,7 @@ export const updateIncidentFollowupNotes = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { ok: false };
     await requireManager(supabase, userId, data.organization_id);
 
     const { error } = await supabase
@@ -367,6 +373,7 @@ export const getIncidentActors = createServerFn({ method: "GET" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { profiles: [] };
     await getMembership(supabase, userId, data.organization_id);
 
     if (!data.user_ids.length) return { profiles: [] };
@@ -394,6 +401,7 @@ export const hasSubmittedIncidentForClientDate = createServerFn({ method: "GET" 
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { submitted: false, incident: null };
     const m = await getMembership(supabase, userId, data.organization_id);
 
     const start = new Date(`${data.date}T00:00:00`).toISOString();
@@ -423,6 +431,7 @@ export const signIncidentPhotos = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { urls: {} as Record<string, string> };
     await getMembership(supabase, userId, data.organization_id);
 
     if (!data.paths.length) return { urls: {} as Record<string, string> };

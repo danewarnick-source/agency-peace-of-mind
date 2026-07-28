@@ -55,6 +55,7 @@ export const setEndOfLifeStatus = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as Sb;
+    if (!sb || !context.userId) return { ok: false };
     await requireAdminForClient(sb, context.userId as string, data.clientId);
     const patch: Record<string, unknown> = { [data.field as EolField]: data.status };
     if (data.field === "dnr_status") {
@@ -79,6 +80,7 @@ export const appendClientArrayField = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as Sb;
+    if (!sb || !context.userId) return { ok: false, count: 0 };
     await requireAdminForClient(sb, context.userId as string, data.clientId);
     const { data: row } = await sb
       .from("clients")
@@ -115,6 +117,7 @@ export const upsertClientMedication = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as Sb;
+    if (!sb || !context.userId) return { ok: false, id: null };
     const orgId = await requireAdminForClient(sb, context.userId as string, data.clientId);
     const row = {
       client_id: data.clientId,
@@ -162,6 +165,7 @@ export const attachClientDocument = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as Sb;
+    if (!sb || !context.userId) return { ok: false, id: null };
     const orgId = await requireAdminForClient(sb, context.userId as string, data.clientId);
     const { data: ins, error } = await sb
       .from("client_documents")
@@ -209,6 +213,7 @@ export const extractAndApplyClientUpload = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => ExtractApplyInput.parse(i))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as Sb;
+    if (!sb || !context.userId) return { ok: false, applied: false, reason: "Not authenticated." };
     const orgId = await requireAdminForClient(sb, context.userId as string, data.clientId);
 
     // 1) Download
@@ -401,6 +406,7 @@ export const previewClientUpdateFromDocument = createServerFn({ method: "POST" }
   .inputValidator((i: unknown) => PreviewInput.parse(i))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as Sb;
+    if (!sb || !context.userId) return { ok: false as const, reason: "Not authenticated." };
     await requireAdminForClient(sb, context.userId as string, data.clientId);
 
     const { data: file, error: dlErr } = await sb.storage
@@ -501,6 +507,8 @@ export const applySelectedClientFields = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => ApplySelectedInput.parse(i))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as Sb;
+    if (!sb || !context.userId)
+      return { ok: false, autofilled: 0, suggested: 0, customCreated: 0, appliedCount: 0 };
     const orgId = await requireAdminForClient(sb, context.userId as string, data.clientId);
 
     const fields = data.fields.map((f) => ({
@@ -555,6 +563,7 @@ export const resolveMergeFlag = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => ResolveFlag.parse(i))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as Sb;
+    if (!sb || !context.userId) return { ok: false };
     const { data: flag } = await sb
       .from("import_merge_flags")
       .select("id, client_id, field, incoming_value, kind")
@@ -601,6 +610,7 @@ export const overrideValidationIssue = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => OverrideIssue.parse(i))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as Sb;
+    if (!sb || !context.userId) return { ok: false, overrides: {} };
     const { data: subj } = await sb
       .from("import_subjects")
       .select("id, org_id, import_job_id, validation_overrides")
@@ -638,6 +648,7 @@ export const setLevelOfNeed = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as Sb;
+    if (!sb || !context.userId) return { ok: false };
     await requireAdminForClient(sb, context.userId as string, data.clientId);
     const { error } = await sb
       .from("clients")
@@ -660,6 +671,7 @@ export const setEmergencyContact = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as Sb;
+    if (!sb || !context.userId) return { ok: false };
     await requireAdminForClient(sb, context.userId as string, data.clientId);
     const cols = data.slot === "primary"
       ? { name: "emergency_contact_name", phone: "emergency_contact_phone", instr: "emergency_contact_instructions" }
@@ -686,6 +698,7 @@ export const setGrievanceAcknowledgment = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as Sb;
+    if (!sb || !context.userId) return { ok: false };
     await requireAdminForClient(sb, context.userId as string, data.clientId);
     const patch: Record<string, unknown> = {
       grievance_acknowledged: data.acknowledged,
@@ -707,6 +720,7 @@ export const listHrcReviewsForClient = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as Sb;
+    if (!sb || !context.userId) return { reviews: [] };
     await requireAdminForClient(sb, context.userId as string, data.clientId);
     const { data: rows, error } = await sb
       .from("hrc_reviews")
@@ -728,6 +742,7 @@ export const createHrcReview = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as Sb;
+    if (!sb || !context.userId) return { ok: false, review: null };
     const orgId = await requireAdminForClient(sb, context.userId as string, data.clientId);
     const { data: ins, error } = await sb
       .from("hrc_reviews")
@@ -755,6 +770,7 @@ export const signClientDocument = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const sb = context.supabase as Sb;
+    if (!sb || !context.userId) return { url: null, fileName: null };
     const { data: doc } = await sb
       .from("client_documents")
       .select("id, client_id, storage_path, file_url, file_name")

@@ -61,6 +61,7 @@ export const listWeekTemplates = createServerFn({ method: "POST" })
   .inputValidator((d: { organizationId: string }) =>
     z.object({ organizationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [];
     const { data: rows, error } = await (context.supabase as any)
       .from("week_templates")
       .select("id, name, created_at")
@@ -79,6 +80,7 @@ export const saveWeekAsTemplate = createServerFn({ method: "POST" })
       name: z.string().min(1).max(120),
     }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { id: "", count: 0 };
     const payload = await snapshotWeek(context.supabase, data.organizationId, data.weekStartIso);
     if (payload.shifts.length === 0) throw new Error("No shifts in that week to save.");
     const { data: row, error } = await (context.supabase as any)
@@ -136,6 +138,7 @@ export const applyWeekTemplate = createServerFn({ method: "POST" })
       targetWeekStartIso: z.string(),
     }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { count: 0 };
     const { data: row, error } = await (context.supabase as any)
       .from("week_templates")
       .select("payload")
@@ -158,6 +161,7 @@ export const copyPreviousWeek = createServerFn({ method: "POST" })
       targetWeekStartIso: z.string(),
     }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { count: 0 };
     const target = weekStart(new Date(data.targetWeekStartIso));
     const prev = new Date(target); prev.setDate(prev.getDate() - 7);
     const payload = await snapshotWeek(context.supabase, data.organizationId, prev.toISOString());
@@ -176,6 +180,7 @@ export const deleteWeekTemplate = createServerFn({ method: "POST" })
       templateId: z.string().uuid(),
     }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     const { error } = await (context.supabase as any)
       .from("week_templates")
       .delete()

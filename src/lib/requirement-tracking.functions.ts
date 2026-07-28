@@ -42,6 +42,18 @@ export const updateRequirementTracking = createServerFn({ method: "POST" })
   .inputValidator((input) => inputSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        ok: true as const,
+        tracking: {
+          frequency: null as string | null,
+          tell_nectar_note: null as string | null,
+          last_checked_at: null as string | null,
+          updated_at: "",
+          updated_by: "",
+        },
+      };
+    }
 
     const { data: req, error: rErr } = await supabase
       .from("nectar_requirements")

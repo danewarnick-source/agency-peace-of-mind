@@ -56,6 +56,7 @@ export const getDistPlans = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }): Promise<DistPlan[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: rows, error } = await (context.supabase.from("distribution_plans" as never) as any)
@@ -70,6 +71,7 @@ export const getDistParticipants = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgPlanInput.parse(i))
   .handler(async ({ data, context }): Promise<DistParticipant[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: rows, error } = await (context.supabase.from("distribution_plan_participants" as never) as any)
@@ -84,6 +86,7 @@ export const getDistCbc = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     const { data: rows, error } = await context.supabase
       .from("client_billing_codes")
@@ -97,6 +100,7 @@ export const getDistEvv = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgYearInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     const yearStartIso = new Date(data.year, 0, 1).toISOString();
     const yearEndIso = new Date(data.year + 1, 0, 1).toISOString();
@@ -114,6 +118,7 @@ export const getDistHhs = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgYearInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     const yearStartDate = `${data.year}-01-01`;
     const yearEndDate = `${data.year + 1}-01-01`;
@@ -133,6 +138,7 @@ export const getDistCtr = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgYearInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: rows, error } = await (context.supabase.from("contractor_monthly_pay" as never) as any)
@@ -148,6 +154,7 @@ export const getDistLedger = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgYearInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     const { data: rows, error } = await context.supabase
       .from("provider_ledger_entries")
@@ -168,6 +175,7 @@ export const createDistPlan = createServerFn({ method: "POST" })
     OrgInput.extend({ name: z.string().min(1), plan_type: PlanType }).parse(i),
   )
   .handler(async ({ data, context }): Promise<DistPlan> => {
+    if (!context.supabase || !context.userId) return null as unknown as DistPlan;
     await gate(context, data.organizationId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: row, error } = await (context.supabase.from("distribution_plans" as never) as any)
@@ -204,6 +212,7 @@ export const updateDistPlan = createServerFn({ method: "POST" })
     OrgInput.extend({ id: z.string().uuid(), patch: UpdatePlanPatch }).parse(i),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     await gate(context, data.organizationId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (context.supabase.from("distribution_plans" as never) as any)
@@ -218,6 +227,7 @@ export const deleteDistPlan = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.extend({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     await gate(context, data.organizationId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (context.supabase.from("distribution_plans" as never) as any)
@@ -232,6 +242,7 @@ export const duplicateDistPlan = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.extend({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }): Promise<DistPlan> => {
+    if (!context.supabase || !context.userId) return null as unknown as DistPlan;
     await gate(context, data.organizationId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
@@ -293,6 +304,7 @@ export const addDistParticipant = createServerFn({ method: "POST" })
     OrgInput.extend({ planId: z.string().uuid(), sort_order: z.number().int() }).parse(i),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     await gate(context, data.organizationId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
@@ -333,6 +345,7 @@ export const updateDistParticipant = createServerFn({ method: "POST" })
     OrgInput.extend({ id: z.string().uuid(), patch: UpdateParticipantPatch }).parse(i),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     await gate(context, data.organizationId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (context.supabase.from("distribution_plan_participants" as never) as any)
@@ -346,6 +359,7 @@ export const deleteDistParticipant = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.extend({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     await gate(context, data.organizationId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (context.supabase.from("distribution_plan_participants" as never) as any)

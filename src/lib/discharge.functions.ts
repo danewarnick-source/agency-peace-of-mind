@@ -70,6 +70,13 @@ export const getSowDischargeProcedure = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }): Promise<SowDischargeProcedure> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        found: false,
+        reason: "Not authenticated.",
+        searched_documents: [],
+      };
+    }
     await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
 
     // Pull authoritative sources visible to this org. RLS already scopes to the org.
@@ -162,6 +169,7 @@ export const recordClientDischarge = createServerFn({ method: "POST" })
   .inputValidator((d) => DischargeInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
 
     // Verify the client belongs to this org BEFORE any write
@@ -213,6 +221,7 @@ export const listClientDischarges = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
     const { data: rows, error } = await supabase
       .from("client_discharges")

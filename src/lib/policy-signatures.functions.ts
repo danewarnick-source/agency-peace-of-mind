@@ -82,6 +82,7 @@ export const listMyPendingPolicies = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ organizationId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { pending: [], gating: [] };
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
 
     const policies = await loadAckRequiredPolicies(supabase, data.organizationId);
@@ -127,6 +128,7 @@ export const listPolicySignatureStatus = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ documentId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { staff: [] };
     const { data: doc, error: dErr } = await supabase
       .from("nectar_documents")
       .select(
@@ -201,6 +203,7 @@ export const supersedePolicyVersion = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true, newVersion: 0 };
     const { data: oldDoc, error: oErr } = await supabase
       .from("nectar_documents")
       .select(
@@ -273,6 +276,7 @@ export const listPolicyAcknowledgmentsForStaff = createServerFn({ method: "POST"
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { policies: [] };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
 
     const policies = await loadAckRequiredPolicies(supabase, data.organizationId);

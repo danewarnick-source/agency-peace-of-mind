@@ -372,6 +372,7 @@ export const getOrgAnnualHoursProgress = createServerFn({ method: "GET" })
       progress: Record<string, Record<string, AnnualHoursProgress>>;
     }> => {
       const { supabase, userId } = context;
+      if (!supabase || !userId) return { configs: [], progress: {} };
       await requireOrgMembership(supabase, userId, data.organization_id);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
@@ -395,6 +396,7 @@ export const getStaffAnnualHoursDetail = createServerFn({ method: "GET" })
   .handler(
     async ({ data, context }): Promise<AnnualHoursDetail[]> => {
       const { supabase, userId } = context;
+      if (!supabase || !userId) return [];
       await requireOrgMembership(supabase, userId, data.organization_id);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
@@ -549,6 +551,7 @@ export const addStaffHoursEntry = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organization_id);
     if (userId === data.staff_id) {
       throw new Error("Forbidden: staff may not log own hours");
@@ -581,6 +584,7 @@ export const deleteStaffHoursEntry = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any)

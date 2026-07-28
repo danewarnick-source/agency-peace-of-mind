@@ -24,6 +24,7 @@ export const listClientTargetBehaviors = createServerFn({ method: "GET" })
   .inputValidator((d) => orgClient.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await requireOrgMembership(supabase, userId, data.organization_id, "employee");
     const { data: rows, error } = await (supabase as any)
       .from("client_target_behaviors")
@@ -50,6 +51,7 @@ export const upsertClientTargetBehavior = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requireOrgMembership(supabase, userId, data.organization_id, "admin");
     const { id, ...payload } = data;
     if (id) {
@@ -82,6 +84,7 @@ export const deleteClientTargetBehavior = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organization_id, "admin");
     const { error } = await (supabase as any)
       .from("client_target_behaviors")

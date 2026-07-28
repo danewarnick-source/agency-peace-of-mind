@@ -158,6 +158,7 @@ export const listPlatformTickets = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context;
+    if (!supabase) return { tickets: [] };
     const { data, error } = await supabase
       .from("hive_platform_tickets")
       .select(
@@ -185,6 +186,7 @@ export const createPlatformTicket = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { id: null };
     const audit = [
       {
         ts: new Date().toISOString(),
@@ -241,6 +243,7 @@ export const updatePlatformTicket = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return { ok: false };
     // Pull current audit so we can append immutably.
     const { data: cur, error: cErr } = await supabase
       .from("hive_platform_tickets")

@@ -37,6 +37,23 @@ export const getBilledRevenueByYear = createServerFn({ method: "POST" })
   .inputValidator((i) => Input.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      const months: MonthBucket[] = Array.from({ length: 12 }, (_, i) => ({
+        month: i + 1,
+        billed: 0,
+      }));
+      return {
+        year: data.year,
+        months,
+        source: {
+          mode: "manual" as const,
+          entitled: false as const,
+          tables: ["provider_ledger_entries"],
+          note: "Manually entered billed revenue (NECTAR Infusion not enabled).",
+        },
+        received: { available: false as const },
+      };
+    }
     const organizationId = data.organizationId;
 
     // ─── Server-side admin gate (Company Admin only) on the PASSED org ───
@@ -186,6 +203,7 @@ export const listBilledManualEntries = createServerFn({ method: "POST" })
   .inputValidator((i) => BilledManualListInput.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { entries: [] };
     await requireOrgMembership(supabase, userId, data.organizationId, "admin");
     const { data: rows, error } = await supabase
       .from("provider_ledger_entries")
@@ -212,6 +230,7 @@ export const upsertBilledManualEntry = createServerFn({ method: "POST" })
   .inputValidator((i) => UpsertInput.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { entry: null };
     const organization_id = data.organizationId;
     await requireOrgMembership(supabase, userId, organization_id, "admin");
 
@@ -273,6 +292,7 @@ export const deleteBilledManualEntry = createServerFn({ method: "POST" })
   .inputValidator((i) => DeleteBilledInput.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false as const };
     await requireOrgMembership(supabase, userId, data.organizationId, "admin");
     const { error } = await supabase
       .from("provider_ledger_entries")

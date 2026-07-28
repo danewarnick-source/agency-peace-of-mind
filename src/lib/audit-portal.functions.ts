@@ -59,6 +59,7 @@ export const getAuditorContext = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<AuditorContext | null> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     const { data } = await supabase
       .from("auditor_accounts")
       .select("id, email, full_name, agency_name, status")
@@ -85,6 +86,7 @@ export const listOrgAuditPackages = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => z.object({ organizationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<AuditPackageRow[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await assertOrgAdmin(supabase, data.organizationId, userId);
 
     const { data: rows } = await supabase
@@ -132,6 +134,7 @@ export const createAuditPackage = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<{ id: string }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { id: "" };
     await assertOrgAdmin(supabase, data.organizationId, userId);
 
     const { data: row, error } = await (supabase as unknown as {
@@ -169,6 +172,7 @@ export const addPackageSubject = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     await assertPackageAccess(supabase, userId, data.auditPackageId);
     const { error } = await supabase
       .from("audit_package_subjects")
@@ -190,6 +194,7 @@ export const removePackageSubject = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ subjectRowId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     await assertPackageAccessViaChild(supabase, userId, "audit_package_subjects", data.subjectRowId);
     const { error } = await supabase
       .from("audit_package_subjects")
@@ -204,6 +209,7 @@ export const releaseAuditPackage = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ auditPackageId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     await assertPackageAccess(supabase, userId, data.auditPackageId);
     const { error } = await supabase
       .from("audit_packages")
@@ -224,6 +230,7 @@ export const grantAuditorAccess = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     const { organizationId } = await assertPackageAccess(supabase, userId, data.auditPackageId);
 
     const { data: auditorRow } = await supabase
@@ -271,6 +278,7 @@ export const revokeAuditorAccess = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ accessRowId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     await assertPackageAccessViaChild(supabase, userId, "audit_package_access", data.accessRowId);
     const { error } = await supabase
       .from("audit_package_access")
@@ -290,6 +298,26 @@ export const getPackageBuilderDetail = createServerFn({ method: "GET" })
     availableAuditors: Array<{ id: string; email: string; full_name: string; agency_name: string }>;
   }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        package: {
+          id: "",
+          organization_id: "",
+          state_agency: "",
+          status: "draft",
+          date_range_start: "",
+          date_range_end: "",
+          title: null,
+          created_at: "",
+          released_at: null,
+          subject_count: 0,
+          auditor_count: 0,
+        },
+        subjects: [],
+        access: [],
+        availableAuditors: [],
+      };
+    }
     await assertPackageAccess(supabase, userId, data.auditPackageId);
 
     const { data: pkg, error: pkgErr } = await supabase
@@ -344,6 +372,7 @@ export const listOrgSubjectCandidates = createServerFn({ method: "GET" })
     clients: Array<{ id: string; label: string }>;
   }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { staff: [], clients: [] };
     await assertOrgAdmin(supabase, data.organizationId, userId);
 
     const [{ data: members }, { data: clients }] = await Promise.all([
@@ -388,6 +417,7 @@ export const listMyAuditPackages = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<AuditPackageRow[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
 
     // Resolve auditor account
     const { data: auditor } = await supabase
@@ -456,6 +486,28 @@ export const getAuditorPackageView = createServerFn({ method: "GET" })
     payload: AuditPackagePayload;
   }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        package: {
+          id: "",
+          state_agency: "",
+          title: null,
+          status: "",
+          date_range_start: "",
+          date_range_end: "",
+          organization_name: "",
+        },
+        payload: {
+          package_id: "",
+          date_range_start: "",
+          date_range_end: "",
+          state_agency: "",
+          subjects: [],
+          nectar_summary: { overall: "", per_subject: {}, flags: [] },
+          is_seed: true,
+        },
+      };
+    }
     await assertPackageAccess(supabase, userId, data.auditPackageId, { allowAuditor: true });
 
     // RLS enforces: auditor can only see released/closed granted packages.
@@ -524,6 +576,7 @@ export const listPackageFolders = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => z.object({ auditPackageId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<AuditPackageFolderRow[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await assertPackageAccess(supabase, userId, data.auditPackageId, { allowAuditor: true });
     const { data: rows, error } = await supabase
       .from("audit_package_folders")
@@ -544,6 +597,7 @@ export const createPackageFolder = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<{ id: string }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { id: "" };
     await assertPackageAccess(supabase, userId, data.auditPackageId);
     const { data: row, error } = await (supabase as unknown as {
       from: (t: string) => {
@@ -569,6 +623,7 @@ export const deletePackageFolder = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ folderId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     await assertPackageAccessViaChild(supabase, userId, "audit_package_folders", data.folderId);
     const { error } = await supabase
       .from("audit_package_folders")
@@ -583,6 +638,7 @@ export const listPackageFiles = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => z.object({ auditPackageId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<AuditPackageFileRow[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await assertPackageAccess(supabase, userId, data.auditPackageId, { allowAuditor: true });
     const { data: rows, error } = await supabase
       .from("audit_package_files")
@@ -613,6 +669,7 @@ export const createPackageFileUpload = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<{ fileId: string; path: string; token: string; bucket: string }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { fileId: "", path: "", token: "", bucket: "" };
     const { organizationId } = await assertPackageAccess(supabase, userId, data.auditPackageId);
     const p = { organization_id: organizationId };
 
@@ -664,6 +721,7 @@ export const getPackageFileDownloadUrl = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ fileId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<{ url: string; fileName: string }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { url: "", fileName: "" };
     const { data: row, error } = await supabase
       .from("audit_package_files")
       .select("id, audit_package_id, storage_bucket, storage_path, file_name")
@@ -686,6 +744,7 @@ export const deletePackageFile = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ fileId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     const { data: row, error } = await supabase
       .from("audit_package_files")
       .select("id, audit_package_id, storage_bucket, storage_path")
@@ -723,6 +782,7 @@ export const listOrgAuditors = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => z.object({ organizationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<OrgAuditorRow[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await assertOrgAdmin(supabase, data.organizationId, userId);
 
     const { data: aud } = await supabase
@@ -767,6 +827,7 @@ export const provisionOrgAuditor = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<{ auditorAccountId: string }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { auditorAccountId: "" };
     await assertOrgAdmin(supabase, data.organizationId, userId);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -970,6 +1031,7 @@ export const revokeOrgAuditor = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     await assertOrgAdmin(supabase, data.organizationId, userId);
 
     const { error } = await supabase

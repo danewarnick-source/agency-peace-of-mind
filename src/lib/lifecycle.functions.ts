@@ -97,6 +97,7 @@ export const archiveEntity = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
+    if (!context.userId) return { ok: false };
     await assertCallerAndTargetInOrg(context.userId, data.kind, data.id, data.organizationId);
     await assertManager(context.userId, data.organizationId);
 
@@ -140,6 +141,7 @@ export const deleteEntity = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
+    if (!context.userId) return { ok: false };
     await assertCallerAndTargetInOrg(context.userId, data.kind, data.id, data.organizationId);
     await assertManager(context.userId, data.organizationId);
 

@@ -19,6 +19,9 @@ export const getMyEntitlements = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<MyEntitlements> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return { organization_id: null, tier: "starter", status: "trial", addons: [] };
+    }
 
     const { data: memberships } = await supabase
       .from("organization_members")

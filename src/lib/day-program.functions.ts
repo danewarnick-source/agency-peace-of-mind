@@ -29,6 +29,7 @@ export const listDayProgramSessions = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [];
     const { data: rows, error } = await context.supabase
       .from("day_program_sessions")
       .select(
@@ -49,6 +50,7 @@ export const getDayProgramSession = createServerFn({ method: "POST" })
     z.object({ sessionId: z.string().uuid() }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { session: null, attendance: [], staff: [] };
     const [{ data: session, error: sErr }, { data: attendance, error: aErr }, { data: staff, error: stErr }] =
       await Promise.all([
         context.supabase
@@ -99,6 +101,7 @@ export const createDayProgramSession = createServerFn({ method: "POST" })
         .parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return null;
     const { data: row, error } = await context.supabase
       .from("day_program_sessions")
       .insert({
@@ -199,6 +202,7 @@ export const upsertDayProgramAttendance = createServerFn({ method: "POST" })
         .parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return null;
     const { data: session, error: sErr } = await context.supabase
       .from("day_program_sessions")
       .select("organization_id, service_code, start_time, end_time")
@@ -359,6 +363,7 @@ export const upsertDayProgramTransport = createServerFn({ method: "POST" })
         .parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return null;
     // Resolve session/client/date to apply the MTP firewall.
     const { data: att, error: aErr } = await context.supabase
       .from("day_program_attendance")
@@ -430,6 +435,7 @@ export const deleteDayProgramSession = createServerFn({ method: "POST" })
     z.object({ sessionId: z.string().uuid() }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     const { error } = await context.supabase
       .from("day_program_sessions")
       .delete()

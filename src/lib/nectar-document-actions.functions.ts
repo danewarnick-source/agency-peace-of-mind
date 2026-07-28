@@ -127,6 +127,7 @@ export const detectAndOfferActions = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     const doc = await fetchDoc(supabase as never, data.documentId);
     await requireOrgMembership(
       supabase,
@@ -254,6 +255,7 @@ export const proposeStaffChecklistFromDocument = createServerFn({ method: "POST"
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { proposed: 0, message: "No checklist items detected." };
     const doc = await fetchDoc(supabase as never, data.documentId);
     await requireOrgMembership(
       supabase,

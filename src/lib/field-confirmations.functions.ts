@@ -30,6 +30,7 @@ export const getClientFieldStates = createServerFn({ method: "POST" })
     states: FieldStateMap;
     confirmations: Record<string, string>;
   }> => {
+    if (!context.supabase || !context.userId) return { states: {}, confirmations: {} };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: client } = await sb
@@ -120,6 +121,7 @@ export const setFieldConfirmation = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false, confirmations: {} };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: client } = await sb

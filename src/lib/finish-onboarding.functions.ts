@@ -55,6 +55,7 @@ export const getClientOnboardingState = createServerFn({ method: "POST" })
     z.object({ clientId: z.string().uuid() }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
 
@@ -196,6 +197,7 @@ export const saveProfileField = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false, fieldKey: data.fieldKey };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const field: ProfileField | undefined =
@@ -234,6 +236,7 @@ export const saveOnboardingClientPatch = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false, geocoded: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: client } = await sb
@@ -287,6 +290,7 @@ export const saveOnboardingBillingRate = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: row } = await sb
@@ -326,6 +330,7 @@ export const saveOnboardingCustomField = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: client } = await sb
@@ -385,6 +390,7 @@ export const skipOnboardingItem = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: client } = await sb
@@ -474,6 +480,7 @@ export const addClientBillingCodes = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false, added: 0 };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { isDailyServiceCode } = await import("@/lib/service-billing");
@@ -578,6 +585,7 @@ export const removeClientBillingCode = createServerFn({ method: "POST" })
     z.object({ codeId: z.string().uuid() }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: row } = await sb

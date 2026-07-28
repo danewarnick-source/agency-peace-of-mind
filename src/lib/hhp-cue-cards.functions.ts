@@ -72,6 +72,7 @@ export const listHhpCueCards = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await requireAnyPermission(supabase, userId, data.organization_id, [
       "view_referrals",
       "manage_referrals",
@@ -92,6 +93,7 @@ export const getHhpCueCard = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requireAnyPermission(supabase, userId, data.organization_id, [
       "view_referrals",
       "manage_referrals",
@@ -144,6 +146,7 @@ export const createHhpCueCard = createServerFn({ method: "POST" })
   .inputValidator((d) => createInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requireAnyPermission(supabase, userId, data.organization_id, [
       "manage_referrals",
       "manage_users",
@@ -196,6 +199,7 @@ export const updateHhpCueCard = createServerFn({ method: "POST" })
   .inputValidator((d) => updateInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireAnyPermission(supabase, userId, data.organization_id, [
       "manage_referrals",
       "manage_users",

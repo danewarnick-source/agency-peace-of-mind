@@ -45,6 +45,7 @@ export const getInboxUnreadCount = createServerFn({ method: "POST" })
   .inputValidator((d) => orgSchema.parse(d))
   .handler(async ({ data, context }): Promise<{ count: number }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { count: 0 };
     await requireOrgMembership(supabase, userId, data.organization_id, "manager");
 
     const { count, error } = await supabase
@@ -63,6 +64,7 @@ export const listInboxMessages = createServerFn({ method: "POST" })
   .inputValidator((d) => orgSchema.parse(d))
   .handler(async ({ data, context }): Promise<InboxMessageRow[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await requireOrgMembership(supabase, userId, data.organization_id, "manager");
 
     const { data: recs, error } = await supabase
@@ -136,8 +138,9 @@ const openSchema = z.object({
 export const openInboxMessage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => openSchema.parse(d))
-  .handler(async ({ data, context }): Promise<InboxMessageDetail> => {
+  .handler(async ({ data, context }): Promise<InboxMessageDetail | null> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requireOrgMembership(supabase, userId, data.organization_id, "manager");
 
     // Verify a recipient row exists for THIS org. If not → reject.

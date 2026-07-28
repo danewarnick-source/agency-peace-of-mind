@@ -34,6 +34,7 @@ export const listForms = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { forms: [] };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     const { data, error } = await supabase
@@ -51,6 +52,7 @@ export const getForm = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => z.object({ formId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { form: null };
     const m = await getMembership(supabase, userId);
     const { data: form, error } = await supabase.from("forms").select("*").eq("id", data.formId).maybeSingle();
     if (error || !form) throw new Error("Form not found.");
@@ -81,6 +83,7 @@ export const saveForm = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => formInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { form: null };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     const payload = {
@@ -244,6 +247,7 @@ export const archiveForm = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ formId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { ok: false };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     const { error } = await supabase.from("forms").update({ status: "archived" })
@@ -338,6 +342,7 @@ export const seedIntakeForms = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { seeded: 0, skipped: true };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
 
@@ -386,6 +391,7 @@ export const getFormDeleteImpact = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => z.object({ formId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return null;
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
 
@@ -449,6 +455,7 @@ export const deleteForm = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { ok: false, deleted: null };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
 
@@ -508,6 +515,7 @@ export const publishForm = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { ok: false, delivered: 0 };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
 
@@ -567,6 +575,7 @@ export const listMyForms = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { forms: [], submissions: [] };
     // RLS already filters; just SELECT
     const { data: forms, error } = await supabase
       .from("forms").select("*").eq("status", "published");
@@ -590,6 +599,7 @@ export const getStaffForm = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => z.object({ formId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase } = context as { supabase: AnySupabase };
+    if (!supabase || !context.userId) return { form: null };
     const { data: form, error } = await supabase
       .from("forms").select("*").eq("id", data.formId).eq("status", "published").maybeSingle();
     if (error || !form) throw new Error("Form not found.");
@@ -606,6 +616,7 @@ export const submitForm = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { submission: null };
     const m = await getMembership(supabase, userId);
     const { data: form, error: fe } = await supabase
       .from("forms").select("id, organization_id, frequency, settings, all_clients, assigned_clients").eq("id", data.formId).maybeSingle();
@@ -719,6 +730,7 @@ export const submitIntakeForm = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { submission: null };
     const m = await getMembership(supabase, userId);
     // Role gate: admin/manager/super_admin only.
     adminGuard(m.role);
@@ -780,6 +792,7 @@ export const submitStaffMandateForm = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { submission: null };
     const m = await getMembership(supabase, userId);
 
     const { data: form, error: fe } = await supabase
@@ -857,6 +870,7 @@ export const getUnmetStaffMandates = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { unmet: [] };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
 
@@ -1047,6 +1061,7 @@ export const recordStaffMandateOverride = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { wrote: false, reason: "no_auth", notificationId: null as string | null };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
 
@@ -1134,6 +1149,7 @@ export const getMyFormNotifications = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { notifications: [] };
     const { data, error } = await supabase
       .from("notifications")
       .select("id, title, body, related_id, read_at, created_at, type")
@@ -1150,6 +1166,7 @@ export const markFormNotificationsRead = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ ids: z.array(z.string().uuid()).max(200) }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { ok: false };
     if (!data.ids.length) return { ok: true };
     await supabase.from("notifications")
       .update({ read_at: new Date().toISOString() })
@@ -1163,6 +1180,7 @@ export const listSubmissions = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => z.object({ formId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { submissions: [], profiles: [] };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     const { data: subs, error } = await supabase
@@ -1185,6 +1203,7 @@ export const getAssignDirectory = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { members: [], profiles: [], staffTypes: [], clients: [] };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     const { data: members } = await supabase
@@ -1215,6 +1234,7 @@ export const listClientForms = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => z.object({ clientId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { forms: [], submissions: [] };
     // Confirm client is on my caseload
     const { data: sa } = await supabase
       .from("staff_assignments").select("organization_id")
@@ -1253,6 +1273,7 @@ export const listIntakeFormsForClient = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { forms: [], submissions: [] };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
 
@@ -1303,6 +1324,7 @@ export const listClientTrackingForms = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { forms: [], submissions: [], submitterNames: {} as Record<string, string> };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
 
@@ -1384,6 +1406,7 @@ export const getPendingTrackingForms = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { pending: [] };
     const m = await getMembership(supabase, userId);
 
     // Pull this org's published tracking forms once.
@@ -1490,6 +1513,7 @@ export const nectarDraftForm = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { userId, supabase } = context as { userId: string; supabase: AnySupabase };
+    if (!supabase || !userId) return { draft: null };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     const apiKey = process.env.LOVABLE_API_KEY;
@@ -1562,6 +1586,7 @@ export const nectarDraftFormFromPdf = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { userId, supabase } = context as { userId: string; supabase: AnySupabase };
+    if (!supabase || !userId) return { draft: null, lowConfidence: false, confidenceNotes: "" };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     const apiKey = process.env.LOVABLE_API_KEY;
@@ -1673,6 +1698,7 @@ export const nectarDraftNotification = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { userId, supabase } = context as { userId: string; supabase: AnySupabase };
+    if (!supabase || !userId) return { draft: null };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     const apiKey = process.env.LOVABLE_API_KEY;
@@ -1717,6 +1743,7 @@ export const nectarProposeRouting = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { userId, supabase } = context as { userId: string; supabase: AnySupabase };
+    if (!supabase || !userId) return { proposal: null };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     const apiKey = process.env.LOVABLE_API_KEY;

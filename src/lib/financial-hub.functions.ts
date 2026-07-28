@@ -17,6 +17,9 @@ export const getBillingSnapshot = createServerFn({ method: "POST" })
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return { totalClients: 0, activeCodes: 0, blockers: 0, expiringSoon: 0 };
+    }
     await requireOrgMembership(supabase, userId, data.organizationId, "admin");
 
     const now = new Date();

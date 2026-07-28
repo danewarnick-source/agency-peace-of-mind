@@ -39,6 +39,7 @@ export const getHhCodes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }): Promise<HhHhsCode[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     const { data: rows, error } = await context.supabase
       .from("client_billing_codes")
@@ -53,6 +54,7 @@ export const getHhClients = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgClientsInput.parse(i))
   .handler(async ({ data, context }): Promise<HhClient[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     if (data.clientIds.length === 0) return [];
     const { data: rows, error } = await context.supabase
@@ -68,6 +70,7 @@ export const getHhDays = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgMonthInput.parse(i))
   .handler(async ({ data, context }): Promise<Record<string, number>> => {
+    if (!context.supabase || !context.userId) return {};
     await gate(context, data.organizationId);
     const monthStart = new Date(data.year, data.month - 1, 1);
     const monthEnd = new Date(data.year, data.month, 1);
@@ -92,6 +95,7 @@ export const getHhSettings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }): Promise<HhSettings[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: rows, error } = await (context.supabase as any)
@@ -106,6 +110,7 @@ export const getHhMonthly = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgMonthInput.parse(i))
   .handler(async ({ data, context }): Promise<HhMonthly[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: rows, error } = await (context.supabase as any)

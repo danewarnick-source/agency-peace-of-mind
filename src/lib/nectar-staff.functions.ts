@@ -174,6 +174,14 @@ export const askNectarStaff = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<NectarStaffReply> => {
     const supabase = context.supabase as unknown as SupabaseLike;
     const userId = context.userId;
+    if (!supabase || !userId) {
+      return {
+        answer: "I don't have that information available to me. Please check with your manager.",
+        citations: [],
+        usedClientIds: [],
+        refused: true,
+      };
+    }
     const orgId = data.organizationId;
     const kw = keywords(data.question);
 

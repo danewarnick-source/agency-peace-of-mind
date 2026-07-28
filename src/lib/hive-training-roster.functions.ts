@@ -37,6 +37,7 @@ export const getRosterTrainingStatus = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [] as StaffTrainingRow[];
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
 
     // 1. Active members with the applicability signals we need.

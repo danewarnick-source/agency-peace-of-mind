@@ -118,6 +118,8 @@ export const createInvitation = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId)
+      return { invitation: null, email_sent: false, email_error: null };
     await requirePermission(
       supabase as unknown as SupabaseClient,
       userId,
@@ -178,6 +180,8 @@ export const resendInvitation = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId)
+      return { invitation: null, email_sent: false, email_error: null };
     await requirePermission(
       supabase as unknown as SupabaseClient,
       userId,
@@ -226,6 +230,7 @@ export const revokeInvitation = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { invitation: null };
     await requirePermission(
       supabase as unknown as SupabaseClient,
       userId,

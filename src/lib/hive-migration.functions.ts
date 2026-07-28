@@ -25,6 +25,7 @@ export const listMigrationJobs = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
+    if (!sb || !context.userId) return [];
     const { data: jobs, error } = await sb
       .from("import_jobs")
       .select("id, status, mode, source, scale, engagement_status, quote_amount_cents, provider_signoff_at, provider_signoff_by, created_at, committed_at, submitted_at, notes, created_by, target_org_id")
@@ -48,6 +49,7 @@ export const setEngagement = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
+    if (!sb || !context.userId) return { ok: false };
     await assertHiveExec(sb, context.userId);
     const patch: Record<string, unknown> = {};
     if (data.engagement_status !== undefined) patch.engagement_status = data.engagement_status;
@@ -66,6 +68,7 @@ export const providerSignoff = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
+    if (!sb || !context.userId) return { ok: false };
     const { data: job, error } = await sb.from("import_jobs")
       .select("id, target_org_id, source").eq("id", data.jobId).single();
     if (error || !job) throw new Error("Job not found");
@@ -108,6 +111,7 @@ export const logHiveAccess = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
+    if (!sb || !context.userId) return { ok: false };
     await assertHiveExec(sb, context.userId);
     await logAccess(sb, data.jobId, context.userId, data.action, data.details ?? {});
     return { ok: true };
@@ -132,6 +136,7 @@ export const listAccessLog = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
+    if (!sb || !context.userId) return [];
     const { data: rows, error } = await sb
       .from("import_access_log")
       .select("id, action, details, actor, created_at")

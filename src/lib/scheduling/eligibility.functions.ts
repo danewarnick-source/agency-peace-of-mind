@@ -33,7 +33,8 @@ export const rankStaffForShift = createServerFn({ method: "POST" })
     overtimeThresholdHours: z.number().int().optional(),
   }).parse(d))
   .handler(async ({ data, context }): Promise<Array<EligibilityResult & { staffName: string }>> => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     const orgId = data.organizationId;
     const shiftStart = new Date(data.startsAtIso);
     const shiftEnd = new Date(data.endsAtIso);

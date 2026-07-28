@@ -59,6 +59,7 @@ export const generateClientFaceSheet = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ clientId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<{ pdfBase64: string; filename: string }> => {
     const { supabase } = context;
+    if (!supabase || !context.userId) return { pdfBase64: "", filename: "" };
 
     // 1) Client row — RLS scopes to caller's org.
     const { data: client, error: clientErr } = await supabase

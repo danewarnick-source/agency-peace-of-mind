@@ -34,6 +34,7 @@ export const autoAssignRange = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as any;
+    if (!sb || !context.userId) return { proposals: [] as Proposal[], applied: 0 };
     const orgId = data.organizationId;
 
     // 1) open shifts in window

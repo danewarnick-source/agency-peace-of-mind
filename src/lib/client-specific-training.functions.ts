@@ -450,7 +450,8 @@ export const extractPcspGoalsForTraining = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ clientId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const { supabase, userId } = context as { supabase: AnySupabase | null; userId: string | null };
+    if (!supabase || !userId) return { ok: false as const, reason: "Not authenticated." };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     await assertClientInOrg(supabase, data.clientId, m.organization_id);
@@ -526,7 +527,8 @@ export const getClientSpecificTraining = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ clientId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const { supabase, userId } = context as { supabase: AnySupabase | null; userId: string | null };
+    if (!supabase || !userId) return { training: null };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     await assertClientInOrg(supabase, data.clientId, m.organization_id);
@@ -550,7 +552,8 @@ export const draftClientSpecificTrainingWithNectar = createServerFn({ method: "P
     rebuild: z.boolean().optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const { supabase, userId } = context as { supabase: AnySupabase | null; userId: string | null };
+    if (!supabase || !userId) return { training: null };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     await assertClientInOrg(supabase, data.clientId, m.organization_id);
@@ -604,7 +607,8 @@ export const draftClientSpecificTrainingBlank = createServerFn({ method: "POST" 
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ clientId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const { supabase, userId } = context as { supabase: AnySupabase | null; userId: string | null };
+    if (!supabase || !userId) return { training: null };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     await assertClientInOrg(supabase, data.clientId, m.organization_id);
@@ -658,7 +662,8 @@ export const createPersonCenteredProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ clientId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const { supabase, userId } = context as { supabase: AnySupabase | null; userId: string | null };
+    if (!supabase || !userId) return { training: null };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     await assertClientInOrg(supabase, data.clientId, m.organization_id);
@@ -755,7 +760,8 @@ export const attachClientSpecificTrainingDocument = createServerFn({ method: "PO
     storagePath: z.string().min(1).max(500),
   }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const { supabase, userId } = context as { supabase: AnySupabase | null; userId: string | null };
+    if (!supabase || !userId) return { ok: false, documentId: null };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     await assertClientInOrg(supabase, data.clientId, m.organization_id);
@@ -821,7 +827,8 @@ export const updateClientSpecificTraining = createServerFn({ method: "POST" })
     goals: z.array(GoalSchema).optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const { supabase, userId } = context as { supabase: AnySupabase | null; userId: string | null };
+    if (!supabase || !userId) return { training: null };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     const { data: row, error } = await supabase
@@ -856,7 +863,8 @@ export const publishClientSpecificTraining = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const { supabase, userId } = context as { supabase: AnySupabase | null; userId: string | null };
+    if (!supabase || !userId) return { training: null };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     const { data: row, error } = await supabase
@@ -888,7 +896,8 @@ export const saveReviewQuestions = createServerFn({ method: "POST" })
     review_questions: z.array(ReviewQuestionSchema),
   }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const { supabase, userId } = context as { supabase: AnySupabase | null; userId: string | null };
+    if (!supabase || !userId) return { ok: false };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     const { data: row, error } = await supabase
@@ -1020,7 +1029,8 @@ export const getSupportStrategiesTraining = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ clientId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const { supabase, userId } = context as { supabase: AnySupabase | null; userId: string | null };
+    if (!supabase || !userId) return { training: null };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     await assertClientInOrg(supabase, data.clientId, m.organization_id);
@@ -1041,7 +1051,8 @@ export const draftSupportStrategies = createServerFn({ method: "POST" })
     mode: z.enum(["nectar", "blank", "rebuild"]),
   }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const { supabase, userId } = context as { supabase: AnySupabase | null; userId: string | null };
+    if (!supabase || !userId) return { training: null };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     await assertClientInOrg(supabase, data.clientId, m.organization_id);
@@ -1108,7 +1119,8 @@ export const attachSupportStrategyDocument = createServerFn({ method: "POST" })
     storagePath: z.string().min(1).max(500),
   }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const { supabase, userId } = context as { supabase: AnySupabase | null; userId: string | null };
+    if (!supabase || !userId) return { ok: false, documentId: null };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
     await assertClientInOrg(supabase, data.clientId, m.organization_id);
@@ -1270,7 +1282,8 @@ export const getStaffClientSpecificTraining = createServerFn({ method: "GET" })
     trainingType: z.enum(["person_specific", "support_strategies", "person_centered"]).optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const { supabase, userId } = context as { supabase: AnySupabase | null; userId: string | null };
+    if (!supabase || !userId) return { training: null, completion: null, hash: null, pinnedToCurrent: false };
     const m = await getMembership(supabase, userId);
     // HARD scope check — admin/manager bypass; staff must be assigned.
     await assertStaffMayViewClient(supabase, m.organization_id, userId, m.role, data.clientId);
@@ -1333,7 +1346,10 @@ export const completeClientSpecificTraining = createServerFn({ method: "POST" })
     questionAnswers: z.array(z.object({ question: z.string(), answer: z.string(), tab: z.string() })).optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const { supabase, userId } = context as { supabase: AnySupabase | null; userId: string | null };
+    if (!supabase || !userId) {
+      return { ok: false as const, completionId: null, requirementId: null, contentHash: null };
+    }
     const m = await getMembership(supabase, userId);
     // Re-verify assignment scope at write time.
     await assertStaffMayViewClient(supabase, m.organization_id, userId, m.role, data.clientId);
@@ -1457,7 +1473,8 @@ export const completeClientSpecificTraining = createServerFn({ method: "POST" })
 export const getMyClientTrainingStatuses = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    const { supabase, userId } = context as { supabase: AnySupabase | null; userId: string | null };
+    if (!supabase || !userId) return { items: [] as Array<{ clientId: string; clientName: string; trainings: Array<{ type: "person_specific" | "support_strategies" | "person_centered"; label: string; setupStatus: "not_setup" | "draft" | "published"; completionStatus: "not_started" | "completed"; completedAt: string | null }> }> };
     const m = await getMembership(supabase, userId);
 
     let clientIds: string[] = [];

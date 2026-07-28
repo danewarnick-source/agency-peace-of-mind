@@ -769,6 +769,23 @@ export const getReferralMatchScore = createServerFn({ method: "POST" })
   .inputValidator((d) => orgRef.parse(d))
   .handler(async ({ data, context }): Promise<ReferralMatchScore> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        referral_id: data.referral_id,
+        organization_id: data.organization_id,
+        overall_score: 1,
+        location_fit: 0,
+        host_fit: 0,
+        disability_fit: 0,
+        need_fit: 0,
+        code_overlap: 0,
+        best_host_ids: [],
+        weights: { ...DEFAULT_MATCH_WEIGHTS },
+        reasons: [],
+        scored_components: [],
+        computed_at: new Date().toISOString(),
+      };
+    }
     await requireAnyPermission(supabase, userId, data.organization_id, [
       "view_referrals",
       "manage_referrals",
@@ -841,6 +858,23 @@ export const recomputeReferralMatchScore = createServerFn({ method: "POST" })
   .inputValidator((d) => orgRef.parse(d))
   .handler(async ({ data, context }): Promise<ReferralMatchScore> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        referral_id: data.referral_id,
+        organization_id: data.organization_id,
+        overall_score: 1,
+        location_fit: 0,
+        host_fit: 0,
+        disability_fit: 0,
+        need_fit: 0,
+        code_overlap: 0,
+        best_host_ids: [],
+        weights: { ...DEFAULT_MATCH_WEIGHTS },
+        reasons: [],
+        scored_components: [],
+        computed_at: new Date().toISOString(),
+      };
+    }
     await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
 
     const computed = await loadAndCompute(

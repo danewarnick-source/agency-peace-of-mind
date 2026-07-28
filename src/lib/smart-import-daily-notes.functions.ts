@@ -27,6 +27,7 @@ export const createDailyNotesImportJob = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase } = context as any;
+    if (!supabase || !context.userId) return { jobId: "" };
     const { data: job, error } = await supabase
       .from("import_jobs")
       .insert({
@@ -60,6 +61,7 @@ export const importHistoricalDailyNotes = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { inserted: 0, rejected: [] };
 
     // Verify staff + clients belong to this org.
     const staffIds = Array.from(new Set(data.rows.map((r) => r.staff_id)));

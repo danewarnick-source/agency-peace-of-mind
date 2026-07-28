@@ -32,6 +32,7 @@ export const discardImportJobHard = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => JobInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false, job_id: data.jobId };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: res, error } = await sb.rpc("discard_import_job_hard", { _job_id: data.jobId });
@@ -43,6 +44,7 @@ export const getClientDeletionImpact = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => ClientInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: res, error } = await sb.rpc("client_deletion_impact", { _client_id: data.clientId });
@@ -54,6 +56,7 @@ export const deleteClientPermanently = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => ClientInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false, client_id: data.clientId, client_name: "" };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: res, error } = await sb.rpc("delete_client_hard", { _client_id: data.clientId });

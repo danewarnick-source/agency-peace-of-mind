@@ -89,6 +89,7 @@ export async function markDraftedByNectar(input: {
 export const listPendingHiveExecApprovals = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    if (!context.supabase || !context.userId) return { items: [] };
     // Guard: only HIVE Executives.
     const { data: isExec } = await context.supabase.rpc("is_hive_executive", {
       _user: context.userId,
@@ -176,6 +177,7 @@ export const hiveExecApproveRequirement = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     const { data: isExec } = await context.supabase.rpc("is_hive_executive", {
       _user: context.userId,
     });
@@ -237,6 +239,7 @@ export const hiveExecRejectRequirement = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     const { data: isExec } = await context.supabase.rpc("is_hive_executive", {
       _user: context.userId,
     });
@@ -274,6 +277,7 @@ export const listProviderPendingConfirmations = createServerFn({ method: "GET" }
     z.object({ organizationId: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { items: [] };
     // RLS will scope reads; require org member explicitly for clarity.
     const { data: member } = await context.supabase
       .from("organization_members")
@@ -331,6 +335,7 @@ export const providerConfirmRequirement = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     const { data: req, error: rErr } = await context.supabase
       .from("nectar_requirements")
       .select("id, organization_id, approval_state, metadata")
@@ -419,6 +424,7 @@ export const providerRejectRequirement = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     const { data: req, error: rErr } = await context.supabase
       .from("nectar_requirements")
       .select("id, organization_id, approval_state")
@@ -464,6 +470,7 @@ export const getApprovalHistory = createServerFn({ method: "GET" })
     z.object({ requirementId: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { events: [] };
     const { data: rows, error } = await context.supabase
       .from("nectar_requirement_approval_events")
       .select("id, stage, action, actor_label, reason, created_at")

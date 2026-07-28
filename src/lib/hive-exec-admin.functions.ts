@@ -112,6 +112,7 @@ export const createCompany = createServerFn({ method: "POST" })
   .inputValidator(validateCreateCompany)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false, organization_id: null };
     await ensureExecutive(supabase, userId);
 
     // Resolve or invite the admin user
@@ -184,6 +185,7 @@ export const listAllMembers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<MemberRow[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await ensureExecutive(supabase, userId);
     await audit(userId, "list_members", null, "Loaded cross-company member roster");
 
@@ -252,6 +254,7 @@ export const updateMember = createServerFn({ method: "POST" })
   .inputValidator(validateMemberUpdate)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await ensureExecutive(supabase, userId);
 
     const { data: existing, error: readErr } = await supabaseAdmin
@@ -286,6 +289,7 @@ export const listHiveExecutives = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<HiveExecRow[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await ensureExecutive(supabase, userId);
 
     const { data, error } = await supabaseAdmin
@@ -325,6 +329,7 @@ export const setHiveExecutiveByEmail = createServerFn({ method: "POST" })
   .inputValidator(validateGrantExec)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await ensureExecutive(supabase, userId);
 
     const { data: profile, error: pErr } = await supabaseAdmin
@@ -366,6 +371,7 @@ export const listAuditLog = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<AuditEntry[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await ensureExecutive(supabase, userId);
 
     const { data, error } = await supabaseAdmin

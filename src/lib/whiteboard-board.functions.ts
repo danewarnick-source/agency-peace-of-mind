@@ -28,6 +28,7 @@ export const getBoardStaff = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }): Promise<BoardStaff[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await requireAnyPermission(supabase, userId, data.organization_id, [
       "view_referrals",
       "manage_referrals",
@@ -83,6 +84,7 @@ export const getCurrentStaffPlacements = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }): Promise<CurrentStaffPlacement[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await requireAnyPermission(supabase, userId, data.organization_id, [
       "view_referrals",
       "manage_referrals",

@@ -45,6 +45,7 @@ export const generateEmployeeFaceSheetFn = createServerFn({ method: "POST" })
   .inputValidator((d) => Input.parse(d))
   .handler(async ({ data, context }): Promise<EmployeeFaceSheetFnOutput> => {
     const { supabase } = context;
+    if (!supabase) return { pdfBase64: "", filename: "", shipped: null };
     if (data.ship) {
       const r = await shipEmployeeFaceSheet({
         staffId: data.staffId,

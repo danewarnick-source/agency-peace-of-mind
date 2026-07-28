@@ -106,6 +106,7 @@ export const getRevenueClientPills = createServerFn({ method: "POST" })
   .inputValidator((i) => MonthInput.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { year: data.year, month: data.month, pills: [] };
     await requireOrgMembership(supabase, userId, data.organizationId, "admin");
 
     const { clients, codes, timesheets, daily } = await loadMonthData(
@@ -221,6 +222,7 @@ export const getRevenueClientDetail = createServerFn({ method: "POST" })
   .inputValidator((i) => ClientDetailInput.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { client: null, lines: [] as CodeLine[], total: 0 };
     await requireOrgMembership(supabase, userId, data.organizationId, "admin");
     const { clients, codes, timesheets, daily } = await loadMonthData(
       supabase,
@@ -328,6 +330,18 @@ export const getMonthlyGridShiftDetail = createServerFn({ method: "POST" })
   .inputValidator((i) => GridShiftInput.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        client: { id: data.clientId, name: data.clientId.slice(0, 8) },
+        code: data.serviceCode,
+        isDaily: isDailyServiceCode(data.serviceCode),
+        rate: 0,
+        units: 0,
+        amount: 0,
+        shifts: [] as ShiftDetailRow[],
+        days: [] as DailyDetailRow[],
+      };
+    }
     await requireOrgMembership(supabase, userId, data.organizationId, "admin");
     const { clients, codes, timesheets, daily } = await loadMonthData(
       supabase,

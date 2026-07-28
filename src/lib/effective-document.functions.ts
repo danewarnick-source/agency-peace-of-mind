@@ -62,6 +62,7 @@ export const getEffectiveDocument = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { document: null, governingSource: toGoverningSource(null) };
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
@@ -124,6 +125,7 @@ export const filterSourcesEffectiveOn = createServerFn({ method: "POST" })
     governing_by_id: Record<string, GoverningSource>;
   }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { effective_ids: [], governing_by_id: {} };
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;

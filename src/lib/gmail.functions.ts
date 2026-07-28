@@ -36,6 +36,7 @@ export const getGmailConnection = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { connection: null };
     await requireOrgMembership(supabase, userId, data.organization_id, "admin");
     const { data: row } = await supabase
       .from("gmail_connections")
@@ -54,6 +55,7 @@ export const getGmailOAuthStartUrl = createServerFn({ method: "POST" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { url: "" };
     await requireOrgMembership(supabase, userId, data.organization_id, "admin");
     const { signOAuthState, buildAuthorizeUrl } = await import("@/lib/gmail-oauth.server");
     const state = signOAuthState({ org: data.organization_id, uid: userId });
@@ -68,6 +70,7 @@ export const disconnectGmail = createServerFn({ method: "POST" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organization_id, "admin");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -115,6 +118,7 @@ export const listGmailRules = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { rules: [] };
     await requireOrgMembership(supabase, userId, data.organization_id, "admin");
     const { data: rows } = await supabase
       .from("gmail_ingestion_rules")
@@ -138,6 +142,7 @@ export const upsertGmailRule = createServerFn({ method: "POST" })
   .inputValidator((d) => ruleInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false as const, id: "" };
     await requireOrgMembership(supabase, userId, data.organization_id, "admin");
     const payload = {
       organization_id: data.organization_id,
@@ -171,6 +176,7 @@ export const deleteGmailRule = createServerFn({ method: "POST" })
   .inputValidator((d) => orgOnly.extend({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organization_id, "admin");
     const { error } = await supabase
       .from("gmail_ingestion_rules")
@@ -188,6 +194,7 @@ export const listGmailAudit = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.extend({ limit: z.number().int().min(1).max(200).default(50) }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { audit: [] };
     await requireOrgMembership(supabase, userId, data.organization_id, "admin");
     const { data: rows } = await supabase
       .from("gmail_ingestion_audit")
@@ -207,6 +214,7 @@ export const discardReferral = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
     const purgeAfter = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const { error } = await supabase
@@ -231,6 +239,7 @@ export const archiveAutoIngestedReferral = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
     const purgeAfter = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     const { error } = await supabase

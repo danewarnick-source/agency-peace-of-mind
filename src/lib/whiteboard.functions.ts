@@ -91,6 +91,14 @@ export const getWhiteboardSnapshot = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }): Promise<WhiteboardSnapshot> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId)
+      return {
+        organization_id: data.organization_id,
+        referrals: [],
+        clients: [],
+        hosts: [],
+        host_suggestions: [],
+      };
     await requireAnyPermission(supabase, userId, data.organization_id, [
       "view_referrals",
       "manage_referrals",

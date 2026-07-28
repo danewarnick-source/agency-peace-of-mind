@@ -463,6 +463,16 @@ export const askFinancialNectar = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => Input.parse(i))
   .handler(async ({ data, context }): Promise<NectarFinReport> => {
+    if (!context.supabase || !context.userId) {
+      return {
+        year: data.year,
+        question: data.question,
+        requested: [],
+        sources: [],
+        answer: "",
+        any_declined: false,
+      };
+    }
     const ctx: Ctx = { supabase: context.supabase, userId: context.userId };
     const requested = detectSources(data.question, data.explicit_sources);
 

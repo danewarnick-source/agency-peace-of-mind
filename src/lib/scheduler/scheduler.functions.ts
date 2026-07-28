@@ -95,6 +95,7 @@ export const saveShift = createServerFn({ method: "POST" })
   .inputValidator((d: ShiftInput) => ShiftInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { id: "" };
 
     await assertClientAuthorizedForCode(
       supabase,
@@ -183,7 +184,8 @@ export const deleteShift = createServerFn({ method: "POST" })
     z.object({ id: z.string().uuid(), organization_id: z.string().uuid() }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context as any;
+    const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { ok: false };
     const { error } = await supabase
       .from("scheduled_shifts")
       .delete()
@@ -202,7 +204,8 @@ export const publishWeek = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context as any;
+    const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { shifts: 0, staff: 0 };
     const start = new Date(data.week_start_iso);
     const end = new Date(start);
     end.setDate(end.getDate() + 7);
@@ -249,7 +252,8 @@ export const addToCaseload = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context as any;
+    const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { ok: false };
     // Idempotent — unique (staff_id, client_id)
     const { error } = await supabase
       .from("staff_assignments")
@@ -275,7 +279,8 @@ export const removeFromCaseload = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context as any;
+    const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { ok: false };
     const { error } = await supabase
       .from("staff_assignments")
       .delete()
@@ -299,6 +304,7 @@ export const setAdminTimeOff = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { ok: false };
     if (data.on) {
       // Insert an approved single-day time off (admin-initiated).
       const { error } = await supabase.from("time_off_requests").insert({
@@ -339,7 +345,8 @@ export const saveAdminHours = createServerFn({ method: "POST" })
       }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context as any;
+    const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { ok: false };
     const { error } = await supabase
       .from("clients")
       .update({ admin_hours_per_week: data.hours })
@@ -376,6 +383,7 @@ export const saveDayProgramSession = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { id: "" };
     if (data.id) {
       const { error } = await supabase
         .from("day_program_sessions")
@@ -422,7 +430,8 @@ export const markAttendance = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context as any;
+    const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { ok: false };
     const { error } = await supabase
       .from("day_program_attendance")
       .upsert(
@@ -446,7 +455,8 @@ export const addSessionStaff = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context as any;
+    const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { ok: false };
     const { error } = await supabase
       .from("day_program_session_staff")
       .upsert(

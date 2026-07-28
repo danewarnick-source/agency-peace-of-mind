@@ -67,6 +67,7 @@ export const listSavedReports = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }): Promise<SavedReport[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     const { data: reports, error } = await supabase
       .from("nectar_saved_reports")
@@ -107,6 +108,7 @@ export const saveReport = createServerFn({ method: "POST" })
   .inputValidator(validateSaveInput)
   .handler(async ({ data, context }): Promise<{ id: string }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { id: "" };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     const { data: inserted, error } = await supabase
       .from("nectar_saved_reports")
@@ -130,6 +132,7 @@ export const togglePinReport = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     const orgId = await orgForSavedReport(supabase, data.id);
     await requireOrgMembership(supabase, userId, orgId, "manager");
     const { error } = await supabase
@@ -146,6 +149,7 @@ export const deleteSavedReport = createServerFn({ method: "POST" })
   .inputValidator(validateIdInput)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     const orgId = await orgForSavedReport(supabase, data.id);
     await requireOrgMembership(supabase, userId, orgId, "manager");
     const { error } = await supabase
@@ -214,6 +218,7 @@ export const upsertReportSchedule = createServerFn({ method: "POST" })
   .inputValidator(validateScheduleInput)
   .handler(async ({ data, context }): Promise<{ id: string; next_run_at: string }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { id: "", next_run_at: "" };
     const orgId = await orgForSavedReport(supabase, data.saved_report_id);
     await requireOrgMembership(supabase, userId, orgId, "manager");
     const next = computeNextRunAt(data);
@@ -253,6 +258,7 @@ export const unscheduleReport = createServerFn({ method: "POST" })
   .inputValidator(validateIdInput)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     const orgId = await orgForSavedReport(supabase, data.id);
     await requireOrgMembership(supabase, userId, orgId, "manager");
     const { error } = await supabase

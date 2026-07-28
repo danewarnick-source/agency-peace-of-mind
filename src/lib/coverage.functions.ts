@@ -22,6 +22,16 @@ export const generateCoverageRequirements = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase } = context;
     const { homeId, date, setting } = data;
+    if (!supabase) {
+      return {
+        home: { id: homeId, name: "", organization_id: null },
+        date,
+        setting,
+        bands: [],
+        clients_without_ratio: [],
+        total_required_staff_per_band: 0,
+      };
+    }
 
     const { data: team, error: teamErr } = await supabase
       .from("teams")
@@ -261,6 +271,15 @@ export const computeRequiredStaff = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase } = context;
     const { locationId, startDate, endDate } = data;
+    if (!supabase) {
+      return {
+        location: { id: locationId, name: "", type: null },
+        residents: [],
+        ratios: [],
+        twoToOne: false,
+        days: [],
+      };
+    }
 
     const { data: loc, error: locErr } = await supabase
       .from("locations")

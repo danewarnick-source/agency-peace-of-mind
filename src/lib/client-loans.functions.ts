@@ -43,6 +43,15 @@ export const getLoanFeatureStatus = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        enabled: false,
+        settings: null,
+        attestations: [],
+        currentVersion: LOAN_ATTESTATION_VERSION,
+        attestationText: LOAN_ATTESTATION_TEXT,
+      };
+    }
     await requireOrgMembership(supabase, userId, data.organization_id, "admin");
     const { data: settings } = await (supabase as any)
       .from("org_loan_settings")
@@ -71,6 +80,7 @@ export const attestLoanFeature = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organization_id, "admin");
     const { data: att, error: attErr } = await (supabase as any)
       .from("org_loan_attestations")
@@ -101,6 +111,7 @@ export const disableLoanFeature = createServerFn({ method: "POST" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organization_id, "admin");
     await (supabase as any)
       .from("org_loan_settings")
@@ -163,6 +174,7 @@ export const listOrgLoans = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await requireOrgMembership(supabase, userId, data.organization_id, "admin");
     await assertEnabled(supabase, data.organization_id);
     const { data: rows, error } = await (supabase as any)
@@ -179,6 +191,7 @@ export const getClientLoanMarkers = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [] as { client_id: string; loan_count: number }[];
     // Admin-only; staff never sees these markers.
     try {
       await requireOrgMembership(supabase, userId, data.organization_id, "admin");
@@ -201,6 +214,7 @@ export const getLoan = createServerFn({ method: "GET" })
   .inputValidator((d) => z.object({ organization_id: z.string().uuid(), loan_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { loan: null, entries: [] };
     await requireOrgMembership(supabase, userId, data.organization_id, "admin");
     await assertEnabled(supabase, data.organization_id);
     const { data: loan, error } = await (supabase as any)
@@ -223,6 +237,7 @@ export const upsertLoan = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ id: z.string().uuid().optional(), values: loanInput }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requireOrgMembership(supabase, userId, data.values.organization_id, "admin");
     await assertEnabled(supabase, data.values.organization_id);
     const payload: any = { ...data.values, created_by: userId };
@@ -251,6 +266,7 @@ export const deleteLoan = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ organization_id: z.string().uuid(), loan_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organization_id, "admin");
     const { error } = await (supabase as any)
       .from("client_loans")
@@ -277,6 +293,7 @@ export const addLoanEntry = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requireOrgMembership(supabase, userId, data.organization_id, "admin");
     await assertEnabled(supabase, data.organization_id);
     const { data: row, error } = await (supabase as any)
@@ -293,6 +310,7 @@ export const deleteLoanEntry = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ organization_id: z.string().uuid(), entry_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organization_id, "admin");
     const { error } = await (supabase as any)
       .from("client_loan_entries")

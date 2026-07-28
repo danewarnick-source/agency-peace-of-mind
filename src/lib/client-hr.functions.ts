@@ -47,6 +47,7 @@ export const getClientIntakeChecklist = createServerFn({ method: "GET" })
   .inputValidator((d) => orgClient.parse(d))
   .handler(async ({ data, context }): Promise<ClientIntakeRow[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await requireOrgMembership(supabase, userId, data.organization_id);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -134,6 +135,7 @@ export const upsertClientIntakeCompletion = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organization_id);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

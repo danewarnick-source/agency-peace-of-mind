@@ -27,6 +27,9 @@ export const getCommandMetrics = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<CommandMetrics> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return { mrr_cents: 0, active_companies: 0, trial_companies: 0, past_due_companies: 0 };
+    }
     await ensureExecutive(supabase, userId);
     const { data } = await supabase
       .from("org_subscriptions")
@@ -54,6 +57,15 @@ export const getNeedsYouSummary = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<NeedsYouSummary> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        upgrade_requests: 0,
+        extraction_approvals: 0,
+        billing_approvals: 0,
+        functionality_reports: 0,
+        agreements_attention: 0,
+      };
+    }
     await ensureExecutive(supabase, userId);
 
     const now = new Date();

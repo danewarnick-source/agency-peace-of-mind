@@ -23,6 +23,7 @@ export const listOpenShifts = createServerFn({ method: "POST" })
     endIso: z.string(),
   }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [];
     const { data: rows, error } = await context.supabase
       .from("scheduled_shifts")
       .select("id, organization_id, client_id, service_code, starts_at, ends_at, location_id, notes, status, claim_requested_by")
@@ -56,6 +57,7 @@ export const postOpenShift = createServerFn({ method: "POST" })
     notes: z.string().optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return null;
     const insertRow = {
       organization_id: data.organizationId,
       staff_id: null,
@@ -87,6 +89,7 @@ export const claimOpenShift = createServerFn({ method: "POST" })
     z.object({ shiftId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { userId, supabase } = context;
+    if (!supabase || !userId) return { ok: false };
     const { data: shift, error: gErr } = await supabase
       .from("scheduled_shifts")
       .select("id, organization_id, status, staff_id, client_id, starts_at, service_code")
@@ -124,7 +127,8 @@ export const decideClaim = createServerFn({ method: "POST" })
   .inputValidator((d: { shiftId: string; approve: boolean }) =>
     z.object({ shiftId: z.string().uuid(), approve: z.boolean() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     const { data: shift, error: gErr } = await supabase
       .from("scheduled_shifts")
       .select("id, organization_id, claim_requested_by, service_code, starts_at")

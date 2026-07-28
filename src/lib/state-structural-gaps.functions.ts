@@ -21,6 +21,7 @@ export const listStructuralGaps = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await ensureExecutive(supabase, userId);
     const { data: rows, error } = await supabase
       .from("state_structural_gaps")
@@ -45,6 +46,7 @@ export const fileStructuralGap = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await ensureExecutive(supabase, userId);
     const { error } = await supabase.from("state_structural_gaps").insert({
       state_code: data.stateCode,
@@ -69,6 +71,7 @@ export const updateStructuralGap = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await ensureExecutive(supabase, userId);
     const { error } = await supabase
       .from("state_structural_gaps")

@@ -139,6 +139,7 @@ export const getStaffQualifications = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }): Promise<QualificationsSnapshot> => {
+    if (!context.supabase || !context.userId) return { activeOnly: [], all: [] };
     return await loadQualifications({
       supabase: context.supabase,
       staffId: data.staffId,

@@ -53,6 +53,27 @@ export const getCompanyOverview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => Input.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) {
+      return {
+        attention: {
+          expiringCredentials: 0,
+          missingDailyLogs: 0,
+          unsignedNotes: 0,
+          pendingIncidents: 0,
+          claimsReady: 0,
+          pendingPayroll: 0,
+          clientsOffPace: 0,
+          requirementsNeedingReview: 0,
+          engineMappingGaps: 0,
+          pendingBillingWarnings: 0,
+          pendingReimbursements: 0,
+          unacceptedShifts: 0,
+          auditorSharesExpiring: 0,
+        },
+        celebrations: [],
+        billing: null,
+      } satisfies CompanyOverview;
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     await requireOrgMembership(context.supabase, context.userId, data.organizationId, "employee");

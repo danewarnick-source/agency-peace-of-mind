@@ -57,6 +57,7 @@ export const getTotalsTps = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }): Promise<TotalsTps> => {
+    if (!context.supabase || !context.userId) return null;
     await gate(context, data.organizationId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: row, error } = await (context.supabase as any)
@@ -72,6 +73,7 @@ export const getTotalsCbc = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }): Promise<TotalsCbc[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     const { data: rows, error } = await context.supabase
       .from("client_billing_codes")
@@ -85,6 +87,7 @@ export const getTotalsEvv = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgYearInput.parse(i))
   .handler(async ({ data, context }): Promise<TotalsEvv[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     const yearStartIso = new Date(data.year, 0, 1).toISOString();
     const yearEndIso = new Date(data.year + 1, 0, 1).toISOString();
@@ -102,6 +105,7 @@ export const getTotalsHhs = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgYearInput.parse(i))
   .handler(async ({ data, context }): Promise<TotalsHhs[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     const yearStartDate = `${data.year}-01-01`;
     const yearEndDate = `${data.year + 1}-01-01`;
@@ -120,6 +124,7 @@ export const getTotalsHostSet = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }): Promise<TotalsHostSet[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: rows, error } = await (context.supabase as any)
@@ -133,6 +138,7 @@ export const getTotalsHhp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }): Promise<TotalsHhp[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     const { data: rows, error } = await context.supabase
       .from("staff_assignments")
@@ -147,6 +153,7 @@ export const getTotalsCtr = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgYearInput.parse(i))
   .handler(async ({ data, context }): Promise<TotalsCtr[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: rows, error } = await (context.supabase as any)
@@ -162,6 +169,7 @@ export const getTotalsProfiles = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }): Promise<TotalsProfilesMap> => {
+    if (!context.supabase || !context.userId) return {};
     await gate(context, data.organizationId);
     const { data: rows, error } = await context.supabase
       .from("profiles")
@@ -178,6 +186,7 @@ export const getTotalsLedger = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgYearInput.parse(i))
   .handler(async ({ data, context }): Promise<TotalsLedgerRow[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     const { data: rows, error } = await context.supabase
       .from("provider_ledger_entries")

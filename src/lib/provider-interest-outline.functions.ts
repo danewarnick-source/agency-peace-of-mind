@@ -55,6 +55,7 @@ export const getProviderInterestOutline = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }): Promise<ProviderInterestOutline | null> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requireAnyPermission(supabase, userId, data.organization_id, [
       "view_referrals",
       "manage_referrals",
@@ -89,6 +90,7 @@ export const saveProviderInterestOutline = createServerFn({ method: "POST" })
   .inputValidator((d) => saveInput.parse(d))
   .handler(async ({ data, context }): Promise<ProviderInterestOutline> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null as unknown as ProviderInterestOutline;
     await requirePermission(
       supabase,
       userId,

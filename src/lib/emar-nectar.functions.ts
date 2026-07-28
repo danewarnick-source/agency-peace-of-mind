@@ -19,6 +19,7 @@ export const emarNectarHelper = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return { content: "" };
 
     const { data: client } = await supabase
       .from("clients")

@@ -63,6 +63,9 @@ export const ingestWebSource = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return { documentId: "", capturedAt: "", sourceUrl: "", textLength: 0 };
+    }
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
 
 
@@ -187,6 +190,7 @@ export const listAuthoritativeSources = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return { sources: [] };
     // Sources tab shows every company-owned doc — the authoritative flag /
     // authoritative_kind just controls whether NECTAR can draft from it yet.
     // Client/staff docs stay filtered out so PHI-scoped files don't leak in.
@@ -217,6 +221,7 @@ export const markAsAuthoritativeSource = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     const { data: docRow } = await supabase
       .from("nectar_documents")
       .select("organization_id")
@@ -262,6 +267,7 @@ export const updatePolicyConfig = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     const { data: docRow } = await supabase
       .from("nectar_documents")
       .select("organization_id, authoritative_kind")
@@ -313,6 +319,7 @@ export const setSourceIgnoreState = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true, requirementsTotal: 0, requirementsConfirmed: 0 };
 
     const { data: doc, error: dErr } = await supabase
       .from("nectar_documents")
@@ -454,6 +461,7 @@ export const listRequirements = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return { requirements: [], sourcesById: {} };
     let q = supabase
       .from("nectar_requirements")
       .select(
@@ -582,6 +590,7 @@ export const upsertRequirement = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { id: "" };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     const payload = {
       organization_id: data.organizationId,
@@ -622,6 +631,7 @@ export const deleteRequirement = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     const { data: reqRow } = await supabase
       .from("nectar_requirements")
       .select("organization_id")
@@ -655,6 +665,7 @@ export const setRequirementReviewStatus = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     const { data: req, error: gErr } = await supabase
       .from("nectar_requirements")
       .select(
@@ -754,6 +765,7 @@ export const verifyRequirement = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     const { data: req, error: getErr } = await supabase
       .from("nectar_requirements")
       .select("id, organization_id, title")
@@ -806,6 +818,9 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return { inserted: 0, reason: "unauthenticated" as const, message: "Not authenticated." };
+    }
     const { data: doc, error: dErr } = await supabase
       .from("nectar_documents")
       .select(
@@ -1349,6 +1364,14 @@ export const startRequirementsDraft = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        jobId: null as string | null,
+        totalChunks: 0,
+        reason: "unauthenticated" as const,
+        message: "Not authenticated.",
+      };
+    }
     const { data: doc, error: dErr } = await supabase
       .from("nectar_documents")
       .select(
@@ -1481,6 +1504,15 @@ export const processDraftChunk = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        processed: 0,
+        total: 0,
+        itemsAdded: 0,
+        failuresAdded: [] as string[],
+        skipped: true as const,
+      };
+    }
     const job = await loadDraftJobDoc(supabase, data.jobId, userId);
     const ranges = (job.chunk_ranges as unknown as Array<[number, number]>) ?? [];
     if (data.chunkIndex >= ranges.length)
@@ -1641,6 +1673,7 @@ export const getActiveDraftJobs = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { jobs: [] };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     const { data: rows, error } = await supabase
       .from("nectar_draft_jobs")
@@ -1694,6 +1727,7 @@ export const nudgeDraftJob = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ jobId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true as const };
     // Auth: only members of the job's org can nudge it.
     await loadDraftJobDoc(supabase, data.jobId, userId);
     try {
@@ -1713,6 +1747,15 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        inserted: 0,
+        chunkCount: 0,
+        chunkFailures: [] as string[],
+        reason: "unauthenticated" as const,
+        message: "Not authenticated.",
+      };
+    }
     const job = await loadDraftJobDoc(supabase, data.jobId, userId);
     const items = (job.extracted_items as unknown as DraftItem[]) ?? [];
     const chunkFailures = (job.chunk_failures as unknown as string[]) ?? [];
@@ -2054,6 +2097,7 @@ export const recordAttestation = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { id: "", attestedAt: "" };
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
     const { data: profile } = await supabase
       .from("profiles")
@@ -2093,6 +2137,7 @@ export const listAttestations = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return { attestations: [] };
     let q = supabase
       .from("nectar_attestations")
       .select(
@@ -2118,6 +2163,18 @@ export const explainRequirement = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) {
+      return {
+        explanation: {
+          plain_language: "Not authenticated.",
+          key_terms: [] as Array<{ term: string; plain: string }>,
+          confidence: "low" as const,
+          caveat: "Defer to the original source wording.",
+        },
+        disclaimer:
+          "This is a NECTAR plain-language restatement to aid your understanding. It is NOT legal, compliance, or audit advice, and does NOT replace the original source text. Always review the original requirement and consult counsel as needed before acting.",
+      };
+    }
     const { data: req, error } = await supabase
       .from("nectar_requirements")
       .select(

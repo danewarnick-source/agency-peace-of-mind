@@ -58,6 +58,7 @@ export const checkImportDuplicates = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase } = context as any;
+    if (!supabase || !context.userId) return { duplicates: [] as DuplicateHit[] };
     if (data.rows.length === 0) return { duplicates: [] as DuplicateHit[] };
 
     if (data.mode === "timesheets") {

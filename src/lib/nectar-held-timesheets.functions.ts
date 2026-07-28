@@ -75,6 +75,7 @@ export const listHeldTimesheets = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ organizationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<HeldTimesheetRow[]> => {
     const { supabase } = context;
+    if (!supabase) return [];
     // Pull all open flags of the two detection types we surface: clock-out
     // billing_conflict AND clock-in staff_prerequisite. Same reader, no
     // engine change — the queue grows by matching more subject_context.source
@@ -277,6 +278,7 @@ export const resolveHeldTimesheet = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false as const, finalized: false as const, flagsResolved: 0 };
     await ensureOverrideRole(supabase, userId, data.organizationId);
 
     // Verify still held.
@@ -383,6 +385,7 @@ export const resolveClockInHold = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false as const, finalized: false as const, flagsResolved: 0 };
     await ensureOverrideRole(supabase, userId, data.organizationId);
 
     const { data: openFlags, error: fe } = await supabase

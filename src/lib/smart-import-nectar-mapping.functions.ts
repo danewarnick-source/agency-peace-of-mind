@@ -115,6 +115,13 @@ export const suggestImportColumnMapping = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) {
+      return {
+        mapping: {} as Record<AnyField, FieldSuggestion>,
+        column_hints: [],
+        per_row_person_column: null,
+      };
+    }
 
     // Confirm caller belongs to this org (RLS already enforces reads, this
     // just gives a clean error message).

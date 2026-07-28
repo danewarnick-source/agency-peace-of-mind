@@ -34,6 +34,7 @@ export const listFeatureRegistry = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<FeatureRegistryRow[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await ensureExecutive(supabase, userId);
     const { data, error } = await supabase
       .from("feature_registry")
@@ -63,6 +64,7 @@ export const upsertFeatureRegistryEntry = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => upsertSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false, id: data.id ?? null };
     await ensureExecutive(supabase, userId);
     const payload = {
       feature_key: data.feature_key,

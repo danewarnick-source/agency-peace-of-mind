@@ -13,6 +13,7 @@ export const listImportJobs = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => OrgInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: jobs, error } = await sb
@@ -60,6 +61,7 @@ export const discardImportJob = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => JobInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: job, error } = await sb.from("import_jobs")
@@ -213,6 +215,7 @@ export const previewUndoImport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => JobInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { removes: [], skips: [], job: null };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const plan = await buildUndoPlan(context.supabase as any, data.jobId);
     return plan;
@@ -222,6 +225,7 @@ export const undoCommittedImport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => JobInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { removed: [], failed: [], skipped: [] };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const plan = await buildUndoPlan(sb, data.jobId);

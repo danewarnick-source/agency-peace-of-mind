@@ -39,6 +39,7 @@ export const listFunctionalityReports = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<FunctionalityReport[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await ensureExecutive(supabase, userId);
     const { data, error } = await supabase
       .from("functionality_reports")
@@ -92,6 +93,7 @@ export const createFunctionalityReport = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => createSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     const { error } = await supabase.from("functionality_reports").insert({
       organization_id: data.organization_id ?? null,
       reported_by: userId,
@@ -115,6 +117,7 @@ export const updateFunctionalityReport = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => updateSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await ensureExecutive(supabase, userId);
     const patch: Record<string, unknown> = {
       status: data.status,

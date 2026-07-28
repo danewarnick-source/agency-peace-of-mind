@@ -59,6 +59,7 @@ export const listEmployeeDocuments = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [] as Doc[];
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
@@ -90,6 +91,7 @@ export const createEmployeeDocumentUploadUrl = createServerFn({ method: "POST" }
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
@@ -144,6 +146,7 @@ export const getEmployeeDocumentUrl = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
@@ -174,6 +177,7 @@ export const deleteEmployeeDocument = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
@@ -233,6 +237,9 @@ export const extractEmployeeDocument = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return { applied_count: 0, suggested_count: 0, applied: [], suggested: [] };
+    }
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;

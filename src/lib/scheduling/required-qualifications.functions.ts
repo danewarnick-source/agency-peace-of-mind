@@ -289,7 +289,17 @@ export const verifyRequiredCertsCoverage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ organizationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<CoverageReport> => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        organizationId: data.organizationId,
+        hardcodedMap: HARDCODED_SERVICE_CODE_REQUIRED_CERTS,
+        perCode: [],
+        fullyCoveredCodes: [],
+        gapCodes: [],
+        fullDeletionSafe: false,
+      };
+    }
     const rules = await loadConfirmedRules(supabase, data.organizationId);
     const ruleMap = buildRuleCodeMap(rules);
 

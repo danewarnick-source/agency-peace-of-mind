@@ -60,6 +60,22 @@ export const attachBaselineCertificate = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId)
+      return {
+        ok: false,
+        validation_status: "failed" as const,
+        reasons: ["Not authenticated"],
+        expires_at: null,
+        completed_date: null,
+        nectar_suggested: false,
+        nectar_confidence: null,
+        nectar_name: null,
+        nectar_cert_type: null,
+        nectar_completed_date: null,
+        nectar_summary: null,
+        profile_name: null,
+        name_match: "unreadable" as const,
+      };
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
@@ -257,6 +273,7 @@ export const setBaselineExpiration = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
@@ -277,6 +294,7 @@ export const adminSignOffBaselineCompletion = createServerFn({ method: "POST" })
   .inputValidator((d) => orgStaffKey.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
@@ -324,6 +342,7 @@ export const revokeBaselineSignOff = createServerFn({ method: "POST" })
   .inputValidator((d) => orgStaffKey.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
@@ -344,6 +363,7 @@ export const clearBaselineCompletion = createServerFn({ method: "POST" })
   .inputValidator((d) => orgStaffKey.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;

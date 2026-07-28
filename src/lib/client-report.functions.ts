@@ -149,6 +149,25 @@ export const pullClientReport = createServerFn({ method: "POST" })
   .inputValidator(validate)
   .handler(async ({ data, context }): Promise<PullClientReportOutput> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        reportType: data.reportType,
+        reportLabel: REPORT_META[data.reportType].label,
+        filename: "",
+        mimeType: "application/pdf",
+        pdfBase64: "",
+        periodLabel: "",
+        organizationId: "",
+        orgName: "",
+        clientId: null,
+        clientName: null,
+        spaceId: null,
+        spaceName: null,
+        attachClientIds: [],
+        snapshots: [],
+        shipped: false,
+      };
+    }
 
     // Authorization: caller must be a manager+ in the org that owns the
     // target client or chore space. PHI-seam: no cross-org access.

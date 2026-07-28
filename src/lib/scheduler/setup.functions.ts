@@ -40,6 +40,7 @@ export const setClientCaseload = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase } = context as any;
+    if (!supabase) return { added: 0, removed: 0, updated: 0 };
 
     // Authoritative set of codes this client may be scoped to.
     const { data: clientRow } = await supabase
@@ -179,6 +180,7 @@ export const addStaffToClientCode = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase } = context as any;
+    if (!supabase) return { ok: false };
     const code = data.service_code.toUpperCase();
 
     const allCodes = await loadClientAuthorizedCodes(supabase, data.client_id);
@@ -239,6 +241,7 @@ export const removeStaffFromClientCode = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase } = context as any;
+    if (!supabase) return { ok: false };
     const code = data.service_code.toUpperCase();
 
     const { data: existing, error: rErr } = await supabase
@@ -288,6 +291,7 @@ export const takeOpenShift = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { ok: false };
 
     const { data: shift, error: sErr } = await supabase
       .from("scheduled_shifts")
@@ -398,6 +402,7 @@ export const nectarDraftShifts = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase } = context as any;
+    if (!supabase) return { drafts: [] };
 
     const [staffRes, clientsRes, authsRes] = await Promise.all([
       supabase
@@ -532,6 +537,7 @@ export const autoFillOpenShifts = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase } = context as any;
+    if (!supabase) return { proposals: [] };
     const start = new Date(data.week_start_iso);
     const end = new Date(start); end.setDate(end.getDate() + 7);
 
@@ -671,6 +677,7 @@ export const applyDrafts = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { created: 0, assigned: 0 };
     let created = 0;
     let assigned = 0;
     for (const d of data.drafts) {

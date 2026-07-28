@@ -103,6 +103,24 @@ export const runInternalAudit = createServerFn({ method: "POST" })
   .inputValidator((input) => auditInput.parse(input))
   .handler(async ({ data, context }): Promise<AuditSummary> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        generatedAt: new Date().toISOString(),
+        scope: {},
+        totals: { critical: 0, attention: 0, minor: 0, total: 0 },
+        readinessScore: 0,
+        byArea: {
+          documentation: 0,
+          daily_logs: 0,
+          evv_timesheets: 0,
+          billing: 0,
+          staff_certifications: 0,
+          requirements_engine: 0,
+          external_attestations: 0,
+        },
+        findings: [],
+      };
+    }
     // Server-side tier enforcement — the UI lock and this check must agree.
     await assertAddonForOrg(supabase, userId, "internal_audit", data.organizationId);
     const orgId = data.organizationId;
@@ -699,6 +717,7 @@ export const listAuditableStaff = createServerFn({ method: "GET" })
   .inputValidator((d) => z.object({ organizationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<AuditableStaff[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await assertAddonForOrg(supabase, userId, "internal_audit", data.organizationId);
     const { data: members, error } = await supabase
       .from("organization_members")
@@ -764,6 +783,15 @@ export const reconcileServiceCodes = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<ServiceCodeReconciliationReport> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        generatedAt: new Date().toISOString(),
+        organizationId: data.organizationId,
+        totalClients: 0,
+        outOfSyncCount: 0,
+        entries: [],
+      };
+    }
     await assertAddonForOrg(supabase, userId, "internal_audit", data.organizationId);
 
     const orgId = data.organizationId;

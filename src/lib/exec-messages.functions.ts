@@ -39,6 +39,7 @@ export const listAllOrganizationsForMessaging = createServerFn({ method: "GET" }
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<OrgForMessaging[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await ensureHiveExecutive(supabase, userId);
 
     // HIVE Execs can read every organization via existing RLS
@@ -67,6 +68,7 @@ export const createExecMessage = createServerFn({ method: "POST" })
   .inputValidator((d) => createSchema.parse(d))
   .handler(async ({ data, context }): Promise<CreateExecMessageResult> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { message_id: "", organization_ids: [], sender_user_id: "" };
     await ensureHiveExecutive(supabase, userId);
 
     // Resolve recipient org list SERVER-SIDE.
@@ -131,6 +133,7 @@ export const recordExecMessageAttachment = createServerFn({ method: "POST" })
   .inputValidator((d) => attachSchema.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await ensureHiveExecutive(supabase, userId);
 
     // Verify the message exists and was sent by this exec
@@ -165,6 +168,7 @@ export const discardExecMessage = createServerFn({ method: "POST" })
   .inputValidator((d) => discardSchema.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await ensureHiveExecutive(supabase, userId);
 
     const { data: msg, error: msgErr } = await supabase
@@ -235,6 +239,7 @@ export const listSentExecMessages = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<SentMessageRow[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await ensureHiveExecutive(supabase, userId);
 
     // Messages this exec sent

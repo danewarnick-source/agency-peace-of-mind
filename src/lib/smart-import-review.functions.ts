@@ -33,6 +33,7 @@ export const getReviewJob = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => JobId.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { job: null, subjects: [], assignments: [] };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: job, error } = await sb
@@ -61,6 +62,7 @@ export const getReviewSubject = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => SubjectId.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: subject, error } = await sb
@@ -149,6 +151,7 @@ export const saveManualReviewRow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => ManualReviewRowInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false, fieldId: "" };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const valueText = typeof data.value === "string" ? data.value.trim() : JSON.stringify(data.value);
@@ -319,6 +322,7 @@ export const editExtractedField = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => EditField.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: row } = await sb.from("extracted_fields").select("*").eq("id", data.fieldId).single();
@@ -382,6 +386,7 @@ export const saveBillingCodeRow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => BillingRowInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false, fieldId: "" };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const row = {
@@ -464,6 +469,7 @@ export const removeExtractedField = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => FieldIdInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: row } = await sb
@@ -496,6 +502,7 @@ export const restoreExtractedField = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => FieldIdInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: row } = await sb
@@ -532,6 +539,7 @@ export const setSubjectDecision = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => Decision.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: subj } = await sb.from("import_subjects").select("import_job_id, org_id").eq("id", data.subjectId).single();
@@ -562,6 +570,7 @@ export const setSubjectReady = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => MarkReady.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: subj } = await sb
@@ -640,6 +649,7 @@ export const upsertCertDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => UpsertCert.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: subj } = await sb.from("import_subjects").select("import_job_id, org_id").eq("id", data.subjectId).single();
@@ -682,6 +692,7 @@ export const answerNectarQuestion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => AnswerQ.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     await sb.from("import_nectar_questions").update({
@@ -701,6 +712,7 @@ export const fileUnfiledItem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => FileUnfiled.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     await sb.from("unfiled_items").update({
@@ -717,6 +729,7 @@ export const computeProvisioningForecast = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => Forecast.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { plan: [] };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: subj } = await sb.from("import_subjects")
@@ -827,6 +840,7 @@ export const togglePlanItem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => TogglePlan.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: row } = await sb.from("provisioning_plan").select("*").eq("id", data.planId).single();
@@ -859,6 +873,7 @@ export const confirmAssignment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => ConfirmAssignment.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: row } = await sb.from("assignment_map").select("*").eq("id", data.assignmentId).single();
@@ -901,6 +916,7 @@ export const getJobAssigner = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => JobId.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { clients: [], staffPool: [], assignments: [] };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
 
@@ -1013,6 +1029,7 @@ export const upsertManualAssignment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => UpsertManual.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false, id: null, updated: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: job } = await sb.from("import_jobs")
@@ -1062,6 +1079,7 @@ export const removeAssignmentMapRow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => RemoveAssignment.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { error } = await sb.from("assignment_map").delete().eq("id", data.assignmentId);
@@ -1080,6 +1098,7 @@ export const submitForSetup = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => JobId.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false, committed: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: job } = await sb
@@ -1153,6 +1172,7 @@ export const applyMissingClientFields = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => MissingClientFields.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: subj } = await sb
@@ -1290,6 +1310,9 @@ export const applyClientFields = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => ApplyFields.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) {
+      return { ok: false, issues: [], blocking: [], readyToFinalize: false };
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: subj } = await sb
@@ -1384,6 +1407,7 @@ export const listPendingClientSubjects = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => PendingList.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { items: [], jobs: {} };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: subjects } = await sb
@@ -1462,6 +1486,7 @@ export const getPendingClientSubject = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => SubjectId.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: subj } = await sb
@@ -1560,6 +1585,7 @@ export const discardImportSubject = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => SubjectId.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: subj } = await sb

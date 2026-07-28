@@ -152,6 +152,18 @@ export const searchTimesheetsByVector = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateSearch)
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId)
+      return {
+        matches: [] as Array<{ id: string; similarity: number }>,
+        route: {
+          caregiver_name: null,
+          client_name: null,
+          hour_min: null,
+          date_from: null,
+          date_to: null,
+          requires_semantic: false,
+        } as RouterResult,
+      };
     await requireOrgMembership(context.supabase, context.userId, data.organizationId, "employee");
     const route = await routeQueryWithLLM(data.query);
 
@@ -191,6 +203,7 @@ export const backfillTimesheetEmbeddings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateBackfill)
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { embedded: 0, remaining: 0 };
     await requireOrgMembership(context.supabase, context.userId, data.organizationId, "admin");
     const { data: rows, error } = await context.supabase
       .from("evv_timesheets")

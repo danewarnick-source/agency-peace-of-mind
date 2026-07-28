@@ -46,6 +46,7 @@ export const getGrossCbc = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => Input.parse(i))
   .handler(async ({ data, context }): Promise<GrossCbcRow[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     const { data: rows, error } = await context.supabase
       .from("client_billing_codes")
@@ -59,6 +60,7 @@ export const getGrossEvv = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => Input.parse(i))
   .handler(async ({ data, context }): Promise<GrossEvvRow[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     const rangeStartIso = new Date(data.startYear, 0, 1).toISOString();
     const rangeEndIso = new Date(data.endYear + 1, 0, 1).toISOString();
@@ -76,6 +78,7 @@ export const getGrossHhs = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => Input.parse(i))
   .handler(async ({ data, context }): Promise<GrossHhsRow[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     const rangeStartDate = `${data.startYear}-01-01`;
     const rangeEndDate = `${data.endYear + 1}-01-01`;
@@ -96,6 +99,7 @@ export const getGrossCtr = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => Input.parse(i))
   .handler(async ({ data, context }): Promise<GrossCtrRow[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: rows, error } = await (context.supabase as any)
@@ -112,6 +116,7 @@ export const getGrossLedger = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => Input.parse(i))
   .handler(async ({ data, context }): Promise<GrossLedgerRow[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     const { data: rows, error } = await context.supabase
       .from("provider_ledger_entries")
@@ -139,6 +144,7 @@ export const getGrossTrackingStart = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => StartInput.parse(i))
   .handler(async ({ data, context }): Promise<GrossTrackingStart> => {
+    if (!context.supabase || !context.userId) return { earliestDate: null, earliestYear: null, earliestMonth: null };
     await gate(context, data.organizationId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;

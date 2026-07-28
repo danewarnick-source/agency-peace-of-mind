@@ -20,6 +20,7 @@ export const requestSwap = createServerFn({ method: "POST" })
     }).parse(d))
   .handler(async ({ data, context }) => {
     const { userId, supabase } = context;
+    if (!supabase || !userId) return null;
 
     const { data: shift, error } = await supabase
       .from("scheduled_shifts")
@@ -64,6 +65,7 @@ export const listEligibleSwapPartners = createServerFn({ method: "POST" })
     z.object({ shiftId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     const { data: shift } = await supabase
       .from("scheduled_shifts")
       .select("organization_id, starts_at, ends_at, service_code, client_id")
@@ -109,6 +111,7 @@ export const respondToSwap = createServerFn({ method: "POST" })
     z.object({ requestId: z.string().uuid(), accept: z.boolean() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     const { data: req } = await supabase
       .from("shift_swap_requests")
       .select("id, organization_id, to_staff_id, from_staff_id, note, shift_id")
@@ -147,6 +150,7 @@ export const decideSwap = createServerFn({ method: "POST" })
     z.object({ requestId: z.string().uuid(), approve: z.boolean() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
 
     const { data: req } = await supabase
       .from("shift_swap_requests")
@@ -198,6 +202,7 @@ export const listPendingSwaps = createServerFn({ method: "POST" })
   .inputValidator((d: { organizationId: string }) =>
     z.object({ organizationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [];
     const { data: rows, error } = await context.supabase
       .from("shift_swap_requests")
       .select("id, shift_id, from_staff_id, to_staff_id, note, status, created_at")
@@ -214,6 +219,7 @@ export const listMySwapsForMe = createServerFn({ method: "POST" })
     z.object({ organizationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     const { data: rows, error } = await supabase
       .from("shift_swap_requests")
       .select("id, shift_id, from_staff_id, to_staff_id, note, status, created_at")

@@ -99,6 +99,7 @@ export const ingestDocument = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
 
 
@@ -288,6 +289,7 @@ export const queryDocuments = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return { documents: [] };
     let q = supabase
       .from("nectar_documents")
       .select(
@@ -314,6 +316,7 @@ export const getDocument = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ documentId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return null;
     const { data: doc, error } = await supabase
       .from("nectar_documents")
       .select("*")
@@ -366,6 +369,7 @@ export const getExtractedFields = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return { fields: [] };
     let docQ = supabase
       .from("nectar_documents")
       .select("id")
@@ -413,6 +417,7 @@ export const reviewExtractedField = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     // Resolve org via the field → document; verify caller is a manager+ there.
     const { data: fieldRow } = await supabase
       .from("nectar_extracted_fields")
@@ -445,6 +450,7 @@ export const deleteDocument = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ documentId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     const { data: doc } = await supabase
       .from("nectar_documents")
       .select("storage_path, storage_bucket, organization_id")

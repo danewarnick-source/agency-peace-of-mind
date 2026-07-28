@@ -133,6 +133,7 @@ export const openApprovalRequest = createServerFn({ method: "POST" })
   .inputValidator((d) => OpenInput.parse(d))
   .handler(async ({ data, context }): Promise<{ requestId: string }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { requestId: "" };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
 
     // If a pending / approved request already exists for this exact
@@ -192,6 +193,7 @@ export const postApprovalMessage = createServerFn({ method: "POST" })
   .inputValidator((d) => PostInput.parse(d))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
 
     const { data: req, error } = await supabase
       .from("billing_code_approval_requests")
@@ -263,6 +265,7 @@ export const withdrawApprovalRequest = createServerFn({ method: "POST" })
   .inputValidator((d) => WithdrawInput.parse(d))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     const { data: req } = await supabase
       .from("billing_code_approval_requests")
       .select("id, organization_id, status")
@@ -296,6 +299,7 @@ export const listMyApprovalRequests = createServerFn({ method: "POST" })
   .inputValidator((d) => ListMineInput.parse(d))
   .handler(async ({ data, context }): Promise<ApprovalRequestRow[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     return listRequestsInternal(supabase, { organizationId: data.organizationId, viewerSide: "provider", viewerUserId: userId });
   });
@@ -309,6 +313,7 @@ export const listPendingHiveApprovals = createServerFn({ method: "POST" })
   .inputValidator((d) => ListHiveInput.parse(d))
   .handler(async ({ data, context }): Promise<ApprovalRequestRow[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     if (!(await isHiveExec(supabase, userId))) throw new Error("HIVE Admin only");
     return listRequestsInternal(supabase, { viewerSide: "hive_admin", viewerUserId: userId, statusFilter: data.status });
   });
@@ -402,6 +407,37 @@ export const getApprovalThread = createServerFn({ method: "POST" })
   .inputValidator((d) => ThreadInput.parse(d))
   .handler(async ({ data, context }): Promise<ApprovalThread> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        request: {
+          id: "",
+          organization_id: "",
+          organization_name: null,
+          requesting_user_id: "",
+          requesting_user_name: null,
+          import_job_id: null,
+          subject_id: null,
+          extracted_field_id: null,
+          code: "",
+          provider_name_on_pcsp: null,
+          justification: "",
+          status: "pending",
+          resolved_by_user_id: null,
+          resolved_by_name: null,
+          resolved_at: null,
+          resolution_note: null,
+          resolved_signature_name: null,
+          resolved_signature_attested: null,
+          resolved_signature_at: null,
+          created_at: "",
+          updated_at: "",
+          last_activity_at: "",
+          unread_for_me: 0,
+        },
+        messages: [],
+        viewer_side: "provider",
+      };
+    }
 
     const { data: req, error } = await supabase
       .from("billing_code_approval_requests")
@@ -493,6 +529,7 @@ export const markApprovalThreadRead = createServerFn({ method: "POST" })
   .inputValidator((d) => MarkReadInput.parse(d))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     const { data: req } = await supabase
       .from("billing_code_approval_requests")
       .select("id, organization_id")
@@ -531,6 +568,7 @@ export const getApprovalUnreadCount = createServerFn({ method: "POST" })
   .inputValidator((d) => UnreadInput.parse(d))
   .handler(async ({ data, context }): Promise<{ count: number }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { count: 0 };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
 
     const { data: reqs } = await supabase
@@ -554,6 +592,7 @@ export const getHiveApprovalUnreadCount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<{ count: number; pending: number }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { count: 0, pending: 0 };
     if (!(await isHiveExec(supabase, userId))) return { count: 0, pending: 0 };
 
     const [{ count: pending }, { data: allReqs }] = await Promise.all([
@@ -589,6 +628,7 @@ export const lookupApprovalRequestsForFields = createServerFn({ method: "POST" }
   .inputValidator((d) => LookupInput.parse(d))
   .handler(async ({ data, context }): Promise<Record<string, ApprovalRequestRow | null>> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return {};
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     if (data.extractedFieldIds.length === 0) return {};
 

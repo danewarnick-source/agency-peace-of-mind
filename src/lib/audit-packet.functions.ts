@@ -89,6 +89,7 @@ export const parseAndProduceAuditPacket = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { packet_id: null, items_created: 0 };
 
     // Verify caller is admin/manager for this org
     const { data: membership } = await supabase

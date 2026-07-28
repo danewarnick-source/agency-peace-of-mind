@@ -28,6 +28,7 @@ export const createTimesheetImportJob = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase } = context as any;
+    if (!supabase || !context.userId) return { jobId: "" };
     const { data: job, error } = await supabase
       .from("import_jobs")
       .insert({
@@ -61,6 +62,7 @@ export const importHistoricalTimesheets = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { inserted: 0, rejected: [], staffCount: 0 };
 
     // Fetch org's DSPD provider ID upfront — required for every row.
     const { data: orgRow, error: orgErr } = await supabase

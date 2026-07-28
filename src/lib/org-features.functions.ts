@@ -78,6 +78,7 @@ export const getOrgFeatureBundle = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => z.object({ organizationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<OrgFeatureBundle> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { registry: [], overrides: [], effective: {} };
 
     const { data: execRow } = await supabase
       .from("hive_executives")
@@ -113,6 +114,7 @@ export const getMyOrgFeatures = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }): Promise<{ organization_id: string | null; effective: Record<string, boolean>; registry: FeatureRegistryRow[] }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { organization_id: null, effective: {}, registry: [] };
 
     const { data: memberships } = await supabase
       .from("organization_members")
@@ -164,6 +166,7 @@ export const requestFeatureUpgrade = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<{ ok: true; id: string }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true, id: "" };
     const { data: row, error } = await (supabase as unknown as {
       from: (t: string) => {
         insert: (v: Record<string, unknown>) => {
@@ -196,6 +199,7 @@ export const setOrgFeature = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
 
     const { data: execRow } = await supabase
       .from("hive_executives")
@@ -262,6 +266,7 @@ export const listUpgradeRequests = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }): Promise<UpgradeRequestRow[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await assertExec(supabase as never, userId);
 
     let q = (supabase as unknown as {
@@ -341,6 +346,7 @@ export const getPendingUpgradeRequestCount = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<{ count: number }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { count: 0 };
     await assertExec(supabase as never, userId);
     const { count } = await (supabase as unknown as {
       from: (t: string) => {
@@ -369,6 +375,7 @@ export const resolveUpgradeRequest = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     await assertExec(supabase as never, userId);
 
     const { data: req, error: reqErr } = await (supabase as unknown as {

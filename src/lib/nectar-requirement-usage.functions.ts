@@ -30,6 +30,7 @@ export const saveRequirementUsageNote = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false as const, usage: null };
     const { data: req, error: rErr } = await supabase
       .from("nectar_requirements")
       .select("id, organization_id")
@@ -75,6 +76,7 @@ export const recategorizeRequirement = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false as const };
     const { data: req, error } = await supabase
       .from("nectar_requirements")
       .select("id, organization_id, obligation_category")
@@ -119,6 +121,7 @@ export const activateCodeRequirements = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false as const, activatedCount: 0, activation: null };
     const { data: isAdmin } = await supabase.rpc("is_org_admin_or_manager", {
       _org: data.organizationId,
       _user: userId,
@@ -174,6 +177,7 @@ export const toggleRequirementOptionalConfirm = createServerFn({ method: "POST" 
     z.object({ requirementId: z.string().uuid(), confirmed: z.boolean() }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase) return { ok: false as const };
     const { error } = await context.supabase
       .from("nectar_requirements")
       .update({ confirmed_optional: data.confirmed })
@@ -188,6 +192,7 @@ export const listPendingCodeActivations = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ organizationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return [];
     const [{ data: authCodes }, { data: pendingReqs }] = await Promise.all([
       supabase
         .from("provider_authorized_codes")

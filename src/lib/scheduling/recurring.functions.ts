@@ -28,6 +28,7 @@ export const listPatterns = createServerFn({ method: "POST" })
   .inputValidator((d: { organizationId: string }) =>
     z.object({ organizationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [];
     const { data: rows, error } = await (context.supabase as any)
       .from("recurring_shift_patterns")
       .select("*")
@@ -41,6 +42,7 @@ export const upsertPattern = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => PatternInput.parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { id: "" };
     const crosses = data.end_time_local <= data.start_time_local;
     const row = {
       ...data,
@@ -64,6 +66,7 @@ export const togglePattern = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string; active: boolean }) =>
     z.object({ id: z.string().uuid(), active: z.boolean() }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     const { error } = await (context.supabase as any)
       .from("recurring_shift_patterns").update({ active: data.active }).eq("id", data.id);
     if (error) throw error;
@@ -75,6 +78,7 @@ export const deletePattern = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) =>
     z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     const { error } = await (context.supabase as any)
       .from("recurring_shift_patterns").delete().eq("id", data.id);
     if (error) throw error;
@@ -87,6 +91,7 @@ export const listRotationGroups = createServerFn({ method: "POST" })
   .inputValidator((d: { organizationId: string }) =>
     z.object({ organizationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [];
     const sb = context.supabase as any;
     const { data: groups, error } = await sb
       .from("staff_rotation_groups")
@@ -107,6 +112,7 @@ export const upsertRotationGroup = createServerFn({ method: "POST" })
       memberIds: z.array(z.string().uuid()),
     }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { id: "" };
     const sb = context.supabase as any;
     let groupId = data.id;
     if (groupId) {
@@ -163,6 +169,7 @@ export const materializeWeek = createServerFn({ method: "POST" })
       weekStartIso: z.string(),
     }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { created: 0, skipped: 0 };
     const sb = context.supabase as any;
     const target = weekStart(new Date(data.weekStartIso));
     const weekEnd = new Date(target); weekEnd.setDate(weekEnd.getDate() + 7);

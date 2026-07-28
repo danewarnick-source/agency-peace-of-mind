@@ -20,6 +20,7 @@ export const getUiDismissals = createServerFn({ method: "GET" })
       };
     };
     const userId = context.userId as string;
+    if (!context.supabase || !context.userId) return [];
     try {
       const { data, error } = await sb
         .from("user_ui_dismissals")
@@ -40,6 +41,7 @@ export const dismissUiPref = createServerFn({ method: "POST" })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const userId = context.userId as string;
+    if (!context.supabase || !context.userId) return { ok: false, persisted: false };
     try {
       const { error } = await sb
         .from("user_ui_dismissals")

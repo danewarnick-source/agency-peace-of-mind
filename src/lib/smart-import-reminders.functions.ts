@@ -45,6 +45,7 @@ export const generateSmartImportReminders = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => OrgScope.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { generated: 0 };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const now = Date.now();
@@ -268,6 +269,7 @@ export const listSmartImportReminders = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => ListInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { reminders: [] };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const TYPES = [
@@ -337,6 +339,7 @@ export const resolveSmartImportReminder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => ReminderId.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: row, error: rerr } = await sb
@@ -384,6 +387,7 @@ export const employeeUploadImportCert = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => UploadInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false, path: "" };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: doc, error: derr } = await sb

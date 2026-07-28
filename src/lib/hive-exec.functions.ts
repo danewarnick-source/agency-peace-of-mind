@@ -151,6 +151,7 @@ export const checkHiveExecutive = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<{ isExecutive: boolean }> => {
     try {
       const { supabase, userId } = context;
+      if (!supabase || !userId) return { isExecutive: false };
       const { data, error } = await supabase
         .from("hive_executives")
         .select("id")
@@ -174,6 +175,16 @@ export const getExecKpis = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<ExecKpis> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        active_companies: 0,
+        trial_companies: 0,
+        past_due_companies: 0,
+        locked_companies: 0,
+        mrr_cents: 0,
+        open_tickets: 0,
+      };
+    }
     await ensureExecutive(supabase, userId);
     await audit(supabase, userId, "view_kpis", null, "Loaded executive KPIs");
 
@@ -219,6 +230,7 @@ export const listCompanies = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<CompanyRow[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await ensureExecutive(supabase, userId);
     await audit(supabase, userId, "list_companies", null, "Loaded company list");
 
@@ -312,8 +324,9 @@ function validateCompanyDetailInput(input: unknown): { organizationId: string } 
 export const getCompanyDetail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateCompanyDetailInput)
-  .handler(async ({ data, context }): Promise<CompanyDetail> => {
+  .handler(async ({ data, context }): Promise<CompanyDetail | null> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await ensureExecutive(supabase, userId);
     await audit(supabase, userId, "view_company", data.organizationId, "Opened company detail");
 
@@ -503,6 +516,7 @@ export const upsertSubscription = createServerFn({ method: "POST" })
   .inputValidator(validateSubPatch)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await ensureExecutive(supabase, userId);
 
     const { data: existing } = await supabase
@@ -543,6 +557,7 @@ export const listAllTickets = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<TicketRow[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await ensureExecutive(supabase, userId);
     await audit(supabase, userId, "list_tickets", null, "Loaded ticket queue");
 
@@ -593,6 +608,7 @@ export const updateTicket = createServerFn({ method: "POST" })
   .inputValidator(validateTicketUpdate)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await ensureExecutive(supabase, userId);
 
     const updates: Record<string, unknown> = { ...data.patch };
@@ -668,6 +684,7 @@ export const updateOrgNames = createServerFn({ method: "POST" })
   .inputValidator(validateOrgNamesInput)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false, changed: 0 };
     await ensureExecutive(supabase, userId);
 
     const { data: before, error: bErr } = await supabase
@@ -771,6 +788,7 @@ export const updateAccountContact = createServerFn({ method: "POST" })
   .inputValidator(validateAccountContactInput)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false, changed: 0 };
 
     // AuthZ: exec OR org admin/manager.
     const { data: execRow } = await supabase
@@ -821,6 +839,7 @@ export const getAccountContact = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { name: null, email: null, phone: null };
     const { data: execRow } = await supabase
       .from("hive_executives").select("id").eq("user_id", userId).eq("active", true).maybeSingle();
     if (!execRow) {

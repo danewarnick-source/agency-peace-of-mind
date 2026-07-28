@@ -390,6 +390,7 @@ export const askNectarHelp = createServerFn({ method: "POST" })
   .inputValidator(validate)
   .handler(async ({ data, context }): Promise<NectarHelpReply> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { answer: "", deepLink: null, isDataRequest: false, followUps: [] };
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
     const facts = await gatherFacts(supabase as unknown as SupabaseLike, userId, data.role, data.question, data.organizationId);
 
@@ -493,6 +494,7 @@ export const escalateHelpToHive = createServerFn({ method: "POST" })
   .inputValidator(validateEscalate)
   .handler(async ({ data, context }): Promise<{ ticketId: string; status: string }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ticketId: "", status: "" };
     const orgId = data.organizationId;
     await requireOrgMembership(supabase, userId, orgId, "employee");
 
@@ -530,6 +532,7 @@ export const getHelpTicketStatus = createServerFn({ method: "POST" })
   .inputValidator(validateStatusInput)
   .handler(async ({ data, context }): Promise<{ status: string; updated_at: string } | null> => {
     const { supabase } = context;
+    if (!supabase) return null;
     const { data: t } = await supabase
       .from("org_support_tickets")
       .select("status, updated_at")

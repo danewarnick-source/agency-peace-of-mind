@@ -272,6 +272,12 @@ export const proposeRequirementMappings = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId)
+      return {
+        inserted: 0,
+        total: 0,
+        facts: { codes: [], activeCodes: [], dormantCodes: [], roles: [], clientCount: 0, jurisdictions: [] },
+      };
     const { data: req, error: rErr } = await supabase
       .from("nectar_requirements")
       .select(
@@ -365,6 +371,7 @@ export const listRequirementMappings = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return { mappings: [] };
     let q = supabase
       .from("nectar_requirement_mappings")
       .select(
@@ -401,6 +408,7 @@ export const setRequirementMapping = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     const nowIso = new Date().toISOString();
 
     if (data.id) {
@@ -477,6 +485,7 @@ export const deleteRequirementMapping = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     const { data: existing, error: exErr } = await supabase
       .from("nectar_requirement_mappings")
       .select("organization_id")
@@ -517,6 +526,7 @@ export const getApplicableRequirements = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return { requirements: [], mappings: [] };
 
     let q = supabase
       .from("nectar_requirement_mappings")
@@ -572,6 +582,7 @@ export const getBillingReadinessForCode = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return { code: data.code.toUpperCase(), rules: [] };
     const code = data.code.toUpperCase();
     const { data: maps } = await supabase
       .from("nectar_requirement_mappings")
@@ -600,6 +611,7 @@ export const listEngineGapsAsTasks = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return { tasks: [] };
     const [reqsRes, mapsRes] = await Promise.all([
       supabase
         .from("nectar_requirements")
@@ -702,6 +714,8 @@ export const prefillRequirementMappings = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId)
+      return { processed: 0, inserted: 0, failed: 0, skipped: 0, candidates: 0, alreadyMapped: 0 };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
 
 
@@ -872,6 +886,7 @@ export const confirmRequirementWithScopes = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false, scopesConfirmed: 0 };
     const nowIso = new Date().toISOString();
 
     const { data: req, error: rErr } = await supabase
@@ -998,6 +1013,11 @@ export const listAuthorizedCodes = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase)
+      return {
+        codes: [],
+        summary: { total: 0, active: 0, dormant: 0, authorizedExplicit: 0, inferredOnly: 0 },
+      };
     const facts = await gatherOrgFacts(supabase, data.organizationId);
 
     const { data: authRows, error } = await supabase
@@ -1110,6 +1130,7 @@ export const upsertAuthorizedCode = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     const code = data.code.trim().toUpperCase();
     if (!code) throw new Error("Code required");
@@ -1160,6 +1181,7 @@ export const removeAuthorizedCode = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     const { data: existing, error: exErr } = await supabase
       .from("provider_authorized_codes")
       .select("organization_id")

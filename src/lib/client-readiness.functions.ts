@@ -29,6 +29,19 @@ export const clientReadiness = createServerFn({ method: "POST" })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const userId = context.userId as string;
+    if (!sb || !userId) {
+      return {
+        schedulable: false,
+        hasStaff: false,
+        evvReady: false,
+        billable: false,
+        guardianValid: false,
+        goalsPresent: false,
+        isLive: false,
+        currentCodes: [],
+        clockableCodes: [],
+      };
+    }
 
     const { data: client } = await sb
       .from("clients")

@@ -70,7 +70,6 @@ export const detectEffectiveDates = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    await requireOrgMembership(supabase, userId, data.organization_id);
     const empty = {
       detected: false as const,
       effective_from: null as string | null,
@@ -79,6 +78,8 @@ export const detectEffectiveDates = createServerFn({ method: "POST" })
       confidence: "low" as "low" | "medium" | "high",
       source_snippet: null as string | null,
     };
+    if (!supabase || !userId) return empty;
+    await requireOrgMembership(supabase, userId, data.organization_id);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
@@ -130,6 +131,7 @@ export const findCurrentSibling = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<{ sibling: CurrentSibling | null }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { sibling: null };
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
@@ -177,6 +179,7 @@ export const setEffectiveDates = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false as const };
     await requireOrgMembership(supabase, userId, data.organization_id);
     if (data.effective_to_mode === "fixed_date" && !data.effective_to) {
       throw new Error("Effective-to date is required when mode is 'fixed date'.");
@@ -216,6 +219,7 @@ export const replaceDocument = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false as const, auto_closed_to: null };
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
@@ -273,6 +277,7 @@ export const listOutdatedDocuments = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<{ documents: OutdatedDocument[] }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { documents: [] };
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;

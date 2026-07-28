@@ -193,6 +193,7 @@ export const createSmartImportJob = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => CreateJobInput.parse(input))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { jobId: "" };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: row, error } = await sb
@@ -229,6 +230,7 @@ export const recordImportDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => RecordDocInput.parse(input))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { documentId: "" };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: row, error } = await sb
@@ -258,6 +260,9 @@ export const runSmartExtraction = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => ExtractInput.parse(input))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) {
+      return { subjects: 0, matched: 0, ambiguous: 0, status: "in_review" as const };
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
 
@@ -623,6 +628,17 @@ export const getSmartImportSummary = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => JobIdInput.parse(input))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) {
+      return {
+        jobId: data.jobId,
+        status: "draft",
+        mode: "client" as const,
+        documents: 0,
+        subjects: 0,
+        matched_existing: 0,
+        review_items: 0,
+      };
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: job } = await sb

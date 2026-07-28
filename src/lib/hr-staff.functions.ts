@@ -57,6 +57,7 @@ export const getStaffPii = createServerFn({ method: "GET" })
   .inputValidator((d) => orgStaff.parse(d))
   .handler(async ({ data, context }): Promise<StaffPii | null> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: rows, error } = await (supabase as any).rpc("get_staff_pii", {
@@ -83,6 +84,7 @@ export const listStaffPii = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }): Promise<StaffPii[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: rows, error } = await (supabase as any).rpc("list_staff_pii", {
@@ -158,6 +160,7 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
   .inputValidator((d) => orgStaff.parse(d))
   .handler(async ({ data, context }): Promise<ChecklistRow[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await requireOrgMembership(supabase, userId, data.organization_id);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -425,6 +428,7 @@ export const getStaffTrainingRiskFlags = createServerFn({ method: "GET" })
   .inputValidator((d) => orgStaff.parse(d))
   .handler(async ({ data, context }): Promise<StaffTrainingRiskFlags> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { has_behavior_client: false, has_abi_client: false };
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
@@ -489,6 +493,7 @@ export const upsertChecklistCompletion = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organization_id);
     if (userId === data.staff_id) {
       throw new Error("Forbidden: staff may not edit own completion");
@@ -554,6 +559,7 @@ export const updateStaffPii = createServerFn({ method: "POST" })
   .inputValidator((d) => piiUpdateSchema.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organization_id);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -612,6 +618,7 @@ export const listHrDocuments = createServerFn({ method: "GET" })
   .inputValidator((d) => orgStaff.parse(d))
   .handler(async ({ data, context }): Promise<HrDocument[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: rows, error } = await (supabase as any)
@@ -641,6 +648,8 @@ export const createHrDocumentUploadUrl = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId)
+      return { hr_document_id: null, object_path: null, upload: null };
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
@@ -709,6 +718,8 @@ export const getHrDocumentUrl = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId)
+      return { signed_url: null, file_name: null, expires_in_seconds: 0 };
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
@@ -760,6 +771,7 @@ export const deleteHrDocument = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
@@ -837,6 +849,18 @@ export const getHrAdminRollup = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }): Promise<HrRollup> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        summary: {
+          staff_count: 0,
+          total_open_gaps: 0,
+          upcoming_renewals_30d: 0,
+          overdue_renewals: 0,
+          onboarding_in_progress: 0,
+        },
+        rows: [],
+      };
+    }
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
@@ -1153,6 +1177,7 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }): Promise<HrMatrix> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { requirements: [], staff: [] };
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;

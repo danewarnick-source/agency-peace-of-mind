@@ -59,6 +59,8 @@ export const getBoardScoringInputs = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }): Promise<BoardScoringInputs> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId)
+      return { pcsp: [], billing_codes: [], staff_credentials: [], notes: [] };
     await requireAnyPermission(supabase, userId, data.organization_id, [
       "view_referrals",
       "manage_referrals",

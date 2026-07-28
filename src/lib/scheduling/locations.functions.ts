@@ -21,6 +21,7 @@ export const syncTeamToLocation = createServerFn({ method: "POST" })
       previousName: z.string().optional(),
     }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return null;
     const { data: team, error: tErr } = await context.supabase
       .from("teams")
       .select("id, organization_id, team_name, setting, team_type, address, active")
@@ -67,6 +68,7 @@ export const listLocations = createServerFn({ method: "POST" })
   .inputValidator((d: { organizationId: string }) =>
     z.object({ organizationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [];
     const { data: rows, error } = await context.supabase
       .from("locations")
       .select("*")
@@ -88,6 +90,7 @@ export const createLocation = createServerFn({ method: "POST" })
     sort: z.number().int().optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return null;
     const { data: row, error } = await context.supabase
       .from("locations")
       .insert({
@@ -116,6 +119,7 @@ export const updateLocation = createServerFn({ method: "POST" })
     sort: z.number().int().optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return null;
     const { id, ...patch } = data;
     const { data: row, error } = await context.supabase
       .from("locations").update(patch).eq("id", id).select("*").single();
@@ -131,6 +135,7 @@ export const listCoverageRequirements = createServerFn({ method: "POST" })
       locationId: z.string().uuid().optional(),
     }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [];
     let q = context.supabase
       .from("location_coverage_requirements")
       .select("*")
@@ -165,6 +170,7 @@ export const upsertCoverageRequirement = createServerFn({ method: "POST" })
     notes: z.string().optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return null;
     const row = {
       organization_id: data.organizationId,
       location_id: data.locationId,
@@ -193,6 +199,7 @@ export const deleteCoverageRequirement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     const { error } = await context.supabase
       .from("location_coverage_requirements").delete().eq("id", data.id);
     if (error) throw error;

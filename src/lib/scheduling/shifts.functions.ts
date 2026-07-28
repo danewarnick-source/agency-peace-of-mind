@@ -73,6 +73,7 @@ export const listShiftsInRange = createServerFn({ method: "POST" })
     locationId: z.string().uuid().optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [];
     let q = context.supabase
       .from("scheduled_shifts")
       .select(`
@@ -120,6 +121,7 @@ export const createShift = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: z.infer<typeof CreateShiftZ>) => CreateShiftZ.parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return null;
     // Segment validations: parent constraints, hourly-only.
     if (data.parentShiftId) {
       if (isDailyCode(data.serviceCode)) {
@@ -206,6 +208,7 @@ export const updateShift = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string; patch: Record<string, unknown> }) =>
     z.object({ id: z.string().uuid(), patch: z.record(z.unknown()) }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return null;
     // Allowlist guard — rejects writes to org-scoping, segment-tree, and audit
     // fields that must never be client-writable.
     const forbidden = Object.keys(data.patch).filter(k => !SHIFT_PATCH_ALLOWLIST.has(k));
@@ -260,6 +263,7 @@ export const deleteShift = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string; organization_id: string }) =>
     z.object({ id: z.string().uuid(), organization_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     const { error } = await context.supabase
       .from("scheduled_shifts")
       .delete()
@@ -277,6 +281,7 @@ export const publishShifts = createServerFn({ method: "POST" })
       organization_id: z.string().uuid(),
     }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false, count: 0 };
     const { error } = await context.supabase
       .from("scheduled_shifts")
       .update({ status: "published", published: true })

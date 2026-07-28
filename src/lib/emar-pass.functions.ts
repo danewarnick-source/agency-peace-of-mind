@@ -58,6 +58,7 @@ export const logMedicationPass = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => PassInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { id: "" };
 
     // Resolve org from client
     const { data: client, error: cErr } = await supabase
@@ -344,6 +345,7 @@ export const addEmarAddendum = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => AddendumInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     const { data: log, error } = await supabase
       .from("emar_logs")
       .select("id, organization_id")
@@ -384,6 +386,7 @@ export const logMedicationTransfer = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => TransferInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     const { data: med, error } = await supabase
       .from("client_medications")
       .select("id, client_id, organization_id")
@@ -425,6 +428,7 @@ export const setRefillStatus = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => RefillInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     const { error } = await supabase
       .from("client_medications")
       .update({
@@ -450,6 +454,7 @@ export const logShiftChangeCount = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => ShiftCountInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false, flagged: false };
     const { data: med, error } = await supabase
       .from("client_medications")
       .select("id, client_id, organization_id")

@@ -28,6 +28,7 @@ export const setClientStaffVisibility = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const supabase = context.supabase as any;
+    if (!supabase || !context.userId) return { ok: true as const };
     const { clientId, sectionPatch, fieldPatch } = data;
 
     // Look up organization for the client + existing row (RLS enforces

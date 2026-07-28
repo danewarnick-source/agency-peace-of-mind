@@ -50,6 +50,7 @@ export const listStateRequirementSources = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [] as StateRequirementSource[];
     await ensureExecutive(supabase, userId);
     const { data: rows, error } = await supabase
       .from("state_requirement_sources")
@@ -75,6 +76,7 @@ export const createStateRequirementSource = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { id: "" };
     await ensureExecutive(supabase, userId);
     const { data: row, error } = await supabase
       .from("state_requirement_sources")
@@ -98,6 +100,7 @@ export const deleteStateRequirementSource = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await ensureExecutive(supabase, userId);
     const { error } = await supabase.from("state_requirement_sources").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
@@ -130,6 +133,7 @@ export const markStateSourceParsed = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false, derived: 0 };
     await ensureExecutive(supabase, userId);
 
     const { data: src, error: srcErr } = await supabase
@@ -176,6 +180,7 @@ export const listStateDerivedRequirements = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return [] as Omit<StateDerivedRequirement, "metadata">[];
     const { data: rows, error } = await supabase
       .from("state_derived_requirements")
       .select("id, state_code, source_id, requirement_key, title, description, category, source_citation, jurisdiction, created_at")
@@ -194,6 +199,7 @@ export const listStateProviders = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await ensureExecutive(supabase, userId);
     const { data: rows, error } = await supabase
       .from("organizations")

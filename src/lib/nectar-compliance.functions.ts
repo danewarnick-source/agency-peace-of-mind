@@ -33,6 +33,7 @@ export const listComplianceRules = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return [];
     let q = supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from("nectar_compliance_rules" as any)
@@ -75,6 +76,7 @@ export const proposeComplianceRule = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { id: "" };
     const { data: rule, error } = await supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from("nectar_compliance_rules" as any)
@@ -120,6 +122,7 @@ export const updateComplianceRule = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     const { data: existing, error: eErr } = await supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from("nectar_compliance_rules" as any)
@@ -191,6 +194,7 @@ export const listRuleHistory = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ ruleId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return [];
     const { data: rows, error } = await supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from("nectar_compliance_rule_history" as any)
@@ -238,6 +242,7 @@ export const checkBillingEntry = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return { flags: [], asOf: data.asOf ?? "now" };
     const upperCodes = data.serviceCodes.map((c) => c.trim().toUpperCase());
     const asOf: "now" | string =
       data.asOf ?? (/^\d{4}-\d{2}-\d{2}/.test(data.serviceDate) ? data.serviceDate.slice(0, 10) : "now");
@@ -344,6 +349,7 @@ export const raiseComplianceFlag = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     const { data: flag, error } = await supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from("nectar_compliance_flags" as any)
@@ -376,6 +382,7 @@ export const resolveComplianceFlag = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     const { error } = await supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from("nectar_compliance_flags" as any)
@@ -404,6 +411,7 @@ export const listComplianceFlags = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return [];
     let q = supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from("nectar_compliance_flags" as any)
@@ -454,6 +462,7 @@ export const checkStaffPrerequisite = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return { flags: [] };
     const at = data.at ?? new Date().toISOString();
     const upperCodes = data.serviceCodes.map((c) => c.trim().toUpperCase());
 
@@ -575,6 +584,7 @@ export const draftStaffPrerequisiteRules = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { drafts: [], declined: [], inserted: 0 };
 
     const { data: reqs, error } = await supabase
       .from("nectar_requirements")

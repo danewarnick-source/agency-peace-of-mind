@@ -50,6 +50,7 @@ export const draftProgressSummary = createServerFn({ method: "POST" })
   }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { status: "no_source" as const, draft: null };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
 
     // 1. Load the summary row.

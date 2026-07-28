@@ -83,6 +83,7 @@ export const createHostHomeCertification = createServerFn({ method: "POST" })
   .inputValidator((i) => createInput.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { id: null, next_due_date: null };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
 
     const isCertifying =
@@ -167,6 +168,7 @@ export const setHostHomeCertificatePdfPath = createServerFn({ method: "POST" })
   }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any)
@@ -189,6 +191,7 @@ export const resolveHostHomeCertConcern = createServerFn({ method: "POST" })
   }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any)

@@ -59,6 +59,19 @@ export const getRhsBoardSnapshot = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }): Promise<RhsBoardSnapshot> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        organization_id: data.organization_id,
+        homes: [],
+        clients: [],
+        unscored_signals: [
+          "behavioral / interpersonal compatibility",
+          "disability type and level",
+          "known client–client conflicts",
+          "interests and personality",
+        ],
+      };
+    }
     await requireAnyPermission(supabase, userId, data.organization_id, [
       "view_referrals",
       "manage_referrals",

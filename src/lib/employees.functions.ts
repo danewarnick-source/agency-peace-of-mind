@@ -41,6 +41,7 @@ export const createEmployeeManually = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => CreateEmployeeInput.parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.userId) return { userId: "", email: "" };
     await assertOrgManager(context.userId, data.organizationId);
 
     const { data: org, error: orgErr } = await supabaseAdmin
@@ -144,6 +145,7 @@ export const adminResetEmployeePassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => ResetInput.parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.userId) return { ok: false };
     await assertOrgManager(context.userId, data.organizationId);
 
     // Confirm target user belongs to that org

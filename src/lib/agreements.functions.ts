@@ -45,6 +45,7 @@ export const listAgreementRequirements = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<AgreementRequirement[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await ensureExecutive(supabase, userId);
     const { data, error } = await supabase
       .from("agreement_requirements")
@@ -69,6 +70,7 @@ export const upsertAgreementRequirement = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => reqSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false as const };
     await ensureExecutive(supabase, userId);
     const payload = {
       name: data.name,
@@ -99,6 +101,7 @@ export const deleteAgreementRequirement = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ id: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false as const };
     await ensureExecutive(supabase, userId);
     const { error } = await supabase
       .from("agreement_requirements")
@@ -132,6 +135,7 @@ export const getOrgAgreements = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ organizationId: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }): Promise<OrgAgreementChecklistItem[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await ensureExecutive(supabase, userId);
     const [reqs, insts] = await Promise.all([
       supabase
@@ -171,6 +175,7 @@ export const upsertOrgAgreement = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => upsertOrgSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false as const };
     await ensureExecutive(supabase, userId);
     const { error } = await supabase
       .from("organization_agreements")
@@ -211,6 +216,7 @@ export const listAgreementsMatrix = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<MatrixData> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { organizations: [], requirements: [], cells: [] };
     await ensureExecutive(supabase, userId);
     const [orgs, reqs, insts] = await Promise.all([
       supabase.from("organizations").select("id, name").order("name"),

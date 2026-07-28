@@ -17,6 +17,7 @@ export const respondToShift = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     const { data: shift, error: rErr } = await supabase
       .from("scheduled_shifts")
       .select("id, organization_id, staff_id, client_id, starts_at, ends_at, service_code, notes")
@@ -63,6 +64,7 @@ export const publishShiftsWithNotify = createServerFn({ method: "POST" })
     z.object({ ids: z.array(z.string().uuid()).min(1) }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return { ok: false, count: 0, notified: 0 };
     const { data: rows, error } = await supabase
       .from("scheduled_shifts")
       .select("id, organization_id, staff_id")
@@ -115,6 +117,7 @@ export const getActionNeeded = createServerFn({ method: "POST" })
     }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return { declines: [], swaps: [], openShifts: [] };
     const [declines, swaps, openShifts] = await Promise.all([
       supabase.from("scheduled_shifts")
         .select("id, staff_id, client_id, starts_at, ends_at, service_code, notes")

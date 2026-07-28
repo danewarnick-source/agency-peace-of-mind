@@ -15,8 +15,18 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
     const request = getRequest();
     const authHeader = request?.headers?.get('authorization');
 
+    // During SSR there is no auth header — return a safe empty context
+    // instead of throwing, so SSR completes and the client re-calls with
+    // proper auth after hydration.
     if (!authHeader?.startsWith('Bearer ')) {
-      throw new Error('Unauthorized');
+      return next({
+        context: {
+          supabase: null,
+          userId: null,
+          claims: null,
+          isSSR: true,
+        },
+      });
     }
 
     const token = authHeader.replace('Bearer ', '');
@@ -36,6 +46,7 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
         supabase,
         userId: data.user.id,
         claims: data.user,
+        isSSR: false,
       },
     });
   },

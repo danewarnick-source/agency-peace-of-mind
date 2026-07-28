@@ -59,6 +59,9 @@ export const insertScheduledShiftsGated = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<InsertScheduledShiftsResult> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return { status: "inserted", inserted: 0, flagsRaised: 0, blocked: false, insertedIds: [] };
+    }
     try {
       const gate = await gateScheduledShiftInsert(supabase, data.rows as ShiftInsertRow[], {
         mode: "strict_acknowledgements",

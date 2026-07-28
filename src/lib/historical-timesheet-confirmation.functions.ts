@@ -25,6 +25,7 @@ export const listMyPendingHistoricalTimesheets = createServerFn({ method: "GET" 
   .handler(async ({ context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { rows: [] };
     const { data, error } = await supabase
       .from("evv_timesheets")
       .select(
@@ -43,6 +44,7 @@ export const countMyPendingHistoricalTimesheets = createServerFn({ method: "GET"
   .handler(async ({ context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { count: 0 };
     const { count, error } = await supabase
       .from("evv_timesheets")
       .select("id", { count: "exact", head: true })
@@ -83,6 +85,7 @@ export const updateMyHistoricalTimesheetNote = createServerFn({ method: "POST" }
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { ok: false };
     await assertOwnPendingRow(supabase, userId, data.id);
     const trimmed = data.note.trim();
     const { error } = await supabase
@@ -104,6 +107,7 @@ export const flagMyHistoricalTimesheet = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { ok: false };
     await assertOwnPendingRow(supabase, userId, data.id);
     const { error } = await supabase
       .from("evv_timesheets")
@@ -119,6 +123,7 @@ export const clearMyHistoricalTimesheetFlag = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { ok: false };
     await assertOwnPendingRow(supabase, userId, data.id);
     const { error } = await supabase
       .from("evv_timesheets")
@@ -134,6 +139,7 @@ export const confirmMyHistoricalTimesheet = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { ok: false };
     await assertOwnPendingRow(supabase, userId, data.id);
     const nowIso = new Date().toISOString();
     // Confirm flips status → Approved. Historical markers are intentionally

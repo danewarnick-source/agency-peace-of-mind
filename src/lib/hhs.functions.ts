@@ -29,6 +29,7 @@ export const saveDailyRecord = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
     const { error, data: row } = await supabase
       .from("daily_logs")
@@ -59,6 +60,7 @@ export const listDailyRecords = createServerFn({ method: "POST" })
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase || !context.userId) return [];
     const { data: rows, error } = await supabase
       .from("daily_logs")
       .select("*")
@@ -97,6 +99,7 @@ export const saveEmarLog = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
 
 
@@ -172,6 +175,7 @@ export const setAttendance = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
     const { error, data: row } = await supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -203,6 +207,7 @@ export const listAttendance = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase || !context.userId) return [];
     const { data: rows, error } = await supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from("hhs_monthly_attendance" as never)
@@ -227,6 +232,7 @@ export const savePrnForm = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
     const { error, data: row } = await supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -271,6 +277,7 @@ export const saveIncidentReport = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
     const { error, data: row } = await supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -306,6 +313,7 @@ export const listEmarLogs = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [];
     const { data: rows, error } = await context.supabase
       .from("emar_logs")
       .select("*")
@@ -320,6 +328,9 @@ export const listPrnForms = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) {
+      return { medical: [], summary: [], inventory: [], drill: [], transfer: [] };
+    }
     const sb = context.supabase;
     const [med, sum, inv, dr, tr] = await Promise.all([
       sb.from("hhs_medical_logs" as never).select("*").eq("organization_id", data.organizationId).order("created_at", { ascending: false }).limit(200),
@@ -341,6 +352,7 @@ export const listIncidents = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [];
     const { data: rows, error } = await context.supabase
       .from("hhs_incident_reports" as never)
       .select("*")
@@ -361,6 +373,7 @@ export const markIncidentFiled = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     // Resolve the incident's org so we can verify caller membership before mutating.
     const { data: incident, error: lookupErr } = await supabase
       .from("hhs_incident_reports" as never)

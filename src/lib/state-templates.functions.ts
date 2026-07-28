@@ -37,6 +37,7 @@ export const listPlatformStates = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context;
+    if (!supabase) return [];
     const { data: states, error } = await supabase
       .from("platform_states")
       .select("code, name, status, is_reference, regulator_label, notes, updated_at")
@@ -104,6 +105,7 @@ export const setStateStatus = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await ensureExecutive(supabase, userId);
     const { error } = await supabase
       .from("platform_states")
@@ -127,6 +129,7 @@ export const updatePlatformStateBasics = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await ensureExecutive(supabase, userId);
     const patch: { status?: string; regulator_label?: string | null; notes?: string | null } = {};
     if (data.status !== undefined) patch.status = data.status;
@@ -151,6 +154,7 @@ export const getStateTemplate = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return null;
     const { data: row, error } = await supabase
       .from("state_templates")
       .select("*")
@@ -165,6 +169,7 @@ export const getMyStateTemplate = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { state_code: null as string | null, template: null };
     const { data: m } = await supabase
       .from("organization_members")
       .select("organization_id")
@@ -213,6 +218,7 @@ export const updateStateTemplateSection = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => SectionPatchSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await ensureExecutive(supabase, userId);
 
     const { data: existing } = await supabase
@@ -251,6 +257,7 @@ export const publishStateTemplate = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await ensureExecutive(supabase, userId);
     const { error } = await supabase
       .from("state_templates")

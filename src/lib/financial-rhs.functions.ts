@@ -42,6 +42,7 @@ export const getRhsCodes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgMonthRangeInput.parse(i))
   .handler(async ({ data, context }): Promise<RhsCode[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     const { data: rows, error } = await context.supabase
       .from("client_billing_codes")
@@ -64,6 +65,7 @@ export const getRhsClients = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgClientsInput.parse(i))
   .handler(async ({ data, context }): Promise<RhsClient[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     if (data.clientIds.length === 0) return [];
     const { data: rows, error } = await context.supabase
@@ -79,6 +81,7 @@ export const getRhsDays = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgMonthRangeInput.parse(i))
   .handler(async ({ data, context }): Promise<RhsDaysMap> => {
+    if (!context.supabase || !context.userId) return {};
     await gate(context, data.organizationId);
     const { data: rows, error } = await context.supabase
       .from("hhs_daily_records_v")

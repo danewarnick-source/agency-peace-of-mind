@@ -71,6 +71,7 @@ export const listEmployeeLoans = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await assertAdmin(supabase, userId, data.organization_id);
     const { data: rows, error } = await (supabase as any)
       .from("employee_loans")
@@ -86,6 +87,7 @@ export const getEmployeeLoan = createServerFn({ method: "GET" })
   .inputValidator((d) => z.object({ organization_id: z.string().uuid(), loan_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { loan: null, entries: [], signatures: [], tokens: [] };
     await assertAdmin(supabase, userId, data.organization_id);
     const { data: loan, error } = await (supabase as any)
       .from("employee_loans")
@@ -117,6 +119,7 @@ export const upsertEmployeeLoan = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ id: z.string().uuid().optional(), values: loanInput }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await assertAdmin(supabase, userId, data.values.organization_id);
     const payload: any = { ...data.values, created_by: userId };
     if (data.id) {
@@ -151,6 +154,7 @@ export const deleteEmployeeLoan = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ organization_id: z.string().uuid(), loan_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await assertAdmin(supabase, userId, data.organization_id);
     const { error } = await (supabase as any)
       .from("employee_loans")
@@ -175,6 +179,7 @@ export const addEmployeeLoanEntry = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await assertAdmin(supabase, userId, data.organization_id);
     const { data: row, error } = await (supabase as any)
       .from("employee_loan_entries")
@@ -189,6 +194,7 @@ export const deleteEmployeeLoanEntry = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ organization_id: z.string().uuid(), entry_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await assertAdmin(supabase, userId, data.organization_id);
     const { error } = await (supabase as any)
       .from("employee_loan_entries")
@@ -229,6 +235,9 @@ export const sendEmployeeLoanForSignature = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return { token_id: null, sign_url: null, expires_at: null, email: { ok: false as const, error: "Unauthorized" } };
+    }
     await assertAdmin(supabase, userId, data.organization_id);
 
     // Load the loan (frozen snapshot for the signer)
@@ -342,6 +351,7 @@ export const voidEmployeeLoanSignatureToken = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ organization_id: z.string().uuid(), token_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await assertAdmin(supabase, userId, data.organization_id);
     const { error } = await (supabase as any)
       .from("employee_loan_signature_tokens")

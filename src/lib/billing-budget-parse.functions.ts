@@ -40,6 +40,7 @@ export const parseClientBudgetDocument = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => InputSchema.parse(input))
   .handler(async ({ data, context }): Promise<ParsedBudget> => {
     const { supabase } = context;
+    if (!supabase) return { plan_number: null, source_form: "Unknown", rows: [] };
 
     // Download the document via the user's own session (RLS applies).
     const { data: blob, error: dlError } = await supabase.storage

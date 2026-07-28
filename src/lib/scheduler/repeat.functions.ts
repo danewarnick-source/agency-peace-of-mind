@@ -111,7 +111,8 @@ export const previewRepeat = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { supabase } = context as any;
+    const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { source_count: 0, projected: [] };
     const src = await loadSourceShifts(
       supabase, data.organization_id, data.source_start_iso, data.source_end_iso,
     );
@@ -148,6 +149,7 @@ export const applyRepeat = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { inserted: 0, skipped: 0 };
     const src = await loadSourceShifts(
       supabase, data.organization_id, data.source_start_iso, data.source_end_iso,
     );
@@ -248,6 +250,7 @@ export const createRecurringShifts = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { inserted: 0 };
 
     const { data: seed, error: sErr } = await supabase
       .from("scheduled_shifts")

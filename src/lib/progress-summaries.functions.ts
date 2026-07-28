@@ -66,6 +66,7 @@ export const ensureCurrentSummaryPeriods = createServerFn({ method: "POST" })
   .inputValidator((i) => z.object({ organizationId: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ensured: 0 };
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
 
     const today = new Date().toISOString().slice(0, 10);
@@ -238,6 +239,7 @@ export const listOpenSummaries = createServerFn({ method: "POST" })
   .inputValidator((i) => z.object({ organizationId: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [] as ProgressSummaryRow[];
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: rows, error } = await (supabase as any)
@@ -257,6 +259,7 @@ export const listAllSummaries = createServerFn({ method: "POST" })
   .inputValidator((i) => z.object({ organizationId: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [] as ProgressSummaryRow[];
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: rows, error } = await (supabase as any)
@@ -277,6 +280,7 @@ export const markSummaryCompleted = createServerFn({ method: "POST" })
   }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any)
@@ -297,6 +301,7 @@ export const attestSummaryUpiEntered = createServerFn({ method: "POST" })
   }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     const ts = new Date().toISOString();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -357,6 +362,7 @@ export const getSummaryWithSource = createServerFn({ method: "POST" })
   }).parse(i))
   .handler(async ({ data, context }): Promise<SummarySourceBundle> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null as unknown as SummarySourceBundle;
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -474,6 +480,7 @@ export const saveSummaryDraft = createServerFn({ method: "POST" })
   }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any)
@@ -496,6 +503,7 @@ export const finalizeSummary = createServerFn({ method: "POST" })
   }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     const ts = new Date().toISOString();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

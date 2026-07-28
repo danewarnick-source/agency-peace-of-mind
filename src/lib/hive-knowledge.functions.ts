@@ -36,6 +36,7 @@ export interface HiveKnowledgeRow {
 export const listHiveKnowledge = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<HiveKnowledgeRow[]> => {
+    if (!context.supabase || !context.userId) return [];
     await ensureExecutive(context.supabase, context.userId);
     const { data, error } = await context.supabase
       .from("hive_knowledge")
@@ -62,6 +63,7 @@ export const upsertHiveKnowledgeEntry = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => upsertSchema.parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false, id: null };
     await ensureExecutive(context.supabase, context.userId);
     const payload = {
       title: data.title,
@@ -89,6 +91,7 @@ export const deleteHiveKnowledgeEntry = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     await ensureExecutive(context.supabase, context.userId);
     const { error } = await context.supabase.from("hive_knowledge").delete().eq("id", data.id);
     if (error) throw error;
@@ -128,6 +131,7 @@ export const askSteve = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => askSchema.parse(d))
   .handler(async ({ data, context }): Promise<SteveAnswer> => {
+    if (!context.supabase || !context.userId) return { answer: "", sources: [], found: false };
     await ensureExecutive(context.supabase, context.userId);
 
     // ── 1. Retrieve candidate articles (keyword ILIKE for now) ──

@@ -54,6 +54,7 @@ export const getEmpEvv = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgMonthRangeInput.parse(i))
   .handler(async ({ data, context }): Promise<EmpEvvUnits> => {
+    if (!context.supabase || !context.userId) return {};
     await gate(context, data.organizationId);
     const { data: rows, error } = await context.supabase
       .from("evv_timesheets")
@@ -78,6 +79,7 @@ export const getEmpHhp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }): Promise<EmpHhpMap> => {
+    if (!context.supabase || !context.userId) return {};
     await gate(context, data.organizationId);
     const { data: rows, error } = await context.supabase
       .from("staff_assignments")
@@ -96,6 +98,7 @@ export const getEmpHostSettings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }): Promise<EmpHostRateMap> => {
+    if (!context.supabase || !context.userId) return {};
     await gate(context, data.organizationId);
     const { data: rows, error } = await context.supabase
       .from("hhs_host_home_settings")
@@ -112,6 +115,7 @@ export const getEmpHhsDays = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgMonthDateRangeInput.parse(i))
   .handler(async ({ data, context }): Promise<EmpHhsDaysMap> => {
+    if (!context.supabase || !context.userId) return {};
     await gate(context, data.organizationId);
     const { data: rows, error } = await context.supabase
       .from("hhs_daily_records_v")
@@ -132,6 +136,7 @@ export const getEmpClients = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }): Promise<EmpClientMap> => {
+    if (!context.supabase || !context.userId) return {};
     await gate(context, data.organizationId);
     const { data: rows, error } = await context.supabase
       .from("clients")
@@ -149,6 +154,7 @@ export const getEmpStaff = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }): Promise<EmpProfileLite[]> => {
+    if (!context.supabase || !context.userId) return [];
     await gate(context, data.organizationId);
     const { data: members, error: e1 } = await context.supabase
       .from("organization_members")
@@ -170,6 +176,7 @@ export const getEmpInputs = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgMonthInput.parse(i))
   .handler(async ({ data, context }): Promise<EmpInputsMap> => {
+    if (!context.supabase || !context.userId) return {};
     await gate(context, data.organizationId);
     const { data: rows, error } = await context.supabase
       .from("contractor_monthly_pay")

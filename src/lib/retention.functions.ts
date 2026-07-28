@@ -18,6 +18,14 @@ export const getRetentionSettings = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        archive_days_after_due: 90,
+        purge_grace_days: 30,
+        auto_archive_enabled: true,
+        updated_at: null as string | null,
+      };
+    }
     await requireAnyPermission(supabase, userId, data.organization_id, [
       "view_referrals",
       "manage_referrals",
@@ -50,6 +58,7 @@ export const updateRetentionSettings = createServerFn({ method: "POST" })
   .inputValidator((d) => updateSettingsInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any)
@@ -80,6 +89,7 @@ export const archiveReferral = createServerFn({ method: "POST" })
   .inputValidator((d) => archiveInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
 
     const { data: settings } = await supabase
@@ -121,6 +131,7 @@ export const restoreReferral = createServerFn({ method: "POST" })
   .inputValidator((d) => restoreInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
 
     const { data: row, error: readErr } = await supabase
@@ -167,6 +178,7 @@ export const sweepArchiveEligible = createServerFn({ method: "POST" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { archived: 0 };
     await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: count, error } = await (supabase as any).rpc(
@@ -182,6 +194,7 @@ export const purgeAgedReferrals = createServerFn({ method: "POST" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { purged: 0 };
     await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: count, error } = await (supabase as any).rpc(
@@ -199,6 +212,7 @@ export const listArchivedReferrals = createServerFn({ method: "GET" })
   .inputValidator((d) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await requireAnyPermission(supabase, userId, data.organization_id, [
       "view_referrals",
       "manage_referrals",

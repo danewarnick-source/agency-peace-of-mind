@@ -54,6 +54,7 @@ export const listMyOtherAssignments = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [] as OtherAssignment[];
     const { data, error } = await supabase
       .from("staff_other_assignments")
       .select("*")
@@ -73,6 +74,7 @@ export const listStaffOtherAssignments = createServerFn({ method: "POST" })
     orgStaff.parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [] as OtherAssignment[];
     await requireOrgMembership(
       context.supabase,
       context.userId,
@@ -96,6 +98,7 @@ export const listOrgOtherAssignments = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { organization_id: string }) => orgOnly.parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [] as OtherAssignment[];
     await requireOrgMembership(
       context.supabase,
       context.userId,
@@ -149,6 +152,7 @@ export const assignOtherItem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: z.input<typeof createInput>) => createInput.parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return null;
     await requireOrgMembership(
       context.supabase,
       context.userId,
@@ -193,6 +197,7 @@ export const proposeOtherAssignment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: z.input<typeof proposeInput>) => proposeInput.parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return null;
     await requireOrgMembership(
       context.supabase,
       context.userId,
@@ -235,6 +240,7 @@ export const confirmProposedAssignment = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: true };
     await requireOrgMembership(
       context.supabase,
       context.userId,
@@ -267,6 +273,7 @@ export const rejectProposedAssignment = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: true };
     await requireOrgMembership(
       context.supabase,
       context.userId,
@@ -295,6 +302,7 @@ export const deleteOtherAssignment = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: true };
     await requireOrgMembership(
       context.supabase,
       context.userId,
@@ -328,6 +336,7 @@ export const updateMyAssignmentStatus = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     const { data: row, error: rErr } = await supabase
       .from("staff_other_assignments")
       .select("id, staff_id, status, requires_admin_confirmation, confirmed")
@@ -376,6 +385,7 @@ export const adminCompleteAssignment = createServerFn({ method: "POST" })
         .parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: true };
     await requireOrgMembership(
       context.supabase,
       context.userId,
@@ -405,6 +415,15 @@ export const getMyOtherAssignmentsSummary = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        total: 0,
+        completed: 0,
+        open_count: 0,
+        safety_critical_open_count: 0,
+        open_items: [],
+      };
+    }
     const { data, error } = await supabase
       .from("staff_other_assignments")
       .select("id, status, is_safety_critical, due_date, title")

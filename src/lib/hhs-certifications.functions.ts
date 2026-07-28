@@ -44,6 +44,7 @@ export const getHhsMonthData = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<{ attendance: AttendanceRow[]; blocked: BlockedDay[] }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { attendance: [], blocked: [] };
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
 
     const attQ = await supabase
@@ -92,6 +93,7 @@ export const getMonthCertification = createServerFn({ method: "POST" })
     }).parse(i),
   )
   .handler(async ({ data, context }): Promise<{ tableReady: boolean; cert: MonthCertification | null }> => {
+    if (!context.supabase || !context.userId) return { tableReady: false, cert: null };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     try {
@@ -131,6 +133,7 @@ export const certifyHhsMonth = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<{ ok: boolean }> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     // Admin or manager (the closest match to "admin or the assigned program lead").
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

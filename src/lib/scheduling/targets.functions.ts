@@ -7,6 +7,7 @@ export const listClientWeeklyTargets = createServerFn({ method: "POST" })
   .inputValidator((d: { organizationId: string; clientId?: string }) =>
     z.object({ organizationId: z.string().uuid(), clientId: z.string().uuid().optional() }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return [];
     let q = context.supabase
       .from("client_weekly_targets")
       .select("*")
@@ -33,6 +34,7 @@ export const upsertClientWeeklyTarget = createServerFn({ method: "POST" })
     source: z.string().optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return null;
     const { data: row, error } = await context.supabase
       .from("client_weekly_targets")
       .upsert({
@@ -52,6 +54,7 @@ export const deleteClientWeeklyTarget = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     const { error } = await context.supabase
       .from("client_weekly_targets").delete().eq("id", data.id);
     if (error) throw error;
@@ -71,6 +74,7 @@ export const sumWeeklyScheduledHours = createServerFn({ method: "POST" })
       weekEndIso: z.string(),
     }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return {};
     const { data: rows, error } = await context.supabase
       .from("scheduled_shifts")
       .select("client_id, service_code, starts_at, ends_at, status")

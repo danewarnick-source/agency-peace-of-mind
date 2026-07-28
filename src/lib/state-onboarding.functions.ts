@@ -43,6 +43,7 @@ export const getOrCreateOnboardingSession = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await ensureExecutive(supabase, userId);
 
     const { data: existing } = await supabase
@@ -84,6 +85,7 @@ export const listOnboardingSessions = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await ensureExecutive(supabase, userId);
     const { data: rows } = await supabase
       .from("state_onboarding_sessions")
@@ -112,6 +114,7 @@ export const saveOnboardingProgress = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => SaveSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await ensureExecutive(supabase, userId);
     const { error } = await supabase
       .from("state_onboarding_sessions")
@@ -130,6 +133,7 @@ export const completeOnboardingSession = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false, tickets_created: 0 };
     await ensureExecutive(supabase, userId);
 
     // 1) persist final answers

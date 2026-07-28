@@ -37,6 +37,7 @@ export const recordPaymentFailureFn = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     await ensureHiveExecutive(context.supabase, context.userId);
     const { recordPaymentFailure } = await import("./billing-lockout.server");
     return recordPaymentFailure(data.organization_id, data.reason, data.stripe_event_id ?? null);
@@ -54,6 +55,7 @@ export const recordPaymentSuccessFn = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false, was_locked: false };
     await ensureHiveExecutive(context.supabase, context.userId);
     const { recordPaymentSuccess } = await import("./billing-lockout.server");
     return recordPaymentSuccess(data.organization_id, data.amount_cents, data.stripe_event_id ?? null);
@@ -65,6 +67,7 @@ export const lockAccountFn = createServerFn({ method: "POST" })
     z.object({ organization_id: ORG_ID, reason: z.string().trim().min(1).max(500) }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     await ensureHiveExecutive(context.supabase, context.userId);
     const { lockAccount } = await import("./billing-lockout.server");
     return lockAccount(data.organization_id, data.reason);
@@ -76,6 +79,7 @@ export const unlockAccountFn = createServerFn({ method: "POST" })
     z.object({ organization_id: ORG_ID }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     await ensureHiveExecutive(context.supabase, context.userId);
     const { unlockAccount } = await import("./billing-lockout.server");
     return unlockAccount(data.organization_id);
@@ -92,6 +96,7 @@ export const updateCardExpiryFn = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false, warned: false };
     await ensureHiveExecutive(context.supabase, context.userId);
     const { updateCardExpiry } = await import("./billing-lockout.server");
     return updateCardExpiry(data.organization_id, data.expires_at);
@@ -100,6 +105,7 @@ export const updateCardExpiryFn = createServerFn({ method: "POST" })
 export const checkAndLockPastDueAccountsFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    if (!context.supabase || !context.userId) return { locked: 0, org_ids: [] as string[], warned_9day: 0 };
     await ensureHiveExecutive(context.supabase, context.userId);
     const { checkAndLockPastDueAccounts } = await import("./billing-lockout.server");
     return checkAndLockPastDueAccounts();
@@ -108,6 +114,7 @@ export const checkAndLockPastDueAccountsFn = createServerFn({ method: "POST" })
 export const checkCardExpiryWarningsFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    if (!context.supabase || !context.userId) return { warned: 0, org_ids: [] as string[] };
     await ensureHiveExecutive(context.supabase, context.userId);
     const { checkCardExpiryWarnings } = await import("./billing-lockout.server");
     return checkCardExpiryWarnings();

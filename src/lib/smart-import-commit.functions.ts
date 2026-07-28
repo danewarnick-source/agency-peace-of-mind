@@ -155,6 +155,7 @@ export const commitSmartImportJob = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => JobId.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { results: [], jobCommitted: false };
     return runJobCommit(context.supabase, context.userId, data.jobId);
   });
 
@@ -165,6 +166,7 @@ export const recommitSmartImportJob = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => JobId.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { results: [], jobCommitted: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: job, error } = await sb
@@ -187,6 +189,7 @@ export const commitSingleSubject = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => SingleSubject.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { results: [], jobCommitted: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: subj, error } = await sb
@@ -1057,6 +1060,7 @@ export const getDoneReadout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => JobId.parse(i))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { job: null, subjects: [], audit: [] };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const { data: job } = await sb.from("import_jobs")

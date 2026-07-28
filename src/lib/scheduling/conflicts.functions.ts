@@ -20,6 +20,9 @@ export const getRuleSettings = createServerFn({ method: "POST" })
   .inputValidator((d: { organizationId: string }) =>
     z.object({ organizationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) {
+      return { ruleSettings: {} as Partial<Record<PolicyRuleCode, RuleMode>>, otThresholdHours: 40 };
+    }
     const { data: row, error } = await context.supabase
       .from("org_shift_behavior_settings")
       .select("rule_settings, ot_threshold_hours")
@@ -44,6 +47,7 @@ export const updateRuleSettings = createServerFn({ method: "POST" })
     otThresholdHours: z.number().min(0).max(168),
   }).parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { ok: false };
     const { error } = await context.supabase
       .from("org_shift_behavior_settings")
       .upsert({
@@ -89,7 +93,8 @@ export const evaluateRange = createServerFn({ method: "POST" })
     targetHoursByClientCode: z.record(z.number()).optional(),
   }).parse(d))
   .handler(async ({ data, context }): Promise<Conflict[]> => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
 
     // 1) shifts in range
     let q = supabase

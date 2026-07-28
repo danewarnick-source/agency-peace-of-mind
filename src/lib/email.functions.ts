@@ -92,6 +92,9 @@ export const getOrgEmailSettings = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return { settings: null, hive_managed_from_address: HIVE_MANAGED_FROM_ADDRESS };
+    }
     await requireOrgMembership(
       supabase as unknown as SupabaseClient,
       userId,
@@ -132,6 +135,7 @@ export const updateOrgEmailSettings = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requirePermission(
       supabase as unknown as SupabaseClient,
       userId,
@@ -201,6 +205,9 @@ export const sendEmail = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return { ok: false as const, error: "Unauthorized" };
+    }
     await requirePermission(
       supabase as unknown as SupabaseClient,
       userId,

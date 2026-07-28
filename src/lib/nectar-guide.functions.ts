@@ -69,6 +69,7 @@ export const planNectarGuide = createServerFn({ method: "POST" })
     if (data.goal.length < 3) throw new Error("Tell NECTAR what you want help with.");
     if (!data.orgId) throw new Error("Missing organization.");
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     const { requireOrgMembership } = await import("@/integrations/supabase/require-org");
     await requireOrgMembership(supabase, userId, data.orgId, "employee");
 
@@ -152,6 +153,7 @@ export const listNectarGuides = createServerFn({ method: "POST" })
   .inputValidator((input: { orgId: string }) => ({ orgId: strField(input.orgId, 100) }))
   .handler(async ({ context, data }): Promise<Guide[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     const { requireOrgMembership } = await import("@/integrations/supabase/require-org");
     await requireOrgMembership(supabase, userId, data.orgId, "employee");
     const { data: guides, error } = await supabase
@@ -198,6 +200,7 @@ export const updateGuideTask = createServerFn({ method: "POST" })
   }))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     const patch: { updated_at: string; status?: GuideTask["status"]; current_step?: number } = {
       updated_at: new Date().toISOString(),
     };
@@ -217,6 +220,7 @@ export const deleteGuide = createServerFn({ method: "POST" })
   .inputValidator((input: { guideId: string }) => ({ guideId: strField(input.guideId, 100) }))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     const { error } = await supabase
       .from("nectar_guides")
       .delete()

@@ -42,6 +42,7 @@ export const createAuditorShare = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { share_ids: [] as string[] };
     await assertAdmin(supabase, userId, data.organization_id);
 
     if (new Date(data.ends_at) <= new Date(data.starts_at))
@@ -99,6 +100,7 @@ export const revokeAuditorShare = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ share_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     const { data: share } = await supabase
       .from("auditor_shares")
       .select("organization_id")
@@ -130,6 +132,7 @@ export const extendAuditorShare = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     const { data: share } = await supabase
       .from("auditor_shares")
       .select("organization_id, starts_at, revoked_at")
@@ -162,6 +165,7 @@ export const listMyAuditorShares = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, claims } = context;
+    if (!supabase) return { shares: [] };
     const email = (claims?.email as string | undefined)?.toLowerCase();
     if (!email) return { shares: [] };
 
@@ -204,6 +208,17 @@ export const getAuditorShareView = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ share_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId, claims } = context;
+    if (!supabase || !userId) {
+      return {
+        share: null,
+        live_status: "revoked" as const,
+        packet: null,
+        organization: null,
+        items: [],
+        linked_files: [],
+        nectar: { authoritative_sources: [], training_courses: [], certifications: [] },
+      };
+    }
     const email = (claims?.email as string | undefined)?.toLowerCase();
 
     const { data: share } = await supabase
@@ -335,6 +350,7 @@ export const listSharesForPacket = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ packet_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return { shares: [] };
     const { data: shares, error } = await supabase
       .from("auditor_shares")
       .select("*")
@@ -367,6 +383,7 @@ export const listActiveSharesForOrg = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ organization_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase) return { shares: [] };
     const nowIso = new Date().toISOString();
     const { data: shares } = await supabase
       .from("auditor_shares")

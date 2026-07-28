@@ -25,6 +25,7 @@ export const listMyPendingHistoricalDailyNotes = createServerFn({ method: "GET" 
   .handler(async ({ context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { rows: [] };
     const { data, error } = await supabase
       .from("daily_logs")
       .select(
@@ -50,6 +51,7 @@ export const updateMyHistoricalDailyNote = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { ok: false };
     const patch: Record<string, unknown> = { narrative: data.narrative };
     if (data.pcsp_goals_addressed) patch.pcsp_goals_addressed = data.pcsp_goals_addressed;
     const { error } = await supabase
@@ -87,6 +89,7 @@ export const attestMyHistoricalDailyNote = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { ok: false };
     const now = new Date().toISOString();
     const patch: Record<string, unknown> = {
       status: APPROVED,
@@ -122,6 +125,7 @@ export const listFormerStaffHistoricalDailyNotes = createServerFn({ method: "GET
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { rows: [] };
 
     // Admin/manager check.
     const { data: isAdmin } = await supabase.rpc("is_org_admin_or_manager", {
@@ -168,6 +172,7 @@ export const adminAttestHistoricalDailyNoteOnBehalf = createServerFn({ method: "
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { ok: false };
 
     const { data: isAdmin } = await supabase.rpc("is_org_admin_or_manager", {
       _org: data.organization_id,

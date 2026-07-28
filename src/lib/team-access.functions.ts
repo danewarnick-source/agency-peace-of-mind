@@ -37,6 +37,7 @@ export const listTeamAccess = createServerFn({ method: "GET" })
   .inputValidator((d) => z.object({ organization_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<TeamMemberAccess[]> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await assertCanManage(supabase, userId, data.organization_id);
 
     const { data: members, error } = await supabase
@@ -88,6 +89,7 @@ export const setMemberGrants = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     const { isHiveExec } = await assertCanManage(supabase, userId, data.organization_id);
 
     // Toggle Company Admin via role column (preserve super_admin if set).
@@ -140,6 +142,7 @@ export const inviteTeamMember = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await assertCanManage(supabase, userId, data.organization_id);
 
     const { data: existing } = await supabase

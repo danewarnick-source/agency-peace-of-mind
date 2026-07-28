@@ -72,6 +72,7 @@ export const computeSowAlerts = createServerFn({ method: "POST" })
     z.object({ organizationId: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { alerts: [] as SowAlert[] };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const orgId = data.organizationId;
@@ -245,6 +246,7 @@ export const getMissingThirtyDayStaffIds = createServerFn({ method: "POST" })
     z.object({ organizationId: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { missingIds: [] as string[] };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
     const orgId = data.organizationId;

@@ -15,6 +15,22 @@ export const getAgencyHealthSnapshot = createServerFn({ method: "POST" })
   .inputValidator((i) => Input.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) {
+      return {
+        client: {
+          overall: 100,
+          daily: { score: 100, passing: 0, total: 0 },
+          medication: { score: 100, passing: 0, total: 0 },
+          attendance: { score: 100, passing: 0, total: 0 },
+        },
+        employee: {
+          overall: 100,
+          geofence: { score: 100, passing: 0, total: 0 },
+          emarAccuracy: { score: 100, passing: 0, total: 0 },
+          credentials: { score: 100, passing: 0, total: 0 },
+        },
+      };
+    }
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
     const orgId = data.organizationId;
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();

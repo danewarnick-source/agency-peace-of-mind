@@ -43,6 +43,7 @@ export const listLedgerEntries = createServerFn({ method: "POST" })
   .inputValidator((i) => ListInput.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { entries: [] };
     await requireOrgMembership(supabase, userId, data.organizationId, "admin");
     const { data: rows, error } = await supabase
       .from("provider_ledger_entries")
@@ -74,6 +75,7 @@ export const createLedgerEntry = createServerFn({ method: "POST" })
   .inputValidator((i) => CreateInput.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { entry: null };
     await requireOrgMembership(supabase, userId, data.organizationId, "admin");
     const { data: row, error } = await supabase
       .from("provider_ledger_entries")
@@ -110,6 +112,7 @@ export const updateLedgerEntry = createServerFn({ method: "POST" })
   .inputValidator((i) => UpdateInput.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { entry: null };
     await requireOrgMembership(supabase, userId, data.organizationId, "admin");
     const { id, organizationId, ...patch } = data;
     const { data: row, error } = await supabase
@@ -134,6 +137,7 @@ export const deleteLedgerEntry = createServerFn({ method: "POST" })
   .inputValidator((i) => DeleteInput.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true as const };
     await requireOrgMembership(supabase, userId, data.organizationId, "admin");
     const { error } = await supabase
       .from("provider_ledger_entries")

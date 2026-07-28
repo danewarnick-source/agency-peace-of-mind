@@ -62,6 +62,7 @@ export const listWhiteboardNotes = createServerFn({ method: "GET" })
   .inputValidator((d) => listSchema.parse(d))
   .handler(async ({ data, context }): Promise<WhiteboardNote[]> => {
     const { supabase } = context;
+    if (!supabase) return [];
     const q = await supabase
       .from("whiteboard_notes")
       .select("*")
@@ -83,6 +84,7 @@ export const getWhiteboardNoteCounts = createServerFn({ method: "GET" })
       Array<{ subject_type: "client" | "staff"; subject_id: string; count: number }>
     > => {
       const { supabase } = context;
+      if (!supabase) return [];
       const q = await supabase
         .from("whiteboard_notes")
         .select("subject_type, subject_id")
@@ -104,6 +106,7 @@ export const createWhiteboardNote = createServerFn({ method: "POST" })
   .inputValidator((d) => createSchema.parse(d))
   .handler(async ({ data, context }): Promise<WhiteboardNote> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null as unknown as WhiteboardNote;
     const ins = await supabase
       .from("whiteboard_notes")
       .insert({
@@ -124,6 +127,7 @@ export const updateWhiteboardNote = createServerFn({ method: "POST" })
   .inputValidator((d) => updateSchema.parse(d))
   .handler(async ({ data, context }): Promise<WhiteboardNote> => {
     const { supabase } = context;
+    if (!supabase) return null as unknown as WhiteboardNote;
     const upd = await supabase
       .from("whiteboard_notes")
       .update({ note_text: data.note_text.trim() })
@@ -139,6 +143,7 @@ export const deleteWhiteboardNote = createServerFn({ method: "POST" })
   .inputValidator((d) => deleteSchema.parse(d))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
     const { supabase } = context;
+    if (!supabase) return { ok: true };
     const del = await supabase.from("whiteboard_notes").delete().eq("id", data.id);
     if (del.error) throw new Error(del.error.message);
     return { ok: true };

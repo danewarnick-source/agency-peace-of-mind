@@ -38,6 +38,7 @@ export const searchOrgEntities = createServerFn({ method: "POST" })
       supabase: { from: (t: string) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
       userId: string;
     };
+    if (!supabase || !userId) return { clients: [], staff: [] };
 
     // Admin-capable only: manager/admin/super_admin.
     await requireOrgMembership(supabase as any, userId, data.organizationId, "manager"); // eslint-disable-line @typescript-eslint/no-explicit-any

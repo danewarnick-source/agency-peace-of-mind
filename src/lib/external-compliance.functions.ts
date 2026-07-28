@@ -110,6 +110,7 @@ export const listExternalRequirements = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { items: [] };
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
 
     const { data: reqs, error } = await supabase
@@ -207,6 +208,7 @@ export const setRequirementClassification = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     const { data: req, error: rErr } = await supabase
       .from("nectar_requirements")
       .select("id, organization_id, metadata")
@@ -245,6 +247,7 @@ export const attestExternalCompletion = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     const { data: req, error: rErr } = await supabase
       .from("nectar_requirements")
       .select("id, organization_id, title, source_citation, metadata")
@@ -310,6 +313,7 @@ export const autoClassifyRequirements = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { classified: 0, external: 0 };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     const { data: rows, error } = await supabase
       .from("nectar_requirements")

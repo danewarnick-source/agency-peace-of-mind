@@ -22,6 +22,9 @@ export const updatePaymentMethodFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: z.input<typeof InputSchema>) => InputSchema.parse(d))
   .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) {
+      return { ok: false, was_past_due: false, card_expires_at: null as string | null };
+    }
     // Authorize: caller must be an active admin/super_admin of this org.
     const { data: membership, error: mErr } = await context.supabase
       .from("organization_members")

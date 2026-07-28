@@ -194,6 +194,7 @@ export const askNectarReport = createServerFn({ method: "POST" })
   .inputValidator(validateInput)
   .handler(async ({ data, context }): Promise<NectarReportResult> => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { plan: { intent: "shifts" }, title: "", columns: [], rows: [] };
     const orgId = data.organizationId;
 
     // Verify manager+ membership on the PASSED org (not first-membership).

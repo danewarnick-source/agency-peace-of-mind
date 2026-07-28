@@ -215,6 +215,72 @@ export const getClientCareData = createServerFn({ method: "GET" })
     const { clientId, shiftServiceCode } = data;
     const supabase = context.supabase as any;
     const userId = context.userId as string;
+    if (!supabase || !userId) {
+      const emptyIdentity: CareIdentity = {
+        id: clientId,
+        organization_id: null,
+        first_name: null,
+        last_name: null,
+        preferred_name: null,
+        date_of_birth: null,
+        admission_date: null,
+        discharge_date: null,
+        medicaid_id: null,
+        status: null,
+        phone_number: null,
+        is_own_guardian: null,
+        guardian_name: null,
+        guardian_phone: null,
+        support_coordinator_name: null,
+        support_coordinator_phone: null,
+        support_coordinator_email: null,
+        has_abi: null,
+        hr_applicable: null,
+        dnr_applicable: null,
+        diagnoses: [],
+        primary_care_name: null,
+        pcsp_expiration_date: null,
+        special_directions: null,
+      };
+      const emptyVisibilityRow: ClientVisibilityRow = { sections: {} as any, fields: {} as any };
+      const emptySections = {
+        identity: false,
+        care_plan: false,
+        billing: false,
+        files: false,
+        operations: false,
+        compliance: false,
+      } as Record<SectionName, boolean>;
+      return {
+        identity: emptyIdentity,
+        flags: { self_admin_med_support: false, self_admin_med_support_locked: false },
+        pcsp_training_id: null,
+        goals: [],
+        medications: [],
+        authorized_codes: [],
+        custom_fields: [],
+        target_behaviors: [],
+        emergency_contacts: [],
+        preferred_activities: [],
+        visibilityRow: emptyVisibilityRow,
+        visibility: {
+          goalsForStaff: [],
+          medicationsVisible: false,
+          shiftServiceCode: shiftServiceCode ? shiftServiceCode.toUpperCase() : null,
+          sections: emptySections,
+          staffCare: {
+            identity: emptyIdentity,
+            goals: [],
+            medications: [],
+            authorized_codes: [],
+            custom_fields: [],
+            target_behaviors: [],
+            emergency_contacts: [],
+            preferred_activities: [],
+          },
+        },
+      };
+    }
 
     const [clientRes, cstRes, medsRes, codesRes, visRes, cfDefsRes, cfValsRes, tbRes, ecRes, myAssignRes] =
       await Promise.all([

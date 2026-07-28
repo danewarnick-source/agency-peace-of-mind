@@ -349,6 +349,7 @@ export const commitClientFromPdf = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => CommitInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
     const c = data.client;
 

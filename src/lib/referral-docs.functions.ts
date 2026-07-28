@@ -29,6 +29,7 @@ export const recordReferralDocument = createServerFn({ method: "POST" })
   .inputValidator((d) => recordInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return null;
     await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
     const { data: row, error } = await supabase
       .from("referral_documents")
@@ -84,7 +85,14 @@ export const parseReferralDocument = createServerFn({ method: "POST" })
   .inputValidator((d) => parseInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
+    if (!supabase || !userId) {
+      return {
+        ok: false as const,
+        status: 401,
+        message: "Unauthorized",
+        fields: {} as ReferralPrefill,
+      };
+    }
 
     let storagePath: string | null = data.storage_path ?? null;
     if (data.document_id) {
@@ -172,6 +180,7 @@ export const listReferralDocuments = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await requireAnyPermission(supabase, userId, data.organization_id, [
       "view_referrals",
       "manage_referrals",
@@ -202,6 +211,7 @@ export const attachDraftDocumentsToReferral = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
     await requirePermission(supabase, userId, data.organization_id, "manage_referrals");
     const { error } = await supabase
       .from("referral_documents")
@@ -221,6 +231,7 @@ export const getReferralDocumentUrl = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { url: "" };
     await requireAnyPermission(supabase, userId, data.organization_id, [
       "view_referrals",
       "manage_referrals",

@@ -24,6 +24,7 @@ export const listBaseTemplateVersions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context;
+    if (!supabase) return [] as BaseTemplateVersion[];
     const { data, error } = await supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from("hive_base_template_versions" as any)
@@ -37,6 +38,7 @@ export const getCurrentBaseTemplateVersion = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context;
+    if (!supabase) return null;
     const { data, error } = await supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from("hive_base_template_versions" as any)
@@ -72,6 +74,7 @@ export const publishBaseTemplateVersion = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { version: 0, changelog: [] };
     await ensureExecutive(supabase, userId);
 
     // Pull the current version to compute the changelog and determine next number.
@@ -137,6 +140,8 @@ export const previewStateBaseUpgrade = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!supabase)
+      return { upToDate: true as const, fromVersion: 0, toVersion: 0, added: [], removed: [] };
     const { data: tpl } = await supabase
       .from("state_templates")
       .select("*")
@@ -192,6 +197,7 @@ export const upgradeStateToBaseVersion = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false, version: data.toVersion };
     await ensureExecutive(supabase, userId);
 
     // Verify the target version exists.

@@ -38,6 +38,7 @@ export const getCustomFields = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return [];
     await assertOrgMember(supabase, userId, data.organizationId);
 
     const { data: defs, error: defsErr } = await supabase
@@ -85,6 +86,7 @@ export const setCustomFieldValue = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await assertOrgMember(supabase, userId, data.organizationId);
 
     // Confirm the definition belongs to the same org — prevents writing a
@@ -134,6 +136,7 @@ export const createCustomFieldDefinition = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { id: "" };
     await assertOrgMember(supabase, userId, data.organizationId);
 
     const baseKey = data.field_label
@@ -184,6 +187,7 @@ export const deleteCustomFieldDefinition = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: false };
     await assertOrgMember(supabase, userId, data.organizationId);
     const { error } = await supabase
       .from("custom_field_definitions")

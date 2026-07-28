@@ -39,7 +39,8 @@ export const nectarImportSchedule = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { supabase } = context as any;
+    const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { drafts: [] };
 
     const approxBytes = Math.floor((data.file_b64.length * 3) / 4);
     if (approxBytes > MAX_BYTES) {

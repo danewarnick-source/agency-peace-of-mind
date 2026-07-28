@@ -36,7 +36,15 @@ jobs:
         run: npm ci
 
       - name: Build (AWS target)
-        run: npm run build:aws
+        # TEMPORARY DIAGNOSTIC: --mode development so TanStack Start's
+        # IS_DEV-gated error messages (e.g. ERR_NO_RESPONSE) show real detail
+        # in CloudWatch instead of the generic "Internal Server Error" —
+        # `npm run build:aws` alone runs plain `vite build`, which is always
+        # production mode regardless of a runtime NODE_ENV Lambda env var
+        # (that gets baked into the bundle at build time). REVERT to
+        # `run: npm run build:aws` once the real error has been captured —
+        # do not ship a dev-mode bundle to production long-term.
+        run: BUILD_TARGET=aws NODE_OPTIONS=--max-old-space-size=8192 npx vite build --mode development
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}

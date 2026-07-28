@@ -8,11 +8,24 @@ function record(error: unknown) {
   lastCapturedError = { error, at: Date.now() };
 }
 
+// Cloudflare Workers runtime dispatches uncaught errors/rejections through
+// globalThis's WHATWG EventTarget.
 if (typeof globalThis.addEventListener === "function") {
   globalThis.addEventListener("error", (event) => record((event as ErrorEvent).error ?? event));
   globalThis.addEventListener("unhandledrejection", (event) =>
     record((event as PromiseRejectionEvent).reason),
   );
+}
+
+// Node.js (AWS Lambda) never fires those globalThis events for uncaught
+// exceptions/rejections — it uses process-level events instead. Without
+// this, every SSR error on Lambda was silently lost before reaching
+// consumeLastCapturedError(), leaving only the generic "h3 swallowed SSR
+// error" placeholder with no way to see the real stack trace.
+declare const process: { on?: (event: string, listener: (...args: unknown[]) => void) => void } | undefined;
+if (typeof process !== "undefined" && typeof process?.on === "function") {
+  process.on("uncaughtException", (err: unknown) => record(err));
+  process.on("unhandledRejection", (reason: unknown) => record(reason));
 }
 
 export function consumeLastCapturedError(): unknown {

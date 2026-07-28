@@ -18,12 +18,21 @@ function createSupabaseClient() {
     throw new Error(message);
   }
 
+  const isSsr = typeof window === 'undefined';
+
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-    auth: {
-      storage: typeof window !== 'undefined' ? localStorage : undefined,
-      persistSession: true,
-      autoRefreshToken: true,
-    }
+    auth: isSsr
+      ? {
+          storage: undefined,
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        }
+      : {
+          storage: localStorage,
+          persistSession: true,
+          autoRefreshToken: true,
+        }
   });
 }
 

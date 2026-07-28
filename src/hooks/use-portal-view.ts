@@ -44,7 +44,7 @@ export function usePortalView() {
   const [hasStoredView, setHasStoredView] = useState(false);
   const [stateCode, setStateCodeState] = useState<string | null>(null);
   const [subView, setSubViewState] = useState<StatePreviewSubView>("admin");
-  const [hydrated, setHydrated] = useState(false);
+  const [hydrated, setHydrated] = useState(typeof window !== "undefined");
 
   useEffect(() => {
     setView(readView());

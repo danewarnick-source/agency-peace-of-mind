@@ -8,22 +8,38 @@ Lovable deploys.
 ## What changed in the repo
 
 - `vite.config.ts` — when `BUILD_TARGET=aws` is set, nitro's preset switches
-  from `cloudflare-module` (Lovable's default) to `aws-lambda`, and output goes
-  to `dist-aws/` instead of `.output/`. Lovable never sets this env var, so its
-  build path is byte-for-byte unaffected.
+  from `cloudflare-module` (Lovable's default) to `node-server`, and output
+  goes to `dist-aws/` instead of `.output/`. Lovable never sets this env var,
+  so its build path is byte-for-byte unaffected.
+- `nitro.config.ts` — disables nitro's built-in static-asset serving for the
+  AWS build only (static assets are served from S3/CloudFront, not the
+  Lambda itself — see the migration note below). No-op for Lovable/Cloudflare.
+- `deploy/aws/run.sh` — the Lambda handler entry when running behind the AWS
+  Lambda Web Adapter (see **Step 4a** below).
 - `package.json` — added `npm run build:aws`.
 - `.gitignore` — added `dist-aws`.
 - `.github/workflows/deploy-aws.yml` — builds with `build:aws` on every push to
   `main`, syncs `dist-aws/client` to S3, updates the Lambda function code from
-  `dist-aws/server`, and invalidates CloudFront.
+  `dist-aws/server` (including `run.sh`), and invalidates CloudFront.
 - `src/lib/ai-bedrock.server.ts` — added `sessionToken` to the Bedrock client
   credentials (see **Known limitation #1** below for why this was necessary).
   This is a no-op on Cloudflare/Lovable, where `AWS_SESSION_TOKEN` is never set.
 
-The AWS build was run and verified locally: `npm run build:aws` produces
-`dist-aws/server/index.mjs` (a Lambda `handler(event, context)` export, per
-nitro's `aws-lambda` preset) and `dist-aws/client/` (static assets). The
-default `npm run build` was also re-run and confirmed unaffected.
+`npm run build:aws` produces `dist-aws/server/index.mjs` — a normal,
+long-running Node HTTP server (nitro's `node-server` preset), not a Lambda
+`handler(event, context)` export — plus `dist-aws/client/` (static assets).
+It's run on Lambda via the **AWS Lambda Web Adapter** (Step 4a). The default
+`npm run build` is unaffected.
+
+> **Migration note (2026-07-30):** this originally used nitro's own
+> `aws-lambda` preset (a native `handler(event, context)` export, no adapter
+> needed). That preset turned out to have an unresolved incompatibility with
+> TanStack Start server functions — every server-function call 500'd inside
+> framework-internal route dispatch, never reaching any application code,
+> confirmed via extensive CloudWatch investigation across many deploys. If
+> you set this up before that date and are seeing the dashboard hang forever
+> on "Loading…" after a successful login, you're on the old preset — follow
+> **Step 4a** to migrate an already-existing Lambda function.
 
 ## Known limitations (read before you start)
 
@@ -134,6 +150,59 @@ selected when you use Bedrock. Also open
     - Leave CORS off (CloudFront + the app itself handle this).
     - Click **Save**. Copy the generated URL
       (`https://<id>.lambda-url.REGION.on.aws`) — you'll need it in Step 6.
+
+## Step 4a — Attach the AWS Lambda Web Adapter
+
+Nitro's `node-server` preset builds a normal, long-running Node HTTP server
+(`dist-aws/server/index.mjs`), not a Lambda `handler(event, context)` export.
+The **AWS Lambda Web Adapter** is a public Lambda layer that bridges the two:
+it intercepts each Lambda invocation, forwards it as a real HTTP request to
+your app's local server, and returns the response — no code changes needed
+in the app itself.
+
+If you're setting this up fresh, do this right after Step 4 (before Step 5).
+If you already have a working Lambda function on the old `aws-lambda` preset
+(dashboard hangs on "Loading…" after login), do this on your existing
+function — nothing else in Steps 1-3/5-8 needs to change.
+
+1. Open your function (`hive-app-server`) → **Code** tab → scroll to
+   **Layers** → **Add a layer**.
+2. Choose **Specify an ARN**, and paste the layer ARN for your function's
+   region and architecture (x86_64, per Step 4.5):
+   `arn:aws:lambda:REGION:753240598075:layer:LambdaAdapterLayerX86:<version>`
+
+   The account ID (`753240598075`) is AWS's own public-layer publisher and is
+   the same in every region — only `REGION` and `<version>` change. **Look up
+   the current `<version>` number** — search "AWS Lambda Web Adapter layer
+   ARN" for the latest release, or check
+   `https://github.com/awslabs/aws-lambda-web-adapter` for the current
+   version if you have GitHub access. (If your function is arm64 instead,
+   use `LambdaAdapterLayerArm64` instead of `LambdaAdapterLayerX86`.)
+3. Click **Add**.
+4. **Configuration → General configuration → Edit** → **Handler** → change to:
+   `run.sh`
+
+   (The adapter execs this as a shell command instead of the Node runtime
+   trying to `require`/`import` it — that's why `deploy/aws/run.sh` just
+   does `exec node index.mjs`.)
+5. **Configuration → Environment variables → Edit** → add:
+   - `AWS_LAMBDA_EXEC_WRAPPER` = `/opt/bootstrap`
+   - `PORT` = `8080`
+   - `AWS_LWA_PORT` = `8080`
+   - `AWS_LWA_READINESS_CHECK_PROTOCOL` = `tcp`
+   - `AWS_LWA_ASYNC_INIT` = `true`
+
+   (`PORT` isn't a Lambda-reserved name — nitro's `node-server` preset reads
+   it directly, and it must match `AWS_LWA_PORT` so the adapter and your app
+   agree on which port to talk over. `AWS_LWA_READINESS_CHECK_PROTOCOL=tcp`
+   avoids the adapter's default behavior of HTTP-GETing `/` on every cold
+   start, which would otherwise render your full SSR home page just to check
+   readiness.)
+6. Save, then trigger a fresh deploy (push to `main`, or re-run the latest
+   `Deploy AWS (parallel target)` workflow) so the new `run.sh`-containing
+   zip actually lands on the function.
+7. Test: hit your CloudFront URL, log in, confirm the dashboard actually
+   loads instead of hanging on "Loading…".
 
 ## Step 5 — Create the CloudFront distribution
 

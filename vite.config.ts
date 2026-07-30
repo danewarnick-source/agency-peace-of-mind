@@ -9,7 +9,12 @@ import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/tanstack/vite";
 
 // AWS parallel-deploy target (see docs/AWS_DEPLOY.md). Lovable/Cloudflare never sets this
 // env var, so its build is completely unaffected — only `npm run build:aws` switches the
-// nitro preset from the default cloudflare-module to aws-lambda.
+// nitro preset from the default cloudflare-module to node-server (run on Lambda via the
+// AWS Lambda Web Adapter — see nitro.config.ts and docs/AWS_DEPLOY.md). Previously used
+// nitro's own "aws-lambda" preset, but that had an unresolved incompatibility with
+// TanStack Start server functions (every server-fn call 500'd inside framework-internal
+// route dispatch, confirmed via extensive CloudWatch investigation — never reached any of
+// our own application code, however much logging was added).
 const isAwsBuild = process.env.BUILD_TARGET === "aws";
 
 // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
@@ -21,7 +26,7 @@ export default defineConfig({
   ...(isAwsBuild
     ? {
         nitro: {
-          preset: "aws-lambda",
+          preset: "node-server",
           output: {
             dir: "dist-aws",
             serverDir: "dist-aws/server",

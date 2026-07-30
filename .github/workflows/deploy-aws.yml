@@ -3,17 +3,14 @@ name: Deploy AWS (parallel target)
 # Parallel deployment target alongside Lovable/Cloudflare. This workflow never
 # touches wrangler.jsonc, src/server.ts's Cloudflare entry point, or anything
 # Lovable's GitHub sync manages — it only runs `npm run build:aws` (a separate
-# nitro preset, see vite.config.ts) and ships that output to S3 + App Runner.
+# nitro preset, see vite.config.ts) and ships that output to S3 + ECS Fargate.
 # See docs/AWS_DEPLOY.md for the one-time AWS console setup this depends on.
 #
-# Migration note (2026-07-30): previously ran the SSR server on Lambda
-# (first via nitro's own "aws-lambda" preset, later via nitro's "node-server"
-# preset behind the AWS Lambda Web Adapter). Both hit the same unresolved
-# issue — every server-function call 500'd inside framework-internal route
-# dispatch, reproducible only inside real Lambda, not in a direct local
-# replay of the same request. Moved to App Runner: the exact same
-# node-server build, packaged as a container, run as a normal always-on
-# process — no Lambda freeze/thaw request lifecycle involved at all.
+# Migration note (2026-07-30): previously ran on Lambda (failed with 500s on
+# every server-function call due to the Lambda invocation lifecycle), then
+# attempted App Runner (shut to new customers April 30 2026). Now on ECS
+# Fargate: same node-server container, managed always-on process, no Lambda
+# freeze/thaw involved.
 
 on:
   push:
@@ -84,47 +81,42 @@ jobs:
               --cache-control "public,max-age=0,must-revalidate"
           fi
 
-      # Skipped (with a notice) until AWS_APPRUNNER_SERVICE_ARN exists — the
-      # App Runner service itself has to be created from an image already in
-      # ECR (a chicken-and-egg problem on first setup), so the very first run
-      # of this workflow only needs to get an image pushed. See
-      # docs/AWS_DEPLOY.md Step 4a for the one-time bootstrap.
-      - name: Deploy new image to App Runner
-        id: apprunner-deploy
-        if: env.SERVICE_ARN != ''
+      # Skipped until AWS_ECS_CLUSTER and AWS_ECS_SERVICE are set — the ECS
+      # service must be created manually first (chicken-and-egg: needs an
+      # image in ECR before the service can be created). The first CI run
+      # just pushes the image; Step 4a in docs/AWS_DEPLOY.md covers creating
+      # the service from the console after that image exists.
+      - name: Deploy new image to ECS
+        if: env.ECS_CLUSTER != '' && env.ECS_SERVICE != ''
         env:
-          SERVICE_ARN: ${{ secrets.AWS_APPRUNNER_SERVICE_ARN }}
+          ECS_CLUSTER: ${{ secrets.AWS_ECS_CLUSTER }}
+          ECS_SERVICE: ${{ secrets.AWS_ECS_SERVICE }}
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.AWS_ECR_REPOSITORY }}
         run: |
-          OPERATION_ID=$(aws apprunner start-deployment \
-            --service-arn "$SERVICE_ARN" \
-            --query 'OperationId' --output text)
-          echo "operation_id=$OPERATION_ID" >> "$GITHUB_OUTPUT"
-
-      - name: Wait for App Runner deployment to finish
-        if: env.SERVICE_ARN != ''
-        env:
-          SERVICE_ARN: ${{ secrets.AWS_APPRUNNER_SERVICE_ARN }}
-        run: |
-          OPERATION_ID="${{ steps.apprunner-deploy.outputs.operation_id }}"
-          for i in $(seq 1 60); do
-            STATUS=$(aws apprunner list-operations \
-              --service-arn "$SERVICE_ARN" \
-              --query "OperationSummaryList[?Id=='$OPERATION_ID'].Status | [0]" \
-              --output text)
-            echo "Deployment operation status: $STATUS"
-            case "$STATUS" in
-              SUCCEEDED)
-                exit 0
-                ;;
-              FAILED|ROLLBACK_SUCCEEDED|ROLLBACK_FAILED)
-                echo "::error::App Runner deployment failed with status: $STATUS"
-                exit 1
-                ;;
-            esac
-            sleep 10
-          done
-          echo "::error::Timed out waiting for App Runner deployment to finish."
-          exit 1
+          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA"
+          # Fetch the current task definition, swap in the new image, strip
+          # read-only fields that aws ecs register-task-definition rejects.
+          NEW_DEF=$(aws ecs describe-task-definition \
+            --task-definition hive-app-server \
+            --query 'taskDefinition' \
+            | jq --arg img "$IMAGE" '
+                .containerDefinitions[0].image = $img
+                | del(.taskDefinitionArn, .revision, .status,
+                      .requiresAttributes, .placementConstraints,
+                      .compatibilities, .registeredAt, .registeredBy)
+              ')
+          NEW_ARN=$(aws ecs register-task-definition \
+            --cli-input-json "$NEW_DEF" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --task-definition "$NEW_ARN"
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE"
 
       - name: Invalidate CloudFront cache
         if: env.DISTRIBUTION_ID != ''

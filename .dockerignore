@@ -1,0 +1,14 @@
+# Keeps the App Runner image build (deploy/aws/Dockerfile) fast — it only
+# ever COPYs dist-aws/server/, so nothing else needs to be in the build
+# context at all.
+node_modules
+.git
+.output
+.wrangler
+dist-aws/client
+src
+public
+supabase
+docs
+*.md
+.env*

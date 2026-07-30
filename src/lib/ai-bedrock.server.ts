@@ -50,23 +50,31 @@ export class BedrockError extends Error {
 
 function getClient(): BedrockRuntimeClient {
   const region = process.env.AWS_REGION;
+  if (!region) throw new BedrockError(500, "AWS_REGION is not configured.");
+
   const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
   const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
-  // Only set on Lambda, where AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY are reserved
-  // env vars auto-populated with the execution role's temporary credentials —
-  // those require the session token to authenticate. Undefined everywhere else
-  // (e.g. Cloudflare Workers with static long-lived creds), so this is a no-op there.
   const sessionToken = process.env.AWS_SESSION_TOKEN;
-  if (!region) throw new BedrockError(500, "AWS_REGION is not configured.");
-  if (!accessKeyId || !secretAccessKey) {
-    throw new BedrockError(
-      401,
-      "AWS Bedrock credentials are not configured (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY).",
-    );
-  }
+
+  // Two deploy targets, two different ways of getting the execution role's
+  // credentials to the SDK:
+  //   - Lambda: AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_SESSION_TOKEN are
+  //     reserved env vars Lambda auto-populates with the execution role's
+  //     temporary credentials — pass them explicitly.
+  //   - App Runner (and most other AWS compute): the instance role's
+  //     credentials are served from a container credentials endpoint the SDK
+  //     resolves on its own via its default provider chain — passing no
+  //     `credentials` at all lets that happen. Explicit static keys are only
+  //     needed on targets (e.g. Cloudflare Workers) that have no such
+  //     endpoint to fall back to; there, omit them and the client throws its
+  //     own descriptive credentials error instead of us guessing.
+  const credentials = accessKeyId && secretAccessKey
+    ? { accessKeyId, secretAccessKey, sessionToken }
+    : undefined;
+
   return new BedrockRuntimeClient({
     region,
-    credentials: { accessKeyId, secretAccessKey, sessionToken },
+    ...(credentials ? { credentials } : {}),
     requestHandler: new FetchHttpHandler(),
   });
 }

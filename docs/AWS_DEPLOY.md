@@ -100,12 +100,31 @@ Bedrock without any static credentials.
 
 1. Go to `https://console.aws.amazon.com/iam/home#/roles`
 2. Click **Create role**.
-3. Trusted entity type: **AWS service**. Use case: search for and choose
-   **App Runner** → **App Runner - Ability to perform tasks at runtime**
-   (this is the *instance* role use case, distinct from App Runner's
-   *build/ECR-access* role — you'll create that separately from inside the
-   App Runner service wizard in Step 4). Click **Next**.
-4. Skip attaching a managed policy here — click **Next**.
+3. Trusted entity type: **Custom trust policy**. (App Runner does have an
+   **AWS service** use case, but it is missing from the use-case list in
+   several IAM console versions — the custom trust policy below produces a
+   byte-identical role, so just use it unconditionally.) Paste:
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Principal": { "Service": "tasks.apprunner.amazonaws.com" },
+         "Action": "sts:AssumeRole"
+       }
+     ]
+   }
+   ```
+
+   The principal must be `tasks.apprunner.amazonaws.com` — that is the
+   *instance* role principal (what your container runs as). Plain
+   `apprunner.amazonaws.com` is the App Runner *service's* own principal, used
+   for the separate ECR-access role you'll create from inside the service
+   wizard in Step 4a. Getting these two backwards makes the role
+   un-selectable in the Step 4a instance-role dropdown.
+4. Click **Next**. Skip attaching a managed policy — click **Next** again.
 5. Role name: `hive-apprunner-instance-role`. Click **Create role**.
 6. Open the role you just created, click **Add permissions → Create inline
    policy**, switch to the **JSON** tab, and paste:

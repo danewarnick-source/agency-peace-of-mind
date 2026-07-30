@@ -3,13 +3,17 @@ name: Deploy AWS (parallel target)
 # Parallel deployment target alongside Lovable/Cloudflare. This workflow never
 # touches wrangler.jsonc, src/server.ts's Cloudflare entry point, or anything
 # Lovable's GitHub sync manages — it only runs `npm run build:aws` (a separate
-# nitro preset, see vite.config.ts) and ships that output to S3 + Lambda.
+# nitro preset, see vite.config.ts) and ships that output to S3 + App Runner.
 # See docs/AWS_DEPLOY.md for the one-time AWS console setup this depends on.
 #
-# Trigger note: AWS_LAMBDA_FUNCTION_NAME/AWS_REGION secrets were corrected
-# after a prior run failed with ResourceNotFoundException on the Lambda
-# function name/region mismatch. This comment-only touch forces a fresh run
-# to confirm the fix.
+# Migration note (2026-07-30): previously ran the SSR server on Lambda
+# (first via nitro's own "aws-lambda" preset, later via nitro's "node-server"
+# preset behind the AWS Lambda Web Adapter). Both hit the same unresolved
+# issue — every server-function call 500'd inside framework-internal route
+# dispatch, reproducible only inside real Lambda, not in a direct local
+# replay of the same request. Moved to App Runner: the exact same
+# node-server build, packaged as a container, run as a normal always-on
+# process — no Lambda freeze/thaw request lifecycle involved at all.
 
 on:
   push:
@@ -45,19 +49,26 @@ jobs:
           VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
           PUBLIC_SITE_URL: ${{ secrets.AWS_PUBLIC_SITE_URL }}
 
-      - name: Package Lambda function code
-        run: |
-          cp deploy/aws/run.sh dist-aws/server/run.sh
-          chmod +x dist-aws/server/run.sh
-          cd dist-aws/server
-          zip -r ../../hive-lambda.zip . -x '*.map'
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.AWS_ECR_REPOSITORY }}
+        run: |
+          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY"
+          docker build -f deploy/aws/Dockerfile -t "$IMAGE:$GITHUB_SHA" -t "$IMAGE:latest" .
+          docker push "$IMAGE:$GITHUB_SHA"
+          docker push "$IMAGE:latest"
 
       - name: Sync static assets to S3
         run: |
@@ -73,17 +84,47 @@ jobs:
               --cache-control "public,max-age=0,must-revalidate"
           fi
 
-      - name: Update Lambda function code
+      # Skipped (with a notice) until AWS_APPRUNNER_SERVICE_ARN exists — the
+      # App Runner service itself has to be created from an image already in
+      # ECR (a chicken-and-egg problem on first setup), so the very first run
+      # of this workflow only needs to get an image pushed. See
+      # docs/AWS_DEPLOY.md Step 4a for the one-time bootstrap.
+      - name: Deploy new image to App Runner
+        id: apprunner-deploy
+        if: env.SERVICE_ARN != ''
+        env:
+          SERVICE_ARN: ${{ secrets.AWS_APPRUNNER_SERVICE_ARN }}
         run: |
-          aws lambda update-function-code \
-            --function-name "${{ secrets.AWS_LAMBDA_FUNCTION_NAME }}" \
-            --zip-file fileb://hive-lambda.zip \
-            --publish
+          OPERATION_ID=$(aws apprunner start-deployment \
+            --service-arn "$SERVICE_ARN" \
+            --query 'OperationId' --output text)
+          echo "operation_id=$OPERATION_ID" >> "$GITHUB_OUTPUT"
 
-      - name: Wait for Lambda update to finish propagating
+      - name: Wait for App Runner deployment to finish
+        if: env.SERVICE_ARN != ''
+        env:
+          SERVICE_ARN: ${{ secrets.AWS_APPRUNNER_SERVICE_ARN }}
         run: |
-          aws lambda wait function-updated \
-            --function-name "${{ secrets.AWS_LAMBDA_FUNCTION_NAME }}"
+          OPERATION_ID="${{ steps.apprunner-deploy.outputs.operation_id }}"
+          for i in $(seq 1 60); do
+            STATUS=$(aws apprunner list-operations \
+              --service-arn "$SERVICE_ARN" \
+              --query "OperationSummaryList[?Id=='$OPERATION_ID'].Status | [0]" \
+              --output text)
+            echo "Deployment operation status: $STATUS"
+            case "$STATUS" in
+              SUCCEEDED)
+                exit 0
+                ;;
+              FAILED|ROLLBACK_SUCCEEDED|ROLLBACK_FAILED)
+                echo "::error::App Runner deployment failed with status: $STATUS"
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
+          echo "::error::Timed out waiting for App Runner deployment to finish."
+          exit 1
 
       - name: Invalidate CloudFront cache
         if: env.DISTRIBUTION_ID != ''

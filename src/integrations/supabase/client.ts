@@ -4,11 +4,10 @@ import type { Database } from './types';
 // ws is required for Supabase realtime in Node.js < 22 (no native WebSocket)
 import ws from 'ws';
 
-function createSupabaseClient() {
-  // Use import.meta.env for client-side (Vite build-time replacement)
-  // Fall back to process.env for SSR (server-side rendering)
+function getEnv() {
   const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
+  const SUPABASE_PUBLISHABLE_KEY =
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
     const missing = [
@@ -20,33 +19,61 @@ function createSupabaseClient() {
     throw new Error(message);
   }
 
-  const isSsr = typeof window === 'undefined';
-
-  return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-    auth: isSsr
-      ? {
-          storage: undefined,
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false,
-        }
-      : {
-          storage: localStorage,
-          persistSession: true,
-          autoRefreshToken: true,
-        },
-    ...(isSsr ? { realtime: { transport: ws } } : {}),
-  });
+  return { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY };
 }
 
-let _supabase: ReturnType<typeof createSupabaseClient> | undefined;
+function hasBrowserStorage(): boolean {
+  try {
+    return (
+      typeof window !== 'undefined' &&
+      typeof window.localStorage !== 'undefined' &&
+      window.localStorage !== null
+    );
+  } catch {
+    return false;
+  }
+}
+
+// Persistent browser client — only instantiated when localStorage is confirmed available.
+let _browserClient: ReturnType<typeof createClient<Database>> | null = null;
+function getBrowserClient() {
+  if (!_browserClient) {
+    const { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } = getEnv();
+    _browserClient = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+      auth: {
+        storage: window.localStorage,
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    });
+  }
+  return _browserClient;
+}
+
+// Stateless server client — used during SSR or when localStorage is unavailable.
+let _serverClient: ReturnType<typeof createClient<Database>> | null = null;
+function getServerClient() {
+  if (!_serverClient) {
+    const { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } = getEnv();
+    _serverClient = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+      auth: {
+        storage: undefined,
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+      realtime: { transport: ws },
+    });
+  }
+  return _serverClient;
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
-export const supabase = new Proxy({} as ReturnType<typeof createSupabaseClient>, {
+export const supabase = new Proxy({} as ReturnType<typeof createClient<Database>>, {
   get(_, prop, receiver) {
-    if (!_supabase) _supabase = createSupabaseClient();
-    return Reflect.get(_supabase, prop, receiver);
+    const client = hasBrowserStorage() ? getBrowserClient() : getServerClient();
+    return Reflect.get(client, prop, receiver);
   },
 });
-

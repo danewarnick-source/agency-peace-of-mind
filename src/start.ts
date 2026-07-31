@@ -1,20 +1,26 @@
 import { createStart, createMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
+import { serializeErrorChain } from "./lib/error-chain";
 import { attachSupabaseAuth } from "@/lib/attach-supabase-auth";
 
-const errorMiddleware = createMiddleware().server(async ({ next }) => {
+const errorMiddleware = createMiddleware().server(async ({ next, request, pathname, handlerType, serverFnMeta }) => {
   try {
     return await next();
   } catch (error) {
+    // TEMPORARY: full-detail structured log (method, path, handler type,
+    // complete cause chain with stacks) — h3/nitro sanitizes everything
+    // downstream to a generic "Internal Server Error", so this line in
+    // CloudWatch is the only place the real error appears. handlerType
+    // tells us whether Start recognized the request as a serverFn call or
+    // misrouted it into the page router. Remove once the AWS serverFn
+    // 500s are root-caused.
+    console.error(
+      `[errorMiddleware] ${request?.method ?? "?"} ${pathname ?? "?"} handlerType=${handlerType ?? "?"} serverFn=${serverFnMeta ? JSON.stringify(serverFnMeta) : "none"} chain=${serializeErrorChain(error)}`,
+    );
     if (error != null && typeof error === "object" && "statusCode" in error) {
-      // TEMPORARY: always log, even for statusCode errors we re-throw —
-      // h3/nitro sanitizes these down to a generic "Internal Server Error"
-      // downstream with no way to see the real cause otherwise.
-      console.error("[errorMiddleware] statusCode error, re-throwing:", error);
       throw error;
     }
-    console.error(error);
     return new Response(renderErrorPage(), {
       status: 500,
       headers: { "content-type": "text/html; charset=utf-8" },

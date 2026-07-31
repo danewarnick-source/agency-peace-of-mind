@@ -1,6 +1,7 @@
 import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
+import { serializeErrorChain } from "./lib/error-chain";
 import { renderErrorPage } from "./lib/error-page";
 
 type ServerEntry = {
@@ -62,7 +63,13 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
     return response;
   }
 
-  console.error(consumeLastCapturedError() ?? new Error(`h3 swallowed SSR error: ${body}`));
+  // TEMPORARY: full-detail structured log — see src/start.ts errorMiddleware.
+  const captured = consumeLastCapturedError();
+  console.error(
+    `[server.ts] h3 swallowed error, body=${body} captured=${
+      captured !== undefined ? serializeErrorChain(captured) : "none"
+    }`,
+  );
   return brandedErrorResponse();
 }
 
@@ -73,7 +80,10 @@ export default {
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
-      console.error(error);
+      // TEMPORARY: full-detail structured log — see src/start.ts errorMiddleware.
+      console.error(
+        `[server.ts] fetch threw for ${request.method} ${request.url} chain=${serializeErrorChain(error)}`,
+      );
       return brandedErrorResponse();
     }
   },

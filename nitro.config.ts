@@ -11,5 +11,13 @@ import { defineNitroConfig } from "nitro/config";
 // so leaving serveStatic on would 500 (ENOENT) on any asset request that
 // somehow reaches Lambda instead of being caught by a CloudFront behavior.
 export default defineNitroConfig(
-  process.env.BUILD_TARGET === "aws" ? { serveStatic: false } : {},
+  process.env.BUILD_TARGET === "aws"
+    ? {
+        serveStatic: false,
+        // TEMPORARY: replace the default error handler with one that logs the
+        // full cause chain as a single line so CloudWatch doesn't collapse it.
+        // Remove once the server function 500s are root-caused.
+        errorHandler: "./src/nitro-plugins/error-handler",
+      }
+    : {},
 );

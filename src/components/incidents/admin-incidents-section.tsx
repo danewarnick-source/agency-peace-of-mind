@@ -314,7 +314,9 @@ function IncidentCard({
     enabled: detailActorIds.length > 0 && !!org?.organization_id,
     queryKey: ["incident-actors-detail", ir.id, detailActorIds.join(",")],
     queryFn: () => detailActorsFn({ data: { organization_id: org!.organization_id, user_ids: detailActorIds } }),
+    staleTime: 5 * 60_000,
   });
+
   const detailActors = useMemo(() => {
     const m = new Map(actors);
     for (const p of (detailActorsData?.profiles ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null }>) {

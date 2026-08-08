@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
@@ -24,7 +25,13 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, CheckCircle2, Skull, Clock, FileCheck2, ChevronDown, ChevronUp } from "lucide-react";
-import { IncidentTrendsStrip, type TrendFilter } from "./incident-trends-strip";
+import type { TrendFilter } from "./incident-trends-strip";
+// recharts is heavy — keep it out of the Incidents tab's initial chunk so the
+// incident rows paint first and the chart streams in behind them.
+const IncidentTrendsStrip = lazy(() =>
+  import("./incident-trends-strip").then((m) => ({ default: m.IncidentTrendsStrip })),
+);
+
 import { AttestationDialog, type AttestationSignature } from "./attestation-dialog";
 import { renderUpiSubmittedAttestation } from "@/lib/incident-attestations";
 
@@ -307,7 +314,9 @@ function IncidentCard({
     enabled: detailActorIds.length > 0 && !!org?.organization_id,
     queryKey: ["incident-actors-detail", ir.id, detailActorIds.join(",")],
     queryFn: () => detailActorsFn({ data: { organization_id: org!.organization_id, user_ids: detailActorIds } }),
+    staleTime: 5 * 60_000,
   });
+
   const detailActors = useMemo(() => {
     const m = new Map(actors);
     for (const p of (detailActorsData?.profiles ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null }>) {
@@ -455,7 +464,7 @@ export function AdminIncidentsSection({
   const { data: org } = useCurrentOrg();
   const activeOrgId = org?.organization_id ?? null;
   const listFn = useServerFn(listIncidents);
-  const actorsFn = useServerFn(getIncidentActors);
+  
 
 
   const [view, setView] = useState<"queue" | "log">(initialView ?? "queue");
@@ -473,6 +482,8 @@ export function AdminIncidentsSection({
     }
   }, [initialClientId, initialView]);
 
+  // The full org client roster only feeds the filter dropdown — it must never
+  // gate the incident rows from rendering.
   const { data: caseload = [] } = useCaseload();
   const { data, isLoading } = useQuery({
     enabled: !!activeOrgId,
@@ -489,6 +500,10 @@ export function AdminIncidentsSection({
           limit: 200,
         },
       }),
+    // Cached so re-entering the tab paints instantly, and filter changes keep
+    // the previous rows on screen instead of blanking the list.
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
   });
 
   const incidents = (data?.incidents ?? []) as IncidentSummary[];
@@ -501,33 +516,19 @@ export function AdminIncidentsSection({
     });
   }, [incidents]);
 
-  const actorIds = useMemo(() => {
-    const s = new Set<string>();
-    for (const ir of incidents) {
-      if (ir.reported_by) s.add(ir.reported_by);
-    }
-    return [...s];
-  }, [incidents]);
-  const { data: actorsData } = useQuery({
-    enabled: actorIds.length > 0 && !!activeOrgId,
-    queryKey: ["incident-actors", activeOrgId, actorIds.join(",")],
-    queryFn: () => actorsFn({ data: { organization_id: activeOrgId!, user_ids: actorIds } }),
-  });
-
-  // Pre-populate immediately from data already in hand (the listIncidents
-  // clients join) so names render before the async staff-profile lookup
-  // resolves; the lookup then fills in reporter/attestation names without
-  // blocking the initial list render.
+  // Reporter names now arrive with the list itself (listIncidents resolves
+  // them server-side), so there is no dependent second round trip here.
   const actorMap = useMemo(() => {
     const m = new Map<string, string>();
     for (const ir of incidents) {
       if (ir.clients) m.set(ir.client_id, `${ir.clients.first_name} ${ir.clients.last_name}`.trim());
     }
-    for (const p of (actorsData?.profiles ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null }>) {
+    for (const p of (data?.actors ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null }>) {
       m.set(p.id, `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.id.slice(0, 8));
     }
     return m;
-  }, [incidents, actorsData]);
+  }, [incidents, data]);
+
 
   const [submitUpiFor, setSubmitUpiFor] = useState<string | null>(null);
 
@@ -621,7 +622,12 @@ export function AdminIncidentsSection({
         </Card>
       )}
 
-      {view === "log" && <IncidentTrendsStrip rangeFrom={from} rangeTo={to} onPick={onTrendPick} />}
+      {view === "log" && (
+        <Suspense fallback={null}>
+          <IncidentTrendsStrip rangeFrom={from} rangeTo={to} onPick={onTrendPick} />
+        </Suspense>
+      )}
+
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading incidents…</p>

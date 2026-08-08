@@ -205,8 +205,27 @@ export const listIncidents = createServerFn({ method: "GET" })
 
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
-    return { incidents: rows ?? [] };
+    const incidents = (rows ?? []) as Array<{ reported_by: string | null }>;
+
+    // Resolve reporter display names in the SAME round trip. Previously the
+    // client fired a dependent follow-up request once the list landed, which
+    // serialized a third hop onto every open of the Incidents tab.
+    // NOTE: two queries joined in JS — never PostgREST-embed
+    // organization_members/profiles (no FK; both key off auth.users.id).
+    const actorIds = Array.from(
+      new Set(incidents.map((r) => r.reported_by).filter(Boolean) as string[]),
+    );
+    let actors: Array<{ id: string; first_name: string | null; last_name: string | null }> = [];
+    if (actorIds.length) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name")
+        .in("id", actorIds);
+      actors = (profiles ?? []) as typeof actors;
+    }
+    return { incidents: rows ?? [], actors };
   });
+
 
 /** Heavy fields deferred out of listIncidents — loaded once, on expand. */
 const detailInput = z.object({

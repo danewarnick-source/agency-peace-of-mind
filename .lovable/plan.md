@@ -1,67 +1,37 @@
-## What's happening
+# Why the Incidents tab takes 5–30 seconds — and how to fix it
 
-Justin's incident report was NOT deleted. I confirmed it in the database:
+## What I measured
 
-- `67c53041-…` · Justin Hesse · 2026-07-07 · `Pending_Admin_Review` · org **TNS FAKE**
+I loaded Documentation and switched to Incidents in a real browser session and timed every request, and I checked the database's slowest-query report.
 
-The reason "No incidents in this view" shows: your user (`d672c985-…`) is an active admin in **two** organizations — **TNS FAKE** and **HIPAA FREE PROVIDER LLC**. Every incident server fn (`listIncidents`, `incidentTrends`, and siblings) picks the org via `getMembership()` in `src/lib/incidents.functions.ts`:
+- The database is **not** the problem. Incident queries don't appear anywhere in the slowest-query list, and each incident request came back in roughly 0.4–0.7 seconds.
+- The slowness is in how the page fetches: it waits in a chain instead of fetching in parallel, and it throws away what it already loaded every time you come back.
 
-```ts
-.from("organization_members")
-.eq("user_id", userId).eq("active", true)
-.limit(1).maybeSingle()
-```
+## What's actually happening when you click Incidents
 
-There is no ordering and no awareness of the currently-active org, so Postgres returns whichever row it likes. When it returns HIPAA FREE, the query is filtered to `organization_id = <HIPAA FREE>` and Justin's TNS-FAKE incident is (correctly, from the query's point of view) filtered out. That's the entire bug.
+1. Nothing starts until the app re-resolves who you are and which organization is active.
+2. Only then does the incident list request go out — and separately a second "trends" request that runs two more database aggregations.
+3. After the list comes back, the app fires *another* request just to translate staff IDs into names. That's a third step that can only start once step 2 finishes.
+4. At the same time the tab loads **every client in the organization** just to populate the client filter dropdown.
+5. The charts library (recharts) for the trends strip loads eagerly as part of the tab, which adds seconds on the first click.
+6. None of these results are cached, so leaving the tab and coming back repeats the entire chain from zero — and the page also has other timers polling in the background competing for the same connections.
 
-The rest of the app already knows the "active org" — `useOrg().activeOrgId` — and org-scoped server fns elsewhere take an `organizationId` input and verify it with `requireOrgMembership`.
+Each step is fast on its own; stacked in sequence with no caching, they add up to the 5–30 seconds you're seeing.
 
-## Fix
+## The fix
 
-Make the incidents server fns org-aware the same way the rest of the codebase is.
+1. **Cache the results.** Give the incident list, the staff-name lookup, and the trends feed a sensible freshness window and keep showing the previous rows while refreshing. Returning to the tab then renders instantly instead of spinning.
+2. **Remove the third round trip.** Have the incident list return reporter names with the list itself, instead of a follow-up request that can't start until the list lands.
+3. **Stop blocking on the client list.** The full org client roster is only needed for the filter dropdown — load it lazily and never let it hold up the incident rows.
+4. **Load the charts on demand.** Split the trends strip (recharts) into a lazily loaded chunk that renders after the list, so the incident rows paint first.
+5. **Keep filters snappy.** Changing status/category/client keeps the current rows visible while the new query runs, instead of blanking the page.
+6. **Verify the index.** Confirm `incident_reports` has an index covering organization + discovered date ordering; add one only if the query plan shows it's missing.
 
-### `src/lib/incidents.functions.ts`
+Expected result: incident rows appear in about a second on first open and effectively instantly on return, with charts filling in a moment later.
 
-1. Add `organization_id: z.string().uuid()` to the input validators for:
-   - `listIncidents`
-   - `incidentTrends`
-   - any sibling reader that currently calls `getMembership` for org scoping (createIncident, updateIncidentFollowupNotes, submitToUpi, getIncidentActors, etc. — only the ones that currently derive org from `getMembership`).
-2. Replace the `getMembership(...)` call in each handler with:
-   ```ts
-   await requireOrgMembership(supabase, userId, data.organization_id /*, minRole*/);
-   ```
-   Preserve the existing minimum-role expectations (e.g. `requireManager` → `"manager"`).
-3. Use `data.organization_id` in the `.eq("organization_id", ...)` filter instead of `m.organization_id`.
-4. Leave `getMembership` in place only if some caller still needs it; otherwise remove.
+## Technical notes
 
-### Client call sites
-
-Every place that calls those server fns must pass the active org id from `useOrg()`:
-
-- `src/components/incidents/admin-incidents-section.tsx` — `listIncidents` (and `getIncidentActors` if it becomes org-scoped)
-- `src/components/incidents/incident-trends-strip.tsx` — `incidentTrends`
-- `src/components/incidents/incident-report-dialog.tsx` (and any other consumer) — `createIncident`, `updateIncidentFollowupNotes`, `submitToUpi`
-
-Pattern:
-```ts
-const { activeOrgId } = useOrg();
-useQuery({
-  queryKey: ["incidents", activeOrgId, view, status, ...],
-  enabled: !!activeOrgId,
-  queryFn: () => listFn({ data: { organization_id: activeOrgId!, ... } }),
-});
-```
-
-Include `activeOrgId` in every query key so switching orgs refetches.
-
-## Out of scope
-
-- No schema/RLS changes. The row already exists and RLS already permits the caller — this is purely a wrong-filter bug on the read path.
-- No changes to the UI/filters (status, client, category, date) — those are working as intended.
-- Not touching non-incident server fns, even those that use similar `getMembership` shortcuts, unless you want a follow-up sweep.
-
-## Validation
-
-1. On the Documentation → Incidents tab with TNS FAKE active, Justin's `Pending_Admin_Review` incident appears in "Open queue".
-2. Switching the active org to HIPAA FREE PROVIDER shows the two DEMO — Reese Carter / Quinn Walker incidents instead, and none from TNS FAKE.
-3. Trends bar chart totals match the visible list for the active org.
+- `src/components/incidents/admin-incidents-section.tsx`: add `staleTime` + `placeholderData: keepPreviousData` to the `incidents` and `incident-actors` queries; drop the dependent actors query once names come from the list; make `useCaseload` non-blocking for the filter.
+- `src/lib/incidents.functions.ts`: extend `listIncidents` to resolve reporter display names server-side (two queries joined in JS — no PostgREST embed between `organization_members` and `profiles`, per project rule).
+- `src/components/incidents/incident-trends-strip.tsx`: convert to `React.lazy` + `Suspense` at its usage site so recharts isn't in the tab's initial chunk; keep its existing `staleTime: 60_000`.
+- No behavior, permission, or data changes — the org-scoped `organization_id` requirement and manager gate on `incidentTrends` stay exactly as they are.

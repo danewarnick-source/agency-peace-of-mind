@@ -18051,6 +18051,23 @@ export type Database = {
           similarity: number
         }[]
       }
+      incident_client_counts: {
+        Args: { _from: string; _org: string; _to: string }
+        Returns: {
+          client_id: string
+          first_name: string
+          incident_count: number
+          last_name: string
+        }[]
+      }
+      incident_monthly_category_counts: {
+        Args: { _org: string; _since: string }
+        Returns: {
+          category: string
+          incident_count: number
+          month_key: string
+        }[]
+      }
       is_active_auditor: { Args: { _uid: string }; Returns: boolean }
       is_admin_anywhere: { Args: { _user: string }; Returns: boolean }
       is_company_executive: {

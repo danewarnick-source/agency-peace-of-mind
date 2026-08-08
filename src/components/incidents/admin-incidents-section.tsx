@@ -25,7 +25,13 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, CheckCircle2, Skull, Clock, FileCheck2, ChevronDown, ChevronUp } from "lucide-react";
-import { IncidentTrendsStrip, type TrendFilter } from "./incident-trends-strip";
+import type { TrendFilter } from "./incident-trends-strip";
+// recharts is heavy — keep it out of the Incidents tab's initial chunk so the
+// incident rows paint first and the chart streams in behind them.
+const IncidentTrendsStrip = lazy(() =>
+  import("./incident-trends-strip").then((m) => ({ default: m.IncidentTrendsStrip })),
+);
+
 import { AttestationDialog, type AttestationSignature } from "./attestation-dialog";
 import { renderUpiSubmittedAttestation } from "@/lib/incident-attestations";
 

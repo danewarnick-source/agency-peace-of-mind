@@ -620,7 +620,12 @@ export function AdminIncidentsSection({
         </Card>
       )}
 
-      {view === "log" && <IncidentTrendsStrip rangeFrom={from} rangeTo={to} onPick={onTrendPick} />}
+      {view === "log" && (
+        <Suspense fallback={null}>
+          <IncidentTrendsStrip rangeFrom={from} rangeTo={to} onPick={onTrendPick} />
+        </Suspense>
+      )}
+
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading incidents…</p>

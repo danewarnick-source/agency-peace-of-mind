@@ -462,7 +462,7 @@ export function AdminIncidentsSection({
   const { data: org } = useCurrentOrg();
   const activeOrgId = org?.organization_id ?? null;
   const listFn = useServerFn(listIncidents);
-  const actorsFn = useServerFn(getIncidentActors);
+  
 
 
   const [view, setView] = useState<"queue" | "log">(initialView ?? "queue");

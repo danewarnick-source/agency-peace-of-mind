@@ -6,6 +6,84 @@ it worked before moving on.
 
 ---
 
+## DIAGNOSTIC — Staff missing hire_date (2026-08-09)
+
+**What this is for:** Staff imported via Smart Import may have `null` hire_date,
+causing "no_hire_date" status across all their compliance checklist requirements.
+Run this diagnostic to find affected staff in production orgs (non-demo only).
+Report back the row count before taking any action.
+
+**Step 1 — Find staff with no hire_date or start_date:**
+
+```sql
+SELECT
+  p.id,
+  p.full_name,
+  p.hire_date,
+  p.start_date,
+  string_agg(om.role, ', ') AS roles
+FROM public.profiles p
+JOIN public.organization_members om ON om.user_id = p.id
+JOIN public.organizations org ON org.id = om.organization_id
+WHERE org.is_demo = false
+  AND p.hire_date IS NULL
+  AND p.start_date IS NULL
+  AND om.role IN ('staff', 'admin', 'manager')
+GROUP BY p.id, p.full_name, p.hire_date, p.start_date
+ORDER BY p.full_name;
+```
+
+**What you'll see:** One row per staff member with no hire_date and no start_date
+in a non-demo org. If 0 rows → no action needed. If rows exist → run Step 2.
+
+**Step 2 — Check Smart Import provenance for a hire_date/start_date field write
+(only run if Step 1 returns rows):**
+
+`import_subjects` does not store the raw parsed field values itself — provenance
+of which imported document/subject wrote which field on which target record is
+tracked separately in `import_field_provenance` (target_table, target_field,
+target_record_id, source_document_id, source_snippet). Use it to find whether
+an import ever attempted to set hire_date/start_date on these profiles (e.g. a
+document had the value but it failed validation and was dropped, or the value
+lives in a source document we can point the admin to).
+
+```sql
+SELECT
+  p.id AS profile_id,
+  p.full_name,
+  ifp.target_field,
+  ifp.source_snippet,
+  ifp.provenance,
+  ifp.created_at AS import_captured_at
+FROM public.profiles p
+JOIN public.organization_members om ON om.user_id = p.id
+JOIN public.organizations org ON org.id = om.organization_id
+JOIN public.import_field_provenance ifp
+  ON ifp.target_table = 'profiles'
+  AND ifp.target_record_id = p.id::text
+  AND ifp.target_field IN ('hire_date', 'start_date')
+WHERE org.is_demo = false
+  AND p.hire_date IS NULL
+  AND p.start_date IS NULL
+  AND om.role IN ('staff', 'admin', 'manager')
+ORDER BY p.full_name;
+```
+
+**What you'll see:** Rows only exist if an import actually tried to write
+hire_date/start_date for one of these staff. `source_snippet` shows the raw
+text the value came from (e.g. a scanned onboarding form), which the admin can
+use to manually confirm and enter the correct date on the profile.
+
+**If Step 2 returns 0 rows:** No import ever captured a hire date for these
+staff — there is nothing to backfill programmatically. Do NOT auto-populate
+with today's date, since that would incorrectly mark tenured staff as
+pre-tenure. Instead, flag these staff for the admin to enter hire_date
+manually. The list from Step 1 is the flag list — hand it to the admin as-is
+(their compliance checklist already shows "No hire date set" for each one via
+the annual_12h row, per item 6 of the compliance workflow build).
+
+---
+
 ## -2. Provider policy / procedure acknowledgments (2026-07-23)
 
 **What this is for:** Authoritative Sources gets a new document kind,

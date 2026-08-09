@@ -7,6 +7,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { createEmployeeManually, adminResetEmployeePassword } from "@/lib/employees.functions";
 import { createInvitation, revokeInvitation } from "@/lib/invitations.functions";
+import { getHrComplianceMatrix } from "@/lib/hr-staff.functions";
+import { StaffCompliancePanel } from "@/components/hr/staff-compliance-panel";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Mail, UserPlus, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal, Ban } from "lucide-react";
+import { Mail, UserPlus, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal, Ban, ExternalLink } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { OnboardingReturnBar } from "@/components/onboarding/onboarding-return-bar";
@@ -62,6 +64,42 @@ export function EmployeesPage() {
   // defaults to Required until the admin deliberately reviews it.
   const [manualRequiresDeescalation, setManualRequiresDeescalation] = useState(true);
   const [manualRequiresAbi, setManualRequiresAbi] = useState(true);
+  // Compliance panel state
+  const [compliancePanelStaff, setCompliancePanelStaff] = useState<{ id: string; name: string; isNew?: boolean } | null>(null);
+
+  const fetchMatrix = useServerFn(getHrComplianceMatrix);
+  const { data: complianceMatrix } = useQuery({
+    enabled: !!org,
+    queryKey: ["hr-matrix", org?.organization_id],
+    queryFn: () => fetchMatrix({ data: { organization_id: org!.organization_id } }),
+  });
+
+  // Derive per-staff compliance summary from the org-level matrix (single fetch, not N+1)
+  const complianceByStaff = useMemo(() => {
+    const matrix = complianceMatrix;
+    if (!matrix) return new Map<string, { overdue: number; expiring: number; pending: number }>();
+    const today = Date.now();
+    const in60Ms = today + 60 * 86_400_000;
+    const result = new Map<string, { overdue: number; expiring: number; pending: number }>();
+    for (const staff of matrix.staff) {
+      let overdueCount = 0;
+      let expiringCount = 0;
+      let pendingCount = 0;
+      for (const req of matrix.requirements) {
+        const cell = staff.cells[req.requirement_id];
+        if (!cell || cell.applicable === false) continue;
+        const status = cell.status as string;
+        const expMs = cell.expires_at ? new Date(cell.expires_at as string).getTime() : null;
+        const isExpired = status === "expired" || (expMs !== null && expMs < today);
+        const isSoon = expMs !== null && expMs >= today && expMs <= in60Ms;
+        if (isExpired) overdueCount++;
+        else if (isSoon) expiringCount++;
+        else if (status !== "complete" && status !== "waived") pendingCount++;
+      }
+      result.set(staff.staff_id, { overdue: overdueCount, expiring: expiringCount, pending: pendingCount });
+    }
+    return result;
+  }, [complianceMatrix]);
 
   const createManual = useServerFn(createEmployeeManually);
   const resetPwFn = useServerFn(adminResetEmployeePassword);
@@ -197,6 +235,11 @@ export function EmployeesPage() {
       setManualOpen(false);
       setTempPassword(genPassword());
       qc.invalidateQueries({ queryKey: ["members"] });
+      // Auto-open checklist panel for the new employee so required fields are immediately visible
+      if (res?.userId) {
+        const name = `${vars.firstName} ${vars.lastName}`.trim();
+        setCompliancePanelStaff({ id: res.userId, name, isNew: true });
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -345,6 +388,11 @@ export function EmployeesPage() {
                   window.location.href = `/dashboard/employees/${m.user_id}`;
                 };
                 const trainings = trainingByStaff.get(m.user_id) ?? [];
+                const compliance = complianceByStaff.get(m.user_id);
+                const hasOverdue = (compliance?.overdue ?? 0) > 0;
+                const hasExpiring = (compliance?.expiring ?? 0) > 0;
+                const hasPending = (compliance?.pending ?? 0) > 0;
+                const needsAction = hasOverdue || hasExpiring || hasPending;
                 return (
                   <React.Fragment key={m.id}>
                   <tr
@@ -397,14 +445,49 @@ export function EmployeesPage() {
                         ? new Date(startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                         : "—"}
                     </td>
-                    <td className="px-4 py-2 text-right whitespace-nowrap w-[220px]" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-4 py-2 text-right whitespace-nowrap w-[280px]" onClick={(e) => e.stopPropagation()}>
                       <div className="inline-flex items-center gap-1">
+                        {/* Compliance badge — tappable, opens checklist panel */}
+                        {compliance !== undefined && (
+                          <button
+                            type="button"
+                            className={
+                              "rounded-full px-2 py-0.5 text-[11px] font-medium cursor-pointer transition-opacity hover:opacity-80 " +
+                              (hasOverdue
+                                ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
+                                : hasExpiring || hasPending
+                                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                                  : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300")
+                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCompliancePanelStaff({ id: m.user_id, name });
+                            }}
+                          >
+                            {hasOverdue
+                              ? `${compliance.overdue} overdue`
+                              : needsAction
+                                ? `${(compliance.expiring + compliance.pending)} needed`
+                                : "Complete"}
+                          </button>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setCaseloadFor({ id: m.user_id, name, role: m.job_title || m.role })}
+                          className="h-7 text-xs"
+                          asChild
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          <UsersIcon className="mr-1 h-3.5 w-3.5" /> Manage Caseload
+                          <a href={`/dashboard/employees/${m.user_id}?tab=checklist`}>
+                            View <ExternalLink className="ml-1 h-3 w-3" />
+                          </a>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); setCaseloadFor({ id: m.user_id, name, role: m.job_title || m.role }); }}
+                        >
+                          <UsersIcon className="mr-1 h-3.5 w-3.5" /> Caseload
                         </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -612,6 +695,17 @@ export function EmployeesPage() {
         organizationId={org?.organization_id ?? null}
         onClose={() => setCaseloadFor(null)}
       />
+
+      {org && compliancePanelStaff && (
+        <StaffCompliancePanel
+          open={!!compliancePanelStaff}
+          onOpenChange={(v) => !v && setCompliancePanelStaff(null)}
+          organizationId={org.organization_id}
+          staffId={compliancePanelStaff.id}
+          staffName={compliancePanelStaff.name}
+          isNewEmployee={compliancePanelStaff.isNew}
+        />
+      )}
     </div>
   );
 }

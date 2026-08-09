@@ -34,6 +34,7 @@ import { DspdCodesMultiSelect } from "@/components/clients/dspd-codes-multiselec
 import { isDailyServiceCode } from "@/lib/service-billing";
 import { useClientIntakeProgress } from "@/hooks/use-client-intake-progress";
 import { DeleteClientDialog } from "@/components/clients/delete-client-dialog";
+import { ClientCompliancePanel } from "@/components/clients/client-compliance-panel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -163,6 +164,7 @@ export function ClientsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [rosterTab, setRosterTab] = useState<"active" | "archived">("active");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [compliancePanelClient, setCompliancePanelClient] = useState<{ id: string; name: string } | null>(null);
 
   const { data: allClients = [], isLoading } = useQuery({
     enabled: !!org,
@@ -279,9 +281,9 @@ export function ClientsPage() {
         if (bcErr) throw bcErr;
       }
 
-      return { id: data!.id as string, mode: input.intake_mode };
+      return { id: data!.id as string, mode: input.intake_mode, name: `${input.first_name} ${input.last_name}`.trim() };
     },
-    onSuccess: ({ id, mode }) => {
+    onSuccess: ({ id, mode, name }) => {
       toast.success(mode === "intake" ? "Client created — starting intake." : "Draft client saved. Finish required fields when you're ready.");
       qc.invalidateQueries({ queryKey: ["clients"] });
       setAddOpen(false);
@@ -290,6 +292,8 @@ export function ClientsPage() {
       } else {
         // Land on the new client so the draft state (missing fields, intake_status=pending) is visible.
         navigate({ to: "/dashboard/clients/$clientId", params: { clientId: id }, search: { tab: "overview" } });
+        // Open the intake checklist panel so incomplete items are immediately visible.
+        setCompliancePanelClient({ id, name });
       }
     },
     onError: (e: Error) => toast.error(e.message),
@@ -485,7 +489,9 @@ export function ClientsPage() {
                         <IntakeChip
                           organizationId={org?.organization_id}
                           clientId={c.id}
+                          clientName={`${c.first_name} ${c.last_name}`.trim()}
                           intakeStatus={c.intake_status}
+                          onClick={() => setCompliancePanelClient({ id: c.id, name: `${c.first_name} ${c.last_name}`.trim() })}
                         />
                       </TableCell>
                       <TableCell className="text-right py-2 w-[220px]" data-no-row-nav onClick={(e) => e.stopPropagation()}>
@@ -517,11 +523,28 @@ export function ClientsPage() {
                               </Button>
                             </>
                           ) : (
-                            <IntakeAction
-                              organizationId={org?.organization_id}
-                              clientId={c.id}
-                              intakeStatus={c.intake_status}
-                            />
+                            <>
+                              <IntakeAction
+                                organizationId={org?.organization_id}
+                                clientId={c.id}
+                                intakeStatus={c.intake_status}
+                              />
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs"
+                                asChild
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Link
+                                  to="/dashboard/clients/$clientId"
+                                  params={{ clientId: c.id }}
+                                  search={{ tab: "overview" }}
+                                >
+                                  View <ChevronRight className="ml-0.5 h-3 w-3" />
+                                </Link>
+                              </Button>
+                            </>
                           )}
                         </div>
                       </TableCell>
@@ -545,6 +568,16 @@ export function ClientsPage() {
           qc.invalidateQueries({ queryKey: ["clients"] });
         }}
       />
+
+      {org && compliancePanelClient && (
+        <ClientCompliancePanel
+          open={!!compliancePanelClient}
+          onOpenChange={(v) => !v && setCompliancePanelClient(null)}
+          organizationId={org.organization_id}
+          clientId={compliancePanelClient.id}
+          clientName={compliancePanelClient.name}
+        />
+      )}
     </div>
   );
 }
@@ -554,11 +587,15 @@ export function ClientsPage() {
 function IntakeChip({
   organizationId,
   clientId,
+  clientName,
   intakeStatus,
+  onClick,
 }: {
   organizationId: string | undefined;
   clientId: string;
+  clientName: string;
   intakeStatus: string | null | undefined;
+  onClick: () => void;
 }) {
   const { isLoading, error, hasItems, required, satisfied, isComplete } =
     useClientIntakeProgress(organizationId, clientId);
@@ -574,17 +611,22 @@ function IntakeChip({
     );
   }
   const done = isComplete && intakeStatus === "complete";
+  const noneStarted = satisfied === 0;
   return (
-    <span
+    <button
+      type="button"
+      onClick={onClick}
       className={
-        "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums " +
+        "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums cursor-pointer transition-opacity hover:opacity-80 " +
         (done
           ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-          : "bg-muted text-muted-foreground")
+          : noneStarted
+            ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
+            : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300")
       }
     >
-      Intake {satisfied}/{required}
-    </span>
+      {done ? "Intake complete" : noneStarted ? "Intake incomplete" : `${satisfied} of ${required} complete`}
+    </button>
   );
 }
 

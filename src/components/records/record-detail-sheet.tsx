@@ -205,6 +205,8 @@ export function RecordDetailSheet({
         toast.info("No changes to save.");
         return "no_changes";
       }
+      // Keep the open sheet's dropdown in step with what was written.
+      if (punchChanged) setReviewStatus("approved");
       return "saved";
     },
     onSuccess: (result) => {

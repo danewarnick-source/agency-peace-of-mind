@@ -304,7 +304,7 @@ function AuditorShareDetail({ shareId, onBack }: { shareId: string; onBack: () =
         <CardContent className="space-y-3">
           <div className="text-xs text-muted-foreground">
             Shared by {data.organization?.name} · access until{" "}
-            {format(new Date(data.share.ends_at), "MMM d, yyyy h:mma")}
+            {format(new Date(data.share!.ends_at), "MMM d, yyyy h:mma")}
           </div>
           {data.packet?.expectations_summary && (
             <p className="text-sm leading-relaxed">

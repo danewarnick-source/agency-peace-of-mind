@@ -510,11 +510,11 @@ function NewReferralDialog({ organizationId }: { organizationId: string }) {
           draft_key: draftKeyRef.current,
         },
       });
-      setUploadedDocs((prev) => [...prev, { id: doc.id, name: doc.file_name, mime: doc.mime_type }]);
+      setUploadedDocs((prev) => [...prev, { id: doc!.id, name: doc!.file_name, mime: doc!.mime_type }]);
 
       setParsing(true);
       const res = await parseDocFn({
-        data: { organization_id: organizationId, document_id: doc.id },
+        data: { organization_id: organizationId, document_id: doc!.id },
       });
       if (res.ok) {
         applyPrefill(res.fields);

@@ -139,7 +139,7 @@ export function HrComplianceMatrix({
       const r = await getDocUrl({
         data: { organization_id: organizationId, hr_document_id: docId },
       });
-      window.open(r.signed_url, "_blank", "noopener");
+      window.open(r?.signed_url ?? "", "_blank", "noopener");
     } catch (e) {
       toast.error((e as Error).message);
     }

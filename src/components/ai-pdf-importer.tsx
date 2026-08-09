@@ -280,9 +280,9 @@ export function AiPdfImporter({
           },
         },
       });
-      const n = res.fieldCount ?? 0;
+      const n = res?.fieldCount ?? 0;
       toast.success(
-        `${res.created ? "Client created" : "Client profile updated"} — NECTAR filled ${n} field${n === 1 ? "" : "s"} from the PCSP.`,
+        `${res?.created ? "Client created" : "Client profile updated"} — NECTAR filled ${n} field${n === 1 ? "" : "s"} from the PCSP.`,
       );
       qc.invalidateQueries();
       reset();

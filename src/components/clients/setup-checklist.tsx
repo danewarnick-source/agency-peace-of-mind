@@ -1265,7 +1265,7 @@ function MedicationsEditor({
         },
       });
       toast.success(`Saved ${d.medication_name}.`);
-      updateAt(i, { id: res.id });
+      updateAt(i, { id: res?.id ?? undefined });
       onChanged();
     } catch (e) {
       toast.error((e as Error).message);

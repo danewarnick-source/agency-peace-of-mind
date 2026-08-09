@@ -93,13 +93,13 @@ export function EmployeeDocumentsCard({
           size_bytes: file.size,
         },
       });
-      const put = await fetch(signed.upload.signed_url, {
+      const put = await fetch(signed!.upload.signed_url, {
         method: "PUT",
         headers: { "Content-Type": file.type || "application/octet-stream" },
         body: file,
       });
       if (!put.ok) throw new Error(`Upload failed (${put.status})`);
-      return { id: signed.employee_document_id, kind, label: labelFor(kind) };
+      return { id: signed!.employee_document_id, kind, label: labelFor(kind) };
     },
     onSuccess: (res) => {
       toast.success("Uploaded — confirm effective dates.");
@@ -142,7 +142,7 @@ export function EmployeeDocumentsCard({
   const openDoc = async (docId: string) => {
     try {
       const res = await readUrlFn({ data: { organization_id: organizationId, employee_document_id: docId } });
-      window.open(res.url, "_blank", "noopener");
+      window.open(res!.url, "_blank", "noopener");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not open");
     }

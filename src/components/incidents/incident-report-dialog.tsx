@@ -1105,7 +1105,7 @@ export function IncidentReportDialog({
       qc.invalidateQueries({ queryKey: ["incident-trends"] });
       qc.invalidateQueries({ queryKey: ["incident-submitted-for"] });
       toast.success(`Incident filed (${res?.report_number ?? ""}). Your supervisor has been notified.`);
-      onSubmitted?.(res!.id);
+      onSubmitted?.(res!.id as string);
     },
     onError: (e) => {
       const msg = (e as Error).message;

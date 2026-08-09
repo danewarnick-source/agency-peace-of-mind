@@ -29,6 +29,7 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter,
 } from "@/components/ui/sheet";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
+import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { toast } from "sonner";
 import {
   saveRecordFields, saveManagerNote as saveManagerNoteFields,
@@ -111,6 +112,13 @@ export function RecordDetailSheet({
 
   const [managerNote, setManagerNote] = useState("");
 
+  // When the admin edits the raw punch times but leaves the rounded (billing)
+  // times alone, the rounded columns must follow the new punch — otherwise the
+  // Records Duration column (and billing/exports, which use the same
+  // precedence) keeps reading the ORIGINAL punch and never changes.
+  // An explicit edit to a rounded field wins and disables the recompute.
+  const [roundedTouched, setRoundedTouched] = useState(false);
+
   useEffect(() => {
     if (!row) return;
     setSvc(row.service_type_code);
@@ -118,6 +126,8 @@ export function RecordDetailSheet({
     setClockOut(toLocalInput(row.clock_out_timestamp));
     setRoundedIn(toLocalInput(row.rounded_clock_in));
     setRoundedOut(toLocalInput(row.rounded_clock_out));
+    setRoundedTouched(false);
+
     setCorrectedIn(toLocalInput(row.corrected_clock_in));
     setCorrectedOut(toLocalInput(row.corrected_clock_out));
     setStatus(row.status ?? "Active");
@@ -143,8 +153,20 @@ export function RecordDetailSheet({
 
       const newClockIn = fromLocalInput(clockIn) ?? row.clock_in_timestamp;
       const newClockOut = fromLocalInput(clockOut);
-      const newRoundedIn = fromLocalInput(roundedIn);
-      const newRoundedOut = fromLocalInput(roundedOut);
+      // Keep the rounded (billing) times in step with the raw punch unless the
+      // admin hand-entered them. Raw timestamps are stored exactly as typed —
+      // only the derived rounded columns are recomputed.
+      const punchChanged =
+        newClockIn !== row.clock_in_timestamp ||
+        (newClockOut ?? null) !== (row.clock_out_timestamp ?? null);
+      const autoRound = punchChanged && !roundedTouched;
+      const newRoundedIn = autoRound
+        ? roundToQuarterHourISO(newClockIn)
+        : fromLocalInput(roundedIn);
+      const newRoundedOut = autoRound
+        ? (newClockOut ? roundToQuarterHourISO(newClockOut) : null)
+        : fromLocalInput(roundedOut);
+
       const newCorrectedIn = fromLocalInput(correctedIn);
       const newCorrectedOut = fromLocalInput(correctedOut);
       const newGoals = goals.split(",").map((g) => g.trim()).filter(Boolean);
@@ -259,11 +281,11 @@ export function RecordDetailSheet({
           </div>
           <div>
             <Label>Rounded clock in</Label>
-            <Input type="datetime-local" value={roundedIn} onChange={(e) => setRoundedIn(e.target.value)} />
+            <Input type="datetime-local" value={roundedIn} onChange={(e) => { setRoundedTouched(true); setRoundedIn(e.target.value); }} />
           </div>
           <div>
             <Label>Rounded clock out</Label>
-            <Input type="datetime-local" value={roundedOut} onChange={(e) => setRoundedOut(e.target.value)} />
+            <Input type="datetime-local" value={roundedOut} onChange={(e) => { setRoundedTouched(true); setRoundedOut(e.target.value); }} />
           </div>
           <div>
             <Label>Corrected clock in</Label>

@@ -13,9 +13,8 @@ export const Route = createFileRoute("/dashboard/authoritative-sources")({
       },
     ],
   }),
-  validateSearch: (s: Record<string, unknown>) => ({
-    focus: typeof s.focus === "string" ? s.focus : undefined,
-  }),
+  validateSearch: (s: Record<string, unknown>): { focus?: string } =>
+    typeof s.focus === "string" ? { focus: s.focus } : {},
   component: () => (
     <FeatureGate featureKey="nectar">
       <AuthoritativeSourcesPage />

@@ -258,7 +258,7 @@ function NewPacketDialog({ orgId, onClose }: { orgId: string; onClose: (newId?: 
     onSuccess: (res) => {
       toast.success(`Audit folder created with ${res.items_created} required items`);
       qc.invalidateQueries({ queryKey: ["audit-packets", orgId] });
-      onClose(res.packet_id);
+      onClose(res.packet_id ?? undefined);
     },
     onError: (e: any) => toast.error(e.message ?? "Couldn't produce audit packet"),
   });

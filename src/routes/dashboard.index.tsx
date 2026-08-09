@@ -18,9 +18,10 @@ import { NectarOnboardingPanel } from "@/components/onboarding/nectar-onboarding
 
 export const Route = createFileRoute("/dashboard/")({
   component: Overview,
-  validateSearch: (s: Record<string, unknown>) => ({
-    welcome: s.welcome === "1" || s.welcome === 1 || s.welcome === true ? true : undefined,
-  }),
+  validateSearch: (s: Record<string, unknown>): { welcome?: boolean } => {
+    const on = s.welcome === "1" || s.welcome === 1 || s.welcome === true;
+    return on ? { welcome: true } : {};
+  },
 });
 
 

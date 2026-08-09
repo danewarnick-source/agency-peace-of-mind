@@ -32,8 +32,8 @@ export function PublishModal({
       setDrafting(true);
       try {
         const out = await draft({ data: formMeta });
-        setTitle(out.draft.title);
-        setBody(out.draft.body);
+        setTitle(out!.draft.title);
+        setBody(out!.draft.body);
       } catch (e) {
         setTitle(`New form assigned: ${formMeta.name}`);
         setBody(`A new form has been assigned to you. Open Forms in your left nav to complete it. (${(e as Error).message})`);

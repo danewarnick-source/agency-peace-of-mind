@@ -471,7 +471,7 @@ function CertificationFormDialog({
         signature_title: sigTitle,
         signed_at: new Date().toISOString(),
         guardian_acknowledgement_name: guardianName || null,
-        next_due_date,
+        next_due_date: next_due_date ?? "",
         concerns: concernsClean.map((c) => ({
           finding: c.finding, corrective_action: c.corrective_action, target_date: c.target_date,
         })),

@@ -27,9 +27,8 @@ function BillingError({ error }: { error: Error; reset: () => void }) {
 
 export const Route = createFileRoute("/dashboard/billing")({
   head: () => ({ meta: [{ title: "Billing — HIVE" }] }),
-  validateSearch: (s: Record<string, unknown>) => ({
-    focus: typeof s.focus === "string" ? s.focus : undefined,
-  }),
+  validateSearch: (s: Record<string, unknown>): { focus?: string } =>
+    typeof s.focus === "string" ? { focus: s.focus } : {},
   component: () => (
     <RequireRole roles={["admin", "manager", "super_admin"]}>
       <BillingLayout />

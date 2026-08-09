@@ -40,7 +40,7 @@ export function SendForSignatureDialog({
         },
       }),
     onSuccess: (r) => {
-      setResult({ sign_url: r.sign_url, expires_at: r.expires_at, email: r.email });
+      setResult({ sign_url: r?.sign_url ?? "", expires_at: r?.expires_at ?? "", email: r?.email ?? "" });
       qc.invalidateQueries({ queryKey: ["employee-loan", organizationId, loanId] });
       qc.invalidateQueries({ queryKey: ["employee-loans", organizationId] });
       if (r.email.ok) toast.success("Signing link emailed");

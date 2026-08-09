@@ -163,7 +163,7 @@ export function StaffHrChecklistCard({
           size_bytes: file.size,
         },
       });
-      const up = await fetch(r.upload.signed_url, {
+      const up = await fetch(r!.upload.signed_url, {
         method: "PUT",
         headers: { "Content-Type": file.type || "application/octet-stream" },
         body: file,
@@ -181,7 +181,7 @@ export function StaffHrChecklistCard({
   const viewDoc = async (id: string) => {
     try {
       const r = await getDocUrl({ data: { organization_id: organizationId, hr_document_id: id } });
-      window.open(r.signed_url, "_blank", "noopener");
+      window.open(r?.signed_url ?? "", "_blank", "noopener");
     } catch (e) {
       toast.error((e as Error).message);
     }
@@ -973,7 +973,7 @@ function BaselineActions(props: {
           size_bytes: file.size,
         },
       });
-      const up = await fetch(r.upload.signed_url, {
+      const up = await fetch(r!.upload.signed_url, {
         method: "PUT",
         headers: { "Content-Type": file.type || "application/octet-stream" },
         body: file,
@@ -1111,7 +1111,7 @@ function BaselineActions(props: {
                   hr_document_id: props.currentEvidenceDocId,
                 },
               });
-              window.open(r.signed_url, "_blank", "noopener");
+              window.open(r?.signed_url ?? "", "_blank", "noopener");
             }}
           >
             <Eye className="mr-1 h-3.5 w-3.5" /> View cert

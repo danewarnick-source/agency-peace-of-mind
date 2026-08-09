@@ -360,7 +360,7 @@ function UploadButton({
     },
     onSuccess: (res) => {
       toast.success(
-        `Uploaded — NECTAR extracted ${res.extracted?.length ?? 0} field(s)`,
+        `Uploaded — NECTAR extracted ${res?.extracted?.length ?? 0} field(s)`,
       );
       const chosenType = docType;
       setTitle(""); setFile(null); setFiscalYear(""); setMedicaidId("");

@@ -8,9 +8,8 @@ import { Button } from "@/components/ui/button";
 import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
 
 export const Route = createFileRoute("/dashboard/certifications")({
-  validateSearch: (s: Record<string, unknown>) => ({
-    focus: typeof s.focus === "string" ? s.focus : undefined,
-  }),
+  validateSearch: (s: Record<string, unknown>): { focus?: string } =>
+    typeof s.focus === "string" ? { focus: s.focus } : {},
   component: CertificationsPage,
 });
 

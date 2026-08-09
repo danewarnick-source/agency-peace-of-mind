@@ -17,10 +17,12 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/nectar-company-profile")({
   head: () => ({ meta: [{ title: "NECTAR Company Profile — HIVE" }] }),
-  validateSearch: (s: Record<string, unknown>) => ({
-    from: typeof s.from === "string" ? s.from : undefined,
-    step: typeof s.step === "string" || typeof s.step === "number" ? s.step : undefined,
-  }),
+  validateSearch: (s: Record<string, unknown>): { from?: string; step?: string | number } => {
+    const out: { from?: string; step?: string | number } = {};
+    if (typeof s.from === "string") out.from = s.from;
+    if (typeof s.step === "string" || typeof s.step === "number") out.step = s.step;
+    return out;
+  },
   component: () => (
     <RequireRole roles={["admin", "manager", "super_admin"]}>
       <NectarCompanyProfilePage />

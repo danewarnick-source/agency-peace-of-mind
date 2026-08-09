@@ -38,9 +38,8 @@ import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
 
 export const Route = createFileRoute("/dashboard/daily-logs")({
   head: () => ({ meta: [{ title: "Daily Logs — HIVE" }] }),
-  validateSearch: (s: Record<string, unknown>) => ({
-    focus: typeof s.focus === "string" ? s.focus : undefined,
-  }),
+  validateSearch: (s: Record<string, unknown>): { focus?: string } =>
+    typeof s.focus === "string" ? { focus: s.focus } : {},
   component: DailyLogsPage,
 });
 

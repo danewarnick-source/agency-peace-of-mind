@@ -18,9 +18,8 @@ function isSafeNext(v: unknown): v is string {
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Sign in — HIVE" }] }),
-  validateSearch: (s: Record<string, unknown>) => ({
-    next: isSafeNext(s.next) ? s.next : undefined,
-  }),
+  validateSearch: (s: Record<string, unknown>): { next?: string } =>
+    isSafeNext(s.next) ? { next: s.next as string } : {},
   component: LoginPage,
 });
 

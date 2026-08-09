@@ -5,12 +5,9 @@ import { serializeErrorChain } from "./lib/error-chain";
 import { attachSupabaseAuth } from "@/lib/attach-supabase-auth";
 
 const errorMiddleware = createMiddleware().server(async (ctx) => {
-  const { next, request, pathname, serverFnMeta } = ctx as unknown as {
-    next: () => Promise<Response>; request?: Request; pathname?: string; serverFnMeta?: unknown;
-  };
-  // handlerType is present at runtime but absent from the published middleware types.
-  const handlerType = (ctx as Record<string, unknown>)["handlerType"] as string | undefined;
-  return await (async () => {
+  const { next, request, pathname, serverFnMeta } = ctx;
+  // handlerType exists at runtime but is missing from the published types.
+  const handlerType = (ctx as unknown as Record<string, unknown>)["handlerType"];
   try {
     return await next();
   } catch (error) {
@@ -22,7 +19,7 @@ const errorMiddleware = createMiddleware().server(async (ctx) => {
     // misrouted it into the page router. Remove once the AWS serverFn
     // 500s are root-caused.
     console.error(
-      `[errorMiddleware] ${request?.method ?? "?"} ${pathname ?? "?"} handlerType=${handlerType ?? "?"} serverFn=${serverFnMeta ? JSON.stringify(serverFnMeta) : "none"} chain=${serializeErrorChain(error)}`,
+      `[errorMiddleware] ${request?.method ?? "?"} ${pathname ?? "?"} handlerType=${String(handlerType ?? "?")} serverFn=${serverFnMeta ? JSON.stringify(serverFnMeta) : "none"} chain=${serializeErrorChain(error)}`,
     );
     if (error != null && typeof error === "object" && "statusCode" in error) {
       throw error;

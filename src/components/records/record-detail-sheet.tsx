@@ -29,6 +29,7 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter,
 } from "@/components/ui/sheet";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
+import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { toast } from "sonner";
 import {
   saveRecordFields, saveManagerNote as saveManagerNoteFields,
@@ -280,11 +281,11 @@ export function RecordDetailSheet({
           </div>
           <div>
             <Label>Rounded clock in</Label>
-            <Input type="datetime-local" value={roundedIn} onChange={(e) => setRoundedIn(e.target.value)} />
+            <Input type="datetime-local" value={roundedIn} onChange={(e) => { setRoundedTouched(true); setRoundedIn(e.target.value); }} />
           </div>
           <div>
             <Label>Rounded clock out</Label>
-            <Input type="datetime-local" value={roundedOut} onChange={(e) => setRoundedOut(e.target.value)} />
+            <Input type="datetime-local" value={roundedOut} onChange={(e) => { setRoundedTouched(true); setRoundedOut(e.target.value); }} />
           </div>
           <div>
             <Label>Corrected clock in</Label>

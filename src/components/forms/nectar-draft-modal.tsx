@@ -85,8 +85,8 @@ export function NectarDraftModal({
         filename: pdfFile.name,
         hint: pdfHint.trim() || undefined,
       } });
-      const fields = out.draft.fields.map((f) => ({ ...defaultFieldFor(f.type), ...f }));
-      onApply({ ...out.draft, fields });
+      if (!out?.draft) throw new Error("Nectar returned no draft.");
+      onApply(normalizeDraft(out.draft));
       onOpenChange(false); reset();
       if (out.lowConfidence) {
         toast.warning("Draft loaded — low confidence. This PDF may be scanned or hard to parse; review every field carefully and expect manual corrections.", { duration: 9000 });

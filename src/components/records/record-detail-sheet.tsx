@@ -167,8 +167,8 @@ export function RecordDetailSheet({
         ? (newClockOut ? roundToQuarterHourISO(newClockOut) : null)
         : fromLocalInput(roundedOut);
 
-      const newCorrectedIn = fromLocalInput(correctedIn);
-      const newCorrectedOut = fromLocalInput(correctedOut);
+      const newCorrectedIn = punchChanged ? newClockIn : fromLocalInput(correctedIn);
+      const newCorrectedOut = punchChanged ? newClockOut : fromLocalInput(correctedOut);
       const newGoals = goals.split(",").map((g) => g.trim()).filter(Boolean);
 
       const result = await saveRecordFields({

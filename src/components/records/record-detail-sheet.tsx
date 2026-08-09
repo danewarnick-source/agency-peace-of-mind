@@ -28,7 +28,7 @@ import {
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter,
 } from "@/components/ui/sheet";
-import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
+import { EVV_SERVICE_CODES, isEvvLockedCode } from "@/lib/evv-codes";
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { toast } from "sonner";
 import {
@@ -276,6 +276,14 @@ export function RecordDetailSheet({
               </SelectContent>
             </Select>
           </div>
+          {isEvvLockedCode(svc) && (
+            <div className="sm:col-span-2 flex items-start gap-2 rounded-md border border-orange-300 bg-orange-50 px-3 py-2 text-xs text-orange-900 dark:border-orange-600 dark:bg-orange-950/40 dark:text-orange-200">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-500" />
+              <span>
+                <span className="font-semibold">EVV record ({svc}).</span> Editing clock in/out times here updates HIVE's records but does <span className="font-semibold">not</span> amend data already transmitted to UEVV. The state's EVV record will continue to reflect the original GPS-captured times. Contact DHHS if the transmitted record needs correction.
+              </span>
+            </div>
+          )}
           <div>
             <Label>Clock in (raw)</Label>
             <Input type="datetime-local" value={clockIn} onChange={(e) => setClockIn(e.target.value)} />

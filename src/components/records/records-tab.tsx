@@ -28,6 +28,7 @@ import { reviewExceptions, type ReviewException } from "@/lib/records-review-rul
 import {
   saveRecordFields, saveManagerNote, toLocalInput, fromLocalInput, type AuditEntry,
 } from "@/lib/records-edit";
+import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { ResidentialDailyTab } from "@/components/residential/residential-daily-tab";
 import { TimeCorrectionReviewSection } from "@/components/records/time-correction-review-section";
 import { RecordDetailSheet } from "@/components/records/record-detail-sheet";
@@ -1081,7 +1082,15 @@ function InlineTimeCell({
       const newOut = fromLocalInput(outVal);
       return saveRecordFields({
         row,
-        updates: { clock_in_timestamp: newIn, clock_out_timestamp: newOut },
+        updates: {
+          clock_in_timestamp: newIn,
+          clock_out_timestamp: newOut,
+          rounded_clock_in: roundToQuarterHourISO(newIn),
+          rounded_clock_out: newOut ? roundToQuarterHourISO(newOut) : null,
+          corrected_clock_in: newIn,
+          corrected_clock_out: newOut,
+          review_status: "approved",
+        },
         adminName,
         userId,
       });
@@ -1098,10 +1107,18 @@ function InlineTimeCell({
     onError: (e) => toast.error((e as Error).message),
   });
 
+  const isEvv = isEvvLockedCode(row.service_type_code);
+
   if (editing) {
     return (
       <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
         <div className="flex flex-col gap-1">
+          {isEvv && (
+            <div className="flex items-start gap-1 rounded border border-orange-300 bg-orange-50 px-2 py-1 text-[10px] text-orange-900 dark:border-orange-600 dark:bg-orange-950/40 dark:text-orange-200">
+              <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-orange-500" />
+              <span><span className="font-semibold">EVV record.</span> Changes here do not amend the UEVV transmission.</span>
+            </div>
+          )}
           <Input type="datetime-local" value={inVal} onChange={(e) => setInVal(e.target.value)} className="h-7 text-xs" />
           <Input type="datetime-local" value={outVal} onChange={(e) => setOutVal(e.target.value)} className="h-7 text-xs" />
           <div className="flex gap-1">
@@ -1128,9 +1145,12 @@ function InlineTimeCell({
         setOutVal(toLocalInput(row.clock_out_timestamp));
         setEditing(true);
       }}
-      title="Click to edit clock in/out"
+      title={isEvv ? "EVV record — click to edit (UEVV transmission won't be amended)" : "Click to edit clock in/out"}
     >
       {fmtTs(inTs)} → {fmtTs(outTs)}
+      {isEvv && (
+        <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-orange-600 dark:text-orange-400">evv</span>
+      )}
       {row.is_edited_by_admin && (
         <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-amber-700">edited</span>
       )}

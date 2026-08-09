@@ -164,7 +164,7 @@ export function EmployeesPage() {
       });
     },
     onSuccess: (res) => {
-      toast.success(`Invitation revoked for ${res.invitation.email}`);
+      toast.success(`Invitation revoked for ${res?.invitation?.email ?? "user"}`);
       qc.invalidateQueries({ queryKey: ["invites"] });
     },
     onError: (e: Error) => toast.error(e.message),

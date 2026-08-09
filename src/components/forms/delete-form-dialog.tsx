@@ -47,8 +47,9 @@ export function DeleteFormDialog({
         data: { formId, confirmName: hasTies ? typed : undefined },
       });
       const parts: string[] = ["Form deleted"];
-      if (res!.deleted.submissionCount > 0) parts.push(`${res!.deleted.submissionCount} submission${res!.deleted.submissionCount === 1 ? "" : "s"} removed`);
-      if (res!.deleted.removedChecklistItem) parts.push("checklist item removed");
+      const removedCount = res?.deleted?.submissionCount ?? 0;
+      if (removedCount > 0) parts.push(`${removedCount} submission${removedCount === 1 ? "" : "s"} removed`);
+      if (res?.deleted?.removedChecklistItem) parts.push("checklist item removed");
       toast.success(parts.join(" · "));
       onOpenChange(false);
       setTyped("");

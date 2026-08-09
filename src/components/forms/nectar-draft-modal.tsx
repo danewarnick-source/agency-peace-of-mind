@@ -13,6 +13,22 @@ import { defaultFieldFor, type FormField } from "@/lib/forms-utils";
 
 const MAX_PDF_BYTES = 10 * 1024 * 1024; // 10MB
 
+type NectarDraft = {
+  name?: string; description?: string; category?: string; frequency?: string;
+  fields: Array<Partial<FormField> & { type: FormField["type"] }>;
+};
+
+/** Nectar may omit metadata — fill in safe defaults so the editor always gets a complete draft. */
+function normalizeDraft(d: NectarDraft) {
+  return {
+    name: d.name ?? "Untitled form",
+    description: d.description ?? "",
+    category: d.category ?? "general",
+    frequency: d.frequency ?? "as_needed",
+    fields: d.fields.map((f) => ({ ...defaultFieldFor(f.type), ...f }) as FormField),
+  };
+}
+
 export function NectarDraftModal({
   open, onOpenChange, onApply,
 }: {
@@ -36,8 +52,8 @@ export function NectarDraftModal({
     setBusy(true);
     try {
       const out = await draft({ data: { description: description.trim() } });
-      const fields = out.draft.fields.map((f) => ({ ...defaultFieldFor(f.type), ...f }));
-      onApply({ ...out.draft, fields });
+      if (!out?.draft) throw new Error("Nectar returned no draft.");
+      onApply(normalizeDraft(out.draft));
       onOpenChange(false); reset();
       toast.success("Draft loaded — review and edit before publishing.");
     } catch (e) {
@@ -69,8 +85,8 @@ export function NectarDraftModal({
         filename: pdfFile.name,
         hint: pdfHint.trim() || undefined,
       } });
-      const fields = out.draft.fields.map((f) => ({ ...defaultFieldFor(f.type), ...f }));
-      onApply({ ...out.draft, fields });
+      if (!out?.draft) throw new Error("Nectar returned no draft.");
+      onApply(normalizeDraft(out.draft));
       onOpenChange(false); reset();
       if (out.lowConfidence) {
         toast.warning("Draft loaded — low confidence. This PDF may be scanned or hard to parse; review every field carefully and expect manual corrections.", { duration: 9000 });

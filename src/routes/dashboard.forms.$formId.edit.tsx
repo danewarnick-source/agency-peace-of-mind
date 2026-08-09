@@ -546,7 +546,7 @@ function RoutingBehaviorCard({
             .slice(0, 60),
         },
       });
-      setSettings((s) => ({ ...s, routing_proposal: out.proposal }));
+      setSettings((s) => ({ ...s, routing_proposal: out?.proposal ?? undefined }));
       toast.success("Nectar proposed a routing behavior — review and confirm.");
     } catch (e) {
       toast.error((e as Error).message);

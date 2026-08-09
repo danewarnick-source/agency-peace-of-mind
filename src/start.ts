@@ -4,7 +4,10 @@ import { renderErrorPage } from "./lib/error-page";
 import { serializeErrorChain } from "./lib/error-chain";
 import { attachSupabaseAuth } from "@/lib/attach-supabase-auth";
 
-const errorMiddleware = createMiddleware().server(async ({ next, request, pathname, handlerType, serverFnMeta }) => {
+const errorMiddleware = createMiddleware().server(async (ctx) => {
+  const { next, request, pathname, serverFnMeta } = ctx;
+  // handlerType exists at runtime but is missing from the published types.
+  const handlerType = (ctx as unknown as Record<string, unknown>)["handlerType"];
   try {
     return await next();
   } catch (error) {
@@ -16,7 +19,7 @@ const errorMiddleware = createMiddleware().server(async ({ next, request, pathna
     // misrouted it into the page router. Remove once the AWS serverFn
     // 500s are root-caused.
     console.error(
-      `[errorMiddleware] ${request?.method ?? "?"} ${pathname ?? "?"} handlerType=${handlerType ?? "?"} serverFn=${serverFnMeta ? JSON.stringify(serverFnMeta) : "none"} chain=${serializeErrorChain(error)}`,
+      `[errorMiddleware] ${request?.method ?? "?"} ${pathname ?? "?"} handlerType=${String(handlerType ?? "?")} serverFn=${serverFnMeta ? JSON.stringify(serverFnMeta) : "none"} chain=${serializeErrorChain(error)}`,
     );
     if (error != null && typeof error === "object" && "statusCode" in error) {
       throw error;

@@ -182,7 +182,10 @@ export function RecordDetailSheet({
           corrected_clock_in: newCorrectedIn,
           corrected_clock_out: newCorrectedOut,
           status,
-          review_status: reviewStatus,
+          // An admin hand-editing the punch times IS the approval — otherwise
+          // the row stays "clean" and the Duration column keeps showing the
+          // pre-edit times.
+          review_status: punchChanged ? "approved" : reviewStatus,
           incident_flag: incidentFlag,
           is_out_of_bounds: outOfBounds,
           outside_geofence_reason: geofenceReason || null,
@@ -202,6 +205,8 @@ export function RecordDetailSheet({
         toast.info("No changes to save.");
         return "no_changes";
       }
+      // Keep the open sheet's dropdown in step with what was written.
+      if (punchChanged) setReviewStatus("approved");
       return "saved";
     },
     onSuccess: (result) => {

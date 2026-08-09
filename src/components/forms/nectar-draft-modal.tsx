@@ -36,8 +36,8 @@ export function NectarDraftModal({
     setBusy(true);
     try {
       const out = await draft({ data: { description: description.trim() } });
-      const fields = out.draft.fields.map((f) => ({ ...defaultFieldFor(f.type), ...f }));
-      onApply({ ...out.draft, fields });
+      if (!out?.draft) throw new Error("Nectar returned no draft.");
+      onApply(normalizeDraft(out.draft));
       onOpenChange(false); reset();
       toast.success("Draft loaded — review and edit before publishing.");
     } catch (e) {

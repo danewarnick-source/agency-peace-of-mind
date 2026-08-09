@@ -13,6 +13,22 @@ import { defaultFieldFor, type FormField } from "@/lib/forms-utils";
 
 const MAX_PDF_BYTES = 10 * 1024 * 1024; // 10MB
 
+type NectarDraft = {
+  name?: string; description?: string; category?: string; frequency?: string;
+  fields: Array<Partial<FormField> & { type: FormField["type"] }>;
+};
+
+/** Nectar may omit metadata — fill in safe defaults so the editor always gets a complete draft. */
+function normalizeDraft(d: NectarDraft) {
+  return {
+    name: d.name ?? "Untitled form",
+    description: d.description ?? "",
+    category: d.category ?? "general",
+    frequency: d.frequency ?? "as_needed",
+    fields: d.fields.map((f) => ({ ...defaultFieldFor(f.type), ...f }) as FormField),
+  };
+}
+
 export function NectarDraftModal({
   open, onOpenChange, onApply,
 }: {

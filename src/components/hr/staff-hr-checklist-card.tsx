@@ -34,11 +34,115 @@ import {
 } from "@/lib/staff-training-requirements.functions";
 
 import { parseBaselineId, baselineByKey } from "@/lib/staff-training-requirements";
-import { AnnualHoursSection } from "@/components/hr/annual-hours-progress";
+import { AnnualHoursSection, statusColor, statusLabel } from "@/components/hr/annual-hours-progress";
+import { getStaffAnnualHoursDetail } from "@/lib/hr-training-hours.functions";
 import { useAuth } from "@/hooks/use-auth";
 
 
 const STATUSES = ["not_started", "in_progress", "complete", "expired", "waived"] as const;
+
+/**
+ * Compact inline progress meter for the annual_12h checklist row.
+ * Shows hours logged this CE year with a progress bar and a link to log more.
+ * Status mapping per CLAUDE.md: tracking_pre_tenure → never flag as overdue.
+ */
+function Annual12hInlineProgress({
+  organizationId,
+  staffId,
+}: {
+  organizationId: string;
+  staffId: string;
+}) {
+  const fetchDetail = useServerFn(getStaffAnnualHoursDetail);
+  const q = useQuery({
+    queryKey: ["staff-annual-hours", organizationId, staffId],
+    queryFn: () => fetchDetail({ data: { organization_id: organizationId, staff_id: staffId } }),
+    staleTime: 30_000,
+  });
+
+  if (q.isLoading) {
+    return <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />;
+  }
+
+  const detail = (q.data ?? []).find((d) => d.config.requirement_key === "annual_12h");
+  if (!detail) {
+    return (
+      <a
+        href="/dashboard/records-desk?tab=training-records"
+        className="text-xs text-[#137182] hover:underline"
+      >
+        Log training hours →
+      </a>
+    );
+  }
+
+  const pct = Math.min(
+    100,
+    detail.target_hours > 0
+      ? Math.round((detail.hours_to_date / detail.target_hours) * 100)
+      : 0,
+  );
+  const color = statusColor(detail.status);
+
+  if (detail.status === "no_hire_date") {
+    return (
+      <span className="text-xs text-muted-foreground">
+        No hire date set — add hire date to enable tracking
+      </span>
+    );
+  }
+
+  if (detail.status === "tracking_pre_tenure") {
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="text-xs text-muted-foreground">
+          {detail.hours_to_date.toFixed(1)} of {detail.target_hours}.0 hrs · CE year{" "}
+          {detail.window_start ?? "—"} – {detail.window_end ?? "—"}
+        </div>
+        <div className="h-1.5 w-32 overflow-hidden rounded-full bg-muted">
+          <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
+        </div>
+        <div className="text-[10px] text-muted-foreground italic">
+          Tracking — required after 1-year anniversary
+        </div>
+        <a
+          href="/dashboard/records-desk?tab=training-records"
+          className="text-xs text-[#137182] hover:underline"
+        >
+          Log training hours →
+        </a>
+      </div>
+    );
+  }
+
+  const label = statusLabel(detail.status);
+  const textTone =
+    detail.status === "behind"
+      ? "text-rose-600"
+      : detail.status === "complete" || detail.status === "on_target"
+        ? "text-emerald-700"
+        : "text-muted-foreground";
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className={`text-xs font-medium ${textTone}`}>
+        {detail.hours_to_date.toFixed(1)} of {detail.target_hours}.0 hrs · {label}
+      </div>
+      <div className="text-[10px] text-muted-foreground">
+        CE year {detail.window_start ?? "—"} – {detail.window_end ?? "—"}
+      </div>
+      <div className="h-1.5 w-32 overflow-hidden rounded-full bg-muted">
+        <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+      <a
+        href="/dashboard/records-desk?tab=training-records"
+        className="text-xs text-[#137182] hover:underline"
+      >
+        Log training hours →
+      </a>
+    </div>
+  );
+}
 
 function maskSsn(last4: string | null) {
   return last4 ? `•••-••-${last4}` : "—";
@@ -522,6 +626,15 @@ export function StaffHrChecklistCard({
                                   <div className="flex flex-wrap items-center gap-2">
                                     {(() => {
                                       const baselineKey = parseBaselineId(row.requirement_id);
+                                      if (baselineKey === "annual_12h") {
+                                        // Render hours progress inline — NEVER an upload button
+                                        return (
+                                          <Annual12hInlineProgress
+                                            organizationId={organizationId}
+                                            staffId={staffId}
+                                          />
+                                        );
+                                      }
                                       if (baselineKey) {
                                         const t = baselineByKey(baselineKey);
                                         return (

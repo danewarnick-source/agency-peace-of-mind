@@ -206,6 +206,31 @@ function StaffProfilePage() {
     },
   });
 
+  // Lightweight checklist summary — used for the tab badge only.
+  // CertsTab fetches the same key so React Query deduplicates; no extra server call.
+  const fetchChecklistForBadge = useServerFn(getStaffChecklist);
+  const checklistBadgeQ = useQuery({
+    enabled: !!orgId && !!staffId,
+    queryKey: ["staff-checklist", orgId, staffId],
+    queryFn: () => fetchChecklistForBadge({ data: { organization_id: orgId!, staff_id: staffId } }),
+    staleTime: 30_000,
+  });
+  const needsActionCount = useMemo(() => {
+    const rows = checklistBadgeQ.data ?? [];
+    const today = Date.now();
+    const in60Ms = today + 60 * 86_400_000;
+    let count = 0;
+    for (const row of rows) {
+      if (row.applicable === false) continue;
+      const status = row.completion.status;
+      const expMs = row.completion.expires_at ? new Date(row.completion.expires_at).getTime() : null;
+      const isExpired = status === "expired" || (expMs !== null && expMs < today);
+      const isSoon = expMs !== null && expMs >= today && expMs <= in60Ms;
+      if (isExpired || isSoon || (status !== "complete" && status !== "waived")) count++;
+    }
+    return count;
+  }, [checklistBadgeQ.data]);
+
   // All active teams in the org (for team picker)
   const teamsQ = useQuery({
     enabled: !!orgId,
@@ -347,7 +372,9 @@ function StaffProfilePage() {
         <TabsList className="flex flex-wrap h-auto justify-start">
           <TabsTrigger value="profile">Overview</TabsTrigger>
           <TabsTrigger value="requirements">Certs &amp; trainings</TabsTrigger>
-          <TabsTrigger value="checklist">Compliance Checklist</TabsTrigger>
+          <TabsTrigger value="checklist">
+            Compliance Checklist{needsActionCount > 0 ? ` (${needsActionCount})` : ""}
+          </TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
           <TabsTrigger value="hrdocs">HR docs</TabsTrigger>
           <TabsTrigger value="deadlines">Deadlines</TabsTrigger>

@@ -4,13 +4,17 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { z } from "zod";
-import { AlarmClock, AlertTriangle, Clock, ShieldCheck, FileSignature, Activity, ExternalLink, Home } from "lucide-react";
+import { AlarmClock, AlertTriangle, Clock, ShieldCheck, FileSignature, Activity, ExternalLink, Home, Upload, UserCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useDeadlines, type DeadlineItem } from "@/hooks/use-deadlines";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { attestSummaryUpiEntered } from "@/lib/progress-summaries.functions";
+import {
+  createHrDocumentUploadUrl,
+  upsertChecklistCompletion,
+} from "@/lib/hr-staff.functions";
 
 const searchSchema = z.object({ client: z.string().uuid().optional() });
 
@@ -219,16 +223,19 @@ function DeadlineRow({ item, tone }: { item: DeadlineItem; tone: DeadlineItem["s
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <span className={`text-xs font-mono ${toneText}`}>{fmtDue(item.dueAt)}</span>
-        <RowAction item={item} />
+        <RowAction item={item} tone={tone} />
       </div>
     </li>
   );
 }
 
-function RowAction({ item }: { item: DeadlineItem }) {
+function RowAction({ item, tone }: { item: DeadlineItem; tone: DeadlineItem["status"] }) {
   const qc = useQueryClient();
   const { data: org } = useCurrentOrg();
   const attestFn = useServerFn(attestSummaryUpiEntered);
+  const createUploadFn = useServerFn(createHrDocumentUploadUrl);
+  const upsertFn = useServerFn(upsertChecklistCompletion);
+  const [uploading, setUploading] = useState(false);
 
   const attest = useMutation({
     mutationFn: async () =>
@@ -239,6 +246,51 @@ function RowAction({ item }: { item: DeadlineItem }) {
     },
     onError: (e) => toast.error((e as Error).message),
   });
+
+  const handleCertUpload = async (file: File) => {
+    if (!org || !item.staffId) return;
+    setUploading(true);
+    try {
+      const r = await createUploadFn({
+        data: {
+          organization_id: org.organization_id,
+          staff_id: item.staffId,
+          requirement_id: null,
+          document_kind: "certification",
+          file_name: file.name,
+          mime_type: file.type,
+          size_bytes: file.size,
+        },
+      });
+      if (!r?.upload?.signed_url) throw new Error("Upload could not be prepared.");
+      const up = await fetch(r.upload.signed_url, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (!up.ok) throw new Error(`Upload failed (${up.status})`);
+      // Mark the corresponding staff checklist requirement as in_progress
+      // by upserting the staff_baseline_training_completions row.
+      // The certification key comes from the deadline title (best effort).
+      await upsertFn({
+        data: {
+          organization_id: org.organization_id,
+          staff_id: item.staffId,
+          requirement_id: `cert:${item.key}`,
+          status: "in_progress",
+          evidence_document_id: r.hr_document_id,
+          completed_date: new Date().toISOString().slice(0, 10),
+        },
+      });
+      toast.success("Certificate uploaded — marked as in review on staff checklist.");
+      qc.invalidateQueries({ queryKey: ["deadlines"] });
+      qc.invalidateQueries({ queryKey: ["staff-checklist"] });
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   // Summary rows: completion happens in the Summaries portal (single source of
   // truth). Always render "Open summary"; for SEI / UPI-required summaries
@@ -267,13 +319,58 @@ function RowAction({ item }: { item: DeadlineItem }) {
     );
   }
 
+  // staff_cert rows: show Upload button (overdue/due_soon) + View staff link
+  if (item.source === "staff_cert") {
+    const showUpload = tone === "overdue" || tone === "due_soon";
+    return (
+      <div className="flex items-center gap-2">
+        {item.href && (
+          <Button asChild size="sm" variant="outline">
+            <a href={item.href}>
+              <UserCircle className="mr-1 h-3.5 w-3.5" /> View staff
+            </a>
+          </Button>
+        )}
+        {showUpload && item.staffId && (
+          <label className={`relative inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted ${uploading ? "opacity-60 pointer-events-none" : ""}`}>
+            <Upload className="h-3.5 w-3.5" />
+            {uploading ? "Uploading…" : "↑ Upload"}
+            <input
+              type="file"
+              className="hidden"
+              accept=".pdf,.doc,.docx,image/*"
+              disabled={uploading}
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                await handleCertUpload(f);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        )}
+      </div>
+    );
+  }
+
   if (item.href) {
     return (
-      <Button asChild size="sm" variant="outline">
-        <a href={item.href}>
-          Open <ExternalLink className="ml-1 h-3 w-3" />
-        </a>
-      </Button>
+      <div className="flex items-center gap-2">
+        {item.subjectKind !== "agency" && item.href && (
+          <Button asChild size="sm" variant="outline">
+            <a href={item.href}>
+              {item.subjectKind === "staff" ? "View staff" : "View client"} <ExternalLink className="ml-1 h-3 w-3" />
+            </a>
+          </Button>
+        )}
+        {item.subjectKind === "agency" && (
+          <Button asChild size="sm" variant="outline">
+            <a href={item.href}>
+              Open <ExternalLink className="ml-1 h-3 w-3" />
+            </a>
+          </Button>
+        )}
+      </div>
     );
   }
   return null;

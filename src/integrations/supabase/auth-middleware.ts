@@ -33,9 +33,10 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
           userId: null,
           claims: null,
           isSSR: true,
-        },
+        } as unknown as SupabaseAuthContext,
       });
     }
+
 
     const token = authHeader.replace('Bearer ', '');
 

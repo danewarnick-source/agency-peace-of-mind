@@ -1,36 +1,34 @@
-# Why login hangs on the AWS deployment
+# AWS login hangs on a loading screen — diagnose and fix
 
-Short answer: there is no Lovable setting that "blocks" logging in from AWS. The Lovable preview and the AWS container run the *same* app code, but they get their configuration, static files, and server-side keys from completely different places. A permanent loading screen after sign-in is almost always one of those three differences — not an auth rule.
+No Lovable setting blocks logins from AWS. Lovable and the AWS container run the same app code; what differs is where configuration, static files, and server-side keys come from. A permanent spinner after sign-in comes from one of the differences below.
 
-## The realistic causes, in order of likelihood
+## Most likely causes
 
-1. **The browser never finishes loading the app's JavaScript.**
-   The AWS deploy serves static files from S3/CloudFront and the app itself from ECS. The deploy syncs S3 with `--delete` and marks assets `immutable`, while `index.html` is served fresh. If CloudFront hands back an HTML page that points at file names from an older build (or the app HTML is cached), those files no longer exist in S3 and the page renders its loading shell forever. This looks exactly like "spinner that never goes away" and would not happen in the Lovable preview.
+1. **The browser never finishes loading the app's JavaScript.** Static files are served from S3/CloudFront while the app runs on ECS. The deploy syncs S3 with `--delete` and marks assets immutable. If CloudFront serves an older page that points at file names already deleted from S3, the app renders its loading shell and never starts. This cannot happen in the Lovable preview.
+2. **Sign-in runs on the server and that server call fails on AWS.** Username/password sign-in is handled server-side and needs the private backend service key at runtime. Lovable injects it automatically; on ECS it has to be set on the task definition. Missing or wrong means the request errors or never resolves and the button stays spinning. This deploy target has a documented history of server-side call failures.
+3. **"Continue with Google" cannot work on the AWS domain.** Google sign-in goes through Lovable's OAuth broker, which only serves Lovable-hosted domains. On AWS that flow stalls; username/password is the working path there.
+4. **Backend URL/key missing at build time.** Those values are baked in when the AWS build runs in GitHub Actions. Empty repository secrets means the app throws before it can render past the loading state.
 
-2. **Sign-in itself runs on the server and that server call fails on AWS.**
-   The username/password sign-in is handled by a server-side function that needs the private backend service key at runtime. In Lovable that key is injected automatically; on ECS it must be present as a task environment variable. If it's missing or wrong, the call errors or never resolves and the button stays in its loading state. This target has a documented history of server-function failures on AWS.
+## What I'll do
 
-3. **"Continue with Google" cannot work on the AWS domain.**
-   Google sign-in goes through Lovable's OAuth broker, which only handles Lovable-hosted domains. On an AWS/CloudFront domain that flow can stall. Email/username + password is the path that should work there.
+Step 1 — Add a visible failure path so this stops being a silent spinner:
+- Make the login screen surface the actual error text when the sign-in call fails or times out, instead of staying in a loading state indefinitely.
+- Add a short client-side timeout on the sign-in call so a hung request becomes a readable message.
+- Add a startup config check that renders a clear "backend configuration missing" message rather than a blank shell.
 
-4. **Backend config missing at build time.**
-   The browser-side backend URL/key are baked in when the AWS build runs in GitHub Actions. If those repository secrets are empty, the app throws before it can render anything past the loading state.
+Step 2 — Harden the AWS deploy against the stale-asset failure:
+- Stop the deploy from deleting previously referenced asset files immediately, and make sure the app's HTML is never cached long-term by CloudFront while asset files stay immutable.
+- Ensure the CloudFront invalidation covers the HTML entry point on every deploy.
 
-## Plan: diagnose first, then fix the confirmed cause
+Step 3 — Confirm the ECS task has the required runtime environment variables (backend URL, publishable key, service key, public site URL) and document the exact list in the AWS deploy doc, so a missing one is obvious.
 
-Step 1 — Collect evidence from the AWS site (no code changes):
-- Open the AWS URL, open the browser console and network tab, attempt a login, and capture: any red console errors, any 404s on `/assets/...` files, and the response status of the sign-in request.
-- Pull the ECS/CloudWatch log lines for that same moment (the app already logs full error chains from its error middleware).
+Step 4 — Hide or disable the Google sign-in button when the app is not running on a Lovable-hosted domain, so AWS users are steered to username/password instead of a flow that cannot complete.
 
-Step 2 — Match the evidence to one of the four causes above and apply the matching fix:
-- 404s on asset files → fix caching/invalidation for the app HTML and stop deleting still-referenced assets on deploy.
-- Sign-in request 500 → add/repair the missing runtime environment variables on the ECS task definition, then redeploy.
-- Google button only → route AWS users to username/password sign-in, or hide the Google button on non-Lovable domains.
-- App throws immediately with a config message → set the missing build-time repository secrets and rebuild.
+Step 5 — Re-test login on the AWS URL and record the confirmed cause in the AWS deploy doc.
 
-Step 3 — Re-test login on AWS and confirm the dashboard loads, then note the resolved cause in the AWS deploy doc.
+## Technical notes
 
-## Notes
-
-- No changes to the Lovable/Cloudflare build path are involved; everything here is on the parallel AWS target.
-- I can't reach the AWS environment from here, so Step 1 needs either you running it and pasting the console/network output, or the CloudWatch log excerpt.
+- Files touched: `src/routes/login.tsx` (error surfacing, timeout, conditional Google button), `.github/workflows/deploy-aws.yml` (S3 sync/cache and invalidation behavior), `docs/AWS_DEPLOY.md` (required runtime env var list).
+- No change to the Lovable/Cloudflare build path, `wrangler.jsonc`, or the Cloudflare server entry.
+- Step 3 partly happens outside this repo, in the AWS console/task definition; I'll give exact values to set.
+- I cannot reach the AWS environment from here, so the final confirmation of which cause it was needs one login attempt on the AWS URL after these changes — the error will then be readable on screen instead of a spinner.

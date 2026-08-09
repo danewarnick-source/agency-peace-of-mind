@@ -152,8 +152,20 @@ export function RecordDetailSheet({
 
       const newClockIn = fromLocalInput(clockIn) ?? row.clock_in_timestamp;
       const newClockOut = fromLocalInput(clockOut);
-      const newRoundedIn = fromLocalInput(roundedIn);
-      const newRoundedOut = fromLocalInput(roundedOut);
+      // Keep the rounded (billing) times in step with the raw punch unless the
+      // admin hand-entered them. Raw timestamps are stored exactly as typed —
+      // only the derived rounded columns are recomputed.
+      const punchChanged =
+        newClockIn !== row.clock_in_timestamp ||
+        (newClockOut ?? null) !== (row.clock_out_timestamp ?? null);
+      const autoRound = punchChanged && !roundedTouched;
+      const newRoundedIn = autoRound
+        ? roundToQuarterHourISO(newClockIn)
+        : fromLocalInput(roundedIn);
+      const newRoundedOut = autoRound
+        ? (newClockOut ? roundToQuarterHourISO(newClockOut) : null)
+        : fromLocalInput(roundedOut);
+
       const newCorrectedIn = fromLocalInput(correctedIn);
       const newCorrectedOut = fromLocalInput(correctedOut);
       const newGoals = goals.split(",").map((g) => g.trim()).filter(Boolean);

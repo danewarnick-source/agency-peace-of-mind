@@ -4,7 +4,13 @@ import { renderErrorPage } from "./lib/error-page";
 import { serializeErrorChain } from "./lib/error-chain";
 import { attachSupabaseAuth } from "@/lib/attach-supabase-auth";
 
-const errorMiddleware = createMiddleware().server(async ({ next, request, pathname, handlerType, serverFnMeta }) => {
+const errorMiddleware = createMiddleware().server(async (ctx) => {
+  const { next, request, pathname, serverFnMeta } = ctx as unknown as {
+    next: () => Promise<Response>; request?: Request; pathname?: string; serverFnMeta?: unknown;
+  };
+  // handlerType is present at runtime but absent from the published middleware types.
+  const handlerType = (ctx as Record<string, unknown>)["handlerType"] as string | undefined;
+  return await (async () => {
   try {
     return await next();
   } catch (error) {

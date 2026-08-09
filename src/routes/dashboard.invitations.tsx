@@ -112,7 +112,7 @@ function InvitationsPage() {
       });
     },
     onSuccess: (res) => {
-      toast.success(`Invitation revoked for ${res.invitation.email}`);
+      toast.success(`Invitation revoked for ${res?.invitation?.email ?? "user"}`);
       qc.invalidateQueries({ queryKey: ["invitations"] });
     },
     onError: (e: Error) => toast.error(e.message),

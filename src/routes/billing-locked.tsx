@@ -38,7 +38,7 @@ function BillingLockedPage() {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user?.id) {
-        if (!cancelled) navigate({ to: "/auth" });
+        if (!cancelled) navigate({ to: "/login" });
         return;
       }
 
@@ -56,7 +56,7 @@ function BillingLockedPage() {
         organizations: { name: string } | null;
       }>;
       if (ms.length === 0) {
-        if (!cancelled) navigate({ to: "/auth" });
+        if (!cancelled) navigate({ to: "/login" });
         return;
       }
       const m = ms.find((x) => x.organization_id === activeOrgId) ?? ms[0];

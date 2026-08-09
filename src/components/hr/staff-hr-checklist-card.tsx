@@ -163,7 +163,8 @@ export function StaffHrChecklistCard({
           size_bytes: file.size,
         },
       });
-      const up = await fetch(r!.upload.signed_url, {
+      if (!r?.upload?.signed_url) throw new Error("Upload could not be prepared.");
+      const up = await fetch(r.upload.signed_url, {
         method: "PUT",
         headers: { "Content-Type": file.type || "application/octet-stream" },
         body: file,
@@ -973,7 +974,8 @@ function BaselineActions(props: {
           size_bytes: file.size,
         },
       });
-      const up = await fetch(r!.upload.signed_url, {
+      if (!r?.upload?.signed_url) throw new Error("Upload could not be prepared.");
+      const up = await fetch(r.upload.signed_url, {
         method: "PUT",
         headers: { "Content-Type": file.type || "application/octet-stream" },
         body: file,

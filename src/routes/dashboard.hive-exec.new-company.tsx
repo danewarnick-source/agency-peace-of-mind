@@ -31,7 +31,7 @@ function NewCompanyPage() {
       toast.success("Company created and admin invited.");
       qc.invalidateQueries({ queryKey: ["hive-exec-companies"] });
       qc.invalidateQueries({ queryKey: ["hive-exec-kpis"] });
-      navigate({ to: "/dashboard/hive-exec/$orgId", params: { orgId: res.organization_id } });
+      navigate({ to: "/dashboard/hive-exec/$orgId", params: { orgId: res?.organization_id ?? "" } });
     },
     onError: (e) => toast.error((e as Error).message),
   });

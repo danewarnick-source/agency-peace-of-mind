@@ -111,6 +111,13 @@ export function RecordDetailSheet({
 
   const [managerNote, setManagerNote] = useState("");
 
+  // When the admin edits the raw punch times but leaves the rounded (billing)
+  // times alone, the rounded columns must follow the new punch — otherwise the
+  // Records Duration column (and billing/exports, which use the same
+  // precedence) keeps reading the ORIGINAL punch and never changes.
+  // An explicit edit to a rounded field wins and disables the recompute.
+  const [roundedTouched, setRoundedTouched] = useState(false);
+
   useEffect(() => {
     if (!row) return;
     setSvc(row.service_type_code);
@@ -118,6 +125,8 @@ export function RecordDetailSheet({
     setClockOut(toLocalInput(row.clock_out_timestamp));
     setRoundedIn(toLocalInput(row.rounded_clock_in));
     setRoundedOut(toLocalInput(row.rounded_clock_out));
+    setRoundedTouched(false);
+
     setCorrectedIn(toLocalInput(row.corrected_clock_in));
     setCorrectedOut(toLocalInput(row.corrected_clock_out));
     setStatus(row.status ?? "Active");

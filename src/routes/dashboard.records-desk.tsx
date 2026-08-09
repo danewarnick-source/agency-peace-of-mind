@@ -21,24 +21,26 @@ const recordsDeskSearch = z.object({
   cc: z.enum(["urgent", "pending", "approved", "analytics", "nectar"]).optional(),
 });
 
-const TAB_MAP: Record<string, string> = {
-  "evv-timesheets": "evv",
-  "host-home": "host-home",
+type HubTab = "records" | "incidents" | "forms" | "audit" | "hrc";
+
+const TAB_MAP: Record<string, HubTab> = {
+  "evv-timesheets": "records",
+  "host-home": "records",
   "audit-zone": "audit",
   forms: "forms",
-  "command-center": "review",
-  "training-records": "review",
-  "training-content": "review",
+  "command-center": "records",
+  "training-records": "records",
+  "training-content": "records",
 };
 
 export const Route = createFileRoute("/dashboard/records-desk")({
   head: () => ({ meta: [{ title: "Records Desk — HIVE" }] }),
   validateSearch: recordsDeskSearch,
   beforeLoad: ({ search }) => {
-    const next = search.tab ? TAB_MAP[search.tab] ?? "review" : "review";
+    const next: HubTab = search.tab ? TAB_MAP[search.tab] ?? "records" : "records";
     throw redirect({
       to: "/dashboard/hub/documentation",
-      search: { tab: next as "review" | "evv" | "host-home" | "forms" | "audit" | "hrc" },
+      search: { tab: next },
       replace: true,
     });
   },

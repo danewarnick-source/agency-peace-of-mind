@@ -19,9 +19,9 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Check, Plus, X, Trash2 } from "lucide-react";
 
-type CustomFieldType = "text" | "date" | "yesno" | "number" | "dropdown";
+export type CustomFieldType = "text" | "date" | "yesno" | "number" | "dropdown";
 
-interface CustomFieldDef {
+export interface CustomFieldDef {
   id: string;
   name: string;
   type: CustomFieldType;
@@ -29,12 +29,12 @@ interface CustomFieldDef {
   at_hire: boolean;
 }
 
-interface ToggleFieldConfig {
+export interface ToggleFieldConfig {
   enabled: boolean;
   options?: string[];
 }
 
-interface StaffIntakeFieldsConfig {
+export interface StaffIntakeFieldsConfig {
   staff_type: ToggleFieldConfig;
   department: ToggleFieldConfig;
   employee_id: ToggleFieldConfig;
@@ -58,7 +58,7 @@ const DEFAULT_DEPARTMENT_OPTIONS = [
   "Transportation",
 ];
 
-const WORKER_TYPE_OPTIONS = ["W2 Employee", "1099 Contractor", "Other"];
+export const WORKER_TYPE_OPTIONS = ["W2 Employee", "1099 Contractor", "Other"];
 
 const ALWAYS_REQUIRED = ["First name", "Last name", "Email address", "Phone number", "Hire date", "Role"];
 
@@ -72,7 +72,7 @@ function defaultConfig(): StaffIntakeFieldsConfig {
   };
 }
 
-function normalizeConfig(raw: unknown): StaffIntakeFieldsConfig {
+export function normalizeConfig(raw: unknown): StaffIntakeFieldsConfig {
   const base = defaultConfig();
   if (!raw || typeof raw !== "object") return base;
   const r = raw as Partial<StaffIntakeFieldsConfig>;
@@ -91,7 +91,7 @@ function normalizeConfig(raw: unknown): StaffIntakeFieldsConfig {
   };
 }
 
-const FIELD_TYPE_LABEL: Record<CustomFieldType, string> = {
+export const FIELD_TYPE_LABEL: Record<CustomFieldType, string> = {
   text: "Text",
   date: "Date",
   yesno: "Yes/No",

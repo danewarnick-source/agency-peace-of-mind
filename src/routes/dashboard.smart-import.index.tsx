@@ -11,7 +11,7 @@ import { RequirePermission } from "@/components/rbac-guard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Upload, FileText, Sparkles, X, ArrowLeft, CheckCircle2, AlertCircle, Pencil, Check, User } from "lucide-react";
+import { Loader2, Upload, FileText, Sparkles, X, ArrowLeft, CheckCircle2, AlertCircle, Pencil, Check, User, Download } from "lucide-react";
 import { toast } from "sonner";
 import {
   createSmartImportJob,
@@ -21,6 +21,8 @@ import {
 } from "@/lib/smart-import.functions";
 import { TimesheetsImportWizard } from "@/components/smart-import/timesheets/timesheets-import-wizard";
 import { DailyNotesImportWizard } from "@/components/smart-import/daily-notes/daily-notes-import-wizard";
+import { normalizeConfig } from "@/components/hr/staff-fields-panel";
+import { buildStaffTemplateCsv, triggerCsvDownload } from "@/lib/staff-import-template";
 
 const SearchSchema = z.object({ mode: z.enum(["employee", "client", "timesheets", "daily_notes"]).optional() });
 
@@ -201,6 +203,26 @@ function SmartImportPage() {
   const recordDoc = useServerFn(recordImportDocument);
   const runExtraction = useServerFn(runSmartExtraction);
   const getSummary = useServerFn(getSmartImportSummary);
+
+  const staffIntakeConfigQuery = useQuery({
+    queryKey: ["staff-intake-fields-config", org?.organization_id],
+    enabled: !!org?.organization_id && mode === "employee",
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("organizations")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select("feature_config" as any)
+        .eq("id", org!.organization_id)
+        .maybeSingle();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return normalizeConfig((data as any)?.feature_config?.staff_intake_fields);
+    },
+  });
+
+  const downloadStaffTemplate = () => {
+    if (!staffIntakeConfigQuery.data) return;
+    triggerCsvDownload(buildStaffTemplateCsv(staffIntakeConfigQuery.data), "staff-import-template.csv");
+  };
 
   const onAddFiles = useCallback((list: FileList | File[]) => {
     const arr = Array.from(list);
@@ -422,6 +444,22 @@ function SmartImportPage() {
 
       {mode === "timesheets" && !jobId && <TimesheetsImportWizard />}
       {mode === "daily_notes" && !jobId && <DailyNotesImportWizard />}
+
+      {!jobId && mode === "employee" && (
+        <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
+          <div className="text-sm text-muted-foreground">
+            Not sure what columns to use? Download a CSV template matching this org&apos;s staff fields.
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={downloadStaffTemplate}
+            disabled={!staffIntakeConfigQuery.data}
+          >
+            <Download className="mr-2 h-4 w-4" /> Download staff template
+          </Button>
+        </div>
+      )}
 
       {!jobId && mode !== "timesheets" && mode !== "daily_notes" && (
         <>

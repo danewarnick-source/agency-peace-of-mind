@@ -74,6 +74,7 @@ import {
   createHrDocumentUploadUrl,
   getHrDocumentUrl,
   upsertChecklistCompletion,
+  type ChecklistRow,
 } from "@/lib/hr-staff.functions";
 import {
   attachBaselineCertificate,
@@ -89,8 +90,9 @@ import {
 } from "@/lib/hr-training-hours.functions";
 import { recordAttestation, listAttestations } from "@/lib/document-attestations.functions";
 import { listPolicyAcknowledgmentsForStaff } from "@/lib/policy-signatures.functions";
+import { useDeadlines, type DeadlineItem } from "@/hooks/use-deadlines";
 
-const PROFILE_TABS = ["profile", "record", "requirements", "checklist", "activity", "hrdocs", "deadlines"] as const;
+const PROFILE_TABS = ["record", "profile", "activity"] as const;
 type ProfileTab = (typeof PROFILE_TABS)[number];
 
 export const Route = createFileRoute("/dashboard/employees/$staffId")({
@@ -113,7 +115,7 @@ function StaffProfilePage() {
   const router = useRouter();
   const qc = useQueryClient();
   const navigate = Route.useNavigate();
-  const activeTab: ProfileTab = tab ?? "profile";
+  const activeTab: ProfileTab = tab ?? "record";
 
   const orgId = org?.organization_id;
   const isSelf = user?.id === staffId;
@@ -216,8 +218,9 @@ function StaffProfilePage() {
     },
   });
 
-  // Lightweight checklist summary — used for the tab badge only.
-  // CertsTab fetches the same key so React Query deduplicates; no extra server call.
+  // Lightweight checklist summary — feeds the compliance-status header on
+  // the Staff record tab. CertsTab fetches the same key so React Query
+  // dedupes; no extra server call.
   const fetchChecklistForBadge = useServerFn(getStaffChecklist);
   const checklistBadgeQ = useQuery({
     enabled: !!orgId && !!staffId,
@@ -225,21 +228,6 @@ function StaffProfilePage() {
     queryFn: () => fetchChecklistForBadge({ data: { organization_id: orgId!, staff_id: staffId } }),
     staleTime: 30_000,
   });
-  const needsActionCount = useMemo(() => {
-    const rows = checklistBadgeQ.data ?? [];
-    const today = Date.now();
-    const in60Ms = today + 60 * 86_400_000;
-    let count = 0;
-    for (const row of rows) {
-      if (row.applicable === false) continue;
-      const status = row.completion.status;
-      const expMs = row.completion.expires_at ? new Date(row.completion.expires_at).getTime() : null;
-      const isExpired = status === "expired" || (expMs !== null && expMs < today);
-      const isSoon = expMs !== null && expMs >= today && expMs <= in60Ms;
-      if (isExpired || isSoon || (status !== "complete" && status !== "waived")) count++;
-    }
-    return count;
-  }, [checklistBadgeQ.data]);
 
   // All active teams in the org (for team picker)
   const teamsQ = useQuery({
@@ -380,40 +368,67 @@ function StaffProfilePage() {
 
       <Tabs
         value={activeTab}
-        onValueChange={(v) => navigate({ search: (prev) => ({ ...prev, tab: v === "profile" ? undefined : (v as ProfileTab) }) })}
+        onValueChange={(v) => navigate({ search: (prev) => ({ ...prev, tab: v === "record" ? undefined : (v as ProfileTab) }) })}
         className="w-full"
       >
         <TabsList className="flex flex-wrap h-auto justify-start">
-          <TabsTrigger value="profile">Overview</TabsTrigger>
           <TabsTrigger value="record">Staff record</TabsTrigger>
-          <TabsTrigger value="requirements">Certs &amp; trainings</TabsTrigger>
-          <TabsTrigger value="checklist">
-            Compliance Checklist{needsActionCount > 0 ? ` (${needsActionCount})` : ""}
-          </TabsTrigger>
+          <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
-          <TabsTrigger value="hrdocs">HR docs</TabsTrigger>
-          <TabsTrigger value="deadlines">Deadlines</TabsTrigger>
         </TabsList>
 
-        {/* ----- OVERVIEW ----- */}
-        {/* Structure mirrors the client Profile tab: completeness bar → main
-            2-col grid (identity/contact + at-a-glance) → assignments group →
-            documents group. Same SectionPanel/SectionGroup language as the
-            client profile so both surfaces read as one design. */}
-        <TabsContent value="profile" className="mt-4 space-y-6">
-          <StaffRecordCompletenessBar
-            photoPath={(p?.photo_path as string | null) ?? null}
-            email={(p?.email as string | null) ?? null}
-            phone={(p?.phone as string | null) ?? null}
-            employeeId={(p?.employee_id as string | null) ?? null}
-            hireDate={(p?.hire_date as string | null) ?? null}
-            teamId={teamId}
-            staffTypeCount={((p?.staff_type_keys as string[] | null) ?? []).length}
-            emergencyName={(p?.emergency_contact_name as string | null) ?? null}
-            emergencyPhone={(p?.emergency_contact_phone as string | null) ?? null}
-            positionsCount={positions.length}
+        {/* ----- STAFF RECORD (default) ----- */}
+        {/* Compliance-status header, then the full HR checklist, certs &
+            training history, HR documents, and sensitive HR — this is the
+            "am I audit ready for this person" tab. */}
+        <TabsContent value="record" className="mt-4 space-y-10">
+          <ComplianceStatusHeader
+            rows={checklistBadgeQ.data ?? []}
+            isLoading={checklistBadgeQ.isLoading}
           />
 
+          <SectionGroup label="HR Compliance Checklist" hint="Full per-staff requirements — evidence, sign-off, attestation, training hours">
+            <SectionPanel icon={ClipboardList} accent="emerald">
+              <div id="staff-hr-checklist-section">
+                <StaffHrChecklistCard
+                  organizationId={orgId}
+                  staffId={staffId}
+                  view="checklist"
+                  filter="all"
+                />
+              </div>
+            </SectionPanel>
+          </SectionGroup>
+
+          <SectionGroup label="Certifications & training" hint="Current status and history" divider>
+            <SectionPanel icon={GraduationCap} accent="amber">
+              <CertsTab organizationId={orgId} staffId={staffId} staffName={name} caseload={caseloadQ.data ?? []} orgRole={org?.role} />
+            </SectionPanel>
+          </SectionGroup>
+
+          <SectionGroup label="HR documents" hint="Signed & uploaded files" divider>
+            <SectionPanel icon={FolderArchive} accent="violet">
+              <StaffHrDocsPanel organizationId={orgId} staffId={staffId} />
+            </SectionPanel>
+          </SectionGroup>
+
+          <SectionGroup label="Sensitive HR" hint="Restricted access" divider>
+            <SectionPanel icon={Lock} accent="rose">
+              <HrSensitiveCard
+                orgId={orgId}
+                staffId={staffId}
+                isSelf={isSelf}
+                orgRole={org?.role}
+              />
+            </SectionPanel>
+          </SectionGroup>
+        </TabsContent>
+
+        {/* ----- PROFILE ----- */}
+        {/* Identity/contact + at-a-glance, client assignments (placeholder —
+            built out in a separate prompt), staff types & schedule, training
+            requirement settings, custom attributes, and danger zone. */}
+        <TabsContent value="profile" className="mt-4 space-y-6">
           <div className="grid gap-6 items-start lg:grid-cols-[1.65fr_1fr]">
             {/* Main column: identity & contact panels stack vertically. */}
             <div className="space-y-6">
@@ -465,16 +480,30 @@ function StaffProfilePage() {
             </div>
           </div>
 
-          <SectionGroup label="Assignments & role" hint="Caseload, schedule & staff types" divider>
+          <SectionGroup label="Client assignments" hint="Caseload" divider>
             <SectionPanel icon={UserCircle} accent="rose">
-              <CaseloadCard
-                orgId={orgId}
-                staffId={staffId}
-                caseload={caseloadQ.data ?? []}
-                allClients={allClientsQ.data ?? []}
-                orgRole={org?.role}
-                onChanged={() => qc.invalidateQueries({ queryKey: ["staff-caseload", orgId, staffId] })}
-              />
+              <Card>
+                <CardHeader><CardTitle>Client assignments</CardTitle></CardHeader>
+                <CardContent className="text-sm text-muted-foreground">Client assignments — coming soon</CardContent>
+              </Card>
+            </SectionPanel>
+          </SectionGroup>
+
+          <SectionGroup label="Staff types & schedule" hint="Union rule: required for any type selected" divider>
+            <SectionPanel icon={Briefcase} accent="teal">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    Staff types
+                    <span className="ml-2 text-[10px] font-normal text-muted-foreground">
+                      Union rule: required for any type selected
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <StaffTypeEditor organizationId={orgId} staffId={staffId} />
+                </CardContent>
+              </Card>
             </SectionPanel>
             <SectionPanel icon={CalendarDays} accent="amber">
               <Card>
@@ -491,20 +520,24 @@ function StaffProfilePage() {
                 </CardContent>
               </Card>
             </SectionPanel>
-            <SectionPanel icon={Briefcase} accent="teal">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">
-                    Staff types
-                    <span className="ml-2 text-[10px] font-normal text-muted-foreground">
-                      Union rule: required for any type selected
-                    </span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <StaffTypeEditor organizationId={orgId} staffId={staffId} />
-                </CardContent>
-              </Card>
+          </SectionGroup>
+
+          <SectionGroup label="Training requirement settings" hint="Required / Exempt & suggested CE focus" divider>
+            <SectionPanel icon={ShieldAlert} accent="rose">
+              <BehaviorTrainingRequirementsCard
+                organizationId={orgId}
+                staffId={staffId}
+                requiresDeescalation={(p?.requires_deescalation as boolean | null | undefined) !== false}
+                requiresAbi={(p?.requires_abi as boolean | null | undefined) !== false}
+                onSaved={invalidateProfile}
+              />
+            </SectionPanel>
+            <SectionPanel icon={Sparkles} accent="violet">
+              <CeSuggestedTopicsCard
+                staffId={staffId}
+                topics={((p?.ce_suggested_topics as string[] | null) ?? [])}
+                onSaved={invalidateProfile}
+              />
             </SectionPanel>
           </SectionGroup>
 
@@ -527,112 +560,7 @@ function StaffProfilePage() {
               />
             </SectionPanel>
           </SectionGroup>
-        </TabsContent>
 
-        {/* ----- STAFF RECORD ----- */}
-        {/* Landing spot after "Add employee manually" — the raw HR record
-            fields (contact, staff types, custom fields), separate from the
-            at-a-glance Overview tab. */}
-        <TabsContent value="record" className="mt-4 space-y-6">
-          <SectionGroup label="Identity & contact" hint="Who this person is">
-            <SectionPanel icon={Contact} accent="violet">
-              <ContactCard
-                orgId={orgId}
-                staffId={staffId}
-                p={p}
-                m={m}
-                positions={positions}
-                onSaved={invalidateProfile}
-              />
-            </SectionPanel>
-          </SectionGroup>
-
-          <SectionGroup label="Staff types" hint="Union rule: required for any type selected" divider>
-            <SectionPanel icon={Briefcase} accent="teal">
-              <StaffTypeEditor organizationId={orgId} staffId={staffId} />
-            </SectionPanel>
-          </SectionGroup>
-
-          <SectionGroup label="Custom attributes" hint="Extra fields imported or added manually" divider>
-            <SectionPanel icon={ClipboardList} accent="sky">
-              <CustomAttributesSection
-                organizationId={orgId}
-                entityKind="employee"
-                entityId={staffId}
-              />
-            </SectionPanel>
-          </SectionGroup>
-        </TabsContent>
-
-        {/* ----- CERTS & TRAININGS ----- */}
-        <TabsContent value="requirements" className="mt-4 space-y-10">
-          <SectionGroup label="Training requirement settings" hint="Required / Exempt & suggested CE focus">
-            <SectionPanel icon={ShieldAlert} accent="rose">
-              <BehaviorTrainingRequirementsCard
-                organizationId={orgId}
-                staffId={staffId}
-                requiresDeescalation={(p?.requires_deescalation as boolean | null | undefined) !== false}
-                requiresAbi={(p?.requires_abi as boolean | null | undefined) !== false}
-                onSaved={invalidateProfile}
-              />
-            </SectionPanel>
-            <SectionPanel icon={Sparkles} accent="violet">
-              <CeSuggestedTopicsCard
-                staffId={staffId}
-                topics={((p?.ce_suggested_topics as string[] | null) ?? [])}
-                onSaved={invalidateProfile}
-              />
-            </SectionPanel>
-          </SectionGroup>
-          <SectionGroup label="Certifications & training" hint="Current status and history" divider>
-            <SectionPanel icon={GraduationCap} accent="amber">
-              <CertsTab organizationId={orgId} staffId={staffId} staffName={name} caseload={caseloadQ.data ?? []} orgRole={org?.role} />
-            </SectionPanel>
-          </SectionGroup>
-        </TabsContent>
-
-        {/* ----- COMPLIANCE CHECKLIST (full per-staff HR checklist) ----- */}
-        <TabsContent value="checklist" className="mt-4 space-y-10">
-          <SectionGroup label="HR Compliance Checklist" hint="Full per-staff requirements — evidence, sign-off, attestation, training hours">
-            <SectionPanel icon={ClipboardList} accent="emerald">
-              <StaffHrChecklistCard
-                organizationId={orgId}
-                staffId={staffId}
-                view="checklist"
-                filter="all"
-              />
-            </SectionPanel>
-          </SectionGroup>
-        </TabsContent>
-
-
-
-        {/* ----- ACTIVITY ----- */}
-        <TabsContent value="activity" className="mt-4 space-y-10">
-          <SectionGroup label="Activity" hint="Shifts, notes & recent actions">
-            <SectionPanel icon={ActivityIcon} accent="sky">
-              <ActivityFeed organizationId={orgId} staffId={staffId} />
-            </SectionPanel>
-          </SectionGroup>
-        </TabsContent>
-
-        {/* ----- HR DOCS ----- */}
-        <TabsContent value="hrdocs" className="mt-4 space-y-10">
-          <SectionGroup label="Sensitive HR" hint="Restricted access">
-            <SectionPanel icon={Lock} accent="rose">
-              <HrSensitiveCard
-                orgId={orgId}
-                staffId={staffId}
-                isSelf={isSelf}
-                orgRole={org?.role}
-              />
-            </SectionPanel>
-          </SectionGroup>
-          <SectionGroup label="HR documents" hint="Signed & uploaded files" divider>
-            <SectionPanel icon={FolderArchive} accent="violet">
-              <StaffHrDocsPanel organizationId={orgId} staffId={staffId} />
-            </SectionPanel>
-          </SectionGroup>
           <SectionGroup label="Danger zone" hint="Archive or permanently delete this record" divider>
             <SectionPanel icon={AlertTriangle} accent="rose">
               <LifecyclePanel
@@ -647,24 +575,216 @@ function StaffProfilePage() {
           </SectionGroup>
         </TabsContent>
 
-        {/* ----- DEADLINES ----- */}
-        <TabsContent value="deadlines" className="mt-4 space-y-10">
-          <SectionGroup label="Deadlines" hint="Renewals & acknowledgements">
+        {/* ----- ACTIVITY ----- */}
+        <TabsContent value="activity" className="mt-4 space-y-10">
+          <SectionGroup label="Activity" hint="Shifts, notes & recent actions">
+            <SectionPanel icon={ActivityIcon} accent="sky">
+              <ActivityFeed organizationId={orgId} staffId={staffId} />
+            </SectionPanel>
+          </SectionGroup>
+
+          <SectionGroup label="Deadlines" hint="Renewals & acknowledgements" divider>
             <SectionPanel icon={CalendarClock} accent="amber">
-              <Card>
-                <CardHeader><CardTitle className="text-base">Deadlines</CardTitle></CardHeader>
-                <CardContent className="text-sm text-muted-foreground">
-                  Staff-scoped deadlines (training expirations, cert renewals, scheduled-shift
-                  acknowledgements) are tracked centrally on the deadlines desk.
-                  {" "}
-                  <Link to="/dashboard/deadlines" className="underline">Open deadlines →</Link>
-                </CardContent>
-              </Card>
+              <StaffDeadlinesList staffId={staffId} />
             </SectionPanel>
           </SectionGroup>
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+/* ======================================================================
+ * Compliance status header — top-of-tab summary for the Staff record tab.
+ * Reuses the checklistBadgeQ rows already fetched by StaffProfilePage
+ * (same query key CertsTab/StaffHrChecklistCard use, so React Query
+ * dedupes — no extra server call here). Classifies rows with the same
+ * current/expiring/overdue/todo/na logic as CertsTab's rowStatusKind.
+ * ====================================================================*/
+type StatusHeaderKind = "current" | "expiring" | "overdue" | "todo" | "na";
+
+function classifyChecklistRow(row: ChecklistRow): StatusHeaderKind {
+  if (row.applicable === false) return "na";
+  const todayMs = Date.now();
+  const in60Ms = todayMs + 60 * 86_400_000;
+  const status = row.completion.status;
+  const expMs = row.completion.expires_at ? new Date(row.completion.expires_at).getTime() : null;
+  const isExpired = status === "expired" || (expMs !== null && expMs < todayMs);
+  const isSoon = expMs !== null && expMs >= todayMs && expMs <= in60Ms;
+  if (status === "complete" && !isExpired) {
+    return isSoon ? "expiring" : "current";
+  }
+  if (isExpired) return "overdue";
+  if (isSoon) return "expiring";
+  return "todo";
+}
+
+function scrollToChecklist() {
+  document.getElementById("staff-hr-checklist-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function ComplianceStatusHeader({ rows, isLoading }: { rows: ChecklistRow[]; isLoading: boolean }) {
+  const { overdue, pending, complete, urgent } = useMemo(() => {
+    const kindRank: Record<StatusHeaderKind, number> = { overdue: 0, expiring: 1, todo: 2, current: 3, na: 4 };
+    let overdueCount = 0;
+    let pendingCount = 0;
+    let completeCount = 0;
+    const actionable: Array<{ row: ChecklistRow; kind: StatusHeaderKind }> = [];
+    for (const row of rows) {
+      const kind = classifyChecklistRow(row);
+      if (kind === "na") continue;
+      if (kind === "overdue") overdueCount++;
+      else if (kind === "expiring" || kind === "todo") pendingCount++;
+      else if (kind === "current") completeCount++;
+      if (kind === "overdue" || kind === "expiring" || kind === "todo") {
+        actionable.push({ row, kind });
+      }
+    }
+    actionable.sort((a, b) => kindRank[a.kind] - kindRank[b.kind]);
+    return {
+      overdue: overdueCount,
+      pending: pendingCount,
+      complete: completeCount,
+      urgent: actionable.slice(0, 3),
+    };
+  }, [rows]);
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-4 text-sm text-muted-foreground">Loading compliance status…</CardContent>
+      </Card>
+    );
+  }
+
+  const auditReady = overdue + pending === 0;
+
+  if (auditReady) {
+    return (
+      <Card className="border-emerald-300 bg-emerald-50/60 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+        <CardContent className="flex items-center gap-2 p-4 text-sm font-medium text-emerald-800 dark:text-emerald-200">
+          <ShieldAlert className="h-4 w-4" />
+          Audit ready — every applicable requirement is current.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-4">
+        <div className="flex flex-wrap gap-2">
+          <span className="inline-flex items-center rounded-full border border-rose-300 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-300">
+            {overdue} overdue
+          </span>
+          <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/10 dark:text-amber-200">
+            {pending} pending
+          </span>
+          <span className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300">
+            {complete} complete
+          </span>
+        </div>
+        {urgent.length > 0 && (
+          <div className="space-y-2">
+            {urgent.map(({ row, kind }) => (
+              <div
+                key={row.requirement_id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/60 px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <span
+                    className={`mr-2 inline-block h-2 w-2 rounded-full ${
+                      kind === "overdue" ? "bg-rose-500" : kind === "expiring" ? "bg-amber-500" : "bg-muted-foreground/40"
+                    }`}
+                  />
+                  <span className="text-sm font-medium">{row.title}</span>
+                  {row.source_citation ? (
+                    <span className="ml-2 text-xs text-muted-foreground">{row.source_citation}</span>
+                  ) : null}
+                </div>
+                <Button size="sm" variant="outline" onClick={scrollToChecklist}>
+                  {row.completion.evidence_document_id ? "Set status" : "Upload"}
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ======================================================================
+ * Deadlines list — inline, staff-scoped slice of the global deadlines
+ * desk (src/hooks/use-deadlines.tsx), for the Activity tab.
+ * ====================================================================*/
+function fmtDeadlineDue(d: Date): string {
+  const now = Date.now();
+  const ms = d.getTime() - now;
+  const days = Math.round(ms / 86_400_000);
+  const date = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  if (ms < 0) {
+    const od = Math.abs(days);
+    return `${date} · ${od}d overdue`;
+  }
+  if (days === 0) return `${date} · today`;
+  if (days === 1) return `${date} · tomorrow`;
+  return `${date} · in ${days}d`;
+}
+
+function StaffDeadlinesList({ staffId }: { staffId: string }) {
+  const { items, isLoading } = useDeadlines();
+
+  const staffItems = useMemo(() => {
+    return items
+      .filter((i: DeadlineItem) => i.staffId === staffId)
+      .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime())
+      .slice(0, 5);
+  }, [items, staffId]);
+
+  if (isLoading) {
+    return <Card><CardContent className="p-4 text-sm text-muted-foreground">Loading deadlines…</CardContent></Card>;
+  }
+
+  return (
+    <Card>
+      <CardHeader><CardTitle className="text-base">Deadlines</CardTitle></CardHeader>
+      <CardContent className="space-y-3">
+        {staffItems.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No upcoming deadlines</p>
+        ) : (
+          <div className="space-y-2">
+            {staffItems.map((item) => {
+              const toneText =
+                item.status === "overdue"
+                  ? "text-rose-700 dark:text-rose-300"
+                  : item.status === "due_soon"
+                    ? "text-amber-700 dark:text-amber-200"
+                    : "text-muted-foreground";
+              const dotCls =
+                item.status === "overdue"
+                  ? "bg-rose-500"
+                  : item.status === "due_soon"
+                    ? "bg-amber-500"
+                    : "bg-muted-foreground/40";
+              return (
+                <div key={item.key} className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 py-2 last:border-0">
+                  <div className="min-w-0 flex-1">
+                    <span className={`mr-2 inline-block h-2 w-2 rounded-full ${dotCls}`} />
+                    <span className="text-sm font-medium">{item.title}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">{item.subject}</span>
+                  </div>
+                  <span className={`text-xs font-mono ${toneText}`}>{fmtDeadlineDue(item.dueAt)}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div className="pt-1">
+          <Link to="/dashboard/deadlines" className="text-sm underline">View all deadlines →</Link>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -1216,215 +1336,6 @@ function TeamCard({ orgId, staffId, teamId, teamData, allTeams, orgRole, onSaved
           </div>
         ) : (
           <p className="text-muted-foreground">Not assigned to a team.</p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ======================================================================
- * Caseload card — list of assigned clients with add/remove controls.
- * ====================================================================*/
-function CaseloadCard({ orgId, staffId, caseload, allClients, orgRole, onChanged }: {
-  orgId: string;
-  staffId: string;
-  caseload: Array<{ id: string; name: string; is_gh: boolean; codes: string[] }>;
-  allClients: Array<{ id: string; first_name: string | null; last_name: string | null }>;
-  orgRole: string | undefined;
-  onChanged: () => void;
-}) {
-  const canEdit = orgRole === "admin" || orgRole === "manager";
-  const [adding, setAdding] = useState(false);
-  const [selectedClientId, setSelectedClientId] = useState("");
-  const [availableCodes, setAvailableCodes] = useState<string[]>([]);
-  const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
-  const [loadingCodes, setLoadingCodes] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  const assignedIds = new Set(caseload.map((c) => c.id));
-  const unassignedClients = allClients.filter((c) => !assignedIds.has(c.id));
-
-  const onClientChange = async (clientId: string) => {
-    setSelectedClientId(clientId);
-    setSelectedCodes([]);
-    setAvailableCodes([]);
-    if (!clientId) return;
-    setLoadingCodes(true);
-    try {
-      const { data } = await supabase
-        .from("client_billing_codes")
-        .select("service_code")
-        .eq("client_id", clientId)
-        .eq("organization_id", orgId);
-      setAvailableCodes((data ?? []).map((r) => r.service_code));
-    } finally {
-      setLoadingCodes(false);
-    }
-  };
-
-  const toggleCode = (code: string) => {
-    setSelectedCodes((prev) =>
-      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
-    );
-  };
-
-  const saveAdd = async () => {
-    if (!selectedClientId || selectedCodes.length === 0) return;
-    setSaving(true);
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await supabase.from("staff_assignments" as any).insert({
-        organization_id: orgId,
-        staff_id: staffId,
-        client_id: selectedClientId,
-        service_codes: selectedCodes,
-        is_group_home_assignment: false,
-      } as any);
-      if (error) throw error;
-      toast.success("Client added to caseload");
-      setAdding(false);
-      setSelectedClientId("");
-      setSelectedCodes([]);
-      setAvailableCodes([]);
-      onChanged();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to add client");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const removeClient = async (clientId: string, clientName: string) => {
-    if (!window.confirm(`Remove ${clientName} from caseload?`)) return;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from("staff_assignments" as any) as any)
-        .delete()
-        .eq("staff_id", staffId)
-        .eq("client_id", clientId)
-        .eq("organization_id", orgId);
-      if (error) throw error;
-      toast.success("Removed from caseload");
-      onChanged();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to remove client");
-    }
-  };
-
-  return (
-    <Card className="lg:col-span-2">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-base">Caseload</CardTitle>
-        {canEdit && !adding && (
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-muted"
-            aria-label="Add client to caseload"
-          >
-            <Plus className="h-3 w-3" />
-          </button>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-1 text-sm">
-        {caseload.length === 0 && !adding && (
-          <p className="text-muted-foreground">No clients assigned.</p>
-        )}
-        {caseload.map((c) => (
-          <div key={c.id} className="flex items-center justify-between gap-2 border-b border-border/30 py-2 last:border-0">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="truncate font-medium">{c.name}</span>
-              {c.codes.length > 0
-                ? c.codes.map((code) => (
-                    <Badge key={code} variant="secondary" className="text-[10px]">{code}</Badge>
-                  ))
-                : <Badge variant="outline" className="text-[10px] text-muted-foreground">No code</Badge>
-              }
-            </div>
-            {canEdit && (
-              <button
-                type="button"
-                onClick={() => removeClient(c.id, c.name)}
-                className="shrink-0 text-muted-foreground hover:text-destructive"
-                aria-label={`Remove ${c.name}`}
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        ))}
-
-        {adding && (
-          <div className="mt-3 space-y-3 rounded-lg border border-border/60 p-3">
-            <div>
-              <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Client</label>
-              <Select value={selectedClientId} onValueChange={onClientChange}>
-                <SelectTrigger className="mt-1 w-full">
-                  <SelectValue placeholder="Select a client…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {unassignedClients.length === 0
-                    ? <SelectItem value="_none" disabled>All clients already assigned</SelectItem>
-                    : unassignedClients.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {`${c.last_name ?? ""}, ${c.first_name ?? ""}`.trim().replace(/^,\s*/, "")}
-                        </SelectItem>
-                      ))
-                  }
-                </SelectContent>
-              </Select>
-            </div>
-
-            {selectedClientId && (
-              <div>
-                <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Job code(s)</label>
-                {loadingCodes ? (
-                  <p className="mt-1 text-xs text-muted-foreground">Loading codes…</p>
-                ) : availableCodes.length === 0 ? (
-                  <p className="mt-1 text-xs text-amber-700">No billing codes on file for this client. Add them on the client profile first.</p>
-                ) : (
-                  <div className="mt-1 flex flex-wrap gap-2">
-                    {availableCodes.map((code) => (
-                      <button
-                        key={code}
-                        type="button"
-                        onClick={() => toggleCode(code)}
-                        className={`rounded-full border px-3 py-0.5 text-xs font-medium transition-colors ${
-                          selectedCodes.includes(code)
-                            ? "border-[#137182] bg-[#137182] text-white"
-                            : "border-border text-muted-foreground hover:border-[#137182]"
-                        }`}
-                      >
-                        {code}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={saveAdd}
-                disabled={saving || !selectedClientId || selectedCodes.length === 0}
-              >
-                {saving ? "Saving…" : "Add to caseload"}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setAdding(false);
-                  setSelectedClientId("");
-                  setSelectedCodes([]);
-                  setAvailableCodes([]);
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
         )}
       </CardContent>
     </Card>
@@ -3182,105 +3093,6 @@ function StaffHrDocsPanel({ organizationId, staffId }: { organizationId: string;
             </table>
           </div>
         )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ── Employee record completeness bar ──────────────────────────────────────
-// Mirrors the client Profile tab's RecordCompletenessBar: a compact progress
-// bar showing "X of Y required complete / N missing", expandable to the row
-// list. All checks read profile fields that already load in memberQ — no new
-// data fetches, purely presentational.
-type StaffReq = {
-  key: string;
-  title: string;
-  sub: string;
-  ok: boolean;
-};
-function StaffRecordCompletenessBar({
-  photoPath, email, phone, employeeId, hireDate, teamId,
-  staffTypeCount, emergencyName, emergencyPhone, positionsCount,
-}: {
-  photoPath: string | null;
-  email: string | null;
-  phone: string | null;
-  employeeId: string | null;
-  hireDate: string | null;
-  teamId: string | null;
-  staffTypeCount: number;
-  emergencyName: string | null;
-  emergencyPhone: string | null;
-  positionsCount: number;
-}) {
-  const [open, setOpen] = useState(false);
-  const reqs: StaffReq[] = [
-    { key: "photo", title: "Profile photo", sub: "Used on scheduler & coverage", ok: !!photoPath },
-    { key: "email", title: "Work email", sub: "Login & notifications", ok: !!email },
-    { key: "phone", title: "Phone number", sub: "Reachable for shifts", ok: !!phone },
-    { key: "employee_id", title: "Employee ID", sub: "Internal roster identifier", ok: !!(employeeId && employeeId.trim()) },
-    { key: "hire_date", title: "Hire date", sub: "Anchors tenure & renewals", ok: !!hireDate },
-    { key: "position", title: "Position / role", sub: "Job title on record", ok: positionsCount > 0 },
-    { key: "team", title: "Team assignment", sub: "Home or workgroup", ok: !!teamId },
-    { key: "staff_types", title: "Staff type(s)", sub: "Drives required trainings", ok: staffTypeCount > 0 },
-    { key: "emergency", title: "Emergency contact", sub: "Name + phone on file", ok: !!(emergencyName && emergencyPhone) },
-  ];
-  const completed = reqs.filter((r) => r.ok).length;
-  const required = reqs.length;
-  const missing = required - completed;
-  const pct = Math.round((completed / required) * 100);
-  const allDone = missing === 0;
-
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          className="w-full flex items-center gap-3 text-left"
-        >
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Record</span>
-          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all ${allDone ? "bg-emerald-500" : "bg-amber-500"}`}
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          <span className="text-xs text-muted-foreground">
-            {allDone ? "Record complete" : `${completed} of ${required} required complete`}
-          </span>
-          {!allDone ? (
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
-              {missing} missing
-            </span>
-          ) : null}
-          {open ? <ChevronDown className="h-4 w-4 rotate-180 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-        </button>
-
-        {open ? (
-          <div className="mt-4 pt-4 border-t space-y-2">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Required fields</div>
-            {reqs.map((r) => (
-              <div key={r.key} className="flex items-center gap-3 py-1.5">
-                <div
-                  className={
-                    "h-6 w-6 rounded grid place-items-center text-xs font-bold flex-none " +
-                    (r.ok ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")
-                  }
-                >
-                  {r.ok ? "✓" : "!"}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{r.title}</div>
-                  <div className="text-xs text-muted-foreground truncate">{r.sub}</div>
-                </div>
-                <span className={"text-xs " + (r.ok ? "text-emerald-700" : "text-amber-700")}>
-                  {r.ok ? "On file" : "Missing"}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : null}
       </CardContent>
     </Card>
   );

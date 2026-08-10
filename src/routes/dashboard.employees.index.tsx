@@ -18,7 +18,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Mail, UserPlus, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal, Ban, ExternalLink } from "lucide-react";
+import { Mail, UserPlus, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal, Ban, ExternalLink, Settings } from "lucide-react";
+import { StaffFieldsPanel } from "@/components/hr/staff-fields-panel";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { OnboardingReturnBar } from "@/components/onboarding/onboarding-return-bar";
@@ -32,6 +33,11 @@ import { useEntitlements } from "@/hooks/use-entitlements";
 import { StaffTrainingStrip, type StaffTrainingStatus } from "@/components/training/staff-training-strip";
 import { TrainingRequirementField } from "@/components/hr/training-requirement-field";
 import type { Position } from "@/lib/employee-positions";
+import {
+  normalizeConfig,
+  WORKER_TYPE_OPTIONS,
+  type StaffIntakeFieldsConfig,
+} from "@/components/hr/staff-fields-panel";
 
 function genPassword(len = 14) {
   const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
@@ -58,7 +64,7 @@ export function EmployeesPage() {
   const [manualOpen, setManualOpen] = useState(false);
   const [resetUser, setResetUser] = useState<{ id: string; name: string } | null>(null);
   const [tempPassword, setTempPassword] = useState(() => genPassword());
-  const [credentialsShown, setCredentialsShown] = useState<{ identifier: string; password: string } | null>(null);
+  const [credentialsShown, setCredentialsShown] = useState<{ identifier: string; password: string; newStaffId?: string } | null>(null);
   const [caseloadFor, setCaseloadFor] = useState<{ id: string; name: string; role: string } | null>(null);
   // Manual "add employee" onboarding form: de-escalation / ABI requirement
   // defaults to Required until the admin deliberately reviews it.
@@ -66,6 +72,38 @@ export function EmployeesPage() {
   const [manualRequiresAbi, setManualRequiresAbi] = useState(true);
   // Compliance panel state
   const [compliancePanelStaff, setCompliancePanelStaff] = useState<{ id: string; name: string; isNew?: boolean } | null>(null);
+  const [staffFieldsOpen, setStaffFieldsOpen] = useState(false);
+  // Optional intake-field values for the "Add manually" form, driven by the
+  // org's staff_intake_fields config
+  const [manualStaffType, setManualStaffType] = useState<string[]>([]);
+  const [manualDepartment, setManualDepartment] = useState("");
+  const [manualEmployeeId, setManualEmployeeId] = useState("");
+  const [manualWorkerType, setManualWorkerType] = useState("");
+  const [manualCustomFieldValues, setManualCustomFieldValues] = useState<Record<string, unknown>>({});
+
+  const resetOptionalFields = () => {
+    setManualStaffType([]);
+    setManualDepartment("");
+    setManualEmployeeId("");
+    setManualWorkerType("");
+    setManualCustomFieldValues({});
+  };
+
+  const { data: staffIntakeConfig } = useQuery({
+    enabled: !!org,
+    queryKey: ["staff-intake-fields", org?.organization_id],
+    queryFn: async (): Promise<StaffIntakeFieldsConfig> => {
+      const { data } = await supabase
+        .from("organizations")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select("feature_config" as any)
+        .eq("id", org!.organization_id)
+        .maybeSingle();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fc = (data as any)?.feature_config ?? null;
+      return normalizeConfig(fc?.staff_intake_fields);
+    },
+  });
 
   const fetchMatrix = useServerFn(getHrComplianceMatrix);
   const { data: complianceMatrix } = useQuery({
@@ -210,36 +248,39 @@ export function EmployeesPage() {
 
   const manualMutation = useMutation({
     mutationFn: async (input: {
-      firstName: string; lastName: string; username: string; email: string;
-      role: Role; department: string; startDate: string; endDate: string; trackIds: string[]; password: string;
+      firstName: string; lastName: string; email: string; phone: string;
+      role: Role; startDate: string; endDate: string; trackIds: string[]; password: string;
       requiresDeescalation: boolean; requiresAbi: boolean;
+      staffType: string[]; department: string; employeeId: string; workerType: string;
+      customFieldValues: Record<string, unknown>;
     }) => {
       if (input.startDate && input.endDate && input.endDate < input.startDate) {
         throw new Error("End date must be on or after Start date.");
       }
       return await createManual({ data: {
         organizationId: org!.organization_id,
-        firstName: input.firstName, lastName: input.lastName, username: input.username,
-        email: input.email, temporaryPassword: input.password, role: input.role,
-        department: input.department, hireDate: input.startDate,
+        firstName: input.firstName, lastName: input.lastName,
+        email: input.email, phone: input.phone, temporaryPassword: input.password, role: input.role,
+        hireDate: input.startDate,
         startDate: input.startDate, endDate: input.endDate,
         trackIds: input.trackIds,
         requiresDeescalation: input.requiresDeescalation,
         requiresAbi: input.requiresAbi,
+        staffType: input.staffType,
+        department: input.department,
+        employeeId: input.employeeId,
+        workerType: input.workerType,
+        customFieldValues: input.customFieldValues,
       } });
     },
 
     onSuccess: (res, vars) => {
       toast.success("Employee account created");
-      setCredentialsShown({ identifier: vars.email || vars.username, password: vars.password });
+      setCredentialsShown({ identifier: vars.email, password: vars.password, newStaffId: res?.userId || undefined });
       setManualOpen(false);
       setTempPassword(genPassword());
+      resetOptionalFields();
       qc.invalidateQueries({ queryKey: ["members"] });
-      // Auto-open checklist panel for the new employee so required fields are immediately visible
-      if (res?.userId) {
-        const name = `${vars.firstName} ${vars.lastName}`.trim();
-        setCompliancePanelStaff({ id: res.userId, name, isNew: true });
-      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -288,8 +329,11 @@ export function EmployeesPage() {
             </Link>
           </Button>
 
-          <Button variant="outline" onClick={() => { setTempPassword(genPassword()); setManualRequiresDeescalation(true); setManualRequiresAbi(true); setManualOpen(true); }}>
+          <Button variant="outline" onClick={() => { setTempPassword(genPassword()); setManualRequiresDeescalation(true); setManualRequiresAbi(true); resetOptionalFields(); setManualOpen(true); }}>
             <ShieldPlus className="mr-2 h-4 w-4" /> Add manually
+          </Button>
+          <Button variant="outline" onClick={() => setStaffFieldsOpen(true)}>
+            <Settings className="mr-2 h-4 w-4" /> Settings
           </Button>
           <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
             <DialogTrigger asChild>
@@ -547,17 +591,21 @@ export function EmployeesPage() {
             manualMutation.mutate({
               firstName: String(fd.get("first_name") || "").trim(),
               lastName: String(fd.get("last_name") || "").trim(),
-              username: String(fd.get("username") || "").trim(),
               email: String(fd.get("email") || "").trim(),
+              phone: String(fd.get("phone") || "").trim(),
               role: String(fd.get("role") || "employee") as Role,
-              department: String(fd.get("department") || "").trim(),
-              startDate: String(fd.get("start_date") || ""),
+              startDate: String(fd.get("hire_date") || ""),
               endDate: String(fd.get("end_date") || ""),
 
               trackIds,
               password: String(fd.get("password") || tempPassword),
               requiresDeescalation: manualRequiresDeescalation,
               requiresAbi: manualRequiresAbi,
+              staffType: manualStaffType,
+              department: manualDepartment,
+              employeeId: manualEmployeeId,
+              workerType: manualWorkerType,
+              customFieldValues: manualCustomFieldValues,
             });
           }} className="grid gap-4">
 
@@ -565,9 +613,28 @@ export function EmployeesPage() {
               <div className="grid gap-2"><Label htmlFor="first_name">First name</Label><Input id="first_name" name="first_name" required /></div>
               <div className="grid gap-2"><Label htmlFor="last_name">Last name</Label><Input id="last_name" name="last_name" required /></div>
             </div>
+            <div className="grid gap-2">
+              <Label htmlFor="email">Email address · used for sign-in <span className="text-destructive">*</span></Label>
+              <Input id="email" name="email" type="email" required />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="phone">Phone number</Label>
+              <Input id="phone" name="phone" type="tel" required />
+            </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2"><Label htmlFor="username">Username</Label><Input id="username" name="username" required pattern="[a-zA-Z0-9._-]+" /></div>
-              <div className="grid gap-2"><Label htmlFor="email">Email (optional)</Label><Input id="email" name="email" type="email" /></div>
+              <div className="grid gap-2"><Label htmlFor="hire_date">Hire date <span className="text-destructive">*</span></Label><Input id="hire_date" name="hire_date" type="date" required /><p className="text-xs text-muted-foreground">All training deadlines are calculated from this date.</p></div>
+              <div className="grid gap-2"><Label htmlFor="end_date">End date (optional)</Label><Input id="end_date" name="end_date" type="date" /></div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="role">Role</Label>
+              <Select name="role" defaultValue="employee">
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="password">Temporary password</Label>
@@ -578,24 +645,21 @@ export function EmployeesPage() {
               </div>
               <p className="text-xs text-muted-foreground">Employee will be prompted to change this on first login.</p>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2">
-                <Label htmlFor="role">Role</Label>
-                <Select name="role" defaultValue="employee">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="employee">Employee</SelectItem>
-                    <SelectItem value="manager">Manager</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2"><Label htmlFor="department">Department / team</Label><Input id="department" name="department" /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2"><Label htmlFor="start_date">Start date <span className="text-destructive">*</span></Label><Input id="start_date" name="start_date" type="date" required /><p className="text-xs text-muted-foreground">All training deadlines are calculated from this date.</p></div>
-              <div className="grid gap-2"><Label htmlFor="end_date">End date (optional)</Label><Input id="end_date" name="end_date" type="date" /></div>
-            </div>
+
+            <OptionalIntakeFields
+              config={staffIntakeConfig}
+              staffType={manualStaffType}
+              onStaffTypeChange={setManualStaffType}
+              department={manualDepartment}
+              onDepartmentChange={setManualDepartment}
+              employeeId={manualEmployeeId}
+              onEmployeeIdChange={setManualEmployeeId}
+              workerType={manualWorkerType}
+              onWorkerTypeChange={setManualWorkerType}
+              customFieldValues={manualCustomFieldValues}
+              onCustomFieldValuesChange={setManualCustomFieldValues}
+              onOpenSettings={() => setStaffFieldsOpen(true)}
+            />
 
             <div className="grid gap-3 rounded-md border border-border bg-muted/30 p-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -686,7 +750,17 @@ export function EmployeesPage() {
               </div>
             </div>
           )}
-          <DialogFooter><Button onClick={() => setCredentialsShown(null)}>Done</Button></DialogFooter>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                const newStaffId = credentialsShown?.newStaffId;
+                setCredentialsShown(null);
+                if (newStaffId) window.location.href = `/dashboard/employees/${newStaffId}?tab=record`;
+              }}
+            >
+              Done
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -695,6 +769,17 @@ export function EmployeesPage() {
         organizationId={org?.organization_id ?? null}
         onClose={() => setCaseloadFor(null)}
       />
+
+      {org && (
+        <StaffFieldsPanel
+          open={staffFieldsOpen}
+          onOpenChange={(v) => {
+            setStaffFieldsOpen(v);
+            if (!v) qc.invalidateQueries({ queryKey: ["staff-intake-fields", org.organization_id] });
+          }}
+          organizationId={org.organization_id}
+        />
+      )}
 
       {org && compliancePanelStaff && (
         <StaffCompliancePanel
@@ -706,6 +791,197 @@ export function EmployeesPage() {
           isNewEmployee={compliancePanelStaff.isNew}
         />
       )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------- */
+/* Optional intake fields (driven by org's staff_intake_fields config)       */
+/* ------------------------------------------------------------------------- */
+
+function OptionalIntakeFields({
+  config,
+  staffType, onStaffTypeChange,
+  department, onDepartmentChange,
+  employeeId, onEmployeeIdChange,
+  workerType, onWorkerTypeChange,
+  customFieldValues, onCustomFieldValuesChange,
+  onOpenSettings,
+}: {
+  config: StaffIntakeFieldsConfig | undefined;
+  staffType: string[];
+  onStaffTypeChange: (v: string[]) => void;
+  department: string;
+  onDepartmentChange: (v: string) => void;
+  employeeId: string;
+  onEmployeeIdChange: (v: string) => void;
+  workerType: string;
+  onWorkerTypeChange: (v: string) => void;
+  customFieldValues: Record<string, unknown>;
+  onCustomFieldValuesChange: (v: Record<string, unknown>) => void;
+  onOpenSettings: () => void;
+}) {
+  if (!config) return null;
+
+  const atHireCustomFields = config.custom_fields.filter((f) => f.at_hire);
+  const hasAnyOptionalField =
+    config.staff_type.enabled ||
+    config.department.enabled ||
+    config.employee_id.enabled ||
+    config.worker_type.enabled ||
+    atHireCustomFields.length > 0;
+
+  const setCustomFieldValue = (id: string, value: unknown) => {
+    onCustomFieldValuesChange({ ...customFieldValues, [id]: value });
+  };
+
+  if (!hasAnyOptionalField) {
+    return (
+      <div className="grid gap-2">
+        <p className="text-sm text-muted-foreground">
+          No optional fields configured.{" "}
+          <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={onOpenSettings}>
+            Configure staff fields
+          </button>
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-4">
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        Your organization's fields
+      </p>
+
+      {!config.staff_type.enabled && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300">
+          <span>
+            Staff type is not enabled — training requirements won't auto-activate until set on this staff
+            member's profile. Enable in staff field settings.
+          </span>
+          <Button type="button" variant="outline" size="sm" className="h-7 shrink-0 text-xs" onClick={onOpenSettings}>
+            Open settings
+          </Button>
+        </div>
+      )}
+
+      {config.staff_type.enabled && (
+        <div className="grid gap-2">
+          <Label>Staff type · drives training requirements</Label>
+          <div className="grid max-h-40 gap-1 overflow-y-auto rounded-md border border-border p-2 text-sm">
+            {(config.staff_type.options ?? []).map((opt) => (
+              <label key={opt} className="flex items-center gap-2">
+                <Checkbox
+                  checked={staffType.includes(opt)}
+                  onCheckedChange={(v) => {
+                    onStaffTypeChange(
+                      v === true ? [...staffType, opt] : staffType.filter((s) => s !== opt),
+                    );
+                  }}
+                />
+                {opt}
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {config.department.enabled && (
+        <div className="grid gap-2">
+          <Label>Department</Label>
+          <Select value={department} onValueChange={onDepartmentChange}>
+            <SelectTrigger><SelectValue placeholder="Select a department" /></SelectTrigger>
+            <SelectContent>
+              {(config.department.options ?? []).map((opt) => (
+                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {config.employee_id.enabled && (
+        <div className="grid gap-2">
+          <Label htmlFor="employee_id">Employee ID (optional)</Label>
+          <Input
+            id="employee_id"
+            value={employeeId}
+            onChange={(e) => onEmployeeIdChange(e.target.value)}
+          />
+        </div>
+      )}
+
+      {config.worker_type.enabled && (
+        <div className="grid gap-2">
+          <Label>Worker type</Label>
+          <Select value={workerType} onValueChange={onWorkerTypeChange}>
+            <SelectTrigger><SelectValue placeholder="Select worker type" /></SelectTrigger>
+            <SelectContent>
+              {WORKER_TYPE_OPTIONS.map((opt) => (
+                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {atHireCustomFields.map((field) => (
+        <div key={field.id} className="grid gap-2">
+          <Label htmlFor={`cf-${field.id}`} className="flex items-center gap-2">
+            {field.name}
+            <Badge variant="outline" className="text-[10px]">Custom</Badge>
+          </Label>
+          {field.type === "text" && (
+            <Input
+              id={`cf-${field.id}`}
+              value={(customFieldValues[field.id] as string) ?? ""}
+              onChange={(e) => setCustomFieldValue(field.id, e.target.value)}
+            />
+          )}
+          {field.type === "date" && (
+            <Input
+              id={`cf-${field.id}`}
+              type="date"
+              value={(customFieldValues[field.id] as string) ?? ""}
+              onChange={(e) => setCustomFieldValue(field.id, e.target.value)}
+            />
+          )}
+          {field.type === "number" && (
+            <Input
+              id={`cf-${field.id}`}
+              type="number"
+              value={(customFieldValues[field.id] as string) ?? ""}
+              onChange={(e) => setCustomFieldValue(field.id, e.target.value)}
+            />
+          )}
+          {field.type === "yesno" && (
+            <Select
+              value={(customFieldValues[field.id] as string) ?? ""}
+              onValueChange={(v) => setCustomFieldValue(field.id, v)}
+            >
+              <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="yes">Yes</SelectItem>
+                <SelectItem value="no">No</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+          {field.type === "dropdown" && (
+            <Select
+              value={(customFieldValues[field.id] as string) ?? ""}
+              onValueChange={(v) => setCustomFieldValue(field.id, v)}
+            >
+              <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+              <SelectContent>
+                {field.options.map((opt) => (
+                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

@@ -9,8 +9,8 @@ const CreateEmployeeInput = z.object({
   organizationId: z.string().uuid(),
   firstName: z.string().trim().min(1).max(80),
   lastName: z.string().trim().min(1).max(80),
-  username: z.string().trim().min(2).max(60).regex(/^[a-zA-Z0-9._-]+$/),
-  email: z.string().trim().email().max(255).optional().or(z.literal("")),
+  email: z.string().trim().email().max(255),
+  phone: z.string().trim().min(7).max(30),
   temporaryPassword: z.string().min(8).max(128),
   role: RoleEnum,
   department: z.string().trim().max(120).optional().or(z.literal("")),
@@ -20,6 +20,10 @@ const CreateEmployeeInput = z.object({
   trackIds: z.array(z.string().uuid()).max(50).default([]),
   requiresDeescalation: z.boolean().default(true),
   requiresAbi: z.boolean().default(true),
+  staffType: z.array(z.string()).optional().default([]),
+  employeeId: z.string().trim().max(80).optional().or(z.literal("")),
+  workerType: z.string().trim().max(80).optional().or(z.literal("")),
+  customFieldValues: z.record(z.string(), z.unknown()).optional().default({}),
 });
 
 
@@ -44,17 +48,7 @@ export const createEmployeeManually = createServerFn({ method: "POST" })
     if (!context.userId) return { userId: "", email: "" };
     await assertOrgManager(context.userId, data.organizationId);
 
-    const { data: org, error: orgErr } = await supabaseAdmin
-      .from("organizations").select("slug").eq("id", data.organizationId).maybeSingle();
-    if (orgErr || !org) throw new Error("Organization not found");
-
-    const cleanEmail = (data.email || "").trim().toLowerCase();
-    const effectiveEmail = cleanEmail || `${data.username.toLowerCase()}@${org.slug}.users.local`;
-
-    // Check username uniqueness
-    const { data: dupe } = await supabaseAdmin
-      .from("profiles").select("id").ilike("username", data.username).maybeSingle();
-    if (dupe) throw new Error("That username is already taken");
+    const effectiveEmail = data.email.trim().toLowerCase();
 
     // Create auth user (email confirmed so they can immediately sign in)
     const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
@@ -78,6 +72,32 @@ export const createEmployeeManually = createServerFn({ method: "POST" })
       if (startDate && endDate && endDate < startDate) {
         throw new Error("End date must be on or after Start date.");
       }
+
+      // Custom field values are keyed by the field's id (as configured in
+      // organizations.feature_config.staff_intake_fields.custom_fields), but
+      // stored on the profile keyed by field name — profiles.custom_attributes
+      // and feature_config are the only two places this data lives, no
+      // custom_field_definitions/custom_field_values involved.
+      const customFieldEntries = Object.entries(data.customFieldValues).filter(
+        ([, v]) => v !== undefined && v !== "",
+      );
+      const customAttributes: Record<string, unknown> = {};
+      if (customFieldEntries.length) {
+        const { data: orgRow } = await supabaseAdmin
+          .from("organizations")
+          .select("feature_config")
+          .eq("id", data.organizationId)
+          .maybeSingle();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const customFieldDefs = ((orgRow as any)?.feature_config?.staff_intake_fields?.custom_fields ?? []) as
+          Array<{ id: string; name: string }>;
+        const nameById = new Map(customFieldDefs.map((f) => [f.id, f.name]));
+        for (const [fieldId, value] of customFieldEntries) {
+          const name = nameById.get(fieldId);
+          if (name) customAttributes[name] = value;
+        }
+      }
+
       // Upsert profile (handle_new_user trigger may have created a stub)
       const { error: profErr } = await supabaseAdmin.from("profiles").upsert({
         id: newUserId,
@@ -85,8 +105,11 @@ export const createEmployeeManually = createServerFn({ method: "POST" })
         full_name: `${data.firstName} ${data.lastName}`.trim(),
         first_name: data.firstName,
         last_name: data.lastName,
-        username: data.username,
+        phone: data.phone.trim(),
         department: data.department || null,
+        employee_id: data.employeeId || null,
+        worker_type: data.workerType || undefined,
+        staff_type_keys: data.staffType,
         hire_date: startDate,
         start_date: startDate,
         end_date: endDate,
@@ -94,6 +117,7 @@ export const createEmployeeManually = createServerFn({ method: "POST" })
         is_active: true,
         requires_deescalation: data.requiresDeescalation,
         requires_abi: data.requiresAbi,
+        custom_attributes: customAttributes,
       } as any, { onConflict: "id" });
 
       if (profErr) throw new Error(profErr.message);

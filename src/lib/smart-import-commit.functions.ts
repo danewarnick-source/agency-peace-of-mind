@@ -10,6 +10,7 @@ import { z } from "zod";
 import { applyExtractedFieldsToClient } from "@/lib/client-import-schema";
 import { validateClientDraft, filterBlocking, normalizeGuardianFields, type ClientDraft } from "@/lib/import-validation";
 import { fetchTenantIdentity, type TenantIdentity } from "@/lib/service-classification";
+import { BASELINE_STAFF_TRAININGS, isBaselineApplicable } from "@/lib/staff-training-requirements";
 
 
 const JobId = z.object({ jobId: z.string().uuid() });
@@ -93,7 +94,25 @@ const CLIENT_COL: Record<string, string> = {
 const PROFILE_COL: Record<string, string> = {
   full_name: "full_name",
   phone: "phone",
+  hire_date: "hire_date",
+  department: "department",
+  employee_id: "employee_id",
+  worker_type: "worker_type",
+  staff_type: "staff_type_keys",
 };
+
+// staff_type is entered as a comma-separated list (see the staff import
+// template); every other PROFILE_COL target is a plain scalar.
+const PROFILE_ARRAY_COLS = new Set(["staff_type_keys"]);
+
+function coerceProfileValue(column: string, raw: string | null): unknown {
+  const value = (raw ?? "").trim();
+  if (!value) return null;
+  if (PROFILE_ARRAY_COLS.has(column)) {
+    return value.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  return value;
+}
 
 const CLIENT_BOOL_COLS = new Set([
   "is_own_guardian",
@@ -787,8 +806,11 @@ async function commitEmployee(
     if (f.is_custom_attribute) continue;
     const col = PROFILE_COL[f.target_field];
     if (!col) continue;
-    mapped[col] = f.value;
+    mapped[col] = coerceProfileValue(col, f.value);
   }
+  // start_date is the CE source of truth (see createEmployeeManually); mirror
+  // an imported hire_date onto it so the same profile reads consistently.
+  if (mapped.hire_date && !mapped.start_date) mapped.start_date = mapped.hire_date;
   const recordId = subj.matched_record_id;
   if (Object.keys(mapped).length > 0) {
     const { error } = await sb.from("profiles").update(mapped).eq("id", recordId);
@@ -1075,6 +1097,7 @@ export const getDoneReadout = createServerFn({ method: "POST" })
       id: string; display_name: string; subject_type: string; committed: boolean;
       record_id: string | null; error: string | null; review_status: string;
       requirements_met: number; requirements_total: number; gaps: string[];
+      staff_training?: { required: number; conditional_active: number; decisions_needed: number; hire_date_missing: boolean };
     }> = [];
 
     for (const s of subjects ?? []) {
@@ -1089,6 +1112,42 @@ export const getDoneReadout = createServerFn({ method: "POST" })
         else if (c.expiry_date && new Date(c.expiry_date).getTime() < Date.now()) gaps.push(`${c.cert_key} expired`);
       }
       if (s.commit_error) gaps.unshift(s.commit_error);
+
+      let staffTraining: { required: number; conditional_active: number; decisions_needed: number; hire_date_missing: boolean } | undefined;
+      if (s.subject_type === "employee" && s.committed_record_id) {
+        const { data: prof } = await sb
+          .from("profiles")
+          .select("hire_date, start_date, staff_type_keys, requires_deescalation, requires_abi")
+          .eq("id", s.committed_record_id)
+          .maybeSingle();
+        const hireDateStr = (prof?.start_date as string | null) ?? (prof?.hire_date as string | null) ?? null;
+        const ctx = {
+          hireDate: hireDateStr ? new Date(`${hireDateStr}T00:00:00Z`) : null,
+          requiresDeescalation: (prof?.requires_deescalation as boolean | undefined) !== false,
+          requiresAbi: (prof?.requires_abi as boolean | undefined) !== false,
+          // The import doesn't wire service-code assignments, so imported
+          // staff_type values (e.g. "SLN, HHS") stand in for assigned codes —
+          // same trigger logic getStaffChecklist uses once codes are assigned.
+          assignedCodes: ((prof?.staff_type_keys as string[] | null) ?? []).map((c) => c.toUpperCase()),
+        };
+        const applicable = BASELINE_STAFF_TRAININGS.filter((t) => isBaselineApplicable(t, ctx));
+        const required = applicable.filter((t) => t.conditional === "all").length;
+        const conditionalActive = applicable.filter((t) => t.conditional !== "all").length;
+        // "codes"-conditional trainings NECTAR couldn't confirm from the
+        // import alone — an admin still has to assign real service codes to
+        // decide whether these apply.
+        const decisionsNeeded = BASELINE_STAFF_TRAININGS.filter(
+          (t) => t.conditional === "codes" && !isBaselineApplicable(t, ctx),
+        ).length;
+        staffTraining = {
+          required,
+          conditional_active: conditionalActive,
+          decisions_needed: decisionsNeeded,
+          hire_date_missing: !hireDateStr,
+        };
+        if (!hireDateStr) gaps.push("No hire date — training deadlines cannot be calculated. Set hire date on their profile.");
+      }
+
       subjectSummaries.push({
         id: s.id,
         display_name: s.display_name,
@@ -1096,6 +1155,7 @@ export const getDoneReadout = createServerFn({ method: "POST" })
         committed: !!s.committed_at,
         record_id: s.committed_record_id,
         error: s.commit_error,
+        staff_training: staffTraining,
         review_status: s.review_status ?? "pending",
         requirements_met: met,
         requirements_total: total,

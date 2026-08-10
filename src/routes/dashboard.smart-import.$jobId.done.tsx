@@ -288,7 +288,13 @@ function DonePage() {
                     ) : (
                       <Badge variant="outline" className="text-amber-600">not committed</Badge>
                     )}
-                    <span className="text-muted-foreground">{s.requirements_met}/{s.requirements_total} requirements met</span>
+                    {s.subject_type === "employee" && s.staff_training ? (
+                      <span className="text-muted-foreground">
+                        {s.staff_training.required} required · {s.staff_training.conditional_active} conditional active · {s.staff_training.decisions_needed} decisions needed
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">{s.requirements_met}/{s.requirements_total} requirements met</span>
+                    )}
                   </div>
                 </div>
                 {s.gaps.length > 0 && (
@@ -309,12 +315,23 @@ function DonePage() {
                 )}
                 {s.record_id && (
                   <div className="mt-2 text-xs">
-                    <Link
-                      to={s.subject_type === "client" ? "/dashboard/clients" : "/dashboard/employees"}
-                      className="inline-flex items-center gap-1 text-primary hover:underline"
-                    >
-                      Open profile <ExternalLink className="h-3 w-3" />
-                    </Link>
+                    {s.subject_type === "employee" ? (
+                      <Link
+                        to="/dashboard/employees/$staffId"
+                        params={{ staffId: s.record_id }}
+                        search={{ tab: "record" }}
+                        className="inline-flex items-center gap-1 text-primary hover:underline"
+                      >
+                        Review <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    ) : (
+                      <Link
+                        to="/dashboard/clients"
+                        className="inline-flex items-center gap-1 text-primary hover:underline"
+                      >
+                        Open profile <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    )}
                   </div>
                 )}
                 {s.record_id && s.subject_type === "client" && s.committed && (

@@ -6,6 +6,31 @@ it worked before moving on.
 
 ---
 
+## ACTION — Add profiles.custom_attributes for org-defined staff intake fields (2026-08-10)
+
+**What this is for:** The add-employee dialog now collects org-defined custom
+fields (configured in Settings → Staff fields, stored in
+`organizations.feature_config.staff_intake_fields.custom_fields`). Their
+values need a home on the staff profile. Rather than the separate
+`custom_field_definitions`/`custom_field_values` system (a different,
+unrelated feature), these values are stored directly on `profiles` in a
+`custom_attributes` jsonb column, keyed by the field's **name** (not a
+definition-table id) so the two systems never need to reconcile ids.
+
+**Run this:**
+
+```sql
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS custom_attributes jsonb NOT NULL DEFAULT '{}'::jsonb;
+```
+
+**What you'll see:** "Success. No rows returned." The column is additive and
+defaults to `{}`, so existing rows are unaffected. This matches migration
+`supabase/migrations/20260810120000_add_profiles_custom_attributes.sql` in
+the repo — run it once against the live DB since migrations here don't
+auto-apply there.
+
+---
+
 ## DIAGNOSTIC — Staff missing hire_date (2026-08-09)
 
 **What this is for:** Staff imported via Smart Import may have `null` hire_date,

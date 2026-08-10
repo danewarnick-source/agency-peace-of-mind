@@ -89,6 +89,7 @@ const CORE_CLIENT = [
 const CORE_EMPLOYEE = [
   "full_name", "first_name", "last_name", "email", "phone",
   "position", "hire_date", "team_name",
+  "staff_type", "department", "employee_id", "worker_type",
 ] as const;
 
 const HEURISTICS: Record<string, string[]> = {
@@ -100,6 +101,10 @@ const HEURISTICS: Record<string, string[]> = {
   position: ["position", "title", "role", "job title"],
   hire_date: ["hire", "hire date", "start date", "date of hire", "joined"],
   team_name: ["team", "facility", "location", "program", "home", "house", "group home", "site"],
+  staff_type: ["staff type", "staff_type", "staff types", "employee type"],
+  department: ["department", "dept"],
+  employee_id: ["employee id", "employee_id", "staff id", "emp id", "personnel id"],
+  worker_type: ["worker type", "worker_type", "employment type", "w2", "1099"],
   address: ["address", "street", "physical address", "residence"],
   medicaid_id: ["medicaid", "medicaid id", "client id", "member id"],
   job_code: ["job code", "service code", "auth code"],

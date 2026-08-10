@@ -9,8 +9,8 @@ const CreateEmployeeInput = z.object({
   organizationId: z.string().uuid(),
   firstName: z.string().trim().min(1).max(80),
   lastName: z.string().trim().min(1).max(80),
-  username: z.string().trim().min(2).max(60).regex(/^[a-zA-Z0-9._-]+$/),
-  email: z.string().trim().email().max(255).optional().or(z.literal("")),
+  email: z.string().trim().email().max(255),
+  phone: z.string().trim().min(7).max(30),
   temporaryPassword: z.string().min(8).max(128),
   role: RoleEnum,
   department: z.string().trim().max(120).optional().or(z.literal("")),
@@ -20,6 +20,10 @@ const CreateEmployeeInput = z.object({
   trackIds: z.array(z.string().uuid()).max(50).default([]),
   requiresDeescalation: z.boolean().default(true),
   requiresAbi: z.boolean().default(true),
+  staffType: z.array(z.string()).optional().default([]),
+  employeeId: z.string().trim().max(80).optional().or(z.literal("")),
+  workerType: z.string().trim().max(80).optional().or(z.literal("")),
+  customFieldValues: z.record(z.string(), z.unknown()).optional().default({}),
 });
 
 
@@ -44,17 +48,7 @@ export const createEmployeeManually = createServerFn({ method: "POST" })
     if (!context.userId) return { userId: "", email: "" };
     await assertOrgManager(context.userId, data.organizationId);
 
-    const { data: org, error: orgErr } = await supabaseAdmin
-      .from("organizations").select("slug").eq("id", data.organizationId).maybeSingle();
-    if (orgErr || !org) throw new Error("Organization not found");
-
-    const cleanEmail = (data.email || "").trim().toLowerCase();
-    const effectiveEmail = cleanEmail || `${data.username.toLowerCase()}@${org.slug}.users.local`;
-
-    // Check username uniqueness
-    const { data: dupe } = await supabaseAdmin
-      .from("profiles").select("id").ilike("username", data.username).maybeSingle();
-    if (dupe) throw new Error("That username is already taken");
+    const effectiveEmail = data.email.trim().toLowerCase();
 
     // Create auth user (email confirmed so they can immediately sign in)
     const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
@@ -85,8 +79,11 @@ export const createEmployeeManually = createServerFn({ method: "POST" })
         full_name: `${data.firstName} ${data.lastName}`.trim(),
         first_name: data.firstName,
         last_name: data.lastName,
-        username: data.username,
+        phone: data.phone.trim(),
         department: data.department || null,
+        employee_id: data.employeeId || null,
+        worker_type: data.workerType || undefined,
+        staff_type_keys: data.staffType,
         hire_date: startDate,
         start_date: startDate,
         end_date: endDate,
@@ -125,6 +122,44 @@ export const createEmployeeManually = createServerFn({ method: "POST" })
         }));
         const { error: trackErr } = await supabaseAdmin.from("track_assignments").insert(rows);
         if (trackErr) console.warn("track assignment failed", trackErr.message);
+      }
+
+      // Optional: custom field values, keyed by custom_field_definitions.id
+      const customFieldEntries = Object.entries(data.customFieldValues).filter(
+        ([, v]) => v !== undefined,
+      );
+      if (customFieldEntries.length) {
+        const { data: defs } = await supabaseAdmin
+          .from("custom_field_definitions")
+          .select("id, data_type")
+          .eq("organization_id", data.organizationId)
+          .eq("entity_kind", "employee")
+          .in("id", customFieldEntries.map(([definitionId]) => definitionId));
+        const defTypeById = new Map((defs ?? []).map((d) => [d.id as string, d.data_type as string]));
+
+        const valueRows = customFieldEntries
+          .filter(([definitionId]) => defTypeById.has(definitionId))
+          .map(([definitionId, value]) => {
+            const dataType = defTypeById.get(definitionId);
+            const row: Record<string, unknown> = {
+              organization_id: data.organizationId,
+              definition_id: definitionId,
+              entity_kind: "employee",
+              entity_id: newUserId,
+              updated_at: new Date().toISOString(),
+            };
+            if (dataType === "number") row.value_number = value === "" || value == null ? null : Number(value);
+            else if (dataType === "boolean") row.value_boolean = Boolean(value);
+            else if (dataType === "date") row.value_date = (value as string) || null;
+            else row.value_text = value == null ? null : String(value);
+            return row;
+          });
+        if (valueRows.length) {
+          const { error: cfErr } = await supabaseAdmin
+            .from("custom_field_values")
+            .upsert(valueRows as any, { onConflict: "definition_id,entity_id" });
+          if (cfErr) console.warn("custom field value write failed", cfErr.message);
+        }
       }
 
       return { userId: newUserId, email: effectiveEmail };

@@ -58,7 +58,7 @@ export function EmployeesPage() {
   const [manualOpen, setManualOpen] = useState(false);
   const [resetUser, setResetUser] = useState<{ id: string; name: string } | null>(null);
   const [tempPassword, setTempPassword] = useState(() => genPassword());
-  const [credentialsShown, setCredentialsShown] = useState<{ identifier: string; password: string } | null>(null);
+  const [credentialsShown, setCredentialsShown] = useState<{ identifier: string; password: string; newStaffId?: string } | null>(null);
   const [caseloadFor, setCaseloadFor] = useState<{ id: string; name: string; role: string } | null>(null);
   // Manual "add employee" onboarding form: de-escalation / ABI requirement
   // defaults to Required until the admin deliberately reviews it.
@@ -210,8 +210,8 @@ export function EmployeesPage() {
 
   const manualMutation = useMutation({
     mutationFn: async (input: {
-      firstName: string; lastName: string; username: string; email: string;
-      role: Role; department: string; startDate: string; endDate: string; trackIds: string[]; password: string;
+      firstName: string; lastName: string; email: string; phone: string;
+      role: Role; startDate: string; endDate: string; trackIds: string[]; password: string;
       requiresDeescalation: boolean; requiresAbi: boolean;
     }) => {
       if (input.startDate && input.endDate && input.endDate < input.startDate) {
@@ -219,9 +219,9 @@ export function EmployeesPage() {
       }
       return await createManual({ data: {
         organizationId: org!.organization_id,
-        firstName: input.firstName, lastName: input.lastName, username: input.username,
-        email: input.email, temporaryPassword: input.password, role: input.role,
-        department: input.department, hireDate: input.startDate,
+        firstName: input.firstName, lastName: input.lastName,
+        email: input.email, phone: input.phone, temporaryPassword: input.password, role: input.role,
+        hireDate: input.startDate,
         startDate: input.startDate, endDate: input.endDate,
         trackIds: input.trackIds,
         requiresDeescalation: input.requiresDeescalation,
@@ -231,15 +231,10 @@ export function EmployeesPage() {
 
     onSuccess: (res, vars) => {
       toast.success("Employee account created");
-      setCredentialsShown({ identifier: vars.email || vars.username, password: vars.password });
+      setCredentialsShown({ identifier: vars.email, password: vars.password, newStaffId: res?.userId || undefined });
       setManualOpen(false);
       setTempPassword(genPassword());
       qc.invalidateQueries({ queryKey: ["members"] });
-      // Auto-open checklist panel for the new employee so required fields are immediately visible
-      if (res?.userId) {
-        const name = `${vars.firstName} ${vars.lastName}`.trim();
-        setCompliancePanelStaff({ id: res.userId, name, isNew: true });
-      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -547,11 +542,10 @@ export function EmployeesPage() {
             manualMutation.mutate({
               firstName: String(fd.get("first_name") || "").trim(),
               lastName: String(fd.get("last_name") || "").trim(),
-              username: String(fd.get("username") || "").trim(),
               email: String(fd.get("email") || "").trim(),
+              phone: String(fd.get("phone") || "").trim(),
               role: String(fd.get("role") || "employee") as Role,
-              department: String(fd.get("department") || "").trim(),
-              startDate: String(fd.get("start_date") || ""),
+              startDate: String(fd.get("hire_date") || ""),
               endDate: String(fd.get("end_date") || ""),
 
               trackIds,
@@ -565,9 +559,28 @@ export function EmployeesPage() {
               <div className="grid gap-2"><Label htmlFor="first_name">First name</Label><Input id="first_name" name="first_name" required /></div>
               <div className="grid gap-2"><Label htmlFor="last_name">Last name</Label><Input id="last_name" name="last_name" required /></div>
             </div>
+            <div className="grid gap-2">
+              <Label htmlFor="email">Email address · used for sign-in <span className="text-destructive">*</span></Label>
+              <Input id="email" name="email" type="email" required />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="phone">Phone number</Label>
+              <Input id="phone" name="phone" type="tel" required />
+            </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2"><Label htmlFor="username">Username</Label><Input id="username" name="username" required pattern="[a-zA-Z0-9._-]+" /></div>
-              <div className="grid gap-2"><Label htmlFor="email">Email (optional)</Label><Input id="email" name="email" type="email" /></div>
+              <div className="grid gap-2"><Label htmlFor="hire_date">Hire date <span className="text-destructive">*</span></Label><Input id="hire_date" name="hire_date" type="date" required /><p className="text-xs text-muted-foreground">All training deadlines are calculated from this date.</p></div>
+              <div className="grid gap-2"><Label htmlFor="end_date">End date (optional)</Label><Input id="end_date" name="end_date" type="date" /></div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="role">Role</Label>
+              <Select name="role" defaultValue="employee">
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="password">Temporary password</Label>
@@ -577,24 +590,6 @@ export function EmployeesPage() {
                 <Button type="button" variant="outline" onClick={() => { navigator.clipboard.writeText(tempPassword); toast.success("Copied"); }}><Copy className="h-3.5 w-3.5" /></Button>
               </div>
               <p className="text-xs text-muted-foreground">Employee will be prompted to change this on first login.</p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2">
-                <Label htmlFor="role">Role</Label>
-                <Select name="role" defaultValue="employee">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="employee">Employee</SelectItem>
-                    <SelectItem value="manager">Manager</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2"><Label htmlFor="department">Department / team</Label><Input id="department" name="department" /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2"><Label htmlFor="start_date">Start date <span className="text-destructive">*</span></Label><Input id="start_date" name="start_date" type="date" required /><p className="text-xs text-muted-foreground">All training deadlines are calculated from this date.</p></div>
-              <div className="grid gap-2"><Label htmlFor="end_date">End date (optional)</Label><Input id="end_date" name="end_date" type="date" /></div>
             </div>
 
             <div className="grid gap-3 rounded-md border border-border bg-muted/30 p-3">
@@ -686,7 +681,17 @@ export function EmployeesPage() {
               </div>
             </div>
           )}
-          <DialogFooter><Button onClick={() => setCredentialsShown(null)}>Done</Button></DialogFooter>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                const newStaffId = credentialsShown?.newStaffId;
+                setCredentialsShown(null);
+                if (newStaffId) window.location.href = `/dashboard/employees/${newStaffId}?tab=record`;
+              }}
+            >
+              Done
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

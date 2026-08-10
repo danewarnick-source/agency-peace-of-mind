@@ -90,7 +90,14 @@ import {
 import { recordAttestation, listAttestations } from "@/lib/document-attestations.functions";
 import { listPolicyAcknowledgmentsForStaff } from "@/lib/policy-signatures.functions";
 
+const PROFILE_TABS = ["profile", "record", "requirements", "checklist", "activity", "hrdocs", "deadlines"] as const;
+type ProfileTab = (typeof PROFILE_TABS)[number];
+
 export const Route = createFileRoute("/dashboard/employees/$staffId")({
+  validateSearch: (s: Record<string, unknown>): { tab?: ProfileTab } =>
+    typeof s.tab === "string" && (PROFILE_TABS as readonly string[]).includes(s.tab)
+      ? { tab: s.tab as ProfileTab }
+      : {},
   component: () => (
     <RequirePermission perm="manage_users">
       <StaffProfilePage />
@@ -100,10 +107,13 @@ export const Route = createFileRoute("/dashboard/employees/$staffId")({
 
 function StaffProfilePage() {
   const { staffId } = Route.useParams();
+  const { tab } = Route.useSearch();
   const { data: org } = useCurrentOrg();
   const { user } = useAuth();
   const router = useRouter();
   const qc = useQueryClient();
+  const navigate = Route.useNavigate();
+  const activeTab: ProfileTab = tab ?? "profile";
 
   const orgId = org?.organization_id;
   const isSelf = user?.id === staffId;
@@ -368,9 +378,14 @@ function StaffProfilePage() {
         </Button>
       </div>
 
-      <Tabs defaultValue="profile" className="w-full">
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => navigate({ search: (prev) => ({ ...prev, tab: v === "profile" ? undefined : (v as ProfileTab) }) })}
+        className="w-full"
+      >
         <TabsList className="flex flex-wrap h-auto justify-start">
           <TabsTrigger value="profile">Overview</TabsTrigger>
+          <TabsTrigger value="record">Staff record</TabsTrigger>
           <TabsTrigger value="requirements">Certs &amp; trainings</TabsTrigger>
           <TabsTrigger value="checklist">
             Compliance Checklist{needsActionCount > 0 ? ` (${needsActionCount})` : ""}
@@ -514,6 +529,40 @@ function StaffProfilePage() {
           </SectionGroup>
         </TabsContent>
 
+        {/* ----- STAFF RECORD ----- */}
+        {/* Landing spot after "Add employee manually" — the raw HR record
+            fields (contact, staff types, custom fields), separate from the
+            at-a-glance Overview tab. */}
+        <TabsContent value="record" className="mt-4 space-y-6">
+          <SectionGroup label="Identity & contact" hint="Who this person is">
+            <SectionPanel icon={Contact} accent="violet">
+              <ContactCard
+                orgId={orgId}
+                staffId={staffId}
+                p={p}
+                m={m}
+                positions={positions}
+                onSaved={invalidateProfile}
+              />
+            </SectionPanel>
+          </SectionGroup>
+
+          <SectionGroup label="Staff types" hint="Union rule: required for any type selected" divider>
+            <SectionPanel icon={Briefcase} accent="teal">
+              <StaffTypeEditor organizationId={orgId} staffId={staffId} />
+            </SectionPanel>
+          </SectionGroup>
+
+          <SectionGroup label="Custom attributes" hint="Extra fields imported or added manually" divider>
+            <SectionPanel icon={ClipboardList} accent="sky">
+              <CustomAttributesSection
+                organizationId={orgId}
+                entityKind="employee"
+                entityId={staffId}
+              />
+            </SectionPanel>
+          </SectionGroup>
+        </TabsContent>
 
         {/* ----- CERTS & TRAININGS ----- */}
         <TabsContent value="requirements" className="mt-4 space-y-10">

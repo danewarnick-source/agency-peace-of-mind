@@ -72,6 +72,32 @@ export const createEmployeeManually = createServerFn({ method: "POST" })
       if (startDate && endDate && endDate < startDate) {
         throw new Error("End date must be on or after Start date.");
       }
+
+      // Custom field values are keyed by the field's id (as configured in
+      // organizations.feature_config.staff_intake_fields.custom_fields), but
+      // stored on the profile keyed by field name — profiles.custom_attributes
+      // and feature_config are the only two places this data lives, no
+      // custom_field_definitions/custom_field_values involved.
+      const customFieldEntries = Object.entries(data.customFieldValues).filter(
+        ([, v]) => v !== undefined && v !== "",
+      );
+      const customAttributes: Record<string, unknown> = {};
+      if (customFieldEntries.length) {
+        const { data: orgRow } = await supabaseAdmin
+          .from("organizations")
+          .select("feature_config")
+          .eq("id", data.organizationId)
+          .maybeSingle();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const customFieldDefs = ((orgRow as any)?.feature_config?.staff_intake_fields?.custom_fields ?? []) as
+          Array<{ id: string; name: string }>;
+        const nameById = new Map(customFieldDefs.map((f) => [f.id, f.name]));
+        for (const [fieldId, value] of customFieldEntries) {
+          const name = nameById.get(fieldId);
+          if (name) customAttributes[name] = value;
+        }
+      }
+
       // Upsert profile (handle_new_user trigger may have created a stub)
       const { error: profErr } = await supabaseAdmin.from("profiles").upsert({
         id: newUserId,
@@ -91,6 +117,7 @@ export const createEmployeeManually = createServerFn({ method: "POST" })
         is_active: true,
         requires_deescalation: data.requiresDeescalation,
         requires_abi: data.requiresAbi,
+        custom_attributes: customAttributes,
       } as any, { onConflict: "id" });
 
       if (profErr) throw new Error(profErr.message);
@@ -122,44 +149,6 @@ export const createEmployeeManually = createServerFn({ method: "POST" })
         }));
         const { error: trackErr } = await supabaseAdmin.from("track_assignments").insert(rows);
         if (trackErr) console.warn("track assignment failed", trackErr.message);
-      }
-
-      // Optional: custom field values, keyed by custom_field_definitions.id
-      const customFieldEntries = Object.entries(data.customFieldValues).filter(
-        ([, v]) => v !== undefined,
-      );
-      if (customFieldEntries.length) {
-        const { data: defs } = await supabaseAdmin
-          .from("custom_field_definitions")
-          .select("id, data_type")
-          .eq("organization_id", data.organizationId)
-          .eq("entity_kind", "employee")
-          .in("id", customFieldEntries.map(([definitionId]) => definitionId));
-        const defTypeById = new Map((defs ?? []).map((d) => [d.id as string, d.data_type as string]));
-
-        const valueRows = customFieldEntries
-          .filter(([definitionId]) => defTypeById.has(definitionId))
-          .map(([definitionId, value]) => {
-            const dataType = defTypeById.get(definitionId);
-            const row: Record<string, unknown> = {
-              organization_id: data.organizationId,
-              definition_id: definitionId,
-              entity_kind: "employee",
-              entity_id: newUserId,
-              updated_at: new Date().toISOString(),
-            };
-            if (dataType === "number") row.value_number = value === "" || value == null ? null : Number(value);
-            else if (dataType === "boolean") row.value_boolean = Boolean(value);
-            else if (dataType === "date") row.value_date = (value as string) || null;
-            else row.value_text = value == null ? null : String(value);
-            return row;
-          });
-        if (valueRows.length) {
-          const { error: cfErr } = await supabaseAdmin
-            .from("custom_field_values")
-            .upsert(valueRows as any, { onConflict: "definition_id,entity_id" });
-          if (cfErr) console.warn("custom field value write failed", cfErr.message);
-        }
       }
 
       return { userId: newUserId, email: effectiveEmail };

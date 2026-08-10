@@ -18,7 +18,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Mail, UserPlus, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal, Ban, ExternalLink } from "lucide-react";
+import { Mail, UserPlus, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal, Ban, ExternalLink, Settings } from "lucide-react";
+import { StaffFieldsPanel } from "@/components/hr/staff-fields-panel";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { OnboardingReturnBar } from "@/components/onboarding/onboarding-return-bar";
@@ -66,6 +67,7 @@ export function EmployeesPage() {
   const [manualRequiresAbi, setManualRequiresAbi] = useState(true);
   // Compliance panel state
   const [compliancePanelStaff, setCompliancePanelStaff] = useState<{ id: string; name: string; isNew?: boolean } | null>(null);
+  const [staffFieldsOpen, setStaffFieldsOpen] = useState(false);
 
   const fetchMatrix = useServerFn(getHrComplianceMatrix);
   const { data: complianceMatrix } = useQuery({
@@ -285,6 +287,9 @@ export function EmployeesPage() {
 
           <Button variant="outline" onClick={() => { setTempPassword(genPassword()); setManualRequiresDeescalation(true); setManualRequiresAbi(true); setManualOpen(true); }}>
             <ShieldPlus className="mr-2 h-4 w-4" /> Add manually
+          </Button>
+          <Button variant="outline" onClick={() => setStaffFieldsOpen(true)}>
+            <Settings className="mr-2 h-4 w-4" /> Settings
           </Button>
           <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
             <DialogTrigger asChild>
@@ -700,6 +705,14 @@ export function EmployeesPage() {
         organizationId={org?.organization_id ?? null}
         onClose={() => setCaseloadFor(null)}
       />
+
+      {org && (
+        <StaffFieldsPanel
+          open={staffFieldsOpen}
+          onOpenChange={setStaffFieldsOpen}
+          organizationId={org.organization_id}
+        />
+      )}
 
       {org && compliancePanelStaff && (
         <StaffCompliancePanel

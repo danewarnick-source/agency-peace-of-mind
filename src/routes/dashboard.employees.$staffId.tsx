@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -13,6 +13,7 @@ import {
   Pencil,
   Eye,
   ChevronDown,
+  ChevronUp,
   ChevronRight,
   FileSignature,
   Download,
@@ -106,6 +107,75 @@ export const Route = createFileRoute("/dashboard/employees/$staffId")({
     </RequirePermission>
   ),
 });
+
+function sectionStorageKey(staffId: string, section: string): string {
+  return `hive:staff-record-section:${staffId}:${section}`;
+}
+
+/**
+ * Collapsible variant of SectionGroup for the Staff record tab — everything
+ * below ComplianceStatusHeader defaults to collapsed so the page needs zero
+ * scrolling on open. Expanded/collapsed state persists per staff member in
+ * localStorage so it survives re-visiting the same profile this session.
+ */
+function CollapsibleSectionGroup({
+  storageKey,
+  label,
+  hint,
+  summary,
+  divider,
+  children,
+}: {
+  storageKey: string;
+  label: string;
+  hint?: string;
+  summary: string;
+  divider?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const stored = typeof window !== "undefined" ? window.localStorage.getItem(storageKey) : null;
+    setOpen(stored === "open");
+    // Re-read when the section identity changes (e.g. navigating between staff profiles).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
+
+  const toggle = () => {
+    setOpen((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") window.localStorage.setItem(storageKey, next ? "open" : "closed");
+      return next;
+    });
+  };
+
+  return (
+    <section className={divider ? "space-y-5 pt-8 border-t border-border/60" : "space-y-5"}>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 rounded-md px-1 py-1 text-left hover:bg-muted/40"
+      >
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 min-w-0">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground shrink-0">
+            {label}
+          </h2>
+          <span className="truncate text-xs text-muted-foreground/80">
+            {open ? hint : summary}
+          </span>
+        </div>
+        {open ? (
+          <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+        ) : (
+          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+        )}
+      </button>
+      {open && <div className="space-y-6">{children}</div>}
+    </section>
+  );
+}
 
 function StaffProfilePage() {
   const { staffId } = Route.useParams();
@@ -227,6 +297,37 @@ function StaffProfilePage() {
     queryKey: ["staff-checklist", orgId, staffId],
     queryFn: () => fetchChecklistForBadge({ data: { organization_id: orgId!, staff_id: staffId } }),
     staleTime: 30_000,
+  });
+
+  // Same current/expiring/overdue/todo/na tally classifyChecklistRow uses for
+  // the compliance-status header — reused for the collapsed-section summaries
+  // below (HR Compliance Checklist, Certifications & training).
+  const checklistTally = useMemo(() => {
+    const tally = { current: 0, expiring: 0, overdue: 0, todo: 0 };
+    for (const row of checklistBadgeQ.data ?? []) {
+      const kind = classifyChecklistRow(row);
+      if (kind === "na") continue;
+      tally[kind]++;
+    }
+    return tally;
+  }, [checklistBadgeQ.data]);
+
+  // Doc count for the collapsed "HR documents" summary — same queryKey as
+  // StaffHrDocsPanel's own fetch, so React Query dedupes.
+  const hrDocsCountQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["staff-profile-hrdocs", orgId, staffId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("hr_documents")
+        .select("id, document_kind, file_name, created_at, size_bytes")
+        .eq("organization_id", orgId!)
+        .eq("staff_id", staffId)
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return data ?? [];
+    },
   });
 
   // All active teams in the org (for team picker)
@@ -387,7 +488,12 @@ function StaffProfilePage() {
             isLoading={checklistBadgeQ.isLoading}
           />
 
-          <SectionGroup label="HR Compliance Checklist" hint="Full per-staff requirements — evidence, sign-off, attestation, training hours">
+          <CollapsibleSectionGroup
+            storageKey={sectionStorageKey(staffId, "checklist")}
+            label="HR Compliance Checklist"
+            hint="Full per-staff requirements — evidence, sign-off, attestation, training hours"
+            summary={`${checklistTally.current + checklistTally.expiring + checklistTally.overdue + checklistTally.todo} items · ${checklistTally.overdue} overdue · ${checklistTally.expiring + checklistTally.todo} pending · ${checklistTally.current} complete`}
+          >
             <SectionPanel icon={ClipboardList} accent="emerald">
               <div id="staff-hr-checklist-section">
                 <StaffHrChecklistCard
@@ -398,21 +504,43 @@ function StaffProfilePage() {
                 />
               </div>
             </SectionPanel>
-          </SectionGroup>
+          </CollapsibleSectionGroup>
 
-          <SectionGroup label="Certifications & training" hint="Current status and history" divider>
+          <CollapsibleSectionGroup
+            storageKey={sectionStorageKey(staffId, "certs")}
+            label="Certifications & training"
+            hint="Current status and history"
+            summary={`Current: ${checklistTally.current} · Expiring: ${checklistTally.expiring} · Overdue: ${checklistTally.overdue} · To do: ${checklistTally.todo}`}
+            divider
+          >
             <SectionPanel icon={GraduationCap} accent="amber">
               <CertsTab organizationId={orgId} staffId={staffId} staffName={name} caseload={caseloadQ.data ?? []} orgRole={org?.role} />
             </SectionPanel>
-          </SectionGroup>
+          </CollapsibleSectionGroup>
 
-          <SectionGroup label="HR documents" hint="Signed & uploaded files" divider>
+          <CollapsibleSectionGroup
+            storageKey={sectionStorageKey(staffId, "hrdocs")}
+            label="HR documents"
+            hint="Signed & uploaded files"
+            summary={
+              (hrDocsCountQ.data?.length ?? 0) > 0
+                ? `${hrDocsCountQ.data!.length} document${hrDocsCountQ.data!.length === 1 ? "" : "s"} on file`
+                : "No documents uploaded"
+            }
+            divider
+          >
             <SectionPanel icon={FolderArchive} accent="violet">
               <StaffHrDocsPanel organizationId={orgId} staffId={staffId} />
             </SectionPanel>
-          </SectionGroup>
+          </CollapsibleSectionGroup>
 
-          <SectionGroup label="Sensitive HR" hint="Restricted access" divider>
+          <CollapsibleSectionGroup
+            storageKey={sectionStorageKey(staffId, "sensitive")}
+            label="Sensitive HR"
+            hint="Restricted access"
+            summary="Restricted access · admin only"
+            divider
+          >
             <SectionPanel icon={Lock} accent="rose">
               <HrSensitiveCard
                 orgId={orgId}
@@ -421,7 +549,7 @@ function StaffProfilePage() {
                 orgRole={org?.role}
               />
             </SectionPanel>
-          </SectionGroup>
+          </CollapsibleSectionGroup>
         </TabsContent>
 
         {/* ----- PROFILE ----- */}

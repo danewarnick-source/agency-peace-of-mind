@@ -6,6 +6,172 @@ it worked before moving on.
 
 ---
 
+## ACTION — Authoritative Sources compliance overhaul: new columns + `nectar_compliance_instances` (2026-08-11)
+
+**What this is for:** Foundation for the compliance overhaul — each
+`nectar_requirements` row gains verification metadata (internal vs.
+external, how it's checked, its recurrence pattern, a plain-language
+explanation, and an optional link into the feature that produces its
+evidence), a new `nectar_compliance_instances` table tracks each concrete
+occurrence of a requirement coming due and being resolved, and
+`nectar_attestations` gains columns to link an attestation back to the
+instance it resolves and to record the staff's raw input alongside
+Nectar's expanded version. Additive only — no existing column, table, or
+row is changed except the one backfill in step 5, which only sets a new
+column's value. Matches migration
+`supabase/migrations/20260811090000_add_compliance_overhaul_columns.sql`
+in the repo (schema-only, steps 1–4) — run these against the live DB since
+migrations here don't auto-apply there.
+
+RLS on the new table follows this repo's standard org-scoping helpers
+(`is_org_member` / `is_org_admin_or_manager`) rather than inlined
+subqueries, to match every other org-data table.
+
+### 1. `nectar_requirements` — verification + evidence columns
+
+```sql
+ALTER TABLE public.nectar_requirements
+  ADD COLUMN IF NOT EXISTS verification_type text
+    CHECK (verification_type IN ('internal','external')) DEFAULT 'external',
+  ADD COLUMN IF NOT EXISTS verification_type_source text
+    CHECK (verification_type_source IN ('auto_regex','auto_ai','manual_override'))
+    DEFAULT 'auto_regex',
+  ADD COLUMN IF NOT EXISTS compliance_pattern text
+    CHECK (compliance_pattern IN
+      ('one_time','renewal','event_driven','ongoing_per_shift','continuous')),
+  ADD COLUMN IF NOT EXISTS plain_language_explanation text,
+  ADD COLUMN IF NOT EXISTS evidence_registered boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS feature_link jsonb;
+```
+
+`feature_link`, when set, is shaped:
+
+```
+{ "feature": "incidents" | "shift_notes" | "summaries" | "emar" | "forms" | "pcsp",
+  "create_new_label": string,
+  "view_existing_label": string,
+  "report_route": string }
+```
+
+**What you'll see:** "Success. No rows returned." All six columns are
+additive with defaults (or nullable), so existing rows are unaffected.
+
+---
+
+### 2. `nectar_compliance_instances` table
+
+```sql
+CREATE TABLE IF NOT EXISTS public.nectar_compliance_instances (
+  id               uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id  uuid        NOT NULL REFERENCES public.organizations(id)       ON DELETE CASCADE,
+  requirement_id   uuid        NOT NULL REFERENCES public.nectar_requirements(id) ON DELETE CASCADE,
+  triggered_by_id  uuid,
+  triggered_by_kind text       CHECK (triggered_by_kind IN
+                                 ('incident','shift','client_assignment','authorization','period','manual')),
+  triggered_at     timestamptz NOT NULL DEFAULT now(),
+  deadline_at      timestamptz NOT NULL,
+  status           text        NOT NULL DEFAULT 'open'
+                                 CHECK (status IN ('open','resolved','overdue')),
+  resolved_at      timestamptz,
+  resolved_by      uuid        REFERENCES public.profiles(id),
+  resolved_via     text        CHECK (resolved_via IN ('auto','attestation','upload','both')),
+  resolution_note  text,
+  external_reference text,
+  attestation_id   uuid        REFERENCES public.nectar_attestations(id),
+  document_url     text,
+  created_at       timestamptz NOT NULL DEFAULT now()
+);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.nectar_compliance_instances TO authenticated;
+GRANT ALL                            ON public.nectar_compliance_instances TO service_role;
+
+ALTER TABLE public.nectar_compliance_instances ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "nci_read" ON public.nectar_compliance_instances
+  FOR SELECT TO authenticated
+  USING (public.is_org_member(organization_id, auth.uid()));
+
+CREATE POLICY "nci_write" ON public.nectar_compliance_instances
+  FOR ALL TO authenticated
+  USING  (public.is_org_admin_or_manager(organization_id, auth.uid()))
+  WITH CHECK (public.is_org_admin_or_manager(organization_id, auth.uid()));
+
+CREATE INDEX IF NOT EXISTS idx_compliance_instances_org    ON public.nectar_compliance_instances(organization_id);
+CREATE INDEX IF NOT EXISTS idx_compliance_instances_req    ON public.nectar_compliance_instances(requirement_id);
+CREATE INDEX IF NOT EXISTS idx_compliance_instances_status ON public.nectar_compliance_instances(status);
+```
+
+**What you'll see:** `CREATE TABLE`, two `GRANT`, `ALTER TABLE`, two
+`CREATE POLICY`, three `CREATE INDEX`.
+
+**Note on write access:** only admins/managers can write directly per
+`nci_write`, matching every other org-data table's pattern in this repo.
+If staff-initiated shift/incident triggers need to insert rows themselves
+(not just Nectar backend code running as service_role), say so and we'll
+add a narrower staff-insert policy scoped to `triggered_by_kind` values
+they're allowed to originate.
+
+---
+
+### 3. `nectar_attestations` — link to instances + raw/expanded input
+
+```sql
+ALTER TABLE public.nectar_attestations
+  ADD COLUMN IF NOT EXISTS covers_instance_id uuid REFERENCES public.nectar_compliance_instances(id),
+  ADD COLUMN IF NOT EXISTS original_staff_input text,
+  ADD COLUMN IF NOT EXISTS nectar_expanded_output text,
+  ADD COLUMN IF NOT EXISTS input_confirmed_at timestamptz,
+  ADD COLUMN IF NOT EXISTS covers_staff_id uuid REFERENCES public.profiles(id),
+  ADD COLUMN IF NOT EXISTS covers_client_id uuid REFERENCES public.clients(id);
+```
+
+**What you'll see:** "Success. No rows returned." All six columns are
+nullable, so existing rows are unaffected.
+
+---
+
+### 4. Shift documentation table — link to attestations
+
+Confirmed from `src/hooks/use-general-shift.tsx` (reads/writes
+`.from("general_shifts")`, with a `note` column staff type into at
+clock-out) that **`general_shifts`** is the shift-documentation table —
+no placeholder substitution needed.
+
+```sql
+ALTER TABLE public.general_shifts
+  ADD COLUMN IF NOT EXISTS nectar_raw_input text,
+  ADD COLUMN IF NOT EXISTS nectar_attestation_id uuid REFERENCES public.nectar_attestations(id);
+```
+
+**What you'll see:** "Success. No rows returned." Both columns are
+nullable, so existing rows are unaffected.
+
+---
+
+### 5. Backfill `evidence_registered` for known requirements
+
+One-time data backfill on production organizations only (`is_demo =
+false`) — run this last, after step 1 has added the column.
+
+```sql
+UPDATE public.nectar_requirements
+SET evidence_registered = true
+WHERE requirement_key IN (
+  'background_screening','oig_exclusion','medicaid_disclosure',
+  'shift_note','quarterly_summary','pcsp','incident_report',
+  'cpr_first_aid','thirty_day_training','annual_training','fraud_exclusion'
+)
+AND organization_id IN (
+  SELECT id FROM public.organizations WHERE is_demo = false
+);
+```
+
+**What you'll see:** "Success. N rows updated" where N is however many
+matching requirement rows exist across non-demo orgs today (0 is a valid
+answer if none of those `requirement_key` values exist yet for any org).
+
+---
+
 ## ACTION — Add profiles.custom_attributes for org-defined staff intake fields (2026-08-10)
 
 **What this is for:** The add-employee dialog now collects org-defined custom

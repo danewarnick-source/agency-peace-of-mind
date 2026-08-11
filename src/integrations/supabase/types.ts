@@ -6291,9 +6291,11 @@ export type Database = {
           manager_note_text: string | null
           matched_approved_location_id: string | null
           matched_approved_location_label: string | null
+          nectar_attestation_id: string | null
           nectar_drafted: boolean
           nectar_drafted_confirmed_at: string | null
           nectar_drafted_confirmed_by: string | null
+          nectar_raw_input: string | null
           organization_id: string
           outside_geofence_reason: string | null
           raw_clock_in: string | null
@@ -6375,9 +6377,11 @@ export type Database = {
           manager_note_text?: string | null
           matched_approved_location_id?: string | null
           matched_approved_location_label?: string | null
+          nectar_attestation_id?: string | null
           nectar_drafted?: boolean
           nectar_drafted_confirmed_at?: string | null
           nectar_drafted_confirmed_by?: string | null
+          nectar_raw_input?: string | null
           organization_id: string
           outside_geofence_reason?: string | null
           raw_clock_in?: string | null
@@ -6459,9 +6463,11 @@ export type Database = {
           manager_note_text?: string | null
           matched_approved_location_id?: string | null
           matched_approved_location_label?: string | null
+          nectar_attestation_id?: string | null
           nectar_drafted?: boolean
           nectar_drafted_confirmed_at?: string | null
           nectar_drafted_confirmed_by?: string | null
+          nectar_raw_input?: string | null
           organization_id?: string
           outside_geofence_reason?: string | null
           raw_clock_in?: string | null

@@ -321,8 +321,15 @@ export function PunchPad({
   const [shorthand, setShorthand]             = useState("");
   const [nectarDraft, setNectarDraft]         = useState<string | null>(null);
   const [draftBusy, setDraftBusy]             = useState(false);
-  const [draftConfirmed, setDraftConfirmed]   = useState(false);
   const [nectarUsed, setNectarUsed]           = useState(false);
+  // Original shorthand as typed/spoken at the moment NECTAR drafted from it —
+  // kept separate from `shorthand` (which the staff can keep editing) so the
+  // attestation always records what was actually handed to NECTAR.
+  const [nectarRawInput, setNectarRawInput]   = useState<string | null>(null);
+  // Per-paragraph "this is accurate" confirmation, keyed by paragraph index
+  // into the current narrative. Reset whenever the narrative text changes so
+  // an edited paragraph can't ride on a stale checkmark.
+  const [paragraphChecks, setParagraphChecks] = useState<Record<number, boolean>>({});
   const [isRecording, setIsRecording]         = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -930,8 +937,22 @@ export function PunchPad({
     return t.split(/\s+/).filter(Boolean).length;
   }, [narrative]);
 
+  // NECTAR-expanded note review: split into paragraphs so staff confirm each
+  // one individually rather than blanket-attesting to the whole draft.
+  const narrativeParagraphs = useMemo(() => {
+    if (!nectarUsed) return [] as string[];
+    const t = narrative.trim();
+    if (!t) return [] as string[];
+    let parts = t.split(/\n\s*\n+/).map((p) => p.trim()).filter(Boolean);
+    if (parts.length <= 1) parts = t.split(/\n+/).map((p) => p.trim()).filter(Boolean);
+    return parts.length > 0 ? parts : [t];
+  }, [narrative, nectarUsed]);
+
   const hasGoalSelected    = baselineChecked || Object.values(checkedGoals).some(Boolean);
   const narrativeOk        = wordCount >= 50;
+  const draftConfirmed     =
+    nectarUsed && narrativeParagraphs.length > 0 &&
+    narrativeParagraphs.every((_, i) => !!paragraphChecks[i]);
   const nectarConfirmOk    = !nectarUsed || draftConfirmed;
   const behaviorError      = behaviorEnabled ? validateBehaviorAnswers(behaviorAnswers) : null;
   const behaviorOk         = behaviorError === null;
@@ -982,7 +1003,8 @@ export function PunchPad({
     setShorthand("");
     setNectarDraft(null);
     setDraftBusy(false);
-    setDraftConfirmed(false);
+    setNectarRawInput(null);
+    setParagraphChecks({});
     setNectarUsed(false);
     setCompletenessRan(false);
     setCompletenessFlags([]);
@@ -1243,7 +1265,8 @@ export function PunchPad({
         data: { shorthand: text, goals: selectedGoalsForAi, clientFirstName: clientFirst },
       });
       setNectarDraft(res.draft);
-      setDraftConfirmed(false);
+      setNectarRawInput(text);
+      setParagraphChecks({});
       setNectarUsed(true);
     } catch (e) {
       toast.error((e as Error).message || "NECTAR couldn't draft the note — please try again.");
@@ -1257,6 +1280,7 @@ export function PunchPad({
     setNarrative(nectarDraft);
     setAiCoach(null);
     setShowNarrativeError(false);
+    setParagraphChecks({});
   }
 
   async function handleDraftVariance(phase: "clock_in" | "clock_out") {
@@ -1513,6 +1537,37 @@ export function PunchPad({
       update.nectar_drafted = true;
       update.nectar_drafted_confirmed_at = clockOut;
       update.nectar_drafted_confirmed_by = user.id;
+
+      // Log the immutable Medicaid-fraud attestation and preserve the
+      // staff's original shorthand alongside NECTAR's expanded output —
+      // required before this shift's note can be treated as reviewed.
+      const rawInput = nectarRawInput ?? shorthand.trim();
+      const { data: attRow, error: attErr } = await supabase
+        .from("nectar_attestations")
+        .insert({
+          organization_id: org?.organization_id ?? null,
+          user_id: user.id,
+          user_display_name: user.email ?? null,
+          scope: "shift_note",
+          scope_ref_id: active.id,
+          scope_ref_type: "evv_timesheet",
+          statement:
+            "I confirm this shift note accurately reflects the services I personally provided on this date. " +
+            "I understand that submitting inaccurate documentation may constitute Medicaid fraud.",
+          context: { client_id: active.client_id },
+          original_staff_input: rawInput,
+          nectar_expanded_output: nectarDraft,
+          input_confirmed_at: clockOut,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any)
+        .select("id")
+        .single();
+      if (attErr || !attRow) {
+        toast.error(`Attestation log failed: ${attErr?.message ?? "unknown error"}`);
+        return;
+      }
+      update.nectar_raw_input = rawInput;
+      update.nectar_attestation_id = (attRow as { id: string }).id;
     }
     if (args.outsideReason) update.outside_geofence_reason = args.outsideReason;
     if (args.gpsBypassReason) {
@@ -1764,7 +1819,7 @@ export function PunchPad({
       return;
     }
     if (nectarUsed && !draftConfirmed) {
-      toast.error("Please review the NECTAR-drafted note and check the confirmation box before submitting.");
+      toast.error("Please review and confirm every paragraph of the NECTAR-drafted note before submitting.");
       return;
     }
     if (behaviorEnabled && behaviorError) {
@@ -2869,7 +2924,7 @@ export function PunchPad({
                             type="button"
                             size="sm"
                             variant="ghost"
-                            onClick={() => { setNectarDraft(null); setNectarUsed(false); setDraftConfirmed(false); }}
+                            onClick={() => { setNectarDraft(null); setNectarUsed(false); setNectarRawInput(null); setParagraphChecks({}); }}
                             className="min-h-[44px]"
                           >
                             Discard draft
@@ -2898,7 +2953,7 @@ export function PunchPad({
                       setNarrative(e.target.value);
                       if (showNarrativeError) setShowNarrativeError(false);
                       if (aiCoach) setAiCoach(null);
-                      if (draftConfirmed) setDraftConfirmed(false);
+                      if (Object.keys(paragraphChecks).length > 0) setParagraphChecks({});
                     }}
                     placeholder="Describe client behaviors, choices, goal responses, and any incidents observed during this shift…"
                     maxLength={5000}
@@ -2913,21 +2968,37 @@ export function PunchPad({
                       to satisfy state Medicaid auditing and DSPD billing validation criteria.
                     </div>
                   )}
-                  {nectarUsed && (
-                    <label className="mt-1 flex cursor-pointer items-start gap-2 rounded-md border-2 border-[color:var(--amber-400)] bg-[color:var(--amber-50)]/60 px-3 py-2 text-xs">
-                      <input
-                        type="checkbox"
-                        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[color:var(--amber-600)]"
-                        checked={draftConfirmed}
-                        onChange={(e) => setDraftConfirmed(e.target.checked)}
-                      />
-                      <span className="leading-relaxed text-[color:var(--navy-900)]">
-                        <span className="font-semibold">I've reviewed this note and confirm it accurately reflects the shift.</span>
-                        <span className="block text-[10px] text-muted-foreground">
-                          NECTAR drafted a starting point — the final narrative is staff-owned. Required before submission.
-                        </span>
-                      </span>
-                    </label>
+                  {nectarUsed && narrativeParagraphs.length > 0 && (
+                    <div className="mt-1 space-y-2 rounded-md border-2 border-[color:var(--amber-400)] bg-[color:var(--amber-50)]/60 px-3 py-2.5">
+                      <p className="text-xs font-semibold text-[color:var(--navy-900)]">
+                        Review each paragraph before submitting
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        NECTAR drafted a starting point — the final narrative is staff-owned. Confirm every
+                        paragraph accurately reflects what you personally did before you can submit.
+                      </p>
+                      {narrativeParagraphs.map((p, i) => (
+                        <label
+                          key={i}
+                          className="flex cursor-pointer items-start gap-2 rounded-md border border-[color:var(--amber-300)] bg-white px-3 py-2 text-xs"
+                        >
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[color:var(--amber-600)]"
+                            checked={!!paragraphChecks[i]}
+                            onChange={(e) =>
+                              setParagraphChecks((prev) => ({ ...prev, [i]: e.target.checked }))
+                            }
+                          />
+                          <span className="leading-relaxed text-[color:var(--navy-900)]">
+                            <span className="block whitespace-pre-wrap text-foreground">{p}</span>
+                            <span className="mt-1 block font-semibold">
+                              This accurately reflects what I personally did during this shift.
+                            </span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
                   )}
                 </div>
 

@@ -6,6 +6,32 @@ it worked before moving on.
 
 ---
 
+## ACTION — Correction: shift-note attestation columns belong on `evv_timesheets`, not `general_shifts` (2026-08-11)
+
+**What this is for:** Section 4 below (still present, unchanged, for history)
+added `nectar_raw_input` / `nectar_attestation_id` to `public.general_shifts`
+on the assumption that table was "the shift documentation table." That's
+wrong: `general_shifts` only tracks non-client Training/Admin/Travel/Meeting
+time (a free-text `note` column that NECTAR never expands). The actual shift
+note NECTAR expands from shorthand — the one that now gets paragraph-level
+staff attestation before submit — is `public.evv_timesheets.shift_note_text`
+(`src/components/evv/punch-pad.tsx` → `draftShiftNote` in
+`src/lib/ai-coach.functions.ts`). This adds the same two columns there.
+The `general_shifts` columns are left as-is (unused, harmless) — additive
+only, nothing dropped. Matches migration
+`supabase/migrations/20260811220000_shift_note_attestation_columns.sql`.
+
+```sql
+ALTER TABLE public.evv_timesheets
+  ADD COLUMN IF NOT EXISTS nectar_raw_input text,
+  ADD COLUMN IF NOT EXISTS nectar_attestation_id uuid REFERENCES public.nectar_attestations(id);
+```
+
+**What you'll see:** "Success. No rows returned." Both columns are nullable,
+so existing rows are unaffected.
+
+---
+
 ## ACTION — Authoritative Sources compliance overhaul: new columns + `nectar_compliance_instances` (2026-08-11)
 
 **What this is for:** Foundation for the compliance overhaul — each

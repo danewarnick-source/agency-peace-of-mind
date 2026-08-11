@@ -9,8 +9,9 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import { usePortalView } from "@/hooks/use-portal-view";
 import { useDeadlines } from "@/hooks/use-deadlines";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Clock, FileText, ArrowRight, Users, CheckCircle2, ShieldAlert } from "lucide-react";
+import { AlertTriangle, Clock, FileText, ArrowRight, Users, CheckCircle2, ShieldAlert, FileSignature } from "lucide-react";
 import { getHrComplianceMatrix } from "@/lib/hr-staff.functions";
+import { listMyPendingPolicies } from "@/lib/policy-signatures.functions";
 
 import { StaffClientGrid } from "@/components/staff-client-grid";
 import { CompanyOverview } from "@/components/company-overview";
@@ -438,6 +439,53 @@ function AdminComplianceStatus() {
   );
 }
 
+// ─── Staff: Policies to acknowledge ──────────────────────────────────────────
+
+function PoliciesToAcknowledgeCard() {
+  const { user } = useAuth();
+  const { data: org } = useCurrentOrg();
+  const fetchPendingPolicies = useServerFn(listMyPendingPolicies);
+
+  const { data: pendingPolicies } = useQuery({
+    enabled: !!user && !!org?.organization_id,
+    queryKey: ["my-pending-policies", org?.organization_id, user?.id],
+    queryFn: () => fetchPendingPolicies({ data: { organizationId: org!.organization_id } }),
+  });
+  const pending = pendingPolicies?.pending ?? [];
+
+  if (pending.length === 0) return null;
+
+  return (
+    <div className="rounded-2xl border border-amber-400/50 bg-amber-500/5 p-4 shadow-[var(--shadow-card)]">
+      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-900 dark:text-amber-200">
+        <FileSignature className="h-4 w-4" /> Policies to read &amp; acknowledge
+      </h2>
+      <ul className="space-y-2">
+        {pending.map((p) => (
+          <li
+            key={p.id}
+            className="flex items-center justify-between gap-3 rounded-lg border border-amber-300/60 bg-background/60 px-3 py-2.5"
+          >
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{p.title}</p>
+              <p className="text-xs text-muted-foreground">
+                {p.cadence === "annual" ? "Annual acknowledgment" : "One-time"}
+              </p>
+            </div>
+            <Link
+              to="/dashboard/courses/policy/$documentId"
+              params={{ documentId: p.id }}
+              className="flex shrink-0 items-center gap-1 text-xs font-medium text-amber-700 hover:underline dark:text-amber-300"
+            >
+              Read and sign <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function Overview() {
   const { data: org } = useCurrentOrg();
   const { view, subView, hasStoredView } = usePortalView();
@@ -471,6 +519,7 @@ function Overview() {
           />
           <TodayHero />
           <AttentionStrip />
+          <PoliciesToAcknowledgeCard />
           <ComplianceInbox />
           <StaffClientGrid />
 

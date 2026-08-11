@@ -74,9 +74,12 @@ async function loadAckRequiredPolicies(supabase: any, organizationId: string): P
   return (data ?? []) as PolicyDocRow[];
 }
 
+const ANNUAL_ACK_STALE_MS = 365 * 24 * 60 * 60 * 1000;
+
 // ---------- STAFF: policies pending for the current user (My Trainings hub +
-// full-screen gate). Pending = required + in scope + no current signature
-// for the CURRENT version of the document. ----------
+// full-screen gate + Home dashboard card). Pending = required + in scope +
+// either never signed, or (for annual-cadence policies) last signed more
+// than 365 days ago. ----------
 export const listMyPendingPolicies = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ organizationId: z.string().uuid() }).parse(input))
@@ -102,18 +105,35 @@ export const listMyPendingPolicies = createServerFn({ method: "POST" })
 
     const { data: sigs } = await supabase
       .from("policy_signatures")
-      .select("document_id")
+      .select("document_id, signed_at")
       .eq("user_id", userId)
       .eq("is_current", true)
       .in(
         "document_id",
         inScope.map((p) => p.id),
       );
-    const signedDocIds = new Set((sigs ?? []).map((s: { document_id: string }) => s.document_id));
+    const signedAtByDoc = new Map(
+      ((sigs ?? []) as Array<{ document_id: string; signed_at: string }>).map((s) => [
+        s.document_id,
+        s.signed_at,
+      ]),
+    );
 
+    const now = Date.now();
     const pending = inScope
-      .filter((p) => !signedDocIds.has(p.id))
-      .map((p) => ({ id: p.id, title: p.title, version: p.version, gateAppAccess: p.gate_app_access }));
+      .filter((p) => {
+        const signedAt = signedAtByDoc.get(p.id);
+        if (!signedAt) return true; // never signed
+        if (p.policy_ack_cadence !== "annual") return false; // one-time, already satisfied
+        return now - new Date(signedAt).getTime() > ANNUAL_ACK_STALE_MS;
+      })
+      .map((p) => ({
+        id: p.id,
+        title: p.title,
+        version: p.version,
+        gateAppAccess: p.gate_app_access,
+        cadence: p.policy_ack_cadence,
+      }));
 
     return {
       pending,
@@ -319,3 +339,76 @@ export const listPolicyAcknowledgmentsForStaff = createServerFn({ method: "POST"
       }),
     };
   });
+
+// ---------- Annual policy renewal tracking ----------
+// Runs client-side, right after a policy_signatures write, so a signed
+// annual policy shows up on the Deadlines page ahead of its next
+// anniversary. Uses the requirement-tracking.ts pattern (metadata.tracking
+// on a nectar_requirements row) rather than a bespoke table — the Deadlines
+// hook (use-deadlines.tsx) already surfaces any confirmed, active,
+// compliance_pattern='renewal' requirement through computeRequirementDueState.
+//
+// Writing to nectar_requirements requires org admin/manager (RLS —
+// "Org admins can insert/update requirements"). Most staff signing their own
+// policy acknowledgment won't have that role, so this is deliberately
+// best-effort: the signature itself is already recorded and unaffected by
+// whether this tracking write succeeds.
+export async function trackAnnualPolicyRenewal(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  doc: { id: string; organizationId: string; title: string; policyAckCadence: string | null | undefined },
+  signedAt: string,
+  userId: string,
+): Promise<void> {
+  if (doc.policyAckCadence !== "annual") return;
+  const requirementKey = `policy_ack:${doc.id}`;
+  try {
+    const { data: existing } = await supabase
+      .from("nectar_requirements")
+      .select("id, metadata")
+      .eq("organization_id", doc.organizationId)
+      .eq("requirement_key", requirementKey)
+      .maybeSingle();
+
+    const tracking = {
+      frequency: "per_year",
+      tell_nectar_note: "Annual policy acknowledgment — tracked automatically at signing.",
+      last_checked_at: signedAt.slice(0, 10),
+      updated_at: signedAt,
+      updated_by: userId,
+    };
+
+    if (existing) {
+      const priorMeta = (existing.metadata as Record<string, unknown>) ?? {};
+      await supabase
+        .from("nectar_requirements")
+        .update({
+          metadata: { ...priorMeta, tracking },
+          compliance_pattern: "renewal",
+          activation_state: "active",
+          review_status: "confirmed",
+        })
+        .eq("id", existing.id);
+    } else {
+      await supabase.from("nectar_requirements").insert({
+        organization_id: doc.organizationId,
+        source_document_id: doc.id,
+        origin: "document",
+        requirement_key: requirementKey,
+        title: `Annual re-acknowledgment — ${doc.title}`,
+        description: "Staff must re-read and re-sign this policy annually.",
+        category: "obligation",
+        applies_to: "staff",
+        verified: true,
+        verified_by: userId,
+        verified_at: signedAt,
+        compliance_pattern: "renewal",
+        review_status: "confirmed",
+        metadata: { tracking },
+      });
+    }
+  } catch (e) {
+    // Best-effort — see comment above. Signature write already succeeded.
+    console.error("[policy-renewal-tracking] skipped:", e);
+  }
+}

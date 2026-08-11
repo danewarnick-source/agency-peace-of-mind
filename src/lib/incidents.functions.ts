@@ -17,6 +17,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { createIncidentInstances, resolveComplianceRequirement } from "@/lib/compliance-resolution";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -165,6 +166,13 @@ export const createIncident = createServerFn({ method: "POST" })
       .select("id, report_number")
       .single();
     if (error) throw new Error(error.message);
+
+    const incidentCreatedAt = discovered;
+    await createIncidentInstances(supabase, m.organization_id, ins.id, incidentCreatedAt);
+    await resolveComplianceRequirement(
+      supabase, m.organization_id, "incidents", ins.id, "incident", incidentCreatedAt,
+    );
+
     return ins as { id: string; report_number: string };
   });
 

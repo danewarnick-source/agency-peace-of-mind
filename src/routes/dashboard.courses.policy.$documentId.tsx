@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { trackAnnualPolicyRenewal } from "@/lib/policy-signatures.functions";
 
 export const Route = createFileRoute("/dashboard/courses/policy/$documentId")({
   component: PolicySignPage,
@@ -56,7 +57,7 @@ export function PolicySignPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("nectar_documents")
-        .select("id, organization_id, title, raw_text, version, requires_acknowledgment")
+        .select("id, organization_id, title, raw_text, version, requires_acknowledgment, policy_ack_cadence")
         .eq("id", documentId)
         .maybeSingle();
       if (error) throw error;
@@ -126,6 +127,18 @@ export function PolicySignPage() {
       signed_at: signedAt,
     });
     if (error) throw error;
+
+    await trackAnnualPolicyRenewal(
+      supabase,
+      {
+        id: doc.id,
+        organizationId: doc.organization_id,
+        title: doc.title,
+        policyAckCadence: (doc as { policy_ack_cadence?: string | null }).policy_ack_cadence,
+      },
+      signedAt,
+      user.id,
+    );
 
     qc.invalidateQueries({ queryKey: ["my-pending-policies"] });
     qc.invalidateQueries({ queryKey: ["policy-signature-status", doc.id] });

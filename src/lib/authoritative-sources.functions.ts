@@ -17,6 +17,8 @@ import {
   isTransientAIError,
   EXPLAIN_SYSTEM_PROMPT,
   ExplainResp,
+  EXTERNAL_REGEX,
+  matchFeatureLink,
 } from "./authoritative-sources.server";
 import { gatewayFetch } from "@/lib/ai-bedrock.server";
 import { classifyServiceCodes } from "./nectar-code-classifier";
@@ -751,6 +753,38 @@ export const setRequirementReviewStatus = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const setRequirementVerificationType = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        requirementId: z.string().uuid(),
+        verificationType: z.enum(["internal", "external"]),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true };
+    const { data: req, error: gErr } = await supabase
+      .from("nectar_requirements")
+      .select("id, organization_id")
+      .eq("id", data.requirementId)
+      .single();
+    if (gErr || !req) throw new Error(gErr?.message ?? "Requirement not found");
+    await requireOrgMembership(supabase, userId, req.organization_id as string, "manager");
+
+    const { error } = await supabase
+      .from("nectar_requirements")
+      .update({
+        verification_type: data.verificationType,
+        verification_type_source: "manual_override",
+      })
+      .eq("id", data.requirementId);
+    if (error) throw new Error(error.message);
+
+    return { ok: true };
+  });
 
 export const verifyRequirement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -1027,6 +1061,16 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
         | "billing_code";
       obligation_category_source: "nectar";
       activation_state: "active" | "pending_code_activation";
+      verification_type: "internal" | "external";
+      verification_type_source: "auto_regex" | "auto_ai";
+      compliance_pattern:
+        | "one_time"
+        | "renewal"
+        | "event_driven"
+        | "ongoing_per_shift"
+        | "continuous"
+        | null;
+      feature_link: Json | null;
     };
     const aiRows: Array<{ row: AiRow; key: string }> = [];
     for (const item of aiItems) {
@@ -1045,17 +1089,25 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
         : `${baseLabel}${webSuffix}`;
       const classified = classifyServiceCodes(titleClean, item.description ?? null);
       const appliesTo = item.applies_to ?? "company";
+      const combinedText = `${titleClean} ${item.description ?? ""}`;
+      const regexExternal = EXTERNAL_REGEX.test(combinedText);
       const obligationCategory: AiRow["obligation_category"] = classified.primary
         ? "billing_code"
         : appliesTo === "client"
           ? "client"
           : appliesTo === "staff"
             ? "staff"
-            : /\b(DWS|DACS|UPI|DSPD portal|state portal|submit to state|OIG|DHHS)\b/i.test(
-                  `${titleClean} ${item.description ?? ""}`,
-                )
+            : regexExternal
               ? "admin_external"
               : "provider_wide";
+      const verificationType: AiRow["verification_type"] = regexExternal
+        ? "external"
+        : (item.verification_type ?? "external");
+      const verificationTypeSource: AiRow["verification_type_source"] = regexExternal
+        ? "auto_regex"
+        : "auto_ai";
+      const featureLink =
+        verificationType === "internal" ? matchFeatureLink(combinedText) : null;
       aiRows.push({
         key,
         row: {
@@ -1075,6 +1127,10 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
           obligation_category_source: "nectar",
           activation_state:
             obligationCategory === "billing_code" ? "pending_code_activation" : "active",
+          verification_type: verificationType,
+          verification_type_source: verificationTypeSource,
+          compliance_pattern: item.compliance_pattern ?? null,
+          feature_link: featureLink as Json | null,
         },
       });
     }
@@ -1862,6 +1918,16 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
         | "billing_code";
       obligation_category_source: "nectar";
       activation_state: "active" | "pending_code_activation";
+      verification_type: "internal" | "external";
+      verification_type_source: "auto_regex" | "auto_ai";
+      compliance_pattern:
+        | "one_time"
+        | "renewal"
+        | "event_driven"
+        | "ongoing_per_shift"
+        | "continuous"
+        | null;
+      feature_link: Json | null;
     };
     const rows: Array<{ row: AiRow; key: string }> = [];
     for (const item of items) {
@@ -1877,17 +1943,25 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
         : `${baseLabel}${webSuffix}`;
       const classified = classifyServiceCodes(titleClean, item.description ?? null);
       const appliesTo = item.applies_to ?? "company";
+      const combinedText = `${titleClean} ${item.description ?? ""}`;
+      const regexExternal = EXTERNAL_REGEX.test(combinedText);
       const obligationCategory: AiRow["obligation_category"] = classified.primary
         ? "billing_code"
         : appliesTo === "client"
           ? "client"
           : appliesTo === "staff"
             ? "staff"
-            : /\b(DWS|DACS|UPI|DSPD portal|state portal|submit to state|OIG|DHHS)\b/i.test(
-                  `${titleClean} ${item.description ?? ""}`,
-                )
+            : regexExternal
               ? "admin_external"
               : "provider_wide";
+      const verificationType: AiRow["verification_type"] = regexExternal
+        ? "external"
+        : (item.verification_type ?? "external");
+      const verificationTypeSource: AiRow["verification_type_source"] = regexExternal
+        ? "auto_regex"
+        : "auto_ai";
+      const featureLink =
+        verificationType === "internal" ? matchFeatureLink(combinedText) : null;
       rows.push({
         key,
         row: {
@@ -1907,6 +1981,10 @@ export const finalizeRequirementsDraft = createServerFn({ method: "POST" })
           obligation_category_source: "nectar",
           activation_state:
             obligationCategory === "billing_code" ? "pending_code_activation" : "active",
+          verification_type: verificationType,
+          verification_type_source: verificationTypeSource,
+          compliance_pattern: item.compliance_pattern ?? null,
+          feature_link: featureLink as Json | null,
         },
       });
     }

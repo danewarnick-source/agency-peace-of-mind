@@ -62,7 +62,9 @@ Return STRICT JSON only, shape:
       "description": "brief summary of the obligation in your own words, <=200 chars, do not copy long passages from the source.",
       "category": "audit_doc" | "obligation" | "rule" | "billing",
       "citation": "best locator you can identify, e.g. '§4.2', 'Section 3.1', 'page 7', 'Attachment A'",
-      "applies_to": "company" | "staff" | "client"
+      "applies_to": "company" | "staff" | "client",
+      "verification_type": "internal" | "external",
+      "compliance_pattern": "one_time" | "renewal" | "event_driven" | "ongoing_per_shift" | "continuous"
     }
   ]
 }
@@ -79,6 +81,15 @@ Content rules:
     obligation = a thing the provider must do (notify within X hours, conduct annual review, maintain insurance, etc.)
     rule       = a constraint / prohibition (no overlapping services, staff-to-client ratio caps, etc.)
     billing    = a billing/reimbursement requirement (EVV, claim timeliness, prior auth)
+- "verification_type":
+    external = provider must act in a system outside HIVE — submit to UPI, run OIG search, file with Office of Licensing, submit a Google Form to DSPD, obtain a document from a third-party vendor, maintain governance records (board minutes, insurance certificates). Default to external when uncertain.
+    internal = provider satisfies this through actions inside their own operations that HIVE tracks — shift notes, incident documentation, support plans, training records, quarterly summaries, eMAR.
+- "compliance_pattern":
+    one_time          = "upon hire", "one-time", "initial", "at time of"
+    renewal            = "annually", "every N months/years", "renews", "expires"
+    event_driven       = "within 24 hours", "within N days of", "per incident", "upon each", "each time", at time of each event
+    ongoing_per_shift  = "each shift", "every visit", "for each service delivery event"
+    continuous         = "at all times", "maintained continuously", "ongoing documentation"
 - Keep every field concise. Do not echo large sections of the document text. The goal is a compact list.
 - Prefer fewer high-quality items over many vague ones.
 - If the text contains no requirement language at all, return {"requirements":[]}.`;
@@ -158,10 +169,95 @@ export const ReqItem = z.object({
   category: z.enum(["audit_doc", "obligation", "rule", "billing"]).optional().nullable(),
   citation: z.string().max(200).optional().nullable(),
   applies_to: z.enum(["company", "staff", "client"]).optional().nullable(),
+  verification_type: z.enum(["internal", "external"]).optional().nullable(),
+  compliance_pattern: z
+    .enum(["one_time", "renewal", "event_driven", "ongoing_per_shift", "continuous"])
+    .optional()
+    .nullable(),
 });
 export const ReqExtraction = z.object({
   requirements: z.array(ReqItem).max(500).default([]),
 });
+
+// Requirement text that references acting in a system outside HIVE — the
+// provider must submit/search/file somewhere else, not just document inside
+// HIVE. Drives verification_type='external' (auto_regex, overrides the AI
+// classification) and, unchanged, obligation_category='admin_external'.
+export const EXTERNAL_REGEX =
+  /\b(DWS|DACS|UPI|USTEPS|DSPD\s*portal|state\s*portal|submit\s*to\s*state|OIG|DHHS|Office\s*of\s*Licensing|Google\s*Form|background\s*screen|background\s*check|BCI|third[\s-]party|driving\s*record|Life\s*Safety|PRISM|eligibility\s*check|board\s*minutes|governing\s*board|exclusion\s*check|exclusions\.oig|E-Verify|DACS\s*application|UPI\s*access)\b/i;
+
+export type FeatureLink = {
+  feature: "incidents" | "shift_notes" | "summaries" | "emar" | "pcsp" | "forms";
+  create_new_label: string;
+  view_existing_label: string;
+  report_route: string;
+};
+
+// Only consulted for verification_type='internal' requirements — picks the
+// in-app feature whose output can serve as evidence for that requirement.
+const FEATURE_LINK_MAP: Array<{ pattern: RegExp; link: FeatureLink }> = [
+  {
+    pattern: /incident/i,
+    link: {
+      feature: "incidents",
+      create_new_label: "Log incident in HIVE",
+      view_existing_label: "View incident reports",
+      report_route: "/dashboard/documentation?tab=incidents",
+    },
+  },
+  {
+    pattern: /shift\s*note|service\s*deliver|written\s*summary/i,
+    link: {
+      feature: "shift_notes",
+      create_new_label: "Document shift in HIVE",
+      view_existing_label: "View shift records",
+      report_route: "/dashboard/documentation?tab=records",
+    },
+  },
+  {
+    pattern: /quarterly\s*summar/i,
+    link: {
+      feature: "summaries",
+      create_new_label: "Write quarterly summary",
+      view_existing_label: "View summaries",
+      report_route: "/dashboard/summaries",
+    },
+  },
+  {
+    pattern: /medication|MAR|med\s*admin/i,
+    link: {
+      feature: "emar",
+      create_new_label: "Open medication record",
+      view_existing_label: "View eMAR",
+      report_route: "/dashboard/documentation?tab=emar",
+    },
+  },
+  {
+    pattern: /PCSP|person.centered\s*support\s*plan/i,
+    link: {
+      feature: "pcsp",
+      create_new_label: "View PCSP",
+      view_existing_label: "View PCSP",
+      report_route: "/dashboard/clients",
+    },
+  },
+  {
+    pattern: /form|medical\s*appointment/i,
+    link: {
+      feature: "forms",
+      create_new_label: "Complete form in HIVE",
+      view_existing_label: "View forms",
+      report_route: "/dashboard/documentation?tab=forms",
+    },
+  },
+];
+
+export function matchFeatureLink(text: string): FeatureLink | null {
+  for (const entry of FEATURE_LINK_MAP) {
+    if (entry.pattern.test(text)) return entry.link;
+  }
+  return null;
+}
 
 export function chunkDocumentRanges(
   text: string,

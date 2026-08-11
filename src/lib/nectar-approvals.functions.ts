@@ -20,6 +20,30 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
+import { generatePlainLanguageExplanation } from "./authoritative-sources.server";
+
+// Requirement keys HIVE already has a first-class feature for — these don't
+// need an admin's individual judgment call, just a bulk rubber-stamp.
+const HIVE_MANAGED_KEYS = new Set<string>([
+  "background_screening",
+  "oig_exclusion",
+  "medicaid_disclosure",
+  "shift_note",
+  "quarterly_summary",
+  "pcsp",
+  "incident_report",
+  "cpr_first_aid",
+  "thirty_day_training",
+  "annual_training",
+  "fraud_exclusion",
+  "code_of_conduct",
+  "annual_12h_training",
+]);
+
+// Categories that are informational (rules/billing constraints the provider
+// should be aware of, not a discrete action item) rather than an obligation
+// requiring a yes/no applicability call.
+const INFORMATIONAL_CATEGORIES = new Set<string>(["rule", "billing"]);
 
 type ApprovalState =
   | "nectar_drafted"
@@ -300,6 +324,58 @@ export const listProviderPendingConfirmations = createServerFn({ method: "GET" }
     return { items: rows ?? [] };
   });
 
+/**
+ * Provider view — same underlying queue as listProviderPendingConfirmations,
+ * but sorted into three guided-review buckets:
+ *   A. HIVE-managed  — requirement_key already has a first-class HIVE
+ *      feature behind it; no individual judgment call needed, bulk-confirm.
+ *   B. Needs your decision — everything else; the admin reviews one at a
+ *      time (or a page at a time) and confirms or skips.
+ *   C. Informational — rule/billing category items that describe a
+ *      constraint rather than an action; confirmed as "acknowledged", not
+ *      reviewed line-by-line.
+ */
+export const classifyPendingRequirements = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ organizationId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId)
+      return { bucketA: [], bucketB: [], bucketC: [] };
+    const { data: member } = await context.supabase
+      .from("organization_members")
+      .select("role, active")
+      .eq("organization_id", data.organizationId)
+      .eq("user_id", context.userId)
+      .eq("active", true)
+      .maybeSingle();
+    if (!member) throw new Error("Not a member of this workspace");
+
+    const { data: rows, error } = await context.supabase
+      .from("nectar_requirements")
+      .select(
+        "id, title, description, category, source_citation, source_document_id, applies_to, requirement_key, verification_type, compliance_pattern, plain_language_explanation, created_at",
+      )
+      .eq("organization_id", data.organizationId)
+      .eq("approval_state", "hive_exec_approved")
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+
+    const bucketA: typeof rows = [];
+    const bucketB: typeof rows = [];
+    const bucketC: typeof rows = [];
+    for (const row of rows ?? []) {
+      const key = (row.requirement_key as string | null) ?? "";
+      const category = (row.category as string | null) ?? "";
+      if (HIVE_MANAGED_KEYS.has(key)) bucketA.push(row);
+      else if (INFORMATIONAL_CATEGORIES.has(category)) bucketC.push(row);
+      else bucketB.push(row);
+    }
+
+    return { bucketA, bucketB, bucketC };
+  });
+
 /** Provider confirms → requirement becomes active. */
 export const providerConfirmRequirement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -338,7 +414,9 @@ export const providerConfirmRequirement = createServerFn({ method: "POST" })
     if (!context.supabase || !context.userId) return { ok: false };
     const { data: req, error: rErr } = await context.supabase
       .from("nectar_requirements")
-      .select("id, organization_id, approval_state, metadata")
+      .select(
+        "id, organization_id, approval_state, metadata, title, description, source_citation, plain_language_explanation",
+      )
       .eq("id", data.requirementId)
       .single();
     if (rErr || !req) throw new Error(rErr?.message ?? "Requirement not found");
@@ -409,7 +487,89 @@ export const providerConfirmRequirement = createServerFn({ method: "POST" })
       actorLabel,
       reason: data.note ?? null,
     });
+
+    // Auto-generate a plain-language restatement if this requirement doesn't
+    // already have one. Non-blocking — the confirmation above already
+    // succeeded; a failed/slow AI call here shouldn't fail the request.
+    if (!req.plain_language_explanation) {
+      try {
+        const explanation = await generatePlainLanguageExplanation(
+          req.title as string,
+          (req.description as string | null) ?? null,
+          (req.source_citation as string | null) ?? null,
+        );
+        await context.supabase
+          .from("nectar_requirements")
+          .update({ plain_language_explanation: explanation })
+          .eq("id", data.requirementId);
+      } catch (e) {
+        console.error("Plain language generation failed:", e);
+      }
+    }
+
     return { ok: true };
+  });
+
+/**
+ * Bulk-confirm a set of HIVE-managed requirements (bucket A of the guided
+ * review) in one round trip — no per-item tracking prompt, since these are
+ * already backed by a first-class HIVE feature.
+ */
+export const providerConfirmRequirementsBulk = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({ requirementIds: z.array(z.string().uuid()).min(1).max(200) })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { confirmed: 0 };
+
+    const { data: reqs, error: rErr } = await context.supabase
+      .from("nectar_requirements")
+      .select("id, organization_id, approval_state")
+      .in("id", data.requirementIds);
+    if (rErr) throw new Error(rErr.message);
+    const rows = (reqs ?? []).filter(
+      (r) => r.approval_state === "hive_exec_approved",
+    );
+    if (rows.length === 0) return { confirmed: 0 };
+
+    const orgId = rows[0].organization_id as string;
+    const { data: isAdmin } = await context.supabase.rpc(
+      "is_org_admin_or_manager",
+      { _org: orgId, _user: context.userId },
+    );
+    if (!isAdmin) throw new Error("Admin or Manager role required");
+
+    const nowIso = new Date().toISOString();
+    const ids = rows.map((r) => r.id as string);
+    const { error: uErr } = await context.supabase
+      .from("nectar_requirements")
+      .update({
+        approval_state: "provider_confirmed" as ApprovalState,
+        review_status: "confirmed",
+        verified: true,
+        verified_by: context.userId,
+        verified_at: nowIso,
+      })
+      .in("id", ids);
+    if (uErr) throw new Error(uErr.message);
+
+    const actorLabel = await resolveActorLabel(context.userId);
+    for (const r of rows) {
+      await logEvent({
+        organizationId: r.organization_id as string,
+        requirementId: r.id as string,
+        stage: "provider",
+        action: "confirmed",
+        actorUserId: context.userId,
+        actorLabel,
+        reason: "Bulk-confirmed as a HIVE-managed requirement.",
+      });
+    }
+
+    return { confirmed: rows.length };
   });
 
 /** Provider sends back — requirement is not active, returns to needs-review. */

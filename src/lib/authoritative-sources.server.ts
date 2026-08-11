@@ -534,3 +534,56 @@ export const ExplainResp = z.object({
   confidence: z.enum(["high", "medium", "low"]).default("medium"),
   caveat: z.string().max(400).optional().nullable(),
 });
+
+/**
+ * Short plain-English restatement of a single requirement, generated at
+ * provider-confirmation time (see providerConfirmRequirement in
+ * nectar-approvals.functions.ts). Reuses the EXPLAIN_SYSTEM_PROMPT contract
+ * but collapses the response to just the plain_language sentence, capped to
+ * 200 chars so it reads as a one-line summary on the requirement row.
+ */
+export async function generatePlainLanguageExplanation(
+  title: string,
+  description: string | null,
+  citation: string | null,
+): Promise<string> {
+  await acquireBedrockSlot();
+  const userBody = `CITATION: ${citation ?? "—"}
+REQUIREMENT TITLE: ${title}
+REQUIREMENT TEXT: ${description ?? "(no extended text — restate the title only)"}`;
+
+  const res = await gatewayFetch({
+    model: "bedrock",
+    messages: [
+      { role: "system", content: EXPLAIN_SYSTEM_PROMPT },
+      { role: "user", content: userBody },
+    ],
+    response_format: { type: "json_object" },
+    max_tokens: 1_200,
+  });
+  if (res.status === 429) throw new TransientAIError("AI rate limit reached. Try again in a moment.");
+  if (res.status === 402)
+    throw new Error("AI credits exhausted. Add funds in Settings → Workspace → Usage.");
+  if ([408, 500, 502, 503, 504].includes(res.status)) {
+    throw new TransientAIError(`AI temporarily unavailable (${res.status}). Try again.`);
+  }
+  if (!res.ok) throw new Error(`AI gateway error ${res.status}`);
+  const json = await res.json();
+  const usage = (json?.usage ?? {}) as { total_tokens?: number; input_tokens?: number; output_tokens?: number };
+  const totalTokens =
+    typeof usage.total_tokens === "number"
+      ? usage.total_tokens
+      : (Number(usage.input_tokens ?? 0) + Number(usage.output_tokens ?? 0));
+  if (totalTokens > 0) void recordBedrockTokens(totalTokens);
+  const content: string = json.choices?.[0]?.message?.content ?? "{}";
+  const repaired = repairJsonPayload(content);
+  let raw: unknown;
+  try {
+    raw = JSON.parse(repaired);
+  } catch {
+    throw new Error("model returned invalid JSON (after repair)");
+  }
+  const parsed = ExplainResp.safeParse(raw);
+  if (!parsed.success) throw new Error("model output failed schema validation");
+  return parsed.data.plain_language.trim().slice(0, 200);
+}

@@ -108,8 +108,9 @@ import {
 } from "@/lib/requirement-tracking";
 import { RequirementTrackingEditor } from "@/components/nectar/requirement-tracking-editor";
 import {
-  listProviderPendingConfirmations,
+  classifyPendingRequirements,
   providerConfirmRequirement,
+  providerConfirmRequirementsBulk,
   providerRejectRequirement,
 } from "@/lib/nectar-approvals.functions";
 
@@ -249,6 +250,7 @@ export function AuthoritativeSourcesPage() {
           </TabsTrigger>
           <TabsTrigger value="requirements" className="gap-1">
             <FileCheck className="h-3.5 w-3.5" /> Requirements
+            <PendingConfirmationsBadge orgId={orgId ?? undefined} />
           </TabsTrigger>
           <TabsTrigger value="codes" className="gap-1">
             <Hexagon className="h-3.5 w-3.5" /> Authorized codes
@@ -1746,6 +1748,8 @@ function RequirementsPanel({
         </div>
         <ManualRequirementDialog orgId={orgId} />
       </div>
+
+      <AwaitingFinalConfirmationPanel orgId={orgId} />
 
       {isLoading && (
         <p className="text-sm text-muted-foreground">
@@ -4384,18 +4388,113 @@ function ReviewQueueDialog({
   );
 }
 
-// ---------- Three-party approval chain: provider's final-confirmation queue ----------
+// ---------- Three-party approval chain: provider's guided-review queue ----------
+// The held queue (requirements HIVE Exec has verified and are now waiting on
+// the provider's own applicability call) is sorted into three buckets so the
+// admin isn't reading a flat list:
+//   A. Already tracked by HIVE — bulk-confirm, no individual review.
+//   B. Needs your decision — one page at a time, confirm or skip.
+//   C. Informational — rule/billing items, collapsed by default.
+
+const BUCKET_B_PAGE_SIZE = 8;
+
+const HIVE_MANAGED_LABELS: Record<string, string> = {
+  background_screening: "background screening",
+  oig_exclusion: "OIG check",
+  medicaid_disclosure: "Medicaid disclosure",
+  shift_note: "shift notes",
+  quarterly_summary: "quarterly summaries",
+  pcsp: "PCSPs",
+  incident_report: "incident reports",
+  cpr_first_aid: "CPR/First Aid",
+  thirty_day_training: "30-day training",
+  annual_training: "annual training",
+  fraud_exclusion: "fraud exclusion checks",
+  code_of_conduct: "code of conduct",
+  annual_12h_training: "annual 12-hour training",
+};
+
+const COMPLIANCE_PATTERN_META: Record<string, { label: string; className: string }> = {
+  event_driven: {
+    label: "Event-driven",
+    className: "border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950/30 dark:text-purple-300",
+  },
+  renewal: {
+    label: "Renewal",
+    className: "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300",
+  },
+  one_time: {
+    label: "One-time",
+    className: "border-border bg-muted text-muted-foreground",
+  },
+  ongoing_per_shift: {
+    label: "Per shift",
+    className: "border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950/30 dark:text-purple-300",
+  },
+  continuous: {
+    label: "Continuous",
+    className: "border-border bg-muted text-muted-foreground",
+  },
+};
+
+type PendingRequirementRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  source_citation: string | null;
+  source_document_id: string | null;
+  applies_to: string | null;
+  requirement_key?: string | null;
+  verification_type?: string | null;
+  compliance_pattern?: string | null;
+  plain_language_explanation?: string | null;
+};
+
+function summarizeHiveManaged(rows: PendingRequirementRow[]): string {
+  const labels = Array.from(
+    new Set(
+      rows.map((r) => HIVE_MANAGED_LABELS[r.requirement_key ?? ""] ?? r.title.toLowerCase()),
+    ),
+  );
+  const shown = labels.slice(0, 3);
+  return shown.join(", ") + (labels.length > shown.length ? ", and more" : "");
+}
+
+/** Badge on the Requirements tab — total items awaiting the provider's guided review. */
+function PendingConfirmationsBadge({ orgId }: { orgId: string | undefined }) {
+  const classifyFn = useServerFn(classifyPendingRequirements);
+  const { data } = useQuery({
+    enabled: !!orgId,
+    queryKey: ["provider-pending-confirmations", orgId],
+    queryFn: () => classifyFn({ data: { organizationId: orgId! } }),
+  });
+  const n =
+    (data?.bucketA.length ?? 0) + (data?.bucketB.length ?? 0) + (data?.bucketC.length ?? 0);
+  if (n === 0) return null;
+  return (
+    <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1 text-[10px]">
+      {n}
+    </Badge>
+  );
+}
 
 function AwaitingFinalConfirmationPanel({ orgId }: { orgId: string }) {
   const qc = useQueryClient();
-  const listFn = useServerFn(listProviderPendingConfirmations);
+  const classifyFn = useServerFn(classifyPendingRequirements);
   const confirmFn = useServerFn(providerConfirmRequirement);
   const rejectFn = useServerFn(providerRejectRequirement);
+  const bulkConfirmFn = useServerFn(providerConfirmRequirementsBulk);
 
   const { data } = useQuery({
     queryKey: ["provider-pending-confirmations", orgId],
-    queryFn: () => listFn({ data: { organizationId: orgId } }),
+    queryFn: () => classifyFn({ data: { organizationId: orgId } }),
   });
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["provider-pending-confirmations", orgId] });
+    qc.invalidateQueries({ queryKey: ["requirements", orgId] });
+  };
 
   const confirm = useMutation({
     mutationFn: (vars: {
@@ -4428,8 +4527,7 @@ function AwaitingFinalConfirmationPanel({ orgId }: { orgId: string }) {
       }),
     onSuccess: () => {
       toast.success("Requirement confirmed — now active in your compliance set.");
-      qc.invalidateQueries({ queryKey: ["provider-pending-confirmations", orgId] });
-      qc.invalidateQueries({ queryKey: ["requirements", orgId] });
+      invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -4439,22 +4537,43 @@ function AwaitingFinalConfirmationPanel({ orgId }: { orgId: string }) {
       rejectFn({ data: { requirementId: vars.requirementId, reason: vars.reason } }),
     onSuccess: () => {
       toast.success("Sent back. NECTAR and HIVE Exec will see your note.");
-      qc.invalidateQueries({ queryKey: ["provider-pending-confirmations", orgId] });
-      qc.invalidateQueries({ queryKey: ["requirements", orgId] });
+      invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const items = ((data?.items ?? []) as Array<{
-    id: string;
-    title: string;
-    description: string | null;
-    category: string | null;
-    source_citation: string | null;
-    applies_to: string | null;
-  }>);
+  const bulkConfirm = useMutation({
+    mutationFn: (ids: string[]) => bulkConfirmFn({ data: { requirementIds: ids } }),
+    onSuccess: (res) => {
+      toast.success(
+        `Confirmed ${res.confirmed} HIVE-managed requirement${res.confirmed === 1 ? "" : "s"} — now active.`,
+      );
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
-  if (items.length === 0) return null;
+  const bucketA = (data?.bucketA ?? []) as PendingRequirementRow[];
+  const bucketB = (data?.bucketB ?? []) as PendingRequirementRow[];
+  const bucketC = (data?.bucketC ?? []) as PendingRequirementRow[];
+  const total = bucketA.length + bucketB.length + bucketC.length;
+
+  const [bPage, setBPage] = useState(0);
+  const [cExpanded, setCExpanded] = useState(false);
+  const bucketBTotalRef = useRef<number | null>(null);
+  if (bucketB.length > 0 && bucketBTotalRef.current === null) {
+    bucketBTotalRef.current = bucketB.length;
+  }
+
+  if (total === 0) return null;
+
+  const decisionsDone = bucketA.length === 0 && bucketB.length === 0;
+  const bTotalPages = Math.max(1, Math.ceil(bucketB.length / BUCKET_B_PAGE_SIZE));
+  const bPageClamped = Math.min(bPage, bTotalPages - 1);
+  const bPageItems = bucketB.slice(
+    bPageClamped * BUCKET_B_PAGE_SIZE,
+    bPageClamped * BUCKET_B_PAGE_SIZE + BUCKET_B_PAGE_SIZE,
+  );
 
   return (
     <section className="rounded-2xl border border-emerald-300/60 bg-emerald-50/40 p-4 dark:bg-emerald-950/20">
@@ -4464,84 +4583,204 @@ function AwaitingFinalConfirmationPanel({ orgId }: { orgId: string }) {
         </span>
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-emerald-950 dark:text-emerald-100">
-            Awaiting your final confirmation ({items.length})
+            Awaiting your final confirmation ({total})
           </h3>
           <p className="mt-0.5 max-w-3xl text-xs text-emerald-900/80 dark:text-emerald-100/80">
             HIVE Executive verified that NECTAR extracted these requirements
             faithfully from your authoritative sources. <strong>You</strong> are
-            the final authority on whether they apply to your operation —
-            confirm to make them active, or send back with a note.
+            the final authority on whether they apply to your operation.
           </p>
         </div>
       </header>
 
-      <ul className="space-y-2">
-        {items.map((r) => (
-          <FinalConfirmRow
-            key={r.id}
-            row={r}
-            onConfirm={(payload) =>
-              confirm.mutate({
-                requirementId: r.id,
-                note: payload.note,
-                frequency: payload.frequency,
-                tellNectarNote: payload.tellNectarNote,
-                lastCheckedAt: payload.lastCheckedAt,
-              })
-            }
-            onReject={(reason) => reject.mutate({ requirementId: r.id, reason })}
-            busy={confirm.isPending || reject.isPending}
-          />
-        ))}
-      </ul>
+      {decisionsDone ? (
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-100/60 px-3 py-2 text-sm font-medium text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">
+          <CheckCircle2 className="h-4 w-4 shrink-0" /> Review complete — requirements are now active.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {bucketA.length > 0 && (
+            <div className="rounded-xl border border-emerald-300 bg-background p-3">
+              <p className="text-sm text-foreground">
+                HIVE already tracks {bucketA.length} requirement{bucketA.length === 1 ? "" : "s"}{" "}
+                from this document — {summarizeHiveManaged(bucketA)}.
+              </p>
+              <Button
+                size="sm"
+                className="mt-2 h-8 bg-emerald-600 text-white hover:bg-emerald-700"
+                onClick={() => bulkConfirm.mutate(bucketA.map((r) => r.id))}
+                disabled={bulkConfirm.isPending}
+              >
+                {bulkConfirm.isPending ? (
+                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+                )}
+                Confirm all →
+              </Button>
+            </div>
+          )}
+
+          {bucketB.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-semibold text-emerald-950 dark:text-emerald-100">
+                  Needs your decision
+                </h4>
+                <span className="text-[11px] text-muted-foreground">
+                  {bucketB.length} of {bucketBTotalRef.current ?? bucketB.length} need your decision
+                </span>
+              </div>
+              <ul className="space-y-2">
+                {bPageItems.map((r) => (
+                  <BucketBRow
+                    key={r.id}
+                    row={r}
+                    onConfirm={(payload) =>
+                      confirm.mutate({
+                        requirementId: r.id,
+                        note: payload.note,
+                        frequency: payload.frequency,
+                        tellNectarNote: payload.tellNectarNote,
+                        lastCheckedAt: payload.lastCheckedAt,
+                      })
+                    }
+                    onSkip={() =>
+                      reject.mutate({ requirementId: r.id, reason: "skipped_by_admin" })
+                    }
+                    busy={confirm.isPending || reject.isPending}
+                  />
+                ))}
+              </ul>
+              {bTotalPages > 1 && (
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2"
+                    onClick={() => setBPage((p) => Math.max(0, p - 1))}
+                    disabled={bPageClamped === 0}
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </Button>
+                  <span className="text-[11px] text-muted-foreground">
+                    Page {bPageClamped + 1} of {bTotalPages}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2"
+                    onClick={() => setBPage((p) => Math.min(bTotalPages - 1, p + 1))}
+                    disabled={bPageClamped >= bTotalPages - 1}
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {bucketC.length > 0 && (
+        <div className="mt-4 rounded-xl border border-border/60 bg-background/60">
+          <button
+            type="button"
+            onClick={() => setCExpanded((v) => !v)}
+            className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs font-medium text-muted-foreground"
+          >
+            <span>Informational — no action needed in HIVE ({bucketC.length})</span>
+            <ChevronDown
+              className={`h-3.5 w-3.5 transition-transform ${cExpanded ? "rotate-180" : ""}`}
+            />
+          </button>
+          {cExpanded && (
+            <ul className="space-y-1.5 border-t border-border/60 p-2">
+              {bucketC.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md px-2 py-1.5 text-xs"
+                >
+                  <span className="min-w-0 truncate text-foreground">{r.title}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 shrink-0"
+                    onClick={() => confirm.mutate({ requirementId: r.id })}
+                    disabled={confirm.isPending}
+                  >
+                    Confirm as informational
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </section>
   );
 }
 
-function FinalConfirmRow({
+function BucketBRow({
   row,
   onConfirm,
-  onReject,
+  onSkip,
   busy,
 }: {
-  row: {
-    id: string;
-    title: string;
-    description: string | null;
-    category: string | null;
-    source_citation: string | null;
-    applies_to: string | null;
-  };
+  row: PendingRequirementRow;
   onConfirm: (payload: {
     note?: string;
     frequency?: string | null;
     tellNectarNote?: string | null;
     lastCheckedAt?: string | null;
   }) => void;
-  onReject: (reason: string) => void;
+  onSkip: () => void;
   busy: boolean;
 }) {
-  const [mode, setMode] = useState<"idle" | "confirm" | "reject">("idle");
+  const [mode, setMode] = useState<"idle" | "confirm">("idle");
   const [note, setNote] = useState("");
   const [frequency, setFrequency] = useState<string>("");
   const [tellNectarNote, setTellNectarNote] = useState("");
   const todayIso = new Date().toISOString().slice(0, 10);
   const [lastCheckedAt, setLastCheckedAt] = useState<string>(todayIso);
 
+  const patternMeta = row.compliance_pattern
+    ? COMPLIANCE_PATTERN_META[row.compliance_pattern]
+    : null;
+
   return (
     <li className="rounded-lg border border-border bg-background p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-medium text-foreground">{row.title}</p>
-          {row.description && (
-            <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-              {row.description}
-            </p>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <Badge
+              variant="outline"
+              className={
+                row.verification_type === "internal"
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
+                  : "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300"
+              }
+            >
+              {row.verification_type === "internal" ? "⬡ Internal" : "↗ External"}
+            </Badge>
+            {patternMeta && (
+              <Badge variant="outline" className={patternMeta.className}>
+                {patternMeta.label}
+              </Badge>
+            )}
+          </div>
+          {row.plain_language_explanation && (
+            <div className="mt-2 rounded-md bg-muted/60 px-2 py-1.5 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Plain language: </span>
+              {row.plain_language_explanation}
+            </div>
+          )}
+          {row.description && !row.plain_language_explanation && (
+            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{row.description}</p>
           )}
           {row.source_citation && (
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Source: {row.source_citation}
-            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">Source: {row.source_citation}</p>
           )}
         </div>
         {mode === "idle" && (
@@ -4552,16 +4791,10 @@ function FinalConfirmRow({
               disabled={busy}
               className="h-8 bg-emerald-600 text-white hover:bg-emerald-700"
             >
-              <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Confirm
+              <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Confirm →
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8"
-              onClick={() => setMode("reject")}
-              disabled={busy}
-            >
-              Send back
+            <Button size="sm" variant="outline" className="h-8" onClick={onSkip} disabled={busy}>
+              Skip
             </Button>
           </div>
         )}
@@ -4648,37 +4881,6 @@ function FinalConfirmRow({
               disabled={busy}
             >
               Make it active
-            </Button>
-            <Button size="sm" variant="ghost" className="h-8" onClick={() => setMode("idle")}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {mode === "reject" && (
-        <div className="mt-2 space-y-2 rounded-md border border-amber-300 bg-amber-50/60 p-2">
-          <Textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Why doesn't this apply, or what should change? (required)"
-            rows={3}
-          />
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="destructive"
-              className="h-8"
-              onClick={() => {
-                if (note.trim().length < 3) {
-                  toast.error("Add a short reason (3+ characters).");
-                  return;
-                }
-                onReject(note.trim());
-              }}
-              disabled={busy}
-            >
-              Send back
             </Button>
             <Button size="sm" variant="ghost" className="h-8" onClick={() => setMode("idle")}>
               Cancel

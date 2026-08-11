@@ -107,6 +107,7 @@ import {
   type RequirementTracking,
 } from "@/lib/requirement-tracking";
 import { RequirementTrackingEditor } from "@/components/nectar/requirement-tracking-editor";
+import { RequirementDrillDownSheet } from "@/components/nectar/requirement-drilldown-sheet";
 import {
   classifyPendingRequirements,
   providerConfirmRequirement,
@@ -2672,6 +2673,7 @@ function RequirementRow({
   const [detailOpen, setDetailOpen] = useState(false);
   const [trackingOpen, setTrackingOpen] = useState(false);
   const [attestOpen, setAttestOpen] = useState(false);
+  const [drillDownOpen, setDrillDownOpen] = useState(false);
 
   // Internal vs external classification (stored in metadata, falls back to heuristic)
   const md = (req.metadata ?? {}) as Record<string, unknown>;
@@ -2728,6 +2730,16 @@ function RequirementRow({
             </Badge>
           )}
           <SourceCitationChip citation={req.source_citation} />
+          {!isRemoved && (
+            <button
+              type="button"
+              onClick={() => setDrillDownOpen(true)}
+              className="rounded-sm text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+              title="View per-person compliance status"
+            >
+              View status →
+            </button>
+          )}
           {isConfirmed && (() => {
             const ready = isScopeReady(applicStats);
             const hasAny = !!applicStats && applicStats.total > 0;
@@ -3123,6 +3135,13 @@ function RequirementRow({
         requirementTitle={req.title}
         orgId={orgId}
         current={trackingMd}
+      />
+      <RequirementDrillDownSheet
+        open={drillDownOpen}
+        onOpenChange={setDrillDownOpen}
+        orgId={orgId}
+        requirementId={req.id}
+        requirementTitle={req.title}
       />
     </li>
   );

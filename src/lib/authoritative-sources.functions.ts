@@ -2316,3 +2316,323 @@ REQUIREMENT TEXT: ${req.description ?? "(no extended text — restate the title 
         "This is a NECTAR plain-language restatement to aid your understanding. It is NOT legal, compliance, or audit advice, and does NOT replace the original source text. Always review the original requirement and consult counsel as needed before acting.",
     };
   });
+
+// ---------- Requirement drill-down (per-person / per-event compliance) ----------
+// Evidence (uploads + attestations) is stored on nectar_attestations with
+// scope="compliance_requirement" and covers_staff_id/covers_client_id/
+// covers_instance_id identifying who or what instance it's for. A person
+// can accumulate many evidence rows for the same requirement — nothing is
+// ever overwritten, so the full history is always visible.
+
+type DrillDownEvidence = {
+  id: string;
+  evidence_type: "attestation" | "upload" | "both" | null;
+  statement: string;
+  document_path: string | null;
+  document_label: string | null;
+  document_url: string | null;
+  external_reference: string | null;
+  completed_at: string | null;
+  attested_at: string;
+  recorded_by_name: string | null;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function signEvidenceUrls(supabase: any, rows: DrillDownEvidence[]) {
+  await Promise.all(
+    rows.map(async (r) => {
+      if (!r.document_path) return;
+      const { data: signed } = await supabase.storage
+        .from("nectar-documents")
+        .createSignedUrl(r.document_path, 60 * 30);
+      r.document_url = signed?.signedUrl ?? null;
+    }),
+  );
+  return rows;
+}
+
+function mapAttestationRow(row: Record<string, unknown>): DrillDownEvidence {
+  const ctx = (row.context ?? {}) as Record<string, unknown>;
+  return {
+    id: row.id as string,
+    evidence_type: (ctx.evidence_type as DrillDownEvidence["evidence_type"]) ?? "attestation",
+    statement: row.statement as string,
+    document_path: (ctx.document_path as string | null) ?? null,
+    document_label: (ctx.document_label as string | null) ?? null,
+    document_url: null,
+    external_reference: (ctx.external_reference as string | null) ?? null,
+    completed_at: (ctx.completed_at as string | null) ?? null,
+    attested_at: row.attested_at as string,
+    recorded_by_name: (row.user_display_name as string | null) ?? null,
+  };
+}
+
+export const getRequirementDrillDown = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        requirementId: z.string().uuid(),
+        organizationId: z.string().uuid(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    if (!supabase || !userId) return { kind: "org_wide" as const, req: null, attestationsByKey: {} };
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+
+    const { data: req, error: reqErr } = await supabase
+      .from("nectar_requirements")
+      .select(
+        "id, title, description, category, source_citation, applies_to, compliance_pattern, verification_type, feature_link, metadata",
+      )
+      .eq("id", data.requirementId)
+      .eq("organization_id", data.organizationId)
+      .single();
+    if (reqErr || !req) throw new Error(reqErr?.message ?? "Requirement not found");
+
+    const compliancePattern = req.compliance_pattern as string | null;
+    const appliesTo = req.applies_to as string | null;
+
+    const kind: "per_staff" | "per_client" | "per_event" | "org_wide" =
+      compliancePattern === "event_driven"
+        ? "per_event"
+        : appliesTo === "staff"
+          ? "per_staff"
+          : appliesTo === "client"
+            ? "per_client"
+            : "org_wide";
+
+    // ---------- per_event ----------
+    if (kind === "per_event") {
+      const { data: instances } = await supabase
+        .from("nectar_compliance_instances")
+        .select(
+          "id, triggered_by_kind, triggered_at, deadline_at, status, resolved_at, resolved_via, resolution_note, external_reference, document_url",
+        )
+        .eq("requirement_id", data.requirementId)
+        .order("triggered_at", { ascending: false })
+        .limit(50);
+
+      const { data: attestRows } = await supabase
+        .from("nectar_attestations")
+        .select("id, statement, context, attested_at, user_display_name, covers_instance_id")
+        .eq("organization_id", data.organizationId)
+        .eq("scope", "compliance_requirement")
+        .eq("scope_ref_id", data.requirementId)
+        .not("covers_instance_id", "is", null)
+        .order("attested_at", { ascending: false });
+
+      const byInstance: Record<string, DrillDownEvidence[]> = {};
+      for (const row of attestRows ?? []) {
+        const iid = row.covers_instance_id as string;
+        (byInstance[iid] ??= []).push(mapAttestationRow(row as Record<string, unknown>));
+      }
+      const flatEvidence = Object.values(byInstance).flat();
+      await signEvidenceUrls(supabase, flatEvidence);
+
+      return { kind, req, instances: instances ?? [], evidenceByInstance: byInstance };
+    }
+
+    // ---------- per_staff ----------
+    if (kind === "per_staff") {
+      const { data: members } = await supabase
+        .from("organization_members")
+        .select("user_id, job_title")
+        .eq("organization_id", data.organizationId)
+        .eq("active", true);
+      const userIds = (members ?? []).map((m) => m.user_id as string);
+      const { data: profiles } = userIds.length
+        ? await supabase
+            .from("profiles")
+            .select("id, full_name, hire_date")
+            .in("id", userIds)
+        : { data: [] as Array<Record<string, unknown>> };
+      const profileById: Record<string, { full_name: string | null; hire_date: string | null }> = {};
+      for (const p of profiles ?? []) {
+        profileById[p.id as string] = {
+          full_name: (p.full_name as string | null) ?? null,
+          hire_date: (p.hire_date as string | null) ?? null,
+        };
+      }
+      const staff = (members ?? []).map((m) => ({
+        user_id: m.user_id as string,
+        job_title: (m.job_title as string | null) ?? null,
+        full_name: profileById[m.user_id as string]?.full_name ?? "(unnamed)",
+        hire_date: profileById[m.user_id as string]?.hire_date ?? null,
+      }));
+
+      const { data: attestRows } = await supabase
+        .from("nectar_attestations")
+        .select("id, statement, context, attested_at, user_display_name, covers_staff_id")
+        .eq("organization_id", data.organizationId)
+        .eq("scope", "compliance_requirement")
+        .eq("scope_ref_id", data.requirementId)
+        .not("covers_staff_id", "is", null)
+        .order("attested_at", { ascending: false });
+
+      const evidenceByStaff: Record<string, DrillDownEvidence[]> = {};
+      for (const row of attestRows ?? []) {
+        const sid = row.covers_staff_id as string;
+        (evidenceByStaff[sid] ??= []).push(mapAttestationRow(row as Record<string, unknown>));
+      }
+      const flatEvidence = Object.values(evidenceByStaff).flat();
+      await signEvidenceUrls(supabase, flatEvidence);
+
+      return { kind, req, staff, evidenceByStaff };
+    }
+
+    // ---------- per_client ----------
+    if (kind === "per_client") {
+      const { data: clients } = await supabase
+        .from("clients")
+        .select("id, first_name, last_name, authorized_dspd_codes")
+        .eq("organization_id", data.organizationId)
+        .eq("account_status", "active");
+
+      const { data: attestRows } = await supabase
+        .from("nectar_attestations")
+        .select("id, statement, context, attested_at, user_display_name, covers_client_id")
+        .eq("organization_id", data.organizationId)
+        .eq("scope", "compliance_requirement")
+        .eq("scope_ref_id", data.requirementId)
+        .not("covers_client_id", "is", null)
+        .order("attested_at", { ascending: false });
+
+      const evidenceByClient: Record<string, DrillDownEvidence[]> = {};
+      for (const row of attestRows ?? []) {
+        const cid = row.covers_client_id as string;
+        (evidenceByClient[cid] ??= []).push(mapAttestationRow(row as Record<string, unknown>));
+      }
+      const flatEvidence = Object.values(evidenceByClient).flat();
+      await signEvidenceUrls(supabase, flatEvidence);
+
+      return { kind, req, clients: clients ?? [], evidenceByClient };
+    }
+
+    // ---------- org_wide ----------
+    const { data: attestRows } = await supabase
+      .from("nectar_attestations")
+      .select("id, statement, context, attested_at, user_display_name")
+      .eq("organization_id", data.organizationId)
+      .eq("scope", "compliance_requirement")
+      .eq("scope_ref_id", data.requirementId)
+      .order("attested_at", { ascending: false });
+    const history = (attestRows ?? []).map((r) => mapAttestationRow(r as Record<string, unknown>));
+    await signEvidenceUrls(supabase, history);
+
+    return { kind, req, history };
+  });
+
+export const recordComplianceEvidence = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        requirementId: z.string().uuid(),
+        organizationId: z.string().uuid(),
+        evidenceType: z.enum(["attestation", "upload", "both"]),
+        statement: z.string().min(10).max(2000).optional(),
+        completedAt: z.string().max(40).optional(),
+        externalReference: z.string().max(200).optional(),
+        coversStaffId: z.string().uuid().optional(),
+        coversClientId: z.string().uuid().optional(),
+        coversInstanceId: z.string().uuid().optional(),
+        fileBase64: z.string().optional(),
+        fileName: z.string().max(200).optional(),
+        mimeType: z.string().max(120).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    if (!supabase || !userId) return { ok: true, attestationId: "" };
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+
+    const { data: req, error: reqErr } = await supabase
+      .from("nectar_requirements")
+      .select("id, title")
+      .eq("id", data.requirementId)
+      .eq("organization_id", data.organizationId)
+      .single();
+    if (reqErr || !req) throw new Error(reqErr?.message ?? "Requirement not found");
+
+    if ((data.evidenceType === "upload" || data.evidenceType === "both") && !data.fileBase64) {
+      throw new Error("Choose a file to upload.");
+    }
+    if ((data.evidenceType === "attestation" || data.evidenceType === "both") && !data.statement) {
+      throw new Error("Add a statement of at least 10 characters.");
+    }
+
+    let documentPath: string | null = null;
+    if (data.fileBase64 && data.fileName) {
+      const bin = Uint8Array.from(atob(data.fileBase64), (c) => c.charCodeAt(0));
+      const personSegment = data.coversStaffId ?? data.coversClientId ?? "org";
+      const safeName = data.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const objectPath = `${data.organizationId}/compliance/${data.requirementId}/${personSegment}/${Date.now()}-${safeName}`;
+      const upload = await supabase.storage
+        .from("nectar-documents")
+        .upload(objectPath, bin, {
+          contentType: data.mimeType ?? "application/octet-stream",
+          upsert: false,
+        });
+      if (upload.error) throw new Error(`Upload failed: ${upload.error.message}`);
+      documentPath = objectPath;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", userId)
+      .maybeSingle();
+    const actorName = (profile?.full_name as string) ?? (profile?.email as string) ?? null;
+
+    const statement =
+      data.statement?.trim() ||
+      `Document uploaded: ${data.fileName ?? "file"}`;
+
+    const { data: attest, error: attestErr } = await supabase
+      .from("nectar_attestations")
+      .insert({
+        organization_id: data.organizationId,
+        user_id: userId,
+        user_display_name: actorName,
+        scope: "compliance_requirement",
+        scope_ref_id: data.requirementId,
+        scope_ref_type: "nectar_requirement",
+        statement,
+        covers_staff_id: data.coversStaffId ?? null,
+        covers_client_id: data.coversClientId ?? null,
+        covers_instance_id: data.coversInstanceId ?? null,
+        context: {
+          evidence_type: data.evidenceType,
+          document_path: documentPath,
+          document_label: data.fileName ?? null,
+          external_reference: data.externalReference ?? null,
+          completed_at: data.completedAt ?? new Date().toISOString(),
+          requirement_title: req.title,
+        },
+      })
+      .select("id")
+      .single();
+    if (attestErr || !attest) throw new Error(attestErr?.message ?? "Insert failed");
+
+    if (data.coversInstanceId) {
+      await supabase
+        .from("nectar_compliance_instances")
+        .update({
+          status: "resolved",
+          resolved_at: new Date().toISOString(),
+          resolved_by: userId,
+          resolved_via: data.evidenceType,
+          attestation_id: attest.id,
+          document_url: documentPath,
+          resolution_note: data.statement ?? null,
+          external_reference: data.externalReference ?? null,
+        })
+        .eq("id", data.coversInstanceId);
+    }
+
+    return { ok: true, attestationId: attest.id as string };
+  });

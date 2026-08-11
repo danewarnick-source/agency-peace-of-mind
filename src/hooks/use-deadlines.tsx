@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { getIncidentOpenClocks } from "@/lib/incident-deadlines";
 import { computeDeadlines } from "@/lib/bc-deadlines";
+import { computeRequirementDueState } from "@/lib/requirement-tracking";
 import {
   ensureCurrentSummaryPeriods,
   listOpenSummaries,
@@ -23,7 +24,9 @@ export type DeadlineSource =
   | "sow_perimeter"
   | "pcsp_support_strategies"
   | "support_strategy_gap"
-  | "hrc_restriction_review";
+  | "hrc_restriction_review"
+  | "nectar_requirement"
+  | "compliance_instance";
 
 export type DeadlineItem = {
   key: string;
@@ -39,6 +42,7 @@ export type DeadlineItem = {
   incidentId?: string;
   clientId?: string;
   staffId?: string;
+  instanceId?: string;
 };
 
 const DAY = 86_400_000;
@@ -335,6 +339,59 @@ export function useDeadlines() {
     },
   });
 
+  // 12. Renewal-cadence requirements approaching expiry or overdue.
+  const renewalReqsQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "renewal_requirements", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("nectar_requirements")
+        .select("id, title, metadata")
+        .eq("organization_id", orgId!)
+        .eq("compliance_pattern", "renewal")
+        .eq("activation_state", "active")
+        .eq("review_status", "confirmed");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; title: string; metadata: Record<string, unknown> | null }>;
+    },
+  });
+
+  // 13. Open/overdue event-driven compliance instances.
+  const complianceInstancesQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "compliance_instances", orgId],
+    queryFn: async () => {
+      const nowIso = new Date().toISOString();
+      await supabase
+        .from("nectar_compliance_instances")
+        .update({ status: "overdue" })
+        .eq("organization_id", orgId!)
+        .eq("status", "open")
+        .lt("deadline_at", nowIso);
+
+      const { data, error } = await supabase
+        .from("nectar_compliance_instances")
+        .select("id, requirement_id, triggered_by_kind, triggered_at, deadline_at, status")
+        .eq("organization_id", orgId!)
+        .in("status", ["open", "overdue"]);
+      if (error) throw error;
+      const rows = (data ?? []) as Array<{
+        id: string; requirement_id: string; triggered_by_kind: string | null;
+        triggered_at: string; deadline_at: string; status: string;
+      }>;
+      const reqIds = Array.from(new Set(rows.map((r) => r.requirement_id)));
+      let titles: Record<string, string> = {};
+      if (reqIds.length) {
+        const { data: reqs } = await supabase
+          .from("nectar_requirements")
+          .select("id, title")
+          .in("id", reqIds);
+        for (const r of (reqs ?? []) as Array<{ id: string; title: string }>) titles[r.id] = r.title;
+      }
+      return { rows, titles };
+    },
+  });
+
   const items = useMemo<DeadlineItem[]>(() => {
     if (!orgId) return [];
     const now = new Date();
@@ -516,6 +573,41 @@ export function useDeadlines() {
       });
     }
 
+    // Renewal-cadence requirements — surfaced when due_soon or overdue.
+    for (const r of renewalReqsQ.data ?? []) {
+      const due = computeRequirementDueState(r.metadata, now);
+      if (due.state !== "due_soon" && due.state !== "overdue") continue;
+      if (!due.dueOn) continue;
+      const dueAt = new Date(`${due.dueOn}T23:59:59`);
+      out.push({
+        key: `req:${r.id}`,
+        source: "nectar_requirement",
+        title: r.title,
+        subject: "Agency",
+        subjectKind: "agency",
+        dueAt,
+        status: due.state === "overdue" ? "overdue" : "due_soon",
+        href: "/dashboard/authoritative-sources?tab=requirements",
+      });
+    }
+
+    // Open event-driven compliance instances.
+    for (const inst of complianceInstancesQ.data?.rows ?? []) {
+      const title = complianceInstancesQ.data?.titles[inst.requirement_id] ?? "Compliance requirement";
+      const due = new Date(inst.deadline_at);
+      out.push({
+        key: `nci:${inst.id}`,
+        source: "compliance_instance",
+        title,
+        subject: "Agency",
+        subjectKind: "agency",
+        dueAt: due,
+        status: inst.status === "overdue" ? "overdue" : bucketStatus(due, now),
+        href: "/dashboard/authoritative-sources?tab=requirements",
+        instanceId: inst.id,
+      });
+    }
+
     out.sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
     return out;
   }, [
@@ -532,6 +624,8 @@ export function useDeadlines() {
     ssApprovalsQ.data,
     ssCoverageQ.data,
     hrcRestrictionsQ.data,
+    renewalReqsQ.data,
+    complianceInstancesQ.data,
   ]);
 
   return {
@@ -542,6 +636,7 @@ export function useDeadlines() {
     isLoading:
       summariesQ.isLoading || clientsQ.isLoading || hhsQ.isLoading ||
       certsQ.isLoading || incidentsQ.isLoading || bcQ.isLoading || hhCertsQ.isLoading ||
-      sowQ.isLoading || ssCoverageQ.isLoading || hrcRestrictionsQ.isLoading,
+      sowQ.isLoading || ssCoverageQ.isLoading || hrcRestrictionsQ.isLoading ||
+      renewalReqsQ.isLoading || complianceInstancesQ.isLoading,
   };
 }

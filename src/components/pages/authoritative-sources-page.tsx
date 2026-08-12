@@ -10,7 +10,6 @@ import {
   FileText,
   Loader2,
   RefreshCw,
-  ScrollText,
   ShieldCheck,
   Sparkles,
   Globe,
@@ -26,8 +25,6 @@ import {
 import { useCurrentOrg } from "@/hooks/use-org";
 import { CodeActivationBanner } from "@/components/nectar/code-activation-banner";
 import { RequirementCard } from "@/components/nectar/requirement-card";
-import { ComplianceRulesPanel } from "@/components/nectar/compliance-rules-panel";
-import { HeldTimesheetsPanel, HeldTimesheetsBadge } from "@/components/nectar/held-timesheets-panel";
 import { activateCodeRequirements } from "@/lib/nectar-requirement-usage.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -253,19 +250,6 @@ export function AuthoritativeSourcesPage() {
             <FileCheck className="h-3.5 w-3.5" /> Requirements
             <PendingConfirmationsBadge orgId={orgId ?? undefined} />
           </TabsTrigger>
-          <TabsTrigger value="codes" className="gap-1">
-            <Hexagon className="h-3.5 w-3.5" /> Authorized codes
-          </TabsTrigger>
-          <TabsTrigger value="attestations" className="gap-1">
-            <ScrollText className="h-3.5 w-3.5" /> Attestation log
-          </TabsTrigger>
-          <TabsTrigger value="rules" className="gap-1">
-            <ScrollText className="h-3.5 w-3.5" /> Compliance rules
-          </TabsTrigger>
-          <TabsTrigger value="held" className="gap-1">
-            <ScrollText className="h-3.5 w-3.5" /> Held timesheets
-            <HeldTimesheetsBadge organizationId={orgId ?? undefined} />
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="sources">
@@ -285,18 +269,6 @@ export function AuthoritativeSourcesPage() {
           ) : (
             <LoadingCard />
           )}
-        </TabsContent>
-        <TabsContent value="codes">
-          {orgId ? <AuthorizedCodesPanel orgId={orgId} /> : <LoadingCard />}
-        </TabsContent>
-        <TabsContent value="attestations">
-          {orgId ? <AttestationsPanel orgId={orgId} /> : <LoadingCard />}
-        </TabsContent>
-        <TabsContent value="rules">
-          {orgId ? <ComplianceRulesPanel organizationId={orgId} /> : <LoadingCard />}
-        </TabsContent>
-        <TabsContent value="held">
-          {orgId ? <HeldTimesheetsPanel organizationId={orgId} /> : <LoadingCard />}
         </TabsContent>
       </Tabs>
     </div>
@@ -1509,6 +1481,7 @@ interface ReqRow {
   out_of_scope_codes?: string[] | null;
   service_code?: string | null;
   service_codes_all?: string[] | null;
+  applies_to?: "company" | "staff" | "client" | null;
 }
 
 interface SourceMeta {
@@ -1779,6 +1752,34 @@ function RequirementsPanel({
           highlight={highlightKey === g.sid}
         />
       ))}
+
+      <CodeApplicabilitySection orgId={orgId} />
+    </div>
+  );
+}
+
+function CodeApplicabilitySection({ orgId }: { orgId: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-2xl border border-border/60 bg-background/60 backdrop-blur">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-semibold"
+        aria-expanded={open}
+      >
+        <span className="flex items-center gap-1.5">
+          <Hexagon className="h-3.5 w-3.5" /> Code applicability
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <div className="border-t border-border/60 p-4">
+          <AuthorizedCodesPanel orgId={orgId} />
+        </div>
+      )}
     </div>
   );
 }
@@ -2693,8 +2694,33 @@ function RequirementRow({
   const trackingMd = (md["tracking"] ?? {}) as Partial<RequirementTracking>;
   const trackingState = computeRequirementDueState(md);
 
-
-
+  // Per-person completion, read from whatever the drill-down sheet already
+  // cached for this requirement — never fetched fresh from this row.
+  const drillDownCache = qc.getQueryData<{
+    kind?: "per_staff" | "per_client" | "per_event" | "org_wide";
+    staff?: Array<{ user_id: string }>;
+    clients?: Array<{ id: string }>;
+    evidenceByStaff?: Record<string, unknown[]>;
+    evidenceByClient?: Record<string, unknown[]>;
+  }>(["requirement-drilldown", orgId, req.id]);
+  const personProgress = (() => {
+    if (!drillDownCache) return null;
+    if (drillDownCache.kind === "per_staff" && drillDownCache.staff) {
+      const total = drillDownCache.staff.length;
+      const complete = drillDownCache.staff.filter(
+        (s) => (drillDownCache.evidenceByStaff?.[s.user_id]?.length ?? 0) > 0,
+      ).length;
+      return { total, complete };
+    }
+    if (drillDownCache.kind === "per_client" && drillDownCache.clients) {
+      const total = drillDownCache.clients.length;
+      const complete = drillDownCache.clients.filter(
+        (c) => (drillDownCache.evidenceByClient?.[c.id]?.length ?? 0) > 0,
+      ).length;
+      return { total, complete };
+    }
+    return null;
+  })();
 
   return (
     <li
@@ -2730,16 +2756,6 @@ function RequirementRow({
             </Badge>
           )}
           <SourceCitationChip citation={req.source_citation} />
-          {!isRemoved && (
-            <button
-              type="button"
-              onClick={() => setDrillDownOpen(true)}
-              className="rounded-sm text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus:ring-2 focus:ring-amber-500/40"
-              title="View per-person compliance status"
-            >
-              View status →
-            </button>
-          )}
           {isConfirmed && (() => {
             const ready = isScopeReady(applicStats);
             const hasAny = !!applicStats && applicStats.total > 0;
@@ -2886,6 +2902,61 @@ function RequirementRow({
             </Badge>
           )}
         </div>
+        {!isRemoved && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            {isConfirmed && !isNotApplicable && (
+              <>
+                {req.applies_to === "company" ? (
+                  req.verified_at ? (
+                    <span className="text-[11px] text-muted-foreground">
+                      Last recorded: {new Date(req.verified_at).toLocaleDateString()}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-amber-700 dark:text-amber-300">
+                      Not yet recorded
+                    </span>
+                  )
+                ) : personProgress ? (
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <div className="h-1.5 w-full max-w-[160px] overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={`h-full rounded-full ${
+                          personProgress.total > 0 && personProgress.complete === personProgress.total
+                            ? "bg-emerald-500"
+                            : personProgress.complete > 0
+                              ? "bg-amber-500"
+                              : "bg-red-500"
+                        }`}
+                        style={{
+                          width: `${
+                            personProgress.total > 0
+                              ? (personProgress.complete / personProgress.total) * 100
+                              : 0
+                          }%`,
+                        }}
+                      />
+                    </div>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                      {personProgress.complete}/{personProgress.total} complete
+                    </span>
+                  </div>
+                ) : applicStats ? (
+                  <span className="text-[11px] text-muted-foreground">
+                    {applicStats.confirmed} confirmed · {applicStats.pending} pending
+                  </span>
+                ) : null}
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => setDrillDownOpen(true)}
+              className="rounded-sm text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+              title="View per-person compliance status"
+            >
+              View status →
+            </button>
+          </div>
+        )}
         {req.description && (
           <p className="mt-1 text-xs text-muted-foreground">{req.description}</p>
         )}

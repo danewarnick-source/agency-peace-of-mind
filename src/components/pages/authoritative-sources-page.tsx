@@ -10,7 +10,6 @@ import {
   FileText,
   Loader2,
   RefreshCw,
-  ScrollText,
   ShieldCheck,
   Sparkles,
   Globe,
@@ -26,8 +25,6 @@ import {
 import { useCurrentOrg } from "@/hooks/use-org";
 import { CodeActivationBanner } from "@/components/nectar/code-activation-banner";
 import { RequirementCard } from "@/components/nectar/requirement-card";
-import { ComplianceRulesPanel } from "@/components/nectar/compliance-rules-panel";
-import { HeldTimesheetsPanel, HeldTimesheetsBadge } from "@/components/nectar/held-timesheets-panel";
 import { activateCodeRequirements } from "@/lib/nectar-requirement-usage.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -57,6 +54,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 import { SourceCitationChip } from "@/components/nectar/source-citation-chip";
 import { AuthoritativeSourceDrop } from "@/components/nectar/authoritative-source-drop";
@@ -77,6 +76,7 @@ import {
   ingestWebSource,
   explainRequirement,
   updatePolicyConfig,
+  setRequirementVerificationType,
 } from "@/lib/authoritative-sources.functions";
 import {
   listPolicySignatureStatus,
@@ -253,19 +253,6 @@ export function AuthoritativeSourcesPage() {
             <FileCheck className="h-3.5 w-3.5" /> Requirements
             <PendingConfirmationsBadge orgId={orgId ?? undefined} />
           </TabsTrigger>
-          <TabsTrigger value="codes" className="gap-1">
-            <Hexagon className="h-3.5 w-3.5" /> Authorized codes
-          </TabsTrigger>
-          <TabsTrigger value="attestations" className="gap-1">
-            <ScrollText className="h-3.5 w-3.5" /> Attestation log
-          </TabsTrigger>
-          <TabsTrigger value="rules" className="gap-1">
-            <ScrollText className="h-3.5 w-3.5" /> Compliance rules
-          </TabsTrigger>
-          <TabsTrigger value="held" className="gap-1">
-            <ScrollText className="h-3.5 w-3.5" /> Held timesheets
-            <HeldTimesheetsBadge organizationId={orgId ?? undefined} />
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="sources">
@@ -285,18 +272,6 @@ export function AuthoritativeSourcesPage() {
           ) : (
             <LoadingCard />
           )}
-        </TabsContent>
-        <TabsContent value="codes">
-          {orgId ? <AuthorizedCodesPanel orgId={orgId} /> : <LoadingCard />}
-        </TabsContent>
-        <TabsContent value="attestations">
-          {orgId ? <AttestationsPanel orgId={orgId} /> : <LoadingCard />}
-        </TabsContent>
-        <TabsContent value="rules">
-          {orgId ? <ComplianceRulesPanel organizationId={orgId} /> : <LoadingCard />}
-        </TabsContent>
-        <TabsContent value="held">
-          {orgId ? <HeldTimesheetsPanel organizationId={orgId} /> : <LoadingCard />}
         </TabsContent>
       </Tabs>
     </div>
@@ -1509,6 +1484,8 @@ interface ReqRow {
   out_of_scope_codes?: string[] | null;
   service_code?: string | null;
   service_codes_all?: string[] | null;
+  applies_to?: "company" | "staff" | "client" | null;
+  verification_type?: "internal" | "external" | null;
 }
 
 interface SourceMeta {
@@ -1779,6 +1756,34 @@ function RequirementsPanel({
           highlight={highlightKey === g.sid}
         />
       ))}
+
+      <CodeApplicabilitySection orgId={orgId} />
+    </div>
+  );
+}
+
+function CodeApplicabilitySection({ orgId }: { orgId: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-2xl border border-border/60 bg-background/60 backdrop-blur">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-semibold"
+        aria-expanded={open}
+      >
+        <span className="flex items-center gap-1.5">
+          <Hexagon className="h-3.5 w-3.5" /> Code applicability
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <div className="border-t border-border/60 p-4">
+          <AuthorizedCodesPanel orgId={orgId} />
+        </div>
+      )}
     </div>
   );
 }
@@ -2609,6 +2614,7 @@ function RequirementRow({
   const qc = useQueryClient();
   const setStatusFn = useServerFn(setRequirementReviewStatus);
   const confirmAllFn = useServerFn(confirmRequirementWithScopes);
+  const setVerifTypeFn = useServerFn(setRequirementVerificationType);
   const set = useMutation({
     mutationFn: (vars: { status: ReviewStatus; attestStatement?: string }) =>
       setStatusFn({
@@ -2647,6 +2653,16 @@ function RequirementRow({
     },
     onError: (e: Error) => toast.error(e.message),
   });
+  const setVerifType = useMutation({
+    mutationFn: (verificationType: "internal" | "external") =>
+      setVerifTypeFn({ data: { requirementId: req.id, verificationType } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["requirements", orgId] });
+      toast.success("Verification type updated");
+      setVerifTypeOpen(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const status = statusOf(req);
   const isRemoved = status === "removed";
@@ -2674,6 +2690,8 @@ function RequirementRow({
   const [trackingOpen, setTrackingOpen] = useState(false);
   const [attestOpen, setAttestOpen] = useState(false);
   const [drillDownOpen, setDrillDownOpen] = useState(false);
+  const [verifTypeOpen, setVerifTypeOpen] = useState(false);
+  const [pendingVerifType, setPendingVerifType] = useState<"internal" | "external">("internal");
 
   // Internal vs external classification (stored in metadata, falls back to heuristic)
   const md = (req.metadata ?? {}) as Record<string, unknown>;
@@ -2686,15 +2704,40 @@ function RequirementRow({
         source_citation: req.source_citation,
       });
   const classification: "internal" | "external" =
-    storedClass ?? (inferred?.classification ?? "internal");
+    req.verification_type ?? storedClass ?? (inferred?.classification ?? "internal");
   const externalSystem =
     (md["external_system"] as string | null | undefined) ?? inferred?.externalSystem ?? null;
   const renewalDueAt = (md["renewal_due_at"] as string | null | undefined) ?? null;
   const trackingMd = (md["tracking"] ?? {}) as Partial<RequirementTracking>;
   const trackingState = computeRequirementDueState(md);
 
-
-
+  // Per-person completion, read from whatever the drill-down sheet already
+  // cached for this requirement — never fetched fresh from this row.
+  const drillDownCache = qc.getQueryData<{
+    kind?: "per_staff" | "per_client" | "per_event" | "org_wide";
+    staff?: Array<{ user_id: string }>;
+    clients?: Array<{ id: string }>;
+    evidenceByStaff?: Record<string, unknown[]>;
+    evidenceByClient?: Record<string, unknown[]>;
+  }>(["requirement-drilldown", orgId, req.id]);
+  const personProgress = (() => {
+    if (!drillDownCache) return null;
+    if (drillDownCache.kind === "per_staff" && drillDownCache.staff) {
+      const total = drillDownCache.staff.length;
+      const complete = drillDownCache.staff.filter(
+        (s) => (drillDownCache.evidenceByStaff?.[s.user_id]?.length ?? 0) > 0,
+      ).length;
+      return { total, complete };
+    }
+    if (drillDownCache.kind === "per_client" && drillDownCache.clients) {
+      const total = drillDownCache.clients.length;
+      const complete = drillDownCache.clients.filter(
+        (c) => (drillDownCache.evidenceByClient?.[c.id]?.length ?? 0) > 0,
+      ).length;
+      return { total, complete };
+    }
+    return null;
+  })();
 
   return (
     <li
@@ -2730,16 +2773,6 @@ function RequirementRow({
             </Badge>
           )}
           <SourceCitationChip citation={req.source_citation} />
-          {!isRemoved && (
-            <button
-              type="button"
-              onClick={() => setDrillDownOpen(true)}
-              className="rounded-sm text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus:ring-2 focus:ring-amber-500/40"
-              title="View per-person compliance status"
-            >
-              View status →
-            </button>
-          )}
           {isConfirmed && (() => {
             const ready = isScopeReady(applicStats);
             const hasAny = !!applicStats && applicStats.total > 0;
@@ -2837,6 +2870,75 @@ function RequirementRow({
               Internal
             </Badge>
           )}
+          {!isRemoved && (
+            <Popover
+              open={verifTypeOpen}
+              onOpenChange={(v) => {
+                if (v) setPendingVerifType(classification);
+                setVerifTypeOpen(v);
+              }}
+            >
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="rounded-sm text-[10px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                >
+                  Change →
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-80 text-sm">
+                <p className="mb-2 text-xs font-semibold text-foreground">
+                  Verification type
+                </p>
+                <RadioGroup
+                  value={pendingVerifType}
+                  onValueChange={(v) => setPendingVerifType(v as "internal" | "external")}
+                  className="gap-2.5"
+                >
+                  <label className="flex cursor-pointer items-start gap-2 text-xs">
+                    <RadioGroupItem value="external" id={`verif-external-${req.id}`} className="mt-0.5" />
+                    <span>
+                      <span className="font-medium text-foreground">↗ External</span>
+                      <br />
+                      <span className="text-muted-foreground">requires action outside HIVE</span>
+                    </span>
+                  </label>
+                  <label className="flex cursor-pointer items-start gap-2 text-xs">
+                    <RadioGroupItem value="internal" id={`verif-internal-${req.id}`} className="mt-0.5" />
+                    <span>
+                      <span className="font-medium text-foreground">⬡ Internal</span>
+                      <br />
+                      <span className="text-muted-foreground">HIVE tracks this automatically</span>
+                    </span>
+                  </label>
+                </RadioGroup>
+                {pendingVerifType === "internal" && (
+                  <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-300">
+                    Changing to Internal means HIVE will attempt to auto-verify this. Ensure the
+                    evidence source is connected.
+                  </p>
+                )}
+                <div className="mt-3 flex justify-end gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs"
+                    onClick={() => setVerifTypeOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-7 text-xs"
+                    disabled={setVerifType.isPending}
+                    onClick={() => setVerifType.mutate(pendingVerifType)}
+                  >
+                    Save
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
           {renewalDueAt && (
             <Badge
               variant="outline"
@@ -2886,6 +2988,61 @@ function RequirementRow({
             </Badge>
           )}
         </div>
+        {!isRemoved && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            {isConfirmed && !isNotApplicable && (
+              <>
+                {req.applies_to === "company" ? (
+                  req.verified_at ? (
+                    <span className="text-[11px] text-muted-foreground">
+                      Last recorded: {new Date(req.verified_at).toLocaleDateString()}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-amber-700 dark:text-amber-300">
+                      Not yet recorded
+                    </span>
+                  )
+                ) : personProgress ? (
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <div className="h-1.5 w-full max-w-[160px] overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={`h-full rounded-full ${
+                          personProgress.total > 0 && personProgress.complete === personProgress.total
+                            ? "bg-emerald-500"
+                            : personProgress.complete > 0
+                              ? "bg-amber-500"
+                              : "bg-red-500"
+                        }`}
+                        style={{
+                          width: `${
+                            personProgress.total > 0
+                              ? (personProgress.complete / personProgress.total) * 100
+                              : 0
+                          }%`,
+                        }}
+                      />
+                    </div>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                      {personProgress.complete}/{personProgress.total} complete
+                    </span>
+                  </div>
+                ) : applicStats ? (
+                  <span className="text-[11px] text-muted-foreground">
+                    {applicStats.confirmed} confirmed · {applicStats.pending} pending
+                  </span>
+                ) : null}
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => setDrillDownOpen(true)}
+              className="rounded-sm text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+              title="View per-person compliance status"
+            >
+              View status →
+            </button>
+          </div>
+        )}
         {req.description && (
           <p className="mt-1 text-xs text-muted-foreground">{req.description}</p>
         )}

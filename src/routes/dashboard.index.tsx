@@ -247,6 +247,9 @@ function AdminComplianceStatus() {
     ).length;
   }, [clientsQ.data]);
 
+  // useDeadlines already includes source: "compliance_instance" rows (open UPI
+  // submissions etc.) with status "overdue" in its `overdue` bucket — no filter
+  // excludes them, so no extra wiring is needed here.
   const overdueDeadlineCount = overdueDeadlines.length;
 
   const isLoading = matrixQ.isLoading || clientsQ.isLoading || deadlinesLoading;
@@ -345,6 +348,7 @@ function AdminComplianceStatus() {
         {/* Tile 3 — Overdue deadlines */}
         <Link
           to="/dashboard/deadlines"
+          title="Includes open UPI submissions, renewal deadlines, and other tracked obligations"
           className={
             "group flex flex-col gap-1 rounded-xl border p-4 transition hover:shadow-sm " +
             (overdueDeadlineCount > 0
@@ -362,6 +366,9 @@ function AdminComplianceStatus() {
           </div>
           <div className="text-xs font-medium leading-tight text-foreground">
             Overdue deadlines
+          </div>
+          <div className="text-[10px] leading-tight text-muted-foreground">
+            Includes open UPI submissions, renewal deadlines, and other tracked obligations
           </div>
         </Link>
       </div>

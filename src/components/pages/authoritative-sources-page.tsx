@@ -54,6 +54,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 import { SourceCitationChip } from "@/components/nectar/source-citation-chip";
 import { AuthoritativeSourceDrop } from "@/components/nectar/authoritative-source-drop";
@@ -74,6 +76,7 @@ import {
   ingestWebSource,
   explainRequirement,
   updatePolicyConfig,
+  setRequirementVerificationType,
 } from "@/lib/authoritative-sources.functions";
 import {
   listPolicySignatureStatus,
@@ -1482,6 +1485,7 @@ interface ReqRow {
   service_code?: string | null;
   service_codes_all?: string[] | null;
   applies_to?: "company" | "staff" | "client" | null;
+  verification_type?: "internal" | "external" | null;
 }
 
 interface SourceMeta {
@@ -2610,6 +2614,7 @@ function RequirementRow({
   const qc = useQueryClient();
   const setStatusFn = useServerFn(setRequirementReviewStatus);
   const confirmAllFn = useServerFn(confirmRequirementWithScopes);
+  const setVerifTypeFn = useServerFn(setRequirementVerificationType);
   const set = useMutation({
     mutationFn: (vars: { status: ReviewStatus; attestStatement?: string }) =>
       setStatusFn({
@@ -2648,6 +2653,16 @@ function RequirementRow({
     },
     onError: (e: Error) => toast.error(e.message),
   });
+  const setVerifType = useMutation({
+    mutationFn: (verificationType: "internal" | "external") =>
+      setVerifTypeFn({ data: { requirementId: req.id, verificationType } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["requirements", orgId] });
+      toast.success("Verification type updated");
+      setVerifTypeOpen(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const status = statusOf(req);
   const isRemoved = status === "removed";
@@ -2675,6 +2690,8 @@ function RequirementRow({
   const [trackingOpen, setTrackingOpen] = useState(false);
   const [attestOpen, setAttestOpen] = useState(false);
   const [drillDownOpen, setDrillDownOpen] = useState(false);
+  const [verifTypeOpen, setVerifTypeOpen] = useState(false);
+  const [pendingVerifType, setPendingVerifType] = useState<"internal" | "external">("internal");
 
   // Internal vs external classification (stored in metadata, falls back to heuristic)
   const md = (req.metadata ?? {}) as Record<string, unknown>;
@@ -2687,7 +2704,7 @@ function RequirementRow({
         source_citation: req.source_citation,
       });
   const classification: "internal" | "external" =
-    storedClass ?? (inferred?.classification ?? "internal");
+    req.verification_type ?? storedClass ?? (inferred?.classification ?? "internal");
   const externalSystem =
     (md["external_system"] as string | null | undefined) ?? inferred?.externalSystem ?? null;
   const renewalDueAt = (md["renewal_due_at"] as string | null | undefined) ?? null;
@@ -2852,6 +2869,75 @@ function RequirementRow({
               <Building className="mr-1 h-3 w-3" />
               Internal
             </Badge>
+          )}
+          {!isRemoved && (
+            <Popover
+              open={verifTypeOpen}
+              onOpenChange={(v) => {
+                if (v) setPendingVerifType(classification);
+                setVerifTypeOpen(v);
+              }}
+            >
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="rounded-sm text-[10px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                >
+                  Change →
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-80 text-sm">
+                <p className="mb-2 text-xs font-semibold text-foreground">
+                  Verification type
+                </p>
+                <RadioGroup
+                  value={pendingVerifType}
+                  onValueChange={(v) => setPendingVerifType(v as "internal" | "external")}
+                  className="gap-2.5"
+                >
+                  <label className="flex cursor-pointer items-start gap-2 text-xs">
+                    <RadioGroupItem value="external" id={`verif-external-${req.id}`} className="mt-0.5" />
+                    <span>
+                      <span className="font-medium text-foreground">↗ External</span>
+                      <br />
+                      <span className="text-muted-foreground">requires action outside HIVE</span>
+                    </span>
+                  </label>
+                  <label className="flex cursor-pointer items-start gap-2 text-xs">
+                    <RadioGroupItem value="internal" id={`verif-internal-${req.id}`} className="mt-0.5" />
+                    <span>
+                      <span className="font-medium text-foreground">⬡ Internal</span>
+                      <br />
+                      <span className="text-muted-foreground">HIVE tracks this automatically</span>
+                    </span>
+                  </label>
+                </RadioGroup>
+                {pendingVerifType === "internal" && (
+                  <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-300">
+                    Changing to Internal means HIVE will attempt to auto-verify this. Ensure the
+                    evidence source is connected.
+                  </p>
+                )}
+                <div className="mt-3 flex justify-end gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs"
+                    onClick={() => setVerifTypeOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-7 text-xs"
+                    disabled={setVerifType.isPending}
+                    onClick={() => setVerifType.mutate(pendingVerifType)}
+                  >
+                    Save
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
           )}
           {renewalDueAt && (
             <Badge

@@ -711,6 +711,9 @@ function ComplianceDeskPage() {
           <Button onClick={onGlobalMasterExport} disabled={approvedQ.isLoading} variant="secondary">
             <Download /> Export Master Agency Ledger CSV
           </Button>
+          <Button variant="outline" onClick={() => navigate({ to: "/dashboard/company-obligations" })}>
+            Company obligations
+          </Button>
         </div>
       </header>
 

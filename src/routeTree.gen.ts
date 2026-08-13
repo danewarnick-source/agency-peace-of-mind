@@ -79,6 +79,7 @@ import { Route as DashboardDeadlinesRouteImport } from './routes/dashboard.deadl
 import { Route as DashboardDayProgramRouteImport } from './routes/dashboard.day-program'
 import { Route as DashboardDailyLogsRouteImport } from './routes/dashboard.daily-logs'
 import { Route as DashboardComplianceDeskRouteImport } from './routes/dashboard.compliance-desk'
+import { Route as DashboardCompanyObligationsRouteImport } from './routes/dashboard.company-obligations'
 import { Route as DashboardCommandCenterRouteImport } from './routes/dashboard.command-center'
 import { Route as DashboardClientsRouteImport } from './routes/dashboard.clients'
 import { Route as DashboardClientLoansRouteImport } from './routes/dashboard.client-loans'
@@ -571,6 +572,12 @@ const DashboardComplianceDeskRoute = DashboardComplianceDeskRouteImport.update({
   path: '/compliance-desk',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardCompanyObligationsRoute =
+  DashboardCompanyObligationsRouteImport.update({
+    id: '/company-obligations',
+    path: '/company-obligations',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardCommandCenterRoute = DashboardCommandCenterRouteImport.update({
   id: '/command-center',
   path: '/command-center',
@@ -1335,6 +1342,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/client-loans': typeof DashboardClientLoansRoute
   '/dashboard/clients': typeof DashboardClientsRouteWithChildren
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
+  '/dashboard/company-obligations': typeof DashboardCompanyObligationsRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/day-program': typeof DashboardDayProgramRoute
@@ -1534,6 +1542,7 @@ export interface FileRoutesByTo {
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
   '/dashboard/client-loans': typeof DashboardClientLoansRoute
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
+  '/dashboard/company-obligations': typeof DashboardCompanyObligationsRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/day-program': typeof DashboardDayProgramRoute
@@ -1733,6 +1742,7 @@ export interface FileRoutesById {
   '/dashboard/client-loans': typeof DashboardClientLoansRoute
   '/dashboard/clients': typeof DashboardClientsRouteWithChildren
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
+  '/dashboard/company-obligations': typeof DashboardCompanyObligationsRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/day-program': typeof DashboardDayProgramRoute
@@ -1937,6 +1947,7 @@ export interface FileRouteTypes {
     | '/dashboard/client-loans'
     | '/dashboard/clients'
     | '/dashboard/command-center'
+    | '/dashboard/company-obligations'
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
     | '/dashboard/day-program'
@@ -2136,6 +2147,7 @@ export interface FileRouteTypes {
     | '/dashboard/client-billing-codes'
     | '/dashboard/client-loans'
     | '/dashboard/command-center'
+    | '/dashboard/company-obligations'
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
     | '/dashboard/day-program'
@@ -2334,6 +2346,7 @@ export interface FileRouteTypes {
     | '/dashboard/client-loans'
     | '/dashboard/clients'
     | '/dashboard/command-center'
+    | '/dashboard/company-obligations'
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
     | '/dashboard/day-program'
@@ -3030,6 +3043,13 @@ declare module '@tanstack/react-router' {
       path: '/compliance-desk'
       fullPath: '/dashboard/compliance-desk'
       preLoaderRoute: typeof DashboardComplianceDeskRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/company-obligations': {
+      id: '/dashboard/company-obligations'
+      path: '/company-obligations'
+      fullPath: '/dashboard/company-obligations'
+      preLoaderRoute: typeof DashboardCompanyObligationsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/command-center': {
@@ -4263,6 +4283,7 @@ interface DashboardRouteChildren {
   DashboardClientLoansRoute: typeof DashboardClientLoansRoute
   DashboardClientsRoute: typeof DashboardClientsRouteWithChildren
   DashboardCommandCenterRoute: typeof DashboardCommandCenterRoute
+  DashboardCompanyObligationsRoute: typeof DashboardCompanyObligationsRoute
   DashboardComplianceDeskRoute: typeof DashboardComplianceDeskRoute
   DashboardDailyLogsRoute: typeof DashboardDailyLogsRoute
   DashboardDayProgramRoute: typeof DashboardDayProgramRoute
@@ -4356,6 +4377,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardClientLoansRoute: DashboardClientLoansRoute,
   DashboardClientsRoute: DashboardClientsRouteWithChildren,
   DashboardCommandCenterRoute: DashboardCommandCenterRoute,
+  DashboardCompanyObligationsRoute: DashboardCompanyObligationsRoute,
   DashboardComplianceDeskRoute: DashboardComplianceDeskRoute,
   DashboardDailyLogsRoute: DashboardDailyLogsRoute,
   DashboardDayProgramRoute: DashboardDayProgramRoute,

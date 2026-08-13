@@ -75,7 +75,10 @@ export const CAPABILITY_REGISTRY: ReadonlyArray<CapabilityAction> = [
     helper:
       "NECTAR extracts items and drafts them as pending entries. Nothing goes live until you confirm.",
     applies_to_types: ["staff_checklist", "scope_of_work"],
-    is_live: true,
+    // Disabled — Company Obligations is now the tracker of record for
+    // recurring compliance requirements; the document-to-checklist pipeline
+    // is retired in favor of admins creating obligations directly.
+    is_live: false,
     handler: "propose_staff_checklist_from_document",
   },
 

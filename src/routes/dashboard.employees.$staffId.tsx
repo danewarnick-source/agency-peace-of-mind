@@ -483,9 +483,10 @@ function StaffProfilePage() {
             training history, HR documents, and sensitive HR — this is the
             "am I audit ready for this person" tab. */}
         <TabsContent value="record" className="mt-4 space-y-10">
-          <ComplianceStatusHeader
-            rows={checklistBadgeQ.data ?? []}
-            isLoading={checklistBadgeQ.isLoading}
+          <DocumentVaultCard
+            organizationId={orgId}
+            staffId={staffId}
+            isSelf={isSelf}
           />
 
           <CollapsibleSectionGroup
@@ -751,91 +752,100 @@ function scrollToChecklist() {
   document.getElementById("staff-hr-checklist-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function ComplianceStatusHeader({ rows, isLoading }: { rows: ChecklistRow[]; isLoading: boolean }) {
-  const { overdue, pending, complete, urgent } = useMemo(() => {
-    const kindRank: Record<StatusHeaderKind, number> = { overdue: 0, expiring: 1, todo: 2, current: 3, na: 4 };
-    let overdueCount = 0;
-    let pendingCount = 0;
-    let completeCount = 0;
-    const actionable: Array<{ row: ChecklistRow; kind: StatusHeaderKind }> = [];
-    for (const row of rows) {
-      const kind = classifyChecklistRow(row);
-      if (kind === "na") continue;
-      if (kind === "overdue") overdueCount++;
-      else if (kind === "expiring" || kind === "todo") pendingCount++;
-      else if (kind === "current") completeCount++;
-      if (kind === "overdue" || kind === "expiring" || kind === "todo") {
-        actionable.push({ row, kind });
-      }
-    }
-    actionable.sort((a, b) => kindRank[a.kind] - kindRank[b.kind]);
-    return {
-      overdue: overdueCount,
-      pending: pendingCount,
-      complete: completeCount,
-      urgent: actionable.slice(0, 3),
-    };
-  }, [rows]);
+type DocumentVaultRow = {
+  id: string;
+  file_name: string;
+  created_at: string;
+  nectar_cert_type: string | null;
+  nectar_expires_at: string | null;
+};
 
-  if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="p-4 text-sm text-muted-foreground">Loading compliance status…</CardContent>
-      </Card>
-    );
-  }
+/**
+ * Replaces the old checklist-driven compliance-status header: this is now a
+ * plain, non-judgmental record of what's on file (uploaded documents, when,
+ * and what NECTAR read off them) — Company Obligations, not this page, is
+ * the tracker of record for whether something is due/overdue.
+ */
+function DocumentVaultCard({
+  organizationId,
+  staffId,
+  isSelf,
+}: {
+  organizationId: string;
+  staffId: string;
+  isSelf: boolean;
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["staff-document-vault", organizationId, staffId],
+    enabled: !!organizationId && !!staffId,
+    queryFn: async (): Promise<DocumentVaultRow[]> => {
+      const [{ data: docs, error: dErr }, { data: completions, error: cErr }] = await Promise.all([
+        supabase
+          .from("hr_documents")
+          .select("id, file_name, created_at")
+          .eq("organization_id", organizationId)
+          .eq("staff_id", staffId)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("staff_baseline_training_completions")
+          .select("evidence_document_id, nectar_extracted_cert_type, expires_at")
+          .eq("organization_id", organizationId)
+          .eq("staff_id", staffId),
+      ]);
+      if (dErr) throw new Error(dErr.message);
+      if (cErr) throw new Error(cErr.message);
+      const nectarByDoc = new Map(
+        (completions ?? [])
+          .filter((c) => !!c.evidence_document_id)
+          .map((c) => [c.evidence_document_id as string, c]),
+      );
+      return (docs ?? []).map((d) => {
+        const match = nectarByDoc.get(d.id) as { nectar_extracted_cert_type: string | null; expires_at: string | null } | undefined;
+        return {
+          id: d.id,
+          file_name: d.file_name,
+          created_at: d.created_at,
+          nectar_cert_type: match?.nectar_extracted_cert_type ?? null,
+          nectar_expires_at: match?.expires_at ?? null,
+        };
+      });
+    },
+  });
 
-  const auditReady = overdue + pending === 0;
-
-  if (auditReady) {
-    return (
-      <Card className="border-emerald-300 bg-emerald-50/60 dark:border-emerald-900/60 dark:bg-emerald-950/20">
-        <CardContent className="flex items-center gap-2 p-4 text-sm font-medium text-emerald-800 dark:text-emerald-200">
-          <ShieldAlert className="h-4 w-4" />
-          Audit ready — every applicable requirement is current.
-        </CardContent>
-      </Card>
-    );
-  }
+  const obligationsHref = isSelf ? "/dashboard/my-obligations" : `/dashboard/my-obligations?staff=${staffId}`;
 
   return (
     <Card>
-      <CardContent className="p-4 space-y-4">
-        <div className="flex flex-wrap gap-2">
-          <span className="inline-flex items-center rounded-full border border-rose-300 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-300">
-            {overdue} overdue
-          </span>
-          <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/10 dark:text-amber-200">
-            {pending} pending
-          </span>
-          <span className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300">
-            {complete} complete
-          </span>
+      <CardContent className="p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-semibold">Document Vault</p>
+          <a href={obligationsHref} className="text-sm font-medium text-[#137182] hover:underline">
+            View compliance obligations →
+          </a>
         </div>
-        {urgent.length > 0 && (
-          <div className="space-y-2">
-            {urgent.map(({ row, kind }) => (
-              <div
-                key={row.requirement_id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/60 px-3 py-2"
-              >
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading documents…</p>
+        ) : !data || data.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No documents uploaded yet.</p>
+        ) : (
+          <ul className="divide-y divide-border rounded-md border border-border">
+            {data.map((d) => (
+              <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
                 <div className="min-w-0">
-                  <span
-                    className={`mr-2 inline-block h-2 w-2 rounded-full ${
-                      kind === "overdue" ? "bg-rose-500" : kind === "expiring" ? "bg-amber-500" : "bg-muted-foreground/40"
-                    }`}
-                  />
-                  <span className="text-sm font-medium">{row.title}</span>
-                  {row.source_citation ? (
-                    <span className="ml-2 text-xs text-muted-foreground">{row.source_citation}</span>
-                  ) : null}
+                  <p className="truncate font-medium">{d.file_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Uploaded {new Date(d.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                    {d.nectar_cert_type && ` · NECTAR read: ${d.nectar_cert_type}`}
+                  </p>
                 </div>
-                <Button size="sm" variant="outline" onClick={scrollToChecklist}>
-                  {row.completion.evidence_document_id ? "Set status" : "Upload"}
-                </Button>
-              </div>
+                {d.nectar_expires_at && (
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    Expires {new Date(d.nectar_expires_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                  </span>
+                )}
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </CardContent>
     </Card>

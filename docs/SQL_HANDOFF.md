@@ -6,6 +6,67 @@ it worked before moving on.
 
 ---
 
+## ACTION — Prompt batch 2–15: staff attestations, client profile, incidents, HHS/RHS, HRC, deadlines (2026-08-13)
+
+**What this is for:** Twelve product prompts in one pass. New tables:
+`client_healthcare_providers` (open-ended provider list, backfilled from the
+old fixed PCP/specialist/prescriber columns), `rhs_hospitalization_days`
+(RHS non-billable day flag), `rhs_evacuation_drills` (RHS quarterly drill
+log). New columns: `hhs_monthly_attendance.away_notes` (required elaboration
+when the away category is Hospitalization), `hrc_meetings.minutes_document_path`
+/ `minutes_document_name`. New storage bucket `hrc-documents`. Plus two RLS
+policies letting a staffer write their own `staff_baseline_training_completions`
+/ `document_attestations` row ONLY for the fixed self-attestable key
+`sei_benefits_attestation` (SEI Benefits Knowledge Attestation — staff may
+complete it themselves; every other baseline training stays admin/manager-only).
+The "New Caregiver Compensation Training" (CMP/CMS) and the presence-only
+"Grievance Policy — Staff Copy" / "Driving Record" items reuse the existing
+baseline-training tables/columns — no schema changes needed for those three.
+Everything below is additive. Matches migrations
+`supabase/migrations/20260813090000_staff_self_attest_baseline.sql` and
+`supabase/migrations/20260813100000_prompts_2_15_batch.sql`.
+
+### 1. Self-attestable baseline training carve-out
+
+```sql
+CREATE POLICY "baseline self attestation write"
+  ON public.staff_baseline_training_completions
+  FOR ALL
+  TO authenticated
+  USING (staff_id = auth.uid() AND training_key IN ('sei_benefits_attestation'))
+  WITH CHECK (staff_id = auth.uid() AND training_key IN ('sei_benefits_attestation'));
+
+CREATE POLICY "doc_attest_insert_self_attest_baseline"
+  ON public.document_attestations
+  FOR INSERT
+  WITH CHECK (
+    staff_id = auth.uid()
+    AND subject_kind = 'baseline_cert'
+    AND subject_ref IN ('sei_benefits_attestation')
+    AND attested_by = auth.uid()
+  );
+```
+
+**What you'll see:** "Success. No rows returned." No existing rows change —
+this only widens who may write a row for one specific training key.
+
+### 2. Healthcare providers, RHS hospitalization, RHS drills, HRC meeting docs
+
+Paste the full contents of
+`supabase/migrations/20260813100000_prompts_2_15_batch.sql` from the repo —
+it's long (new tables + RLS + a guarded one-time backfill of the old
+PCP/specialist/prescriber columns into the new provider-list rows) so it
+isn't duplicated here to avoid drift. Run it as one block.
+
+**What you'll see:** several `CREATE TABLE`, `CREATE POLICY`, `CREATE INDEX`,
+two `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, one `INSERT INTO
+storage.buckets ... ON CONFLICT DO NOTHING`, and three guarded backfill
+`INSERT`s (only fire for clients that have a non-null legacy PCP/specialist
+/prescriber name and don't already have that provider-type row). No existing
+column or row is dropped or overwritten.
+
+---
+
 ## ACTION — Correction: shift-note attestation columns belong on `evv_timesheets`, not `general_shifts` (2026-08-11)
 
 **What this is for:** Section 4 below (still present, unchanged, for history)

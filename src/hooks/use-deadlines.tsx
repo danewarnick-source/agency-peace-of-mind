@@ -26,7 +26,9 @@ export type DeadlineSource =
   | "support_strategy_gap"
   | "hrc_restriction_review"
   | "nectar_requirement"
-  | "compliance_instance";
+  | "compliance_instance"
+  | "hhs_evacuation_drill"
+  | "rhs_evacuation_drill";
 
 export type DeadlineItem = {
   key: string;
@@ -53,6 +55,16 @@ function bucketStatus(due: Date, now: Date): DeadlineItem["status"] {
   if (ms <= 7 * DAY) return "due_soon";
   return "upcoming";
 }
+
+function bucketStatusWithin(due: Date, now: Date, dueSoonDays: number): DeadlineItem["status"] {
+  const ms = due.getTime() - now.getTime();
+  if (ms < 0) return "overdue";
+  if (ms <= dueSoonDays * DAY) return "due_soon";
+  return "upcoming";
+}
+
+const QUARTERLY_DRILL_DAYS = 90;
+const DRILL_REMINDER_DAYS = 14;
 
 function fmtMonth(yyyyMm: string): string {
   const [y, m] = yyyyMm.split("-").map(Number);
@@ -83,10 +95,10 @@ export function useDeadlines() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, first_name, last_name, pcsp_expiration_date")
+        .select("id, first_name, last_name, pcsp_expiration_date, admission_date")
         .eq("organization_id", orgId!);
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; first_name: string; last_name: string; pcsp_expiration_date: string | null }>;
+      return (data ?? []) as Array<{ id: string; first_name: string; last_name: string; pcsp_expiration_date: string | null; admission_date: string | null }>;
     },
   });
 
@@ -246,6 +258,70 @@ export function useDeadlines() {
   });
 
 
+
+  // 8b. Active RHS clients (drives the RHS quarterly evacuation drill source).
+  const rhsActiveQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "rhs", orgId],
+    queryFn: async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: codes, error } = await supabase
+        .from("client_billing_codes")
+        .select("client_id, service_start_date, service_end_date")
+        .eq("organization_id", orgId!)
+        .eq("service_code", "RHS");
+      if (error) throw error;
+      const activeIds = (codes ?? [])
+        .filter((c) => (!c.service_start_date || c.service_start_date <= today)
+                    && (!c.service_end_date || c.service_end_date >= today))
+        .map((c) => c.client_id);
+      return { activeIds };
+    },
+  });
+
+  // 8c. Quarterly evacuation drills — latest drill date per active HHS client.
+  const hhsDrillsQ = useQuery({
+    enabled: !!orgId && !!hhsQ.data,
+    queryKey: ["deadlines", "hhs_drills", orgId, (hhsQ.data?.activeIds ?? []).join(",")],
+    queryFn: async () => {
+      const activeIds = hhsQ.data?.activeIds ?? [];
+      if (activeIds.length === 0) return { latest: new Map<string, string>() };
+      const { data, error } = await supabase
+        .from("hhs_evacuation_drills" as never)
+        .select("client_id, drill_executed_at")
+        .eq("organization_id", orgId!)
+        .in("client_id", activeIds)
+        .order("drill_executed_at", { ascending: false });
+      if (error) throw error;
+      const latest = new Map<string, string>();
+      for (const row of (data ?? []) as unknown as Array<{ client_id: string; drill_executed_at: string }>) {
+        if (!latest.has(row.client_id)) latest.set(row.client_id, row.drill_executed_at);
+      }
+      return { latest };
+    },
+  });
+
+  // 8d. Quarterly evacuation drills — latest drill date per active RHS client.
+  const rhsDrillsQ = useQuery({
+    enabled: !!orgId && !!rhsActiveQ.data,
+    queryKey: ["deadlines", "rhs_drills", orgId, (rhsActiveQ.data?.activeIds ?? []).join(",")],
+    queryFn: async () => {
+      const activeIds = rhsActiveQ.data?.activeIds ?? [];
+      if (activeIds.length === 0) return { latest: new Map<string, string>() };
+      const { data, error } = await supabase
+        .from("rhs_evacuation_drills" as never)
+        .select("client_id, drill_date")
+        .eq("organization_id", orgId!)
+        .in("client_id", activeIds)
+        .order("drill_date", { ascending: false });
+      if (error) throw error;
+      const latest = new Map<string, string>();
+      for (const row of (data ?? []) as unknown as Array<{ client_id: string; drill_date: string }>) {
+        if (!latest.has(row.client_id)) latest.set(row.client_id, row.drill_date);
+      }
+      return { latest };
+    },
+  });
 
   // 9. SOW perimeter alerts — R1 through R5 (training gaps, incident timelines, requirements).
   const sowQ = useQuery({
@@ -495,6 +571,53 @@ export function useDeadlines() {
           dueAt: due,
           status: bucketStatus(due, now),
           href: `/dashboard/hub/employees?tab=hosts`,
+          clientId,
+        });
+      }
+    }
+
+    // Quarterly evacuation drills — HHS. Due every 90 days from the last
+    // recorded drill; overdue from admission date if never recorded.
+    if (hhsQ.data && hhsDrillsQ.data) {
+      for (const clientId of hhsQ.data.activeIds) {
+        const lastDrill = hhsDrillsQ.data.latest.get(clientId);
+        const admission = (clientsQ.data ?? []).find((c) => c.id === clientId)?.admission_date;
+        const baseline = lastDrill ?? admission;
+        const due = baseline
+          ? new Date(new Date(baseline).getTime() + QUARTERLY_DRILL_DAYS * DAY)
+          : new Date(now.getTime() - DAY);
+        out.push({
+          key: `hhsdrill:${clientId}`,
+          source: "hhs_evacuation_drill",
+          title: lastDrill ? "Quarterly evacuation drill due" : "Evacuation drill never recorded",
+          subject: nameOf(clientId),
+          subjectKind: "client",
+          dueAt: due,
+          status: bucketStatusWithin(due, now, DRILL_REMINDER_DAYS),
+          href: `/dashboard/hhs-hub/${clientId}?tab=prn&form=drill`,
+          clientId,
+        });
+      }
+    }
+
+    // Quarterly evacuation drills — RHS. Same cadence, mirrors HHS.
+    if (rhsActiveQ.data && rhsDrillsQ.data) {
+      for (const clientId of rhsActiveQ.data.activeIds) {
+        const lastDrill = rhsDrillsQ.data.latest.get(clientId);
+        const admission = (clientsQ.data ?? []).find((c) => c.id === clientId)?.admission_date;
+        const baseline = lastDrill ?? admission;
+        const due = baseline
+          ? new Date(new Date(baseline).getTime() + QUARTERLY_DRILL_DAYS * DAY)
+          : new Date(now.getTime() - DAY);
+        out.push({
+          key: `rhsdrill:${clientId}`,
+          source: "rhs_evacuation_drill",
+          title: lastDrill ? "Quarterly evacuation drill due" : "Evacuation drill never recorded",
+          subject: nameOf(clientId),
+          subjectKind: "client",
+          dueAt: due,
+          status: bucketStatusWithin(due, now, DRILL_REMINDER_DAYS),
+          href: `/dashboard/clients/${clientId}?tab=profile`,
           clientId,
         });
       }

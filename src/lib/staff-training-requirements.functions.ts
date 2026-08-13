@@ -42,6 +42,20 @@ async function assertAdminOrManager(
     throw new Error("Forbidden: admin or manager role required");
 }
 
+/** Admin/manager OR — for trainings marked self_attest — the staffer themselves. */
+async function assertCanCompleteBaseline(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  orgId: string,
+  viewerId: string,
+  staffId: string,
+  trainingKey: string,
+) {
+  const t = baselineByKey(trainingKey);
+  if (t?.self_attest && viewerId === staffId) return;
+  await assertAdminOrManager(supabase, orgId, viewerId);
+}
+
 /** Attach an uploaded hr_documents row as the evidence for a baseline training.
  *  Nectar runs OCR, validates against the per-training rule, and records
  *  pass/fail + reasons. A failed validation still saves the review (so the UI
@@ -103,7 +117,7 @@ export const attachBaselineCertificate = createServerFn({ method: "POST" })
     let nectarSummary: string | null = null;
     let ocrFailed = false;
     let ocrError: string | null = null;
-    if (data.run_ocr) {
+    if (data.run_ocr && !t.auto_complete_on_upload) {
       try {
         const ocr = await runNectarCertOcr(
           sb,
@@ -126,9 +140,13 @@ export const attachBaselineCertificate = createServerFn({ method: "POST" })
 
     const nameMatch = compareNames(profileName, nectarName);
 
-    // Deterministic validation against the per-training rule.
+    // Deterministic validation against the per-training rule. Presence-only
+    // trainings (auto_complete_on_upload) skip content/name validation
+    // entirely — any uploaded document satisfies the requirement.
     const reasons: string[] = [];
-    if (ocrFailed) {
+    if (t.auto_complete_on_upload) {
+      // no-op: reasons stays empty, validation always passes.
+    } else if (ocrFailed) {
       reasons.push(
         `Nectar could not read this certificate${ocrError ? ` (${ocrError})` : ""}.`,
       );
@@ -228,8 +246,10 @@ export const attachBaselineCertificate = createServerFn({ method: "POST" })
     if (validationStatus === "passed") {
       upsertRow.completed_date = completedDate;
       upsertRow.expires_at = expires;
-      upsertRow.admin_signed_off_at = null;
-      upsertRow.admin_signed_off_by = null;
+      // Presence-only trainings are complete the moment a document is on
+      // file — no separate admin sign-off step.
+      upsertRow.admin_signed_off_at = t.auto_complete_on_upload ? new Date().toISOString() : null;
+      upsertRow.admin_signed_off_by = t.auto_complete_on_upload ? userId : null;
       upsertRow.completed_by = userId;
     } else {
       // Preserve prior fields on failure.
@@ -298,7 +318,10 @@ export const adminSignOffBaselineCompletion = createServerFn({ method: "POST" })
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
-    await assertAdminOrManager(sb, data.organization_id, userId);
+    await assertCanCompleteBaseline(sb, data.organization_id, userId, data.staff_id, data.training_key);
+
+    const t = baselineByKey(data.training_key);
+    const requiresUpload = t?.requires_upload !== false;
 
     const { data: row, error: rErr } = await sb
       .from("staff_baseline_training_completions")
@@ -310,28 +333,33 @@ export const adminSignOffBaselineCompletion = createServerFn({ method: "POST" })
       .eq("training_key", data.training_key)
       .maybeSingle();
     if (rErr) throw new Error(rErr.message);
-    if (!row?.evidence_document_id)
-      throw new Error("Upload a valid certificate before signing off.");
-    if (row.nectar_validation_status === "failed")
-      throw new Error(
-        "Nectar rejected this certificate — upload a valid one before signing off.",
-      );
+    if (requiresUpload) {
+      if (!row?.evidence_document_id)
+        throw new Error("Upload a valid certificate before signing off.");
+      if (row.nectar_validation_status === "failed")
+        throw new Error(
+          "Nectar rejected this certificate — upload a valid one before signing off.",
+        );
+    }
 
     const completedDate =
-      (row.completed_date as string | null) ??
+      (row?.completed_date as string | null) ??
       new Date().toISOString().slice(0, 10);
 
     const { error } = await sb
       .from("staff_baseline_training_completions")
-      .update({
-        admin_signed_off_at: new Date().toISOString(),
-        admin_signed_off_by: userId,
-        completed_date: completedDate,
-        completed_by: userId,
-      })
-      .eq("organization_id", data.organization_id)
-      .eq("staff_id", data.staff_id)
-      .eq("training_key", data.training_key);
+      .upsert(
+        {
+          organization_id: data.organization_id,
+          staff_id: data.staff_id,
+          training_key: data.training_key,
+          admin_signed_off_at: new Date().toISOString(),
+          admin_signed_off_by: userId,
+          completed_date: completedDate,
+          completed_by: userId,
+        },
+        { onConflict: "organization_id,staff_id,training_key" },
+      );
     if (error) throw new Error(error.message);
     return { ok: true };
   });

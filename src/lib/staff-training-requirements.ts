@@ -49,6 +49,26 @@ export interface BaselineTraining {
   hint?: string;
   /** What Nectar must see on a valid certificate for this training. */
   validation: BaselineValidationRule;
+  /**
+   * Whether this training requires an uploaded evidence document before it
+   * can be signed off. Defaults to true. Set false for a plain checkbox
+   * attestation with no supporting file (e.g. a knowledge attestation).
+   */
+  requires_upload?: boolean;
+  /**
+   * Whether the assigned staffer may complete this item themselves (not just
+   * an admin/manager). Defaults to false.
+   */
+  self_attest?: boolean;
+  /** Exact wording shown on the attestation checkbox for this training. */
+  attestation_text?: string;
+  /**
+   * Skip Nectar OCR/content validation and admin sign-off — the item is
+   * "complete" as soon as any evidence document is uploaded. For plain
+   * presence-only records (e.g. a policy handed to staff, an MVR pulled by
+   * admin) where there's nothing to read off the document.
+   */
+  auto_complete_on_upload?: boolean;
 }
 
 export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
@@ -279,6 +299,51 @@ export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
     },
   },
   {
+    key: "sei_benefits_attestation",
+    title: "SEI Benefits Knowledge Attestation",
+    due_days: 90,
+    tracks_expiration: false,
+    default_validity_months: null,
+    conditional: "codes",
+    applies_to_codes: ["SEI"],
+    category: "Required trainings",
+    requires_upload: false,
+    self_attest: true,
+    attestation_text:
+      "I confirm that before providing Supported Employment services I have acquired a basic understanding of how earned income affects SSI, Social Security Title II benefits, Medicaid, and other public benefits, and I understand when to refer complex matters to USOR.",
+    hint: "One-time attestation. Applies to staff assigned to SEI. Completed by the staff member or an admin.",
+    validation: {
+      cert_type_label: "SEI Benefits Knowledge Attestation",
+      required_keyword_groups: [],
+      requires_completion_date: false,
+      requires_expiration_date: false,
+    },
+  },
+  {
+    key: "new_caregiver_compensation",
+    title: "New Caregiver Compensation Training",
+    due_days: 90,
+    tracks_expiration: false,
+    default_validity_months: null,
+    conditional: "codes",
+    applies_to_codes: ["CMP", "CMS"],
+    category: "Required trainings",
+    attestation_text:
+      "I confirm I have completed the DSPD New Caregiver Compensation training and passed with a score of 80% or higher (effective 7/1/26).",
+    hint: "One-time. Applies to staff assigned to CMP or CMS. Requires an uploaded proof of completion plus attestation of an 80%+ score (effective 7/1/26).",
+    validation: {
+      cert_type_label: "New Caregiver Compensation Training",
+      required_keyword_groups: [
+        {
+          label: "New Caregiver Compensation training wording",
+          any_of: ["new caregiver compensation", "caregiver compensation"],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: false,
+    },
+  },
+  {
     key: "bcba_credential",
     title: "BCBA Credential",
     due_days: 90,
@@ -298,6 +363,40 @@ export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
       ],
       requires_completion_date: true,
       requires_expiration_date: true,
+    },
+  },
+  {
+    key: "grievance_policy_staff_copy",
+    title: "Grievance Policy — Staff Copy",
+    due_days: 30,
+    tracks_expiration: false,
+    default_validity_months: null,
+    conditional: "all",
+    category: "Employment Documents (Upon Hire)",
+    auto_complete_on_upload: true,
+    hint: "The organization's grievance policy provided to this staff member. Presence-only — no expiration.",
+    validation: {
+      cert_type_label: "Grievance Policy — Staff Copy",
+      required_keyword_groups: [],
+      requires_completion_date: false,
+      requires_expiration_date: false,
+    },
+  },
+  {
+    key: "driving_record",
+    title: "Driving Record",
+    due_days: 30,
+    tracks_expiration: false,
+    default_validity_months: null,
+    conditional: "all",
+    category: "Employment Documents (Upon Hire)",
+    auto_complete_on_upload: true,
+    hint: "Motor vehicle record on file. Presence-only — no expiration tracking.",
+    validation: {
+      cert_type_label: "Driving Record",
+      required_keyword_groups: [],
+      requires_completion_date: false,
+      requires_expiration_date: false,
     },
   },
   {

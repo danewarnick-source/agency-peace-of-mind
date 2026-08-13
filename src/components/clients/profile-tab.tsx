@@ -5,7 +5,7 @@
 // real columns documented in the prompt. Custom attributes, EVV, mailing/
 // service addresses, and level of need are intentionally absent here.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -20,6 +20,32 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { ClientPhotoCard } from "@/components/clients/client-photo-card";
+import { NectarAsk } from "@/components/clients/nectar-ask";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  RESTRICTION_ELEMENTS,
+  computeRestrictionCompletion,
+  type RestrictionRecord,
+} from "@/lib/hrc-restrictions";
+import { useServerFn } from "@tanstack/react-start";
+import {
+  listRhsHospitalizationDays,
+  setRhsHospitalizationDay,
+  deleteRhsHospitalizationDay,
+} from "@/lib/rhs-hospitalization.functions";
+import { HealthcareProvidersCard } from "@/components/clients/healthcare-providers-card";
+import {
+  listRhsEvacuationDrills,
+  recordRhsEvacuationDrill,
+} from "@/lib/rhs-evacuation-drills.functions";
+import {
+  Select as UiSelect,
+  SelectContent as UiSelectContent,
+  SelectItem as UiSelectItem,
+  SelectTrigger as UiSelectTrigger,
+  SelectValue as UiSelectValue,
+} from "@/components/ui/select";
 
 type ClientRow = Record<string, unknown>;
 type DocRow = { id: string; document_type: string | null; file_name: string | null; storage_path: string | null; uploaded_at: string | null };
@@ -30,7 +56,7 @@ type RecKey =
   | "grievance_policy" | "individualized_plan";
 const RECORD_LABELS: Record<RecKey, { title: string; sub: string }> = {
   pcsp: { title: "Person-Centered Plan", sub: "Annual; renews each year" },
-  photograph: { title: "Photograph", sub: "Current likeness on file" },
+  photograph: { title: "Photograph", sub: "No expiration — flagged only when missing" },
   grievance_acknowledgment: { title: "Grievance acknowledgment", sub: "Signed by client / guardian" },
   guardian: { title: "Guardianship docs", sub: "Letter or court order" },
   hrc_approval: { title: "Human Rights / HRC restriction", sub: "Required when rights are restricted or Human Rights applies" },
@@ -54,7 +80,7 @@ export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; 
         .from("clients")
         .select(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          "id, first_name, last_name, medicaid_id, date_of_birth, phone_number, is_own_guardian, guardian_name, guardian_phone, support_coordinator_name, support_coordinator_phone, support_coordinator_email, admission_date, discharge_date, diagnoses, primary_care_name, special_directions, dnr_status, account_status, pcsp_expiration_date, rights_restrictions, has_abi, hr_applicable, dnr_applicable, pcp_name, pcp_phone, specialist_name, specialist_phone, med_prescriber_name, med_prescriber_phone, medical_insurance" as any,
+          "id, first_name, last_name, medicaid_id, date_of_birth, phone_number, is_own_guardian, guardian_name, guardian_phone, support_coordinator_name, support_coordinator_phone, support_coordinator_email, admission_date, discharge_date, diagnoses, primary_care_name, special_directions, dnr_status, account_status, pcsp_expiration_date, rights_restrictions, has_abi, hr_applicable, dnr_applicable, pcp_name, pcp_phone, specialist_name, specialist_phone, med_prescriber_name, med_prescriber_phone, medical_insurance, client_photo_url, profile_photo_url" as any,
         )
         .eq("id", clientId)
         .maybeSingle();
@@ -92,9 +118,26 @@ export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; 
     },
   });
 
+  const restrictionsQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["client-restrictions", clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("hrc_restriction_records" as never)
+        .select("*")
+        .eq("client_id", clientId)
+        .eq("active", true)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as RestrictionRecord[];
+    },
+  });
+
   const client = clientQ.data ?? null;
   const docs = docsQ.data ?? [];
   const contacts = contactsQ.data ?? [];
+  const restrictions = restrictionsQ.data ?? [];
+  const primaryRestriction = restrictions[0] ?? null;
 
   if (clientQ.isLoading || !client) {
     return <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Loading…</CardContent></Card>;
@@ -105,6 +148,7 @@ export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; 
       <RecordCompletenessBar
         client={client}
         docs={docs}
+        restriction={primaryRestriction}
         onOpenFiles={onOpenFiles}
         onContinueIntake={() => navigate({ to: "/dashboard/client-intake/$clientId", params: { clientId } })}
       />
@@ -116,6 +160,10 @@ export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; 
         <div className="space-y-4">
           <ContactsCard clientId={clientId} orgId={orgId!} contacts={contacts} />
           <AtGlanceCard clientId={clientId} client={client} />
+          <HealthcareProvidersCard clientId={clientId} orgId={orgId!} />
+          <HrcCard clientId={clientId} client={client} docs={docs} restriction={primaryRestriction} />
+          <RhsHospitalizationCard clientId={clientId} orgId={orgId!} />
+          <RhsEvacuationDrillsCard clientId={clientId} orgId={orgId!} />
         </div>
       </div>
 
@@ -224,28 +272,33 @@ function CardShell({
 // ── Record completeness bar ────────────────────────────────────────────────
 
 function RecordCompletenessBar({
-  client, docs, onOpenFiles, onContinueIntake,
-}: { client: ClientRow; docs: DocRow[]; onOpenFiles: () => void; onContinueIntake: () => void }) {
+  client, docs, restriction, onOpenFiles, onContinueIntake,
+}: { client: ClientRow; docs: DocRow[]; restriction: RestrictionRecord | null; onOpenFiles: () => void; onContinueIntake: () => void }) {
   const [open, setOpen] = useState(false);
 
   const isOwnGuardian = client.is_own_guardian === true;
-  const hasRightsRestrictions = Array.isArray(client.rights_restrictions) && (client.rights_restrictions as string[]).length > 0;
   const dnrStatus = (client.dnr_status as string | null) ?? null;
   const hrApplicable = client.hr_applicable === true;
   const dnrApplicable = client.dnr_applicable === true;
 
   type RecState = "ok" | "missing" | "na";
   function stateFor(key: RecKey): { state: RecState; doc?: DocRow } {
+    if (key === "photograph") {
+      const hasPhoto = !!(client.client_photo_url || client.profile_photo_url);
+      return hasPhoto ? { state: "ok" } : { state: "missing" };
+    }
     if (key === "hrc_approval") {
+      // Yes/No checkbox at the top of the HRC section. "No" = satisfied.
+      if (!hrApplicable) return { state: "na" };
       const hrrDoc = docs.find(
         (d) =>
           d.document_type === "hrc_approval" ||
           d.document_type === "human_rights" ||
           (d.file_name ? HRR_FILENAME_RE.test(d.file_name) : false),
       );
-      const applicable = hasRightsRestrictions || hrApplicable || !!hrrDoc;
-      if (!applicable) return { state: "na" };
-      return hrrDoc ? { state: "ok", doc: hrrDoc } : { state: "missing" };
+      const formComplete = restriction ? computeRestrictionCompletion(restriction).isComplete : false;
+      if (hrrDoc && formComplete) return { state: "ok", doc: hrrDoc };
+      return { state: "missing" };
     }
     const doc = docs.find((d) => d.document_type === key);
     if (key === "guardian" && isOwnGuardian) return { state: "na" };
@@ -320,9 +373,13 @@ function RecordCompletenessBar({
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{label.title}</div>
-                    <div className="text-xs text-muted-foreground truncate">{label.sub}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {key === "photograph" && state === "missing" ? "No photograph on file" : label.sub}
+                    </div>
                   </div>
-                  {state === "ok" ? (
+                  {key === "photograph" ? (
+                    <span className="text-xs text-muted-foreground px-2">{state === "ok" ? "On file" : "See Identity & contact"}</span>
+                  ) : state === "ok" ? (
                     <Button size="sm" variant="outline" onClick={() => openDoc(doc)}>View</Button>
                   ) : state === "missing" ? (
                     <Button size="sm" variant="outline" onClick={onOpenFiles}>
@@ -478,18 +535,8 @@ function IdentityCard({ clientId, client }: { clientId: string; client: ClientRo
       saving={mut.isPending}
     >
       <div className="space-y-1">
-        <div className="flex items-center gap-3 pb-4 mb-2 border-b border-border/60">
-          <div
-            aria-hidden
-            className="h-[52px] w-[52px] grid place-items-center bg-muted text-muted-foreground text-base font-bold flex-none"
-            style={{ clipPath: "polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)" }}
-          >
-            {initials(`${client.first_name ?? ""} ${client.last_name ?? ""}`) || "—"}
-          </div>
-          <div className="text-xs text-muted-foreground">
-            <span className="block text-sm font-semibold text-foreground">Profile photo</span>
-            Required within the last 5 years — upload coming soon.
-          </div>
+        <div className="pb-4 mb-2 border-b border-border/60">
+          <ClientPhotoCard clientId={clientId} />
         </div>
 
         {!editing ? (
@@ -761,6 +808,387 @@ function AtGlanceCard({ clientId, client }: { clientId: string; client: ClientRo
         </div>
       )}
     </CardShell>
+  );
+}
+
+// ── Human Rights / HRC ──────────────────────────────────────────────────────
+
+function HrcCard({
+  clientId, client, docs, restriction,
+}: { clientId: string; client: ClientRow; docs: DocRow[]; restriction: RestrictionRecord | null }) {
+  const qc = useQueryClient();
+  const hasRestrictions = client.hr_applicable === true;
+  const hrrDoc = docs.find(
+    (d) =>
+      d.document_type === "hrc_approval" ||
+      d.document_type === "human_rights" ||
+      (d.file_name ? HRR_FILENAME_RE.test(d.file_name) : false),
+  );
+
+  const [fields, setFields] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    for (const def of RESTRICTION_ELEMENTS) {
+      init[def.textField as string] = (restriction?.[def.textField] as string | null) ?? "";
+      if (def.dateField) init[def.dateField as string] = (restriction?.[def.dateField] as string | null) ?? "";
+    }
+    return init;
+  });
+  useEffect(() => {
+    const init: Record<string, string> = {};
+    for (const def of RESTRICTION_ELEMENTS) {
+      init[def.textField as string] = (restriction?.[def.textField] as string | null) ?? "";
+      if (def.dateField) init[def.dateField as string] = (restriction?.[def.dateField] as string | null) ?? "";
+    }
+    setFields(init);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restriction?.id]);
+
+  const toggleMutation = useMutation({
+    mutationFn: async (value: boolean) => {
+      const { error } = await supabase.from("clients").update({ hr_applicable: value }).eq("id", clientId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["client-profile-tab"] });
+      qc.invalidateQueries({ queryKey: ["client-profile"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const patch: Record<string, string | boolean | null> = { active: true };
+      for (const def of RESTRICTION_ELEMENTS) {
+        patch[def.textField as string] = fields[def.textField as string]?.trim() || null;
+        if (def.dateField) patch[def.dateField as string] = fields[def.dateField as string] || null;
+      }
+      if (restriction) {
+        const { error } = await supabase
+          .from("hrc_restriction_records" as never)
+          .update(patch as never)
+          .eq("id", restriction.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("hrc_restriction_records" as never).insert({
+          organization_id: (client as unknown as { organization_id?: string }).organization_id,
+          client_id: clientId,
+          restriction_title: "Rights restriction",
+          ...patch,
+        } as never);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      toast.success("HRC record saved.");
+      qc.invalidateQueries({ queryKey: ["client-restrictions", clientId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const previewRecord = { ...(restriction ?? {}) } as RestrictionRecord;
+  for (const def of RESTRICTION_ELEMENTS) {
+    (previewRecord as unknown as Record<string, string | null>)[def.textField as string] = fields[def.textField as string] || null;
+    if (def.dateField) (previewRecord as unknown as Record<string, string | null>)[def.dateField as string] = fields[def.dateField as string] || null;
+  }
+  const completion = computeRestrictionCompletion(previewRecord);
+
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-0">
+        <div className="flex items-start gap-2.5 px-5 py-4 border-b border-border/60">
+          <HexMarker />
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold leading-tight">Human Rights / HRC</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">SOW §1.20 rights-restriction documentation</p>
+          </div>
+        </div>
+        <div className="p-5 space-y-4">
+          <label className="flex items-center justify-between gap-3 rounded-md border border-border/60 p-3">
+            <span className="text-sm font-medium">Does this client have any rights restrictions?</span>
+            <div className="flex items-center gap-2 text-sm">
+              <span className={!hasRestrictions ? "font-semibold" : "text-muted-foreground"}>No</span>
+              <Switch checked={hasRestrictions} onCheckedChange={(v) => toggleMutation.mutate(v)} />
+              <span className={hasRestrictions ? "font-semibold" : "text-muted-foreground"}>Yes</span>
+            </div>
+          </label>
+
+          {!hasRestrictions ? (
+            <div className="rounded-md border border-emerald-300/60 bg-emerald-50/40 p-3 text-sm text-emerald-800">
+              No restrictions — this section is satisfied.
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  8-element restriction form
+                </span>
+                <span className={cn(
+                  "text-xs font-semibold px-2 py-0.5 rounded-full",
+                  completion.isComplete ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800",
+                )}>
+                  {completion.completedCount}/{completion.total} complete
+                </span>
+              </div>
+              {RESTRICTION_ELEMENTS.map((def) => (
+                <div key={def.key} className="space-y-1">
+                  <Label className="text-xs">{def.letter}) {def.label}</Label>
+                  <Textarea
+                    value={fields[def.textField as string] ?? ""}
+                    onChange={(e) => setFields((f) => ({ ...f, [def.textField as string]: e.target.value }))}
+                    placeholder={def.description}
+                    rows={2}
+                  />
+                  {def.dateField ? (
+                    <Input
+                      type="date"
+                      className="w-44"
+                      value={fields[def.dateField as string] ?? ""}
+                      onChange={(e) => setFields((f) => ({ ...f, [def.dateField as string]: e.target.value }))}
+                    />
+                  ) : null}
+                </div>
+              ))}
+              <div className="flex justify-end">
+                <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+                  {saveMutation.isPending ? "Saving…" : "Save restriction form"}
+                </Button>
+              </div>
+
+              <div className="pt-2 border-t border-border/60">
+                <Label className="text-xs">HRC restriction document — requires staff, coordinator, and client signatures</Label>
+                {hrrDoc ? (
+                  <NectarAsk
+                    question="HRC restriction document — requires staff, coordinator, and client signatures"
+                    kind="data_rich_gap"
+                    clientId={clientId}
+                    uploadDocumentType="hrc_approval"
+                    answeredSummary={`On file: ${hrrDoc.file_name ?? "signed document"}`}
+                  />
+                ) : (
+                  <NectarAsk
+                    question="Upload the signed HRC restriction document (staff, coordinator, and client signatures)"
+                    kind="data_rich_gap"
+                    clientId={clientId}
+                    uploadDocumentType="hrc_approval"
+                  />
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── RHS hospitalization / non-billable days ─────────────────────────────────
+
+function RhsHospitalizationCard({ clientId, orgId }: { clientId: string; orgId: string }) {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listRhsHospitalizationDays);
+  const setFn = useServerFn(setRhsHospitalizationDay);
+  const deleteFn = useServerFn(deleteRhsHospitalizationDay);
+  const [adding, setAdding] = useState(false);
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [notes, setNotes] = useState("");
+
+  const q = useQuery({
+    queryKey: ["rhs-hospitalization-days", orgId, clientId],
+    queryFn: () => listFn({ data: { organization_id: orgId, client_id: clientId } }),
+  });
+
+  const save = useMutation({
+    mutationFn: () => setFn({ data: { organization_id: orgId, client_id: clientId, record_date: date, notes } }),
+    onSuccess: () => {
+      toast.success("Marked hospitalized — day excluded from RHS billing.");
+      qc.invalidateQueries({ queryKey: ["rhs-hospitalization-days", orgId, clientId] });
+      qc.invalidateQueries({ queryKey: ["client-budget"] });
+      setAdding(false);
+      setNotes("");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => deleteFn({ data: { organization_id: orgId, id } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["rhs-hospitalization-days", orgId, clientId] });
+      qc.invalidateQueries({ queryKey: ["client-budget"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const days = q.data ?? [];
+
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-0">
+        <div className="flex items-start gap-2.5 px-5 py-4 border-b border-border/60">
+          <HexMarker />
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold leading-tight">RHS hospitalized / non-billable days</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Excludes the day from RHS billing.</p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => setAdding((v) => !v)}>
+            <Plus className="h-3.5 w-3.5 mr-1" /> Add
+          </Button>
+        </div>
+        <div className="p-5 space-y-3">
+          {adding && (
+            <div className="space-y-2 rounded-md border border-rose-300 bg-rose-50/40 p-3">
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-44" />
+              <Label className="text-xs">🏥 Hospitalization details (required)</Label>
+              <textarea
+                className="w-full min-h-[70px] rounded-md border border-border bg-background px-3 py-2 text-sm"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Reason for hospitalization, hospital name, expected duration…"
+              />
+              <div className="flex justify-end gap-2">
+                <Button size="sm" variant="ghost" onClick={() => setAdding(false)}>Cancel</Button>
+                <Button size="sm" disabled={save.isPending || !notes.trim()} onClick={() => save.mutate()}>
+                  {save.isPending ? "Saving…" : "Save"}
+                </Button>
+              </div>
+            </div>
+          )}
+          {days.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No hospitalized days on file.</p>
+          ) : (
+            <ul className="space-y-2">
+              {days.map((d) => (
+                <li key={d.id} className="flex items-start justify-between gap-3 rounded-md border border-rose-300/60 bg-rose-50/30 p-2.5 text-sm">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-rose-800">🏥 {fmtDate(d.record_date)} — non-billable</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{d.notes}</div>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => remove.mutate(d.id)}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── RHS quarterly evacuation drills ──────────────────────────────────────────
+
+function RhsEvacuationDrillsCard({ clientId, orgId }: { clientId: string; orgId: string }) {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listRhsEvacuationDrills);
+  const recordFn = useServerFn(recordRhsEvacuationDrill);
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState({
+    drill_date: new Date().toISOString().slice(0, 10),
+    simulation_type: "Fire" as "Fire" | "Earthquake" | "Severe Weather" | "Other",
+    duration_minutes: "",
+    participants: "",
+    notes: "",
+  });
+
+  const q = useQuery({
+    queryKey: ["rhs-evacuation-drills", orgId, clientId],
+    queryFn: () => listFn({ data: { organization_id: orgId, client_id: clientId } }),
+  });
+
+  const save = useMutation({
+    mutationFn: () =>
+      recordFn({
+        data: {
+          organization_id: orgId,
+          client_id: clientId,
+          drill_date: draft.drill_date,
+          simulation_type: draft.simulation_type,
+          duration_minutes: draft.duration_minutes ? Number(draft.duration_minutes) : null,
+          participants: draft.participants,
+          notes: draft.notes,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Drill recorded.");
+      qc.invalidateQueries({ queryKey: ["rhs-evacuation-drills", orgId, clientId] });
+      qc.invalidateQueries({ queryKey: ["deadlines"] });
+      setAdding(false);
+      setDraft({ drill_date: new Date().toISOString().slice(0, 10), simulation_type: "Fire", duration_minutes: "", participants: "", notes: "" });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const drills = q.data ?? [];
+
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-0">
+        <div className="flex items-start gap-2.5 px-5 py-4 border-b border-border/60">
+          <HexMarker />
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold leading-tight">RHS evacuation drills</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Quarterly — due every 90 days.</p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => setAdding((v) => !v)}>
+            <Plus className="h-3.5 w-3.5 mr-1" /> Log drill
+          </Button>
+        </div>
+        <div className="p-5 space-y-3">
+          {adding && (
+            <div className="space-y-2 rounded-md border border-border p-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">Drill date</Label>
+                  <Input type="date" value={draft.drill_date} onChange={(e) => setDraft((d) => ({ ...d, drill_date: e.target.value }))} />
+                </div>
+                <div>
+                  <Label className="text-xs">Simulation type</Label>
+                  <UiSelect value={draft.simulation_type} onValueChange={(v) => setDraft((d) => ({ ...d, simulation_type: v as typeof d.simulation_type }))}>
+                    <UiSelectTrigger><UiSelectValue /></UiSelectTrigger>
+                    <UiSelectContent>
+                      <UiSelectItem value="Fire">Fire</UiSelectItem>
+                      <UiSelectItem value="Earthquake">Earthquake</UiSelectItem>
+                      <UiSelectItem value="Severe Weather">Severe Weather</UiSelectItem>
+                      <UiSelectItem value="Other">Other</UiSelectItem>
+                    </UiSelectContent>
+                  </UiSelect>
+                </div>
+                <div>
+                  <Label className="text-xs">Duration (minutes)</Label>
+                  <Input type="number" min="0" value={draft.duration_minutes} onChange={(e) => setDraft((d) => ({ ...d, duration_minutes: e.target.value }))} />
+                </div>
+                <div>
+                  <Label className="text-xs">Participants</Label>
+                  <Input value={draft.participants} onChange={(e) => setDraft((d) => ({ ...d, participants: e.target.value }))} placeholder="Names" />
+                </div>
+              </div>
+              <Label className="text-xs">Notes</Label>
+              <Textarea value={draft.notes} onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))} rows={2} />
+              <div className="flex justify-end gap-2">
+                <Button size="sm" variant="ghost" onClick={() => setAdding(false)}>Cancel</Button>
+                <Button size="sm" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving…" : "Save"}</Button>
+              </div>
+            </div>
+          )}
+          {drills.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No drills recorded yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {drills.map((d) => (
+                <li key={d.id} className="rounded-md border border-border p-2.5 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{fmtDate(d.drill_date)} — {d.simulation_type}</span>
+                    {d.duration_minutes != null && <span className="text-xs text-muted-foreground">{d.duration_minutes} min</span>}
+                  </div>
+                  {d.participants && <div className="text-xs text-muted-foreground mt-0.5">Participants: {d.participants}</div>}
+                  {d.notes && <div className="text-xs text-muted-foreground mt-0.5">{d.notes}</div>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

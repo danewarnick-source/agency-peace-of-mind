@@ -7,6 +7,9 @@
  */
 export const INCIDENT_CATEGORIES = [
   "Injury",
+  "Surgery / planned procedure",
+  "First aid administered (no ER referral)",
+  "Significant health change",
   "Unplanned medical visit (ER/urgent care)",
   "Medical emergency",
   "Medication error",

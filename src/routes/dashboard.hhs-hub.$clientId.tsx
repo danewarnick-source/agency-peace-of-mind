@@ -678,6 +678,7 @@ function AttendanceTab({ orgId, clientId }: { orgId: string; clientId: string })
   const [agreed, setAgreed] = useState(false);
   const [initials, setInitials] = useState("");
   const [awayCategory, setAwayCategory] = useState<"Hospitalization" | "Family Leave" | "Unapproved Absence">("Hospitalization");
+  const [awayNotes, setAwayNotes] = useState("");
 
   const fullName = (user?.user_metadata?.full_name ?? user?.email ?? "").toString().trim();
   const parts = fullName.split(/\s+/).filter(Boolean);
@@ -699,6 +700,7 @@ function AttendanceTab({ orgId, clientId }: { orgId: string; clientId: string })
           presenceStatus: action,
           awayReason: action === "Away" ? awayCategory : null,
           awayCategory: action === "Away" ? awayCategory : null,
+          awayNotes: action === "Away" && awayCategory === "Hospitalization" ? awayNotes.trim() : null,
           staffInitials: action === "Present" ? initials.trim().toUpperCase() : null,
           attestationAccepted: action === "Present" ? agreed : false,
         },
@@ -706,7 +708,7 @@ function AttendanceTab({ orgId, clientId }: { orgId: string; clientId: string })
     },
     onSuccess: () => {
       toast.success("Attendance recorded with court-admissible audit trail.");
-      setAction(null); setAgreed(false); setInitials("");
+      setAction(null); setAgreed(false); setInitials(""); setAwayNotes("");
       qc.invalidateQueries({ queryKey: ["hhs-att-month"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -728,30 +730,34 @@ function AttendanceTab({ orgId, clientId }: { orgId: string; clientId: string })
             const day = i + 1;
             const rec = byDate.get(fmt(new Date(year, month, day)));
             const status = rec ? String(rec.presence_status) : null;
+            const isHospitalized = status === "Away" && String((rec as Record<string, unknown> | undefined)?.away_category ?? "") === "Hospitalization";
             const initialsStamp = rec ? String((rec as Record<string, unknown>).staff_initials_signature ?? "") : "";
             const future = day > todayDay;
             const isSel = selected === day;
             const cls = future
               ? "bg-muted/40 text-muted-foreground/40 cursor-not-allowed"
-              : status === "Present"
-                ? "bg-green-200 dark:bg-green-900/40 text-green-900 dark:text-green-100 border-green-400"
-                : status === "Away"
-                  ? "bg-amber-200 dark:bg-amber-900/40 text-amber-900 dark:text-amber-100 border-amber-400"
-                  : "bg-background hover:bg-muted";
+              : isHospitalized
+                ? "bg-rose-200 dark:bg-rose-900/40 text-rose-900 dark:text-rose-100 border-rose-500"
+                : status === "Present"
+                  ? "bg-green-200 dark:bg-green-900/40 text-green-900 dark:text-green-100 border-green-400"
+                  : status === "Away"
+                    ? "bg-amber-200 dark:bg-amber-900/40 text-amber-900 dark:text-amber-100 border-amber-400"
+                    : "bg-background hover:bg-muted";
             return (
               <button
                 key={day}
                 disabled={future}
-                onClick={() => { setSelected(day); setAction(null); setAgreed(false); setInitials(""); }}
+                onClick={() => { setSelected(day); setAction(null); setAgreed(false); setInitials(""); setAwayNotes(""); }}
                 className={`relative h-12 rounded border text-xs font-medium transition ${cls} ${isSel ? "ring-2 ring-primary" : ""}`}
-                title={status ? `Day ${day}: ${status}${initialsStamp ? ` (${initialsStamp})` : ""}` : `Day ${day}`}
+                title={status ? `Day ${day}: ${status}${isHospitalized ? " — Hospitalized (non-billable)" : ""}${initialsStamp ? ` (${initialsStamp})` : ""}` : `Day ${day}`}
               >
                 <div>{day}</div>
                 {status === "Present" && initialsStamp && (
                   <div className="absolute bottom-0.5 right-1 text-[9px] font-bold">{initialsStamp}</div>
                 )}
                 {status === "Present" && <div className="absolute top-0.5 left-1 text-[9px]">✓</div>}
-                {status === "Away" && <div className="absolute top-0.5 left-1 text-[9px]">AWAY</div>}
+                {isHospitalized && <div className="absolute top-0.5 left-1 text-[9px]">🏥</div>}
+                {status === "Away" && !isHospitalized && <div className="absolute top-0.5 left-1 text-[9px]">AWAY</div>}
               </button>
             );
           })}
@@ -803,6 +809,17 @@ function AttendanceTab({ orgId, clientId }: { orgId: string; clientId: string })
                   </SelectContent>
                 </Select>
                 <p className="text-[11px] text-muted-foreground">This day will be flagged as unbillable.</p>
+                {awayCategory === "Hospitalization" && (
+                  <div className="space-y-1 pt-1">
+                    <Label className="text-xs">🏥 Hospitalization details (required)</Label>
+                    <Textarea
+                      value={awayNotes}
+                      onChange={(e) => setAwayNotes(e.target.value)}
+                      placeholder="Reason for hospitalization, hospital name, expected duration…"
+                      className="min-h-[70px]"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -812,7 +829,8 @@ function AttendanceTab({ orgId, clientId }: { orgId: string; clientId: string })
                 mut.isPending ||
                 !action ||
                 (action === "Present" && (!agreed || !initialsValid)) ||
-                (action === "Away" && !awayCategory)
+                (action === "Away" && !awayCategory) ||
+                (action === "Away" && awayCategory === "Hospitalization" && !awayNotes.trim())
               }
             >
               {mut.isPending ? "Saving…" : action === "Present" ? "Sign & Save (Billable)" : "Save Absence"}

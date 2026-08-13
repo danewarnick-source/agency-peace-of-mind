@@ -169,6 +169,7 @@ export const setAttendance = createServerFn({ method: "POST" })
       presenceStatus:      z.enum(["Present", "Away"]),
       awayReason:          z.string().nullable().optional(),
       awayCategory:        z.enum(["Hospitalization", "Family Leave", "Unapproved Absence"]).nullable().optional(),
+      awayNotes:           z.string().nullable().optional(),
       staffInitials:       z.string().max(10).nullable().optional(),
       attestationAccepted: z.boolean().default(false),
     }).parse(i)
@@ -177,6 +178,9 @@ export const setAttendance = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     if (!supabase || !userId) return null;
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+    if (data.presenceStatus === "Away" && data.awayCategory === "Hospitalization" && !data.awayNotes?.trim()) {
+      throw new Error("Elaborate on the hospitalization (reason, hospital name, expected duration) before saving.");
+    }
     const { error, data: row } = await supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from("hhs_monthly_attendance" as never)
@@ -187,6 +191,7 @@ export const setAttendance = createServerFn({ method: "POST" })
         presence_status:         data.presenceStatus,
         away_reason:             data.awayReason ?? null,
         away_category:           data.awayCategory ?? null,
+        away_notes:              data.awayCategory === "Hospitalization" ? (data.awayNotes?.trim() ?? null) : null,
         staff_initials_signature: data.staffInitials ?? null,
         attestation_accepted:    data.attestationAccepted,
         provider_id:             userId,

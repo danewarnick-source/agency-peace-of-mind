@@ -516,6 +516,28 @@ export const upsertChecklistCompletion = createServerFn({ method: "POST" })
       .maybeSingle();
     if (selErr) throw new Error(selErr.message);
 
+    // Renewable requirements (metadata.is_renewable + renewal_interval_months)
+    // get a durable expiration stamped at completion time — same behavior as
+    // the annually-expiring baseline trainings. Explicit input always wins.
+    let effExpires = data.expires_at ?? null;
+    if (!effExpires && data.completed_date) {
+      const { data: reqRow } = await sb
+        .from("nectar_requirements")
+        .select("metadata")
+        .eq("id", data.requirement_id)
+        .maybeSingle();
+      const meta = (reqRow?.metadata ?? {}) as Record<string, unknown>;
+      if (
+        meta.is_renewable === true &&
+        typeof meta.renewal_interval_months === "number"
+      ) {
+        effExpires = addMonthsIso(
+          data.completed_date,
+          meta.renewal_interval_months as number,
+        );
+      }
+    }
+
     const payload = {
       organization_id: data.organization_id,
       staff_id: data.staff_id,
@@ -523,7 +545,7 @@ export const upsertChecklistCompletion = createServerFn({ method: "POST" })
       client_id: null as string | null,
       status: data.status,
       completed_date: data.completed_date ?? null,
-      expires_at: data.expires_at ?? null,
+      expires_at: effExpires,
       evidence_document_id: data.evidence_document_id ?? null,
       notes: data.notes ?? null,
       completed_by: userId,
@@ -1480,4 +1502,98 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
 
     staff.sort((a, b) => a.full_name.localeCompare(b.full_name));
     return { requirements, staff };
+  });
+
+// ---------------------------------------------------------------------------
+// Renewable HR checklist expirations — feeds the Deadlines panel.
+// Any staff-checklist requirement whose metadata carries
+// { is_renewable: true, renewal_interval_months: N } produces a renewal
+// deadline once a staffer has completed it (Medicaid Disclosure is the first).
+// ---------------------------------------------------------------------------
+
+export interface HrChecklistRenewal {
+  requirement_id: string;
+  requirement_title: string;
+  staff_id: string;
+  staff_name: string;
+  due_date: string; // YYYY-MM-DD
+}
+
+export const getHrChecklistRenewals = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({ organization_id: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    if (!supabase || !userId) return [] as HrChecklistRenewal[];
+    await requireOrgMembership(supabase, userId, data.organization_id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+
+    const { data: base } = await sb.rpc("get_hr_staff_checklist_base", {
+      _org: data.organization_id,
+    });
+    const renewable = new Map<string, { title: string; months: number }>();
+    for (const r of (base ?? []) as Array<Record<string, unknown>>) {
+      const meta = (r.metadata ?? {}) as Record<string, unknown>;
+      if (
+        meta.is_renewable === true &&
+        typeof meta.renewal_interval_months === "number"
+      ) {
+        renewable.set(r.id as string, {
+          title:
+            (meta.short_label as string) ??
+            (r.title as string) ??
+            "Requirement",
+          months: meta.renewal_interval_months as number,
+        });
+      }
+    }
+    if (renewable.size === 0) return [] as HrChecklistRenewal[];
+
+    const { data: comps } = await sb
+      .from("staff_checklist_completion")
+      .select("staff_id, requirement_id, status, completed_date, expires_at")
+      .eq("organization_id", data.organization_id)
+      .in("requirement_id", Array.from(renewable.keys()))
+      .is("client_id", null);
+
+    const rows = (comps ?? []) as Array<{
+      staff_id: string;
+      requirement_id: string;
+      status: string;
+      completed_date: string | null;
+      expires_at: string | null;
+    }>;
+    if (rows.length === 0) return [] as HrChecklistRenewal[];
+
+    const staffIds = Array.from(new Set(rows.map((r) => r.staff_id)));
+    const { data: profs } = await sb
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", staffIds);
+    const nameById = new Map<string, string>();
+    for (const p of (profs ?? []) as Array<{ id: string; full_name: string | null }>) {
+      nameById.set(p.id, p.full_name ?? "Staff member");
+    }
+
+    const out: HrChecklistRenewal[] = [];
+    for (const c of rows) {
+      const req = renewable.get(c.requirement_id);
+      if (!req) continue;
+      const due =
+        c.expires_at ??
+        (c.completed_date ? addMonthsIso(c.completed_date, req.months) : null);
+      if (!due) continue;
+      out.push({
+        requirement_id: c.requirement_id,
+        requirement_title: req.title,
+        staff_id: c.staff_id,
+        staff_name: nameById.get(c.staff_id) ?? "Staff member",
+        due_date: due,
+      });
+    }
+    out.sort((a, b) => a.due_date.localeCompare(b.due_date));
+    return out;
   });

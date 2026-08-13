@@ -705,12 +705,23 @@ export function StaffHrChecklistCard({
                                           )}
                                           {!isSelf && (
                                             <label
-                                              className="relative z-0 inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center gap-1 rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
-                                              title={completionDoc ? "Replace evidence" : "Upload evidence (PDF, DOCX, image)"}
-                                              aria-label={completionDoc ? "Replace evidence" : "Upload evidence"}
+                                              className={
+                                                "relative z-0 inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center gap-1 rounded-md border border-dashed px-2 py-1 text-xs hover:bg-muted " +
+                                                (isExpired
+                                                  ? "border-rose-400 font-semibold text-rose-700"
+                                                  : "text-muted-foreground")
+                                              }
+                                              title={
+                                                isExpired
+                                                  ? "Renewal overdue — upload the current document"
+                                                  : completionDoc
+                                                    ? "Replace evidence"
+                                                    : "Upload evidence (PDF, DOCX, image)"
+                                              }
+                                              aria-label={isExpired ? "Re-upload evidence" : completionDoc ? "Replace evidence" : "Upload evidence"}
                                             >
                                               <Upload className="h-3.5 w-3.5" />
-                                              <span>{completionDoc ? "Replace" : "Upload"}</span>
+                                              <span>{isExpired ? "Re-upload" : completionDoc ? "Replace" : "Upload"}</span>
                                               <input
                                                 type="file"
                                                 className="hidden"

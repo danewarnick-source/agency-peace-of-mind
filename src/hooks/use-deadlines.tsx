@@ -14,6 +14,7 @@ import {
 import { computeSowAlerts } from "@/lib/sow-perimeters.functions";
 import { computeSupportStrategyCoverage } from "@/lib/support-strategy-coverage";
 import type { CSTSection } from "@/lib/client-specific-training.functions";
+import { getHrChecklistRenewals } from "@/lib/hr-staff.functions";
 
 export type DeadlineSource =
   | "summary"
@@ -26,7 +27,8 @@ export type DeadlineSource =
   | "support_strategy_gap"
   | "hrc_restriction_review"
   | "nectar_requirement"
-  | "compliance_instance";
+  | "compliance_instance"
+  | "staff_checklist";
 
 export type DeadlineItem = {
   key: string;
@@ -129,6 +131,14 @@ export function useDeadlines() {
         id: string; user_id: string; expires_at: string; course_title: string | null; recipient_name: string | null;
       }>;
     },
+  });
+
+  // 4b. Renewable HR checklist items (e.g. Medicaid Disclosure — annual).
+  const fetchChecklistRenewals = useServerFn(getHrChecklistRenewals);
+  const checklistRenewalsQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "hr_checklist_renewals", orgId],
+    queryFn: () => fetchChecklistRenewals({ data: { organization_id: orgId! } }),
   });
 
   // 5. Open incidents — clocks.
@@ -442,6 +452,23 @@ export function useDeadlines() {
       });
     }
 
+    // Renewable HR checklist items (annual disclosures, etc.)
+    for (const r of checklistRenewalsQ.data ?? []) {
+      const due = new Date(`${r.due_date}T00:00:00`);
+      if (Number.isNaN(due.getTime())) continue;
+      out.push({
+        key: `hrchk:${r.staff_id}:${r.requirement_id}`,
+        source: "staff_checklist",
+        title: `${r.requirement_title} renewal due`,
+        subject: r.staff_name,
+        subjectKind: "staff",
+        dueAt: due,
+        status: bucketStatus(due, now),
+        href: `/dashboard/employees/${r.staff_id}`,
+        staffId: r.staff_id,
+      });
+    }
+
     // Incident clocks
     for (const inc of incidentsQ.data ?? []) {
       const clocks = getIncidentOpenClocks(inc);
@@ -617,6 +644,7 @@ export function useDeadlines() {
     hhsQ.data,
     hhCertsQ.data,
     certsQ.data,
+    checklistRenewalsQ.data,
     profilesQ.data,
     incidentsQ.data,
     bcQ.data,
@@ -635,7 +663,7 @@ export function useDeadlines() {
     upcoming: items.filter((i) => i.status === "upcoming"),
     isLoading:
       summariesQ.isLoading || clientsQ.isLoading || hhsQ.isLoading ||
-      certsQ.isLoading || incidentsQ.isLoading || bcQ.isLoading || hhCertsQ.isLoading ||
+      certsQ.isLoading || checklistRenewalsQ.isLoading || incidentsQ.isLoading || bcQ.isLoading || hhCertsQ.isLoading ||
       sowQ.isLoading || ssCoverageQ.isLoading || hrcRestrictionsQ.isLoading ||
       renewalReqsQ.isLoading || complianceInstancesQ.isLoading,
   };

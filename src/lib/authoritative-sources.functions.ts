@@ -979,6 +979,14 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       category?: "audit_doc" | "obligation" | "rule" | "billing" | null;
       citation?: string | null;
       applies_to?: "company" | "staff" | "client" | null;
+      verification_type?: "internal" | "external" | null;
+      compliance_pattern?:
+        | "one_time"
+        | "renewal"
+        | "event_driven"
+        | "ongoing_per_shift"
+        | "continuous"
+        | null;
     }> = [];
     let chunkCount = 1;
     let chunkFailures: string[] = [];
@@ -1389,6 +1397,14 @@ type DraftItem = {
   category?: "audit_doc" | "obligation" | "rule" | "billing" | null;
   citation?: string | null;
   applies_to?: "company" | "staff" | "client" | null;
+  verification_type?: "internal" | "external" | null;
+  compliance_pattern?:
+    | "one_time"
+    | "renewal"
+    | "event_driven"
+    | "ongoing_per_shift"
+    | "continuous"
+    | null;
 };
 
 async function loadDraftJobDoc(

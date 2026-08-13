@@ -51,6 +51,7 @@ import {
 } from "lucide-react";
 import {
   addGroupMember,
+  ALL_STAFF_GROUP_NAME,
   createStaffGroup,
   deleteStaffGroup,
   getStaffGroupWithMembers,
@@ -258,7 +259,7 @@ function SyncFromTeamMenu({
   );
 }
 
-function GroupDetail({ orgId, groupId }: { orgId: string; groupId: string }) {
+function GroupDetail({ orgId, groupId, isAllStaff }: { orgId: string; groupId: string; isAllStaff: boolean }) {
   const qc = useQueryClient();
   const getFn = useServerFn(getStaffGroupWithMembers);
   const addFn = useServerFn(addGroupMember);
@@ -322,22 +323,26 @@ function GroupDetail({ orgId, groupId }: { orgId: string; groupId: string }) {
             className="pl-8 h-8 text-sm"
           />
         </div>
-        <AddStaffCombobox
-          orgId={orgId}
-          excludeIds={existingIds}
-          onSelect={(staffId) => addMember.mutate(staffId)}
-        />
-        <SyncFromTeamMenu
-          orgId={orgId}
-          isSyncing={sync.isPending}
-          onSync={(teamId, teamName) => {
-            sync.mutate(teamId, {
-              onSuccess: (res: { added: number }) => {
-                toast.success(`Added ${res.added} member${res.added === 1 ? "" : "s"} from ${teamName}.`);
-              },
-            });
-          }}
-        />
+        {!isAllStaff && (
+          <>
+            <AddStaffCombobox
+              orgId={orgId}
+              excludeIds={existingIds}
+              onSelect={(staffId) => addMember.mutate(staffId)}
+            />
+            <SyncFromTeamMenu
+              orgId={orgId}
+              isSyncing={sync.isPending}
+              onSync={(teamId, teamName) => {
+                sync.mutate(teamId, {
+                  onSuccess: (res: { added: number }) => {
+                    toast.success(`Added ${res.added} member${res.added === 1 ? "" : "s"} from ${teamName}.`);
+                  },
+                });
+              }}
+            />
+          </>
+        )}
       </div>
 
       {filtered.length === 0 ? (
@@ -354,15 +359,17 @@ function GroupDetail({ orgId, groupId }: { orgId: string; groupId: string }) {
                   <div className="truncate text-xs text-muted-foreground">{m.staff_position}</div>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => removeMember.mutate(m.staff_id)}
-                disabled={removeMember.isPending}
-                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                aria-label={`Remove ${m.staff_name}`}
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+              {!isAllStaff && (
+                <button
+                  type="button"
+                  onClick={() => removeMember.mutate(m.staff_id)}
+                  disabled={removeMember.isPending}
+                  className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  aria-label={`Remove ${m.staff_name}`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </li>
           ))}
         </ul>
@@ -375,6 +382,8 @@ function GroupRow({ orgId, group }: { orgId: string; group: GroupWithCount }) {
   const qc = useQueryClient();
   const updateFn = useServerFn(updateStaffGroup);
   const deleteFn = useServerFn(deleteStaffGroup);
+
+  const isAllStaff = group.name === ALL_STAFF_GROUP_NAME;
 
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -447,37 +456,44 @@ function GroupRow({ orgId, group }: { orgId: string; group: GroupWithCount }) {
               <Badge variant="secondary" className="text-[11px]">
                 ({group.member_count} member{group.member_count === 1 ? "" : "s"})
               </Badge>
+              {isAllStaff && (
+                <Badge variant="outline" className="text-[11px] font-normal text-muted-foreground">
+                  Auto-managed — all staff are members
+                </Badge>
+              )}
             </div>
             {group.description && (
               <p className="truncate text-xs text-muted-foreground">{group.description}</p>
             )}
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 shrink-0"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-              <DropdownMenuItem onSelect={() => setEditing(true)}>Edit</DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onSelect={() => setConfirmDelete(true)}
-              >
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {!isAllStaff && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuItem onSelect={() => setEditing(true)}>Edit</DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onSelect={() => setConfirmDelete(true)}
+                >
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       )}
 
-      {expanded && !editing && <GroupDetail orgId={orgId} groupId={group.id} />}
+      {expanded && !editing && <GroupDetail orgId={orgId} groupId={group.id} isAllStaff={isAllStaff} />}
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>

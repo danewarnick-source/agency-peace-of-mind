@@ -60,6 +60,7 @@ export type ObligationInstanceRow = {
   event_description: string | null;
   waive_reason: string | null;
   admin_notes: string | null;
+  assignee_staff_id: string | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -74,6 +75,10 @@ const MONTHS_FULL = [
 
 function addDaysUTC(d: Date, days: number): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + days));
+}
+
+function addYearsUTC(d: Date, years: number): Date {
+  return new Date(Date.UTC(d.getUTCFullYear() + years, d.getUTCMonth(), d.getUTCDate()));
 }
 
 function isoWeekday(d: Date): number {
@@ -383,6 +388,163 @@ export async function scheduleRemindersInternal(
   }
 }
 
+/**
+ * True when an obligation's due_day_config uses a per-staffer date basis
+ * (30-day-from-hire onboarding items, or hire-anniversary renewals) rather
+ * than a shared calendar date — these generate one instance PER ASSIGNEE
+ * (assignee_staff_id set) instead of one shared instance for the group.
+ */
+function isPerPersonDueConfig(cfg: Record<string, unknown>): boolean {
+  return cfg.days_after_hire !== undefined || cfg.anniversary_based === true;
+}
+
+async function fetchAssigneeHireDates(
+  supabase: AnySupabase,
+  staffIds: string[],
+): Promise<Map<string, { basis_date: string | null }>> {
+  const map = new Map<string, { basis_date: string | null }>();
+  if (!staffIds.length) return map;
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, hire_date, start_date, created_at")
+    .in("id", staffIds);
+  if (error) throw new Error(error.message);
+  for (const p of (data ?? []) as Array<{
+    id: string; hire_date: string | null; start_date: string | null; created_at: string | null;
+  }>) {
+    map.set(p.id, { basis_date: p.hire_date ?? p.start_date ?? p.created_at ?? null });
+  }
+  return map;
+}
+
+async function resolveAllAssigneesInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  ob: CompanyObligationRow,
+): Promise<ResolvedStaffMember[]> {
+  const groupMembers = await resolveGroupMembersInternal(
+    supabase, organizationId, ob.assigned_to_groups ?? [], ob.assignee_role,
+  );
+  const directUserIds = ob.assigned_to_users ?? [];
+  let directMembers: ResolvedStaffMember[] = [];
+  if (directUserIds.length) {
+    const [{ data: dirRows, error: dErr }, { data: roleRows, error: rErr }] = await Promise.all([
+      supabase.from("org_member_directory").select("id, full_name").in("id", directUserIds),
+      supabase.from("organization_members").select("user_id, role")
+        .eq("organization_id", organizationId).eq("active", true).in("user_id", directUserIds),
+    ]);
+    if (dErr) throw new Error(dErr.message);
+    if (rErr) throw new Error(rErr.message);
+    const nameById = new Map(
+      (dirRows ?? []).map((r: { id: string; full_name: string | null }) => [r.id, r.full_name ?? "Unknown"]),
+    );
+    const roleById = new Map((roleRows ?? []).map((r: { user_id: string; role: string }) => [r.user_id, r.role]));
+    directMembers = directUserIds
+      .map((uid: string) => {
+        const role = roleById.get(uid);
+        if (!role) return null;
+        if (ob.assignee_role === "managers_only" && !["manager", "super_admin"].includes(role)) return null;
+        if (ob.assignee_role === "admin_only" && !["admin", "super_admin"].includes(role)) return null;
+        return { staff_id: uid, staff_name: nameById.get(uid) ?? "Unknown", staff_role: role };
+      })
+      .filter((m): m is ResolvedStaffMember => m !== null);
+  }
+  const byId = new Map<string, ResolvedStaffMember>();
+  for (const m of [...groupMembers, ...directMembers]) byId.set(m.staff_id, m);
+  return Array.from(byId.values());
+}
+
+/**
+ * days_after_hire: due_at = hire_date + N days (fallback to created_at).
+ * anniversary_based: due_at = the next hire anniversary on/after today that
+ * is >= due_day_config.start_year (default 1) — i.e. only the CURRENT due
+ * instance, not every future year at once. One instance per assignee;
+ * skips assignees who already have an open (pending/overdue) instance.
+ */
+async function generatePerPersonInstancesInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  ob: CompanyObligationRow,
+): Promise<ObligationInstanceRow[]> {
+  const cfg = (ob.due_day_config ?? {}) as Record<string, unknown>;
+  const assignees = await resolveAllAssigneesInternal(supabase, organizationId, ob);
+  if (!assignees.length) return [];
+
+  const hireDates = await fetchAssigneeHireDates(supabase, assignees.map((a) => a.staff_id));
+  const now = new Date();
+  const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+
+  const created: ObligationInstanceRow[] = [];
+  for (const a of assignees) {
+    const basisStr = hireDates.get(a.staff_id)?.basis_date;
+    if (!basisStr) continue; // no hire_date/start_date/created_at on file — can't compute a due date
+    const basisDate = new Date(`${basisStr.slice(0, 10)}T00:00:00Z`);
+
+    let due: Date;
+    if (cfg.days_after_hire !== undefined) {
+      const days = Number(cfg.days_after_hire);
+      if (!Number.isFinite(days)) continue;
+      due = addDaysUTC(basisDate, days);
+    } else {
+      const startYear = Math.max(1, Number(cfg.start_year ?? 1));
+      let n = startYear;
+      due = addYearsUTC(basisDate, n);
+      // Advance to the nearest anniversary on/after today so only the
+      // current due instance is generated — never future years at once.
+      while (due.getTime() < todayUTC.getTime()) {
+        n += 1;
+        due = addYearsUTC(basisDate, n);
+      }
+    }
+
+    const { data: existingOpen, error: openErr } = await supabase
+      .from("company_obligation_instances")
+      .select("id")
+      .eq("obligation_id", ob.id)
+      .eq("assignee_staff_id", a.staff_id)
+      .in("status", ["pending", "overdue"])
+      .maybeSingle();
+    if (openErr) throw new Error(openErr.message);
+    if (existingOpen) continue; // already has an open instance — don't duplicate
+
+    const periodKey = `Due ${formatShort(due)}`;
+    const { data: inserted, error: insErr } = await supabase
+      .from("company_obligation_instances")
+      .insert({
+        obligation_id: ob.id,
+        organization_id: organizationId,
+        period_key: periodKey,
+        due_at: endOfDayUTC(due),
+        status: "pending",
+        assignee_staff_id: a.staff_id,
+      })
+      .select("*")
+      .maybeSingle();
+    if (insErr) {
+      // Unique-index race with a concurrent generator call — safe to skip.
+      if ((insErr as { code?: string }).code === "23505") continue;
+      throw new Error(insErr.message);
+    }
+    if (!inserted) continue;
+
+    const { error: assErr } = await supabase.from("company_obligation_instance_assignees").upsert(
+      [{
+        instance_id: inserted.id,
+        organization_id: organizationId,
+        staff_id: a.staff_id,
+        staff_name: a.staff_name,
+        staff_role: a.staff_role,
+      }],
+      { onConflict: "instance_id,staff_id", ignoreDuplicates: true },
+    );
+    if (assErr) throw new Error(assErr.message);
+
+    await scheduleRemindersInternal(supabase, organizationId, inserted.id, ob);
+    created.push(inserted as ObligationInstanceRow);
+  }
+  return created;
+}
+
 export async function generateNextInstanceInternal(
   supabase: AnySupabase,
   organizationId: string,
@@ -390,6 +552,12 @@ export async function generateNextInstanceInternal(
 ): Promise<ObligationInstanceRow | null> {
   const ob = await fetchObligation(supabase, organizationId, obligationId);
   if (ob.cadence === "per_event") return null;
+
+  const dueCfg = (ob.due_day_config ?? {}) as Record<string, unknown>;
+  if (isPerPersonDueConfig(dueCfg)) {
+    const created = await generatePerPersonInstancesInternal(supabase, organizationId, ob);
+    return created[0] ?? null;
+  }
 
   const period = computePeriod(ob.cadence, ob.due_day_config ?? {}, new Date());
   if (!period) return null;

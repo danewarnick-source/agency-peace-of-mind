@@ -156,6 +156,17 @@ export const updateStaffGroup = createServerFn({ method: "POST" })
     if (!supabase || !userId) return { group: null as StaffGroupRow | null };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
 
+    const { data: existing, error: exErr } = await supabase
+      .from("staff_groups")
+      .select("name")
+      .eq("id", data.groupId)
+      .eq("organization_id", data.organizationId)
+      .maybeSingle();
+    if (exErr) throw new Error(exErr.message);
+    if (existing?.name === ALL_STAFF_GROUP_NAME && data.name !== ALL_STAFF_GROUP_NAME) {
+      throw new Error("The All Staff group can't be renamed.");
+    }
+
     const { data: updated, error } = await supabase
       .from("staff_groups")
       .update({
@@ -171,6 +182,71 @@ export const updateStaffGroup = createServerFn({ method: "POST" })
     return { group: (updated ?? null) as StaffGroupRow | null };
   });
 
+// ─── "All Staff" system-managed auto-group ─────────────────────────────────
+// Looked up/created lazily rather than seeded at org creation, so it also
+// self-heals for orgs created before this existed. name === 'All Staff' is
+// the identity — treat it as reserved (Groups UI blocks renaming/deleting).
+export const ALL_STAFF_GROUP_NAME = "All Staff";
+
+export async function ensureAllStaffGroupInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+): Promise<string> {
+  const { data: existing, error: exErr } = await supabase
+    .from("staff_groups")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("name", ALL_STAFF_GROUP_NAME)
+    .maybeSingle();
+  if (exErr) throw new Error(exErr.message);
+  if (existing) return existing.id as string;
+
+  const { data: inserted, error: insErr } = await supabase
+    .from("staff_groups")
+    .insert({
+      organization_id: organizationId,
+      name: ALL_STAFF_GROUP_NAME,
+      description: "System-managed group — every staff member in this organization",
+      color: "#6B7280",
+    })
+    .select("id")
+    .maybeSingle();
+  if (insErr) throw new Error(insErr.message);
+  if (!inserted) throw new Error("Failed to create All Staff group.");
+  return inserted.id as string;
+}
+
+export const ensureAllStaffGroup = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ organizationId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { id: null as string | null };
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+    const id = await ensureAllStaffGroupInternal(supabase, data.organizationId);
+    return { id };
+  });
+
+/** Add a staff member to the All Staff auto-group (idempotent). Called when
+ *  a new staff member is created/activated — see accept_invitation() in
+ *  supabase for the primary invocation site (SQL-level, for reliability
+ *  regardless of which client flow completes signup); this JS entry point
+ *  covers admin-side staff creation flows that don't go through invite. */
+export async function addToAllStaffGroupInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  staffId: string,
+): Promise<void> {
+  const groupId = await ensureAllStaffGroupInternal(supabase, organizationId);
+  const { error } = await supabase
+    .from("staff_group_members")
+    .upsert(
+      { group_id: groupId, staff_id: staffId },
+      { onConflict: "group_id,staff_id", ignoreDuplicates: true },
+    );
+  if (error) throw new Error(error.message);
+}
+
 // ─── delete (cascades staff_group_members) ─────────────────────────────────
 export const deleteStaffGroup = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -182,6 +258,17 @@ export const deleteStaffGroup = createServerFn({ method: "POST" })
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
     if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+
+    const { data: existing, error: exErr } = await supabase
+      .from("staff_groups")
+      .select("name")
+      .eq("id", data.groupId)
+      .eq("organization_id", data.organizationId)
+      .maybeSingle();
+    if (exErr) throw new Error(exErr.message);
+    if (existing?.name === ALL_STAFF_GROUP_NAME) {
+      throw new Error("The All Staff group is system-managed and can't be deleted.");
+    }
 
     const { error } = await supabase
       .from("staff_groups")
@@ -227,6 +314,17 @@ export const removeGroupMember = createServerFn({ method: "POST" })
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
     if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+
+    const { data: existing, error: exErr } = await supabase
+      .from("staff_groups")
+      .select("name")
+      .eq("id", data.groupId)
+      .eq("organization_id", data.organizationId)
+      .maybeSingle();
+    if (exErr) throw new Error(exErr.message);
+    if (existing?.name === ALL_STAFF_GROUP_NAME) {
+      throw new Error("Members of the All Staff group can't be removed individually — every staff member belongs automatically.");
+    }
 
     const { error } = await supabase
       .from("staff_group_members")

@@ -1725,7 +1725,7 @@ function NewSummaryDialog({
               checked={requiresUpi}
               onChange={(e) => setRequiresUpi(e.target.checked)}
             />
-            Requires UPI attestation (SEI)
+            Requires UPI attestation (SEI/SJD)
           </label>
         </div>
         <div className="flex justify-end gap-2 pt-2">

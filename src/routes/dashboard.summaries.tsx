@@ -299,12 +299,14 @@ function SummaryReviewDialog({
   });
 
   const isSei = bundleQ.data?.summary.service_codes?.includes("SEI") ?? false;
+  const isSjd = bundleQ.data?.summary.service_codes?.includes("SJD") ?? false;
+  const empAttestKind = isSjd && !isSei ? "sjd_employment_monthly" : "sei_employment_monthly";
   const listUpiAttestFn = useServerFn(listUpiAttestations);
   const recordUpiAttestFn = useServerFn(recordUpiAttestation);
   const empAttestQ = useQuery({
-    enabled: isSei && !!bundleQ.data,
-    queryKey: ["upi-attestations", organizationId, "sei_employment_monthly", bundleQ.data?.summary.client_id, bundleQ.data?.summary.period_label],
-    queryFn: () => listUpiAttestFn({ data: { organizationId, kind: "sei_employment_monthly" } }),
+    enabled: (isSei || isSjd) && !!bundleQ.data,
+    queryKey: ["upi-attestations", organizationId, empAttestKind, bundleQ.data?.summary.client_id, bundleQ.data?.summary.period_label],
+    queryFn: () => listUpiAttestFn({ data: { organizationId, kind: empAttestKind } }),
   });
   const empAttestedAt = empAttestQ.data?.find(
     (a) => a.client_id === bundleQ.data?.summary.client_id && a.period_label === bundleQ.data?.summary.period_label,
@@ -314,7 +316,7 @@ function SummaryReviewDialog({
       data: {
         organizationId,
         clientId: bundleQ.data!.summary.client_id,
-        kind: "sei_employment_monthly",
+        kind: empAttestKind,
         periodLabel: bundleQ.data!.summary.period_label,
       },
     }),
@@ -437,7 +439,7 @@ function SummaryReviewDialog({
                   </div>
                 </>
               )}
-              {isSei && (
+              {(isSei || isSjd) && (
                 <label className="mt-3 flex items-start gap-2 rounded-md border border-border/60 p-3 text-sm">
                   <input
                     type="checkbox"

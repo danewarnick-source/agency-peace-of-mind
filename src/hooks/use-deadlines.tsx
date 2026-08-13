@@ -35,7 +35,11 @@ export type DeadlineSource =
   | "sei_upi_employment"
   | "sei_upi_support_strategies"
   | "org_license"
-  | "epr_informed_choice";
+  | "epr_informed_choice"
+  | "sjd_upi_employment"
+  | "sjd_upi_support_strategies"
+  | "sjd_usor_outreach"
+  | "sjd_assessment_doc";
 
 export type DeadlineItem = {
   key: string;
@@ -545,6 +549,96 @@ export function useDeadlines() {
     queryFn: () => listUpiAttestFn({ data: { organizationId: orgId!, kind: "sei_support_strategies" } }),
   });
 
+  // 11f. Active SJD clients (drives the SJD employment-data / support-strategies
+  // / USOR-outreach UPI attestation sources — mirrors SEI above).
+  const sjdActiveQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "sjd", orgId],
+    queryFn: async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: codes, error } = await supabase
+        .from("client_billing_codes")
+        .select("client_id, service_start_date, service_end_date")
+        .eq("organization_id", orgId!)
+        .eq("service_code", "SJD");
+      if (error) throw error;
+      const activeIds: string[] = [];
+      const starts = new Map<string, string>();
+      for (const c of (codes ?? []) as Array<{ client_id: string; service_start_date: string | null; service_end_date: string | null }>) {
+        const active = (!c.service_start_date || c.service_start_date <= today)
+          && (!c.service_end_date || c.service_end_date >= today);
+        if (!active) continue;
+        activeIds.push(c.client_id);
+        if (c.service_start_date) {
+          const prev = starts.get(c.client_id);
+          if (!prev || c.service_start_date < prev) starts.set(c.client_id, c.service_start_date);
+        }
+      }
+      return { activeIds, starts };
+    },
+  });
+
+  // 11g. SJD employment-data UPI attestations already recorded (prompt 14).
+  const sjdEmploymentAttestQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "sjd_employment_attest", orgId],
+    queryFn: () => listUpiAttestFn({ data: { organizationId: orgId!, kind: "sjd_employment_monthly" } }),
+  });
+
+  // 11h. SJD support-strategies UPI attestations already recorded (prompt 14).
+  const sjdSupportStrategiesAttestQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "sjd_ss_attest", orgId],
+    queryFn: () => listUpiAttestFn({ data: { organizationId: orgId!, kind: "sjd_support_strategies" } }),
+  });
+
+  // 11i. SJD USOR Outreach Verification monthly entries already recorded (prompt 17).
+  const sjdUsorOutreachQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "sjd_usor_outreach", orgId],
+    queryFn: () => listUpiAttestFn({ data: { organizationId: orgId!, kind: "sjd_usor_outreach" } }),
+  });
+
+  // 11j. SJD assessment documentation selection + admin-entered assessment
+  // start date, and whether the corresponding upload is already on file
+  // (prompt 15 — Discovery Process vs Vocational Assessment).
+  const sjdAssessmentSelectionsQ = useQuery({
+    enabled: !!orgId && !!sjdActiveQ.data,
+    queryKey: ["deadlines", "sjd_assessment_selections", orgId, (sjdActiveQ.data?.activeIds ?? []).join(",")],
+    queryFn: async () => {
+      const clientIds = sjdActiveQ.data?.activeIds ?? [];
+      if (clientIds.length === 0) return new Map<string, { assessment_type: string; assessment_start_date: string | null }>();
+      const { data, error } = await supabase
+        .from("sjd_assessment_selections" as never)
+        .select("client_id, assessment_type, assessment_start_date")
+        .eq("organization_id", orgId!)
+        .in("client_id", clientIds);
+      if (error) throw error;
+      const m = new Map<string, { assessment_type: string; assessment_start_date: string | null }>();
+      for (const row of (data ?? []) as unknown as Array<{ client_id: string; assessment_type: string; assessment_start_date: string | null }>) {
+        m.set(row.client_id, { assessment_type: row.assessment_type, assessment_start_date: row.assessment_start_date });
+      }
+      return m;
+    },
+  });
+
+  const sjdAssessmentDocsQ = useQuery({
+    enabled: !!orgId && !!sjdActiveQ.data,
+    queryKey: ["deadlines", "sjd_assessment_docs", orgId, (sjdActiveQ.data?.activeIds ?? []).join(",")],
+    queryFn: async () => {
+      const clientIds = sjdActiveQ.data?.activeIds ?? [];
+      if (clientIds.length === 0) return { hasDoc: new Set<string>() };
+      const { data, error } = await supabase
+        .from("client_documents")
+        .select("client_id, document_type")
+        .eq("organization_id", orgId!)
+        .in("document_type", ["sjd_discovery_assessment", "sjd_vocational_assessment"])
+        .in("client_id", clientIds);
+      if (error) throw error;
+      return { hasDoc: new Set((data ?? []).map((r) => (r as { client_id: string }).client_id)) };
+    },
+  });
+
   // 12. Renewal-cadence requirements approaching expiry or overdue.
   const renewalReqsQ = useQuery({
     enabled: !!orgId,
@@ -975,6 +1069,117 @@ export function useDeadlines() {
       });
     }
 
+    // SJD employment-data UPI attestation — monthly checkbox, mirrors SEI
+    // (prompt 14). Same 1st/5th/10th cadence, clears on attest.
+    const sjdEmploymentAttested = new Set(
+      (sjdEmploymentAttestQ.data ?? []).map((a) => `${a.client_id}:${a.period_label}`),
+    );
+    for (const clientId of sjdActiveQ.data?.activeIds ?? []) {
+      for (const p of recentMonthlyPeriods(now, 6)) {
+        if (sjdEmploymentAttested.has(`${clientId}:${p.period_label}`)) continue;
+        const due = new Date(`${p.due_date}T23:59:59`);
+        out.push({
+          key: `sjd-emp-upi:${clientId}:${p.period_label}`,
+          source: "sjd_upi_employment",
+          title: `SJD employment data for ${formatPeriodMonthYear(p.period_label)} — confirm entered into UPI (${nameOf(clientId)}).`,
+          subject: nameOf(clientId),
+          subjectKind: "client",
+          dueAt: due,
+          status: bucketStatus(due, now),
+          href: `/dashboard/clients/${clientId}?tab=care`,
+          clientId,
+          cadenceReminder: true,
+          periodLabel: p.period_label,
+        });
+      }
+    }
+
+    // SJD support-strategies UPI attestation — one-time per PCSP cycle,
+    // deadline = 2 weeks after the PCSP update/expiration date. Mirrors SEI
+    // (prompt 14).
+    const sjdSsUpiAttested = new Map<string, string>();
+    for (const a of sjdSupportStrategiesAttestQ.data ?? []) {
+      if (a.client_id) sjdSsUpiAttested.set(a.client_id, a.attested_at);
+    }
+    const sjdActiveSet = new Set(sjdActiveQ.data?.activeIds ?? []);
+    for (const c of clientsQ.data ?? []) {
+      if (!sjdActiveSet.has(c.id) || !c.pcsp_expiration_date) continue;
+      const pcspAnchor = new Date(`${c.pcsp_expiration_date}T23:59:59`);
+      if (now < pcspAnchor) continue; // new plan year hasn't begun yet
+      const attestedAt = sjdSsUpiAttested.get(c.id);
+      if (attestedAt && new Date(attestedAt) >= pcspAnchor) continue; // already attested this cycle
+      const due = new Date(pcspAnchor.getTime() + 14 * DAY);
+      out.push({
+        key: `sjd-ss-upi:${c.id}`,
+        source: "sjd_upi_support_strategies",
+        title: `Confirm employment support strategies entered into UPI for ${nameOf(c.id)}.`,
+        subject: nameOf(c.id),
+        subjectKind: "client",
+        dueAt: due,
+        status: bucketStatus(due, now),
+        href: `/dashboard/clients/${c.id}?tab=care`,
+        clientId: c.id,
+      });
+    }
+
+    // SJD monthly USOR Outreach Verification — short text field, 1st/5th/10th
+    // reminder cadence until entered for the current month (prompt 17).
+    const sjdOutreachEntered = new Set(
+      (sjdUsorOutreachQ.data ?? []).map((a) => `${a.client_id}:${a.period_label}`),
+    );
+    const currentMonthLabel = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    for (const clientId of sjdActiveQ.data?.activeIds ?? []) {
+      if (sjdOutreachEntered.has(`${clientId}:${currentMonthLabel}`)) continue;
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      out.push({
+        key: `sjd-usor-outreach:${clientId}:${currentMonthLabel}`,
+        source: "sjd_usor_outreach",
+        title: `USOR Outreach Verification — ${formatPeriodMonthYear(currentMonthLabel)} (${nameOf(clientId)})`,
+        subject: nameOf(clientId),
+        subjectKind: "client",
+        dueAt: monthEnd,
+        status: bucketStatus(monthEnd, now),
+        href: `/dashboard/clients/${clientId}?tab=care`,
+        clientId,
+        cadenceReminder: true,
+        periodLabel: currentMonthLabel,
+      });
+    }
+
+    // SJD Assessment Documentation — Discovery Process (60 days from SJD
+    // service start) or Vocational Assessment (30 days from admin-entered
+    // assessment start date), whichever is selected for the client. Once
+    // either upload is on file it's satisfied and drops off the panel
+    // (prompt 15).
+    if (sjdActiveQ.data && sjdAssessmentSelectionsQ.data && sjdAssessmentDocsQ.data) {
+      for (const [clientId, sjdStart] of sjdActiveQ.data.starts) {
+        if (sjdAssessmentDocsQ.data.hasDoc.has(clientId)) continue;
+        const selection = sjdAssessmentSelectionsQ.data.get(clientId);
+        const assessmentType = selection?.assessment_type ?? "discovery_process";
+        let due: Date | null = null;
+        let title = "";
+        if (assessmentType === "vocational_assessment") {
+          if (!selection?.assessment_start_date) continue; // no admin-entered start date yet — nothing to compute
+          due = new Date(new Date(`${selection.assessment_start_date}T00:00:00`).getTime() + 30 * DAY);
+          title = "Vocational Assessment and Employment Plan — documentation due";
+        } else {
+          due = new Date(new Date(`${sjdStart}T00:00:00`).getTime() + 60 * DAY);
+          title = "Individualized Strengths-based Job Discovery Assessment — documentation due";
+        }
+        out.push({
+          key: `sjd-assessment:${clientId}`,
+          source: "sjd_assessment_doc",
+          title,
+          subject: nameOf(clientId),
+          subjectKind: "client",
+          dueAt: due,
+          status: bucketStatus(due, now),
+          href: `/dashboard/clients/${clientId}?tab=profile`,
+          clientId,
+        });
+      }
+    }
+
     // Support Strategy coverage gaps (SOW §1.24(5)).
     const dueImmediately = new Date(now.getTime() - DAY);
     for (const [clientId, gaps] of ssCoverageQ.data ?? new Map<string, string[]>()) {
@@ -1139,6 +1344,12 @@ export function useDeadlines() {
     seiActiveQ.data,
     seiEmploymentAttestQ.data,
     seiSupportStrategiesAttestQ.data,
+    sjdActiveQ.data,
+    sjdEmploymentAttestQ.data,
+    sjdSupportStrategiesAttestQ.data,
+    sjdUsorOutreachQ.data,
+    sjdAssessmentSelectionsQ.data,
+    sjdAssessmentDocsQ.data,
     orgLicenseCodesQ.data,
     orgLicenseDocsQ.data,
     orgLicenseAttestQ.data,
@@ -1155,6 +1366,8 @@ export function useDeadlines() {
       certsQ.isLoading || incidentsQ.isLoading || bcQ.isLoading || hhCertsQ.isLoading ||
       rhsActiveQ.isLoading || rhsDrillsQ.isLoading || ppsActiveQ.isLoading || ppsDrillsQ.isLoading ||
       eprActiveQ.isLoading || eprDocsQ.isLoading ||
+      sjdActiveQ.isLoading || sjdEmploymentAttestQ.isLoading || sjdSupportStrategiesAttestQ.isLoading ||
+      sjdUsorOutreachQ.isLoading || sjdAssessmentSelectionsQ.isLoading || sjdAssessmentDocsQ.isLoading ||
       sowQ.isLoading || ssCoverageQ.isLoading || hrcRestrictionsQ.isLoading ||
       renewalReqsQ.isLoading || complianceInstancesQ.isLoading ||
       orgLicenseCodesQ.isLoading || orgLicenseDocsQ.isLoading,

@@ -3,17 +3,35 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 
-const KindEnum = z.enum(["sei_employment_monthly", "sei_support_strategies", "usor_vendor", "usor_vendor_job_development"]);
+const KindEnum = z.enum([
+  "sei_employment_monthly",
+  "sei_support_strategies",
+  "usor_vendor",
+  "usor_vendor_job_development",
+  "sjd_employment_monthly",
+  "sjd_support_strategies",
+  "sjd_usor_outreach",
+]);
 
 // Sentinel values, not NULL — see migration 20260813110000 for why.
 const NIL_CLIENT_ID = "00000000-0000-0000-0000-000000000000";
+
+export type UpiAttestationKind =
+  | "sei_employment_monthly"
+  | "sei_support_strategies"
+  | "usor_vendor"
+  | "usor_vendor_job_development"
+  | "sjd_employment_monthly"
+  | "sjd_support_strategies"
+  | "sjd_usor_outreach";
 
 export type UpiAttestationRow = {
   id: string;
   organization_id: string;
   client_id: string | null;
-  kind: "sei_employment_monthly" | "sei_support_strategies" | "usor_vendor" | "usor_vendor_job_development";
+  kind: UpiAttestationKind;
   period_label: string | null;
+  note_text: string | null;
   attested_at: string;
   attested_by: string;
   attested_by_name: string | null;
@@ -24,6 +42,7 @@ function normalizeRow(r: { client_id: string; period_label: string } & Record<st
     ...(r as unknown as UpiAttestationRow),
     client_id: r.client_id === NIL_CLIENT_ID ? null : r.client_id,
     period_label: r.period_label === "" ? null : r.period_label,
+    note_text: (r.note_text as string | null) ?? null,
   };
 }
 
@@ -41,7 +60,7 @@ export const listUpiAttestations = createServerFn({ method: "POST" })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: rows, error } = await (supabase as any)
       .from("upi_attestations")
-      .select("id, organization_id, client_id, kind, period_label, attested_at, attested_by, attested_by_name")
+      .select("id, organization_id, client_id, kind, period_label, note_text, attested_at, attested_by, attested_by_name")
       .eq("organization_id", data.organizationId)
       .eq("kind", data.kind);
     if (error) throw new Error(error.message);
@@ -56,6 +75,7 @@ export const recordUpiAttestation = createServerFn({ method: "POST" })
     clientId: z.string().uuid().nullable(),
     kind: KindEnum,
     periodLabel: z.string().max(20).nullable(),
+    noteText: z.string().max(2000).nullable().optional(),
   }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -71,6 +91,7 @@ export const recordUpiAttestation = createServerFn({ method: "POST" })
         client_id: data.clientId ?? NIL_CLIENT_ID,
         kind: data.kind,
         period_label: data.periodLabel ?? "",
+        note_text: data.noteText ?? null,
         attested_at: new Date().toISOString(),
         attested_by: userId,
         attested_by_name: (prof?.full_name as string | null) ?? null,

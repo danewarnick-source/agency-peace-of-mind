@@ -47,6 +47,8 @@ import {
   SelectTrigger as UiSelectTrigger,
   SelectValue as UiSelectValue,
 } from "@/components/ui/select";
+import { listUpiAttestations, recordUpiAttestation } from "@/lib/upi-attestations.functions";
+import { formatPeriodMonthYear } from "@/lib/progress-summaries";
 
 type ClientRow = Record<string, unknown>;
 type DocRow = { id: string; document_type: string | null; file_name: string | null; storage_path: string | null; uploaded_at: string | null };
@@ -165,6 +167,7 @@ export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; 
   const showBelongings = activeCodes.some((c) => ["HHS", "RHS", "SLH", "PPS"].includes(c));
   const isEls = activeCodes.includes("ELS");
   const isEpr = activeCodes.includes("EPR");
+  const isSjd = activeCodes.includes("SJD");
   const clientAge = age(client?.date_of_birth as string | null | undefined);
   const showElsSchoolDocs = isEls && (clientAge == null || clientAge < 22);
   const eprServiceStart = (activeCodesQ.data?.rows ?? [])
@@ -172,6 +175,12 @@ export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; 
     .map((r) => r.service_start_date)
     .filter((d): d is string => !!d)
     .sort()[0] ?? null;
+  const sjdServiceStart = (activeCodesQ.data?.rows ?? [])
+    .filter((r) => r.service_code.toUpperCase() === "SJD")
+    .map((r) => r.service_start_date)
+    .filter((d): d is string => !!d)
+    .sort()[0] ?? null;
+  const isOrgAdmin = org?.role === "admin" || org?.role === "super_admin" || org?.role === "manager";
 
   if (clientQ.isLoading || !client) {
     return <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Loading…</CardContent></Card>;
@@ -201,6 +210,16 @@ export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; 
           {isHhs && <RoomBoardAgreementCard clientId={clientId} docs={docs} onOpenFiles={onOpenFiles} />}
           {showElsSchoolDocs && <ElsSchoolDocumentationCard clientId={clientId} docs={docs} />}
           {isEpr && <EprInformedChoiceCard clientId={clientId} docs={docs} serviceStart={eprServiceStart} />}
+          {isSjd && (
+            <SjdAssessmentDocumentationCard
+              clientId={clientId}
+              orgId={orgId!}
+              docs={docs}
+              serviceStart={sjdServiceStart}
+              isOrgAdmin={isOrgAdmin}
+            />
+          )}
+          {isSjd && <SjdUsorOutreachCard clientId={clientId} orgId={orgId!} />}
           <RhsHospitalizationCard clientId={clientId} orgId={orgId!} />
           <RhsEvacuationDrillsCard clientId={clientId} orgId={orgId!} />
         </div>
@@ -364,6 +383,262 @@ function EprInformedChoiceCard({ clientId, docs, serviceStart }: { clientId: str
               clientId={clientId}
               uploadDocumentType="epr_informed_choice"
             />
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── SJD — Assessment Documentation (Discovery Process / Vocational Assessment) ─
+
+type SjdSelection = { assessment_type: "discovery_process" | "vocational_assessment"; assessment_start_date: string | null };
+
+function SjdAssessmentDocumentationCard({
+  clientId, orgId, docs, serviceStart, isOrgAdmin,
+}: { clientId: string; orgId: string; docs: DocRow[]; serviceStart: string | null; isOrgAdmin: boolean }) {
+  const qc = useQueryClient();
+
+  const selectionQ = useQuery({
+    queryKey: ["sjd-assessment-selection", orgId, clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sjd_assessment_selections" as never)
+        .select("assessment_type, assessment_start_date")
+        .eq("organization_id", orgId)
+        .eq("client_id", clientId)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as unknown as SjdSelection | null) ?? { assessment_type: "discovery_process" as const, assessment_start_date: null };
+    },
+  });
+
+  const selection = selectionQ.data ?? { assessment_type: "discovery_process" as const, assessment_start_date: null };
+  const [startDateDraft, setStartDateDraft] = useState(selection.assessment_start_date ?? "");
+  useEffect(() => { setStartDateDraft(selection.assessment_start_date ?? ""); }, [selection.assessment_start_date]);
+
+  const saveMut = useMutation({
+    mutationFn: async (patch: Partial<SjdSelection>) => {
+      const { error } = await supabase
+        .from("sjd_assessment_selections" as never)
+        .upsert({
+          organization_id: orgId,
+          client_id: clientId,
+          assessment_type: patch.assessment_type ?? selection.assessment_type,
+          assessment_start_date: "assessment_start_date" in patch ? patch.assessment_start_date : selection.assessment_start_date,
+          updated_at: new Date().toISOString(),
+        } as never, { onConflict: "organization_id,client_id" });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Saved.");
+      qc.invalidateQueries({ queryKey: ["sjd-assessment-selection", orgId, clientId] });
+      qc.invalidateQueries({ queryKey: ["deadlines"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const isDiscovery = selection.assessment_type === "discovery_process";
+  const discoveryDoc = docs.find((d) => d.document_type === "sjd_discovery_assessment");
+  const vocationalDoc = docs.find((d) => d.document_type === "sjd_vocational_assessment");
+
+  const discoveryDue = serviceStart ? new Date(new Date(`${serviceStart}T00:00:00`).getTime() + 60 * 86_400_000) : null;
+  const vocationalDue = selection.assessment_start_date
+    ? new Date(new Date(`${selection.assessment_start_date}T00:00:00`).getTime() + 30 * 86_400_000)
+    : null;
+
+  function DeadlineBanner({ due, doc, days, missingHint }: { due: Date | null; doc: DocRow | undefined; days: number; missingHint: string }) {
+    if (!due) {
+      return (
+        <div className="rounded-md border border-border p-2.5 text-sm text-muted-foreground">{missingHint}</div>
+      );
+    }
+    const isOverdue = !doc && due.getTime() < Date.now();
+    return (
+      <div className={cn(
+        "rounded-md border p-2.5 text-sm font-medium",
+        doc ? "border-emerald-300/60 bg-emerald-50/40 text-emerald-800"
+          : isOverdue ? "border-red-300 bg-red-50 text-red-700"
+          : "border-amber-300/60 bg-amber-50/40 text-amber-800",
+      )}>
+        {doc ? `Satisfied — deadline was ${fmtDate(due.toISOString().slice(0, 10))}`
+          : isOverdue ? `Overdue — was due ${fmtDate(due.toISOString().slice(0, 10))} (${days} days)`
+          : `Due ${fmtDate(due.toISOString().slice(0, 10))} — ${days} days`}
+      </div>
+    );
+  }
+
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-0">
+        <div className="flex items-start gap-2.5 px-5 py-4 border-b border-border/60">
+          <HexMarker />
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold leading-tight">SJD — Assessment Documentation</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Discovery Process or Vocational Assessment — only the selected option is tracked.</p>
+          </div>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="rounded-md border border-border/60 p-3">
+            <Label className="text-xs">Assessment type</Label>
+            {isOrgAdmin ? (
+              <div className="mt-2 flex items-center gap-2 text-sm">
+                <span className={isDiscovery ? "font-semibold" : "text-muted-foreground"}>Discovery Process</span>
+                <Switch
+                  checked={!isDiscovery}
+                  onCheckedChange={(v) => saveMut.mutate({ assessment_type: v ? "vocational_assessment" : "discovery_process" })}
+                  disabled={saveMut.isPending}
+                />
+                <span className={!isDiscovery ? "font-semibold" : "text-muted-foreground"}>Vocational Assessment</span>
+              </div>
+            ) : (
+              <p className="mt-1 text-sm">{isDiscovery ? "Discovery Process" : "Vocational Assessment"} <span className="text-xs text-muted-foreground">(admin-only to change)</span></p>
+            )}
+          </div>
+
+          {isDiscovery ? (
+            <div className="space-y-3">
+              <Label className="text-xs">Individualized Strengths-based Job Discovery Assessment</Label>
+              <DeadlineBanner
+                due={discoveryDue}
+                doc={discoveryDoc}
+                days={60}
+                missingHint="No SJD service start date on file — set the SJD authorization's start date to compute the deadline."
+              />
+              {discoveryDoc ? (
+                <NectarAsk
+                  question="Individualized Strengths-based Job Discovery Assessment"
+                  kind="data_rich_gap"
+                  clientId={clientId}
+                  uploadDocumentType="sjd_discovery_assessment"
+                  answeredSummary={`On file since ${fmtDate(discoveryDoc.uploaded_at)} — ${discoveryDoc.file_name ?? "document"}`}
+                />
+              ) : (
+                <NectarAsk
+                  question="Upload the Individualized Strengths-based Job Discovery Assessment"
+                  kind="data_rich_gap"
+                  clientId={clientId}
+                  uploadDocumentType="sjd_discovery_assessment"
+                />
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <Label className="text-xs">Assessment start date (admin-entered)</Label>
+              {isOrgAdmin ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="date"
+                    className="w-44"
+                    value={startDateDraft}
+                    onChange={(e) => setStartDateDraft(e.target.value)}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={saveMut.isPending || startDateDraft === (selection.assessment_start_date ?? "")}
+                    onClick={() => saveMut.mutate({ assessment_start_date: startDateDraft || null })}
+                  >
+                    Save date
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm">{selection.assessment_start_date ? fmtDate(selection.assessment_start_date) : "Not set — admin must enter the assessment start date."}</p>
+              )}
+              <Label className="text-xs">Vocational Assessment and Employment Plan</Label>
+              <DeadlineBanner
+                due={vocationalDue}
+                doc={vocationalDoc}
+                days={30}
+                missingHint="No assessment start date entered yet — an admin must enter it above to compute the deadline."
+              />
+              {vocationalDoc ? (
+                <NectarAsk
+                  question="Vocational Assessment and Employment Plan"
+                  kind="data_rich_gap"
+                  clientId={clientId}
+                  uploadDocumentType="sjd_vocational_assessment"
+                  answeredSummary={`On file since ${fmtDate(vocationalDoc.uploaded_at)} — ${vocationalDoc.file_name ?? "document"}`}
+                />
+              ) : (
+                <NectarAsk
+                  question="Upload the Vocational Assessment and Employment Plan"
+                  kind="data_rich_gap"
+                  clientId={clientId}
+                  uploadDocumentType="sjd_vocational_assessment"
+                />
+              )}
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── SJD — Monthly USOR Outreach Verification ────────────────────────────────
+
+function currentPeriodLabel(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function SjdUsorOutreachCard({ clientId, orgId }: { clientId: string; orgId: string }) {
+  const qc = useQueryClient();
+  const period = currentPeriodLabel();
+  const listFn = useServerFn(listUpiAttestations);
+  const recordFn = useServerFn(recordUpiAttestation);
+  const [note, setNote] = useState("");
+
+  const q = useQuery({
+    queryKey: ["sjd-usor-outreach", orgId, clientId, period],
+    queryFn: () => listFn({ data: { organizationId: orgId, kind: "sjd_usor_outreach" } }),
+  });
+  const current = q.data?.find((a) => a.client_id === clientId && a.period_label === period) ?? null;
+
+  const mut = useMutation({
+    mutationFn: () => recordFn({
+      data: { organizationId: orgId, clientId, kind: "sjd_usor_outreach", periodLabel: period, noteText: note.trim() || null },
+    }),
+    onSuccess: () => {
+      toast.success("USOR outreach verification recorded.");
+      qc.invalidateQueries({ queryKey: ["sjd-usor-outreach"] });
+      qc.invalidateQueries({ queryKey: ["deadlines"] });
+      setNote("");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-0">
+        <div className="flex items-start gap-2.5 px-5 py-4 border-b border-border/60">
+          <HexMarker />
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold leading-tight">USOR Outreach Verification — {formatPeriodMonthYear(period)}</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Whether the Person received USOR outreach this month, and current USOR funding status.</p>
+          </div>
+        </div>
+        <div className="p-5 space-y-3">
+          {current ? (
+            <div className="rounded-md border border-emerald-300/60 bg-emerald-50/40 p-3 text-sm text-emerald-800">
+              <div className="font-medium">Entered by {current.attested_by_name ?? "staff"} on {fmtDate(current.attested_at.slice(0, 10))}</div>
+              {current.note_text && <div className="mt-1 whitespace-pre-wrap">{current.note_text}</div>}
+            </div>
+          ) : (
+            <>
+              <Textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="e.g. Person received USOR outreach on 8/10; funding status: active and current."
+                rows={2}
+              />
+              <div className="flex justify-end">
+                <Button size="sm" onClick={() => mut.mutate()} disabled={mut.isPending}>
+                  {mut.isPending ? "Saving…" : "Save"}
+                </Button>
+              </div>
+            </>
           )}
         </div>
       </CardContent>

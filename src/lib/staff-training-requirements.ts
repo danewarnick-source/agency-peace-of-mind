@@ -283,15 +283,81 @@ export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
     tracks_expiration: false,
     default_validity_months: null,
     conditional: "codes",
-    applies_to_codes: ["EPR", "SED", "SEE", "SEI"],
+    applies_to_codes: ["EPR", "SEE", "SEI"],
     category: "Required trainings",
-    hint: "One-time. Applies to staff assigned to EPR, SED, SEE, or SEI. At least one supervisory staff must hold this before EPR or SED services begin. All supervisory EPR/SED staff must complete within 90 days of employment.",
+    hint: "One-time. Applies to staff assigned to EPR, SEE, or SEI. At least one supervisory staff must hold this before EPR services begin. All supervisory EPR staff must complete within 90 days of employment.",
     validation: {
       cert_type_label: "ACRE / USU Workplace Support Training",
       required_keyword_groups: [
         {
           label: "ACRE / USU / Workplace Support wording",
           any_of: ["acre", "usu", "workplace support"],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: false,
+    },
+  },
+  {
+    key: "sed_acre_training",
+    title: "ACRE / USU Workplace Support Training — SED (Immediate)",
+    due_days: 0,
+    tracks_expiration: false,
+    default_validity_months: null,
+    conditional: "codes",
+    applies_to_codes: ["SED"],
+    category: "Required trainings",
+    hint: "Required immediately upon SED assignment — no grace period. Staff must hold this training from day one of providing SED services; flagged overdue from hire/assignment date itself.",
+    validation: {
+      cert_type_label: "ACRE / USU Workplace Support Training",
+      required_keyword_groups: [
+        {
+          label: "ACRE / USU / Workplace Support wording",
+          any_of: ["acre", "usu", "workplace support"],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: false,
+    },
+  },
+  {
+    key: "sjd_acre_training",
+    title: "ACRE Training — SJD (60-day)",
+    due_days: 60,
+    tracks_expiration: false,
+    default_validity_months: null,
+    conditional: "codes",
+    applies_to_codes: ["SJD"],
+    category: "Required trainings",
+    hint: "SJD staff must complete ACRE training within 60 days of hire and must be supervised by an ACRE-certified staff member until then.",
+    validation: {
+      cert_type_label: "ACRE / USU Workplace Support Training",
+      required_keyword_groups: [
+        {
+          label: "ACRE / USU / Workplace Support wording",
+          any_of: ["acre", "usu", "workplace support"],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: false,
+    },
+  },
+  {
+    key: "customized_employment_training",
+    title: "Customized Employment Training (USU)",
+    due_days: 0,
+    tracks_expiration: false,
+    default_validity_months: null,
+    conditional: "codes",
+    applies_to_codes: ["SEE", "SJD"],
+    category: "Required trainings",
+    hint: "Required for staff assigned to SEE or SJD who perform Discovery Process assessments or new task development. Separate from ACRE. Available through Utah State University at ceiutah.com/ce-training/.",
+    validation: {
+      cert_type_label: "Customized Employment Training (USU)",
+      required_keyword_groups: [
+        {
+          label: "Customized Employment / CE training wording",
+          any_of: ["customized employment", "ce training", "ceiutah", "utah state university customized"],
         },
       ],
       requires_completion_date: true,

@@ -39,9 +39,15 @@ const sourceIcon: Record<DeadlineItem["source"], typeof AlarmClock> = {
   compliance_instance: ShieldCheck,
   hhs_evacuation_drill: Home,
   rhs_evacuation_drill: Home,
+  pps_evacuation_drill: Home,
   sei_upi_employment: FileSignature,
   sei_upi_support_strategies: FileSignature,
   org_license: BadgeCheck,
+  epr_informed_choice: FileSignature,
+  sjd_upi_employment: FileSignature,
+  sjd_upi_support_strategies: FileSignature,
+  sjd_usor_outreach: FileSignature,
+  sjd_assessment_doc: Upload,
 };
 
 const sourceLabel: Record<DeadlineItem["source"], string> = {
@@ -58,9 +64,15 @@ const sourceLabel: Record<DeadlineItem["source"], string> = {
   compliance_instance: "Compliance requirement",
   hhs_evacuation_drill: "Evacuation drill",
   rhs_evacuation_drill: "Evacuation drill",
+  pps_evacuation_drill: "Evacuation drill",
   sei_upi_employment: "SEI UPI attestation",
   sei_upi_support_strategies: "SEI UPI attestation",
   org_license: "Provider license / certification",
+  epr_informed_choice: "EPR Informed Choice documentation",
+  sjd_upi_employment: "SJD UPI attestation",
+  sjd_upi_support_strategies: "SJD UPI attestation",
+  sjd_usor_outreach: "USOR Outreach Verification",
+  sjd_assessment_doc: "SJD Assessment Documentation",
 };
 
 function fmtDue(d: Date): string {
@@ -228,7 +240,11 @@ function DeadlineRow({ item, tone }: { item: DeadlineItem; tone: DeadlineItem["s
               item.title
             )}
             {item.source === "summary" && item.summary?.requires_upi_attestation && (
-              <Badge className="ml-2 bg-[#137182] text-white hover:bg-[#137182]">SEI — Monthly UPI submission required</Badge>
+              <Badge className="ml-2 bg-[#137182] text-white hover:bg-[#137182]">
+                {item.summary?.service_codes?.includes("SJD") && !item.summary?.service_codes?.includes("SEI")
+                  ? "SJD — Monthly UPI submission required"
+                  : "SEI — Monthly UPI submission required"}
+              </Badge>
             )}
           </p>
           <p className="text-xs text-muted-foreground">
@@ -264,7 +280,7 @@ function RowAction({ item, tone }: { item: DeadlineItem; tone: DeadlineItem["sta
   });
 
   const attestUpi = useMutation({
-    mutationFn: async (kind: "sei_employment_monthly" | "sei_support_strategies") =>
+    mutationFn: async (kind: "sei_employment_monthly" | "sei_support_strategies" | "sjd_employment_monthly" | "sjd_support_strategies") =>
       recordUpiFn({
         data: {
           organizationId: org!.organization_id,
@@ -276,6 +292,26 @@ function RowAction({ item, tone }: { item: DeadlineItem; tone: DeadlineItem["sta
     onSuccess: () => {
       toast.success("Attested.");
       qc.invalidateQueries({ queryKey: ["deadlines"] });
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  const [outreachNote, setOutreachNote] = useState("");
+  const recordOutreach = useMutation({
+    mutationFn: async () =>
+      recordUpiFn({
+        data: {
+          organizationId: org!.organization_id,
+          clientId: item.clientId ?? null,
+          kind: "sjd_usor_outreach",
+          periodLabel: item.periodLabel ?? null,
+          noteText: outreachNote.trim() || null,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("USOR outreach verification recorded.");
+      qc.invalidateQueries({ queryKey: ["deadlines"] });
+      setOutreachNote("");
     },
     onError: (e) => toast.error((e as Error).message),
   });
@@ -386,8 +422,14 @@ function RowAction({ item, tone }: { item: DeadlineItem; tone: DeadlineItem["sta
     );
   }
 
-  if (item.source === "sei_upi_employment" || item.source === "sei_upi_support_strategies") {
-    const kind = item.source === "sei_upi_employment" ? "sei_employment_monthly" : "sei_support_strategies";
+  if (
+    item.source === "sei_upi_employment" || item.source === "sei_upi_support_strategies" ||
+    item.source === "sjd_upi_employment" || item.source === "sjd_upi_support_strategies"
+  ) {
+    const kind = item.source === "sei_upi_employment" ? "sei_employment_monthly"
+      : item.source === "sei_upi_support_strategies" ? "sei_support_strategies"
+      : item.source === "sjd_upi_employment" ? "sjd_employment_monthly"
+      : "sjd_support_strategies";
     return (
       <div className="flex items-center gap-2">
         {item.href && (
@@ -397,6 +439,23 @@ function RowAction({ item, tone }: { item: DeadlineItem; tone: DeadlineItem["sta
         )}
         <Button size="sm" disabled={attestUpi.isPending || !org} onClick={() => attestUpi.mutate(kind)}>
           Confirm entered in UPI
+        </Button>
+      </div>
+    );
+  }
+
+  if (item.source === "sjd_usor_outreach") {
+    return (
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={outreachNote}
+          onChange={(e) => setOutreachNote(e.target.value)}
+          placeholder="Outreach received? Funding status?"
+          className="h-8 w-56 rounded-md border border-input bg-background px-2 text-xs"
+        />
+        <Button size="sm" disabled={recordOutreach.isPending || !org} onClick={() => recordOutreach.mutate()}>
+          Save
         </Button>
       </div>
     );

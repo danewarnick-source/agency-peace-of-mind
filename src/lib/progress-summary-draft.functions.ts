@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { MONTHLY_SUMMARY_REQUIRED_FIELDS } from "@/lib/progress-summaries";
 
 /**
  * Nectar drafter for periodic progress summaries.
@@ -139,6 +140,13 @@ export const draftProgressSummary = createServerFn({ method: "POST" })
     const services = (row.service_codes ?? []) as string[];
     const includeGoals: boolean = row.include_goal_progress && goals.length > 0;
 
+    // Per-code required-field guidance (e.g. SJD's USOR contact/funding
+    // status line) — only added when a matching code is in this period's
+    // service_codes. See MONTHLY_SUMMARY_REQUIRED_FIELDS.
+    const extraFieldGuidance = services
+      .flatMap((code) => MONTHLY_SUMMARY_REQUIRED_FIELDS[code.toUpperCase()] ?? [])
+      .filter((v, i, arr) => arr.indexOf(v) === i);
+
     // 3. Build prompts (mirrors draftIncidentNarrative's honesty contract).
     const system = `You are NECTAR, a Utah DSPD periodic progress-summary drafter for a clinical record sent to the state Support Coordinator.
 
@@ -157,6 +165,9 @@ REQUIRED SECTIONS (in this order, each as its own heading on its own line, all c
    2–5 short paragraphs covering: the services delivered, the person's status and response to those services, and notable events/activities — drawn ONLY from the source notes. Reference incidents by report number when relevant.
 ${includeGoals ? `5) GOAL PROGRESS
    For EACH PCSP goal listed, write a sub-heading "Goal: <verbatim goal text>" followed by 1–3 sentences describing what the notes show about progress on THAT goal during this period. If the notes do not support progress on a goal, use the exact sentence specified above.` : `5) GOAL PROGRESS: Not required for this client's services.`}
+${extraFieldGuidance.length > 0 ? `
+ADDITIONAL REQUIRED CONTENT for this client's service code(s) — cover each of these, drawing ONLY from the source notes; use the same "No documentation in this period supports..." sentence for any that the notes do not support:
+${extraFieldGuidance.map((f) => `- ${f}`).join("\n")}` : ""}
 
 OUTPUT FORMAT — STRICT JSON only, no markdown, no code fences:
 {"draft":"<the full prose with the section headings above>"}`;

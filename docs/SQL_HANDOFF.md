@@ -1699,3 +1699,84 @@ ALTER TABLE public.daily_logs ALTER COLUMN service_code SET DEFAULT 'HHS';
 backfilling existing rows to `'HHS'`, and one `ALTER TABLE` setting the
 default for future inserts. No rows are deleted; no existing HHS billing
 attribution changes.
+
+---
+
+## ACTION — SJD product prompts 11–17 (2026-08-13)
+
+**What this is for:** Seven product prompts extending SJD (Supported
+Employment — Job Development) parity with SEI:
+- Prompts 11/12/16 (ACRE gate for SED, Customized Employment Training for
+  SEE/SJD, SJD 60-day ACRE) — new `BASELINE_STAFF_TRAININGS` entries in
+  `src/lib/staff-training-requirements.ts`. No schema change — this list
+  drives both the staff checklist and compliance matrix automatically.
+- Prompt 13 (SJD → monthly summary cadence + UPI attestation flag) —
+  code-only change in `src/lib/progress-summaries.ts` /
+  `progress-summaries.functions.ts`. No schema change.
+- Prompt 14 (SJD employment-data + support-strategies UPI attestations,
+  mirroring SEI) — widens `upi_attestations.kind` to add
+  `sjd_employment_monthly` and `sjd_support_strategies`.
+- Prompt 17 (SJD monthly USOR Outreach Verification short text field) —
+  reuses the same `upi_attestations` table rather than a new one: adds
+  `kind = 'sjd_usor_outreach'` plus a new nullable `note_text` column that
+  carries the outreach/funding-status note. Existing rows are unaffected
+  (`note_text` defaults to NULL).
+- Prompt 15 (SJD Assessment Documentation — Discovery Process vs Vocational
+  Assessment) — new table `sjd_assessment_selections` holding the
+  per-client toggle plus the admin-entered assessment start date used only
+  by the Vocational Assessment deadline. The Discovery Process deadline
+  (SJD service start + 60 days) needs no new column — it's derived from
+  the existing `client_billing_codes.service_start_date`. The uploads
+  themselves reuse `client_documents` with two new free-text
+  `document_type` values (`sjd_discovery_assessment`,
+  `sjd_vocational_assessment`) via the existing `NectarAsk` upload
+  component — no schema change needed for those.
+
+Matches migration `supabase/migrations/20260813230000_sjd_prompts_11_17.sql`.
+
+```sql
+ALTER TABLE public.upi_attestations DROP CONSTRAINT IF EXISTS upi_attestations_kind_check;
+ALTER TABLE public.upi_attestations ADD CONSTRAINT upi_attestations_kind_check
+  CHECK (kind IN (
+    'sei_employment_monthly', 'sei_support_strategies',
+    'usor_vendor', 'usor_vendor_job_development',
+    'sjd_employment_monthly', 'sjd_support_strategies', 'sjd_usor_outreach'
+  ));
+
+ALTER TABLE public.upi_attestations ADD COLUMN IF NOT EXISTS note_text text;
+
+CREATE TABLE IF NOT EXISTS public.sjd_assessment_selections (
+  id                     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id        uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  client_id              uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+  assessment_type        text NOT NULL DEFAULT 'discovery_process'
+                            CHECK (assessment_type IN ('discovery_process', 'vocational_assessment')),
+  assessment_start_date  date,
+  updated_at             timestamptz NOT NULL DEFAULT now(),
+  updated_by             uuid,
+  updated_by_name        text,
+  UNIQUE (organization_id, client_id)
+);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.sjd_assessment_selections TO authenticated;
+GRANT ALL ON public.sjd_assessment_selections TO service_role;
+
+ALTER TABLE public.sjd_assessment_selections ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "org members read sjd assessment selections"
+  ON public.sjd_assessment_selections FOR SELECT TO authenticated
+  USING (is_org_member(organization_id, auth.uid()) OR is_super_admin(auth.uid()));
+
+CREATE POLICY "admins manage sjd assessment selections"
+  ON public.sjd_assessment_selections FOR ALL TO authenticated
+  USING (is_org_admin_or_manager(organization_id, auth.uid()) OR is_super_admin(auth.uid()))
+  WITH CHECK (is_org_admin_or_manager(organization_id, auth.uid()) OR is_super_admin(auth.uid()));
+
+CREATE INDEX IF NOT EXISTS idx_sjd_assessment_selections_org_client
+  ON public.sjd_assessment_selections (organization_id, client_id);
+```
+
+**What you'll see:** two `ALTER TABLE` statements widening the existing
+`upi_attestations` table (no rows touched, `note_text` defaults to NULL on
+every existing row), then one new table `sjd_assessment_selections` with
+its RLS policies and index. Nothing existing is deleted or renamed.

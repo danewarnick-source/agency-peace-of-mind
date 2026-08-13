@@ -31,9 +31,11 @@ export type DeadlineSource =
   | "compliance_instance"
   | "hhs_evacuation_drill"
   | "rhs_evacuation_drill"
+  | "pps_evacuation_drill"
   | "sei_upi_employment"
   | "sei_upi_support_strategies"
-  | "org_license";
+  | "org_license"
+  | "epr_informed_choice";
 
 export type DeadlineItem = {
   key: string;
@@ -330,6 +332,90 @@ export function useDeadlines() {
         if (!latest.has(row.client_id)) latest.set(row.client_id, row.drill_date);
       }
       return { latest };
+    },
+  });
+
+  // 8e. Active PPS clients (drives the PPS quarterly evacuation drill source).
+  const ppsActiveQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "pps", orgId],
+    queryFn: async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: codes, error } = await supabase
+        .from("client_billing_codes")
+        .select("client_id, service_start_date, service_end_date")
+        .eq("organization_id", orgId!)
+        .eq("service_code", "PPS");
+      if (error) throw error;
+      const activeIds = (codes ?? [])
+        .filter((c) => (!c.service_start_date || c.service_start_date <= today)
+                    && (!c.service_end_date || c.service_end_date >= today))
+        .map((c) => c.client_id);
+      return { activeIds };
+    },
+  });
+
+  // 8f. Quarterly evacuation drills — latest drill date per active PPS client.
+  const ppsDrillsQ = useQuery({
+    enabled: !!orgId && !!ppsActiveQ.data,
+    queryKey: ["deadlines", "pps_drills", orgId, (ppsActiveQ.data?.activeIds ?? []).join(",")],
+    queryFn: async () => {
+      const activeIds = ppsActiveQ.data?.activeIds ?? [];
+      if (activeIds.length === 0) return { latest: new Map<string, string>() };
+      const { data, error } = await supabase
+        .from("rhs_evacuation_drills" as never)
+        .select("client_id, drill_date")
+        .eq("organization_id", orgId!)
+        .in("client_id", activeIds)
+        .order("drill_date", { ascending: false });
+      if (error) throw error;
+      const latest = new Map<string, string>();
+      for (const row of (data ?? []) as unknown as Array<{ client_id: string; drill_date: string }>) {
+        if (!latest.has(row.client_id)) latest.set(row.client_id, row.drill_date);
+      }
+      return { latest };
+    },
+  });
+
+  // 8g. Active EPR clients + earliest EPR service start date (drives the
+  // EPR Informed Choice conversation 60-day deadline).
+  const eprActiveQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "epr", orgId],
+    queryFn: async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: codes, error } = await supabase
+        .from("client_billing_codes")
+        .select("client_id, service_start_date, service_end_date")
+        .eq("organization_id", orgId!)
+        .eq("service_code", "EPR");
+      if (error) throw error;
+      const starts = new Map<string, string>();
+      for (const c of (codes ?? []) as Array<{ client_id: string; service_start_date: string | null; service_end_date: string | null }>) {
+        if (!(!c.service_start_date || c.service_start_date <= today) || !(!c.service_end_date || c.service_end_date >= today)) continue;
+        if (!c.service_start_date) continue;
+        const prev = starts.get(c.client_id);
+        if (!prev || c.service_start_date < prev) starts.set(c.client_id, c.service_start_date);
+      }
+      return { starts };
+    },
+  });
+
+  // 8h. EPR Informed Choice documents already on file.
+  const eprDocsQ = useQuery({
+    enabled: !!orgId && !!eprActiveQ.data,
+    queryKey: ["deadlines", "epr_docs", orgId, [...(eprActiveQ.data?.starts.keys() ?? [])].join(",")],
+    queryFn: async () => {
+      const clientIds = [...(eprActiveQ.data?.starts.keys() ?? [])];
+      if (clientIds.length === 0) return { hasDoc: new Set<string>() };
+      const { data, error } = await supabase
+        .from("client_documents")
+        .select("client_id")
+        .eq("organization_id", orgId!)
+        .eq("document_type", "epr_informed_choice")
+        .in("client_id", clientIds);
+      if (error) throw error;
+      return { hasDoc: new Set((data ?? []).map((r) => (r as { client_id: string }).client_id)) };
     },
   });
 
@@ -755,6 +841,49 @@ export function useDeadlines() {
       }
     }
 
+    // Quarterly evacuation drills — PPS. Same cadence, mirrors HHS/RHS.
+    if (ppsActiveQ.data && ppsDrillsQ.data) {
+      for (const clientId of ppsActiveQ.data.activeIds) {
+        const lastDrill = ppsDrillsQ.data.latest.get(clientId);
+        const admission = (clientsQ.data ?? []).find((c) => c.id === clientId)?.admission_date;
+        const baseline = lastDrill ?? admission;
+        const due = baseline
+          ? new Date(new Date(baseline).getTime() + QUARTERLY_DRILL_DAYS * DAY)
+          : new Date(now.getTime() - DAY);
+        out.push({
+          key: `ppsdrill:${clientId}`,
+          source: "pps_evacuation_drill",
+          title: lastDrill ? "Quarterly evacuation drill due" : "Evacuation drill never recorded",
+          subject: nameOf(clientId),
+          subjectKind: "client",
+          dueAt: due,
+          status: bucketStatusWithin(due, now, DRILL_REMINDER_DAYS),
+          href: `/dashboard/clients/${clientId}?tab=profile`,
+          clientId,
+        });
+      }
+    }
+
+    // EPR Informed Choice conversation — due 60 calendar days from EPR
+    // service start. Once uploaded it's satisfied and drops off the panel.
+    if (eprActiveQ.data && eprDocsQ.data) {
+      for (const [clientId, startDate] of eprActiveQ.data.starts) {
+        if (eprDocsQ.data.hasDoc.has(clientId)) continue;
+        const due = new Date(new Date(`${startDate}T00:00:00`).getTime() + 60 * DAY);
+        out.push({
+          key: `eprchoice:${clientId}`,
+          source: "epr_informed_choice",
+          title: "EPR Informed Choice conversation — documentation due",
+          subject: nameOf(clientId),
+          subjectKind: "client",
+          dueAt: due,
+          status: bucketStatus(due, now),
+          href: `/dashboard/clients/${clientId}?tab=profile`,
+          clientId,
+        });
+      }
+    }
+
     // SOW perimeter alerts (R1–R5)
     for (const a of sowQ.data?.alerts ?? []) {
       out.push({
@@ -990,6 +1119,13 @@ export function useDeadlines() {
     clientsQ.data,
     hhsQ.data,
     hhCertsQ.data,
+    hhsDrillsQ.data,
+    rhsActiveQ.data,
+    rhsDrillsQ.data,
+    ppsActiveQ.data,
+    ppsDrillsQ.data,
+    eprActiveQ.data,
+    eprDocsQ.data,
     certsQ.data,
     profilesQ.data,
     incidentsQ.data,
@@ -1017,6 +1153,8 @@ export function useDeadlines() {
     isLoading:
       summariesQ.isLoading || clientsQ.isLoading || hhsQ.isLoading ||
       certsQ.isLoading || incidentsQ.isLoading || bcQ.isLoading || hhCertsQ.isLoading ||
+      rhsActiveQ.isLoading || rhsDrillsQ.isLoading || ppsActiveQ.isLoading || ppsDrillsQ.isLoading ||
+      eprActiveQ.isLoading || eprDocsQ.isLoading ||
       sowQ.isLoading || ssCoverageQ.isLoading || hrcRestrictionsQ.isLoading ||
       renewalReqsQ.isLoading || complianceInstancesQ.isLoading ||
       orgLicenseCodesQ.isLoading || orgLicenseDocsQ.isLoading,

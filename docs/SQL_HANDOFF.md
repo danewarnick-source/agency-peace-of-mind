@@ -1673,3 +1673,29 @@ ALTER TABLE public.upi_attestations ADD CONSTRAINT upi_attestations_kind_check
 
 **What you'll see:** two `ALTER TABLE` statements. No rows are touched —
 this only widens which `kind` values are allowed going forward.
+
+---
+
+## ACTION — RP5 daily notes: add daily_logs.service_code (2026-08-13)
+
+**What this is for:** RP5 (Exceptional Care Respite With Room and Board)
+now reuses the HHS daily-summary-note flow (Daily Logs — narrative, PCSP
+goals, signature). Every existing `daily_logs` row is HHS, but there was no
+column recording which service code a note bills against, so a new RP5 row
+would be indistinguishable from HHS. Adding a nullable `service_code`
+column, backfilled to `'HHS'` for all existing rows, fixes that without
+touching any other data. HHS behavior is unchanged — the app only starts
+writing `'RP5'` for clients whose active service code is RP5 instead of HHS.
+
+Matches migration `supabase/migrations/20260813220000_daily_logs_service_code.sql`.
+
+```sql
+ALTER TABLE public.daily_logs ADD COLUMN IF NOT EXISTS service_code text;
+UPDATE public.daily_logs SET service_code = 'HHS' WHERE service_code IS NULL;
+ALTER TABLE public.daily_logs ALTER COLUMN service_code SET DEFAULT 'HHS';
+```
+
+**What you'll see:** one `ALTER TABLE` adding the column, one `UPDATE`
+backfilling existing rows to `'HHS'`, and one `ALTER TABLE` setting the
+default for future inserts. No rows are deleted; no existing HHS billing
+attribution changes.

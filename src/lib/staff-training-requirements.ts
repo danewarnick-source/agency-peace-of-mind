@@ -285,7 +285,7 @@ export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
     conditional: "codes",
     applies_to_codes: ["EPR", "SED", "SEE", "SEI"],
     category: "Required trainings",
-    hint: "One-time. Applies to staff assigned to EPR, SED, SEE, or SEI.",
+    hint: "One-time. Applies to staff assigned to EPR, SED, SEE, or SEI. At least one supervisory staff must hold this before EPR or SED services begin. All supervisory EPR/SED staff must complete within 90 days of employment.",
     validation: {
       cert_type_label: "ACRE / USU Workplace Support Training",
       required_keyword_groups: [
@@ -397,6 +397,54 @@ export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
       required_keyword_groups: [],
       requires_completion_date: false,
       requires_expiration_date: false,
+    },
+  },
+  {
+    key: "hsq_cleaning_training",
+    title: "HSQ — Clean, Sanitary & Safe Environment Training",
+    due_days: 0,
+    tracks_expiration: false,
+    default_validity_months: null,
+    conditional: "codes",
+    applies_to_codes: ["HSQ"],
+    category: "Required trainings",
+    requires_upload: false,
+    self_attest: true,
+    attestation_text:
+      "I confirm I have been trained on maintaining a clean, sanitary, and safe living environment in accordance with HSQ service requirements and Contractor policies.",
+    hint: "Required before providing any HSQ service. Staff must be trained on maintaining a clean, sanitary, and safe living environment. Document completion in the staff's file.",
+    validation: {
+      cert_type_label: "HSQ Clean, Sanitary & Safe Environment Training",
+      required_keyword_groups: [
+        {
+          label: "HSQ cleaning/sanitation training wording",
+          any_of: ["clean", "sanitary", "sanitation", "safe environment", "hsq"],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: false,
+    },
+  },
+  {
+    key: "foster_care_license",
+    title: "Child Placing / Foster Care License (DHHS/OL)",
+    due_days: 0,
+    tracks_expiration: true,
+    default_validity_months: null,
+    conditional: "codes",
+    applies_to_codes: ["PPS"],
+    category: "Credentials & licenses",
+    hint: "Required for all staff providing PPS. Must hold a current Child Placing or Foster Care License issued by DHHS/OL. Renewal tracks the license's own expiration date.",
+    validation: {
+      cert_type_label: "Child Placing / Foster Care License",
+      required_keyword_groups: [
+        {
+          label: "Child Placing / Foster Care / DHHS Office of Licensing wording",
+          any_of: ["child placing", "foster care", "foster", "dhhs", "ol", "office of licensing"],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: true,
     },
   },
   {

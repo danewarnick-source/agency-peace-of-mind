@@ -102,6 +102,16 @@ function DailyLogsPage() {
 // STAFF VIEW
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** HHS is host-home daily-note billing; RP5 (Exceptional Care Respite With
+ *  Room and Board) uses the identical daily-summary-note model. Same form,
+ *  different service code on the stored record. */
+function dailyLogProgram(c: { job_code?: string[] | null }): "HHS" | "RP5" | null {
+  if (!Array.isArray(c.job_code)) return null;
+  if (c.job_code.includes("HHS")) return "HHS";
+  if (c.job_code.includes("RP5")) return "RP5";
+  return null;
+}
+
 function StaffDailyJournal() {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
@@ -117,10 +127,7 @@ function StaffDailyJournal() {
   const hhsClients = useMemo(
     () =>
       (caseload ?? []).filter(
-        (c) =>
-          allowedIds.has(c.id) &&
-          Array.isArray(c.job_code) &&
-          c.job_code.includes("HHS"),
+        (c) => allowedIds.has(c.id) && !!dailyLogProgram(c as unknown as CaseloadClient),
       ) as unknown as CaseloadClient[],
     [caseload, allowedIds],
   );
@@ -295,7 +302,7 @@ function StaffDailyJournal() {
         <div className="grid place-items-center py-12 text-sm text-muted-foreground">Loading caseload…</div>
       ) : !hhsClients.length ? (
         <Card className="p-8 text-center text-sm text-muted-foreground">
-          No HHS clients currently assigned to your caseload. Please contact an Administrator.
+          No HHS or RP5 clients currently assigned to your caseload. Please contact an Administrator.
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-3">
@@ -398,6 +405,8 @@ function DailyLogDialog({
 
   const isBackdated = !!date;
   const logDate = date ?? new Date().toISOString().split("T")[0];
+  const program = client ? dailyLogProgram(client) ?? "HHS" : "HHS";
+  const journalTitle = program === "RP5" ? "RP5 Daily Summary Note" : "Host Home Daily Compliance Journal";
 
   useEffect(() => {
     if (client) {
@@ -475,6 +484,7 @@ function DailyLogDialog({
       organization_id:        org.organization_id,
       user_id:                user.id,
       client_id:              client.id,
+      service_code:           dailyLogProgram(client) ?? "HHS",
       log_date:               logDate,
       pcsp_goals_addressed:   goals,
       narrative:              narrative.trim(),
@@ -617,7 +627,7 @@ function DailyLogDialog({
           onEscapeKeyDown={(e) => { if (submitting || aiBusy) e.preventDefault(); }}>
           <DialogHeader>
             <DialogTitle>
-              {isBackdated ? "📅 Backdated Daily Log" : "Host Home Daily Compliance Journal"}
+              {isBackdated ? "📅 Backdated Daily Log" : journalTitle}
             </DialogTitle>
             <DialogDescription>
               {client
@@ -779,7 +789,7 @@ function DailyLogDialog({
                           {aiBusy ? "NECTAR reviewing your note…" : "Submitting…"}</>
                       : aiCoach?.status === "Flagged"
                       ? "🔁 Re-Check with NECTAR Coach"
-                      : <><CheckCircle2 className="mr-2 h-4 w-4" /> Submit Daily Host Home Log</>}
+                      : <><CheckCircle2 className="mr-2 h-4 w-4" /> Submit Daily {program === "RP5" ? "RP5" : "Host Home"} Log</>}
                   </Button>
                 </div>
                 {allowException && aiCoach?.status === "Flagged" && (

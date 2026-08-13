@@ -54,7 +54,8 @@ type DocRow = { id: string; document_type: string | null; file_name: string | nu
 // Required SOW §1.10 record types surfaced in the completeness bar.
 type RecKey =
   | "pcsp" | "photograph" | "grievance_acknowledgment" | "guardian" | "hrc_approval" | "dnr"
-  | "grievance_policy" | "individualized_plan" | "room_board_agreement";
+  | "grievance_policy" | "individualized_plan" | "room_board_agreement"
+  | "els_shortened_school_hours" | "els_iep";
 const RECORD_LABELS: Record<RecKey, { title: string; sub: string }> = {
   pcsp: { title: "Person-Centered Plan", sub: "Annual; renews each year" },
   photograph: { title: "Photograph", sub: "No expiration — flagged only when missing" },
@@ -65,6 +66,8 @@ const RECORD_LABELS: Record<RecKey, { title: string; sub: string }> = {
   grievance_policy: { title: "Grievance policy", sub: "A signed copy on file" },
   individualized_plan: { title: "Individualized plans", sub: "Behavior support / IEP / similar" },
   room_board_agreement: { title: "Room and Board Agreement", sub: "Signed legal doc — HHS only, no expiration" },
+  els_shortened_school_hours: { title: "ELS — shortened school hours doc", sub: "School district letter/form — ELS under 22 only" },
+  els_iep: { title: "ELS — Individualized Education Plan (IEP)", sub: "ELS under 22 only" },
 };
 
 const HRR_FILENAME_RE = /hrr|hrc|human[\s_-]*rights|rights[\s_-]*restriction/i;
@@ -146,9 +149,9 @@ export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; 
         .eq("organization_id", orgId!)
         .eq("client_id", clientId);
       if (error) throw error;
-      return ((data ?? []) as Array<{ service_code: string; service_start_date: string | null; service_end_date: string | null }>)
-        .filter((c) => (!c.service_start_date || c.service_start_date <= today) && (!c.service_end_date || c.service_end_date >= today))
-        .map((c) => c.service_code.toUpperCase());
+      const rows = (data ?? []) as Array<{ service_code: string; service_start_date: string | null; service_end_date: string | null }>;
+      const active = rows.filter((c) => (!c.service_start_date || c.service_start_date <= today) && (!c.service_end_date || c.service_end_date >= today));
+      return { codes: active.map((c) => c.service_code.toUpperCase()), rows };
     },
   });
 
@@ -157,9 +160,18 @@ export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; 
   const contacts = contactsQ.data ?? [];
   const restrictions = restrictionsQ.data ?? [];
   const primaryRestriction = restrictions[0] ?? null;
-  const activeCodes = activeCodesQ.data ?? [];
+  const activeCodes = activeCodesQ.data?.codes ?? [];
   const isHhs = activeCodes.includes("HHS");
-  const showBelongings = activeCodes.some((c) => ["HHS", "RHS", "SLH"].includes(c));
+  const showBelongings = activeCodes.some((c) => ["HHS", "RHS", "SLH", "PPS"].includes(c));
+  const isEls = activeCodes.includes("ELS");
+  const isEpr = activeCodes.includes("EPR");
+  const clientAge = age(client?.date_of_birth as string | null | undefined);
+  const showElsSchoolDocs = isEls && (clientAge == null || clientAge < 22);
+  const eprServiceStart = (activeCodesQ.data?.rows ?? [])
+    .filter((r) => r.service_code.toUpperCase() === "EPR")
+    .map((r) => r.service_start_date)
+    .filter((d): d is string => !!d)
+    .sort()[0] ?? null;
 
   if (clientQ.isLoading || !client) {
     return <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Loading…</CardContent></Card>;
@@ -172,6 +184,7 @@ export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; 
         docs={docs}
         restriction={primaryRestriction}
         isHhs={isHhs}
+        showElsSchoolDocs={showElsSchoolDocs}
         onOpenFiles={onOpenFiles}
         onContinueIntake={() => navigate({ to: "/dashboard/client-intake/$clientId", params: { clientId } })}
       />
@@ -186,6 +199,8 @@ export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; 
           <HealthcareProvidersCard clientId={clientId} orgId={orgId!} />
           <HrcCard clientId={clientId} client={client} docs={docs} restriction={primaryRestriction} />
           {isHhs && <RoomBoardAgreementCard clientId={clientId} docs={docs} onOpenFiles={onOpenFiles} />}
+          {showElsSchoolDocs && <ElsSchoolDocumentationCard clientId={clientId} docs={docs} />}
+          {isEpr && <EprInformedChoiceCard clientId={clientId} docs={docs} serviceStart={eprServiceStart} />}
           <RhsHospitalizationCard clientId={clientId} orgId={orgId!} />
           <RhsEvacuationDrillsCard clientId={clientId} orgId={orgId!} />
         </div>
@@ -232,6 +247,122 @@ function RoomBoardAgreementCard({ clientId, docs, onOpenFiles }: { clientId: str
               kind="data_rich_gap"
               clientId={clientId}
               uploadDocumentType="room_board_agreement"
+            />
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── ELS — Extended Living Supports school documentation (under 22) ─────────
+
+function ElsSchoolDocumentationCard({ clientId, docs }: { clientId: string; docs: DocRow[] }) {
+  const hoursDoc = docs.find((d) => d.document_type === "els_shortened_school_hours");
+  const iepDoc = docs.find((d) => d.document_type === "els_iep");
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-0">
+        <div className="flex items-start gap-2.5 px-5 py-4 border-b border-border/60">
+          <HexMarker />
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold leading-tight">Extended Living Supports — School Documentation</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">ELS · school-age (under 22) — no expiration, just present or missing</p>
+          </div>
+        </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <Label className="text-xs">School district documentation — shortened school hours</Label>
+            {hoursDoc ? (
+              <NectarAsk
+                question="School district documentation — shortened school hours"
+                kind="data_rich_gap"
+                clientId={clientId}
+                uploadDocumentType="els_shortened_school_hours"
+                answeredSummary={`On file since ${fmtDate(hoursDoc.uploaded_at)} — ${hoursDoc.file_name ?? "document"}`}
+              />
+            ) : (
+              <NectarAsk
+                question="Upload the school district letter/form confirming shortened school hours"
+                kind="data_rich_gap"
+                clientId={clientId}
+                uploadDocumentType="els_shortened_school_hours"
+              />
+            )}
+          </div>
+          <div>
+            <Label className="text-xs">Individualized Education Plan (IEP)</Label>
+            {iepDoc ? (
+              <NectarAsk
+                question="Individualized Education Plan (IEP)"
+                kind="data_rich_gap"
+                clientId={clientId}
+                uploadDocumentType="els_iep"
+                answeredSummary={`On file since ${fmtDate(iepDoc.uploaded_at)} — ${iepDoc.file_name ?? "document"}`}
+              />
+            ) : (
+              <NectarAsk
+                question="Upload the Individualized Education Plan (IEP)"
+                kind="data_rich_gap"
+                clientId={clientId}
+                uploadDocumentType="els_iep"
+              />
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── EPR — Informed Choice conversation documentation (60-day deadline) ─────
+
+function EprInformedChoiceCard({ clientId, docs, serviceStart }: { clientId: string; docs: DocRow[]; serviceStart: string | null }) {
+  const doc = docs.find((d) => d.document_type === "epr_informed_choice");
+  const dueDate = serviceStart ? new Date(new Date(`${serviceStart}T00:00:00`).getTime() + 60 * 86_400_000) : null;
+  const dueStr = dueDate ? dueDate.toISOString().slice(0, 10) : null;
+  const isOverdue = !doc && !!dueDate && dueDate.getTime() < Date.now();
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-0">
+        <div className="flex items-start gap-2.5 px-5 py-4 border-b border-border/60">
+          <HexMarker />
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold leading-tight">EPR Informed Choice Conversation — Documentation</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Must confirm EPR is not permanent, the Person's employment goals, and a plan for after EPR ends.
+            </p>
+          </div>
+        </div>
+        <div className="p-5 space-y-3">
+          {dueStr ? (
+            <div className={cn(
+              "rounded-md border p-2.5 text-sm font-medium",
+              doc ? "border-emerald-300/60 bg-emerald-50/40 text-emerald-800"
+                : isOverdue ? "border-red-300 bg-red-50 text-red-700"
+                : "border-amber-300/60 bg-amber-50/40 text-amber-800",
+            )}>
+              {doc ? `Satisfied — deadline was ${fmtDate(dueStr)}` : isOverdue ? `Overdue — was due ${fmtDate(dueStr)} (60 days from EPR start)` : `Due ${fmtDate(dueStr)} — 60 days from EPR service start`}
+            </div>
+          ) : (
+            <div className="rounded-md border border-border p-2.5 text-sm text-muted-foreground">
+              No EPR service start date on file — set the EPR authorization's start date to compute the deadline.
+            </div>
+          )}
+          {doc ? (
+            <NectarAsk
+              question="EPR Informed Choice Conversation — Documentation"
+              kind="data_rich_gap"
+              clientId={clientId}
+              uploadDocumentType="epr_informed_choice"
+              answeredSummary={`On file since ${fmtDate(doc.uploaded_at)} — ${doc.file_name ?? "document"}`}
+            />
+          ) : (
+            <NectarAsk
+              question="Upload the written Informed Choice conversation document"
+              kind="data_rich_gap"
+              clientId={clientId}
+              uploadDocumentType="epr_informed_choice"
             />
           )}
         </div>
@@ -340,8 +471,8 @@ function CardShell({
 // ── Record completeness bar ────────────────────────────────────────────────
 
 function RecordCompletenessBar({
-  client, docs, restriction, isHhs, onOpenFiles, onContinueIntake,
-}: { client: ClientRow; docs: DocRow[]; restriction: RestrictionRecord | null; isHhs: boolean; onOpenFiles: () => void; onContinueIntake: () => void }) {
+  client, docs, restriction, isHhs, showElsSchoolDocs, onOpenFiles, onContinueIntake,
+}: { client: ClientRow; docs: DocRow[]; restriction: RestrictionRecord | null; isHhs: boolean; showElsSchoolDocs: boolean; onOpenFiles: () => void; onContinueIntake: () => void }) {
   const [open, setOpen] = useState(false);
 
   const isOwnGuardian = client.is_own_guardian === true;
@@ -373,6 +504,11 @@ function RecordCompletenessBar({
       const rbaDoc = docs.find((d) => d.document_type === "room_board_agreement");
       return rbaDoc ? { state: "ok", doc: rbaDoc } : { state: "missing" };
     }
+    if (key === "els_shortened_school_hours" || key === "els_iep") {
+      if (!showElsSchoolDocs) return { state: "na" };
+      const elsDoc = docs.find((d) => d.document_type === key);
+      return elsDoc ? { state: "ok", doc: elsDoc } : { state: "missing" };
+    }
     const doc = docs.find((d) => d.document_type === key);
     if (key === "guardian" && isOwnGuardian) return { state: "na" };
     if (key === "dnr") {
@@ -384,7 +520,7 @@ function RecordCompletenessBar({
     return doc ? { state: "ok", doc } : { state: "missing" };
   }
 
-  const keys: RecKey[] = ["pcsp", "photograph", "grievance_acknowledgment", "grievance_policy", "individualized_plan", "guardian", "hrc_approval", "dnr", "room_board_agreement"];
+  const keys: RecKey[] = ["pcsp", "photograph", "grievance_acknowledgment", "grievance_policy", "individualized_plan", "guardian", "hrc_approval", "dnr", "room_board_agreement", "els_shortened_school_hours", "els_iep"];
   const states = keys.map((k) => ({ key: k, ...stateFor(k) }));
   const applicable = states.filter((s) => s.state !== "na");
   const completed = applicable.filter((s) => s.state === "ok").length;

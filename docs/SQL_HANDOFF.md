@@ -2138,3 +2138,32 @@ each with their `GRANT`s, RLS enabled, and policies; two `updated_at`
 triggers; and one new private storage bucket `obligation-evidence` with four
 `storage.objects` policies scoped by the org-id folder prefix. Nothing
 existing is altered, deleted, or renamed — this is purely additive.
+
+## ACTION — Widen notifications.type for Company Obligations (2026-08-13)
+
+**What this is for:** The Company Obligations server functions (Section 2)
+send two new kinds of notification — a per-assignee due-date reminder
+ladder (`company_obligation_reminder`) and an admin/manager update on
+completion or overdue (`company_obligation_update`). The existing
+`notifications_type_check` constraint is an explicit whitelist and does not
+include these, so inserts would fail without this change. Purely additive —
+drops and re-adds the same CHECK with two more allowed values; no existing
+rows are touched.
+
+Matches migration
+`supabase/migrations/20260813234500_obligation_notification_types.sql`.
+
+```sql
+ALTER TABLE public.notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
+ALTER TABLE public.notifications ADD CONSTRAINT notifications_type_check CHECK (type = ANY (ARRAY[
+  'incident_report_filed','incident_deadline_warning','timesheet_exception','daily_log_exception',
+  'open_shift_warning','medication_error','form_assigned','form_reminder','form_due',
+  'staff_mandate_missing','smart_import_flag','smart_import_provisional_cert',
+  'smart_import_unverified_cert','smart_import_cert_expiring','smart_import_question',
+  'shift_published','shift_updated','time_off_requested','time_off_decided',
+  'company_obligation_reminder','company_obligation_update'
+]));
+```
+
+**What you'll see:** one `DROP CONSTRAINT` / `ADD CONSTRAINT` pair widening
+the allowed `type` values on `public.notifications`. Nothing else changes.

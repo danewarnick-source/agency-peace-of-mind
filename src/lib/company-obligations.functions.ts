@@ -1,0 +1,931 @@
+// Server functions for the Company Obligations tracker — recurring / per-event
+// compliance duties (e.g. "Post the grievance poster quarterly", "File the
+// PBA financial statement monthly") that generate due-dated instances, get
+// assigned to staff groups or individuals, and are tracked to completion with
+// admin/manager notifications on submission and overdue.
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
+import { resolveGroupMembersInternal, type ResolvedStaffMember } from "./staff-groups.functions";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnySupabase = any;
+
+export type CompanyObligationRow = {
+  id: string;
+  organization_id: string;
+  title: string;
+  description: string | null;
+  source_policy_section: string | null;
+  cadence: "weekly" | "monthly" | "quarterly" | "annually" | "per_event" | "one_time";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  due_day_config: any;
+  reminder_days_before: number[];
+  evidence_type: "attestation" | "upload" | "upload_and_attestation" | "form";
+  linked_form_id: string | null;
+  attestation_text: string | null;
+  requires_individual_completion: boolean;
+  assigned_to_groups: string[];
+  assigned_to_users: string[];
+  assignee_role: "any_assigned" | "managers_only" | "admin_only";
+  notify_manager_on_complete: boolean;
+  notify_manager_on_overdue: boolean;
+  active: boolean;
+  created_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type ObligationInstanceRow = {
+  id: string;
+  obligation_id: string;
+  organization_id: string;
+  period_key: string;
+  due_at: string;
+  status: "pending" | "completed" | "overdue" | "waived";
+  completed_at: string | null;
+  completed_by_id: string | null;
+  completed_by_name: string | null;
+  evidence_type_used: string | null;
+  upload_path: string | null;
+  upload_filename: string | null;
+  attestation_signed_at: string | null;
+  attestation_signed_by_id: string | null;
+  attestation_signed_by_name: string | null;
+  attestation_text_snapshot: string | null;
+  form_submission_id: string | null;
+  event_description: string | null;
+  waive_reason: string | null;
+  admin_notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+// ─── date / period helpers (all arithmetic in UTC, no timezone drift) ──────
+
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS_FULL = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function addDaysUTC(d: Date, days: number): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + days));
+}
+
+function isoWeekday(d: Date): number {
+  const wd = d.getUTCDay();
+  return wd === 0 ? 7 : wd;
+}
+
+function nextWeekdayOnOrAfter(from: Date, weekday: number): Date {
+  let d = from;
+  for (let i = 0; i < 7; i++) {
+    if (isoWeekday(d) === weekday) return d;
+    d = addDaysUTC(d, 1);
+  }
+  return d;
+}
+
+function mondayOfWeek(d: Date): Date {
+  return addDaysUTC(d, -(isoWeekday(d) - 1));
+}
+
+function lastDayOfMonth(year: number, month0: number): number {
+  return new Date(Date.UTC(year, month0 + 1, 0)).getUTCDate();
+}
+
+function monthlyOccurrence(year: number, month0: number, dayConfig: number | "last"): Date {
+  const day = dayConfig === "last" ? lastDayOfMonth(year, month0) : Math.min(dayConfig, lastDayOfMonth(year, month0));
+  return new Date(Date.UTC(year, month0, day));
+}
+
+function nextMonthlyOnOrAfter(from: Date, dayConfig: number | "last"): Date {
+  const occ = monthlyOccurrence(from.getUTCFullYear(), from.getUTCMonth(), dayConfig);
+  if (occ.getTime() >= from.getTime()) return occ;
+  return monthlyOccurrence(from.getUTCFullYear(), from.getUTCMonth() + 1, dayConfig);
+}
+
+const QUARTER_START_MONTHS0 = [0, 3, 6, 9]; // Jan, Apr, Jul, Oct (0-indexed)
+
+function nextQuarterOnOrAfter(
+  from: Date,
+  dayConfig: number | "last",
+): { due: Date; quarterNum: number; year: number } {
+  const year = from.getUTCFullYear();
+  for (const month0 of QUARTER_START_MONTHS0) {
+    const occ = monthlyOccurrence(year, month0, dayConfig);
+    if (occ.getTime() >= from.getTime()) return { due: occ, quarterNum: month0 / 3 + 1, year };
+  }
+  return { due: monthlyOccurrence(year + 1, 0, dayConfig), quarterNum: 1, year: year + 1 };
+}
+
+function nextAnnualOnOrAfter(from: Date, month1: number, dayConfig: number | "last"): Date {
+  const month0 = month1 - 1;
+  const occ = monthlyOccurrence(from.getUTCFullYear(), month0, dayConfig);
+  if (occ.getTime() >= from.getTime()) return occ;
+  return monthlyOccurrence(from.getUTCFullYear() + 1, month0, dayConfig);
+}
+
+function formatShort(d: Date): string {
+  return `${MONTHS_SHORT[d.getUTCMonth()]} ${String(d.getUTCDate()).padStart(2, "0")}, ${d.getUTCFullYear()}`;
+}
+
+function formatMonthYear(d: Date): string {
+  return `${MONTHS_FULL[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+function endOfDayUTC(d: Date): string {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59)).toISOString();
+}
+
+function normalizeDayConfig(v: unknown): number | "last" {
+  if (v === "last") return "last";
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 1 || n > 31) throw new Error("due_day_config.day_of_month must be 1-31 or 'last'.");
+  return n;
+}
+
+function cadenceDescription(cadence: string): string {
+  switch (cadence) {
+    case "weekly": return "Weekly";
+    case "monthly": return "Monthly";
+    case "quarterly": return "Quarterly";
+    case "annually": return "Annually";
+    case "per_event": return "Per event";
+    case "one_time": return "One-time";
+    default: return cadence;
+  }
+}
+
+type PeriodResult = { period_key: string; due_at: string } | null;
+
+function computePeriod(cadence: string, cfg: Record<string, unknown>, now: Date): PeriodResult {
+  switch (cadence) {
+    case "weekly": {
+      const weekday = Number(cfg.weekday);
+      if (!Number.isFinite(weekday) || weekday < 1 || weekday > 7) {
+        throw new Error("weekly cadence requires due_day_config.weekday (1=Mon..7=Sun).");
+      }
+      const due = nextWeekdayOnOrAfter(now, weekday);
+      const monday = mondayOfWeek(due);
+      return { period_key: `Week of ${formatShort(monday)}`, due_at: endOfDayUTC(due) };
+    }
+    case "monthly": {
+      const day = normalizeDayConfig(cfg.day_of_month);
+      const due = nextMonthlyOnOrAfter(now, day);
+      return { period_key: formatMonthYear(due), due_at: endOfDayUTC(due) };
+    }
+    case "quarterly": {
+      const day = normalizeDayConfig(cfg.day_of_month);
+      const { due, quarterNum, year } = nextQuarterOnOrAfter(now, day);
+      return { period_key: `Q${quarterNum} ${year}`, due_at: endOfDayUTC(due) };
+    }
+    case "annually": {
+      const month = Number(cfg.month);
+      if (!Number.isFinite(month) || month < 1 || month > 12) {
+        throw new Error("annually cadence requires due_day_config.month (1-12).");
+      }
+      const day = normalizeDayConfig(cfg.day_of_month);
+      const due = nextAnnualOnOrAfter(now, month, day);
+      return { period_key: `${due.getUTCFullYear()}`, due_at: endOfDayUTC(due) };
+    }
+    case "one_time": {
+      const dateStr = typeof cfg.date === "string" ? cfg.date : "";
+      if (!dateStr) throw new Error("one_time cadence requires due_day_config.date.");
+      const due = new Date(`${dateStr}T00:00:00Z`);
+      return { period_key: `Due ${formatShort(due)}`, due_at: endOfDayUTC(due) };
+    }
+    case "per_event":
+      return null;
+    default:
+      throw new Error(`Unknown cadence: ${cadence}`);
+  }
+}
+
+// ─── internal helpers (share the caller's request-scoped supabase client) ──
+
+async function fetchObligation(supabase: AnySupabase, organizationId: string, obligationId: string) {
+  const { data, error } = await supabase
+    .from("company_obligations")
+    .select("*")
+    .eq("id", obligationId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Obligation not found.");
+  return data as CompanyObligationRow;
+}
+
+export async function snapshotAssigneesInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  obligationId: string,
+  instanceId: string,
+  obligationRow?: CompanyObligationRow,
+): Promise<ResolvedStaffMember[]> {
+  const ob = obligationRow ?? (await fetchObligation(supabase, organizationId, obligationId));
+
+  const groupMembers = await resolveGroupMembersInternal(
+    supabase, organizationId, ob.assigned_to_groups ?? [], ob.assignee_role,
+  );
+
+  const directUserIds = ob.assigned_to_users ?? [];
+  let directMembers: ResolvedStaffMember[] = [];
+  if (directUserIds.length) {
+    const [{ data: dirRows, error: dErr }, { data: roleRows, error: rErr }] = await Promise.all([
+      supabase.from("org_member_directory").select("id, full_name").in("id", directUserIds),
+      supabase.from("organization_members").select("user_id, role")
+        .eq("organization_id", organizationId).eq("active", true).in("user_id", directUserIds),
+    ]);
+    if (dErr) throw new Error(dErr.message);
+    if (rErr) throw new Error(rErr.message);
+    const nameById = new Map(
+      (dirRows ?? []).map((r: { id: string; full_name: string | null }) => [r.id, r.full_name ?? "Unknown"]),
+    );
+    const roleById = new Map((roleRows ?? []).map((r: { user_id: string; role: string }) => [r.user_id, r.role]));
+    directMembers = directUserIds
+      .map((uid: string) => {
+        const role = roleById.get(uid);
+        if (!role) return null;
+        if (ob.assignee_role === "managers_only" && !["manager", "super_admin"].includes(role)) return null;
+        if (ob.assignee_role === "admin_only" && !["admin", "super_admin"].includes(role)) return null;
+        return { staff_id: uid, staff_name: nameById.get(uid) ?? "Unknown", staff_role: role };
+      })
+      .filter((m): m is ResolvedStaffMember => m !== null);
+  }
+
+  const byId = new Map<string, ResolvedStaffMember>();
+  for (const m of [...groupMembers, ...directMembers]) byId.set(m.staff_id, m);
+  const all = Array.from(byId.values());
+
+  if (all.length) {
+    const rows = all.map((m) => ({
+      instance_id: instanceId,
+      organization_id: organizationId,
+      staff_id: m.staff_id,
+      staff_name: m.staff_name,
+      staff_role: m.staff_role,
+    }));
+    const { error } = await supabase
+      .from("company_obligation_instance_assignees")
+      .upsert(rows, { onConflict: "instance_id,staff_id", ignoreDuplicates: true });
+    if (error) throw new Error(error.message);
+  }
+
+  return all;
+}
+
+export async function scheduleRemindersInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  instanceId: string,
+  obligationRow: CompanyObligationRow,
+): Promise<void> {
+  const days = obligationRow.reminder_days_before ?? [];
+  if (!days.length) return;
+
+  const { data: assignees, error: aErr } = await supabase
+    .from("company_obligation_instance_assignees")
+    .select("staff_id")
+    .eq("instance_id", instanceId);
+  if (aErr) throw new Error(aErr.message);
+  if (!assignees?.length) return;
+
+  const { data: inst, error: iErr } = await supabase
+    .from("company_obligation_instances")
+    .select("due_at, period_key")
+    .eq("id", instanceId)
+    .maybeSingle();
+  if (iErr) throw new Error(iErr.message);
+  if (!inst) return;
+
+  const dueAt = new Date(inst.due_at);
+  const linkTo = obligationRow.evidence_type === "form" && obligationRow.linked_form_id
+    ? `/dashboard/forms/${obligationRow.linked_form_id}`
+    : "/dashboard/my-obligations";
+  const cadenceDesc = cadenceDescription(obligationRow.cadence);
+
+  for (const a of assignees as Array<{ staff_id: string }>) {
+    for (const n of days) {
+      const recurrenceKey = `obligation_reminder_${instanceId}_${a.staff_id}_${n}`;
+      const { data: existing, error: eErr } = await supabase
+        .from("notifications").select("id").eq("organization_id", organizationId)
+        .eq("recurrence_key", recurrenceKey).maybeSingle();
+      if (eErr) throw new Error(eErr.message);
+      if (existing) continue;
+
+      const remindAt = new Date(dueAt.getTime() - n * 24 * 60 * 60 * 1000);
+      const title = n === 0
+        ? `${obligationRow.title} is due today`
+        : `${obligationRow.title} is due in ${n} day${n === 1 ? "" : "s"}`;
+      const urgency = n >= 3 ? "normal" : "high";
+
+      const { error: insErr } = await supabase.from("notifications").insert({
+        organization_id: organizationId,
+        recipient_user_id: a.staff_id,
+        recipient_role: "staff",
+        type: "company_obligation_reminder",
+        urgency,
+        title,
+        body: `${cadenceDesc} — ${inst.period_key}. ${obligationRow.description ?? ""}`.trim(),
+        link_to: linkTo,
+        next_remind_at: remindAt.toISOString(),
+        related_id: instanceId,
+        related_type: "company_obligation_instance",
+        recurrence_key: recurrenceKey,
+      });
+      if (insErr) throw new Error(insErr.message);
+    }
+  }
+}
+
+export async function generateNextInstanceInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  obligationId: string,
+): Promise<ObligationInstanceRow | null> {
+  const ob = await fetchObligation(supabase, organizationId, obligationId);
+  if (ob.cadence === "per_event") return null;
+
+  const period = computePeriod(ob.cadence, ob.due_day_config ?? {}, new Date());
+  if (!period) return null;
+
+  const { data: existing, error: exErr } = await supabase
+    .from("company_obligation_instances")
+    .select("*")
+    .eq("obligation_id", obligationId)
+    .eq("period_key", period.period_key)
+    .maybeSingle();
+  if (exErr) throw new Error(exErr.message);
+  if (existing) return existing as ObligationInstanceRow;
+
+  const { data: inserted, error: insErr } = await supabase
+    .from("company_obligation_instances")
+    .insert({
+      obligation_id: obligationId,
+      organization_id: organizationId,
+      period_key: period.period_key,
+      due_at: period.due_at,
+      status: "pending",
+    })
+    .select("*")
+    .maybeSingle();
+  if (insErr) throw new Error(insErr.message);
+  if (!inserted) throw new Error("Failed to create obligation instance.");
+
+  await snapshotAssigneesInternal(supabase, organizationId, obligationId, inserted.id, ob);
+  await scheduleRemindersInternal(supabase, organizationId, inserted.id, ob);
+
+  return inserted as ObligationInstanceRow;
+}
+
+export async function notifyObligationManagersInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  obligationId: string,
+  instanceId: string,
+  eventType: "completion" | "overdue",
+): Promise<void> {
+  const ob = await fetchObligation(supabase, organizationId, obligationId);
+  const { data: inst, error: iErr } = await supabase
+    .from("company_obligation_instances").select("*").eq("id", instanceId).maybeSingle();
+  if (iErr) throw new Error(iErr.message);
+  if (!inst) return;
+
+  if (eventType === "completion" && !ob.notify_manager_on_complete) return;
+  if (eventType === "overdue" && !ob.notify_manager_on_overdue) return;
+
+  const [{ data: completions, error: cErr }, { data: assignees, error: aErr }] = await Promise.all([
+    supabase.from("company_obligation_completions")
+      .select("staff_id, staff_name, completed_at, evidence_type_used")
+      .eq("instance_id", instanceId).order("completed_at", { ascending: true }),
+    supabase.from("company_obligation_instance_assignees")
+      .select("staff_id, staff_name").eq("instance_id", instanceId),
+  ]);
+  if (cErr) throw new Error(cErr.message);
+  if (aErr) throw new Error(aErr.message);
+
+  const completedIds = new Set((completions ?? []).map((c: { staff_id: string }) => c.staff_id));
+  const completedNames = (completions ?? []).map((c: { staff_name: string }) => c.staff_name);
+  const notSubmittedNames = (assignees ?? [])
+    .filter((a: { staff_id: string }) => !completedIds.has(a.staff_id))
+    .map((a: { staff_name: string }) => a.staff_name);
+
+  // Resolve recipients: managers of linked teams, falling back to org admins.
+  const recipientIds = new Set<string>();
+  const groupIds = ob.assigned_to_groups ?? [];
+  if (groupIds.length) {
+    const { data: groups, error: gErr } = await supabase
+      .from("staff_groups").select("id, linked_team_id").in("id", groupIds);
+    if (gErr) throw new Error(gErr.message);
+    const teamIds = (groups ?? [])
+      .map((g: { linked_team_id: string | null }) => g.linked_team_id)
+      .filter((id: string | null): id is string => !!id);
+    if (teamIds.length) {
+      const { data: teams, error: tErr } = await supabase
+        .from("teams").select("id, manager_id").in("id", teamIds);
+      if (tErr) throw new Error(tErr.message);
+      for (const t of (teams ?? []) as Array<{ manager_id: string | null }>) {
+        if (t.manager_id) recipientIds.add(t.manager_id);
+      }
+    }
+  }
+  if (!recipientIds.size) {
+    const { data: admins, error: adErr } = await supabase
+      .from("organization_members").select("user_id, role")
+      .eq("organization_id", organizationId).eq("active", true).in("role", ["admin", "super_admin"]);
+    if (adErr) throw new Error(adErr.message);
+    for (const a of (admins ?? []) as Array<{ user_id: string }>) recipientIds.add(a.user_id);
+  }
+  if (!recipientIds.size) return;
+
+  const cadenceDesc = cadenceDescription(ob.cadence);
+  const lastCompletion = (completions ?? [])[completions.length - 1] as
+    { staff_name: string; completed_at: string; evidence_type_used: string } | undefined;
+
+  let title: string;
+  let body: string;
+  let urgency: string;
+  let recurrenceKeyBase: string | null = null;
+
+  if (eventType === "completion") {
+    const staffName = lastCompletion?.staff_name ?? "A staff member";
+    if (!ob.requires_individual_completion) {
+      title = `${staffName} completed "${ob.title}"`;
+      body = `${inst.period_key} — ${cadenceDesc}. Submitted ${lastCompletion?.completed_at ?? new Date().toISOString()}. `
+        + `Evidence: ${lastCompletion?.evidence_type_used ?? ob.evidence_type}.`;
+      urgency = "normal";
+    } else {
+      const total = (assignees ?? []).length;
+      const done = completedIds.size;
+      title = `${staffName} submitted "${ob.title}" — ${done} of ${total} complete`;
+      body = `Completed: ${completedNames.length ? completedNames.join(", ") : "None"}\n`
+        + `Not submitted: ${notSubmittedNames.length ? notSubmittedNames.join(", ") : "All submitted"}`;
+      const hoursRemaining = (new Date(inst.due_at).getTime() - Date.now()) / (60 * 60 * 1000);
+      urgency = notSubmittedNames.length && hoursRemaining <= 24 ? "high" : "normal";
+    }
+  } else {
+    title = `OVERDUE — "${ob.title}" (${inst.period_key})`;
+    body = `Due ${inst.due_at}. ${cadenceDesc}.\n`
+      + `Completed: ${completedNames.length ? completedNames.join(", ") : "None submitted"}\n`
+      + `Not submitted: ${notSubmittedNames.length ? notSubmittedNames.join(", ") : "All submitted"}`;
+    urgency = "critical";
+    recurrenceKeyBase = `obligation_overdue_${instanceId}`;
+  }
+
+  if (recurrenceKeyBase) {
+    // Unique index is (organization_id, recurrence_key), so a per-recipient
+    // suffix is needed for the fan-out insert below; this prefix check is
+    // what actually enforces "only once per overdue transition".
+    const { data: already, error: chkErr } = await supabase
+      .from("notifications").select("id")
+      .eq("organization_id", organizationId)
+      .like("recurrence_key", `${recurrenceKeyBase}%`)
+      .limit(1);
+    if (chkErr) throw new Error(chkErr.message);
+    if (already && already.length) return;
+  }
+
+  const rows = Array.from(recipientIds).map((recipientId) => ({
+    organization_id: organizationId,
+    recipient_user_id: recipientId,
+    recipient_role: "admin",
+    type: "company_obligation_update",
+    urgency,
+    title,
+    body,
+    link_to: "/dashboard/company-obligations",
+    related_id: instanceId,
+    related_type: "company_obligation_instance",
+    recurrence_key: recurrenceKeyBase ? `${recurrenceKeyBase}_${recipientId}` : null,
+  }));
+  const { error: insErr } = await supabase.from("notifications").insert(rows);
+  if (insErr) throw new Error(insErr.message);
+}
+
+export async function checkAndMarkOverdueInternal(supabase: AnySupabase, organizationId: string): Promise<void> {
+  const { data: overdue, error } = await supabase
+    .from("company_obligation_instances")
+    .select("id, obligation_id")
+    .eq("organization_id", organizationId)
+    .eq("status", "pending")
+    .lt("due_at", new Date().toISOString());
+  if (error) throw new Error(error.message);
+
+  for (const inst of (overdue ?? []) as Array<{ id: string; obligation_id: string }>) {
+    const { data: updated, error: upErr } = await supabase
+      .from("company_obligation_instances")
+      .update({ status: "overdue" })
+      .eq("id", inst.id)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
+    if (upErr) throw new Error(upErr.message);
+    if (updated) {
+      await notifyObligationManagersInternal(supabase, organizationId, inst.obligation_id, inst.id, "overdue");
+    }
+  }
+}
+
+// ─── obligation CRUD ────────────────────────────────────────────────────
+
+const obligationInputSchema = z.object({
+  title: z.string().trim().min(1).max(300),
+  description: z.string().max(5000).optional().nullable(),
+  sourcePolicySection: z.string().max(500).optional().nullable(),
+  cadence: z.enum(["weekly", "monthly", "quarterly", "annually", "per_event", "one_time"]),
+  dueDayConfig: z.record(z.any()).default({}),
+  reminderDaysBefore: z.array(z.number().int().min(0).max(365)).max(20).default([]),
+  evidenceType: z.enum(["attestation", "upload", "upload_and_attestation", "form"]),
+  linkedFormId: z.string().uuid().optional().nullable(),
+  attestationText: z.string().max(20000).optional().nullable(),
+  requiresIndividualCompletion: z.boolean().default(false),
+  assignedToGroups: z.array(z.string().uuid()).max(200).default([]),
+  assignedToUsers: z.array(z.string().uuid()).max(500).default([]),
+  assigneeRole: z.enum(["any_assigned", "managers_only", "admin_only"]).default("any_assigned"),
+  notifyManagerOnComplete: z.boolean().default(true),
+  notifyManagerOnOverdue: z.boolean().default(true),
+});
+
+export const listCompanyObligations = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ organizationId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return [] as Array<CompanyObligationRow & { current_instance: ObligationInstanceRow | null }>;
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+
+    await checkAndMarkOverdueInternal(supabase, data.organizationId);
+
+    const { data: obligations, error } = await supabase
+      .from("company_obligations").select("*")
+      .eq("organization_id", data.organizationId)
+      .order("title", { ascending: true });
+    if (error) throw new Error(error.message);
+
+    const obligationIds = (obligations ?? []).map((o: CompanyObligationRow) => o.id);
+    const latestByObligation = new Map<string, ObligationInstanceRow>();
+    if (obligationIds.length) {
+      const { data: instances, error: iErr } = await supabase
+        .from("company_obligation_instances").select("*")
+        .in("obligation_id", obligationIds)
+        .order("created_at", { ascending: false });
+      if (iErr) throw new Error(iErr.message);
+      for (const inst of (instances ?? []) as ObligationInstanceRow[]) {
+        if (!latestByObligation.has(inst.obligation_id)) latestByObligation.set(inst.obligation_id, inst);
+      }
+    }
+
+    return (obligations ?? []).map((o: CompanyObligationRow) => ({
+      ...o,
+      current_instance: latestByObligation.get(o.id) ?? null,
+    }));
+  });
+
+export const getCompanyObligation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    organizationId: z.string().uuid(),
+    obligationId: z.string().uuid(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { obligation: null, current_instance: null };
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+
+    const ob = await fetchObligation(supabase, data.organizationId, data.obligationId);
+    const { data: inst, error: iErr } = await supabase
+      .from("company_obligation_instances").select("*")
+      .eq("obligation_id", data.obligationId)
+      .order("created_at", { ascending: false })
+      .limit(1).maybeSingle();
+    if (iErr) throw new Error(iErr.message);
+
+    return { obligation: ob, current_instance: (inst ?? null) as ObligationInstanceRow | null };
+  });
+
+export const createCompanyObligation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ organizationId: z.string().uuid() }).merge(obligationInputSchema).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { obligation: null as CompanyObligationRow | null, instance: null as ObligationInstanceRow | null };
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+
+    const { data: inserted, error } = await supabase
+      .from("company_obligations")
+      .insert({
+        organization_id: data.organizationId,
+        title: data.title,
+        description: data.description ?? null,
+        source_policy_section: data.sourcePolicySection ?? null,
+        cadence: data.cadence,
+        due_day_config: data.dueDayConfig,
+        reminder_days_before: data.reminderDaysBefore,
+        evidence_type: data.evidenceType,
+        linked_form_id: data.linkedFormId ?? null,
+        attestation_text: data.attestationText ?? null,
+        requires_individual_completion: data.requiresIndividualCompletion,
+        assigned_to_groups: data.assignedToGroups,
+        assigned_to_users: data.assignedToUsers,
+        assignee_role: data.assigneeRole,
+        notify_manager_on_complete: data.notifyManagerOnComplete,
+        notify_manager_on_overdue: data.notifyManagerOnOverdue,
+        created_by: userId,
+      })
+      .select("*").maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!inserted) throw new Error("Failed to create obligation.");
+
+    const instance = await generateNextInstanceInternal(supabase, data.organizationId, inserted.id);
+    return { obligation: inserted as CompanyObligationRow, instance };
+  });
+
+export const updateCompanyObligation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    organizationId: z.string().uuid(),
+    obligationId: z.string().uuid(),
+  }).merge(obligationInputSchema).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { obligation: null as CompanyObligationRow | null };
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+
+    const { data: updated, error } = await supabase
+      .from("company_obligations")
+      .update({
+        title: data.title,
+        description: data.description ?? null,
+        source_policy_section: data.sourcePolicySection ?? null,
+        cadence: data.cadence,
+        due_day_config: data.dueDayConfig,
+        reminder_days_before: data.reminderDaysBefore,
+        evidence_type: data.evidenceType,
+        linked_form_id: data.linkedFormId ?? null,
+        attestation_text: data.attestationText ?? null,
+        requires_individual_completion: data.requiresIndividualCompletion,
+        assigned_to_groups: data.assignedToGroups,
+        assigned_to_users: data.assignedToUsers,
+        assignee_role: data.assigneeRole,
+        notify_manager_on_complete: data.notifyManagerOnComplete,
+        notify_manager_on_overdue: data.notifyManagerOnOverdue,
+      })
+      .eq("id", data.obligationId)
+      .eq("organization_id", data.organizationId)
+      .select("*").maybeSingle();
+    if (error) throw new Error(error.message);
+    return { obligation: (updated ?? null) as CompanyObligationRow | null };
+  });
+
+export const toggleObligationActive = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    organizationId: z.string().uuid(),
+    obligationId: z.string().uuid(),
+    active: z.boolean(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { obligation: null as CompanyObligationRow | null, instance: null as ObligationInstanceRow | null };
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+
+    const { data: updated, error } = await supabase
+      .from("company_obligations")
+      .update({ active: data.active })
+      .eq("id", data.obligationId)
+      .eq("organization_id", data.organizationId)
+      .select("*").maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!updated) throw new Error("Obligation not found.");
+
+    let instance: ObligationInstanceRow | null = null;
+    if (data.active) {
+      instance = await generateNextInstanceInternal(supabase, data.organizationId, data.obligationId);
+    }
+    return { obligation: updated as CompanyObligationRow, instance };
+  });
+
+export const deleteCompanyObligation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    organizationId: z.string().uuid(),
+    obligationId: z.string().uuid(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { ok: false };
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+
+    const { error } = await supabase
+      .from("company_obligations").delete()
+      .eq("id", data.obligationId).eq("organization_id", data.organizationId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ─── per-event instance logging ─────────────────────────────────────────
+
+export const logObligationEvent = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    organizationId: z.string().uuid(),
+    obligationId: z.string().uuid(),
+    eventDescription: z.string().trim().min(1).max(2000),
+    eventDate: z.string().min(1),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { instance: null as ObligationInstanceRow | null };
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+
+    const ob = await fetchObligation(supabase, data.organizationId, data.obligationId);
+    if (ob.cadence !== "per_event") throw new Error("logObligationEvent is only valid for per_event obligations.");
+
+    const cfg = (ob.due_day_config ?? {}) as Record<string, unknown>;
+    const daysAfter = Number.isFinite(Number(cfg.days_after_trigger)) ? Number(cfg.days_after_trigger) : 0;
+    const eventDate = new Date(`${data.eventDate}T00:00:00Z`);
+    const dueDate = addDaysUTC(eventDate, daysAfter);
+    const periodKey = `Event — ${formatShort(eventDate)}`;
+
+    const { data: inserted, error } = await supabase
+      .from("company_obligation_instances")
+      .insert({
+        obligation_id: ob.id,
+        organization_id: data.organizationId,
+        period_key: periodKey,
+        due_at: endOfDayUTC(dueDate),
+        status: "pending",
+        event_description: data.eventDescription,
+      })
+      .select("*").maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!inserted) throw new Error("Failed to create obligation instance.");
+
+    const assignees = await snapshotAssigneesInternal(supabase, data.organizationId, ob.id, inserted.id, ob);
+
+    if (assignees.length) {
+      const rows = assignees.map((a) => ({
+        organization_id: data.organizationId,
+        recipient_user_id: a.staff_id,
+        recipient_role: "staff",
+        type: "company_obligation_reminder",
+        urgency: "high",
+        title: `${ob.title} is due — new event logged`,
+        body: `${data.eventDescription}. Due ${formatShort(dueDate)}.`,
+        link_to: "/dashboard/my-obligations",
+        related_id: inserted.id,
+        related_type: "company_obligation_instance",
+      }));
+      const { error: notifErr } = await supabase.from("notifications").insert(rows);
+      if (notifErr) throw new Error(notifErr.message);
+    }
+
+    return { instance: inserted as ObligationInstanceRow };
+  });
+
+// ─── instance completion ────────────────────────────────────────────────
+
+export const recordCompletion = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    organizationId: z.string().uuid(),
+    instanceId: z.string().uuid(),
+    evidenceTypeUsed: z.string().min(1).max(60),
+    uploadPath: z.string().max(2000).optional().nullable(),
+    uploadFilename: z.string().max(500).optional().nullable(),
+    attestationSignedAt: z.string().optional().nullable(),
+    attestationTextSnapshot: z.string().max(20000).optional().nullable(),
+    formSubmissionId: z.string().uuid().optional().nullable(),
+    notes: z.string().max(5000).optional().nullable(),
+    isManualEntry: z.boolean().optional(),
+    manualEntryByName: z.string().max(200).optional().nullable(),
+    // On-behalf entry: staffId/staffName of the person credited, when
+    // different from the submitting admin/manager (requires manager role).
+    staffId: z.string().uuid().optional(),
+    staffName: z.string().max(200).optional(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { instance: null as ObligationInstanceRow | null };
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+
+    const targetStaffId = data.staffId ?? userId;
+    const isOnBehalf = targetStaffId !== userId;
+    if (isOnBehalf) {
+      await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+    }
+
+    const { data: inst, error: iErr } = await supabase
+      .from("company_obligation_instances").select("*")
+      .eq("id", data.instanceId).eq("organization_id", data.organizationId).maybeSingle();
+    if (iErr) throw new Error(iErr.message);
+    if (!inst) throw new Error("Instance not found.");
+    const ob = await fetchObligation(supabase, data.organizationId, inst.obligation_id);
+
+    let staffName = data.staffName;
+    if (!staffName) {
+      const { data: dir, error: dErr } = await supabase
+        .from("org_member_directory").select("full_name").eq("id", targetStaffId).maybeSingle();
+      if (dErr) throw new Error(dErr.message);
+      staffName = dir?.full_name ?? "Unknown";
+    }
+    const isManual = data.isManualEntry ?? isOnBehalf;
+
+    const { error: cErr } = await supabase.from("company_obligation_completions").insert({
+      instance_id: data.instanceId,
+      organization_id: data.organizationId,
+      staff_id: targetStaffId,
+      staff_name: staffName,
+      evidence_type_used: data.evidenceTypeUsed,
+      upload_path: data.uploadPath ?? null,
+      upload_filename: data.uploadFilename ?? null,
+      attestation_signed_at: data.attestationSignedAt ?? null,
+      attestation_text_snapshot: data.attestationTextSnapshot ?? null,
+      form_submission_id: data.formSubmissionId ?? null,
+      notes: data.notes ?? null,
+      is_manual_entry: isManual,
+      manual_entry_by: isManual ? userId : null,
+      manual_entry_by_name: isManual ? (data.manualEntryByName ?? null) : null,
+    });
+    if (cErr) throw new Error(cErr.message);
+
+    let updatedInstance = inst as ObligationInstanceRow;
+    const nowIso = new Date().toISOString();
+
+    if (!ob.requires_individual_completion) {
+      const { data: closed, error: upErr } = await supabase
+        .from("company_obligation_instances")
+        .update({ status: "completed", completed_at: nowIso, completed_by_id: targetStaffId, completed_by_name: staffName })
+        .eq("id", data.instanceId)
+        .in("status", ["pending", "overdue"])
+        .select("*").maybeSingle();
+      if (upErr) throw new Error(upErr.message);
+      if (closed) {
+        updatedInstance = closed as ObligationInstanceRow;
+        await resolveInstanceNotifications(supabase, data.instanceId);
+      }
+    } else {
+      const [{ count: assigneeCount, error: acErr }, { count: completionCount, error: ccErr }] = await Promise.all([
+        supabase.from("company_obligation_instance_assignees")
+          .select("id", { count: "exact", head: true }).eq("instance_id", data.instanceId),
+        supabase.from("company_obligation_completions")
+          .select("id", { count: "exact", head: true }).eq("instance_id", data.instanceId),
+      ]);
+      if (acErr) throw new Error(acErr.message);
+      if (ccErr) throw new Error(ccErr.message);
+      if ((assigneeCount ?? 0) > 0 && assigneeCount === completionCount) {
+        const { data: closed, error: upErr } = await supabase
+          .from("company_obligation_instances")
+          .update({ status: "completed", completed_at: nowIso, completed_by_id: targetStaffId, completed_by_name: staffName })
+          .eq("id", data.instanceId)
+          .in("status", ["pending", "overdue"])
+          .select("*").maybeSingle();
+        if (upErr) throw new Error(upErr.message);
+        if (closed) {
+          updatedInstance = closed as ObligationInstanceRow;
+          await resolveInstanceNotifications(supabase, data.instanceId);
+        }
+      }
+    }
+
+    await notifyObligationManagersInternal(supabase, data.organizationId, ob.id, data.instanceId, "completion");
+
+    return { instance: updatedInstance };
+  });
+
+async function resolveInstanceNotifications(supabase: AnySupabase, instanceId: string): Promise<void> {
+  const { error } = await supabase
+    .from("notifications")
+    .update({ resolved_at: new Date().toISOString() })
+    .eq("related_id", instanceId)
+    .eq("related_type", "company_obligation_instance")
+    .is("resolved_at", null);
+  if (error) throw new Error(error.message);
+}
+
+export const waiveInstance = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    organizationId: z.string().uuid(),
+    instanceId: z.string().uuid(),
+    waiveReason: z.string().trim().min(1).max(2000),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { ok: false };
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+
+    const { error: upErr } = await supabase
+      .from("company_obligation_instances")
+      .update({ status: "waived", waive_reason: data.waiveReason })
+      .eq("id", data.instanceId)
+      .eq("organization_id", data.organizationId);
+    if (upErr) throw new Error(upErr.message);
+
+    await resolveInstanceNotifications(supabase, data.instanceId);
+
+    return { ok: true };
+  });

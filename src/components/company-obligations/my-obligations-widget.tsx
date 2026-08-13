@@ -6,7 +6,7 @@ import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ClipboardList, ArrowRight, Upload, FileSignature } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, ClipboardList, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -51,6 +51,9 @@ function EvidencePanel({
   const [checked, setChecked] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [nectarResult, setNectarResult] = useState<
+    { status: "passed" | "failed"; certType: string | null; expiresAt: string | null; reasons: string[] } | null
+  >(null);
 
   const needsUpload = ob.evidence_type === "upload" || ob.evidence_type === "upload_and_attestation";
   const needsAttestation = ob.evidence_type === "attestation" || ob.evidence_type === "upload_and_attestation";
@@ -69,7 +72,7 @@ function EvidencePanel({
         uploadPath = path;
         uploadFilename = file.name;
       }
-      await recordFn({
+      const result = await recordFn({
         data: {
           organizationId: orgId,
           instanceId: instance.id,
@@ -80,8 +83,21 @@ function EvidencePanel({
           attestationTextSnapshot: needsAttestation ? ob.attestation_text : null,
         },
       });
-      toast.success("Evidence submitted");
-      onDone();
+      const validation = (result as { nectarValidation?: { ran: boolean; status: "passed" | "failed" | null; reasons: string[]; cert_type: string | null; expires_date: string | null } }).nectarValidation;
+      if (validation?.ran && validation.status) {
+        setNectarResult({
+          status: validation.status,
+          certType: validation.cert_type,
+          expiresAt: validation.expires_date,
+          reasons: validation.reasons,
+        });
+      }
+      if (validation?.ran && validation.status === "failed") {
+        toast.warning("Uploaded, but NECTAR couldn't verify it — pending admin review");
+      } else {
+        toast.success("Evidence submitted");
+        onDone();
+      }
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -89,8 +105,32 @@ function EvidencePanel({
     }
   };
 
+  if (nectarResult?.status === "failed") {
+    return (
+      <div className="mt-2 space-y-1.5 rounded-lg border border-amber-300/60 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
+        <div className="flex items-start gap-1.5">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <div>
+            <p className="font-medium">NECTAR couldn't verify this upload</p>
+            <p>{nectarResult.reasons.join("; ")}</p>
+            <p className="mt-1 font-medium">Pending admin review</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-2 space-y-2 rounded-lg border border-border bg-background/60 p-3">
+      {nectarResult?.status === "passed" && (
+        <div className="flex items-center gap-1.5 rounded-md border border-success/30 bg-success/10 p-2 text-xs text-success">
+          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+          <span>
+            NECTAR verified — {nectarResult.certType ?? ob.nectar_cert_type_label ?? "document"}
+            {nectarResult.expiresAt && ` / Expires: ${nectarResult.expiresAt}`}
+          </span>
+        </div>
+      )}
       {needsUpload && (
         <div>
           <label className="flex min-h-[36px] cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted">

@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/dialog";
 import { AlertTriangle, CheckCircle2, Circle, Lock, MoreHorizontal } from "lucide-react";
 import {
+  confirmFailedObligationCompletion,
   deleteCompanyObligation,
   logObligationEvent,
   toggleObligationActive,
@@ -125,7 +126,44 @@ function InstanceStatusLine({ instance }: { instance: ObligationInstanceRow | nu
 }
 
 type AssigneeRow = { staff_id: string; staff_name: string };
-type CompletionRow = { staff_id: string; staff_name: string; completed_at: string | null };
+type CompletionRow = {
+  id: string;
+  staff_id: string;
+  staff_name: string;
+  completed_at: string | null;
+  nectar_validation_status: string | null;
+  nectar_validation_reasons: string[] | null;
+  nectar_extracted_cert_type: string | null;
+};
+
+function ConfirmNectarOverrideButton({
+  orgId,
+  instanceId,
+  completionId,
+  staffName,
+}: {
+  orgId: string;
+  instanceId: string;
+  completionId: string;
+  staffName: string;
+}) {
+  const qc = useQueryClient();
+  const confirmFn = useServerFn(confirmFailedObligationCompletion);
+  const confirm = useMutation({
+    mutationFn: () => confirmFn({ data: { organizationId: orgId, instanceId, completionId } }),
+    onSuccess: () => {
+      toast.success(`Confirmed ${staffName}'s upload`);
+      qc.invalidateQueries({ queryKey: ["obligation-instance-detail", instanceId] });
+      qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <Button size="sm" variant="outline" className="h-6 px-2 text-xs" disabled={confirm.isPending} onClick={() => confirm.mutate()}>
+      Confirm
+    </Button>
+  );
+}
 
 function PerNameCompletion({
   orgId,
@@ -146,7 +184,7 @@ function PerNameCompletion({
           .eq("instance_id", instanceId as string),
         supabase
           .from("company_obligation_completions")
-          .select("staff_id, staff_name, completed_at")
+          .select("id, staff_id, staff_name, completed_at, nectar_validation_status, nectar_validation_reasons, nectar_extracted_cert_type")
           .eq("instance_id", instanceId as string),
       ]);
       if (aErr) throw new Error(aErr.message);
@@ -188,12 +226,25 @@ function PerNameCompletion({
           <p className="text-muted-foreground">None yet</p>
         ) : (
           <ul className="space-y-0.5">
-            {completions.map((c) => (
-              <li key={c.staff_id} className="flex items-center gap-1 text-success">
-                <CheckCircle2 className="h-3 w-3 shrink-0" />
-                <span className="truncate">{c.staff_name} — {formatDate(c.completed_at)}</span>
-              </li>
-            ))}
+            {completions.map((c) => {
+              const failed = c.nectar_validation_status === "failed";
+              return (
+                <li key={c.staff_id} className={failed ? "text-amber-600 dark:text-amber-400" : "text-success"}>
+                  <div className="flex items-center gap-1">
+                    {failed ? <AlertTriangle className="h-3 w-3 shrink-0" /> : <CheckCircle2 className="h-3 w-3 shrink-0" />}
+                    <span className="truncate">
+                      {c.staff_name} — {failed ? "NECTAR could not verify" : formatDate(c.completed_at)}
+                    </span>
+                    {failed && instanceId && (
+                      <ConfirmNectarOverrideButton orgId={orgId} instanceId={instanceId} completionId={c.id} staffName={c.staff_name} />
+                    )}
+                  </div>
+                  {failed && (c.nectar_validation_reasons?.length ?? 0) > 0 && (
+                    <p className="ml-4 text-[11px] text-muted-foreground">{c.nectar_validation_reasons!.join("; ")}</p>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

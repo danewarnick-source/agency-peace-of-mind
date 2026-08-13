@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ClipboardList, CheckCircle2, Upload, ExternalLink } from "lucide-react";
+import { AlertTriangle, ClipboardList, CheckCircle2, Upload, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
@@ -108,6 +108,9 @@ function OpenCard({
   const [file, setFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
+  const [nectarResult, setNectarResult] = useState<
+    { status: "passed" | "failed"; certType: string | null; expiresAt: string | null; reasons: string[] } | null
+  >(null);
 
   const needsUpload = ob.evidence_type === "upload" || ob.evidence_type === "upload_and_attestation";
   const needsAttestation = ob.evidence_type === "attestation" || ob.evidence_type === "upload_and_attestation";
@@ -128,7 +131,7 @@ function OpenCard({
         uploadPath = path;
         uploadFilename = file.name;
       }
-      await recordFn({
+      const result = await recordFn({
         data: {
           organizationId: orgId,
           instanceId: instance.id,
@@ -140,14 +143,43 @@ function OpenCard({
           notes: notes.trim() || null,
         },
       });
-      toast.success("Evidence submitted");
-      onCompleted();
+      const validation = (result as { nectarValidation?: { ran: boolean; status: "passed" | "failed" | null; reasons: string[]; cert_type: string | null; expires_date: string | null } }).nectarValidation;
+      if (validation?.ran && validation.status) {
+        setNectarResult({
+          status: validation.status,
+          certType: validation.cert_type,
+          expiresAt: validation.expires_date,
+          reasons: validation.reasons,
+        });
+      }
+      if (validation?.ran && validation.status === "failed") {
+        toast.warning("Uploaded, but NECTAR couldn't verify it — pending admin review");
+      } else {
+        toast.success("Evidence submitted");
+        onCompleted();
+      }
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
       setBusy(false);
     }
   };
+
+  if (nectarResult?.status === "failed") {
+    return (
+      <div className="rounded-xl border border-amber-300/60 bg-amber-500/10 p-4 shadow-[var(--shadow-card)]">
+        <p className="font-semibold">{ob.title}</p>
+        <div className="mt-2 flex items-start gap-2 text-sm text-amber-900 dark:text-amber-200">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <p className="font-medium">NECTAR couldn't verify this upload</p>
+            <p>{nectarResult.reasons.join("; ")}</p>
+            <p className="mt-1 font-medium">Pending admin review — an admin will confirm your upload.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">

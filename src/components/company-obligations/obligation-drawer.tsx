@@ -33,7 +33,7 @@ import {
 import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from "@/components/ui/command";
-import { ChevronDown, Lock, X } from "lucide-react";
+import { ChevronDown, Lock, Plus, X } from "lucide-react";
 import {
   createCompanyObligation,
   updateCompanyObligation,
@@ -63,6 +63,8 @@ interface FormState {
   notifyManagerOnComplete: boolean;
   notifyManagerOnOverdue: boolean;
   active: boolean;
+  nectarCertTypeLabel: string;
+  nectarKeywordGroups: Array<{ label: string; any_of: string[] }>;
 }
 
 const DEFAULT_STATE: FormState = {
@@ -82,6 +84,8 @@ const DEFAULT_STATE: FormState = {
   notifyManagerOnComplete: true,
   notifyManagerOnOverdue: true,
   active: true,
+  nectarCertTypeLabel: "",
+  nectarKeywordGroups: [],
 };
 
 function fromObligation(ob: CompanyObligationRow): FormState {
@@ -102,6 +106,10 @@ function fromObligation(ob: CompanyObligationRow): FormState {
     notifyManagerOnComplete: ob.notify_manager_on_complete,
     notifyManagerOnOverdue: ob.notify_manager_on_overdue,
     active: ob.active,
+    nectarCertTypeLabel: ob.nectar_cert_type_label ?? "",
+    nectarKeywordGroups: Array.isArray(ob.nectar_keyword_groups)
+      ? (ob.nectar_keyword_groups as Array<{ label: string; any_of: string[] }>)
+      : [],
   };
 }
 
@@ -399,6 +407,14 @@ export function ObligationDrawer({
         assigneeRole: state.assigneeRole,
         notifyManagerOnComplete: state.notifyManagerOnComplete,
         notifyManagerOnOverdue: state.notifyManagerOnOverdue,
+        nectarCertTypeLabel:
+          (state.evidenceType === "upload" || state.evidenceType === "upload_and_attestation")
+            ? (state.nectarCertTypeLabel.trim() || null)
+            : null,
+        nectarKeywordGroups:
+          (state.evidenceType === "upload" || state.evidenceType === "upload_and_attestation")
+            ? state.nectarKeywordGroups.filter((g) => g.label.trim() && g.any_of.length > 0)
+            : [],
       };
       if (isEdit && obligation) {
         const result = await updateFn({ data: { obligationId: obligation.id, ...payload } });
@@ -584,6 +600,84 @@ export function ObligationDrawer({
                 required
                 disabled={isLocked}
               />
+            </div>
+          )}
+
+          {/* 8b. NECTAR document validation — only for upload evidence */}
+          {(state.evidenceType === "upload" || state.evidenceType === "upload_and_attestation") && (
+            <div className="grid gap-3 rounded-md border border-border p-3">
+              <div>
+                <p className="text-sm font-medium">NECTAR document validation</p>
+                <p className="text-xs text-muted-foreground">
+                  Optional — when set, NECTAR reads uploaded evidence and checks it matches before marking this complete.
+                </p>
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Expected certificate type</Label>
+                <Input
+                  value={state.nectarCertTypeLabel}
+                  onChange={(e) => setState({ ...state, nectarCertTypeLabel: e.target.value })}
+                  placeholder="e.g. CPR/First Aid Certification"
+                  disabled={isLocked}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Validation keywords</Label>
+                {state.nectarKeywordGroups.map((g, idx) => (
+                  <div key={idx} className="grid gap-1.5 rounded-md border border-border/60 p-2">
+                    <div className="flex items-center gap-1.5">
+                      <Input
+                        value={g.label}
+                        onChange={(e) => {
+                          const next = [...state.nectarKeywordGroups];
+                          next[idx] = { ...next[idx], label: e.target.value };
+                          setState({ ...state, nectarKeywordGroups: next });
+                        }}
+                        placeholder="Group label, e.g. CPR"
+                        disabled={isLocked}
+                        className="flex-1"
+                      />
+                      {!isLocked && (
+                        <button
+                          type="button"
+                          onClick={() => setState({
+                            ...state,
+                            nectarKeywordGroups: state.nectarKeywordGroups.filter((_, i) => i !== idx),
+                          })}
+                          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          aria-label="Remove keyword group"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    <Input
+                      value={g.any_of.join(", ")}
+                      onChange={(e) => {
+                        const next = [...state.nectarKeywordGroups];
+                        next[idx] = { ...next[idx], any_of: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) };
+                        setState({ ...state, nectarKeywordGroups: next });
+                      }}
+                      placeholder="Comma-separated terms, e.g. cpr, cardiopulmonary resuscitation"
+                      disabled={isLocked}
+                    />
+                  </div>
+                ))}
+                {!isLocked && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="justify-self-start"
+                    onClick={() => setState({
+                      ...state,
+                      nectarKeywordGroups: [...state.nectarKeywordGroups, { label: "", any_of: [] }],
+                    })}
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Add keyword group
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 

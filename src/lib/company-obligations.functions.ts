@@ -8,6 +8,8 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { resolveGroupMembersInternal, type ResolvedStaffMember } from "./staff-groups.functions";
+import { runNectarCertOcrFromStoragePath } from "./nectar-cert-ocr";
+import { compareNames } from "./name-matching";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -34,6 +36,9 @@ export type CompanyObligationRow = {
   active: boolean;
   source: "sow" | "provider";
   is_locked: boolean;
+  nectar_cert_type_label: string | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  nectar_keyword_groups: any;
   created_by: string | null;
   created_at: string | null;
   updated_at: string | null;
@@ -882,6 +887,11 @@ const obligationInputSchema = z.object({
   assigneeRole: z.enum(["any_assigned", "managers_only", "admin_only"]).default("any_assigned"),
   notifyManagerOnComplete: z.boolean().default(true),
   notifyManagerOnOverdue: z.boolean().default(true),
+  nectarCertTypeLabel: z.string().max(300).optional().nullable(),
+  nectarKeywordGroups: z.array(z.object({
+    label: z.string().max(200),
+    any_of: z.array(z.string().max(120)).max(20),
+  })).max(20).default([]),
 });
 
 export const listCompanyObligations = createServerFn({ method: "POST" })
@@ -968,6 +978,8 @@ export const createCompanyObligation = createServerFn({ method: "POST" })
         assignee_role: data.assigneeRole,
         notify_manager_on_complete: data.notifyManagerOnComplete,
         notify_manager_on_overdue: data.notifyManagerOnOverdue,
+        nectar_cert_type_label: data.nectarCertTypeLabel ?? null,
+        nectar_keyword_groups: data.nectarKeywordGroups,
         created_by: userId,
       })
       .select("*").maybeSingle();
@@ -1010,6 +1022,8 @@ export const updateCompanyObligation = createServerFn({ method: "POST" })
         assignee_role: data.assigneeRole,
         notify_manager_on_complete: data.notifyManagerOnComplete,
         notify_manager_on_overdue: data.notifyManagerOnOverdue,
+        nectar_cert_type_label: data.nectarCertTypeLabel ?? null,
+        nectar_keyword_groups: data.nectarKeywordGroups,
       })
       .eq("id", data.obligationId)
       .eq("organization_id", data.organizationId)
@@ -1190,6 +1204,88 @@ export const logObligationEvent = createServerFn({ method: "POST" })
     return { instance: inserted as ObligationInstanceRow };
   });
 
+// ─── NECTAR document validation for upload evidence ────────────────────────
+// Mirrors the validation pattern in staff-training-requirements.functions.ts
+// (attachBaselineCertificate): OCR the upload, check it against the
+// obligation's expected keyword groups + staffer name match, and produce a
+// pass/fail with human-readable reasons. Applies only when the obligation
+// has nectar_cert_type_label configured — provider-created obligations
+// without it skip validation entirely (upload always "passes").
+type NectarValidationOutcome = {
+  ran: boolean;
+  status: "passed" | "failed" | null;
+  reasons: string[];
+  cert_type: string | null;
+  name: string | null;
+  completed_date: string | null;
+  expires_date: string | null;
+  name_match: "match" | "mismatch" | "unreadable" | null;
+  confidence: number | null;
+};
+
+const NO_VALIDATION: NectarValidationOutcome = {
+  ran: false, status: null, reasons: [], cert_type: null, name: null,
+  completed_date: null, expires_date: null, name_match: null, confidence: null,
+};
+
+async function runObligationNectarValidation(
+  supabase: AnySupabase,
+  ob: CompanyObligationRow,
+  staffId: string,
+  uploadPath: string,
+  uploadFilename: string | null,
+): Promise<NectarValidationOutcome> {
+  if (!ob.nectar_cert_type_label) return NO_VALIDATION;
+
+  const keywordGroups = (Array.isArray(ob.nectar_keyword_groups) ? ob.nectar_keyword_groups : []) as
+    Array<{ label: string; any_of: string[] }>;
+
+  const { data: prof, error: pErr } = await supabase
+    .from("profiles").select("full_name").eq("id", staffId).maybeSingle();
+  if (pErr) throw new Error(pErr.message);
+  const profileName: string | null = (prof?.full_name as string | null) ?? null;
+
+  let ocr: Awaited<ReturnType<typeof runNectarCertOcrFromStoragePath>>;
+  try {
+    ocr = await runNectarCertOcrFromStoragePath(
+      supabase, "obligation-evidence", uploadPath, null, uploadFilename,
+      { title: ob.title, validation: { cert_type_label: ob.nectar_cert_type_label, required_keyword_groups: keywordGroups } },
+    );
+  } catch (e) {
+    return {
+      ran: true, status: "failed",
+      reasons: [`Nectar could not read this document (${(e as Error).message}).`],
+      cert_type: null, name: null, completed_date: null, expires_date: null,
+      name_match: "unreadable", confidence: null,
+    };
+  }
+
+  const nameMatch = compareNames(profileName, ocr.name_on_certificate);
+  const reasons: string[] = [];
+  const haystack = ((ocr.summary ?? "") + " " + (ocr.cert_type ?? "")).toLowerCase();
+  for (const group of keywordGroups) {
+    const hit = (group.any_of ?? []).some((kw) => haystack.includes(kw.toLowerCase()));
+    if (!hit) reasons.push(`Missing ${group.label} (expected one of: ${(group.any_of ?? []).join(", ")}).`);
+  }
+  if (nameMatch === "unreadable") {
+    reasons.push("Could not read the staff member's name on the document.");
+  } else if (nameMatch === "mismatch") {
+    reasons.push(`Name on document ("${ocr.name_on_certificate ?? "—"}") does not match staff profile ("${profileName ?? "—"}").`);
+  }
+
+  return {
+    ran: true,
+    status: reasons.length === 0 ? "passed" : "failed",
+    reasons,
+    cert_type: ocr.cert_type,
+    name: ocr.name_on_certificate,
+    completed_date: ocr.completed_on,
+    expires_date: ocr.expires_on,
+    name_match: nameMatch,
+    confidence: ocr.confidence,
+  };
+}
+
 // ─── instance completion ────────────────────────────────────────────────
 
 export const recordCompletion = createServerFn({ method: "POST" })
@@ -1239,7 +1335,22 @@ export const recordCompletion = createServerFn({ method: "POST" })
       staffName = dir?.full_name ?? "Unknown";
     }
     const isManual = data.isManualEntry ?? isOnBehalf;
-    const completedAt = data.completedAt ?? new Date().toISOString();
+
+    // Run NECTAR validation on upload evidence when the obligation has an
+    // expected cert type configured. Manual admin entries (recorded via the
+    // "Add manual completion" drawer) skip it — an admin vouching for the
+    // record IS the verification.
+    const needsValidation =
+      !isManual &&
+      (data.evidenceTypeUsed === "upload" || data.evidenceTypeUsed === "upload_and_attestation") &&
+      !!data.uploadPath;
+    const validation = needsValidation
+      ? await runObligationNectarValidation(supabase, ob, targetStaffId, data.uploadPath as string, data.uploadFilename ?? null)
+      : NO_VALIDATION;
+
+    const completedAt = (validation.status === "passed" && validation.completed_date)
+      ? new Date(`${validation.completed_date}T00:00:00Z`).toISOString()
+      : (data.completedAt ?? new Date().toISOString());
 
     const { error: cErr } = await supabase.from("company_obligation_completions").insert({
       instance_id: data.instanceId,
@@ -1257,8 +1368,43 @@ export const recordCompletion = createServerFn({ method: "POST" })
       manual_entry_by: isManual ? userId : null,
       manual_entry_by_name: isManual ? (data.manualEntryByName ?? null) : null,
       completed_at: completedAt,
+      nectar_validation_status: validation.ran ? validation.status : null,
+      nectar_validation_reasons: validation.reasons,
+      nectar_extracted_cert_type: validation.cert_type,
+      nectar_extracted_name: validation.name,
+      nectar_extracted_completed_date: validation.completed_date,
+      nectar_extracted_expires_date: validation.expires_date,
+      nectar_name_match: validation.name_match,
+      nectar_confidence: validation.confidence,
     });
     if (cErr) throw new Error(cErr.message);
+
+    // A failed NECTAR validation saves the completion record (so the UI can
+    // show what was uploaded and why it didn't pass) but does NOT close the
+    // instance — an admin must manually confirm before it counts. Notify
+    // admins directly instead of going through the generic completion
+    // notifier below.
+    if (validation.ran && validation.status === "failed") {
+      const recipients = await resolveAdminRecipients(supabase, data.organizationId, ob);
+      if (recipients.length) {
+        const rows = recipients.map((recipientId) => ({
+          organization_id: data.organizationId,
+          recipient_user_id: recipientId,
+          recipient_role: "admin",
+          type: "company_obligation_update",
+          urgency: "high",
+          title: `NECTAR could not verify "${ob.title}" upload`,
+          body: `${staffName} uploaded evidence for "${ob.title}" but NECTAR could not verify it: `
+            + `${validation.reasons.join("; ")}. An admin can manually confirm the upload.`,
+          link_to: "/dashboard/company-obligations",
+          related_id: data.instanceId,
+          related_type: "company_obligation_instance",
+        }));
+        const { error: notifErr } = await supabase.from("notifications").insert(rows);
+        if (notifErr) throw new Error(notifErr.message);
+      }
+      return { instance: inst as ObligationInstanceRow, nectarValidation: validation };
+    }
 
     let updatedInstance = inst as ObligationInstanceRow;
     const nowIso = completedAt;
@@ -1301,8 +1447,80 @@ export const recordCompletion = createServerFn({ method: "POST" })
 
     await notifyObligationManagersInternal(supabase, data.organizationId, ob.id, data.instanceId, "completion");
 
-    return { instance: updatedInstance };
+    // Passed a NECTAR-verified renewal cert (CPR, background screening,
+    // fraud exclusion, etc.): schedule the next instance from the
+    // certificate's own expiration date rather than waiting for the normal
+    // hire-anniversary generator, so renewal dates track the real cert.
+    const dueCfgForRenewal = (ob.due_day_config ?? {}) as Record<string, unknown>;
+    if (
+      validation.ran && validation.status === "passed" && validation.expires_date &&
+      dueCfgForRenewal.anniversary_based === true && updatedInstance.status === "completed"
+    ) {
+      const { data: alreadyOpen } = await supabase
+        .from("company_obligation_instances")
+        .select("id")
+        .eq("obligation_id", ob.id)
+        .eq("assignee_staff_id", targetStaffId)
+        .in("status", ["pending", "overdue"])
+        .maybeSingle();
+      if (!alreadyOpen) {
+        const expiresDue = new Date(`${validation.expires_date}T00:00:00Z`);
+        const { data: nextInst, error: nextErr } = await supabase
+          .from("company_obligation_instances")
+          .insert({
+            obligation_id: ob.id,
+            organization_id: data.organizationId,
+            period_key: `Due ${formatShort(expiresDue)}`,
+            due_at: endOfDayUTC(expiresDue),
+            status: "pending",
+            assignee_staff_id: targetStaffId,
+          })
+          .select("*").maybeSingle();
+        if (!nextErr && nextInst) {
+          await supabase.from("company_obligation_instance_assignees").upsert(
+            [{ instance_id: nextInst.id, organization_id: data.organizationId, staff_id: targetStaffId, staff_name: staffName, staff_role: "employee" }],
+            { onConflict: "instance_id,staff_id", ignoreDuplicates: true },
+          );
+          await scheduleRemindersInternal(supabase, data.organizationId, nextInst.id, ob);
+        }
+      }
+    }
+
+    return { instance: updatedInstance, nectarValidation: validation };
   });
+
+async function resolveAdminRecipients(
+  supabase: AnySupabase,
+  organizationId: string,
+  ob: CompanyObligationRow,
+): Promise<string[]> {
+  const recipientIds = new Set<string>();
+  const groupIds = ob.assigned_to_groups ?? [];
+  if (groupIds.length) {
+    const { data: groups, error: gErr } = await supabase
+      .from("staff_groups").select("id, linked_team_id").in("id", groupIds);
+    if (gErr) throw new Error(gErr.message);
+    const teamIds = (groups ?? [])
+      .map((g: { linked_team_id: string | null }) => g.linked_team_id)
+      .filter((id: string | null): id is string => !!id);
+    if (teamIds.length) {
+      const { data: teams, error: tErr } = await supabase
+        .from("teams").select("id, manager_id").in("id", teamIds);
+      if (tErr) throw new Error(tErr.message);
+      for (const t of (teams ?? []) as Array<{ manager_id: string | null }>) {
+        if (t.manager_id) recipientIds.add(t.manager_id);
+      }
+    }
+  }
+  if (!recipientIds.size) {
+    const { data: admins, error: adErr } = await supabase
+      .from("organization_members").select("user_id, role")
+      .eq("organization_id", organizationId).eq("active", true).in("role", ["admin", "super_admin"]);
+    if (adErr) throw new Error(adErr.message);
+    for (const a of (admins ?? []) as Array<{ user_id: string }>) recipientIds.add(a.user_id);
+  }
+  return Array.from(recipientIds);
+}
 
 async function resolveInstanceNotifications(supabase: AnySupabase, instanceId: string): Promise<void> {
   const { error } = await supabase
@@ -1313,6 +1531,94 @@ async function resolveInstanceNotifications(supabase: AnySupabase, instanceId: s
     .is("resolved_at", null);
   if (error) throw new Error(error.message);
 }
+
+/**
+ * Admin override for a completion NECTAR flagged as failed: the admin has
+ * looked at the uploaded document themselves and confirms it's valid. Marks
+ * that completion row as a manual entry (preserving the original NECTAR
+ * fields for the audit trail) and closes the instance same as any other
+ * completion.
+ */
+export const confirmFailedObligationCompletion = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    organizationId: z.string().uuid(),
+    instanceId: z.string().uuid(),
+    completionId: z.string().uuid(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { instance: null as ObligationInstanceRow | null };
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+
+    const { data: completion, error: cErr } = await supabase
+      .from("company_obligation_completions").select("*")
+      .eq("id", data.completionId).eq("instance_id", data.instanceId).maybeSingle();
+    if (cErr) throw new Error(cErr.message);
+    if (!completion) throw new Error("Completion not found.");
+
+    const { data: adminDir } = await supabase
+      .from("org_member_directory").select("full_name").eq("id", userId).maybeSingle();
+
+    const { error: upErr } = await supabase
+      .from("company_obligation_completions")
+      .update({
+        is_manual_entry: true,
+        manual_entry_by: userId,
+        manual_entry_by_name: adminDir?.full_name ?? "an admin",
+        admin_notes: "Admin override: NECTAR validation failed but admin confirmed document is valid",
+      })
+      .eq("id", data.completionId);
+    if (upErr) throw new Error(upErr.message);
+
+    const { data: inst, error: iErr } = await supabase
+      .from("company_obligation_instances").select("*")
+      .eq("id", data.instanceId).eq("organization_id", data.organizationId).maybeSingle();
+    if (iErr) throw new Error(iErr.message);
+    if (!inst) throw new Error("Instance not found.");
+    const ob = await fetchObligation(supabase, data.organizationId, inst.obligation_id);
+
+    let updatedInstance = inst as ObligationInstanceRow;
+    const nowIso = new Date().toISOString();
+
+    if (!ob.requires_individual_completion) {
+      const { data: closed, error: closeErr } = await supabase
+        .from("company_obligation_instances")
+        .update({ status: "completed", completed_at: nowIso, completed_by_id: completion.staff_id, completed_by_name: completion.staff_name })
+        .eq("id", data.instanceId)
+        .in("status", ["pending", "overdue"])
+        .select("*").maybeSingle();
+      if (closeErr) throw new Error(closeErr.message);
+      if (closed) {
+        updatedInstance = closed as ObligationInstanceRow;
+        await resolveInstanceNotifications(supabase, data.instanceId);
+      }
+    } else {
+      const [{ count: assigneeCount, error: acErr }, { count: completionCount, error: ccErr }] = await Promise.all([
+        supabase.from("company_obligation_instance_assignees")
+          .select("id", { count: "exact", head: true }).eq("instance_id", data.instanceId),
+        supabase.from("company_obligation_completions")
+          .select("id", { count: "exact", head: true }).eq("instance_id", data.instanceId),
+      ]);
+      if (acErr) throw new Error(acErr.message);
+      if (ccErr) throw new Error(ccErr.message);
+      if ((assigneeCount ?? 0) > 0 && assigneeCount === completionCount) {
+        const { data: closed, error: closeErr } = await supabase
+          .from("company_obligation_instances")
+          .update({ status: "completed", completed_at: nowIso, completed_by_id: completion.staff_id, completed_by_name: completion.staff_name })
+          .eq("id", data.instanceId)
+          .in("status", ["pending", "overdue"])
+          .select("*").maybeSingle();
+        if (closeErr) throw new Error(closeErr.message);
+        if (closed) {
+          updatedInstance = closed as ObligationInstanceRow;
+          await resolveInstanceNotifications(supabase, data.instanceId);
+        }
+      }
+    }
+
+    return { instance: updatedInstance };
+  });
 
 export const waiveInstance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

@@ -32,7 +32,8 @@ export type DeadlineSource =
   | "hhs_evacuation_drill"
   | "rhs_evacuation_drill"
   | "sei_upi_employment"
-  | "sei_upi_support_strategies";
+  | "sei_upi_support_strategies"
+  | "org_license";
 
 export type DeadlineItem = {
   key: string;
@@ -511,6 +512,82 @@ export function useDeadlines() {
     },
   });
 
+  // 14. Org-level licenses & certifications (Provider Licensing Hub) —
+  // required set is gated by active service codes; expiration/attestation
+  // deadlines mirror the flag logic on the Settings > Licensing cards.
+  const orgLicenseCodesQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "org_license_codes", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("service_codes" as never)
+        .select("code, is_active")
+        .eq("organization_id", orgId!)
+        .eq("is_active", true);
+      if (error) throw error;
+      return new Set(((data ?? []) as unknown as Array<{ code: string }>).map((r) => r.code.toUpperCase()));
+    },
+  });
+
+  const orgLicenseDocsQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "org_license_docs", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("nectar_documents" as never)
+        .select("document_type, effective_end")
+        .eq("organization_id", orgId!)
+        .eq("owner_kind", "company")
+        .eq("is_current", true)
+        .in("document_type", [
+          "ol_residential_license", "ol_residential_certification",
+          "ol_day_treatment_license", "ol_day_support_certification",
+          "usor_approved_vendor", "usor_approved_vendor_job_development",
+        ]);
+      if (error) throw error;
+      const byType = new Map<string, string | null>();
+      for (const row of (data ?? []) as unknown as Array<{ document_type: string; effective_end: string | null }>) {
+        if (!byType.has(row.document_type)) byType.set(row.document_type, row.effective_end);
+      }
+      return byType;
+    },
+  });
+
+  const orgLicenseAttestQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "org_license_attest", orgId],
+    queryFn: async () => {
+      const [sei, sjd] = await Promise.all([
+        listUpiAttestFn({ data: { organizationId: orgId!, kind: "usor_vendor" } }),
+        listUpiAttestFn({ data: { organizationId: orgId!, kind: "usor_vendor_job_development" } }),
+      ]);
+      return {
+        usor_approved_vendor: sei[0]?.attested_at ?? null,
+        usor_approved_vendor_job_development: sjd[0]?.attested_at ?? null,
+      } as Record<string, string | null>;
+    },
+  });
+
+  const orgLicenseStartsQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "org_license_starts", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_billing_codes")
+        .select("service_code, service_start_date")
+        .eq("organization_id", orgId!)
+        .in("service_code", ["SEI", "SJD"])
+        .not("service_start_date", "is", null)
+        .order("service_start_date", { ascending: true });
+      if (error) throw error;
+      const earliest = new Map<string, string>();
+      for (const row of (data ?? []) as Array<{ service_code: string; service_start_date: string }>) {
+        if (!earliest.has(row.service_code)) earliest.set(row.service_code, row.service_start_date);
+      }
+      return earliest;
+    },
+  });
+
   const items = useMemo<DeadlineItem[]>(() => {
     if (!orgId) return [];
     const now = new Date();
@@ -838,6 +915,73 @@ export function useDeadlines() {
       });
     }
 
+    // Org-level licenses & certifications (Provider Licensing Hub).
+    if (orgLicenseCodesQ.data && orgLicenseDocsQ.data) {
+      const activeCodes = orgLicenseCodesQ.data;
+      const docs = orgLicenseDocsQ.data;
+      const attest = orgLicenseAttestQ.data ?? {};
+      const starts = orgLicenseStartsQ.data;
+
+      const sixMonthsFrom = (dateStr: string) => {
+        const d = new Date(`${dateStr}T00:00:00`);
+        d.setMonth(d.getMonth() + 6);
+        return d;
+      };
+
+      const LICENSE_DEFS: Array<{
+        docType: string;
+        title: string;
+        requiredIf: boolean;
+        attestKind?: "usor_approved_vendor" | "usor_approved_vendor_job_development";
+      }> = [
+        { docType: "ol_residential_license", title: "OL Residential Support License", requiredIf: activeCodes.has("RHS") },
+        { docType: "ol_residential_certification", title: "OL Residential Support Certification", requiredIf: activeCodes.has("RHS") },
+        { docType: "ol_day_treatment_license", title: "OL Day Treatment License", requiredIf: activeCodes.has("DSG") || activeCodes.has("DSP") || activeCodes.has("EPR") },
+        { docType: "ol_day_support_certification", title: "OL Day Support Certification", requiredIf: activeCodes.has("DSG") || activeCodes.has("DSP") || activeCodes.has("EPR") },
+        { docType: "usor_approved_vendor", title: "USOR Approved Vendor — Job Coaching", requiredIf: activeCodes.has("SEI"), attestKind: "usor_approved_vendor" },
+        { docType: "usor_approved_vendor_job_development", title: "USOR Approved Vendor — Job Development", requiredIf: activeCodes.has("SJD"), attestKind: "usor_approved_vendor_job_development" },
+      ];
+
+      for (const def of LICENSE_DEFS) {
+        if (!def.requiredIf) continue;
+        const hasDoc = docs.has(def.docType);
+        const effectiveEnd = docs.get(def.docType) ?? null;
+        const notAttested = !!def.attestKind && !attest[def.attestKind];
+
+        let due: Date;
+        let title: string;
+        if (!hasDoc) {
+          due = new Date(now.getTime() - DAY);
+          title = `${def.title} — document missing`;
+        } else if (notAttested) {
+          const earliest = def.attestKind === "usor_approved_vendor" ? starts?.get("SEI") : starts?.get("SJD");
+          if (def.attestKind === "usor_approved_vendor") {
+            due = earliest && earliest < "2026-07-01" ? new Date("2027-01-31T23:59:59")
+              : earliest ? sixMonthsFrom(earliest) : new Date("2027-01-31T23:59:59");
+          } else {
+            due = earliest ? sixMonthsFrom(earliest) : new Date(now.getTime() - DAY);
+          }
+          title = `${def.title} — attestation required`;
+        } else if (effectiveEnd) {
+          due = new Date(`${effectiveEnd}T23:59:59`);
+          title = `${def.title} expires`;
+        } else {
+          continue; // on file, no expiration set, nothing to track
+        }
+
+        out.push({
+          key: `orglic:${def.docType}`,
+          source: "org_license",
+          title,
+          subject: "Agency",
+          subjectKind: "agency",
+          dueAt: due,
+          status: bucketStatusWithin(due, now, 60),
+          href: "/dashboard/settings/licensing",
+        });
+      }
+    }
+
     out.sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
     return out;
   }, [
@@ -859,6 +1003,10 @@ export function useDeadlines() {
     seiActiveQ.data,
     seiEmploymentAttestQ.data,
     seiSupportStrategiesAttestQ.data,
+    orgLicenseCodesQ.data,
+    orgLicenseDocsQ.data,
+    orgLicenseAttestQ.data,
+    orgLicenseStartsQ.data,
   ]);
 
   return {
@@ -870,6 +1018,7 @@ export function useDeadlines() {
       summariesQ.isLoading || clientsQ.isLoading || hhsQ.isLoading ||
       certsQ.isLoading || incidentsQ.isLoading || bcQ.isLoading || hhCertsQ.isLoading ||
       sowQ.isLoading || ssCoverageQ.isLoading || hrcRestrictionsQ.isLoading ||
-      renewalReqsQ.isLoading || complianceInstancesQ.isLoading,
+      renewalReqsQ.isLoading || complianceInstancesQ.isLoading ||
+      orgLicenseCodesQ.isLoading || orgLicenseDocsQ.isLoading,
   };
 }

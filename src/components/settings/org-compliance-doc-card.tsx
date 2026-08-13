@@ -57,7 +57,13 @@ export function OrgComplianceDocCard({
 }: {
   title: string;
   subtitle: string;
-  documentType: "ol_residential_license" | "ol_residential_certification" | "usor_approved_vendor";
+  documentType:
+    | "ol_residential_license"
+    | "ol_residential_certification"
+    | "ol_day_treatment_license"
+    | "ol_day_support_certification"
+    | "usor_approved_vendor"
+    | "usor_approved_vendor_job_development";
   hasExpiration?: boolean;
   footer?: React.ReactNode;
   attestation?: {

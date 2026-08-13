@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 
-const KindEnum = z.enum(["sei_employment_monthly", "sei_support_strategies", "usor_vendor"]);
+const KindEnum = z.enum(["sei_employment_monthly", "sei_support_strategies", "usor_vendor", "usor_vendor_job_development"]);
 
 // Sentinel values, not NULL — see migration 20260813110000 for why.
 const NIL_CLIENT_ID = "00000000-0000-0000-0000-000000000000";
@@ -12,7 +12,7 @@ export type UpiAttestationRow = {
   id: string;
   organization_id: string;
   client_id: string | null;
-  kind: "sei_employment_monthly" | "sei_support_strategies" | "usor_vendor";
+  kind: "sei_employment_monthly" | "sei_support_strategies" | "usor_vendor" | "usor_vendor_job_development";
   period_label: string | null;
   attested_at: string;
   attested_by: string;

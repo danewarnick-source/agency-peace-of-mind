@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { z } from "zod";
-import { AlarmClock, AlertTriangle, Clock, ShieldCheck, FileSignature, Activity, ExternalLink, Home, Upload, UserCircle } from "lucide-react";
+import { AlarmClock, AlertTriangle, Clock, ShieldCheck, FileSignature, Activity, ExternalLink, Home, Upload, UserCircle, BadgeCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ const sourceIcon: Record<DeadlineItem["source"], typeof AlarmClock> = {
   rhs_evacuation_drill: Home,
   sei_upi_employment: FileSignature,
   sei_upi_support_strategies: FileSignature,
+  org_license: BadgeCheck,
 };
 
 const sourceLabel: Record<DeadlineItem["source"], string> = {
@@ -59,6 +60,7 @@ const sourceLabel: Record<DeadlineItem["source"], string> = {
   rhs_evacuation_drill: "Evacuation drill",
   sei_upi_employment: "SEI UPI attestation",
   sei_upi_support_strategies: "SEI UPI attestation",
+  org_license: "Provider license / certification",
 };
 
 function fmtDue(d: Date): string {

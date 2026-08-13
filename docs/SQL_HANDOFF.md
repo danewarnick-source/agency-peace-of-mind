@@ -1646,3 +1646,30 @@ GRANT EXECUTE ON FUNCTION public.incident_client_counts(uuid, timestamptz, times
 EXECUTE`. No tables, columns, or existing rows are touched. Until this runs,
 the Incidents tab's trends strip (bar chart / category breakdown / per-client
 table) will error — the app code calls these two functions by name.
+
+---
+
+## ACTION — Provider Licensing Hub: widen upi_attestations.kind (2026-08-13)
+
+**What this is for:** New Settings > Licenses & Certifications page adds a
+"USOR Approved Vendor — Job Development" card (for orgs running SJD),
+mirroring the existing SEI "USOR Approved Vendor — Job Coaching" card. It
+reuses the `upi_attestations` table with a new `kind` value,
+`usor_vendor_job_development`. No new table — the license documents
+themselves reuse `nectar_documents` with `owner_kind='company'` and two new
+`document_type` values (`ol_day_treatment_license`,
+`ol_day_support_certification`) plus a third
+(`usor_approved_vendor_job_development`) for the Job Development USOR
+upload slot — all free-text `document_type`, no schema change needed for
+those.
+
+Matches migration `supabase/migrations/20260813150000_usor_job_development_kind.sql`.
+
+```sql
+ALTER TABLE public.upi_attestations DROP CONSTRAINT IF EXISTS upi_attestations_kind_check;
+ALTER TABLE public.upi_attestations ADD CONSTRAINT upi_attestations_kind_check
+  CHECK (kind IN ('sei_employment_monthly', 'sei_support_strategies', 'usor_vendor', 'usor_vendor_job_development'));
+```
+
+**What you'll see:** two `ALTER TABLE` statements. No rows are touched —
+this only widens which `kind` values are allowed going forward.

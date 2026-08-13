@@ -147,7 +147,7 @@ function normalizeDayConfig(v: unknown): number | "last" {
   return n;
 }
 
-function cadenceDescription(cadence: string): string {
+function cadenceShortLabel(cadence: string): string {
   switch (cadence) {
     case "weekly": return "Weekly";
     case "monthly": return "Monthly";
@@ -156,6 +156,46 @@ function cadenceDescription(cadence: string): string {
     case "per_event": return "Per event";
     case "one_time": return "One-time";
     default: return cadence;
+  }
+}
+
+const WEEKDAY_NAMES = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+function ordinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
+}
+
+/** Human cadence sentence for staff-facing surfaces, e.g. "Monthly — due 5th". */
+export function cadenceDescription(ob: Pick<CompanyObligationRow, "cadence" | "due_day_config">): string {
+  const cfg = (ob.due_day_config ?? {}) as Record<string, unknown>;
+  switch (ob.cadence) {
+    case "weekly": {
+      const wd = Number(cfg.weekday);
+      return `Weekly — due each ${WEEKDAY_NAMES[wd] ?? "week"}`;
+    }
+    case "monthly": {
+      const d = cfg.day_of_month;
+      return `Monthly — due ${d === "last" ? "the last day of the month" : ordinal(Number(d))}`;
+    }
+    case "quarterly": {
+      const d = cfg.day_of_month;
+      return `Quarterly — due ${d === "last" ? "the last day" : ordinal(Number(d))} of the first month of the quarter`;
+    }
+    case "annually": {
+      const m = Number(cfg.month);
+      const d = cfg.day_of_month;
+      return `Annually — due ${MONTHS_SHORT[m - 1] ?? "?"} ${d === "last" ? "last day" : ordinal(Number(d))}`;
+    }
+    case "per_event":
+      return "Triggered per event — due within a set number of days";
+    case "one_time": {
+      const dateStr = typeof cfg.date === "string" ? cfg.date : "";
+      return dateStr ? `One-time — due ${formatShort(new Date(`${dateStr}T00:00:00Z`))}` : "One-time";
+    }
+    default:
+      return ob.cadence;
   }
 }
 
@@ -305,7 +345,7 @@ export async function scheduleRemindersInternal(
   const linkTo = obligationRow.evidence_type === "form" && obligationRow.linked_form_id
     ? `/dashboard/forms/${obligationRow.linked_form_id}`
     : "/dashboard/my-obligations";
-  const cadenceDesc = cadenceDescription(obligationRow.cadence);
+  const cadenceDesc = cadenceShortLabel(obligationRow.cadence);
 
   for (const a of assignees as Array<{ staff_id: string }>) {
     for (const n of days) {
@@ -441,7 +481,7 @@ export async function notifyObligationManagersInternal(
   }
   if (!recipientIds.size) return;
 
-  const cadenceDesc = cadenceDescription(ob.cadence);
+  const cadenceDesc = cadenceShortLabel(ob.cadence);
   const lastCompletion = (completions ?? [])[completions.length - 1] as
     { staff_name: string; completed_at: string; evidence_type_used: string } | undefined;
 
@@ -528,6 +568,131 @@ export async function checkAndMarkOverdueInternal(supabase: AnySupabase, organiz
     }
   }
 }
+
+export const checkAndMarkOverdue = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ organizationId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { ok: false };
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+    await checkAndMarkOverdueInternal(supabase, data.organizationId);
+    return { ok: true };
+  });
+
+export type MyObligationInstanceRow = ObligationInstanceRow & {
+  obligation: CompanyObligationRow;
+};
+
+/** Instances (open or completed) assigned to the calling staff member, obligation joined in. */
+export const listMyObligationInstances = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ organizationId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return [] as MyObligationInstanceRow[];
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+
+    await checkAndMarkOverdueInternal(supabase, data.organizationId);
+
+    const { data: assigneeRows, error: aErr } = await supabase
+      .from("company_obligation_instance_assignees")
+      .select("instance_id")
+      .eq("organization_id", data.organizationId)
+      .eq("staff_id", userId);
+    if (aErr) throw new Error(aErr.message);
+    const instanceIds = Array.from(new Set((assigneeRows ?? []).map((r: { instance_id: string }) => r.instance_id)));
+    if (!instanceIds.length) return [];
+
+    const { data: instances, error: iErr } = await supabase
+      .from("company_obligation_instances")
+      .select("*")
+      .in("id", instanceIds)
+      .order("due_at", { ascending: true });
+    if (iErr) throw new Error(iErr.message);
+
+    const obligationIds = Array.from(new Set((instances ?? []).map((i: ObligationInstanceRow) => i.obligation_id)));
+    if (!obligationIds.length) return [];
+    const { data: obligations, error: oErr } = await supabase
+      .from("company_obligations").select("*").in("id", obligationIds);
+    if (oErr) throw new Error(oErr.message);
+    const obligationById = new Map((obligations ?? []).map((o: CompanyObligationRow) => [o.id, o]));
+
+    return (instances ?? [])
+      .map((i: ObligationInstanceRow) => {
+        const obligation = obligationById.get(i.obligation_id);
+        return obligation ? { ...i, obligation } : null;
+      })
+      .filter((r): r is MyObligationInstanceRow => r !== null);
+  });
+
+/** Obligation + instance context for the form-fill obligation banner. */
+export const getObligationInstanceContext = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    organizationId: z.string().uuid(),
+    instanceId: z.string().uuid(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { instance: null as ObligationInstanceRow | null, obligation: null as CompanyObligationRow | null };
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+
+    const { data: inst, error: iErr } = await supabase
+      .from("company_obligation_instances").select("*")
+      .eq("id", data.instanceId).eq("organization_id", data.organizationId).maybeSingle();
+    if (iErr) throw new Error(iErr.message);
+    if (!inst) return { instance: null, obligation: null };
+
+    const ob = await fetchObligation(supabase, data.organizationId, inst.obligation_id);
+    return { instance: inst as ObligationInstanceRow, obligation: ob };
+  });
+
+/**
+ * Company obligations are org-wide, not tied to a client, but the forms
+ * system's submitForm() always requires a caseload client. This inserts the
+ * submission directly (client_id null) once the linked form + instance are
+ * verified to belong together, so obligation-linked forms don't need a
+ * client context to satisfy.
+ */
+export const submitObligationForm = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    organizationId: z.string().uuid(),
+    instanceId: z.string().uuid(),
+    formId: z.string().uuid(),
+    answers: z.record(z.any()),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { submissionId: null as string | null };
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+
+    const { data: inst, error: iErr } = await supabase
+      .from("company_obligation_instances").select("id, obligation_id")
+      .eq("id", data.instanceId).eq("organization_id", data.organizationId).maybeSingle();
+    if (iErr) throw new Error(iErr.message);
+    if (!inst) throw new Error("Obligation instance not found.");
+    const ob = await fetchObligation(supabase, data.organizationId, inst.obligation_id);
+    if (ob.evidence_type !== "form" || ob.linked_form_id !== data.formId) {
+      throw new Error("This form is not linked to that obligation.");
+    }
+
+    const { data: sub, error: sErr } = await supabase
+      .from("form_submissions")
+      .insert({
+        organization_id: data.organizationId,
+        form_id: data.formId,
+        client_id: null,
+        submitted_by: userId,
+        answers: data.answers,
+      })
+      .select("id").maybeSingle();
+    if (sErr) throw new Error(sErr.message);
+    if (!sub) throw new Error("Failed to submit form.");
+
+    return { submissionId: sub.id as string };
+  });
 
 // ─── obligation CRUD ────────────────────────────────────────────────────
 
@@ -726,6 +891,66 @@ export const deleteCompanyObligation = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/**
+ * Called when an admin archives a form that active obligations depend on:
+ * pauses those obligations (so they stop generating new instances) and
+ * notifies org admins so someone links a replacement form.
+ */
+export const pauseObligationsForArchivedForm = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    organizationId: z.string().uuid(),
+    formId: z.string().uuid(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { paused: [] as string[] };
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+
+    const { data: obligations, error } = await supabase
+      .from("company_obligations")
+      .select("id, title")
+      .eq("organization_id", data.organizationId)
+      .eq("linked_form_id", data.formId)
+      .eq("active", true);
+    if (error) throw new Error(error.message);
+    const list = (obligations ?? []) as Array<{ id: string; title: string }>;
+    if (!list.length) return { paused: [] };
+
+    const { error: upErr } = await supabase
+      .from("company_obligations")
+      .update({ active: false })
+      .in("id", list.map((o) => o.id));
+    if (upErr) throw new Error(upErr.message);
+
+    const { data: form } = await supabase.from("forms").select("name").eq("id", data.formId).maybeSingle();
+    const formName = (form as { name: string } | null)?.name ?? "Unknown form";
+    const titles = list.map((o) => o.title).join(", ");
+
+    const { data: admins, error: adErr } = await supabase
+      .from("organization_members").select("user_id")
+      .eq("organization_id", data.organizationId).eq("active", true).in("role", ["admin", "super_admin"]);
+    if (adErr) throw new Error(adErr.message);
+
+    if (admins?.length) {
+      const rows = (admins as Array<{ user_id: string }>).map((a) => ({
+        organization_id: data.organizationId,
+        recipient_user_id: a.user_id,
+        recipient_role: "admin",
+        type: "company_obligation_update",
+        urgency: "high",
+        title: "Obligation paused — linked form archived",
+        body: `${list.length} obligation(s) were paused because their linked form '${formName}' was archived: ${titles}. `
+          + `Edit each obligation in Company Obligations to restore it.`,
+        link_to: "/dashboard/company-obligations",
+      }));
+      const { error: notifErr } = await supabase.from("notifications").insert(rows);
+      if (notifErr) throw new Error(notifErr.message);
+    }
+
+    return { paused: list.map((o) => o.title) };
+  });
+
 // ─── per-event instance logging ─────────────────────────────────────────
 
 export const logObligationEvent = createServerFn({ method: "POST" })
@@ -806,6 +1031,8 @@ export const recordCompletion = createServerFn({ method: "POST" })
     // different from the submitting admin/manager (requires manager role).
     staffId: z.string().uuid().optional(),
     staffName: z.string().max(200).optional(),
+    // Manual-entry backdating: when the admin records the completed date/time.
+    completedAt: z.string().optional(),
   }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
@@ -833,6 +1060,7 @@ export const recordCompletion = createServerFn({ method: "POST" })
       staffName = dir?.full_name ?? "Unknown";
     }
     const isManual = data.isManualEntry ?? isOnBehalf;
+    const completedAt = data.completedAt ?? new Date().toISOString();
 
     const { error: cErr } = await supabase.from("company_obligation_completions").insert({
       instance_id: data.instanceId,
@@ -849,11 +1077,12 @@ export const recordCompletion = createServerFn({ method: "POST" })
       is_manual_entry: isManual,
       manual_entry_by: isManual ? userId : null,
       manual_entry_by_name: isManual ? (data.manualEntryByName ?? null) : null,
+      completed_at: completedAt,
     });
     if (cErr) throw new Error(cErr.message);
 
     let updatedInstance = inst as ObligationInstanceRow;
-    const nowIso = new Date().toISOString();
+    const nowIso = completedAt;
 
     if (!ob.requires_individual_completion) {
       const { data: closed, error: upErr } = await supabase

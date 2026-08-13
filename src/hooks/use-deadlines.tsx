@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { useAuth } from "@/hooks/use-auth";
 import { getIncidentOpenClocks } from "@/lib/incident-deadlines";
 import { computeDeadlines } from "@/lib/bc-deadlines";
 import { computeRequirementDueState } from "@/lib/requirement-tracking";
@@ -17,6 +18,11 @@ import { computeSupportStrategyCoverage } from "@/lib/support-strategy-coverage"
 import type { CSTSection } from "@/lib/client-specific-training.functions";
 import { listUpiAttestations } from "@/lib/upi-attestations.functions";
 import { getHrChecklistRenewals } from "@/lib/hr-staff.functions";
+import {
+  cadenceDescription,
+  type CompanyObligationRow,
+  type ObligationInstanceRow,
+} from "@/lib/company-obligations.functions";
 
 export type DeadlineSource =
   | "summary"
@@ -41,7 +47,8 @@ export type DeadlineSource =
   | "sjd_upi_support_strategies"
   | "sjd_usor_outreach"
   | "sjd_assessment_doc"
-  | "staff_checklist";
+  | "staff_checklist"
+  | "company_obligation";
 
 export type DeadlineItem = {
   key: string;
@@ -91,6 +98,9 @@ function fmtMonth(yyyyMm: string): string {
 export function useDeadlines() {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id ?? null;
+  const isAdminRole = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
+  const { user } = useAuth();
+  const currentUserId = user?.id ?? null;
   const ensureFn = useServerFn(ensureCurrentSummaryPeriods);
   const listSummariesFn = useServerFn(listOpenSummaries);
   const computeSowFn = useServerFn(computeSowAlerts);
@@ -778,6 +788,47 @@ export function useDeadlines() {
     },
   });
 
+  // 15. Company obligation instances — pending/overdue, due within 14 days.
+  // Staff see only instances they're assigned to; admins/managers see all.
+  const companyObligationsQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "company_obligations", orgId, isAdminRole, currentUserId],
+    queryFn: async () => {
+      const cutoff = new Date(Date.now() + 14 * DAY).toISOString();
+      let query = supabase
+        .from("company_obligation_instances")
+        .select("id, obligation_id, period_key, due_at, status")
+        .eq("organization_id", orgId!)
+        .in("status", ["pending", "overdue"])
+        .lte("due_at", cutoff);
+      if (!isAdminRole && currentUserId) {
+        const { data: assigneeRows, error: aErr } = await supabase
+          .from("company_obligation_instance_assignees")
+          .select("instance_id")
+          .eq("organization_id", orgId!)
+          .eq("staff_id", currentUserId);
+        if (aErr) throw aErr;
+        const ids = (assigneeRows ?? []).map((r: { instance_id: string }) => r.instance_id);
+        if (ids.length === 0) return { rows: [], obligationsById: new Map<string, CompanyObligationRow>() };
+        query = query.in("id", ids);
+      }
+      const { data: rows, error } = await query;
+      if (error) throw error;
+      const obligationIds = Array.from(new Set((rows ?? []).map((r: { obligation_id: string }) => r.obligation_id)));
+      const obligationsById = new Map<string, CompanyObligationRow>();
+      if (obligationIds.length) {
+        const { data: obs, error: oErr } = await supabase
+          .from("company_obligations").select("*").in("id", obligationIds);
+        if (oErr) throw oErr;
+        for (const o of (obs ?? []) as CompanyObligationRow[]) obligationsById.set(o.id, o);
+      }
+      return {
+        rows: (rows ?? []) as Array<Pick<ObligationInstanceRow, "id" | "obligation_id" | "period_key" | "due_at" | "status">>,
+        obligationsById,
+      };
+    },
+  });
+
   const items = useMemo<DeadlineItem[]>(() => {
     if (!orgId) return [];
     const now = new Date();
@@ -1343,10 +1394,31 @@ export function useDeadlines() {
       }
     }
 
+    // Company obligation instances.
+    for (const inst of companyObligationsQ.data?.rows ?? []) {
+      const obligation = companyObligationsQ.data?.obligationsById.get(inst.obligation_id);
+      if (!obligation) continue;
+      const due = new Date(inst.due_at);
+      const daysLeft = (due.getTime() - now.getTime()) / DAY;
+      out.push({
+        key: `company_obligation_${inst.id}`,
+        source: "company_obligation",
+        title: obligation.title,
+        subject: `Company policy — ${cadenceDescription(obligation)}`,
+        subjectKind: "agency",
+        dueAt: due,
+        status: inst.status === "overdue" ? "overdue" : daysLeft <= 7 ? "due_soon" : "upcoming",
+        href: isAdminRole ? "/dashboard/company-obligations" : "/dashboard/my-obligations",
+        instanceId: inst.id,
+      });
+    }
+
     out.sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
     return out;
   }, [
     orgId,
+    isAdminRole,
+    companyObligationsQ.data,
     summariesQ.data,
     clientsQ.data,
     hhsQ.data,
@@ -1398,6 +1470,6 @@ export function useDeadlines() {
       sjdUsorOutreachQ.isLoading || sjdAssessmentSelectionsQ.isLoading || sjdAssessmentDocsQ.isLoading ||
       sowQ.isLoading || ssCoverageQ.isLoading || hrcRestrictionsQ.isLoading ||
       renewalReqsQ.isLoading || complianceInstancesQ.isLoading ||
-      orgLicenseCodesQ.isLoading || orgLicenseDocsQ.isLoading,
+      orgLicenseCodesQ.isLoading || orgLicenseDocsQ.isLoading || companyObligationsQ.isLoading,
   };
 }

@@ -22,6 +22,7 @@ import { AttentionStrip } from "@/components/staff-mobile/attention-strip";
 import { NectarOnboardingPanel } from "@/components/onboarding/nectar-onboarding-panel";
 import { StaffCompliancePanel } from "@/components/hr/staff-compliance-panel";
 import { PersonAvatar } from "@/components/person/person-avatar";
+import { MyObligationsWidget } from "@/components/company-obligations/my-obligations-widget";
 
 export const Route = createFileRoute("/dashboard/")({
   component: Overview,
@@ -525,6 +526,7 @@ function Overview() {
             subtitle="Your assigned clients, today's shift, and anything that needs your attention."
           />
           <TodayHero />
+          <MyObligationsWidget />
           <AttentionStrip />
           <PoliciesToAcknowledgeCard />
           <ComplianceInbox />

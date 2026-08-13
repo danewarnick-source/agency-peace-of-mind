@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { waiveInstance, type CompanyObligationRow, type ObligationInstanceRow } from "@/lib/company-obligations.functions";
-import { ManualCompletionDialog } from "./obligation-card";
+import { ManualCompletionDrawer } from "./manual-completion-drawer";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -84,7 +84,7 @@ function InstanceRow({
   const waive = useMutation({
     mutationFn: () => waiveFn({ data: { organizationId: orgId, instanceId: instance.id, waiveReason: waiveReason.trim() } }),
     onSuccess: () => {
-      toast.success("Instance waived");
+      toast.success("Instance waived. All reminders resolved.");
       setWaiveOpen(false);
       qc.invalidateQueries({ queryKey: ["obligation-history", instance.obligation_id] });
       qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
@@ -218,11 +218,12 @@ export function ObligationHistorySheet({
         </div>
       </SheetContent>
 
-      <ManualCompletionDialog
+      <ManualCompletionDrawer
         open={!!manualInstanceId}
         onOpenChange={(v) => !v && setManualInstanceId(null)}
         orgId={orgId}
         instanceId={manualInstanceId}
+        attestationText={obligation.attestation_text}
       />
     </Sheet>
   );

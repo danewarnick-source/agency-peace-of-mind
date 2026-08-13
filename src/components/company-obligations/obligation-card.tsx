@@ -36,29 +36,16 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { AlertTriangle, CheckCircle2, Circle, MoreHorizontal } from "lucide-react";
 import {
   deleteCompanyObligation,
   logObligationEvent,
-  recordCompletion,
   toggleObligationActive,
   type CompanyObligationRow,
   type ObligationInstanceRow,
 } from "@/lib/company-obligations.functions";
 import { ObligationHistorySheet } from "./obligation-history-sheet";
+import { ManualCompletionDrawer } from "./manual-completion-drawer";
 
 export type ObligationWithInstance = CompanyObligationRow & { current_instance: ObligationInstanceRow | null };
 
@@ -303,124 +290,6 @@ function LogEventDialog({
   );
 }
 
-export function ManualCompletionDialog({
-  open,
-  onOpenChange,
-  orgId,
-  instanceId,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  orgId: string;
-  instanceId: string | null;
-}) {
-  const qc = useQueryClient();
-  const recordFn = useServerFn(recordCompletion);
-  const [staffId, setStaffId] = useState<string | null>(null);
-  const [staffName, setStaffName] = useState<string>("");
-  const [note, setNote] = useState("");
-  const [pickerOpen, setPickerOpen] = useState(false);
-
-  const { data: directory = [] } = useQuery({
-    queryKey: ["org-member-directory-active", orgId],
-    enabled: pickerOpen,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("org_member_directory")
-        .select("id, full_name")
-        .eq("is_active", true)
-        .order("full_name", { ascending: true });
-      if (error) throw new Error(error.message);
-      return (data ?? []) as Array<{ id: string; full_name: string | null }>;
-    },
-  });
-
-  const record = useMutation({
-    mutationFn: () =>
-      recordFn({
-        data: {
-          organizationId: orgId,
-          instanceId: instanceId as string,
-          evidenceTypeUsed: "manual",
-          isManualEntry: true,
-          staffId: staffId ?? undefined,
-          staffName: staffName || undefined,
-          notes: note.trim() || null,
-        },
-      }),
-    onSuccess: () => {
-      toast.success("Manual completion recorded");
-      onOpenChange(false);
-      setStaffId(null);
-      setStaffName("");
-      setNote("");
-      qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
-      qc.invalidateQueries({ queryKey: ["obligation-instance-detail"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Add manual completion</DialogTitle>
-          <DialogDescription>Record a completion on behalf of a staff member.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div className="grid gap-1.5">
-            <Label>Staff member</Label>
-            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="justify-start font-normal">
-                  {staffName || "Select staff member…"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-72 p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Search staff…" />
-                  <CommandList>
-                    <CommandEmpty>No matches.</CommandEmpty>
-                    <CommandGroup>
-                      {directory.map((d) => (
-                        <CommandItem
-                          key={d.id}
-                          value={d.full_name ?? d.id}
-                          onSelect={() => {
-                            setStaffId(d.id);
-                            setStaffName(d.full_name ?? "Unnamed");
-                            setPickerOpen(false);
-                          }}
-                        >
-                          {d.full_name ?? "Unnamed"}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div className="grid gap-1.5">
-            <Label>Evidence / note</Label>
-            <Textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="How this was satisfied (e.g. emailed PDF received, verbal confirmation)…"
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={() => record.mutate()} disabled={!staffId || record.isPending}>
-            Record completion
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export function ObligationCard({
   orgId,
   obligation,
@@ -570,11 +439,12 @@ export function ObligationCard({
       </AlertDialog>
 
       <LogEventDialog open={logEventOpen} onOpenChange={setLogEventOpen} orgId={orgId} obligation={obligation} />
-      <ManualCompletionDialog
+      <ManualCompletionDrawer
         open={manualOpen}
         onOpenChange={setManualOpen}
         orgId={orgId}
         instanceId={obligation.current_instance?.id ?? null}
+        attestationText={obligation.attestation_text}
       />
       <ObligationHistorySheet
         open={historyOpen}

@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { z } from "zod";
-import { AlarmClock, AlertTriangle, Clock, ShieldCheck, FileSignature, Activity, ExternalLink, Home, Upload, UserCircle, BadgeCheck } from "lucide-react";
+import { AlarmClock, AlertTriangle, Clock, ShieldCheck, FileSignature, Activity, ExternalLink, Home, Upload, UserCircle, BadgeCheck, ClipboardList } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,7 @@ const sourceIcon: Record<DeadlineItem["source"], typeof AlarmClock> = {
   sjd_usor_outreach: FileSignature,
   sjd_assessment_doc: Upload,
   staff_checklist: ShieldCheck,
+  company_obligation: ClipboardList,
 };
 
 const sourceLabel: Record<DeadlineItem["source"], string> = {
@@ -75,6 +76,7 @@ const sourceLabel: Record<DeadlineItem["source"], string> = {
   sjd_usor_outreach: "USOR Outreach Verification",
   sjd_assessment_doc: "SJD Assessment Documentation",
   staff_checklist: "HR checklist renewal",
+  company_obligation: "Company policy",
 };
 
 function fmtDue(d: Date): string {
@@ -240,6 +242,14 @@ function DeadlineRow({ item, tone }: { item: DeadlineItem; tone: DeadlineItem["s
               </a>
             ) : (
               item.title
+            )}
+            {item.source === "company_obligation" && (
+              <Badge
+                variant="outline"
+                className="ml-2 border-amber-400/60 bg-amber-500/10 text-amber-700 dark:border-amber-500/40 dark:text-amber-300"
+              >
+                Company policy
+              </Badge>
             )}
             {item.source === "summary" && item.summary?.requires_upi_attestation && (
               <Badge className="ml-2 bg-[#137182] text-white hover:bg-[#137182]">

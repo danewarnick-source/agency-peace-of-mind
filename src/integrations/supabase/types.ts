@@ -6291,11 +6291,9 @@ export type Database = {
           manager_note_text: string | null
           matched_approved_location_id: string | null
           matched_approved_location_label: string | null
-          nectar_attestation_id: string | null
           nectar_drafted: boolean
           nectar_drafted_confirmed_at: string | null
           nectar_drafted_confirmed_by: string | null
-          nectar_raw_input: string | null
           organization_id: string
           outside_geofence_reason: string | null
           raw_clock_in: string | null
@@ -6377,11 +6375,9 @@ export type Database = {
           manager_note_text?: string | null
           matched_approved_location_id?: string | null
           matched_approved_location_label?: string | null
-          nectar_attestation_id?: string | null
           nectar_drafted?: boolean
           nectar_drafted_confirmed_at?: string | null
           nectar_drafted_confirmed_by?: string | null
-          nectar_raw_input?: string | null
           organization_id: string
           outside_geofence_reason?: string | null
           raw_clock_in?: string | null
@@ -6463,11 +6459,9 @@ export type Database = {
           manager_note_text?: string | null
           matched_approved_location_id?: string | null
           matched_approved_location_label?: string | null
-          nectar_attestation_id?: string | null
           nectar_drafted?: boolean
           nectar_drafted_confirmed_at?: string | null
           nectar_drafted_confirmed_by?: string | null
-          nectar_raw_input?: string | null
           organization_id?: string
           outside_geofence_reason?: string | null
           raw_clock_in?: string | null
@@ -7161,6 +7155,8 @@ export type Database = {
           clock_out_timestamp: string | null
           created_at: string
           id: string
+          nectar_attestation_id: string | null
+          nectar_raw_input: string | null
           note: string | null
           organization_id: string
           updated_at: string
@@ -7172,6 +7168,8 @@ export type Database = {
           clock_out_timestamp?: string | null
           created_at?: string
           id?: string
+          nectar_attestation_id?: string | null
+          nectar_raw_input?: string | null
           note?: string | null
           organization_id: string
           updated_at?: string
@@ -7183,12 +7181,21 @@ export type Database = {
           clock_out_timestamp?: string | null
           created_at?: string
           id?: string
+          nectar_attestation_id?: string | null
+          nectar_raw_input?: string | null
           note?: string | null
           organization_id?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "general_shifts_nectar_attestation_id_fkey"
+            columns: ["nectar_attestation_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_attestations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "general_shifts_organization_id_fkey"
             columns: ["organization_id"]
@@ -11117,8 +11124,14 @@ export type Database = {
         Row: {
           attested_at: string
           context: Json
+          covers_client_id: string | null
+          covers_instance_id: string | null
+          covers_staff_id: string | null
           id: string
+          input_confirmed_at: string | null
+          nectar_expanded_output: string | null
           organization_id: string
+          original_staff_input: string | null
           scope: string
           scope_ref_id: string | null
           scope_ref_type: string | null
@@ -11129,8 +11142,14 @@ export type Database = {
         Insert: {
           attested_at?: string
           context?: Json
+          covers_client_id?: string | null
+          covers_instance_id?: string | null
+          covers_staff_id?: string | null
           id?: string
+          input_confirmed_at?: string | null
+          nectar_expanded_output?: string | null
           organization_id: string
+          original_staff_input?: string | null
           scope: string
           scope_ref_id?: string | null
           scope_ref_type?: string | null
@@ -11141,8 +11160,14 @@ export type Database = {
         Update: {
           attested_at?: string
           context?: Json
+          covers_client_id?: string | null
+          covers_instance_id?: string | null
+          covers_staff_id?: string | null
           id?: string
+          input_confirmed_at?: string | null
+          nectar_expanded_output?: string | null
           organization_id?: string
+          original_staff_input?: string | null
           scope?: string
           scope_ref_id?: string | null
           scope_ref_type?: string | null
@@ -11150,7 +11175,36 @@ export type Database = {
           user_display_name?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "nectar_attestations_covers_client_id_fkey"
+            columns: ["covers_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nectar_attestations_covers_instance_id_fkey"
+            columns: ["covers_instance_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_compliance_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nectar_attestations_covers_staff_id_fkey"
+            columns: ["covers_staff_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nectar_attestations_covers_staff_id_fkey"
+            columns: ["covers_staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       nectar_code_activations: {
         Row: {
@@ -11262,6 +11316,99 @@ export type Database = {
             columns: ["rule_id"]
             isOneToOne: false
             referencedRelation: "nectar_compliance_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nectar_compliance_instances: {
+        Row: {
+          attestation_id: string | null
+          created_at: string
+          deadline_at: string
+          document_url: string | null
+          external_reference: string | null
+          id: string
+          organization_id: string
+          requirement_id: string
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          resolved_via: string | null
+          status: string
+          triggered_at: string
+          triggered_by_id: string | null
+          triggered_by_kind: string | null
+        }
+        Insert: {
+          attestation_id?: string | null
+          created_at?: string
+          deadline_at: string
+          document_url?: string | null
+          external_reference?: string | null
+          id?: string
+          organization_id: string
+          requirement_id: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          resolved_via?: string | null
+          status?: string
+          triggered_at?: string
+          triggered_by_id?: string | null
+          triggered_by_kind?: string | null
+        }
+        Update: {
+          attestation_id?: string | null
+          created_at?: string
+          deadline_at?: string
+          document_url?: string | null
+          external_reference?: string | null
+          id?: string
+          organization_id?: string
+          requirement_id?: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          resolved_via?: string | null
+          status?: string
+          triggered_at?: string
+          triggered_by_id?: string | null
+          triggered_by_kind?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nectar_compliance_instances_attestation_id_fkey"
+            columns: ["attestation_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_attestations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nectar_compliance_instances_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nectar_compliance_instances_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "nectar_requirements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nectar_compliance_instances_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nectar_compliance_instances_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -12188,9 +12335,12 @@ export type Database = {
           applies_to: string | null
           approval_state: string | null
           category: string | null
+          compliance_pattern: string | null
           confirmed_optional: boolean
           created_at: string
           description: string | null
+          evidence_registered: boolean
+          feature_link: Json | null
           id: string
           jurisdiction: string | null
           metadata: Json
@@ -12202,6 +12352,7 @@ export type Database = {
           original_frozen_at: string | null
           original_source_citation: string | null
           original_title: string | null
+          plain_language_explanation: string | null
           requirement_key: string
           review_status: string
           satisfied_by: string | null
@@ -12212,6 +12363,8 @@ export type Database = {
           source_document_id: string | null
           title: string
           updated_at: string
+          verification_type: string | null
+          verification_type_source: string | null
           verified: boolean
           verified_at: string | null
           verified_by: string | null
@@ -12223,9 +12376,12 @@ export type Database = {
           applies_to?: string | null
           approval_state?: string | null
           category?: string | null
+          compliance_pattern?: string | null
           confirmed_optional?: boolean
           created_at?: string
           description?: string | null
+          evidence_registered?: boolean
+          feature_link?: Json | null
           id?: string
           jurisdiction?: string | null
           metadata?: Json
@@ -12237,6 +12393,7 @@ export type Database = {
           original_frozen_at?: string | null
           original_source_citation?: string | null
           original_title?: string | null
+          plain_language_explanation?: string | null
           requirement_key: string
           review_status?: string
           satisfied_by?: string | null
@@ -12247,6 +12404,8 @@ export type Database = {
           source_document_id?: string | null
           title: string
           updated_at?: string
+          verification_type?: string | null
+          verification_type_source?: string | null
           verified?: boolean
           verified_at?: string | null
           verified_by?: string | null
@@ -12258,9 +12417,12 @@ export type Database = {
           applies_to?: string | null
           approval_state?: string | null
           category?: string | null
+          compliance_pattern?: string | null
           confirmed_optional?: boolean
           created_at?: string
           description?: string | null
+          evidence_registered?: boolean
+          feature_link?: Json | null
           id?: string
           jurisdiction?: string | null
           metadata?: Json
@@ -12272,6 +12434,7 @@ export type Database = {
           original_frozen_at?: string | null
           original_source_citation?: string | null
           original_title?: string | null
+          plain_language_explanation?: string | null
           requirement_key?: string
           review_status?: string
           satisfied_by?: string | null
@@ -12282,6 +12445,8 @@ export type Database = {
           source_document_id?: string | null
           title?: string
           updated_at?: string
+          verification_type?: string | null
+          verification_type_source?: string | null
           verified?: boolean
           verified_at?: string | null
           verified_by?: string | null
@@ -13475,6 +13640,7 @@ export type Database = {
           bc_role: Database["public"]["Enums"]["bc_code"] | null
           ce_suggested_topics: string[]
           created_at: string
+          custom_attributes: Json
           daily_rate: number | null
           date_of_birth: string | null
           department: string | null
@@ -13518,6 +13684,7 @@ export type Database = {
           bc_role?: Database["public"]["Enums"]["bc_code"] | null
           ce_suggested_topics?: string[]
           created_at?: string
+          custom_attributes?: Json
           daily_rate?: number | null
           date_of_birth?: string | null
           department?: string | null
@@ -13561,6 +13728,7 @@ export type Database = {
           bc_role?: Database["public"]["Enums"]["bc_code"] | null
           ce_suggested_topics?: string[]
           created_at?: string
+          custom_attributes?: Json
           daily_rate?: number | null
           date_of_birth?: string | null
           department?: string | null
@@ -17915,9 +18083,12 @@ export type Database = {
           applies_to: string | null
           approval_state: string | null
           category: string | null
+          compliance_pattern: string | null
           confirmed_optional: boolean
           created_at: string
           description: string | null
+          evidence_registered: boolean
+          feature_link: Json | null
           id: string
           jurisdiction: string | null
           metadata: Json
@@ -17929,6 +18100,7 @@ export type Database = {
           original_frozen_at: string | null
           original_source_citation: string | null
           original_title: string | null
+          plain_language_explanation: string | null
           requirement_key: string
           review_status: string
           satisfied_by: string | null
@@ -17939,6 +18111,8 @@ export type Database = {
           source_document_id: string | null
           title: string
           updated_at: string
+          verification_type: string | null
+          verification_type_source: string | null
           verified: boolean
           verified_at: string | null
           verified_by: string | null
@@ -17959,9 +18133,12 @@ export type Database = {
           applies_to: string | null
           approval_state: string | null
           category: string | null
+          compliance_pattern: string | null
           confirmed_optional: boolean
           created_at: string
           description: string | null
+          evidence_registered: boolean
+          feature_link: Json | null
           id: string
           jurisdiction: string | null
           metadata: Json
@@ -17973,6 +18150,7 @@ export type Database = {
           original_frozen_at: string | null
           original_source_citation: string | null
           original_title: string | null
+          plain_language_explanation: string | null
           requirement_key: string
           review_status: string
           satisfied_by: string | null
@@ -17983,6 +18161,8 @@ export type Database = {
           source_document_id: string | null
           title: string
           updated_at: string
+          verification_type: string | null
+          verification_type_source: string | null
           verified: boolean
           verified_at: string | null
           verified_by: string | null

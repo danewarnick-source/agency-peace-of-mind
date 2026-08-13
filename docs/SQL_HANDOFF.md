@@ -6,6 +6,144 @@ it worked before moving on.
 
 ---
 
+## ACTION — Prompt batch 16–28: belongings inventory, doc uploads, UPI attestations, cadence changes, removals (2026-08-13)
+
+**What this is for:** Thirteen product prompts. Only ONE new table is
+needed — everything else reuses existing infrastructure:
+- Prompt 16 (Personal Belongings Inventory) — UI only, `client_belongings`
+  already has the right columns (confirmed via `supabase/migrations/20260524055323_*.sql`).
+  The "$50 or more" checkbox is derived from `estimated_value >= 50`, not a
+  stored column.
+- Prompt 17 (Room and Board Agreement) — reuses `client_documents` +
+  `client-documents` bucket via the existing `NectarAsk` upload component,
+  document_type `room_board_agreement`. No schema change.
+- Prompts 18/19/23 (OL License, OL Certification, USOR Approved Vendor) —
+  reuse `nectar_documents` with `owner_kind='company'` and new
+  `document_type` values (`ol_residential_license`,
+  `ol_residential_certification`, `usor_approved_vendor`); expiration stored
+  in the existing `effective_end` column. No schema change.
+- Prompts 21/22/23 (UPI + USOR attestations) — new table `upi_attestations`
+  below.
+- Prompts 20/25 (SEI / CMP-CMS monthly summary UPI reminder cadence) —
+  computed client-side from existing `client_progress_summaries` columns
+  (`requires_upi_attestation`, `upi_entered_at`, `finalized_at`). No schema
+  change.
+- Prompt 24 (CMP/CMS quarterly→monthly) — code-only change in
+  `src/lib/progress-summaries.ts` (`MONTHLY_SUMMARY_CODES`). No schema
+  change, no data touched — forward-looking only.
+- Prompts 26/27/28 (remove org-level written-BSP-policy requirement,
+  healthcare-access-training checklist item, remediation-plan tracking) —
+  grepped `src`, `supabase/migrations`, and this doc for "BSP", "R539-4",
+  "remediation", and "primary health care professional" / "health care
+  access training"; none of these exist as a checklist item, compliance
+  flag, or authoritative-sources requirement anywhere in the codebase today.
+  Nothing to remove — treated as already satisfied.
+
+Matches migration `supabase/migrations/20260813110000_prompts_16_28_batch.sql`.
+
+```sql
+-- client_id uses the nil UUID (not NULL) for org-level rows (usor_vendor), and
+-- period_label uses '' (not NULL) for one-time rows (sei_support_strategies,
+-- usor_vendor) so a real composite UNIQUE constraint can back upserts —
+-- Postgres treats NULL <> NULL, which would defeat ON CONFLICT dedup.
+CREATE TABLE IF NOT EXISTS public.upi_attestations (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id  uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  client_id        uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000'::uuid,
+  kind             text NOT NULL CHECK (kind IN ('sei_employment_monthly', 'sei_support_strategies', 'usor_vendor')),
+  period_label     text NOT NULL DEFAULT '',
+  attested_at      timestamptz NOT NULL DEFAULT now(),
+  attested_by      uuid NOT NULL,
+  attested_by_name text,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (organization_id, kind, client_id, period_label)
+);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.upi_attestations TO authenticated;
+GRANT ALL ON public.upi_attestations TO service_role;
+
+ALTER TABLE public.upi_attestations ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "org members read upi attestations"
+  ON public.upi_attestations FOR SELECT TO authenticated
+  USING (is_org_member(organization_id, auth.uid()) OR is_super_admin(auth.uid()));
+
+CREATE POLICY "admins manage upi attestations"
+  ON public.upi_attestations FOR ALL TO authenticated
+  USING (is_org_admin_or_manager(organization_id, auth.uid()) OR is_super_admin(auth.uid()))
+  WITH CHECK (is_org_admin_or_manager(organization_id, auth.uid()) OR is_super_admin(auth.uid()));
+
+CREATE INDEX IF NOT EXISTS idx_upi_attestations_org_kind
+  ON public.upi_attestations (organization_id, kind);
+```
+
+**What you'll see:** one `CREATE TABLE`, two `GRANT`s, `ALTER TABLE ... ENABLE
+ROW LEVEL SECURITY`, two `CREATE POLICY`, one `CREATE INDEX`. Purely
+additive — no existing table, column, or row is touched.
+
+---
+
+## ACTION — Prompt batch 2–15: staff attestations, client profile, incidents, HHS/RHS, HRC, deadlines (2026-08-13)
+
+**What this is for:** Twelve product prompts in one pass. New tables:
+`client_healthcare_providers` (open-ended provider list, backfilled from the
+old fixed PCP/specialist/prescriber columns), `rhs_hospitalization_days`
+(RHS non-billable day flag), `rhs_evacuation_drills` (RHS quarterly drill
+log). New columns: `hhs_monthly_attendance.away_notes` (required elaboration
+when the away category is Hospitalization), `hrc_meetings.minutes_document_path`
+/ `minutes_document_name`. New storage bucket `hrc-documents`. Plus two RLS
+policies letting a staffer write their own `staff_baseline_training_completions`
+/ `document_attestations` row ONLY for the fixed self-attestable key
+`sei_benefits_attestation` (SEI Benefits Knowledge Attestation — staff may
+complete it themselves; every other baseline training stays admin/manager-only).
+The "New Caregiver Compensation Training" (CMP/CMS) and the presence-only
+"Grievance Policy — Staff Copy" / "Driving Record" items reuse the existing
+baseline-training tables/columns — no schema changes needed for those three.
+Everything below is additive. Matches migrations
+`supabase/migrations/20260813090000_staff_self_attest_baseline.sql` and
+`supabase/migrations/20260813100000_prompts_2_15_batch.sql`.
+
+### 1. Self-attestable baseline training carve-out
+
+```sql
+CREATE POLICY "baseline self attestation write"
+  ON public.staff_baseline_training_completions
+  FOR ALL
+  TO authenticated
+  USING (staff_id = auth.uid() AND training_key IN ('sei_benefits_attestation'))
+  WITH CHECK (staff_id = auth.uid() AND training_key IN ('sei_benefits_attestation'));
+
+CREATE POLICY "doc_attest_insert_self_attest_baseline"
+  ON public.document_attestations
+  FOR INSERT
+  WITH CHECK (
+    staff_id = auth.uid()
+    AND subject_kind = 'baseline_cert'
+    AND subject_ref IN ('sei_benefits_attestation')
+    AND attested_by = auth.uid()
+  );
+```
+
+**What you'll see:** "Success. No rows returned." No existing rows change —
+this only widens who may write a row for one specific training key.
+
+### 2. Healthcare providers, RHS hospitalization, RHS drills, HRC meeting docs
+
+Paste the full contents of
+`supabase/migrations/20260813100000_prompts_2_15_batch.sql` from the repo —
+it's long (new tables + RLS + a guarded one-time backfill of the old
+PCP/specialist/prescriber columns into the new provider-list rows) so it
+isn't duplicated here to avoid drift. Run it as one block.
+
+**What you'll see:** several `CREATE TABLE`, `CREATE POLICY`, `CREATE INDEX`,
+two `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, one `INSERT INTO
+storage.buckets ... ON CONFLICT DO NOTHING`, and three guarded backfill
+`INSERT`s (only fire for clients that have a non-null legacy PCP/specialist
+/prescriber name and don't already have that provider-type row). No existing
+column or row is dropped or overwritten.
+
+---
+
 ## ACTION — Correction: shift-note attestation columns belong on `evv_timesheets`, not `general_shifts` (2026-08-11)
 
 **What this is for:** Section 4 below (still present, unchanged, for history)
@@ -1508,3 +1646,137 @@ GRANT EXECUTE ON FUNCTION public.incident_client_counts(uuid, timestamptz, times
 EXECUTE`. No tables, columns, or existing rows are touched. Until this runs,
 the Incidents tab's trends strip (bar chart / category breakdown / per-client
 table) will error — the app code calls these two functions by name.
+
+---
+
+## ACTION — Provider Licensing Hub: widen upi_attestations.kind (2026-08-13)
+
+**What this is for:** New Settings > Licenses & Certifications page adds a
+"USOR Approved Vendor — Job Development" card (for orgs running SJD),
+mirroring the existing SEI "USOR Approved Vendor — Job Coaching" card. It
+reuses the `upi_attestations` table with a new `kind` value,
+`usor_vendor_job_development`. No new table — the license documents
+themselves reuse `nectar_documents` with `owner_kind='company'` and two new
+`document_type` values (`ol_day_treatment_license`,
+`ol_day_support_certification`) plus a third
+(`usor_approved_vendor_job_development`) for the Job Development USOR
+upload slot — all free-text `document_type`, no schema change needed for
+those.
+
+Matches migration `supabase/migrations/20260813150000_usor_job_development_kind.sql`.
+
+```sql
+ALTER TABLE public.upi_attestations DROP CONSTRAINT IF EXISTS upi_attestations_kind_check;
+ALTER TABLE public.upi_attestations ADD CONSTRAINT upi_attestations_kind_check
+  CHECK (kind IN ('sei_employment_monthly', 'sei_support_strategies', 'usor_vendor', 'usor_vendor_job_development'));
+```
+
+**What you'll see:** two `ALTER TABLE` statements. No rows are touched —
+this only widens which `kind` values are allowed going forward.
+
+---
+
+## ACTION — RP5 daily notes: add daily_logs.service_code (2026-08-13)
+
+**What this is for:** RP5 (Exceptional Care Respite With Room and Board)
+now reuses the HHS daily-summary-note flow (Daily Logs — narrative, PCSP
+goals, signature). Every existing `daily_logs` row is HHS, but there was no
+column recording which service code a note bills against, so a new RP5 row
+would be indistinguishable from HHS. Adding a nullable `service_code`
+column, backfilled to `'HHS'` for all existing rows, fixes that without
+touching any other data. HHS behavior is unchanged — the app only starts
+writing `'RP5'` for clients whose active service code is RP5 instead of HHS.
+
+Matches migration `supabase/migrations/20260813220000_daily_logs_service_code.sql`.
+
+```sql
+ALTER TABLE public.daily_logs ADD COLUMN IF NOT EXISTS service_code text;
+UPDATE public.daily_logs SET service_code = 'HHS' WHERE service_code IS NULL;
+ALTER TABLE public.daily_logs ALTER COLUMN service_code SET DEFAULT 'HHS';
+```
+
+**What you'll see:** one `ALTER TABLE` adding the column, one `UPDATE`
+backfilling existing rows to `'HHS'`, and one `ALTER TABLE` setting the
+default for future inserts. No rows are deleted; no existing HHS billing
+attribution changes.
+
+---
+
+## ACTION — SJD product prompts 11–17 (2026-08-13)
+
+**What this is for:** Seven product prompts extending SJD (Supported
+Employment — Job Development) parity with SEI:
+- Prompts 11/12/16 (ACRE gate for SED, Customized Employment Training for
+  SEE/SJD, SJD 60-day ACRE) — new `BASELINE_STAFF_TRAININGS` entries in
+  `src/lib/staff-training-requirements.ts`. No schema change — this list
+  drives both the staff checklist and compliance matrix automatically.
+- Prompt 13 (SJD → monthly summary cadence + UPI attestation flag) —
+  code-only change in `src/lib/progress-summaries.ts` /
+  `progress-summaries.functions.ts`. No schema change.
+- Prompt 14 (SJD employment-data + support-strategies UPI attestations,
+  mirroring SEI) — widens `upi_attestations.kind` to add
+  `sjd_employment_monthly` and `sjd_support_strategies`.
+- Prompt 17 (SJD monthly USOR Outreach Verification short text field) —
+  reuses the same `upi_attestations` table rather than a new one: adds
+  `kind = 'sjd_usor_outreach'` plus a new nullable `note_text` column that
+  carries the outreach/funding-status note. Existing rows are unaffected
+  (`note_text` defaults to NULL).
+- Prompt 15 (SJD Assessment Documentation — Discovery Process vs Vocational
+  Assessment) — new table `sjd_assessment_selections` holding the
+  per-client toggle plus the admin-entered assessment start date used only
+  by the Vocational Assessment deadline. The Discovery Process deadline
+  (SJD service start + 60 days) needs no new column — it's derived from
+  the existing `client_billing_codes.service_start_date`. The uploads
+  themselves reuse `client_documents` with two new free-text
+  `document_type` values (`sjd_discovery_assessment`,
+  `sjd_vocational_assessment`) via the existing `NectarAsk` upload
+  component — no schema change needed for those.
+
+Matches migration `supabase/migrations/20260813230000_sjd_prompts_11_17.sql`.
+
+```sql
+ALTER TABLE public.upi_attestations DROP CONSTRAINT IF EXISTS upi_attestations_kind_check;
+ALTER TABLE public.upi_attestations ADD CONSTRAINT upi_attestations_kind_check
+  CHECK (kind IN (
+    'sei_employment_monthly', 'sei_support_strategies',
+    'usor_vendor', 'usor_vendor_job_development',
+    'sjd_employment_monthly', 'sjd_support_strategies', 'sjd_usor_outreach'
+  ));
+
+ALTER TABLE public.upi_attestations ADD COLUMN IF NOT EXISTS note_text text;
+
+CREATE TABLE IF NOT EXISTS public.sjd_assessment_selections (
+  id                     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id        uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  client_id              uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+  assessment_type        text NOT NULL DEFAULT 'discovery_process'
+                            CHECK (assessment_type IN ('discovery_process', 'vocational_assessment')),
+  assessment_start_date  date,
+  updated_at             timestamptz NOT NULL DEFAULT now(),
+  updated_by             uuid,
+  updated_by_name        text,
+  UNIQUE (organization_id, client_id)
+);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.sjd_assessment_selections TO authenticated;
+GRANT ALL ON public.sjd_assessment_selections TO service_role;
+
+ALTER TABLE public.sjd_assessment_selections ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "org members read sjd assessment selections"
+  ON public.sjd_assessment_selections FOR SELECT TO authenticated
+  USING (is_org_member(organization_id, auth.uid()) OR is_super_admin(auth.uid()));
+
+CREATE POLICY "admins manage sjd assessment selections"
+  ON public.sjd_assessment_selections FOR ALL TO authenticated
+  USING (is_org_admin_or_manager(organization_id, auth.uid()) OR is_super_admin(auth.uid()))
+  WITH CHECK (is_org_admin_or_manager(organization_id, auth.uid()) OR is_super_admin(auth.uid()));
+
+CREATE INDEX IF NOT EXISTS idx_sjd_assessment_selections_org_client
+  ON public.sjd_assessment_selections (organization_id, client_id);
+```
+
+**What you'll see:** two `ALTER TABLE` statements widening the existing
+`upi_attestations` table (no rows touched, `note_text` defaults to NULL on
+every existing row), then one new table `sjd_assessment_selections` with
+its RLS policies and index. Nothing existing is deleted or renamed.

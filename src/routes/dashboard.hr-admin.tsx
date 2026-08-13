@@ -102,7 +102,6 @@ export function HrAdminPage() {
 
       <div className="space-y-6">
 
-
       {/* NECTAR gaps / renewals bar */}
       <Card className="border-amber-200/60 bg-amber-50/40 dark:bg-amber-900/10">
         <CardHeader className="flex flex-row items-center justify-between pb-3">

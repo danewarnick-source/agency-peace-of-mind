@@ -49,6 +49,26 @@ export interface BaselineTraining {
   hint?: string;
   /** What Nectar must see on a valid certificate for this training. */
   validation: BaselineValidationRule;
+  /**
+   * Whether this training requires an uploaded evidence document before it
+   * can be signed off. Defaults to true. Set false for a plain checkbox
+   * attestation with no supporting file (e.g. a knowledge attestation).
+   */
+  requires_upload?: boolean;
+  /**
+   * Whether the assigned staffer may complete this item themselves (not just
+   * an admin/manager). Defaults to false.
+   */
+  self_attest?: boolean;
+  /** Exact wording shown on the attestation checkbox for this training. */
+  attestation_text?: string;
+  /**
+   * Skip Nectar OCR/content validation and admin sign-off — the item is
+   * "complete" as soon as any evidence document is uploaded. For plain
+   * presence-only records (e.g. a policy handed to staff, an MVR pulled by
+   * admin) where there's nothing to read off the document.
+   */
+  auto_complete_on_upload?: boolean;
 }
 
 export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
@@ -263,15 +283,126 @@ export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
     tracks_expiration: false,
     default_validity_months: null,
     conditional: "codes",
-    applies_to_codes: ["EPR", "SED", "SEE", "SEI"],
+    applies_to_codes: ["EPR", "SEE", "SEI"],
     category: "Required trainings",
-    hint: "One-time. Applies to staff assigned to EPR, SED, SEE, or SEI.",
+    hint: "One-time. Applies to staff assigned to EPR, SEE, or SEI. At least one supervisory staff must hold this before EPR services begin. All supervisory EPR staff must complete within 90 days of employment.",
     validation: {
       cert_type_label: "ACRE / USU Workplace Support Training",
       required_keyword_groups: [
         {
           label: "ACRE / USU / Workplace Support wording",
           any_of: ["acre", "usu", "workplace support"],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: false,
+    },
+  },
+  {
+    key: "sed_acre_training",
+    title: "ACRE / USU Workplace Support Training — SED (Immediate)",
+    due_days: 0,
+    tracks_expiration: false,
+    default_validity_months: null,
+    conditional: "codes",
+    applies_to_codes: ["SED"],
+    category: "Required trainings",
+    hint: "Required immediately upon SED assignment — no grace period. Staff must hold this training from day one of providing SED services; flagged overdue from hire/assignment date itself.",
+    validation: {
+      cert_type_label: "ACRE / USU Workplace Support Training",
+      required_keyword_groups: [
+        {
+          label: "ACRE / USU / Workplace Support wording",
+          any_of: ["acre", "usu", "workplace support"],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: false,
+    },
+  },
+  {
+    key: "sjd_acre_training",
+    title: "ACRE Training — SJD (60-day)",
+    due_days: 60,
+    tracks_expiration: false,
+    default_validity_months: null,
+    conditional: "codes",
+    applies_to_codes: ["SJD"],
+    category: "Required trainings",
+    hint: "SJD staff must complete ACRE training within 60 days of hire and must be supervised by an ACRE-certified staff member until then.",
+    validation: {
+      cert_type_label: "ACRE / USU Workplace Support Training",
+      required_keyword_groups: [
+        {
+          label: "ACRE / USU / Workplace Support wording",
+          any_of: ["acre", "usu", "workplace support"],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: false,
+    },
+  },
+  {
+    key: "customized_employment_training",
+    title: "Customized Employment Training (USU)",
+    due_days: 0,
+    tracks_expiration: false,
+    default_validity_months: null,
+    conditional: "codes",
+    applies_to_codes: ["SEE", "SJD"],
+    category: "Required trainings",
+    hint: "Required for staff assigned to SEE or SJD who perform Discovery Process assessments or new task development. Separate from ACRE. Available through Utah State University at ceiutah.com/ce-training/.",
+    validation: {
+      cert_type_label: "Customized Employment Training (USU)",
+      required_keyword_groups: [
+        {
+          label: "Customized Employment / CE training wording",
+          any_of: ["customized employment", "ce training", "ceiutah", "utah state university customized"],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: false,
+    },
+  },
+  {
+    key: "sei_benefits_attestation",
+    title: "SEI Benefits Knowledge Attestation",
+    due_days: 90,
+    tracks_expiration: false,
+    default_validity_months: null,
+    conditional: "codes",
+    applies_to_codes: ["SEI"],
+    category: "Required trainings",
+    requires_upload: false,
+    self_attest: true,
+    attestation_text:
+      "I confirm that before providing Supported Employment services I have acquired a basic understanding of how earned income affects SSI, Social Security Title II benefits, Medicaid, and other public benefits, and I understand when to refer complex matters to USOR.",
+    hint: "One-time attestation. Applies to staff assigned to SEI. Completed by the staff member or an admin.",
+    validation: {
+      cert_type_label: "SEI Benefits Knowledge Attestation",
+      required_keyword_groups: [],
+      requires_completion_date: false,
+      requires_expiration_date: false,
+    },
+  },
+  {
+    key: "new_caregiver_compensation",
+    title: "New Caregiver Compensation Training",
+    due_days: 90,
+    tracks_expiration: false,
+    default_validity_months: null,
+    conditional: "codes",
+    applies_to_codes: ["CMP", "CMS"],
+    category: "Required trainings",
+    attestation_text:
+      "I confirm I have completed the DSPD New Caregiver Compensation training and passed with a score of 80% or higher (effective 7/1/26).",
+    hint: "One-time. Applies to staff assigned to CMP or CMS. Requires an uploaded proof of completion plus attestation of an 80%+ score (effective 7/1/26).",
+    validation: {
+      cert_type_label: "New Caregiver Compensation Training",
+      required_keyword_groups: [
+        {
+          label: "New Caregiver Compensation training wording",
+          any_of: ["new caregiver compensation", "caregiver compensation"],
         },
       ],
       requires_completion_date: true,
@@ -294,6 +425,88 @@ export const BASELINE_STAFF_TRAININGS: BaselineTraining[] = [
         {
           label: "BCBA / Board Certified Behavior Analyst wording",
           any_of: ["bcba", "board certified behavior analyst"],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: true,
+    },
+  },
+  {
+    key: "grievance_policy_staff_copy",
+    title: "Grievance Policy — Staff Copy",
+    due_days: 30,
+    tracks_expiration: false,
+    default_validity_months: null,
+    conditional: "all",
+    category: "Employment Documents (Upon Hire)",
+    auto_complete_on_upload: true,
+    hint: "The organization's grievance policy provided to this staff member. Presence-only — no expiration.",
+    validation: {
+      cert_type_label: "Grievance Policy — Staff Copy",
+      required_keyword_groups: [],
+      requires_completion_date: false,
+      requires_expiration_date: false,
+    },
+  },
+  {
+    key: "driving_record",
+    title: "Driving Record",
+    due_days: 30,
+    tracks_expiration: false,
+    default_validity_months: null,
+    conditional: "all",
+    category: "Employment Documents (Upon Hire)",
+    auto_complete_on_upload: true,
+    hint: "Motor vehicle record on file. Presence-only — no expiration tracking.",
+    validation: {
+      cert_type_label: "Driving Record",
+      required_keyword_groups: [],
+      requires_completion_date: false,
+      requires_expiration_date: false,
+    },
+  },
+  {
+    key: "hsq_cleaning_training",
+    title: "HSQ — Clean, Sanitary & Safe Environment Training",
+    due_days: 0,
+    tracks_expiration: false,
+    default_validity_months: null,
+    conditional: "codes",
+    applies_to_codes: ["HSQ"],
+    category: "Required trainings",
+    requires_upload: false,
+    self_attest: true,
+    attestation_text:
+      "I confirm I have been trained on maintaining a clean, sanitary, and safe living environment in accordance with HSQ service requirements and Contractor policies.",
+    hint: "Required before providing any HSQ service. Staff must be trained on maintaining a clean, sanitary, and safe living environment. Document completion in the staff's file.",
+    validation: {
+      cert_type_label: "HSQ Clean, Sanitary & Safe Environment Training",
+      required_keyword_groups: [
+        {
+          label: "HSQ cleaning/sanitation training wording",
+          any_of: ["clean", "sanitary", "sanitation", "safe environment", "hsq"],
+        },
+      ],
+      requires_completion_date: true,
+      requires_expiration_date: false,
+    },
+  },
+  {
+    key: "foster_care_license",
+    title: "Child Placing / Foster Care License (DHHS/OL)",
+    due_days: 0,
+    tracks_expiration: true,
+    default_validity_months: null,
+    conditional: "codes",
+    applies_to_codes: ["PPS"],
+    category: "Credentials & licenses",
+    hint: "Required for all staff providing PPS. Must hold a current Child Placing or Foster Care License issued by DHHS/OL. Renewal tracks the license's own expiration date.",
+    validation: {
+      cert_type_label: "Child Placing / Foster Care License",
+      required_keyword_groups: [
+        {
+          label: "Child Placing / Foster Care / DHHS Office of Licensing wording",
+          any_of: ["child placing", "foster care", "foster", "dhhs", "ol", "office of licensing"],
         },
       ],
       requires_completion_date: true,

@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
+import { baselineByKey } from "@/lib/staff-training-requirements";
 
 async function assertAdminOrManager(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -15,6 +16,23 @@ async function assertAdminOrManager(
   );
   if (error) throw new Error(error.message);
   if (!isAdmin) throw new Error("Forbidden: admin or manager role required");
+}
+
+/** Admin/manager, OR the staffer themselves when the subject is a self_attest baseline training. */
+async function assertCanAttest(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  orgId: string,
+  viewerId: string,
+  staffId: string,
+  subjectKind: string,
+  subjectRef: string,
+) {
+  if (viewerId === staffId && subjectKind === "baseline_cert") {
+    const t = baselineByKey(subjectRef);
+    if (t?.self_attest) return;
+  }
+  await assertAdminOrManager(supabase, orgId, viewerId);
 }
 
 export const recordAttestation = createServerFn({ method: "POST" })
@@ -35,7 +53,7 @@ export const recordAttestation = createServerFn({ method: "POST" })
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
-    await assertAdminOrManager(sb, data.organization_id, userId);
+    await assertCanAttest(sb, data.organization_id, userId, data.staff_id, data.subject_kind, data.subject_ref);
     const { data: prof } = await sb.from("profiles").select("full_name").eq("id", userId).maybeSingle();
     const { error } = await sb.from("document_attestations").insert({
       organization_id: data.organization_id,

@@ -95,7 +95,6 @@ export function HrcPage() {
                 Meeting records: date, attendees, minutes, decisions.
               </CardDescription>
             </div>
-            <ScaffoldNotice />
           </div>
         </CardHeader>
         <CardContent>
@@ -479,12 +478,24 @@ function RestrictionEditDialog({
 
 /* ---------- Sub-stubs (minimal, real reads/writes against scaffold tables) ---------- */
 
+type HrcMeetingRow = {
+  id: string;
+  meeting_date: string | null;
+  attendees: string | null;
+  minutes: string | null;
+  decisions: string | null;
+  minutes_document_path: string | null;
+  minutes_document_name: string | null;
+};
+
 function MeetingsStub({ canManage, orgId }: { canManage: boolean; orgId: string | null }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [meetingDate, setMeetingDate] = useState(new Date().toISOString().slice(0, 10));
   const [attendees, setAttendees] = useState("");
-  const [decisions, setDecisions] = useState("");
+  const [minutes, setMinutes] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const { data, isLoading } = useQuery({
     enabled: !!orgId,
@@ -492,24 +503,38 @@ function MeetingsStub({ canManage, orgId }: { canManage: boolean; orgId: string 
     queryFn: async () => {
       const { data, error } = await supabase
         .from("hrc_meetings")
-        .select("id, meeting_date, attendees, decisions")
+        .select("id, meeting_date, attendees, minutes, decisions, minutes_document_path, minutes_document_name")
         .eq("organization_id", orgId!)
         .order("meeting_date", { ascending: false })
-        .limit(20);
+        .order("created_at", { ascending: false })
+        .limit(50);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as HrcMeetingRow[];
     },
   });
 
   const add = useMutation({
-    mutationFn: async (values: { meeting_date: string; attendees: string; decisions: string }) => {
+    mutationFn: async (values: { meeting_date: string; attendees: string; minutes: string; file: File | null }) => {
       if (!values.meeting_date) throw new Error("Meeting date is required.");
       if (!values.attendees.trim()) throw new Error("Attendees are required.");
+      let minutes_document_path: string | null = null;
+      let minutes_document_name: string | null = null;
+      if (values.file) {
+        setUploading(true);
+        const path = `${orgId}/${Date.now()}-${values.file.name}`;
+        const { error: upErr } = await supabase.storage.from("hrc-documents").upload(path, values.file);
+        setUploading(false);
+        if (upErr) throw upErr;
+        minutes_document_path = path;
+        minutes_document_name = values.file.name;
+      }
       const { error } = await supabase.from("hrc_meetings").insert({
         organization_id: orgId!,
         meeting_date: values.meeting_date,
         attendees: values.attendees.trim(),
-        decisions: values.decisions.trim() || null,
+        minutes: values.minutes.trim() || null,
+        minutes_document_path,
+        minutes_document_name,
       });
       if (error) throw error;
     },
@@ -519,13 +544,46 @@ function MeetingsStub({ canManage, orgId }: { canManage: boolean; orgId: string 
       setOpen(false);
       setMeetingDate(new Date().toISOString().slice(0, 10));
       setAttendees("");
-      setDecisions("");
+      setMinutes("");
+      setFile(null);
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const openMinutesDoc = async (m: HrcMeetingRow) => {
+    if (!m.minutes_document_path) return;
+    const { data, error } = await supabase.storage.from("hrc-documents").createSignedUrl(m.minutes_document_path, 60);
+    if (error || !data?.signedUrl) { toast.error("Could not open document"); return; }
+    window.open(data.signedUrl, "_blank");
+  };
+
+  const exportCsv = () => {
+    const rows = data ?? [];
+    const esc = (v: unknown) => {
+      const s = v == null ? "" : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [
+      ["Meeting date", "Attendees", "Minutes", "Minutes document"].join(","),
+      ...rows.map((m) => [m.meeting_date ?? "", m.attendees ?? "", m.minutes ?? m.decisions ?? "", m.minutes_document_name ?? ""].map(esc).join(",")),
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `hrc-committee-meetings-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-3">
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="outline" onClick={exportCsv} disabled={!data?.length}>Export CSV</Button>
+        <Button size="sm" variant="outline" onClick={() => window.print()} disabled={!data?.length}>Print</Button>
+      </div>
       {isLoading ? (
         <div className="text-sm text-muted-foreground">Loading…</div>
       ) : !data?.length ? (
@@ -535,15 +593,20 @@ function MeetingsStub({ canManage, orgId }: { canManage: boolean; orgId: string 
       ) : (
         <ul className="divide-y divide-border rounded-md border border-border">
           {data.map((m) => (
-            <li key={m.id} className="flex flex-col gap-0.5 px-3 py-2 text-sm">
+            <li key={m.id} className="flex flex-col gap-1 px-3 py-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="font-medium">{m.meeting_date ?? "(no date)"}</span>
                 <span className="text-xs text-muted-foreground truncate ml-3">
                   {m.attendees ?? ""}
                 </span>
               </div>
-              {m.decisions && (
-                <p className="text-xs text-muted-foreground">{m.decisions}</p>
+              {(m.minutes ?? m.decisions) && (
+                <p className="text-xs text-muted-foreground whitespace-pre-wrap">{m.minutes ?? m.decisions}</p>
+              )}
+              {m.minutes_document_path && (
+                <button type="button" onClick={() => openMinutesDoc(m)} className="w-fit text-xs text-primary underline">
+                  📎 {m.minutes_document_name ?? "Minutes document"}
+                </button>
               )}
             </li>
           ))}
@@ -573,22 +636,26 @@ function MeetingsStub({ canManage, orgId }: { canManage: boolean; orgId: string 
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Decisions / minutes</Label>
+                  <Label>Notes / minutes</Label>
                   <Textarea
-                    value={decisions}
-                    onChange={(e) => setDecisions(e.target.value)}
-                    placeholder="Decisions made and action items"
+                    value={minutes}
+                    onChange={(e) => setMinutes(e.target.value)}
+                    placeholder="Discussion, decisions made, and action items"
                     rows={4}
                   />
+                </div>
+                <div className="space-y-1">
+                  <Label>Formal minutes document (optional)</Label>
+                  <Input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
                 <Button
-                  disabled={add.isPending}
-                  onClick={() => add.mutate({ meeting_date: meetingDate, attendees, decisions })}
+                  disabled={add.isPending || uploading}
+                  onClick={() => add.mutate({ meeting_date: meetingDate, attendees, minutes, file })}
                 >
-                  Save meeting
+                  {add.isPending || uploading ? "Saving…" : "Save meeting"}
                 </Button>
               </DialogFooter>
             </DialogContent>

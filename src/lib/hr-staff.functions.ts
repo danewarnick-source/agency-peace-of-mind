@@ -39,6 +39,41 @@ const orgStaff = z.object({
   staff_id: z.string().uuid(),
 });
 
+/**
+ * Shared status computation for a baseline training row, given its raw
+ * `staff_baseline_training_completions` record (or undefined if none yet).
+ *   complete   = admin signed off AND not expired
+ *   expired    = past expiration OR (no completion and past due date)
+ *   in_progress= evidence uploaded, awaiting admin sign-off
+ *   not_started= nothing on file
+ */
+function computeBaselineStatus(
+  t: (typeof BASELINE_STAFF_TRAININGS)[number],
+  bc: Record<string, unknown> | undefined,
+  hireDate: Date | null,
+) {
+  const completedDate = (bc?.completed_date as string | null) ?? null;
+  const expiresAt = (bc?.expires_at as string | null) ?? null;
+  const evidenceDocId = (bc?.evidence_document_id as string | null) ?? null;
+  const adminSignedOffAt = (bc?.admin_signed_off_at as string | null) ?? null;
+  const todayMs = Date.now();
+  const expMs = expiresAt ? new Date(`${expiresAt}T00:00:00Z`).getTime() : null;
+  let status: string = "not_started";
+  if (adminSignedOffAt) {
+    status = expMs !== null && expMs < todayMs ? "expired" : "complete";
+  } else if (evidenceDocId) {
+    status = "in_progress";
+  } else {
+    const due = dueDateFor(t, hireDate);
+    if (due && new Date(`${due}T00:00:00Z`).getTime() < todayMs) {
+      status = "expired";
+    } else {
+      status = "not_started";
+    }
+  }
+  return { status, completedDate, expiresAt, evidenceDocId, adminSignedOffAt };
+}
+
 const HR_BUCKET = "hr-documents";
 
 // --- Reads -----------------------------------------------------------------
@@ -319,40 +354,14 @@ export const getStaffChecklist = createServerFn({ method: "GET" })
         assignedCodes,
       });
       const bc = baselineMap.get(t.key);
-      const completedDate = (bc?.completed_date as string | null) ?? null;
-      const expiresAt = (bc?.expires_at as string | null) ?? null;
-      const evidenceDocId =
-        (bc?.evidence_document_id as string | null) ?? null;
-      const adminSignedOffAt =
-        (bc?.admin_signed_off_at as string | null) ?? null;
       const nectarNameMatch =
         (bc?.nectar_name_match as string | null) ?? null;
       const nectarExtractedName =
         (bc?.nectar_extracted_name as string | null) ?? null;
       const nectarReviewedAt =
         (bc?.nectar_reviewed_at as string | null) ?? null;
-      // Status:
-      //   complete   = admin signed off AND not expired
-      //   expired    = past expiration OR (no completion and past due date)
-      //   in_progress= certificate uploaded, awaiting admin sign-off
-      //   not_started= nothing on file
-      const todayMs = Date.now();
-      const expMs = expiresAt
-        ? new Date(`${expiresAt}T00:00:00Z`).getTime()
-        : null;
-      let status: string = "not_started";
-      if (adminSignedOffAt) {
-        status = expMs !== null && expMs < todayMs ? "expired" : "complete";
-      } else if (evidenceDocId) {
-        status = "in_progress";
-      } else {
-        const due = dueDateFor(t, hireDate);
-        if (due && new Date(`${due}T00:00:00Z`).getTime() < todayMs) {
-          status = "expired"; // UI renders as Overdue
-        } else {
-          status = "not_started"; // UI renders as Incomplete
-        }
-      }
+      const { status, completedDate, expiresAt, evidenceDocId, adminSignedOffAt } =
+        computeBaselineStatus(t, bc, hireDate);
       return {
         requirement_id: baselineRequirementId(t.key),
         title: t.title,
@@ -1215,12 +1224,12 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
       return { requirements: [], staff: [] };
     }
 
-    const [{ data: base, error: baseErr }, { data: profs }, { data: comps }, { data: hoursEntries }, { data: completions }, { data: mappings }, { data: topics }] =
+    const [{ data: base, error: baseErr }, { data: profs }, { data: comps }, { data: hoursEntries }, { data: completions }, { data: mappings }, { data: topics }, { data: baselineComps }, { data: assignmentRows }] =
       await Promise.all([
         sb.rpc("get_hr_staff_checklist_base", { _org: data.organization_id }),
         sb
           .from("profiles")
-          .select("id, full_name, team_id, hire_date, staff_type_keys")
+          .select("id, full_name, team_id, hire_date, start_date, staff_type_keys, requires_deescalation, requires_abi")
           .in("id", staffIds),
         sb
           .from("staff_checklist_completion")
@@ -1245,8 +1254,33 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
           .select("training_topic_id, requirement_key, is_active")
           .eq("is_active", true),
         sb.from("training_topics").select("id, title, default_hours"),
+        sb
+          .from("staff_baseline_training_completions")
+          .select("*")
+          .eq("organization_id", data.organization_id)
+          .in("staff_id", staffIds),
+        sb
+          .from("staff_assignments")
+          .select("staff_id, service_codes")
+          .eq("organization_id", data.organization_id)
+          .in("staff_id", staffIds),
       ]);
     if (baseErr) throw new Error(baseErr.message);
+
+    const assignedCodesByStaff = new Map<string, string[]>();
+    for (const a of (assignmentRows ?? []) as Array<{ staff_id: string; service_codes: string[] | null }>) {
+      const prev = assignedCodesByStaff.get(a.staff_id) ?? [];
+      assignedCodesByStaff.set(
+        a.staff_id,
+        Array.from(new Set([...prev, ...((a.service_codes ?? []).map((c) => c.toUpperCase()))])),
+      );
+    }
+    const baselineCompByStaff = new Map<string, Map<string, Record<string, unknown>>>();
+    for (const bc of (baselineComps ?? []) as Array<Record<string, unknown>>) {
+      const sid = bc.staff_id as string;
+      if (!baselineCompByStaff.has(sid)) baselineCompByStaff.set(sid, new Map());
+      baselineCompByStaff.get(sid)!.set(bc.training_key as string, bc);
+    }
 
     const baseRows = (base ?? []) as Array<Record<string, unknown>>;
     const cumulativeConfigByReqId = new Map<string, CumulativeRequirementConfig>();
@@ -1284,6 +1318,27 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
         phase: typeof meta.phase === "string" ? (meta.phase as string) : null,
       };
     });
+
+    const matrixTitleSet = new Set(requirements.map((r) => r.title.trim().toLowerCase()));
+    for (const t of BASELINE_STAFF_TRAININGS) {
+      if (matrixTitleSet.has(t.title.trim().toLowerCase())) continue;
+      requirements.push({
+        requirement_id: baselineRequirementId(t.key),
+        title: t.title,
+        short_label: null,
+        category: t.category,
+        source_citation: t.hint ?? null,
+        checklist_layer: "Baseline",
+        is_renewable: t.tracks_expiration,
+        renewal_interval_months: t.default_validity_months,
+        renewal_source: null,
+        requirement_type: "binary",
+        cumulative_config: null,
+        applies_to_staff_types: "all",
+        applies_to_confirmed_at: null,
+        phase: baselinePhaseFor(t.key),
+      });
+    }
 
     const reqById = new Map(requirements.map((r) => [r.requirement_id, r]));
 
@@ -1411,7 +1466,10 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
         full_name: string | null;
         team_id: string | null;
         hire_date: string | null;
+        start_date: string | null;
         staff_type_keys: string[] | null;
+        requires_deescalation: boolean | null;
+        requires_abi: boolean | null;
       }
     >();
     for (const p of (profs ?? []) as Array<{
@@ -1419,7 +1477,10 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
       full_name: string | null;
       team_id: string | null;
       hire_date: string | null;
+      start_date: string | null;
       staff_type_keys: string[] | null;
+      requires_deescalation: boolean | null;
+      requires_abi: boolean | null;
     }>) {
       mProfMap.set(p.id, p);
     }
@@ -1485,6 +1546,38 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
           cumulative_progress: progress,
           applicable: applicableByReq.get(cfg.requirement_id) ?? true,
         };
+      }
+      // Inject synthetic baseline-training cells (SEI attestation, new
+      // caregiver comp training, ACRE/USU, etc.) — same source used by the
+      // per-staff checklist, so the matrix and the staff profile agree.
+      {
+        const hireDateStr = p?.start_date ?? p?.hire_date ?? null;
+        const hireDate = hireDateStr ? new Date(`${hireDateStr}T00:00:00Z`) : null;
+        const requiresDeescalation = (p?.requires_deescalation as boolean | null) !== false;
+        const requiresAbi = (p?.requires_abi as boolean | null) !== false;
+        const assignedCodes = assignedCodesByStaff.get(sid) ?? [];
+        const bcMap = baselineCompByStaff.get(sid) ?? new Map<string, Record<string, unknown>>();
+        for (const t of BASELINE_STAFF_TRAININGS) {
+          const reqId = baselineRequirementId(t.key);
+          if (!reqById.has(reqId)) continue;
+          const applicable = isBaselineApplicable(t, {
+            hireDate,
+            requiresDeescalation,
+            requiresAbi,
+            assignedCodes,
+          });
+          const { status, completedDate, expiresAt, evidenceDocId } =
+            computeBaselineStatus(t, bcMap.get(t.key), hireDate);
+          cells[reqId] = {
+            status,
+            completed_date: completedDate,
+            expires_at: expiresAt,
+            evidence_document_id: evidenceDocId,
+            training_completion_id: null,
+            auto_checked_at: null,
+            applicable,
+          };
+        }
       }
       return {
         staff_id: sid,

@@ -174,8 +174,9 @@ export const ensureCurrentSummaryPeriods = createServerFn({ method: "POST" })
         });
       }
 
-      // Monthly narrative (SEI / PN1 / PN2). Single row per month, even if
-      // the client has multiple of them; UPI flag set if SEI is among them.
+      // Monthly narrative (SEI / SJD / PN1 / PN2). Single row per month, even
+      // if the client has multiple of them; UPI flag set if SEI or SJD is
+      // among them.
       for (const p of monthly) {
         const active = startedByPeriodEnd(monthlyNarrativeEntries, p.period_end);
         if (active.length === 0) continue;
@@ -189,7 +190,7 @@ export const ensureCurrentSummaryPeriods = createServerFn({ method: "POST" })
           period_end: p.period_end,
           due_date: p.due_date,
           service_codes: services,
-          requires_upi_attestation: active.some((e) => e.code === "SEI"),
+          requires_upi_attestation: active.some((e) => e.code === "SEI" || e.code === "SJD"),
           summary_kind: "narrative",
           include_goal_progress: clientNeedsGoalProgress(services),
         });

@@ -91,6 +91,16 @@ export function useClientBudget(clientId: string | undefined) {
         .gte("record_date", earliestStart.toISOString().slice(0, 10));
       if (dlErr) throw dlErr;
 
+      // Hospitalized/non-billable RHS days never count toward budget usage.
+      const { data: hospRows } = await supabase
+        .from("rhs_hospitalization_days" as never)
+        .select("record_date")
+        .eq("organization_id", org!.organization_id)
+        .eq("client_id", clientId!);
+      const hospitalizedDates = new Set(
+        ((hospRows ?? []) as unknown as Array<{ record_date: string }>).map((r) => r.record_date),
+      );
+
       return codes.map((code): CodeBudget => {
         const period_start = parseDate(code.service_start_date) ?? new Date(now.getFullYear(), 0, 1);
         const period_end = parseDate(code.service_end_date);
@@ -138,7 +148,9 @@ export function useClientBudget(clientId: string | undefined) {
               ? (!isNonAnswer(note) && note.trim().length >= 50)
               : (!isNonAnswer(note) && note.trim().length > 0);
             if (!qualifies) continue;
-            dates.add(billIn.slice(0, 10));
+            const dateStr = billIn.slice(0, 10);
+            if (code.service_code === "RHS" && hospitalizedDates.has(dateStr)) continue;
+            dates.add(dateStr);
           }
           used_days = dates.size;
         } else if (is_daily) {

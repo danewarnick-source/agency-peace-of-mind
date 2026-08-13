@@ -1851,6 +1851,8 @@ function CertsTab({
     "medicaid_fraud_exclusion",
     "dhhs_code_of_conduct",
     "acre_usu_workplace_support",
+    "sei_benefits_attestation",
+    "new_caregiver_compensation",
     "bcba_credential",
     "rn_lpn_license",
   ] as const;
@@ -2108,6 +2110,14 @@ function CertsTab({
               title: "ACRE / USU Workplace Support Training",
               meta: "One-time · SOW §9.5, 28.4, 29.4, 30.5",
             },
+            sei_benefits_attestation: {
+              title: "SEI Benefits Knowledge Attestation",
+              meta: "One-time attestation · Staff or admin can complete",
+            },
+            new_caregiver_compensation: {
+              title: "New Caregiver Compensation Training",
+              meta: "One-time · Upload proof + attest 80%+ score (effective 7/1/26)",
+            },
             bcba_credential: {
               title: "BCBA Credential",
               meta: "Renewal tracks the credential's own expiration date · SOW §1.9(4)",
@@ -2122,6 +2132,8 @@ function CertsTab({
             deescalation: "no behavior-coded client currently assigned",
             dhhs_code_of_conduct: "not assigned to SLN, SLH, PPS, or HHS",
             acre_usu_workplace_support: "not assigned to EPR, SED, SEE, or SEI",
+            sei_benefits_attestation: "not assigned to SEI",
+            new_caregiver_compensation: "not assigned to CMP or CMS",
             bcba_credential: "not assigned to BC1, BC2, or BC3",
             rn_lpn_license: "not assigned to PN1, PN2, PM1, or PM2",
           };
@@ -2291,25 +2303,27 @@ function CertsTab({
                   {!row.completion.expires_at && kind === "overdue" && (
                     <span className="text-[11px] text-rose-600 font-medium">Overdue</span>
                   )}
-                  <CertBaselineAction
-                    organizationId={organizationId}
-                    staffId={staffId}
-                    trainingKey={key}
-                    currentEvidenceDocId={row.completion.evidence_document_id}
-                    nectarValidationStatus={row.completion.nectar_validation_status}
-                    onChanged={invalidate}
-                    attachBaselineFn={attachBaselineFn}
-                    createUpload={createUpload}
-                    getDocUrl={getDocUrl}
-                  />
-                  {!!row.completion.evidence_document_id && row.completion.nectar_validation_status !== "failed" && (
+                  {(baselineByKey(key)?.requires_upload !== false) && (
+                    <CertBaselineAction
+                      organizationId={organizationId}
+                      staffId={staffId}
+                      trainingKey={key}
+                      currentEvidenceDocId={row.completion.evidence_document_id}
+                      nectarValidationStatus={row.completion.nectar_validation_status}
+                      onChanged={invalidate}
+                      attachBaselineFn={attachBaselineFn}
+                      createUpload={createUpload}
+                      getDocUrl={getDocUrl}
+                    />
+                  )}
+                  {(baselineByKey(key)?.requires_upload === false || (!!row.completion.evidence_document_id && row.completion.nectar_validation_status !== "failed")) && (
                     <AttestationGate
                       organizationId={organizationId}
                       staffId={staffId}
                       subjectKind="baseline_cert"
                       subjectRef={key}
                       hrDocumentId={row.completion.evidence_document_id}
-                      statement="I verify that the information on this document is accurate and current, and that this individual has met this requirement."
+                      statement={baselineByKey(key)?.attestation_text ?? "I verify that the information on this document is accurate and current, and that this individual has met this requirement."}
                       attested={(attestationsQ.data ?? []).some((a: { subject_kind: string; subject_ref: string }) => a.subject_kind === "baseline_cert" && a.subject_ref === key)}
                       onAttested={async () => {
                         attestationsQ.refetch();
@@ -2361,6 +2375,7 @@ function CertsTab({
                     <div className="font-medium text-sm">{row.title}</div>
                     <div className="mt-0.5 text-[11px] text-muted-foreground">
                       {row.is_renewable && row.renewal_interval_months && `Renews every ${row.renewal_interval_months} mo`}
+                      {!row.is_renewable && !row.completion.expires_at && row.completion.completed_date && `On file since ${row.completion.completed_date}`}
                       {row.source_citation && ` · ${row.source_citation}`}
                     </div>
                   </div>
@@ -2398,7 +2413,7 @@ function CertsTab({
                         upsertChecklistFn={upsertChecklistFn}
                       />
                     )}
-                    {row.applicable !== false && !!row.completion.evidence_document_id && row.completion.nectar_validation_status !== "failed" && (
+                    {row.applicable !== false && !!row.completion.evidence_document_id && row.completion.nectar_validation_status !== "failed" && !(bKey && baselineByKey(bKey)?.auto_complete_on_upload) && (
                       <AttestationGate
                         organizationId={organizationId}
                         staffId={staffId}

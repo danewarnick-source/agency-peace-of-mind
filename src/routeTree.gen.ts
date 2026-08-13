@@ -117,6 +117,7 @@ import { Route as DashboardSettingsSubscriptionRouteImport } from './routes/dash
 import { Route as DashboardSettingsServiceCodesRouteImport } from './routes/dashboard.settings.service-codes'
 import { Route as DashboardSettingsServiceCatalogRouteImport } from './routes/dashboard.settings.service-catalog'
 import { Route as DashboardSettingsRetentionRouteImport } from './routes/dashboard.settings.retention'
+import { Route as DashboardSettingsLicensingRouteImport } from './routes/dashboard.settings.licensing'
 import { Route as DashboardSettingsGmailRouteImport } from './routes/dashboard.settings.gmail'
 import { Route as DashboardSettingsEmailRouteImport } from './routes/dashboard.settings.email'
 import { Route as DashboardSettingsBankMappingRouteImport } from './routes/dashboard.settings.bank-mapping'
@@ -772,6 +773,12 @@ const DashboardSettingsRetentionRoute =
   DashboardSettingsRetentionRouteImport.update({
     id: '/retention',
     path: '/retention',
+    getParentRoute: () => DashboardSettingsRoute,
+  } as any)
+const DashboardSettingsLicensingRoute =
+  DashboardSettingsLicensingRouteImport.update({
+    id: '/licensing',
+    path: '/licensing',
     getParentRoute: () => DashboardSettingsRoute,
   } as any)
 const DashboardSettingsGmailRoute = DashboardSettingsGmailRouteImport.update({
@@ -1450,6 +1457,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/email': typeof DashboardSettingsEmailRoute
   '/dashboard/settings/gmail': typeof DashboardSettingsGmailRoute
+  '/dashboard/settings/licensing': typeof DashboardSettingsLicensingRoute
   '/dashboard/settings/retention': typeof DashboardSettingsRetentionRoute
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
   '/dashboard/settings/service-codes': typeof DashboardSettingsServiceCodesRoute
@@ -1644,6 +1652,7 @@ export interface FileRoutesByTo {
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/email': typeof DashboardSettingsEmailRoute
   '/dashboard/settings/gmail': typeof DashboardSettingsGmailRoute
+  '/dashboard/settings/licensing': typeof DashboardSettingsLicensingRoute
   '/dashboard/settings/retention': typeof DashboardSettingsRetentionRoute
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
   '/dashboard/settings/service-codes': typeof DashboardSettingsServiceCodesRoute
@@ -1846,6 +1855,7 @@ export interface FileRoutesById {
   '/dashboard/settings/bank-mapping': typeof DashboardSettingsBankMappingRoute
   '/dashboard/settings/email': typeof DashboardSettingsEmailRoute
   '/dashboard/settings/gmail': typeof DashboardSettingsGmailRoute
+  '/dashboard/settings/licensing': typeof DashboardSettingsLicensingRoute
   '/dashboard/settings/retention': typeof DashboardSettingsRetentionRoute
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
   '/dashboard/settings/service-codes': typeof DashboardSettingsServiceCodesRoute
@@ -2049,6 +2059,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/email'
     | '/dashboard/settings/gmail'
+    | '/dashboard/settings/licensing'
     | '/dashboard/settings/retention'
     | '/dashboard/settings/service-catalog'
     | '/dashboard/settings/service-codes'
@@ -2243,6 +2254,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/email'
     | '/dashboard/settings/gmail'
+    | '/dashboard/settings/licensing'
     | '/dashboard/settings/retention'
     | '/dashboard/settings/service-catalog'
     | '/dashboard/settings/service-codes'
@@ -2444,6 +2456,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/bank-mapping'
     | '/dashboard/settings/email'
     | '/dashboard/settings/gmail'
+    | '/dashboard/settings/licensing'
     | '/dashboard/settings/retention'
     | '/dashboard/settings/service-catalog'
     | '/dashboard/settings/service-codes'
@@ -3283,6 +3296,13 @@ declare module '@tanstack/react-router' {
       path: '/retention'
       fullPath: '/dashboard/settings/retention'
       preLoaderRoute: typeof DashboardSettingsRetentionRouteImport
+      parentRoute: typeof DashboardSettingsRoute
+    }
+    '/dashboard/settings/licensing': {
+      id: '/dashboard/settings/licensing'
+      path: '/licensing'
+      fullPath: '/dashboard/settings/licensing'
+      preLoaderRoute: typeof DashboardSettingsLicensingRouteImport
       parentRoute: typeof DashboardSettingsRoute
     }
     '/dashboard/settings/gmail': {
@@ -4163,6 +4183,7 @@ interface DashboardSettingsRouteChildren {
   DashboardSettingsBankMappingRoute: typeof DashboardSettingsBankMappingRoute
   DashboardSettingsEmailRoute: typeof DashboardSettingsEmailRoute
   DashboardSettingsGmailRoute: typeof DashboardSettingsGmailRoute
+  DashboardSettingsLicensingRoute: typeof DashboardSettingsLicensingRoute
   DashboardSettingsRetentionRoute: typeof DashboardSettingsRetentionRoute
   DashboardSettingsServiceCatalogRoute: typeof DashboardSettingsServiceCatalogRoute
   DashboardSettingsServiceCodesRoute: typeof DashboardSettingsServiceCodesRoute
@@ -4175,6 +4196,7 @@ const DashboardSettingsRouteChildren: DashboardSettingsRouteChildren = {
   DashboardSettingsBankMappingRoute: DashboardSettingsBankMappingRoute,
   DashboardSettingsEmailRoute: DashboardSettingsEmailRoute,
   DashboardSettingsGmailRoute: DashboardSettingsGmailRoute,
+  DashboardSettingsLicensingRoute: DashboardSettingsLicensingRoute,
   DashboardSettingsRetentionRoute: DashboardSettingsRetentionRoute,
   DashboardSettingsServiceCatalogRoute: DashboardSettingsServiceCatalogRoute,
   DashboardSettingsServiceCodesRoute: DashboardSettingsServiceCodesRoute,

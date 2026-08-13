@@ -10,6 +10,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getOrgCeRoster } from "@/lib/ce.functions";
+import { useDeadlines } from "@/hooks/use-deadlines";
+import { isUpiReminderFireDay } from "@/lib/upi-reminder-cadence";
 
 type Urgency = "normal" | "urgent" | "critical";
 type NotificationType =
@@ -229,9 +231,34 @@ export function NotificationBell() {
     };
   }, [ceBehind, org?.organization_id]);
 
+  // UPI attestation cadence reminders (prompts 20/21/25) — SEI monthly
+  // summary, SEI employment data, and CMP/CMS monthly summary. These only
+  // fire into the bell on the 1st/5th/10th of the month; the Deadlines panel
+  // shows the underlying item every day it's open.
+  const { items: deadlineItems } = useDeadlines();
+  const cadenceSynthetics = useMemo<AppNotification[]>(() => {
+    if (!isUpiReminderFireDay(new Date())) return [];
+    return deadlineItems
+      .filter((i) => i.cadenceReminder)
+      .map((i) => ({
+        id: `__cadence_${i.key}__`,
+        organization_id: org?.organization_id ?? "",
+        type: "incident_deadline_warning" as NotificationType,
+        urgency: (i.status === "overdue" ? "critical" : "urgent") as Urgency,
+        title: i.title,
+        body: `${i.subject} · due ${i.dueAt.toLocaleDateString()}`,
+        link_to: i.href ?? "/dashboard/deadlines",
+        related_id: null,
+        related_type: null,
+        read_at: null,
+        dismissed_at: null,
+        created_at: new Date().toISOString(),
+      }));
+  }, [deadlineItems, org?.organization_id]);
+
   const merged = useMemo(
-    () => (ceSynthetic ? [ceSynthetic, ...notifications] : notifications),
-    [ceSynthetic, notifications],
+    () => [...cadenceSynthetics, ...(ceSynthetic ? [ceSynthetic] : []), ...notifications],
+    [cadenceSynthetics, ceSynthetic, notifications],
   );
 
   const unread = merged.filter((n) => !n.read_at);
@@ -239,7 +266,7 @@ export function NotificationBell() {
   const unreadCount = unread.length;
 
   function handleClick(n: AppNotification) {
-    if (n.id !== "__ce_synthetic__" && n.id !== "__ce_behind__" && !n.read_at) markReadMut.mutate(n.id);
+    if (!n.id.startsWith("__") && !n.read_at) markReadMut.mutate(n.id);
     if (n.link_to) {
       if (!n.link_to.startsWith("/dashboard/")) {
         console.warn("[NotificationBell] skipping navigation — unexpected link_to:", n.link_to);

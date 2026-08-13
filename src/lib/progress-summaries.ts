@@ -1,6 +1,6 @@
 // Pure helpers for client progress summary periods.
 // HHS / RHS / DSI / SLH / SLN → quarterly narrative (due 15 days after quarter end).
-// SEI / PN1 / PN2 → monthly narrative (due 15th of following month).
+// SEI / PN1 / PN2 / CMP / CMS → monthly narrative (due 15th of following month).
 //   SEI additionally requires UPI attestation.
 // PBA → monthly FINANCIAL STATEMENT marker (no AI draft).
 //
@@ -8,8 +8,38 @@
 // are in GOAL_PROGRESS_EXCLUDED_CODES (ELS, MTP, PBA, PM1/PM2, RP/RL respite).
 
 export const QUARTERLY_SUMMARY_CODES = new Set(["HHS", "RHS", "DSI", "SLH", "SLN"]);
-export const MONTHLY_SUMMARY_CODES = new Set(["SEI", "PN1", "PN2"]);
+// CMP/CMS moved from (implicit, never-generated) quarterly to explicit monthly
+// cadence — forward-looking only, does not touch any historical quarterly rows.
+// SJD (Supported Employment — Job Development) also monthly, same UPI
+// attestation requirement as SEI.
+export const MONTHLY_SUMMARY_CODES = new Set(["SEI", "SJD", "PN1", "PN2", "CMP", "CMS"]);
 export const FINANCIAL_STATEMENT_CODES = new Set(["PBA"]);
+
+/**
+ * Lightweight per-code required-field guidance surfaced to Nectar's draft
+ * prompt for monthly narrative summaries. Freeform prose otherwise — this
+ * only nudges which topics must be covered for codes with specific content
+ * requirements (SEI, SJD). Codes not listed here get no extra guidance.
+ */
+export const MONTHLY_SUMMARY_REQUIRED_FIELDS: Record<string, string[]> = {
+  SJD: [
+    "Person's name",
+    "Service code: SJD",
+    "Date range covered",
+    "All employment activities during the period",
+    "Person's response to the service",
+    "Progress toward employment goals",
+    "Documentation of weekly assessment data",
+    "Staff name",
+    "USOR contact date and current funding status",
+  ],
+};
+
+/** "2026-06" -> "June 2026". Shared by the deadlines panel and notification bell. */
+export function formatPeriodMonthYear(yyyyMm: string): string {
+  const [y, m] = yyyyMm.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleString(undefined, { month: "long", year: "numeric" });
+}
 
 /** Services where contract does NOT require goal-progress reporting. */
 export const GOAL_PROGRESS_EXCLUDED_CODES = new Set([

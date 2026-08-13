@@ -27,6 +27,8 @@ import {
 } from "@/lib/progress-summaries.functions";
 import { draftProgressSummary } from "@/lib/progress-summary-draft.functions";
 import { renderSummaryPdf } from "@/lib/progress-summary-pdf";
+import { formatPeriodMonthYear } from "@/lib/progress-summaries";
+import { listUpiAttestations, recordUpiAttestation } from "@/lib/upi-attestations.functions";
 
 const searchSchema = z.object({ open: z.string().uuid().optional() });
 
@@ -296,6 +298,36 @@ function SummaryReviewDialog({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const isSei = bundleQ.data?.summary.service_codes?.includes("SEI") ?? false;
+  const isSjd = bundleQ.data?.summary.service_codes?.includes("SJD") ?? false;
+  const empAttestKind = isSjd && !isSei ? "sjd_employment_monthly" : "sei_employment_monthly";
+  const listUpiAttestFn = useServerFn(listUpiAttestations);
+  const recordUpiAttestFn = useServerFn(recordUpiAttestation);
+  const empAttestQ = useQuery({
+    enabled: (isSei || isSjd) && !!bundleQ.data,
+    queryKey: ["upi-attestations", organizationId, empAttestKind, bundleQ.data?.summary.client_id, bundleQ.data?.summary.period_label],
+    queryFn: () => listUpiAttestFn({ data: { organizationId, kind: empAttestKind } }),
+  });
+  const empAttestedAt = empAttestQ.data?.find(
+    (a) => a.client_id === bundleQ.data?.summary.client_id && a.period_label === bundleQ.data?.summary.period_label,
+  )?.attested_at ?? null;
+  const empAttestMut = useMutation({
+    mutationFn: () => recordUpiAttestFn({
+      data: {
+        organizationId,
+        clientId: bundleQ.data!.summary.client_id,
+        kind: empAttestKind,
+        periodLabel: bundleQ.data!.summary.period_label,
+      },
+    }),
+    onSuccess: () => {
+      toast.success("Employment data attestation recorded.");
+      qc.invalidateQueries({ queryKey: ["upi-attestations"] });
+      qc.invalidateQueries({ queryKey: ["deadlines"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const handleDownload = () => {
     if (!bundleQ.data) return;
     const s = bundleQ.data.summary;
@@ -406,6 +438,21 @@ function SummaryReviewDialog({
                     )}
                   </div>
                 </>
+              )}
+              {(isSei || isSjd) && (
+                <label className="mt-3 flex items-start gap-2 rounded-md border border-border/60 p-3 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={!!empAttestedAt}
+                    disabled={!!empAttestedAt || empAttestMut.isPending}
+                    onChange={(e) => { if (e.target.checked) empAttestMut.mutate(); }}
+                  />
+                  <span>
+                    I confirm I have entered this client's employment data into UPI for {formatPeriodMonthYear(bundleQ.data.summary.period_label)}.
+                    {empAttestedAt && <span className="ml-1 text-xs text-muted-foreground">Attested {new Date(empAttestedAt).toLocaleDateString()}.</span>}
+                  </span>
+                </label>
               )}
             </div>
           </div>

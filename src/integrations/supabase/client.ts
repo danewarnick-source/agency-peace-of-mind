@@ -56,6 +56,7 @@ let _serverClient: ReturnType<typeof createClient<Database>> | null = null;
 function getServerClient() {
   if (!_serverClient) {
     const { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } = getEnv();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     _serverClient = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
       auth: {
         storage: undefined,
@@ -63,15 +64,16 @@ function getServerClient() {
         autoRefreshToken: false,
         detectSessionInUrl: false,
       },
-      realtime: { transport: ws },
-    });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      realtime: { transport: ws as any },
+    }) as unknown as NonNullable<typeof _serverClient>;
   }
-  return _serverClient;
+  return _serverClient!;
 }
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
-export const supabase = new Proxy({} as ReturnType<typeof createClient<Database>>, {
+export const supabase = new Proxy({} as unknown as ReturnType<typeof createClient<Database>> & object, {
   get(_, prop, receiver) {
     const client = hasBrowserStorage() ? getBrowserClient() : getServerClient();
     return Reflect.get(client, prop, receiver);

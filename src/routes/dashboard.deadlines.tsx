@@ -34,6 +34,9 @@ const sourceIcon: Record<DeadlineItem["source"], typeof AlarmClock> = {
   pcsp_support_strategies: FileSignature,
   support_strategy_gap: AlertTriangle,
   hrc_restriction_review: ShieldCheck,
+  nectar_requirement: FileSignature,
+  compliance_instance: AlertTriangle,
+  staff_checklist: ShieldCheck,
 };
 
 const sourceLabel: Record<DeadlineItem["source"], string> = {
@@ -46,6 +49,9 @@ const sourceLabel: Record<DeadlineItem["source"], string> = {
   pcsp_support_strategies: "Support Strategies renewal",
   support_strategy_gap: "Support Strategy gap",
   hrc_restriction_review: "HRC restriction review",
+  nectar_requirement: "Nectar requirement",
+  compliance_instance: "Compliance item",
+  staff_checklist: "HR checklist renewal",
 };
 
 function fmtDue(d: Date): string {

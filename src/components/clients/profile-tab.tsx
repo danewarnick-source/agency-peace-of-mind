@@ -35,6 +35,7 @@ import {
   deleteRhsHospitalizationDay,
 } from "@/lib/rhs-hospitalization.functions";
 import { HealthcareProvidersCard } from "@/components/clients/healthcare-providers-card";
+import { BelongingsInventoryCard } from "@/components/clients/belongings-inventory-card";
 import {
   listRhsEvacuationDrills,
   recordRhsEvacuationDrill,
@@ -53,7 +54,7 @@ type DocRow = { id: string; document_type: string | null; file_name: string | nu
 // Required SOW §1.10 record types surfaced in the completeness bar.
 type RecKey =
   | "pcsp" | "photograph" | "grievance_acknowledgment" | "guardian" | "hrc_approval" | "dnr"
-  | "grievance_policy" | "individualized_plan";
+  | "grievance_policy" | "individualized_plan" | "room_board_agreement";
 const RECORD_LABELS: Record<RecKey, { title: string; sub: string }> = {
   pcsp: { title: "Person-Centered Plan", sub: "Annual; renews each year" },
   photograph: { title: "Photograph", sub: "No expiration — flagged only when missing" },
@@ -63,6 +64,7 @@ const RECORD_LABELS: Record<RecKey, { title: string; sub: string }> = {
   dnr: { title: "DNR order", sub: "Required when DNR is on file" },
   grievance_policy: { title: "Grievance policy", sub: "A signed copy on file" },
   individualized_plan: { title: "Individualized plans", sub: "Behavior support / IEP / similar" },
+  room_board_agreement: { title: "Room and Board Agreement", sub: "Signed legal doc — HHS only, no expiration" },
 };
 
 const HRR_FILENAME_RE = /hrr|hrc|human[\s_-]*rights|rights[\s_-]*restriction/i;
@@ -133,11 +135,31 @@ export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; 
     },
   });
 
+  const activeCodesQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["client-profile-tab-codes", orgId, clientId],
+    queryFn: async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data, error } = await supabase
+        .from("client_billing_codes")
+        .select("service_code, service_start_date, service_end_date")
+        .eq("organization_id", orgId!)
+        .eq("client_id", clientId);
+      if (error) throw error;
+      return ((data ?? []) as Array<{ service_code: string; service_start_date: string | null; service_end_date: string | null }>)
+        .filter((c) => (!c.service_start_date || c.service_start_date <= today) && (!c.service_end_date || c.service_end_date >= today))
+        .map((c) => c.service_code.toUpperCase());
+    },
+  });
+
   const client = clientQ.data ?? null;
   const docs = docsQ.data ?? [];
   const contacts = contactsQ.data ?? [];
   const restrictions = restrictionsQ.data ?? [];
   const primaryRestriction = restrictions[0] ?? null;
+  const activeCodes = activeCodesQ.data ?? [];
+  const isHhs = activeCodes.includes("HHS");
+  const showBelongings = activeCodes.some((c) => ["HHS", "RHS", "SLH"].includes(c));
 
   if (clientQ.isLoading || !client) {
     return <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Loading…</CardContent></Card>;
@@ -149,6 +171,7 @@ export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; 
         client={client}
         docs={docs}
         restriction={primaryRestriction}
+        isHhs={isHhs}
         onOpenFiles={onOpenFiles}
         onContinueIntake={() => navigate({ to: "/dashboard/client-intake/$clientId", params: { clientId } })}
       />
@@ -162,13 +185,58 @@ export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; 
           <AtGlanceCard clientId={clientId} client={client} />
           <HealthcareProvidersCard clientId={clientId} orgId={orgId!} />
           <HrcCard clientId={clientId} client={client} docs={docs} restriction={primaryRestriction} />
+          {isHhs && <RoomBoardAgreementCard clientId={clientId} docs={docs} onOpenFiles={onOpenFiles} />}
           <RhsHospitalizationCard clientId={clientId} orgId={orgId!} />
           <RhsEvacuationDrillsCard clientId={clientId} orgId={orgId!} />
         </div>
       </div>
 
+      {showBelongings && (
+        <BelongingsInventoryCard clientId={clientId} clientName={`${client.first_name ?? ""} ${client.last_name ?? ""}`.trim()} />
+      )}
+
       <RetentionFooter clientId={clientId} status={(client.account_status as string | null) ?? "active"} />
     </div>
+  );
+}
+
+// ── Room and Board Agreement (HHS only) ─────────────────────────────────────
+
+function RoomBoardAgreementCard({ clientId, docs, onOpenFiles }: { clientId: string; docs: DocRow[]; onOpenFiles: () => void }) {
+  const doc = docs.find((d) => d.document_type === "room_board_agreement");
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-0">
+        <div className="flex items-start gap-2.5 px-5 py-4 border-b border-border/60">
+          <HexMarker />
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold leading-tight">Room and Board Agreement</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Signed legal doc — no expiration</p>
+          </div>
+        </div>
+        <div className="p-5">
+          {doc ? (
+            <NectarAsk
+              question="Room and Board Agreement"
+              kind="data_rich_gap"
+              clientId={clientId}
+              uploadDocumentType="room_board_agreement"
+              answeredSummary={`On file since ${fmtDate(doc.uploaded_at)} — ${doc.file_name ?? "signed document"}`}
+              manualForm={
+                <Button size="sm" variant="outline" onClick={onOpenFiles}>View in Files</Button>
+              }
+            />
+          ) : (
+            <NectarAsk
+              question="Upload the signed Room and Board Agreement"
+              kind="data_rich_gap"
+              clientId={clientId}
+              uploadDocumentType="room_board_agreement"
+            />
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -272,8 +340,8 @@ function CardShell({
 // ── Record completeness bar ────────────────────────────────────────────────
 
 function RecordCompletenessBar({
-  client, docs, restriction, onOpenFiles, onContinueIntake,
-}: { client: ClientRow; docs: DocRow[]; restriction: RestrictionRecord | null; onOpenFiles: () => void; onContinueIntake: () => void }) {
+  client, docs, restriction, isHhs, onOpenFiles, onContinueIntake,
+}: { client: ClientRow; docs: DocRow[]; restriction: RestrictionRecord | null; isHhs: boolean; onOpenFiles: () => void; onContinueIntake: () => void }) {
   const [open, setOpen] = useState(false);
 
   const isOwnGuardian = client.is_own_guardian === true;
@@ -300,6 +368,11 @@ function RecordCompletenessBar({
       if (hrrDoc && formComplete) return { state: "ok", doc: hrrDoc };
       return { state: "missing" };
     }
+    if (key === "room_board_agreement") {
+      if (!isHhs) return { state: "na" };
+      const rbaDoc = docs.find((d) => d.document_type === "room_board_agreement");
+      return rbaDoc ? { state: "ok", doc: rbaDoc } : { state: "missing" };
+    }
     const doc = docs.find((d) => d.document_type === key);
     if (key === "guardian" && isOwnGuardian) return { state: "na" };
     if (key === "dnr") {
@@ -311,7 +384,7 @@ function RecordCompletenessBar({
     return doc ? { state: "ok", doc } : { state: "missing" };
   }
 
-  const keys: RecKey[] = ["pcsp", "photograph", "grievance_acknowledgment", "grievance_policy", "individualized_plan", "guardian", "hrc_approval", "dnr"];
+  const keys: RecKey[] = ["pcsp", "photograph", "grievance_acknowledgment", "grievance_policy", "individualized_plan", "guardian", "hrc_approval", "dnr", "room_board_agreement"];
   const states = keys.map((k) => ({ key: k, ...stateFor(k) }));
   const applicable = states.filter((s) => s.state !== "na");
   const completed = applicable.filter((s) => s.state === "ok").length;

@@ -11,9 +11,11 @@ import {
   listOpenSummaries,
   type ProgressSummaryRow,
 } from "@/lib/progress-summaries.functions";
+import { formatPeriodMonthYear, recentMonthlyPeriods } from "@/lib/progress-summaries";
 import { computeSowAlerts } from "@/lib/sow-perimeters.functions";
 import { computeSupportStrategyCoverage } from "@/lib/support-strategy-coverage";
 import type { CSTSection } from "@/lib/client-specific-training.functions";
+import { listUpiAttestations } from "@/lib/upi-attestations.functions";
 
 export type DeadlineSource =
   | "summary"
@@ -28,7 +30,9 @@ export type DeadlineSource =
   | "nectar_requirement"
   | "compliance_instance"
   | "hhs_evacuation_drill"
-  | "rhs_evacuation_drill";
+  | "rhs_evacuation_drill"
+  | "sei_upi_employment"
+  | "sei_upi_support_strategies";
 
 export type DeadlineItem = {
   key: string;
@@ -45,6 +49,10 @@ export type DeadlineItem = {
   clientId?: string;
   staffId?: string;
   instanceId?: string;
+  /** 1st/5th/10th-of-month reminder cadence (prompts 20/21/25) — the notification bell only fires these on those days. */
+  cadenceReminder?: boolean;
+  /** YYYY-MM period label, set on sei_upi_employment items so the row action can attest the right month. */
+  periodLabel?: string;
 };
 
 const DAY = 86_400_000;
@@ -77,6 +85,7 @@ export function useDeadlines() {
   const ensureFn = useServerFn(ensureCurrentSummaryPeriods);
   const listSummariesFn = useServerFn(listOpenSummaries);
   const computeSowFn = useServerFn(computeSowAlerts);
+  const listUpiAttestFn = useServerFn(listUpiAttestations);
 
   // 1. Progress summaries — ensure rows then list.
   const summariesQ = useQuery({
@@ -415,6 +424,40 @@ export function useDeadlines() {
     },
   });
 
+  // 11c. Active SEI clients (drives the SEI employment-data / support-strategies UPI attestation sources).
+  const seiActiveQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "sei", orgId],
+    queryFn: async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: codes, error } = await supabase
+        .from("client_billing_codes")
+        .select("client_id, service_start_date, service_end_date")
+        .eq("organization_id", orgId!)
+        .eq("service_code", "SEI");
+      if (error) throw error;
+      const activeIds = (codes ?? [])
+        .filter((c) => (!c.service_start_date || c.service_start_date <= today)
+                    && (!c.service_end_date || c.service_end_date >= today))
+        .map((c) => c.client_id);
+      return { activeIds };
+    },
+  });
+
+  // 11d. SEI employment-data UPI attestations already recorded (prompt 21).
+  const seiEmploymentAttestQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "sei_employment_attest", orgId],
+    queryFn: () => listUpiAttestFn({ data: { organizationId: orgId!, kind: "sei_employment_monthly" } }),
+  });
+
+  // 11e. SEI support-strategies UPI attestations already recorded (prompt 22).
+  const seiSupportStrategiesAttestQ = useQuery({
+    enabled: !!orgId,
+    queryKey: ["deadlines", "sei_ss_attest", orgId],
+    queryFn: () => listUpiAttestFn({ data: { organizationId: orgId!, kind: "sei_support_strategies" } }),
+  });
+
   // 12. Renewal-cadence requirements approaching expiry or overdue.
   const renewalReqsQ = useQuery({
     enabled: !!orgId,
@@ -480,20 +523,32 @@ export function useDeadlines() {
     // Progress summaries
     for (const s of summariesQ.data ?? []) {
       const due = new Date(`${s.due_date}T23:59:59`);
-      const title = s.period_kind === "quarterly"
-        ? `${s.period_label} quarterly summary`
-        : `${fmtMonth(s.period_label)} monthly summary`;
+      const clientName = nameOf(s.client_id);
+      const isSei = s.period_kind === "monthly" && s.service_codes?.includes("SEI");
+      const isCmpCms = s.period_kind === "monthly" && s.service_codes?.some((c) => c === "CMP" || c === "CMS");
+      const finalizedUnattested = isSei && !!s.finalized_at && !s.upi_entered_at;
+      let title: string;
+      if (finalizedUnattested) {
+        title = `SEI monthly summary for ${fmtMonth(s.period_label)} — mark as entered in UPI.`;
+      } else if (isCmpCms) {
+        title = `CMP/CMS monthly summary for ${fmtMonth(s.period_label)} — ${clientName} is due.`;
+      } else if (s.period_kind === "quarterly") {
+        title = `${s.period_label} quarterly summary`;
+      } else {
+        title = `${fmtMonth(s.period_label)} monthly summary`;
+      }
       out.push({
         key: `sum:${s.id}`,
         source: "summary",
         title,
-        subject: nameOf(s.client_id),
+        subject: clientName,
         subjectKind: "client",
         dueAt: due,
         status: bucketStatus(due, now),
         href: `/dashboard/summaries?open=${s.id}`,
         summary: s,
         clientId: s.client_id,
+        cadenceReminder: finalizedUnattested || (isCmpCms && !s.completed_at),
       });
     }
 
@@ -662,6 +717,58 @@ export function useDeadlines() {
       });
     }
 
+    // SEI employment-data UPI attestation — separate monthly checkbox from the
+    // narrative summary (prompt 21). Same 1st/5th/10th cadence, clears on attest.
+    const employmentAttested = new Set(
+      (seiEmploymentAttestQ.data ?? []).map((a) => `${a.client_id}:${a.period_label}`),
+    );
+    for (const clientId of seiActiveQ.data?.activeIds ?? []) {
+      for (const p of recentMonthlyPeriods(now, 6)) {
+        if (employmentAttested.has(`${clientId}:${p.period_label}`)) continue;
+        const due = new Date(`${p.due_date}T23:59:59`);
+        out.push({
+          key: `sei-emp-upi:${clientId}:${p.period_label}`,
+          source: "sei_upi_employment",
+          title: `SEI employment data for ${formatPeriodMonthYear(p.period_label)} — confirm entered into UPI (${nameOf(clientId)}).`,
+          subject: nameOf(clientId),
+          subjectKind: "client",
+          dueAt: due,
+          status: bucketStatus(due, now),
+          href: `/dashboard/clients/${clientId}?tab=care`,
+          clientId,
+          cadenceReminder: true,
+          periodLabel: p.period_label,
+        });
+      }
+    }
+
+    // SEI support-strategies UPI attestation — one-time per PCSP cycle,
+    // deadline = 2 weeks after the PCSP update/expiration date (prompt 22).
+    const ssUpiAttested = new Map<string, string>();
+    for (const a of seiSupportStrategiesAttestQ.data ?? []) {
+      if (a.client_id) ssUpiAttested.set(a.client_id, a.attested_at);
+    }
+    const seiActiveSet = new Set(seiActiveQ.data?.activeIds ?? []);
+    for (const c of clientsQ.data ?? []) {
+      if (!seiActiveSet.has(c.id) || !c.pcsp_expiration_date) continue;
+      const pcspAnchor = new Date(`${c.pcsp_expiration_date}T23:59:59`);
+      if (now < pcspAnchor) continue; // new plan year hasn't begun yet
+      const attestedAt = ssUpiAttested.get(c.id);
+      if (attestedAt && new Date(attestedAt) >= pcspAnchor) continue; // already attested this cycle
+      const due = new Date(pcspAnchor.getTime() + 14 * DAY);
+      out.push({
+        key: `sei-ss-upi:${c.id}`,
+        source: "sei_upi_support_strategies",
+        title: `Confirm employment support strategies entered into UPI for ${nameOf(c.id)}.`,
+        subject: nameOf(c.id),
+        subjectKind: "client",
+        dueAt: due,
+        status: bucketStatus(due, now),
+        href: `/dashboard/clients/${c.id}?tab=care`,
+        clientId: c.id,
+      });
+    }
+
     // Support Strategy coverage gaps (SOW §1.24(5)).
     const dueImmediately = new Date(now.getTime() - DAY);
     for (const [clientId, gaps] of ssCoverageQ.data ?? new Map<string, string[]>()) {
@@ -749,6 +856,9 @@ export function useDeadlines() {
     hrcRestrictionsQ.data,
     renewalReqsQ.data,
     complianceInstancesQ.data,
+    seiActiveQ.data,
+    seiEmploymentAttestQ.data,
+    seiSupportStrategiesAttestQ.data,
   ]);
 
   return {

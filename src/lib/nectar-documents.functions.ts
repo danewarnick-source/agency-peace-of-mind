@@ -28,6 +28,9 @@ const DOC_TYPES = [
   "incident_report",
   "billing_record",
   "hrc_approval",
+  "ol_residential_license",
+  "ol_residential_certification",
+  "usor_approved_vendor",
   "other",
 ] as const;
 
@@ -293,7 +296,7 @@ export const queryDocuments = createServerFn({ method: "POST" })
     let q = supabase
       .from("nectar_documents")
       .select(
-        "id, owner_kind, client_id, staff_id, document_type, category, title, version, is_current, effective_start, effective_end, fiscal_year, medicaid_id, tags, file_name, mime_type, parse_status, uploaded_by_name, uploaded_at:created_at, created_at",
+        "id, owner_kind, client_id, staff_id, document_type, category, title, version, is_current, effective_start, effective_end, fiscal_year, medicaid_id, tags, file_name, mime_type, parse_status, uploaded_by_name, uploaded_at:created_at, created_at, storage_path",
       )
       .eq("organization_id", data.organizationId)
       .order("created_at", { ascending: false })

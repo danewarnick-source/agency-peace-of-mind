@@ -53,6 +53,7 @@ const CLIENT_DOC_TYPES = [
   { value: "contract", label: "Guardian / legal papers" },
   { value: "hrc_approval", label: "HRR / HRC / Rights Restriction" },
   { value: "certification", label: "Consent" },
+  { value: "room_board_agreement", label: "Room and Board Agreement (HHS)" },
   { value: "other", label: "Other" },
 ];
 

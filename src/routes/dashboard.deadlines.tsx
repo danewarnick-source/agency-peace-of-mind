@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useDeadlines, type DeadlineItem } from "@/hooks/use-deadlines";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { attestSummaryUpiEntered } from "@/lib/progress-summaries.functions";
+import { recordUpiAttestation } from "@/lib/upi-attestations.functions";
 import {
   createHrDocumentUploadUrl,
   upsertChecklistCompletion,
@@ -34,6 +35,12 @@ const sourceIcon: Record<DeadlineItem["source"], typeof AlarmClock> = {
   pcsp_support_strategies: FileSignature,
   support_strategy_gap: AlertTriangle,
   hrc_restriction_review: ShieldCheck,
+  nectar_requirement: ShieldCheck,
+  compliance_instance: ShieldCheck,
+  hhs_evacuation_drill: Home,
+  rhs_evacuation_drill: Home,
+  sei_upi_employment: FileSignature,
+  sei_upi_support_strategies: FileSignature,
 };
 
 const sourceLabel: Record<DeadlineItem["source"], string> = {
@@ -46,6 +53,12 @@ const sourceLabel: Record<DeadlineItem["source"], string> = {
   pcsp_support_strategies: "Support Strategies renewal",
   support_strategy_gap: "Support Strategy gap",
   hrc_restriction_review: "HRC restriction review",
+  nectar_requirement: "Renewal requirement",
+  compliance_instance: "Compliance requirement",
+  hhs_evacuation_drill: "Evacuation drill",
+  rhs_evacuation_drill: "Evacuation drill",
+  sei_upi_employment: "SEI UPI attestation",
+  sei_upi_support_strategies: "SEI UPI attestation",
 };
 
 function fmtDue(d: Date): string {
@@ -235,6 +248,7 @@ function RowAction({ item, tone }: { item: DeadlineItem; tone: DeadlineItem["sta
   const attestFn = useServerFn(attestSummaryUpiEntered);
   const createUploadFn = useServerFn(createHrDocumentUploadUrl);
   const upsertFn = useServerFn(upsertChecklistCompletion);
+  const recordUpiFn = useServerFn(recordUpiAttestation);
   const [uploading, setUploading] = useState(false);
 
   const attest = useMutation({
@@ -242,6 +256,23 @@ function RowAction({ item, tone }: { item: DeadlineItem; tone: DeadlineItem["sta
       attestFn({ data: { organizationId: org!.organization_id, summaryId: item.summary!.id } }),
     onSuccess: () => {
       toast.success("Attested — entered into UPI.");
+      qc.invalidateQueries({ queryKey: ["deadlines"] });
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  const attestUpi = useMutation({
+    mutationFn: async (kind: "sei_employment_monthly" | "sei_support_strategies") =>
+      recordUpiFn({
+        data: {
+          organizationId: org!.organization_id,
+          clientId: item.clientId ?? null,
+          kind,
+          periodLabel: item.periodLabel ?? null,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Attested.");
       qc.invalidateQueries({ queryKey: ["deadlines"] });
     },
     onError: (e) => toast.error((e as Error).message),
@@ -349,6 +380,22 @@ function RowAction({ item, tone }: { item: DeadlineItem; tone: DeadlineItem["sta
             />
           </label>
         )}
+      </div>
+    );
+  }
+
+  if (item.source === "sei_upi_employment" || item.source === "sei_upi_support_strategies") {
+    const kind = item.source === "sei_upi_employment" ? "sei_employment_monthly" : "sei_support_strategies";
+    return (
+      <div className="flex items-center gap-2">
+        {item.href && (
+          <Button asChild size="sm" variant="outline">
+            <a href={item.href}>View client <ExternalLink className="ml-1 h-3 w-3" /></a>
+          </Button>
+        )}
+        <Button size="sm" disabled={attestUpi.isPending || !org} onClick={() => attestUpi.mutate(kind)}>
+          Confirm entered in UPI
+        </Button>
       </div>
     );
   }

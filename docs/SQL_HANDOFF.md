@@ -6,6 +6,83 @@ it worked before moving on.
 
 ---
 
+## ACTION — Prompt batch 16–28: belongings inventory, doc uploads, UPI attestations, cadence changes, removals (2026-08-13)
+
+**What this is for:** Thirteen product prompts. Only ONE new table is
+needed — everything else reuses existing infrastructure:
+- Prompt 16 (Personal Belongings Inventory) — UI only, `client_belongings`
+  already has the right columns (confirmed via `supabase/migrations/20260524055323_*.sql`).
+  The "$50 or more" checkbox is derived from `estimated_value >= 50`, not a
+  stored column.
+- Prompt 17 (Room and Board Agreement) — reuses `client_documents` +
+  `client-documents` bucket via the existing `NectarAsk` upload component,
+  document_type `room_board_agreement`. No schema change.
+- Prompts 18/19/23 (OL License, OL Certification, USOR Approved Vendor) —
+  reuse `nectar_documents` with `owner_kind='company'` and new
+  `document_type` values (`ol_residential_license`,
+  `ol_residential_certification`, `usor_approved_vendor`); expiration stored
+  in the existing `effective_end` column. No schema change.
+- Prompts 21/22/23 (UPI + USOR attestations) — new table `upi_attestations`
+  below.
+- Prompts 20/25 (SEI / CMP-CMS monthly summary UPI reminder cadence) —
+  computed client-side from existing `client_progress_summaries` columns
+  (`requires_upi_attestation`, `upi_entered_at`, `finalized_at`). No schema
+  change.
+- Prompt 24 (CMP/CMS quarterly→monthly) — code-only change in
+  `src/lib/progress-summaries.ts` (`MONTHLY_SUMMARY_CODES`). No schema
+  change, no data touched — forward-looking only.
+- Prompts 26/27/28 (remove org-level written-BSP-policy requirement,
+  healthcare-access-training checklist item, remediation-plan tracking) —
+  grepped `src`, `supabase/migrations`, and this doc for "BSP", "R539-4",
+  "remediation", and "primary health care professional" / "health care
+  access training"; none of these exist as a checklist item, compliance
+  flag, or authoritative-sources requirement anywhere in the codebase today.
+  Nothing to remove — treated as already satisfied.
+
+Matches migration `supabase/migrations/20260813110000_prompts_16_28_batch.sql`.
+
+```sql
+-- client_id uses the nil UUID (not NULL) for org-level rows (usor_vendor), and
+-- period_label uses '' (not NULL) for one-time rows (sei_support_strategies,
+-- usor_vendor) so a real composite UNIQUE constraint can back upserts —
+-- Postgres treats NULL <> NULL, which would defeat ON CONFLICT dedup.
+CREATE TABLE IF NOT EXISTS public.upi_attestations (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id  uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  client_id        uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000'::uuid,
+  kind             text NOT NULL CHECK (kind IN ('sei_employment_monthly', 'sei_support_strategies', 'usor_vendor')),
+  period_label     text NOT NULL DEFAULT '',
+  attested_at      timestamptz NOT NULL DEFAULT now(),
+  attested_by      uuid NOT NULL,
+  attested_by_name text,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (organization_id, kind, client_id, period_label)
+);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.upi_attestations TO authenticated;
+GRANT ALL ON public.upi_attestations TO service_role;
+
+ALTER TABLE public.upi_attestations ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "org members read upi attestations"
+  ON public.upi_attestations FOR SELECT TO authenticated
+  USING (is_org_member(organization_id, auth.uid()) OR is_super_admin(auth.uid()));
+
+CREATE POLICY "admins manage upi attestations"
+  ON public.upi_attestations FOR ALL TO authenticated
+  USING (is_org_admin_or_manager(organization_id, auth.uid()) OR is_super_admin(auth.uid()))
+  WITH CHECK (is_org_admin_or_manager(organization_id, auth.uid()) OR is_super_admin(auth.uid()));
+
+CREATE INDEX IF NOT EXISTS idx_upi_attestations_org_kind
+  ON public.upi_attestations (organization_id, kind);
+```
+
+**What you'll see:** one `CREATE TABLE`, two `GRANT`s, `ALTER TABLE ... ENABLE
+ROW LEVEL SECURITY`, two `CREATE POLICY`, one `CREATE INDEX`. Purely
+additive — no existing table, column, or row is touched.
+
+---
+
 ## ACTION — Prompt batch 2–15: staff attestations, client profile, incidents, HHS/RHS, HRC, deadlines (2026-08-13)
 
 **What this is for:** Twelve product prompts in one pass. New tables:

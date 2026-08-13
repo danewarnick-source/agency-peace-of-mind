@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { RequirePermission } from "@/components/rbac-guard";
 import { HrComplianceMatrix } from "@/components/hr/hr-compliance-matrix";
+import { OrgComplianceDocumentsSection } from "@/components/settings/org-compliance-documents-section";
 import { OtherAssignmentsRollup } from "@/components/training/other-assignments-rollup";
 import { Settings as SettingsIcon } from "lucide-react";
 import { EmployeeLoansPanel } from "@/components/employee-loans/EmployeeLoansPanel";
@@ -102,6 +103,7 @@ export function HrAdminPage() {
 
       <div className="space-y-6">
 
+      <OrgComplianceDocumentsSection />
 
       {/* NECTAR gaps / renewals bar */}
       <Card className="border-amber-200/60 bg-amber-50/40 dark:bg-amber-900/10">

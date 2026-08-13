@@ -32,6 +32,10 @@ type MyCompletionRow = {
   upload_filename: string | null;
   attestation_text_snapshot: string | null;
   form_submission_id: string | null;
+  nectar_validation_status: string | null;
+  nectar_validation_reasons: string[] | null;
+  nectar_extracted_cert_type: string | null;
+  nectar_extracted_expires_date: string | null;
 };
 
 function formatDateTime(iso: string | null): string {
@@ -86,6 +90,29 @@ function CompletedCard({ instance, completion }: { instance: MyObligationInstanc
               {completion.attestation_text_snapshot}
             </div>
           ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** A previously-submitted upload NECTAR could not verify — the assignee has
+ *  already acted, so this reads like a status card (not the input form),
+ *  but stays out of the "Completed" bucket until an admin confirms it. */
+function PendingReviewCard({ instance, completion }: { instance: MyObligationInstanceRow; completion: MyCompletionRow }) {
+  const ob = instance.obligation;
+  return (
+    <div className="rounded-xl border border-amber-300/60 bg-amber-500/10 p-4 shadow-[var(--shadow-card)]">
+      <p className="font-semibold">{ob.title}</p>
+      <p className="text-sm text-muted-foreground">{instance.period_key}</p>
+      <div className="mt-2 flex items-start gap-2 text-sm text-amber-900 dark:text-amber-200">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+        <div>
+          <p className="font-medium">NECTAR couldn't verify this upload</p>
+          {(completion.nectar_validation_reasons?.length ?? 0) > 0 && (
+            <p>{completion.nectar_validation_reasons!.join("; ")}</p>
+          )}
+          <p className="mt-1 font-medium">Pending admin review — an admin will confirm your upload.</p>
         </div>
       </div>
     </div>
@@ -280,7 +307,7 @@ function MyObligationsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("company_obligation_completions")
-        .select("instance_id, staff_name, completed_at, evidence_type_used, upload_path, upload_filename, attestation_text_snapshot, form_submission_id")
+        .select("instance_id, staff_name, completed_at, evidence_type_used, upload_path, upload_filename, attestation_text_snapshot, form_submission_id, nectar_validation_status, nectar_validation_reasons, nectar_extracted_cert_type, nectar_extracted_expires_date")
         .eq("staff_id", user!.id)
         .in("instance_id", instanceIds);
       if (error) throw new Error(error.message);
@@ -296,11 +323,18 @@ function MyObligationsPage() {
 
   const [tab, setTab] = useState<"all" | "due_soon" | "overdue" | "completed">("all");
 
+  // A completion whose NECTAR validation failed stays out of "Completed" —
+  // the instance was never closed and an admin still needs to confirm it.
+  const isPendingReview = (instId: string) =>
+    completionByInstance.get(instId)?.nectar_validation_status === "failed";
+
   const { open, completed } = useMemo(() => {
     const open: MyObligationInstanceRow[] = [];
     const completed: MyObligationInstanceRow[] = [];
     for (const inst of instances) {
-      const iCompleted = inst.status === "completed" || inst.status === "waived" || completionByInstance.has(inst.id);
+      const hasCompletion = completionByInstance.has(inst.id);
+      const failedValidation = completionByInstance.get(inst.id)?.nectar_validation_status === "failed";
+      const iCompleted = inst.status === "completed" || inst.status === "waived" || (hasCompletion && !failedValidation);
       if (iCompleted) completed.push(inst);
       else open.push(inst);
     }
@@ -355,13 +389,15 @@ function MyObligationsPage() {
         </div>
       ) : (
         <div className="grid gap-3">
-          {shown.map((inst) =>
-            tab === "completed" || inst.status === "completed" || inst.status === "waived" || completionByInstance.has(inst.id) ? (
-              <CompletedCard key={inst.id} instance={inst} completion={completionByInstance.get(inst.id)} />
-            ) : (
-              <OpenCard key={inst.id} orgId={orgId!} instance={inst} onCompleted={onCompleted} />
-            ),
-          )}
+          {shown.map((inst) => {
+            if (isPendingReview(inst.id)) {
+              return <PendingReviewCard key={inst.id} instance={inst} completion={completionByInstance.get(inst.id)!} />;
+            }
+            if (tab === "completed" || inst.status === "completed" || inst.status === "waived" || completionByInstance.has(inst.id)) {
+              return <CompletedCard key={inst.id} instance={inst} completion={completionByInstance.get(inst.id)} />;
+            }
+            return <OpenCard key={inst.id} orgId={orgId!} instance={inst} onCompleted={onCompleted} />;
+          })}
         </div>
       )}
     </div>

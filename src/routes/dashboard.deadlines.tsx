@@ -48,6 +48,7 @@ const sourceIcon: Record<DeadlineItem["source"], typeof AlarmClock> = {
   sjd_upi_support_strategies: FileSignature,
   sjd_usor_outreach: FileSignature,
   sjd_assessment_doc: Upload,
+  staff_checklist: ShieldCheck,
 };
 
 const sourceLabel: Record<DeadlineItem["source"], string> = {
@@ -73,6 +74,7 @@ const sourceLabel: Record<DeadlineItem["source"], string> = {
   sjd_upi_support_strategies: "SJD UPI attestation",
   sjd_usor_outreach: "USOR Outreach Verification",
   sjd_assessment_doc: "SJD Assessment Documentation",
+  staff_checklist: "HR checklist renewal",
 };
 
 function fmtDue(d: Date): string {

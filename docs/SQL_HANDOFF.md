@@ -2167,3 +2167,28 @@ ALTER TABLE public.notifications ADD CONSTRAINT notifications_type_check CHECK (
 
 **What you'll see:** one `DROP CONSTRAINT` / `ADD CONSTRAINT` pair widening
 the allowed `type` values on `public.notifications`. Nothing else changes.
+
+## ACTION — company_obligations: source/is_locked columns (2026-08-13)
+
+**What this is for:** Some obligations are mandated verbatim by the state
+contract (DSPD SOW DHHS91172) rather than authored by the provider — e.g.
+required postings or attestations the SOW spells out. Admins need to see
+which is which, and state-mandated obligations shouldn't be editable,
+pausable, or deletable from the UI (the app also rejects those mutations
+server-side even if someone bypasses the UI). Purely additive — every
+existing row defaults to `source = 'provider'`, `is_locked = false`, so
+nothing existing changes behavior.
+
+Matches migration
+`supabase/migrations/20260813235500_company_obligations_source_lock.sql`.
+
+```sql
+ALTER TABLE public.company_obligations
+  ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'provider'
+    CHECK (source IN ('sow', 'provider')),
+  ADD COLUMN IF NOT EXISTS is_locked boolean NOT NULL DEFAULT false;
+```
+
+**What you'll see:** two new columns added to `public.company_obligations` —
+`source` (text, checked to `'sow'` or `'provider'`) and `is_locked`
+(boolean). No existing columns, rows, or constraints are touched.

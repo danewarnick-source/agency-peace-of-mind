@@ -60,6 +60,11 @@ function CompletedCard({ instance, completion }: { instance: MyObligationInstanc
         <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
         <div className="min-w-0 flex-1">
           <p className="font-semibold">{ob.title}</p>
+          {ob.source === "sow" ? (
+            <p className="text-xs text-muted-foreground">🔒 Required by state contract — DSPD SOW DHHS91172</p>
+          ) : (
+            ob.source_policy_section && <p className="text-xs text-muted-foreground">{ob.source_policy_section}</p>
+          )}
           <p className="text-sm text-muted-foreground">{instance.period_key}</p>
           <p className="mt-1 text-sm font-medium text-success">
             Submitted {formatDateTime(completion?.completed_at ?? instance.completed_at)}
@@ -147,7 +152,11 @@ function OpenCard({
   return (
     <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <p className="font-semibold">{ob.title}</p>
-      {ob.source_policy_section && <p className="text-xs text-muted-foreground">{ob.source_policy_section}</p>}
+      {ob.source === "sow" ? (
+        <p className="text-xs text-muted-foreground">🔒 Required by state contract — DSPD SOW DHHS91172</p>
+      ) : (
+        ob.source_policy_section && <p className="text-xs text-muted-foreground">{ob.source_policy_section}</p>
+      )}
       <p className="mt-1 text-sm font-medium text-muted-foreground">{cadenceDescription(ob)}</p>
       <p className={`mt-1 text-lg font-semibold ${due.overdue ? "text-destructive" : "text-warning-foreground"}`}>
         {due.overdue ? `Overdue — was due ${new Date(instance.due_at).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}` : `Due ${new Date(instance.due_at).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}`}

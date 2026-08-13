@@ -36,7 +36,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { AlertTriangle, CheckCircle2, Circle, MoreHorizontal } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Circle, Lock, MoreHorizontal } from "lucide-react";
 import {
   deleteCompanyObligation,
   logObligationEvent,
@@ -353,27 +353,46 @@ export function ObligationCard({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => onEdit(obligation)}>Edit</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setHistoryOpen(true)}>View history</DropdownMenuItem>
-            {obligation.cadence === "per_event" && (
-              <DropdownMenuItem onSelect={() => setLogEventOpen(true)}>Log event</DropdownMenuItem>
+            {obligation.is_locked ? (
+              <>
+                <DropdownMenuItem onSelect={() => setHistoryOpen(true)}>View history</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setManualOpen(true)}>Add manual completion</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                  State-required — cannot be modified.
+                </div>
+              </>
+            ) : (
+              <>
+                <DropdownMenuItem onSelect={() => onEdit(obligation)}>Edit</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setHistoryOpen(true)}>View history</DropdownMenuItem>
+                {obligation.cadence === "per_event" && (
+                  <DropdownMenuItem onSelect={() => setLogEventOpen(true)}>Log event</DropdownMenuItem>
+                )}
+                <DropdownMenuItem onSelect={() => setManualOpen(true)}>Add manual completion</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => toggleActive.mutate()}>
+                  {obligation.active ? "Pause" : "Resume"}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onSelect={() => setConfirmDelete(true)}
+                >
+                  Delete
+                </DropdownMenuItem>
+              </>
             )}
-            <DropdownMenuItem onSelect={() => setManualOpen(true)}>Add manual completion</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => toggleActive.mutate()}>
-              {obligation.active ? "Pause" : "Resume"}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              onSelect={() => setConfirmDelete(true)}
-            >
-              Delete
-            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
       <div className="mt-2 flex flex-wrap gap-1.5">
+        {obligation.source === "sow" && (
+          <Badge className="gap-1 border-transparent bg-blue-600 text-white hover:bg-blue-600">
+            <Lock className="h-3 w-3" />
+            SOW — DHHS91172
+          </Badge>
+        )}
         <Badge variant="outline">{cadenceLabel(obligation)}</Badge>
         <Badge variant="outline">{evidenceLabel(obligation.evidence_type)}</Badge>
         <Badge variant="secondary">

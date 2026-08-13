@@ -4822,12 +4822,14 @@ export type Database = {
           due_day_config: Json
           evidence_type: string
           id: string
+          is_locked: boolean
           linked_form_id: string | null
           notify_manager_on_complete: boolean
           notify_manager_on_overdue: boolean
           organization_id: string
           reminder_days_before: number[]
           requires_individual_completion: boolean
+          source: string
           source_policy_section: string | null
           title: string
           updated_at: string | null
@@ -4845,12 +4847,14 @@ export type Database = {
           due_day_config?: Json
           evidence_type: string
           id?: string
+          is_locked?: boolean
           linked_form_id?: string | null
           notify_manager_on_complete?: boolean
           notify_manager_on_overdue?: boolean
           organization_id: string
           reminder_days_before?: number[]
           requires_individual_completion?: boolean
+          source?: string
           source_policy_section?: string | null
           title: string
           updated_at?: string | null
@@ -4868,12 +4872,14 @@ export type Database = {
           due_day_config?: Json
           evidence_type?: string
           id?: string
+          is_locked?: boolean
           linked_form_id?: string | null
           notify_manager_on_complete?: boolean
           notify_manager_on_overdue?: boolean
           organization_id?: string
           reminder_days_before?: number[]
           requires_individual_completion?: boolean
+          source?: string
           source_policy_section?: string | null
           title?: string
           updated_at?: string | null

@@ -33,7 +33,7 @@ import {
 import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from "@/components/ui/command";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, Lock, X } from "lucide-react";
 import {
   createCompanyObligation,
   updateCompanyObligation,
@@ -118,7 +118,15 @@ const MONTH_OPTIONS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
-function DueDayFields({ state, setState }: { state: FormState; setState: (s: FormState) => void }) {
+function DueDayFields({
+  state,
+  setState,
+  readOnly,
+}: {
+  state: FormState;
+  setState: (s: FormState) => void;
+  readOnly: boolean;
+}) {
   const cfg = state.dueDayConfig;
   const setCfg = (next: Record<string, unknown>) => setState({ ...state, dueDayConfig: next });
 
@@ -127,7 +135,7 @@ function DueDayFields({ state, setState }: { state: FormState; setState: (s: For
     return (
       <div className="grid gap-1.5">
         <Label>Weekday</Label>
-        <Select value={String(weekday)} onValueChange={(v) => setCfg({ weekday: Number(v) })}>
+        <Select value={String(weekday)} onValueChange={(v) => setCfg({ weekday: Number(v) })} disabled={readOnly}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d, i) => (
@@ -149,7 +157,7 @@ function DueDayFields({ state, setState }: { state: FormState; setState: (s: For
             type="number"
             min={1}
             max={28}
-            disabled={isLast}
+            disabled={isLast || readOnly}
             value={isLast ? "" : String(cfg.day_of_month ?? 1)}
             onChange={(e) => setCfg({ day_of_month: Number(e.target.value) })}
             className="w-24"
@@ -157,6 +165,7 @@ function DueDayFields({ state, setState }: { state: FormState; setState: (s: For
           <label className="flex items-center gap-1.5 text-sm">
             <Checkbox
               checked={isLast}
+              disabled={readOnly}
               onCheckedChange={(v) => setCfg({ day_of_month: v === true ? "last" : 1 })}
             />
             Last day of month
@@ -178,7 +187,7 @@ function DueDayFields({ state, setState }: { state: FormState; setState: (s: For
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="grid gap-1.5">
           <Label>Month</Label>
-          <Select value={String(month)} onValueChange={(v) => setCfg({ ...cfg, month: Number(v) })}>
+          <Select value={String(month)} onValueChange={(v) => setCfg({ ...cfg, month: Number(v) })} disabled={readOnly}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               {MONTH_OPTIONS.map((m, i) => (
@@ -194,7 +203,7 @@ function DueDayFields({ state, setState }: { state: FormState; setState: (s: For
               type="number"
               min={1}
               max={28}
-              disabled={isLast}
+              disabled={isLast || readOnly}
               value={isLast ? "" : String(cfg.day_of_month ?? 1)}
               onChange={(e) => setCfg({ ...cfg, day_of_month: Number(e.target.value) })}
               className="w-20"
@@ -202,6 +211,7 @@ function DueDayFields({ state, setState }: { state: FormState; setState: (s: For
             <label className="flex items-center gap-1.5 text-sm">
               <Checkbox
                 checked={isLast}
+                disabled={readOnly}
                 onCheckedChange={(v) => setCfg({ ...cfg, day_of_month: v === true ? "last" : 1 })}
               />
               Last day
@@ -219,6 +229,7 @@ function DueDayFields({ state, setState }: { state: FormState; setState: (s: For
         <Input
           type="number"
           min={0}
+          disabled={readOnly}
           value={String(cfg.days_after_trigger ?? 0)}
           onChange={(e) => setCfg({ days_after_trigger: Number(e.target.value) })}
           className="w-24"
@@ -233,6 +244,7 @@ function DueDayFields({ state, setState }: { state: FormState; setState: (s: For
         <Label>Due date</Label>
         <Input
           type="date"
+          disabled={readOnly}
           value={typeof cfg.date === "string" ? cfg.date : ""}
           onChange={(e) => setCfg({ date: e.target.value })}
         />
@@ -318,6 +330,7 @@ export function ObligationDrawer({
   const listGroupsFn = useServerFn(listStaffGroups);
 
   const isEdit = !!obligation;
+  const isLocked = obligation?.is_locked ?? false;
   const [state, setState] = useState<FormState>(obligation ? fromObligation(obligation) : DEFAULT_STATE);
   const [userNames, setUserNames] = useState<Map<string, string>>(new Map());
 
@@ -425,10 +438,19 @@ export function ObligationDrawer({
         </SheetHeader>
 
         <div className="mt-4 space-y-5 pb-4">
+          {isLocked && (
+            <div className="flex items-start gap-2 rounded-md border border-blue-300 bg-blue-50 p-3 text-sm text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200">
+              <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                This obligation is required by the state contract (DSPD SOW DHHS91172) and cannot be modified.
+              </span>
+            </div>
+          )}
+
           {/* 1. Title */}
           <div className="grid gap-1.5">
             <Label>Title</Label>
-            <Input value={state.title} onChange={(e) => setState({ ...state, title: e.target.value })} required />
+            <Input value={state.title} onChange={(e) => setState({ ...state, title: e.target.value })} required disabled={isLocked} />
           </div>
 
           {/* 2. Policy section */}
@@ -438,13 +460,18 @@ export function ObligationDrawer({
               value={state.sourcePolicySection}
               onChange={(e) => setState({ ...state, sourcePolicySection: e.target.value })}
               placeholder="e.g. § 3.2 — TNS Operating P&P v2.1"
+              disabled={isLocked}
             />
           </div>
 
           {/* 3. Description */}
           <div className="grid gap-1.5">
             <Label>Description</Label>
-            <Textarea value={state.description} onChange={(e) => setState({ ...state, description: e.target.value })} />
+            <Textarea
+              value={state.description}
+              onChange={(e) => setState({ ...state, description: e.target.value })}
+              disabled={isLocked}
+            />
           </div>
 
           {/* 4. Cadence */}
@@ -464,6 +491,7 @@ export function ObligationDrawer({
                 };
                 setState({ ...state, cadence, dueDayConfig: defaults[cadence] });
               }}
+              disabled={isLocked}
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -478,7 +506,7 @@ export function ObligationDrawer({
           </div>
 
           {/* 5. Due date specifics */}
-          <DueDayFields state={state} setState={setState} />
+          <DueDayFields state={state} setState={setState} readOnly={isLocked} />
 
           {/* 6. Reminders */}
           <div className="grid gap-1.5">
@@ -488,6 +516,7 @@ export function ObligationDrawer({
                 <label key={opt.value} className="flex items-center gap-2 text-sm">
                   <Checkbox
                     checked={state.reminderDaysBefore.includes(opt.value)}
+                    disabled={isLocked}
                     onCheckedChange={(v) => {
                       const set = new Set(state.reminderDaysBefore);
                       if (v === true) set.add(opt.value); else set.delete(opt.value);
@@ -511,6 +540,7 @@ export function ObligationDrawer({
               value={state.evidenceType}
               onValueChange={(v) => setState({ ...state, evidenceType: v as EvidenceType })}
               className="grid gap-2"
+              disabled={isLocked}
             >
               <label className="flex items-start gap-2 text-sm">
                 <RadioGroupItem value="attestation" className="mt-0.5" />
@@ -552,6 +582,7 @@ export function ObligationDrawer({
                 onChange={(e) => setState({ ...state, attestationText: e.target.value })}
                 placeholder="The statement staff will sign, e.g. “I confirm I have posted the current grievance poster in a visible location.”"
                 required
+                disabled={isLocked}
               />
             </div>
           )}
@@ -563,6 +594,7 @@ export function ObligationDrawer({
               <Select
                 value={state.linkedFormId ?? undefined}
                 onValueChange={(v) => setState({ ...state, linkedFormId: v })}
+                disabled={isLocked}
               >
                 <SelectTrigger><SelectValue placeholder="Select a published form" /></SelectTrigger>
                 <SelectContent>
@@ -571,19 +603,21 @@ export function ObligationDrawer({
                   ))}
                 </SelectContent>
               </Select>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open("/dashboard/forms", "_blank")}
-                >
-                  Create new form →
-                </Button>
-                <Button type="button" variant="ghost" size="sm" onClick={() => refetchForms()}>
-                  Refresh list
-                </Button>
-              </div>
+              {!isLocked && (
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open("/dashboard/forms", "_blank")}
+                  >
+                    Create new form →
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => refetchForms()}>
+                    Refresh list
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
@@ -595,6 +629,7 @@ export function ObligationDrawer({
                 value={state.requiresIndividualCompletion ? "individual" : "any"}
                 onValueChange={(v) => setState({ ...state, requiresIndividualCompletion: v === "individual" })}
                 className="grid gap-2"
+                disabled={isLocked}
               >
                 <label className="flex items-center gap-2 text-sm">
                   <RadioGroupItem value="any" /> Any one person
@@ -617,6 +652,7 @@ export function ObligationDrawer({
                 <label key={g.id} className="flex items-center gap-2 text-sm">
                   <Checkbox
                     checked={state.assignedToGroups.includes(g.id)}
+                    disabled={isLocked}
                     onCheckedChange={(v) => {
                       const set = new Set(state.assignedToGroups);
                       if (v === true) set.add(g.id); else set.delete(g.id);
@@ -633,29 +669,34 @@ export function ObligationDrawer({
               {state.assignedToUsers.map((uid) => (
                 <Badge key={uid} variant="secondary" className="gap-1">
                   {userNames.get(uid) ?? uid}
-                  <button
-                    type="button"
-                    onClick={() => setState({ ...state, assignedToUsers: state.assignedToUsers.filter((x) => x !== uid) })}
-                    className="ml-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full hover:bg-foreground/10"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
+                  {!isLocked && (
+                    <button
+                      type="button"
+                      onClick={() => setState({ ...state, assignedToUsers: state.assignedToUsers.filter((x) => x !== uid) })}
+                      className="ml-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full hover:bg-foreground/10"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
                 </Badge>
               ))}
             </div>
-            <StaffPickerCombobox
-              orgId={orgId}
-              excludeIds={excludeUserIds}
-              onSelect={(id, name) => {
-                setState({ ...state, assignedToUsers: [...state.assignedToUsers, id] });
-                setUserNames((m) => new Map(m).set(id, name));
-              }}
-            />
+            {!isLocked && (
+              <StaffPickerCombobox
+                orgId={orgId}
+                excludeIds={excludeUserIds}
+                onSelect={(id, name) => {
+                  setState({ ...state, assignedToUsers: [...state.assignedToUsers, id] });
+                  setUserNames((m) => new Map(m).set(id, name));
+                }}
+              />
+            )}
 
             <Label className="mt-2">Who can complete it</Label>
             <Select
               value={state.assigneeRole}
               onValueChange={(v) => setState({ ...state, assigneeRole: v as AssigneeRole })}
+              disabled={isLocked}
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -676,6 +717,7 @@ export function ObligationDrawer({
               <label className="flex items-center gap-2 text-sm">
                 <Checkbox
                   checked={state.notifyManagerOnComplete}
+                  disabled={isLocked}
                   onCheckedChange={(v) => setState({ ...state, notifyManagerOnComplete: v === true })}
                 />
                 Notify when someone completes
@@ -683,6 +725,7 @@ export function ObligationDrawer({
               <label className="flex items-center gap-2 text-sm">
                 <Checkbox
                   checked={state.notifyManagerOnOverdue}
+                  disabled={isLocked}
                   onCheckedChange={(v) => setState({ ...state, notifyManagerOnOverdue: v === true })}
                 />
                 Notify when overdue
@@ -696,15 +739,21 @@ export function ObligationDrawer({
               <p className="text-sm font-medium">Active</p>
               <p className="text-xs text-muted-foreground">Only meaningful when editing an existing obligation.</p>
             </div>
-            <Switch checked={state.active} onCheckedChange={(v) => setState({ ...state, active: v })} />
+            <Switch checked={state.active} disabled={isLocked} onCheckedChange={(v) => setState({ ...state, active: v })} />
           </div>
         </div>
 
         <SheetFooter className="gap-2 sm:justify-end">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={() => save.mutate()} disabled={!canSave || save.isPending}>
-            Save obligation
-          </Button>
+          {isLocked ? (
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+          ) : (
+            <>
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button onClick={() => save.mutate()} disabled={!canSave || save.isPending}>
+                Save obligation
+              </Button>
+            </>
+          )}
         </SheetFooter>
       </SheetContent>
     </Sheet>

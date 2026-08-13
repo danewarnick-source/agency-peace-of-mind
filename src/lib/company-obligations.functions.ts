@@ -32,6 +32,8 @@ export type CompanyObligationRow = {
   notify_manager_on_complete: boolean;
   notify_manager_on_overdue: boolean;
   active: boolean;
+  source: "sow" | "provider";
+  is_locked: boolean;
   created_by: string | null;
   created_at: string | null;
   updated_at: string | null;
@@ -819,6 +821,9 @@ export const updateCompanyObligation = createServerFn({ method: "POST" })
     if (!supabase || !userId) return { obligation: null as CompanyObligationRow | null };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
 
+    const existing = await fetchObligation(supabase, data.organizationId, data.obligationId);
+    if (existing.is_locked) throw new Error("This obligation is required by the state contract and cannot be modified.");
+
     const { data: updated, error } = await supabase
       .from("company_obligations")
       .update({
@@ -857,6 +862,9 @@ export const toggleObligationActive = createServerFn({ method: "POST" })
     if (!supabase || !userId) return { obligation: null as CompanyObligationRow | null, instance: null as ObligationInstanceRow | null };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
 
+    const existing = await fetchObligation(supabase, data.organizationId, data.obligationId);
+    if (existing.is_locked) throw new Error("This obligation is required by the state contract and cannot be modified.");
+
     const { data: updated, error } = await supabase
       .from("company_obligations")
       .update({ active: data.active })
@@ -883,6 +891,9 @@ export const deleteCompanyObligation = createServerFn({ method: "POST" })
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
     if (!supabase || !userId) return { ok: false };
     await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+
+    const existing = await fetchObligation(supabase, data.organizationId, data.obligationId);
+    if (existing.is_locked) throw new Error("This obligation is required by the state contract and cannot be modified.");
 
     const { error } = await supabase
       .from("company_obligations").delete()

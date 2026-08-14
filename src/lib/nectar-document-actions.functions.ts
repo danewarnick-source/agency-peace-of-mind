@@ -248,55 +248,19 @@ function slug(s: string): string {
     .slice(0, 60);
 }
 
+// Disabled — Company Obligations is now the tracker of record for recurring
+// compliance requirements. This handler is kept (rather than removed) so
+// the capability registry entry and any stale UI wiring still resolve, but
+// it does none of its prior extraction/insert work and always returns
+// immediately with a message directing admins to Company Obligations.
 export const proposeStaffChecklistFromDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
     z.object({ documentId: z.string().uuid() }).parse(input),
   )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    if (!supabase || !userId) return { proposed: 0, message: "No checklist items detected." };
-    const doc = await fetchDoc(supabase as never, data.documentId);
-    await requireOrgMembership(
-      supabase,
-      userId,
-      doc.organization_id,
-      "manager",
-    );
-    if (!doc.raw_text) {
-      throw new Error("Document is still being parsed — try again in a moment.");
-    }
-
-    const items = await extractChecklistItems(doc.raw_text);
-    if (!items.length) {
-      return { proposed: 0, message: "No checklist items detected." };
-    }
-
-    const rows = items.map((it) => ({
-      organization_id: doc.organization_id,
-      source_document_id: doc.id,
-      origin: "document",
-      requirement_key: `doc_${doc.id.slice(0, 8)}_${slug(it.title)}`,
-      title: it.title,
-      category: it.category,
-      source_citation: it.source_citation,
-      approval_state: "nectar_drafted",
-      review_status: "needs_attention",
-      metadata: {
-        scope: "hr_staff_checklist",
-        renewal: it.renewal,
-        proposed_by: "nectar_document_action",
-        proposed_at: new Date().toISOString(),
-      },
-    }));
-
-    const { error } = await supabase
-      .from("nectar_requirements")
-      .insert(rows as never);
-    if (error) throw new Error(error.message);
-
+  .handler(async () => {
     return {
-      proposed: rows.length,
-      message: `Drafted ${rows.length} item${rows.length === 1 ? "" : "s"} for your review. Nothing is live until you confirm.`,
+      proposed: 0,
+      message: "Checklist proposals from documents are disabled. Create obligations in Company Obligations to track compliance requirements.",
     };
   });

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Lock, Mail, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -17,6 +18,7 @@ import {
   inviteTeamMember,
   type TeamMemberAccess,
 } from "@/lib/team-access.functions";
+import { StaffGroupsPanel } from "@/components/settings/staff-groups-panel";
 
 export const Route = createFileRoute("/dashboard/settings/team-access")({
   head: () => ({ meta: [{ title: "Team access — HIVE" }] }),
@@ -93,6 +95,9 @@ function TeamAccessPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const canManageGroups =
+    org?.role === "admin" || org?.role === "super_admin" || isHiveExec;
+
   if (!canManage) {
     return (
       <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
@@ -128,6 +133,13 @@ function TeamAccessPage() {
         </p>
       </div>
 
+      <Tabs defaultValue="members">
+        <TabsList>
+          <TabsTrigger value="members">Members</TabsTrigger>
+          {canManageGroups && <TabsTrigger value="groups">Groups</TabsTrigger>}
+        </TabsList>
+
+        <TabsContent value="members" className="space-y-6">
       {/* Invite */}
       <form
         className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
@@ -238,6 +250,16 @@ function TeamAccessPage() {
           </div>
         )}
       </div>
+        </TabsContent>
+
+        {canManageGroups && (
+          <TabsContent value="groups">
+            <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+              <StaffGroupsPanel orgId={org!.organization_id} />
+            </div>
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   );
 }

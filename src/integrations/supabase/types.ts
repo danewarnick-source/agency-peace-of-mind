@@ -4569,6 +4569,345 @@ export type Database = {
           },
         ]
       }
+      company_obligation_completions: {
+        Row: {
+          attestation_signed_at: string | null
+          attestation_text_snapshot: string | null
+          completed_at: string
+          evidence_type_used: string
+          form_submission_id: string | null
+          id: string
+          instance_id: string
+          is_manual_entry: boolean
+          manual_entry_by: string | null
+          manual_entry_by_name: string | null
+          notes: string | null
+          organization_id: string
+          staff_id: string
+          staff_name: string
+          upload_filename: string | null
+          upload_path: string | null
+        }
+        Insert: {
+          attestation_signed_at?: string | null
+          attestation_text_snapshot?: string | null
+          completed_at?: string
+          evidence_type_used: string
+          form_submission_id?: string | null
+          id?: string
+          instance_id: string
+          is_manual_entry?: boolean
+          manual_entry_by?: string | null
+          manual_entry_by_name?: string | null
+          notes?: string | null
+          organization_id: string
+          staff_id: string
+          staff_name: string
+          upload_filename?: string | null
+          upload_path?: string | null
+        }
+        Update: {
+          attestation_signed_at?: string | null
+          attestation_text_snapshot?: string | null
+          completed_at?: string
+          evidence_type_used?: string
+          form_submission_id?: string | null
+          id?: string
+          instance_id?: string
+          is_manual_entry?: boolean
+          manual_entry_by?: string | null
+          manual_entry_by_name?: string | null
+          notes?: string | null
+          organization_id?: string
+          staff_id?: string
+          staff_name?: string
+          upload_filename?: string | null
+          upload_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_obligation_completions_form_submission_id_fkey"
+            columns: ["form_submission_id"]
+            isOneToOne: false
+            referencedRelation: "form_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_obligation_completions_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "company_obligation_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_obligation_completions_manual_entry_by_fkey"
+            columns: ["manual_entry_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_obligation_completions_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_obligation_instance_assignees: {
+        Row: {
+          id: string
+          instance_id: string
+          organization_id: string
+          staff_id: string
+          staff_name: string
+          staff_role: string | null
+        }
+        Insert: {
+          id?: string
+          instance_id: string
+          organization_id: string
+          staff_id: string
+          staff_name: string
+          staff_role?: string | null
+        }
+        Update: {
+          id?: string
+          instance_id?: string
+          organization_id?: string
+          staff_id?: string
+          staff_name?: string
+          staff_role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_obligation_instance_assignees_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "company_obligation_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_obligation_instance_assignees_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_obligation_instances: {
+        Row: {
+          admin_notes: string | null
+          attestation_signed_at: string | null
+          attestation_signed_by_id: string | null
+          attestation_signed_by_name: string | null
+          attestation_text_snapshot: string | null
+          completed_at: string | null
+          completed_by_id: string | null
+          completed_by_name: string | null
+          created_at: string | null
+          due_at: string
+          event_description: string | null
+          evidence_type_used: string | null
+          form_submission_id: string | null
+          id: string
+          obligation_id: string
+          organization_id: string
+          period_key: string
+          status: string
+          updated_at: string | null
+          upload_filename: string | null
+          upload_path: string | null
+          waive_reason: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          attestation_signed_at?: string | null
+          attestation_signed_by_id?: string | null
+          attestation_signed_by_name?: string | null
+          attestation_text_snapshot?: string | null
+          completed_at?: string | null
+          completed_by_id?: string | null
+          completed_by_name?: string | null
+          created_at?: string | null
+          due_at: string
+          event_description?: string | null
+          evidence_type_used?: string | null
+          form_submission_id?: string | null
+          id?: string
+          obligation_id: string
+          organization_id: string
+          period_key: string
+          status?: string
+          updated_at?: string | null
+          upload_filename?: string | null
+          upload_path?: string | null
+          waive_reason?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          attestation_signed_at?: string | null
+          attestation_signed_by_id?: string | null
+          attestation_signed_by_name?: string | null
+          attestation_text_snapshot?: string | null
+          completed_at?: string | null
+          completed_by_id?: string | null
+          completed_by_name?: string | null
+          created_at?: string | null
+          due_at?: string
+          event_description?: string | null
+          evidence_type_used?: string | null
+          form_submission_id?: string | null
+          id?: string
+          obligation_id?: string
+          organization_id?: string
+          period_key?: string
+          status?: string
+          updated_at?: string | null
+          upload_filename?: string | null
+          upload_path?: string | null
+          waive_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_obligation_instances_attestation_signed_by_id_fkey"
+            columns: ["attestation_signed_by_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_obligation_instances_completed_by_id_fkey"
+            columns: ["completed_by_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_obligation_instances_form_submission_id_fkey"
+            columns: ["form_submission_id"]
+            isOneToOne: false
+            referencedRelation: "form_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_obligation_instances_obligation_id_fkey"
+            columns: ["obligation_id"]
+            isOneToOne: false
+            referencedRelation: "company_obligations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_obligation_instances_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_obligations: {
+        Row: {
+          active: boolean
+          assigned_to_groups: string[]
+          assigned_to_users: string[]
+          assignee_role: string
+          attestation_text: string | null
+          cadence: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          due_day_config: Json
+          evidence_type: string
+          id: string
+          is_locked: boolean
+          linked_form_id: string | null
+          notify_manager_on_complete: boolean
+          notify_manager_on_overdue: boolean
+          organization_id: string
+          reminder_days_before: number[]
+          requires_individual_completion: boolean
+          source: string
+          source_policy_section: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean
+          assigned_to_groups?: string[]
+          assigned_to_users?: string[]
+          assignee_role?: string
+          attestation_text?: string | null
+          cadence: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          due_day_config?: Json
+          evidence_type: string
+          id?: string
+          is_locked?: boolean
+          linked_form_id?: string | null
+          notify_manager_on_complete?: boolean
+          notify_manager_on_overdue?: boolean
+          organization_id: string
+          reminder_days_before?: number[]
+          requires_individual_completion?: boolean
+          source?: string
+          source_policy_section?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean
+          assigned_to_groups?: string[]
+          assigned_to_users?: string[]
+          assignee_role?: string
+          attestation_text?: string | null
+          cadence?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          due_day_config?: Json
+          evidence_type?: string
+          id?: string
+          is_locked?: boolean
+          linked_form_id?: string | null
+          notify_manager_on_complete?: boolean
+          notify_manager_on_overdue?: boolean
+          organization_id?: string
+          reminder_days_before?: number[]
+          requires_individual_completion?: boolean
+          source?: string
+          source_policy_section?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_obligations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_obligations_linked_form_id_fkey"
+            columns: ["linked_form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_obligations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       compliance_overrides: {
         Row: {
           created_at: string
@@ -16014,6 +16353,90 @@ export type Database = {
             columns: ["training_completion_id"]
             isOneToOne: false
             referencedRelation: "training_completions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_group_members: {
+        Row: {
+          added_at: string | null
+          group_id: string
+          id: string
+          staff_id: string
+        }
+        Insert: {
+          added_at?: string | null
+          group_id: string
+          id?: string
+          staff_id: string
+        }
+        Update: {
+          added_at?: string | null
+          group_id?: string
+          id?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "staff_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_group_members_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_groups: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          linked_team_id: string | null
+          name: string
+          organization_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          linked_team_id?: string | null
+          name: string
+          organization_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          linked_team_id?: string | null
+          name?: string
+          organization_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_groups_linked_team_id_fkey"
+            columns: ["linked_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_groups_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]

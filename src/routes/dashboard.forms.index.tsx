@@ -6,13 +6,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Plus, FileText, Sparkles, Archive, Send, Edit3, Trash2, ChevronRight } from "lucide-react";
 import { useEffectiveView } from "@/hooks/use-effective-view";
 import { useCaseload } from "@/hooks/use-caseload";
+import { useCurrentOrg } from "@/hooks/use-org";
+import { supabase } from "@/integrations/supabase/client";
 import {
   listForms, listMyForms, archiveForm, saveForm,
   getMyFormNotifications, markFormNotificationsRead, seedIntakeForms,
 } from "@/lib/forms.functions";
+import { pauseObligationsForArchivedForm } from "@/lib/company-obligations.functions";
 import {
   periodKeyFor, dueDateFor, formatDue, describeFrequency, isOverdue,
   type Frequency, type Schedule, type FormSettings,
@@ -39,13 +46,55 @@ export function FormsIndex() {
 function AdminList() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { data: org } = useCurrentOrg();
   const fetchList = useServerFn(listForms);
   const save = useServerFn(saveForm);
   const archive = useServerFn(archiveForm);
   const seed = useServerFn(seedIntakeForms);
+  const pauseObligations = useServerFn(pauseObligationsForArchivedForm);
   const { data, isLoading } = useQuery({ queryKey: ["forms-admin"], queryFn: () => fetchList() });
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<{ id: string; name: string; obligationTitles: string[] } | null>(null);
+  const [archiving, setArchiving] = useState(false);
+
+  async function requestArchive(f: { id: string; name: string }) {
+    if (!org) return;
+    const { data: linked, error } = await supabase
+      .from("company_obligations")
+      .select("title")
+      .eq("organization_id", org.organization_id)
+      .eq("linked_form_id", f.id)
+      .eq("active", true);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    const titles = (linked ?? []).map((o: { title: string }) => o.title);
+    if (titles.length === 0) {
+      await archive({ data: { formId: f.id } });
+      toast.success("Archived");
+      qc.invalidateQueries({ queryKey: ["forms-admin"] });
+      return;
+    }
+    setArchiveTarget({ id: f.id, name: f.name, obligationTitles: titles });
+  }
+
+  async function confirmArchiveWithObligations() {
+    if (!archiveTarget || !org) return;
+    setArchiving(true);
+    try {
+      await archive({ data: { formId: archiveTarget.id } });
+      await pauseObligations({ data: { organizationId: org.organization_id, formId: archiveTarget.id } });
+      toast.success("Form archived — linked obligations paused");
+      setArchiveTarget(null);
+      qc.invalidateQueries({ queryKey: ["forms-admin"] });
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setArchiving(false);
+    }
+  }
 
   async function createBlank() {
     const out = await save({ data: {
@@ -111,7 +160,7 @@ function AdminList() {
                   </Link>
                   {f.status !== "archived" && (
                     <Button size="sm" variant="ghost" className="min-h-[36px] text-rose-600"
-                      onClick={async () => { await archive({ data: { formId: f.id } }); toast.success("Archived"); qc.invalidateQueries({ queryKey: ["forms-admin"] }); }}>
+                      onClick={() => requestArchive({ id: f.id, name: f.name })}>
                       <Archive className="mr-1 h-3.5 w-3.5" /> Archive
                     </Button>
                   )}
@@ -140,6 +189,28 @@ function AdminList() {
           onDeleted={() => { setDeleteTarget(null); qc.invalidateQueries({ queryKey: ["forms-admin"] }); }}
         />
       )}
+
+      <AlertDialog open={!!archiveTarget} onOpenChange={(o) => { if (!o) setArchiveTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>This form is used by active obligations</AlertDialogTitle>
+            <AlertDialogDescription>
+              This form is used by {archiveTarget?.obligationTitles.length} active obligation(s): {archiveTarget?.obligationTitles.join(", ")}.
+              Archiving it will disable those obligations until a new form is linked. Proceed?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={archiving}
+              onClick={confirmArchiveWithObligations}
+            >
+              Archive and disable obligations
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -55,6 +55,7 @@ import { Route as DashboardPbaLedgerRouteImport } from './routes/dashboard.pba-l
 import { Route as DashboardNectarDocsRouteImport } from './routes/dashboard.nectar-docs'
 import { Route as DashboardNectarCompanyProfileRouteImport } from './routes/dashboard.nectar-company-profile'
 import { Route as DashboardMyTimeCorrectionsRouteImport } from './routes/dashboard.my-time-corrections'
+import { Route as DashboardMyObligationsRouteImport } from './routes/dashboard.my-obligations'
 import { Route as DashboardMyHistoricalTimesheetsRouteImport } from './routes/dashboard.my-historical-timesheets'
 import { Route as DashboardMyHistoricalRecordsRouteImport } from './routes/dashboard.my-historical-records'
 import { Route as DashboardMyHistoricalDailyNotesRouteImport } from './routes/dashboard.my-historical-daily-notes'
@@ -79,6 +80,7 @@ import { Route as DashboardDeadlinesRouteImport } from './routes/dashboard.deadl
 import { Route as DashboardDayProgramRouteImport } from './routes/dashboard.day-program'
 import { Route as DashboardDailyLogsRouteImport } from './routes/dashboard.daily-logs'
 import { Route as DashboardComplianceDeskRouteImport } from './routes/dashboard.compliance-desk'
+import { Route as DashboardCompanyObligationsRouteImport } from './routes/dashboard.company-obligations'
 import { Route as DashboardCommandCenterRouteImport } from './routes/dashboard.command-center'
 import { Route as DashboardClientsRouteImport } from './routes/dashboard.clients'
 import { Route as DashboardClientLoansRouteImport } from './routes/dashboard.client-loans'
@@ -443,6 +445,11 @@ const DashboardMyTimeCorrectionsRoute =
     path: '/my-time-corrections',
     getParentRoute: () => DashboardRoute,
   } as any)
+const DashboardMyObligationsRoute = DashboardMyObligationsRouteImport.update({
+  id: '/my-obligations',
+  path: '/my-obligations',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardMyHistoricalTimesheetsRoute =
   DashboardMyHistoricalTimesheetsRouteImport.update({
     id: '/my-historical-timesheets',
@@ -571,6 +578,12 @@ const DashboardComplianceDeskRoute = DashboardComplianceDeskRouteImport.update({
   path: '/compliance-desk',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardCompanyObligationsRoute =
+  DashboardCompanyObligationsRouteImport.update({
+    id: '/company-obligations',
+    path: '/company-obligations',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardCommandCenterRoute = DashboardCommandCenterRouteImport.update({
   id: '/command-center',
   path: '/command-center',
@@ -1335,6 +1348,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/client-loans': typeof DashboardClientLoansRoute
   '/dashboard/clients': typeof DashboardClientsRouteWithChildren
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
+  '/dashboard/company-obligations': typeof DashboardCompanyObligationsRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/day-program': typeof DashboardDayProgramRoute
@@ -1359,6 +1373,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/my-historical-daily-notes': typeof DashboardMyHistoricalDailyNotesRoute
   '/dashboard/my-historical-records': typeof DashboardMyHistoricalRecordsRoute
   '/dashboard/my-historical-timesheets': typeof DashboardMyHistoricalTimesheetsRoute
+  '/dashboard/my-obligations': typeof DashboardMyObligationsRoute
   '/dashboard/my-time-corrections': typeof DashboardMyTimeCorrectionsRoute
   '/dashboard/nectar-company-profile': typeof DashboardNectarCompanyProfileRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
@@ -1534,6 +1549,7 @@ export interface FileRoutesByTo {
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
   '/dashboard/client-loans': typeof DashboardClientLoansRoute
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
+  '/dashboard/company-obligations': typeof DashboardCompanyObligationsRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/day-program': typeof DashboardDayProgramRoute
@@ -1555,6 +1571,7 @@ export interface FileRoutesByTo {
   '/dashboard/my-historical-daily-notes': typeof DashboardMyHistoricalDailyNotesRoute
   '/dashboard/my-historical-records': typeof DashboardMyHistoricalRecordsRoute
   '/dashboard/my-historical-timesheets': typeof DashboardMyHistoricalTimesheetsRoute
+  '/dashboard/my-obligations': typeof DashboardMyObligationsRoute
   '/dashboard/my-time-corrections': typeof DashboardMyTimeCorrectionsRoute
   '/dashboard/nectar-company-profile': typeof DashboardNectarCompanyProfileRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
@@ -1733,6 +1750,7 @@ export interface FileRoutesById {
   '/dashboard/client-loans': typeof DashboardClientLoansRoute
   '/dashboard/clients': typeof DashboardClientsRouteWithChildren
   '/dashboard/command-center': typeof DashboardCommandCenterRoute
+  '/dashboard/company-obligations': typeof DashboardCompanyObligationsRoute
   '/dashboard/compliance-desk': typeof DashboardComplianceDeskRoute
   '/dashboard/daily-logs': typeof DashboardDailyLogsRoute
   '/dashboard/day-program': typeof DashboardDayProgramRoute
@@ -1757,6 +1775,7 @@ export interface FileRoutesById {
   '/dashboard/my-historical-daily-notes': typeof DashboardMyHistoricalDailyNotesRoute
   '/dashboard/my-historical-records': typeof DashboardMyHistoricalRecordsRoute
   '/dashboard/my-historical-timesheets': typeof DashboardMyHistoricalTimesheetsRoute
+  '/dashboard/my-obligations': typeof DashboardMyObligationsRoute
   '/dashboard/my-time-corrections': typeof DashboardMyTimeCorrectionsRoute
   '/dashboard/nectar-company-profile': typeof DashboardNectarCompanyProfileRoute
   '/dashboard/nectar-docs': typeof DashboardNectarDocsRoute
@@ -1937,6 +1956,7 @@ export interface FileRouteTypes {
     | '/dashboard/client-loans'
     | '/dashboard/clients'
     | '/dashboard/command-center'
+    | '/dashboard/company-obligations'
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
     | '/dashboard/day-program'
@@ -1961,6 +1981,7 @@ export interface FileRouteTypes {
     | '/dashboard/my-historical-daily-notes'
     | '/dashboard/my-historical-records'
     | '/dashboard/my-historical-timesheets'
+    | '/dashboard/my-obligations'
     | '/dashboard/my-time-corrections'
     | '/dashboard/nectar-company-profile'
     | '/dashboard/nectar-docs'
@@ -2136,6 +2157,7 @@ export interface FileRouteTypes {
     | '/dashboard/client-billing-codes'
     | '/dashboard/client-loans'
     | '/dashboard/command-center'
+    | '/dashboard/company-obligations'
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
     | '/dashboard/day-program'
@@ -2157,6 +2179,7 @@ export interface FileRouteTypes {
     | '/dashboard/my-historical-daily-notes'
     | '/dashboard/my-historical-records'
     | '/dashboard/my-historical-timesheets'
+    | '/dashboard/my-obligations'
     | '/dashboard/my-time-corrections'
     | '/dashboard/nectar-company-profile'
     | '/dashboard/nectar-docs'
@@ -2334,6 +2357,7 @@ export interface FileRouteTypes {
     | '/dashboard/client-loans'
     | '/dashboard/clients'
     | '/dashboard/command-center'
+    | '/dashboard/company-obligations'
     | '/dashboard/compliance-desk'
     | '/dashboard/daily-logs'
     | '/dashboard/day-program'
@@ -2358,6 +2382,7 @@ export interface FileRouteTypes {
     | '/dashboard/my-historical-daily-notes'
     | '/dashboard/my-historical-records'
     | '/dashboard/my-historical-timesheets'
+    | '/dashboard/my-obligations'
     | '/dashboard/my-time-corrections'
     | '/dashboard/nectar-company-profile'
     | '/dashboard/nectar-docs'
@@ -2864,6 +2889,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardMyTimeCorrectionsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/my-obligations': {
+      id: '/dashboard/my-obligations'
+      path: '/my-obligations'
+      fullPath: '/dashboard/my-obligations'
+      preLoaderRoute: typeof DashboardMyObligationsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/my-historical-timesheets': {
       id: '/dashboard/my-historical-timesheets'
       path: '/my-historical-timesheets'
@@ -3030,6 +3062,13 @@ declare module '@tanstack/react-router' {
       path: '/compliance-desk'
       fullPath: '/dashboard/compliance-desk'
       preLoaderRoute: typeof DashboardComplianceDeskRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/company-obligations': {
+      id: '/dashboard/company-obligations'
+      path: '/company-obligations'
+      fullPath: '/dashboard/company-obligations'
+      preLoaderRoute: typeof DashboardCompanyObligationsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/command-center': {
@@ -4263,6 +4302,7 @@ interface DashboardRouteChildren {
   DashboardClientLoansRoute: typeof DashboardClientLoansRoute
   DashboardClientsRoute: typeof DashboardClientsRouteWithChildren
   DashboardCommandCenterRoute: typeof DashboardCommandCenterRoute
+  DashboardCompanyObligationsRoute: typeof DashboardCompanyObligationsRoute
   DashboardComplianceDeskRoute: typeof DashboardComplianceDeskRoute
   DashboardDailyLogsRoute: typeof DashboardDailyLogsRoute
   DashboardDayProgramRoute: typeof DashboardDayProgramRoute
@@ -4287,6 +4327,7 @@ interface DashboardRouteChildren {
   DashboardMyHistoricalDailyNotesRoute: typeof DashboardMyHistoricalDailyNotesRoute
   DashboardMyHistoricalRecordsRoute: typeof DashboardMyHistoricalRecordsRoute
   DashboardMyHistoricalTimesheetsRoute: typeof DashboardMyHistoricalTimesheetsRoute
+  DashboardMyObligationsRoute: typeof DashboardMyObligationsRoute
   DashboardMyTimeCorrectionsRoute: typeof DashboardMyTimeCorrectionsRoute
   DashboardNectarCompanyProfileRoute: typeof DashboardNectarCompanyProfileRoute
   DashboardNectarDocsRoute: typeof DashboardNectarDocsRoute
@@ -4356,6 +4397,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardClientLoansRoute: DashboardClientLoansRoute,
   DashboardClientsRoute: DashboardClientsRouteWithChildren,
   DashboardCommandCenterRoute: DashboardCommandCenterRoute,
+  DashboardCompanyObligationsRoute: DashboardCompanyObligationsRoute,
   DashboardComplianceDeskRoute: DashboardComplianceDeskRoute,
   DashboardDailyLogsRoute: DashboardDailyLogsRoute,
   DashboardDayProgramRoute: DashboardDayProgramRoute,
@@ -4381,6 +4423,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardMyHistoricalDailyNotesRoute: DashboardMyHistoricalDailyNotesRoute,
   DashboardMyHistoricalRecordsRoute: DashboardMyHistoricalRecordsRoute,
   DashboardMyHistoricalTimesheetsRoute: DashboardMyHistoricalTimesheetsRoute,
+  DashboardMyObligationsRoute: DashboardMyObligationsRoute,
   DashboardMyTimeCorrectionsRoute: DashboardMyTimeCorrectionsRoute,
   DashboardNectarCompanyProfileRoute: DashboardNectarCompanyProfileRoute,
   DashboardNectarDocsRoute: DashboardNectarDocsRoute,

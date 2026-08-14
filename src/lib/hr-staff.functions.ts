@@ -1186,6 +1186,7 @@ export interface HrMatrixStaff {
   manager_id: string | null;
   manager_name: string | null;
   staff_type_keys: string[];
+  hire_date: string | null;
   cells: Record<string, HrMatrixCell>;
 }
 
@@ -1589,6 +1590,7 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
           ? (managerNames.get(team.manager_id) ?? null)
           : null,
         staff_type_keys: staffTypeKeys,
+        hire_date: p?.start_date ?? p?.hire_date ?? null,
         cells,
       };
     });

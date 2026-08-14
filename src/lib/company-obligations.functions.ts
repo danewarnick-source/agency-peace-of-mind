@@ -86,6 +86,10 @@ function addYearsUTC(d: Date, years: number): Date {
   return new Date(Date.UTC(d.getUTCFullYear() + years, d.getUTCMonth(), d.getUTCDate()));
 }
 
+function addMonthsUTC(d: Date, months: number): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, d.getUTCDate()));
+}
+
 function isoWeekday(d: Date): number {
   const wd = d.getUTCDay();
   return wd === 0 ? 7 : wd;
@@ -196,6 +200,13 @@ export function cadenceDescription(ob: Pick<CompanyObligationRow, "cadence" | "d
       return `Quarterly — due ${d === "last" ? "the last day" : ordinal(Number(d))} of the first month of the quarter`;
     }
     case "annually": {
+      if (cfg.every_n_months !== undefined) {
+        const n = Number(cfg.every_n_months);
+        const src = cfg.from === "cert_expiration" ? "cert expiration date" : "completion date";
+        return n === 24
+          ? `Every 2 years — renewal due on ${src}`
+          : `Every ${n} months — renewal due on ${src}`;
+      }
       const m = Number(cfg.month);
       const d = cfg.day_of_month;
       return `Annually — due ${MONTHS_SHORT[m - 1] ?? "?"} ${d === "last" ? "last day" : ordinal(Number(d))}`;
@@ -203,6 +214,9 @@ export function cadenceDescription(ob: Pick<CompanyObligationRow, "cadence" | "d
     case "per_event":
       return "Triggered per event — due within a set number of days";
     case "one_time": {
+      if (cfg.days_after_hire !== undefined) {
+        return `One-time — due ${Number(cfg.days_after_hire)} days after hire`;
+      }
       const dateStr = typeof cfg.date === "string" ? cfg.date : "";
       return dateStr ? `One-time — due ${formatShort(new Date(`${dateStr}T00:00:00Z`))}` : "One-time";
     }
@@ -400,7 +414,7 @@ export async function scheduleRemindersInternal(
  * (assignee_staff_id set) instead of one shared instance for the group.
  */
 function isPerPersonDueConfig(cfg: Record<string, unknown>): boolean {
-  return cfg.days_after_hire !== undefined || cfg.anniversary_based === true;
+  return cfg.days_after_hire !== undefined || cfg.anniversary_based === true || cfg.every_n_months !== undefined;
 }
 
 async function fetchAssigneeHireDates(
@@ -490,6 +504,14 @@ async function generatePerPersonInstancesInternal(
       const days = Number(cfg.days_after_hire);
       if (!Number.isFinite(days)) continue;
       due = addDaysUTC(basisDate, days);
+    } else if (cfg.every_n_months !== undefined) {
+      // First instance for a not-yet-certified assignee: give them a
+      // reasonable window from hire before any cert exists. Later renewals
+      // are scheduled directly off the cert's expiration date in
+      // recordCompletion, not by this per-assignee generator.
+      const months = Number(cfg.every_n_months);
+      if (!Number.isFinite(months)) continue;
+      due = addMonthsUTC(basisDate, months);
     } else {
       const startYear = Math.max(1, Number(cfg.start_year ?? 1));
       let n = startYear;
@@ -1352,6 +1374,19 @@ export const recordCompletion = createServerFn({ method: "POST" })
       ? new Date(`${validation.completed_date}T00:00:00Z`).toISOString()
       : (data.completedAt ?? new Date().toISOString());
 
+    // Renewal cadences that track a certificate's own printed expiration
+    // date (e.g. CPR/First Aid) fall back to completed_at + N months when
+    // NECTAR couldn't read an expiration off the upload (or the completion
+    // was entered manually, so NECTAR never ran) — flag that on the record
+    // so an admin knows to verify the real expiration.
+    const dueCfgForRenewal = (ob.due_day_config ?? {}) as Record<string, unknown>;
+    const usesCertExpirationCadence =
+      dueCfgForRenewal.every_n_months !== undefined && dueCfgForRenewal.from === "cert_expiration";
+    const expirationFallbackWarning =
+      usesCertExpirationCadence && !validation.expires_date
+        ? `Expiration date could not be extracted — renewal defaulted to ${Number(dueCfgForRenewal.every_n_months)} months from upload date. Admin should verify.`
+        : null;
+
     const { error: cErr } = await supabase.from("company_obligation_completions").insert({
       instance_id: data.instanceId,
       organization_id: data.organizationId,
@@ -1369,7 +1404,9 @@ export const recordCompletion = createServerFn({ method: "POST" })
       manual_entry_by_name: isManual ? (data.manualEntryByName ?? null) : null,
       completed_at: completedAt,
       nectar_validation_status: validation.ran ? validation.status : null,
-      nectar_validation_reasons: validation.reasons,
+      nectar_validation_reasons: expirationFallbackWarning
+        ? [...validation.reasons, expirationFallbackWarning]
+        : validation.reasons,
       nectar_extracted_cert_type: validation.cert_type,
       nectar_extracted_name: validation.name,
       nectar_extracted_completed_date: validation.completed_date,
@@ -1447,11 +1484,10 @@ export const recordCompletion = createServerFn({ method: "POST" })
 
     await notifyObligationManagersInternal(supabase, data.organizationId, ob.id, data.instanceId, "completion");
 
-    // Passed a NECTAR-verified renewal cert (CPR, background screening,
-    // fraud exclusion, etc.): schedule the next instance from the
-    // certificate's own expiration date rather than waiting for the normal
+    // Passed a NECTAR-verified renewal cert (background screening, fraud
+    // exclusion, etc.): schedule the next instance from the certificate's
+    // own expiration date rather than waiting for the normal
     // hire-anniversary generator, so renewal dates track the real cert.
-    const dueCfgForRenewal = (ob.due_day_config ?? {}) as Record<string, unknown>;
     if (
       validation.ran && validation.status === "passed" && validation.expires_date &&
       dueCfgForRenewal.anniversary_based === true && updatedInstance.status === "completed"
@@ -1482,6 +1518,46 @@ export const recordCompletion = createServerFn({ method: "POST" })
             { onConflict: "instance_id,staff_id", ignoreDuplicates: true },
           );
           await scheduleRemindersInternal(supabase, data.organizationId, nextInst.id, ob);
+        }
+      }
+    }
+
+    // every_n_months renewal (e.g. CPR/First Aid): due on the cert's own
+    // printed expiration date when NECTAR read one off the upload;
+    // otherwise fall back to completed_at + N months (the completion
+    // record already carries an admin-facing warning for that case).
+    if (dueCfgForRenewal.every_n_months !== undefined && updatedInstance.status === "completed") {
+      const months = Number(dueCfgForRenewal.every_n_months);
+      if (Number.isFinite(months)) {
+        const { data: alreadyOpen } = await supabase
+          .from("company_obligation_instances")
+          .select("id")
+          .eq("obligation_id", ob.id)
+          .eq("assignee_staff_id", targetStaffId)
+          .in("status", ["pending", "overdue"])
+          .maybeSingle();
+        if (!alreadyOpen) {
+          const nextDue = usesCertExpirationCadence && validation.expires_date
+            ? new Date(`${validation.expires_date}T00:00:00Z`)
+            : addMonthsUTC(new Date(completedAt), months);
+          const { data: nextInst, error: nextErr } = await supabase
+            .from("company_obligation_instances")
+            .insert({
+              obligation_id: ob.id,
+              organization_id: data.organizationId,
+              period_key: `Due ${formatShort(nextDue)}`,
+              due_at: endOfDayUTC(nextDue),
+              status: "pending",
+              assignee_staff_id: targetStaffId,
+            })
+            .select("*").maybeSingle();
+          if (!nextErr && nextInst) {
+            await supabase.from("company_obligation_instance_assignees").upsert(
+              [{ instance_id: nextInst.id, organization_id: data.organizationId, staff_id: targetStaffId, staff_name: staffName, staff_role: "employee" }],
+              { onConflict: "instance_id,staff_id", ignoreDuplicates: true },
+            );
+            await scheduleRemindersInternal(supabase, data.organizationId, nextInst.id, ob);
+          }
         }
       }
     }

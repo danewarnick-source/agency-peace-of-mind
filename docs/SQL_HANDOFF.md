@@ -2662,3 +2662,85 @@ ALTER TABLE public.company_obligation_completions
 statements adding eight columns total to
 `public.company_obligation_completions`. No existing columns, rows, or
 constraints are touched.
+
+---
+
+## ACTION — Obligation scope + client targeting, remaining SOW obligations seed (2026-08-14)
+
+**What this is for:** Company Obligations currently only supports one
+instance per staff member. This adds `scope` (`org` / `staff` /
+`staff_per_client`) so an obligation can instead generate a single shared
+org-wide instance (e.g. an OL license renewal), or one instance per active
+staff+client assignment (e.g. client-specific training due 30 days after a
+caseload assignment). Then seeds the ~29 remaining SOW-mandated obligations
+from DHHS91172 that weren't part of the original six universal ones.
+
+Run the two blocks below in order. **Clear the editor before each.**
+
+Matches migration
+`supabase/migrations/20260814050000_obligation_scope_and_client_targeting.sql`.
+
+```sql
+ALTER TABLE public.company_obligations
+  ADD COLUMN IF NOT EXISTS scope text NOT NULL DEFAULT 'staff'
+    CHECK (scope IN ('org', 'staff', 'staff_per_client')),
+  ADD COLUMN IF NOT EXISTS target_service_codes text[] NOT NULL DEFAULT '{}';
+
+ALTER TABLE public.company_obligation_instances
+  ADD COLUMN IF NOT EXISTS client_id uuid REFERENCES public.clients(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS client_name text;
+
+ALTER TABLE public.company_obligation_instance_assignees
+  ADD COLUMN IF NOT EXISTS client_id uuid REFERENCES public.clients(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS client_name text;
+
+UPDATE public.company_obligations
+SET scope = 'staff'
+WHERE organization_id = '7fabcf5d-f826-487f-8730-8b0c3f1969bb'
+  AND source = 'sow';
+
+CREATE INDEX IF NOT EXISTS idx_company_obligation_instances_client
+  ON public.company_obligation_instances(client_id) WHERE client_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_company_obligation_instances_staff_client
+  ON public.company_obligation_instances(assignee_staff_id, client_id)
+  WHERE assignee_staff_id IS NOT NULL AND client_id IS NOT NULL;
+
+DROP INDEX IF EXISTS idx_company_obligation_instances_person_period;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_company_obligation_instances_person_period
+  ON public.company_obligation_instances(obligation_id, period_key, assignee_staff_id)
+  WHERE assignee_staff_id IS NOT NULL AND client_id IS NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_company_obligation_instances_person_client_period
+  ON public.company_obligation_instances(obligation_id, period_key, assignee_staff_id, client_id)
+  WHERE assignee_staff_id IS NOT NULL AND client_id IS NOT NULL;
+```
+
+**What you'll see:** two `ALTER TABLE` statements widening
+`company_obligations` (new `scope`/`target_service_codes` columns), two more
+adding `client_id`/`client_name` to the instances and assignees tables, one
+`UPDATE` touching the six existing universal obligations (sets `scope =
+'staff'`, a no-op since that's already the column default), two new
+`CREATE INDEX`, then an index rebuild (`DROP INDEX` + two `CREATE UNIQUE
+INDEX`) that splits the existing per-person uniqueness constraint so a
+staff+client pairing is unique on its own dimension. No existing rows are
+deleted or altered beyond that one `scope` backfill.
+
+Second block seeds ~29 obligation definitions (org-level shared-instance
+ones like OL licenses and UPI attestations, staff-level ones like ACRE/HSQ
+training targeted by service code, and two staff_per_client ones —
+Client-Specific Training and Support Strategies — that generate one
+instance per active staff+client assignment). Every insert is guarded with
+`WHERE NOT EXISTS`, so it's safe to re-run.
+
+Matches migration
+`supabase/migrations/20260814060000_seed_remaining_sow_obligations.sql`.
+Paste the full contents of that file here (too long to duplicate in this
+doc) — it's a single `DO $$ ... END $$;` block with ~29 guarded `INSERT`
+statements.
+
+**What you'll see:** up to 29 new rows in `public.company_obligations`
+(fewer if some titles already exist from a prior partial run — the
+`WHERE NOT EXISTS` guard skips those). No existing obligation rows are
+touched.

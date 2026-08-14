@@ -277,6 +277,78 @@ function PerNameCompletion({
   );
 }
 
+type PerClientInstanceRow = {
+  id: string;
+  status: string;
+  due_at: string;
+  completed_at: string | null;
+  client_id: string | null;
+  client_name: string | null;
+};
+type PerClientAssigneeRow = { instance_id: string; staff_id: string; staff_name: string };
+type PerClientCompletionRow = { instance_id: string; staff_id: string; staff_name: string; completed_at: string | null };
+
+/** scope='staff_per_client' obligations have many concurrent open instances
+ *  (one per staff+client pair) instead of a single current_instance, so this
+ *  lists every instance's staff/client pairing with its own status line —
+ *  format: "✓ Jordan M. (for Marcus W.) — Aug 11, 4:32 PM". */
+function PerClientCompletion({ obligation }: { obligation: ObligationWithInstance }) {
+  const { data } = useQuery({
+    queryKey: ["obligation-per-client-detail", obligation.id],
+    queryFn: async () => {
+      const { data: instances, error: iErr } = await supabase
+        .from("company_obligation_instances")
+        .select("id, status, due_at, completed_at, client_id, client_name")
+        .eq("obligation_id", obligation.id)
+        .order("due_at", { ascending: true });
+      if (iErr) throw new Error(iErr.message);
+      const instanceIds = (instances ?? []).map((i: { id: string }) => i.id);
+      const [{ data: assignees, error: aErr }, { data: completions, error: cErr }] = instanceIds.length
+        ? await Promise.all([
+            supabase.from("company_obligation_instance_assignees")
+              .select("instance_id, staff_id, staff_name").in("instance_id", instanceIds),
+            supabase.from("company_obligation_completions")
+              .select("instance_id, staff_id, staff_name, completed_at").in("instance_id", instanceIds),
+          ])
+        : [{ data: [], error: null }, { data: [], error: null }];
+      if (aErr) throw new Error(aErr.message);
+      if (cErr) throw new Error(cErr.message);
+      return {
+        instances: (instances ?? []) as PerClientInstanceRow[],
+        assignees: (assignees ?? []) as PerClientAssigneeRow[],
+        completions: (completions ?? []) as PerClientCompletionRow[],
+      };
+    },
+  });
+
+  if (!data) return null;
+  const { instances, assignees, completions } = data;
+  if (!instances.length) return <p className="text-xs text-muted-foreground">No active staff+client assignments yet.</p>;
+
+  const assigneeByInstance = new Map(assignees.map((a) => [a.instance_id, a]));
+  const completionByInstance = new Map(completions.map((c) => [c.instance_id, c]));
+
+  return (
+    <ul className="space-y-1 text-xs">
+      {instances.map((inst) => {
+        const assignee = assigneeByInstance.get(inst.id);
+        const completion = completionByInstance.get(inst.id);
+        const done = inst.status === "completed" || !!completion;
+        const staffName = assignee?.staff_name ?? "Unknown staff";
+        const clientName = inst.client_name ?? "Unknown client";
+        return (
+          <li key={inst.id} className={`flex items-center gap-1 ${done ? "text-success" : "text-muted-foreground"}`}>
+            {done ? <CheckCircle2 className="h-3 w-3 shrink-0" /> : <Circle className="h-3 w-3 shrink-0" />}
+            <span className="truncate">
+              {staffName} (for {clientName}) — {done ? formatDate(completion?.completed_at ?? inst.completed_at) : "not yet submitted"}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function LogEventDialog({
   open,
   onOpenChange,
@@ -456,6 +528,9 @@ export function ObligationCard({
         )}
         <Badge variant="outline">{cadenceLabel(obligation)}</Badge>
         <Badge variant="outline">{evidenceLabel(obligation.evidence_type)}</Badge>
+        <Badge variant="outline">
+          {obligation.scope === "org" ? "Org-level" : obligation.scope === "staff_per_client" ? "Per staff+client" : "Per staff"}
+        </Badge>
         <Badge variant="secondary">
           {obligation.requires_individual_completion ? "Everyone individually" : "Any one person"}
         </Badge>
@@ -491,9 +566,15 @@ export function ObligationCard({
             <InstanceStatusLine instance={obligation.current_instance} />
           </div>
 
-          <div className="mt-2">
-            <PerNameCompletion orgId={orgId} obligation={obligation} />
-          </div>
+          {obligation.scope === "org" ? null : (
+            <div className="mt-2">
+              {obligation.scope === "staff_per_client" ? (
+                <PerClientCompletion obligation={obligation} />
+              ) : (
+                <PerNameCompletion orgId={orgId} obligation={obligation} />
+              )}
+            </div>
+          )}
         </>
       )}
 

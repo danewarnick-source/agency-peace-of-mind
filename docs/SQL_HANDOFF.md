@@ -2192,3 +2192,473 @@ ALTER TABLE public.company_obligations
 **What you'll see:** two new columns added to `public.company_obligations` —
 `source` (text, checked to `'sow'` or `'provider'`) and `is_locked`
 (boolean). No existing columns, rows, or constraints are touched.
+
+---
+
+## ACTION — Retire SOW training sub-topics from the HR checklist (2026-08-14)
+
+**What this is for:** Company Obligations (30-day / annual training) is now
+the tracker of record for recurring training compliance, so the per-topic
+`hr_staff_checklist`-scoped rows on `nectar_requirements` are retired —
+deleted where they were purely checklist items, or de-scoped (kept for
+their reference content, just dropped from `hr_staff_checklist`) where
+useful elsewhere. This prevents the same training being double-counted
+once in the old checklist and again in Company Obligations. Run this
+**after** the Company Obligations tables/seed below exist, so the tracker
+of record is already live before the old checklist entries disappear.
+
+Matches migration
+`supabase/migrations/20260814000000_retire_sow_training_subtopics.sql`.
+
+```sql
+DELETE FROM public.nectar_requirements
+WHERE organization_id = '7fabcf5d-f826-487f-8730-8b0c3f1969bb'
+  AND requirement_key IN (
+    'staff_train_hipaa',
+    'staff_train_communicable_disease',
+    'staff_train_seizure_orientation',
+    'staff_train_choking_heimlich',
+    'staff_train_emergency_escalation',
+    'staff_train_incident_reporting',
+    'staff_train_legal_rights_ada',
+    'staff_train_abuse_neglect_exploitation',
+    'staff_train_positive_behavior_supports_r539_4',
+    'staff_train_dspd_philosophy',
+    'staff_train_hcbs_settings_rule',
+    'staff_train_crisis_deescalation',
+    'staff_train_trauma_informed_care',
+    'staff_train_suicide_prevention',
+    'staff_train_oig_fwa_reporting',
+    'staff_train_dnr_polst_palliative',
+    'staff_train_person_specific'
+  );
+
+UPDATE public.nectar_requirements
+SET metadata = metadata - 'scope'
+WHERE id = '6840afd5-9cac-4453-aded-f65c43b8d9d8';
+
+UPDATE public.nectar_requirements
+SET metadata = metadata - 'scope'
+WHERE id IN (
+  'a2a68349-e98a-488d-a42e-b574ea7b4880',
+  '860f403c-12ea-4b5a-b945-f7ae0475ee86',
+  '7f23fd32-e5f9-4190-add5-2f8cf8587782',
+  'e8ebc6df-adef-4e27-9c36-b0e8c4570bad',
+  '180a9df2-99d2-4d91-b5d3-8c3ca35c19e4',
+  '1404ebf5-40ac-46f9-99e5-eb9be29374d3',
+  'dafca597-c245-459a-acd9-847eca181cbf',
+  '57bfacb6-5c33-4b68-bd4c-d3dabcb37354',
+  'a914c07e-e30f-45e4-bb07-583d1003ca92',
+  'aacedee9-0914-46f0-aa5d-52e95356c5cb',
+  '3cdb2270-54fd-48e4-8666-68ea6c6b138e',
+  '0a5bcfc8-cd10-4f31-b476-707ca3c20c9a',
+  '14f4cc7f-7e88-4a16-a4d0-e4510cd563c0',
+  'ab933f19-4d8f-4fe5-a1e7-b3e7f7f0632f',
+  '56942dbd-5d1c-4cb4-b07c-e398427730cc',
+  'cf4cac6b-c2b1-4416-8d40-dc44f07bfaac',
+  '076af0c0-1d13-41af-8413-141361b36158',
+  '04b74162-9938-473e-86d3-2bfe563e26e5',
+  '045a9a9c-22f7-4f3d-92d2-5106fccb3efe',
+  'cce9a5f1-62fa-4891-ab87-1d6ff9bf00ca',
+  '01a7e412-bd7e-4526-893c-4fd8aa5803b9'
+);
+```
+
+**What you'll see:** one `DELETE` (17 rows, if all are still present — fewer
+or "0 rows deleted" is fine if some were already removed) and two `UPDATE`
+statements stripping the `scope` key from each listed row's `metadata`
+(row counts should match how many of the listed ids exist — 0 for any
+already-updated or missing id is not an error).
+
+---
+
+## ACTION — "All Staff" auto-group (2026-08-14)
+
+**What this is for:** Company Obligations needs to target "every staff
+member" without an admin manually keeping a group's roster in sync. This
+replaces `accept_invitation()` so every new staffer is automatically added
+to a system-managed "All Staff" `staff_groups` row the moment they accept
+an invite, then backfills that group (creating it if needed) for True
+North Supports with every currently-active member. **Run this before** the
+seed-defaults block below, which assumes the All Staff group already
+exists and raises an exception if it doesn't.
+
+Matches migration `supabase/migrations/20260814010000_all_staff_auto_group.sql`.
+
+```sql
+CREATE OR REPLACE FUNCTION public.accept_invitation(_token text)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_inv invitations%ROWTYPE;
+  v_email text;
+  v_member_id uuid;
+  v_group_id uuid;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  SELECT (auth.jwt() ->> 'email') INTO v_email;
+
+  SELECT * INTO v_inv FROM public.invitations WHERE token = _token LIMIT 1;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Invitation not found'; END IF;
+  IF v_inv.status <> 'pending' THEN RAISE EXCEPTION 'Invitation already used'; END IF;
+  IF v_inv.expires_at < now() THEN RAISE EXCEPTION 'Invitation expired'; END IF;
+  IF lower(v_inv.email) <> lower(coalesce(v_email, '')) THEN
+    RAISE EXCEPTION 'Invitation email does not match your account';
+  END IF;
+
+  INSERT INTO public.organization_members (organization_id, user_id, role, active)
+  VALUES (v_inv.organization_id, auth.uid(), v_inv.role, true)
+  ON CONFLICT (organization_id, user_id) DO UPDATE
+    SET role = EXCLUDED.role, active = true
+  RETURNING id INTO v_member_id;
+
+  UPDATE public.invitations
+    SET status = 'accepted', accepted_at = now(), accepted_by = auth.uid()
+    WHERE id = v_inv.id;
+
+  SELECT id INTO v_group_id
+    FROM public.staff_groups
+    WHERE organization_id = v_inv.organization_id AND name = 'All Staff'
+    LIMIT 1;
+  IF v_group_id IS NULL THEN
+    INSERT INTO public.staff_groups (organization_id, name, description, color)
+    VALUES (
+      v_inv.organization_id,
+      'All Staff',
+      'System-managed group — every staff member in this organization',
+      '#6B7280'
+    )
+    RETURNING id INTO v_group_id;
+  END IF;
+
+  INSERT INTO public.staff_group_members (group_id, staff_id)
+  VALUES (v_group_id, auth.uid())
+  ON CONFLICT (group_id, staff_id) DO NOTHING;
+
+  RETURN v_inv.organization_id;
+END;
+$$;
+
+DO $$
+DECLARE
+  v_org_id uuid := '7fabcf5d-f826-487f-8730-8b0c3f1969bb';
+  v_group_id uuid;
+BEGIN
+  SELECT id INTO v_group_id
+    FROM public.staff_groups
+    WHERE organization_id = v_org_id AND name = 'All Staff'
+    LIMIT 1;
+
+  IF v_group_id IS NULL THEN
+    INSERT INTO public.staff_groups (organization_id, name, description, color)
+    VALUES (
+      v_org_id,
+      'All Staff',
+      'System-managed group — every staff member in this organization',
+      '#6B7280'
+    )
+    RETURNING id INTO v_group_id;
+  END IF;
+
+  INSERT INTO public.staff_group_members (group_id, staff_id)
+  SELECT v_group_id, om.user_id
+  FROM public.organization_members om
+  WHERE om.organization_id = v_org_id
+    AND om.active = true
+  ON CONFLICT (group_id, staff_id) DO NOTHING;
+END $$;
+```
+
+**What you'll see:** `CREATE FUNCTION` (replacing `accept_invitation`),
+then a `DO` block with no direct output — check afterward with
+`SELECT * FROM public.staff_groups WHERE name = 'All Staff';` (one row)
+and a member count against your active-staff count.
+
+---
+
+## ACTION — Seed the six SOW-mandated Company Obligations (2026-08-14)
+
+**What this is for:** Adds the two NECTAR-matching columns Company
+Obligations definitions need (`nectar_cert_type_label`,
+`nectar_keyword_groups`), switches per-person cadence obligations (hire-
+anniversary / days-after-hire) from one shared instance per obligation to
+one instance per assignee — each with their own due date computed from
+their own `hire_date` — via a new nullable `assignee_staff_id` column and
+a partial-unique-index scheme replacing the old shared `(obligation_id,
+period_key)` constraint, then seeds the six DHHS91172-mandated obligations
+(30-day orientation, annual 12hr CE, CPR/First Aid initial + renewal,
+annual background screening, annual Medicaid exclusion screening) for True
+North Supports, each locked (`source = 'sow'`, `is_locked = true`) so
+they can't be edited or deleted from the UI. **Run this after** the "All
+Staff" auto-group block above — the seed block raises an exception if
+that group doesn't exist yet.
+
+Matches migration
+`supabase/migrations/20260814020000_seed_company_obligations_defaults.sql`.
+
+```sql
+ALTER TABLE public.company_obligations
+  ADD COLUMN IF NOT EXISTS nectar_cert_type_label text,
+  ADD COLUMN IF NOT EXISTS nectar_keyword_groups jsonb NOT NULL DEFAULT '[]'::jsonb;
+
+ALTER TABLE public.company_obligation_instances
+  ADD COLUMN IF NOT EXISTS assignee_staff_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS idx_company_obligation_instances_assignee_staff
+  ON public.company_obligation_instances(assignee_staff_id);
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'company_obligation_instances_obligation_id_period_key_key'
+  ) THEN
+    ALTER TABLE public.company_obligation_instances
+      DROP CONSTRAINT company_obligation_instances_obligation_id_period_key_key;
+  END IF;
+END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_company_obligation_instances_shared_period
+  ON public.company_obligation_instances(obligation_id, period_key)
+  WHERE assignee_staff_id IS NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_company_obligation_instances_person_period
+  ON public.company_obligation_instances(obligation_id, period_key, assignee_staff_id)
+  WHERE assignee_staff_id IS NOT NULL;
+
+DO $$
+DECLARE
+  v_org_id uuid := '7fabcf5d-f826-487f-8730-8b0c3f1969bb';
+  v_all_staff_group_id uuid;
+BEGIN
+  SELECT id INTO v_all_staff_group_id
+    FROM public.staff_groups
+    WHERE organization_id = v_org_id AND name = 'All Staff'
+    LIMIT 1;
+
+  IF v_all_staff_group_id IS NULL THEN
+    RAISE EXCEPTION 'All Staff group not found for org % — run the all_staff_auto_group migration first', v_org_id;
+  END IF;
+
+  INSERT INTO public.company_obligations (
+    organization_id, title, description, source_policy_section, cadence,
+    due_day_config, reminder_days_before, evidence_type, attestation_text,
+    requires_individual_completion, assigned_to_groups, assignee_role,
+    notify_manager_on_complete, notify_manager_on_overdue, active, source, is_locked,
+    nectar_cert_type_label, nectar_keyword_groups
+  )
+  SELECT
+    v_org_id,
+    '30-Day New Hire Orientation Training',
+    'DHHS91172 requires every new direct-service staff member to complete orientation training — HIPAA, abuse/neglect/exploitation reporting, person rights, HCBS settings rule, and emergency procedures — within 30 days of their hire date.',
+    'DHHS91172 SOW §1.9 — Staff Training Requirements',
+    'one_time',
+    '{"days_after_hire": 30}'::jsonb,
+    ARRAY[14, 7, 3, 0],
+    'upload_and_attestation',
+    'I attest that I have completed the required 30-day new hire orientation training covering HIPAA, abuse/neglect/exploitation reporting, participant rights, the HCBS settings rule, and emergency procedures.',
+    true,
+    ARRAY[v_all_staff_group_id],
+    'any_assigned',
+    true, true, true, 'sow', true,
+    '30-Day New Hire Training Certificate',
+    '[{"label":"HIPAA","any_of":["hipaa","privacy","confidentiality"]},{"label":"Abuse/Neglect/Exploitation","any_of":["abuse","neglect","exploitation","mandatory reporter"]},{"label":"Participant Rights","any_of":["rights","person-centered","self-determination"]},{"label":"HCBS Settings Rule","any_of":["hcbs","settings rule"]}]'::jsonb
+  WHERE NOT EXISTS (
+    SELECT 1 FROM public.company_obligations
+    WHERE organization_id = v_org_id AND title = '30-Day New Hire Orientation Training'
+  );
+
+  INSERT INTO public.company_obligations (
+    organization_id, title, description, source_policy_section, cadence,
+    due_day_config, reminder_days_before, evidence_type, attestation_text,
+    requires_individual_completion, assigned_to_groups, assignee_role,
+    notify_manager_on_complete, notify_manager_on_overdue, active, source, is_locked,
+    nectar_cert_type_label, nectar_keyword_groups
+  )
+  SELECT
+    v_org_id,
+    'Annual 12-Hour Continuing Education',
+    'Direct-service staff must complete 12 hours of DSPD-approved continuing education each year, starting the year after hire.',
+    'DHHS91172 SOW §1.9 — Staff Training Requirements',
+    'annually',
+    '{"anniversary_based": true, "start_year": 2}'::jsonb,
+    ARRAY[30, 14, 0],
+    'upload_and_attestation',
+    'I attest that I have completed at least 12 hours of DSPD-approved continuing education for this anniversary year.',
+    true,
+    ARRAY[v_all_staff_group_id],
+    'any_assigned',
+    true, true, true, 'sow', true,
+    'Annual Continuing Education Certificate (12 hours)',
+    '[{"label":"Continuing Education","any_of":["continuing education","ce hours","training hours","annual training"]}]'::jsonb
+  WHERE NOT EXISTS (
+    SELECT 1 FROM public.company_obligations
+    WHERE organization_id = v_org_id AND title = 'Annual 12-Hour Continuing Education'
+  );
+
+  INSERT INTO public.company_obligations (
+    organization_id, title, description, source_policy_section, cadence,
+    due_day_config, reminder_days_before, evidence_type, attestation_text,
+    requires_individual_completion, assigned_to_groups, assignee_role,
+    notify_manager_on_complete, notify_manager_on_overdue, active, source, is_locked,
+    nectar_cert_type_label, nectar_keyword_groups
+  )
+  SELECT
+    v_org_id,
+    'CPR/First Aid Certification — Initial',
+    'Direct-service staff must hold a current CPR/First Aid certification within 30 days of hire.',
+    'DHHS91172 SOW §1.9 — Staff Training Requirements',
+    'one_time',
+    '{"days_after_hire": 30}'::jsonb,
+    ARRAY[14, 7, 3, 0],
+    'upload',
+    NULL,
+    true,
+    ARRAY[v_all_staff_group_id],
+    'any_assigned',
+    true, true, true, 'sow', true,
+    'CPR/First Aid Certification',
+    '[{"label":"CPR","any_of":["cpr","cardiopulmonary resuscitation"]},{"label":"First Aid","any_of":["first aid"]}]'::jsonb
+  WHERE NOT EXISTS (
+    SELECT 1 FROM public.company_obligations
+    WHERE organization_id = v_org_id AND title = 'CPR/First Aid Certification — Initial'
+  );
+
+  INSERT INTO public.company_obligations (
+    organization_id, title, description, source_policy_section, cadence,
+    due_day_config, reminder_days_before, evidence_type, attestation_text,
+    requires_individual_completion, assigned_to_groups, assignee_role,
+    notify_manager_on_complete, notify_manager_on_overdue, active, source, is_locked,
+    nectar_cert_type_label, nectar_keyword_groups
+  )
+  SELECT
+    v_org_id,
+    'CPR/First Aid Certification — Renewal',
+    'CPR/First Aid certification must stay current — renew before it expires. A passing NECTAR-verified upload schedules the next renewal from the certificate''s own expiration date.',
+    'DHHS91172 SOW §1.9 — Staff Training Requirements',
+    'annually',
+    '{"anniversary_based": true, "start_year": 1}'::jsonb,
+    ARRAY[30, 14, 0],
+    'upload',
+    NULL,
+    true,
+    ARRAY[v_all_staff_group_id],
+    'any_assigned',
+    true, true, true, 'sow', true,
+    'CPR/First Aid Certification',
+    '[{"label":"CPR","any_of":["cpr","cardiopulmonary resuscitation"]},{"label":"First Aid","any_of":["first aid"]}]'::jsonb
+  WHERE NOT EXISTS (
+    SELECT 1 FROM public.company_obligations
+    WHERE organization_id = v_org_id AND title = 'CPR/First Aid Certification — Renewal'
+  );
+
+  INSERT INTO public.company_obligations (
+    organization_id, title, description, source_policy_section, cadence,
+    due_day_config, reminder_days_before, evidence_type, attestation_text,
+    requires_individual_completion, assigned_to_groups, assignee_role,
+    notify_manager_on_complete, notify_manager_on_overdue, active, source, is_locked,
+    nectar_cert_type_label, nectar_keyword_groups
+  )
+  SELECT
+    v_org_id,
+    'Background Screening — Annual',
+    'Direct-service staff must have a current background screening clearance on file, re-verified annually from hire date.',
+    'DHHS91172 SOW §1.10 — Background Screening',
+    'annually',
+    '{"anniversary_based": true, "start_year": 1}'::jsonb,
+    ARRAY[30, 14, 0],
+    'upload',
+    NULL,
+    true,
+    ARRAY[v_all_staff_group_id],
+    'any_assigned',
+    true, true, true, 'sow', true,
+    'Background Screening Clearance',
+    '[{"label":"Background Screening","any_of":["background check","background screening","criminal history","bci"]}]'::jsonb
+  WHERE NOT EXISTS (
+    SELECT 1 FROM public.company_obligations
+    WHERE organization_id = v_org_id AND title = 'Background Screening — Annual'
+  );
+
+  INSERT INTO public.company_obligations (
+    organization_id, title, description, source_policy_section, cadence,
+    due_day_config, reminder_days_before, evidence_type, attestation_text,
+    requires_individual_completion, assigned_to_groups, assignee_role,
+    notify_manager_on_complete, notify_manager_on_overdue, active, source, is_locked,
+    nectar_cert_type_label, nectar_keyword_groups
+  )
+  SELECT
+    v_org_id,
+    'Medicaid Fraud & Abuse Exclusion Screening — Annual',
+    'Staff must be screened annually against the OIG/Medicaid exclusion lists per OIG FWA reporting requirements.',
+    'DHHS91172 SOW §1.11 — Program Integrity',
+    'annually',
+    '{"anniversary_based": true, "start_year": 1}'::jsonb,
+    ARRAY[30, 14, 0],
+    'upload_and_attestation',
+    'I attest that this staff member has been screened against the OIG and Medicaid exclusion lists for the current period with no exclusions found.',
+    true,
+    ARRAY[v_all_staff_group_id],
+    'any_assigned',
+    true, true, true, 'sow', true,
+    'OIG/Medicaid Exclusion Screening Confirmation',
+    '[{"label":"Exclusion Screening","any_of":["exclusion","oig","leie","medicaid exclusion","sam.gov"]}]'::jsonb
+  WHERE NOT EXISTS (
+    SELECT 1 FROM public.company_obligations
+    WHERE organization_id = v_org_id AND title = 'Medicaid Fraud & Abuse Exclusion Screening — Annual'
+  );
+END $$;
+```
+
+**What you'll see:** two `ALTER TABLE` (new columns), `CREATE INDEX`, a
+`DO` block dropping the old shared-uniqueness constraint if present, two
+more `CREATE INDEX` (the replacement partial-unique scheme), then a `DO`
+block seeding six obligations — re-running this block is safe, each
+`INSERT` is guarded by `WHERE NOT EXISTS` so it won't duplicate.
+
+---
+
+## ACTION — NECTAR document intelligence for Company Obligations (2026-08-14)
+
+**What this is for:** Adds the columns `recordCompletion()` writes when it
+runs NECTAR OCR against an uploaded evidence file — pass/fail status,
+failure reasons, extracted cert type / name / completed / expiration
+dates, name-match result, confidence — plus `admin_notes` for the
+"confirm a failed validation" override flow. The first `ALTER TABLE` here
+duplicates the one in the seed-defaults block above; it's written as a
+defensive no-op (`IF NOT EXISTS`) in case this block is ever run against a
+database that skipped that one.
+
+Matches migration
+`supabase/migrations/20260814030000_company_obligation_nectar_validation.sql`.
+
+```sql
+ALTER TABLE public.company_obligations
+  ADD COLUMN IF NOT EXISTS nectar_cert_type_label text,
+  ADD COLUMN IF NOT EXISTS nectar_keyword_groups jsonb NOT NULL DEFAULT '[]'::jsonb;
+
+ALTER TABLE public.company_obligation_completions
+  ADD COLUMN IF NOT EXISTS nectar_validation_status text CHECK (nectar_validation_status IN ('passed', 'failed')),
+  ADD COLUMN IF NOT EXISTS nectar_validation_reasons text[] NOT NULL DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS nectar_extracted_cert_type text,
+  ADD COLUMN IF NOT EXISTS nectar_extracted_name text,
+  ADD COLUMN IF NOT EXISTS nectar_extracted_completed_date date,
+  ADD COLUMN IF NOT EXISTS nectar_extracted_expires_date date,
+  ADD COLUMN IF NOT EXISTS nectar_name_match text CHECK (nectar_name_match IN ('match', 'mismatch', 'unreadable')),
+  ADD COLUMN IF NOT EXISTS nectar_confidence numeric;
+
+ALTER TABLE public.company_obligation_completions
+  ADD COLUMN IF NOT EXISTS admin_notes text;
+```
+
+**What you'll see:** one `ALTER TABLE` widening `company_obligations`
+(harmless no-op if already applied above), then two more `ALTER TABLE`
+statements adding eight columns total to
+`public.company_obligation_completions`. No existing columns, rows, or
+constraints are touched.

@@ -47,6 +47,7 @@ import {
 } from "@/lib/company-obligations.functions";
 import { ObligationHistorySheet } from "./obligation-history-sheet";
 import { ManualCompletionDrawer } from "./manual-completion-drawer";
+import { ObligationCardActions } from "./obligation-card-actions";
 
 export type ObligationWithInstance = CompanyObligationRow & { current_instance: ObligationInstanceRow | null };
 
@@ -575,6 +576,13 @@ export function ObligationCard({
               )}
             </div>
           )}
+
+          <ObligationCardActions
+            orgId={orgId}
+            obligation={obligation}
+            onManualOpen={() => setManualOpen(true)}
+            onLogEvent={() => setLogEventOpen(true)}
+          />
         </>
       )}
 

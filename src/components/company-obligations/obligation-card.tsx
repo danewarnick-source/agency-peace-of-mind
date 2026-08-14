@@ -79,6 +79,13 @@ export function cadenceLabel(ob: CompanyObligationRow): string {
       return "Quarterly · 1st of quarter";
     }
     case "annually": {
+      if (cfg.every_n_months !== undefined) {
+        const n = Number(cfg.every_n_months);
+        const from = cfg.from === "cert_expiration" ? "cert expiration" : "completion";
+        return n === 24 ? `Every 2 years · from ${from}`
+             : n === 12 ? `Annually · from ${from}`
+             : `Every ${n} months · from ${from}`;
+      }
       const m = Number(cfg.month);
       const d = cfg.day_of_month;
       return `Annually · ${MONTHS[m - 1] ?? "?"} ${d === "last" ? "Last" : ordinal(Number(d))}`;
@@ -86,6 +93,9 @@ export function cadenceLabel(ob: CompanyObligationRow): string {
     case "per_event":
       return "Per event";
     case "one_time": {
+      if (cfg.days_after_hire !== undefined) {
+        return `One-time · due ${Number(cfg.days_after_hire)} days after hire`;
+      }
       const dateStr = typeof cfg.date === "string" ? cfg.date : "";
       return `One-time · ${dateStr ? formatDate(`${dateStr}T00:00:00Z`) : "date TBD"}`;
     }

@@ -38,6 +38,16 @@ type MyCompletionRow = {
   nectar_extracted_expires_date: string | null;
 };
 
+/** staff_per_client obligation titles carry a literal "[Client Name]"
+ *  placeholder (e.g. "Client-Specific Training — [Client Name]") so staff
+ *  clearly know which client a given instance is for. */
+function resolveObligationTitle(ob: MyObligationInstanceRow["obligation"], instance: MyObligationInstanceRow): string {
+  if (ob.scope === "staff_per_client" && instance.client_name) {
+    return ob.title.replace("[Client Name]", instance.client_name);
+  }
+  return ob.title;
+}
+
 function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
@@ -63,7 +73,7 @@ function CompletedCard({ instance, completion }: { instance: MyObligationInstanc
       <div className="flex items-start gap-3">
         <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
         <div className="min-w-0 flex-1">
-          <p className="font-semibold">{ob.title}</p>
+          <p className="font-semibold">{resolveObligationTitle(ob, instance)}</p>
           {ob.source === "sow" ? (
             <p className="text-xs text-muted-foreground">🔒 Required by state contract — DSPD SOW DHHS91172</p>
           ) : (
@@ -103,7 +113,7 @@ function PendingReviewCard({ instance, completion }: { instance: MyObligationIns
   const ob = instance.obligation;
   return (
     <div className="rounded-xl border border-amber-300/60 bg-amber-500/10 p-4 shadow-[var(--shadow-card)]">
-      <p className="font-semibold">{ob.title}</p>
+      <p className="font-semibold">{resolveObligationTitle(ob, instance)}</p>
       <p className="text-sm text-muted-foreground">{instance.period_key}</p>
       <div className="mt-2 flex items-start gap-2 text-sm text-amber-900 dark:text-amber-200">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -195,7 +205,7 @@ function OpenCard({
   if (nectarResult?.status === "failed") {
     return (
       <div className="rounded-xl border border-amber-300/60 bg-amber-500/10 p-4 shadow-[var(--shadow-card)]">
-        <p className="font-semibold">{ob.title}</p>
+        <p className="font-semibold">{resolveObligationTitle(ob, instance)}</p>
         <div className="mt-2 flex items-start gap-2 text-sm text-amber-900 dark:text-amber-200">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
@@ -210,7 +220,7 @@ function OpenCard({
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-      <p className="font-semibold">{ob.title}</p>
+      <p className="font-semibold">{resolveObligationTitle(ob, instance)}</p>
       {ob.source === "sow" ? (
         <p className="text-xs text-muted-foreground">🔒 Required by state contract — DSPD SOW DHHS91172</p>
       ) : (
@@ -389,15 +399,48 @@ function MyObligationsPage() {
         </div>
       ) : (
         <div className="grid gap-3">
-          {shown.map((inst) => {
-            if (isPendingReview(inst.id)) {
-              return <PendingReviewCard key={inst.id} instance={inst} completion={completionByInstance.get(inst.id)!} />;
+          {(() => {
+            const renderCard = (inst: MyObligationInstanceRow) => {
+              if (isPendingReview(inst.id)) {
+                return <PendingReviewCard key={inst.id} instance={inst} completion={completionByInstance.get(inst.id)!} />;
+              }
+              if (tab === "completed" || inst.status === "completed" || inst.status === "waived" || completionByInstance.has(inst.id)) {
+                return <CompletedCard key={inst.id} instance={inst} completion={completionByInstance.get(inst.id)} />;
+              }
+              return <OpenCard key={inst.id} orgId={orgId!} instance={inst} onCompleted={onCompleted} />;
+            };
+
+            // Group scope='staff_per_client' instances (e.g. multiple
+            // client-specific trainings) by client name so staff see all
+            // their per-client obligations for one Person together.
+            type Group = { key: string; clientLabel: string | null; items: MyObligationInstanceRow[] };
+            const groups: Group[] = [];
+            const groupIndexByClient = new Map<string, number>();
+            for (const inst of shown) {
+              if (inst.obligation.scope === "staff_per_client" && inst.client_name) {
+                const idx = groupIndexByClient.get(inst.client_name);
+                if (idx === undefined) {
+                  groupIndexByClient.set(inst.client_name, groups.length);
+                  groups.push({ key: `client:${inst.client_name}`, clientLabel: inst.client_name, items: [inst] });
+                } else {
+                  groups[idx].items.push(inst);
+                }
+              } else {
+                groups.push({ key: `single:${inst.id}`, clientLabel: null, items: [inst] });
+              }
             }
-            if (tab === "completed" || inst.status === "completed" || inst.status === "waived" || completionByInstance.has(inst.id)) {
-              return <CompletedCard key={inst.id} instance={inst} completion={completionByInstance.get(inst.id)} />;
-            }
-            return <OpenCard key={inst.id} orgId={orgId!} instance={inst} onCompleted={onCompleted} />;
-          })}
+
+            return groups.map((g) => (
+              g.clientLabel ? (
+                <div key={g.key} className="space-y-2 rounded-lg border border-dashed border-border p-2.5">
+                  <p className="px-1 text-xs font-semibold text-muted-foreground">For {g.clientLabel}</p>
+                  <div className="grid gap-3">{g.items.map(renderCard)}</div>
+                </div>
+              ) : (
+                g.items.map(renderCard)
+              )
+            ));
+          })()}
         </div>
       )}
     </div>

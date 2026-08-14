@@ -109,6 +109,7 @@ function ObligationsTab({ orgId }: { orgId: string }) {
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "paused">("all");
+  const [scopeFilter, setScopeFilter] = useState<"all" | "org" | "staff" | "staff_per_client">("all");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingObligation, setEditingObligation] = useState<CompanyObligationRow | null>(null);
 
@@ -139,10 +140,11 @@ function ObligationsTab({ orgId }: { orgId: string }) {
     let list = obligations;
     if (filter === "active") list = list.filter((o) => o.active);
     if (filter === "paused") list = list.filter((o) => !o.active);
+    if (scopeFilter !== "all") list = list.filter((o) => o.scope === scopeFilter);
     const q = search.trim().toLowerCase();
     if (q) list = list.filter((o) => o.title.toLowerCase().includes(q));
     return [...list].sort((a, b) => (a.active === b.active ? 0 : a.active ? -1 : 1));
-  }, [obligations, filter, search]);
+  }, [obligations, filter, scopeFilter, search]);
 
   const openCreate = () => {
     setEditingObligation(null);
@@ -194,7 +196,7 @@ function ObligationsTab({ orgId }: { orgId: string }) {
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="text-sm font-semibold text-muted-foreground">All obligations</h3>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <div className="flex rounded-md border border-border p-0.5">
                   {(["all", "active", "paused"] as const).map((f) => (
                     <button
@@ -204,6 +206,24 @@ function ObligationsTab({ orgId }: { orgId: string }) {
                       className={`rounded px-2.5 py-1 text-xs font-medium capitalize ${filter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"}`}
                     >
                       {f}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-1.5 rounded-md border border-border p-0.5">
+                  <span className="pl-1.5 text-[11px] font-medium text-muted-foreground">By scope</span>
+                  {([
+                    ["all", "All"],
+                    ["org", "Org-level"],
+                    ["staff", "Per staff"],
+                    ["staff_per_client", "Per staff+client"],
+                  ] as const).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setScopeFilter(key)}
+                      className={`rounded px-2.5 py-1 text-xs font-medium ${scopeFilter === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"}`}
+                    >
+                      {label}
                     </button>
                   ))}
                 </div>

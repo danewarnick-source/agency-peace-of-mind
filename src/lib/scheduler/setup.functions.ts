@@ -3,6 +3,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { onStaffAssignmentCreatedInternal } from "@/lib/staff-assignment-hooks.functions";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Setup tool A — bulk caseload editor (client → staff[])
@@ -206,6 +207,9 @@ export const addStaffToClientCode = createServerFn({ method: "POST" })
         service_codes: [code],
       });
       if (iErr) throw iErr;
+      await onStaffAssignmentCreatedInternal(
+        supabase, data.organization_id, data.staff_id, data.client_id, [code],
+      );
       return { ok: true };
     }
 

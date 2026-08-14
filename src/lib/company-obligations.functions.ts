@@ -36,6 +36,8 @@ export type CompanyObligationRow = {
   active: boolean;
   source: "sow" | "provider";
   is_locked: boolean;
+  scope: "org" | "staff" | "staff_per_client";
+  target_service_codes: string[];
   nectar_cert_type_label: string | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   nectar_keyword_groups: any;
@@ -66,6 +68,8 @@ export type ObligationInstanceRow = {
   waive_reason: string | null;
   admin_notes: string | null;
   assignee_staff_id: string | null;
+  client_id: string | null;
+  client_name: string | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -572,6 +576,133 @@ async function generatePerPersonInstancesInternal(
   return created;
 }
 
+function arraysOverlapCaseInsensitive(target: string[], have: string[]): boolean {
+  if (!target.length) return true; // empty target list = applies to everyone
+  const haveUpper = new Set(have.map((c) => c.toUpperCase()));
+  return target.some((c) => haveUpper.has(c.toUpperCase()));
+}
+
+async function fetchClientNamesInternal(supabase: AnySupabase, clientIds: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (!clientIds.length) return map;
+  const { data, error } = await supabase
+    .from("clients")
+    .select("id, first_name, last_name")
+    .in("id", clientIds);
+  if (error) throw new Error(error.message);
+  for (const c of (data ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null }>) {
+    map.set(c.id, [c.first_name, c.last_name].filter(Boolean).join(" ").trim() || "Client");
+  }
+  return map;
+}
+
+/**
+ * scope = 'staff_per_client': one instance per active staff_assignments row
+ * whose service_codes overlap the obligation's target_service_codes (empty
+ * target = every assignment qualifies). due_day_config.days_after_assignment
+ * bases the due date on the assignment's own created_at rather than a
+ * shared calendar period; other cadences fall back to computePeriod, with
+ * the client name prefixed onto the period key.
+ */
+async function generatePerClientInstancesInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  ob: CompanyObligationRow,
+): Promise<ObligationInstanceRow[]> {
+  const cfg = (ob.due_day_config ?? {}) as Record<string, unknown>;
+
+  const { data: assignments, error: aErr } = await supabase
+    .from("staff_assignments")
+    .select("staff_id, client_id, service_codes, created_at")
+    .eq("organization_id", organizationId);
+  if (aErr) throw new Error(aErr.message);
+  const list = (assignments ?? []) as Array<{
+    staff_id: string; client_id: string; service_codes: string[] | null; created_at: string;
+  }>;
+  const qualifying = list.filter((a) => arraysOverlapCaseInsensitive(ob.target_service_codes ?? [], a.service_codes ?? []));
+  if (!qualifying.length) return [];
+
+  const staffIds = Array.from(new Set(qualifying.map((a) => a.staff_id)));
+  const clientIds = Array.from(new Set(qualifying.map((a) => a.client_id)));
+  const [{ data: dirRows, error: dErr }, clientNameById] = await Promise.all([
+    supabase.from("org_member_directory").select("id, full_name").in("id", staffIds),
+    fetchClientNamesInternal(supabase, clientIds),
+  ]);
+  if (dErr) throw new Error(dErr.message);
+  const staffNameById = new Map(
+    (dirRows ?? []).map((r: { id: string; full_name: string | null }) => [r.id, r.full_name ?? "Unknown"]),
+  );
+
+  const created: ObligationInstanceRow[] = [];
+  for (const a of qualifying) {
+    const { data: existingOpen, error: openErr } = await supabase
+      .from("company_obligation_instances")
+      .select("id")
+      .eq("obligation_id", ob.id)
+      .eq("assignee_staff_id", a.staff_id)
+      .eq("client_id", a.client_id)
+      .in("status", ["pending", "overdue"])
+      .maybeSingle();
+    if (openErr) throw new Error(openErr.message);
+    if (existingOpen) continue;
+
+    const clientName = clientNameById.get(a.client_id) ?? "Client";
+    let due: Date;
+    let periodKey: string;
+    if (cfg.days_after_assignment !== undefined) {
+      const days = Number(cfg.days_after_assignment);
+      if (!Number.isFinite(days)) continue;
+      const assignedAt = new Date(a.created_at);
+      due = addDaysUTC(assignedAt, days);
+      periodKey = `${clientName} — Assigned ${formatShort(assignedAt)}`;
+    } else {
+      const period = computePeriod(ob.cadence, cfg, new Date());
+      if (!period) continue;
+      due = new Date(period.due_at);
+      periodKey = ob.cadence === "one_time" ? clientName : `${clientName} — ${period.period_key}`;
+    }
+
+    const { data: inserted, error: insErr } = await supabase
+      .from("company_obligation_instances")
+      .insert({
+        obligation_id: ob.id,
+        organization_id: organizationId,
+        period_key: periodKey,
+        due_at: endOfDayUTC(due),
+        status: "pending",
+        assignee_staff_id: a.staff_id,
+        client_id: a.client_id,
+        client_name: clientName,
+      })
+      .select("*")
+      .maybeSingle();
+    if (insErr) {
+      // Unique-index race with a concurrent generator call — safe to skip.
+      if ((insErr as { code?: string }).code === "23505") continue;
+      throw new Error(insErr.message);
+    }
+    if (!inserted) continue;
+
+    const { error: assErr } = await supabase.from("company_obligation_instance_assignees").upsert(
+      [{
+        instance_id: inserted.id,
+        organization_id: organizationId,
+        staff_id: a.staff_id,
+        staff_name: staffNameById.get(a.staff_id) ?? "Unknown",
+        staff_role: "employee",
+        client_id: a.client_id,
+        client_name: clientName,
+      }],
+      { onConflict: "instance_id,staff_id", ignoreDuplicates: true },
+    );
+    if (assErr) throw new Error(assErr.message);
+
+    await scheduleRemindersInternal(supabase, organizationId, inserted.id, ob);
+    created.push(inserted as ObligationInstanceRow);
+  }
+  return created;
+}
+
 export async function generateNextInstanceInternal(
   supabase: AnySupabase,
   organizationId: string,
@@ -580,8 +711,13 @@ export async function generateNextInstanceInternal(
   const ob = await fetchObligation(supabase, organizationId, obligationId);
   if (ob.cadence === "per_event") return null;
 
+  if (ob.scope === "staff_per_client") {
+    const created = await generatePerClientInstancesInternal(supabase, organizationId, ob);
+    return created[0] ?? null;
+  }
+
   const dueCfg = (ob.due_day_config ?? {}) as Record<string, unknown>;
-  if (isPerPersonDueConfig(dueCfg)) {
+  if (ob.scope === "staff" && isPerPersonDueConfig(dueCfg)) {
     const created = await generatePerPersonInstancesInternal(supabase, organizationId, ob);
     return created[0] ?? null;
   }
@@ -907,6 +1043,8 @@ const obligationInputSchema = z.object({
   assignedToGroups: z.array(z.string().uuid()).max(200).default([]),
   assignedToUsers: z.array(z.string().uuid()).max(500).default([]),
   assigneeRole: z.enum(["any_assigned", "managers_only", "admin_only"]).default("any_assigned"),
+  scope: z.enum(["org", "staff", "staff_per_client"]).default("staff"),
+  targetServiceCodes: z.array(z.string().max(20)).max(50).default([]),
   notifyManagerOnComplete: z.boolean().default(true),
   notifyManagerOnOverdue: z.boolean().default(true),
   nectarCertTypeLabel: z.string().max(300).optional().nullable(),
@@ -998,6 +1136,8 @@ export const createCompanyObligation = createServerFn({ method: "POST" })
         assigned_to_groups: data.assignedToGroups,
         assigned_to_users: data.assignedToUsers,
         assignee_role: data.assigneeRole,
+        scope: data.scope,
+        target_service_codes: data.targetServiceCodes,
         notify_manager_on_complete: data.notifyManagerOnComplete,
         notify_manager_on_overdue: data.notifyManagerOnOverdue,
         nectar_cert_type_label: data.nectarCertTypeLabel ?? null,
@@ -1042,6 +1182,8 @@ export const updateCompanyObligation = createServerFn({ method: "POST" })
         assigned_to_groups: data.assignedToGroups,
         assigned_to_users: data.assignedToUsers,
         assignee_role: data.assigneeRole,
+        scope: data.scope,
+        target_service_codes: data.targetServiceCodes,
         notify_manager_on_complete: data.notifyManagerOnComplete,
         notify_manager_on_overdue: data.notifyManagerOnOverdue,
         nectar_cert_type_label: data.nectarCertTypeLabel ?? null,

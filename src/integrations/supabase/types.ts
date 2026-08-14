@@ -4657,6 +4657,8 @@ export type Database = {
       }
       company_obligation_instance_assignees: {
         Row: {
+          client_id: string | null
+          client_name: string | null
           id: string
           instance_id: string
           organization_id: string
@@ -4665,6 +4667,8 @@ export type Database = {
           staff_role: string | null
         }
         Insert: {
+          client_id?: string | null
+          client_name?: string | null
           id?: string
           instance_id: string
           organization_id: string
@@ -4673,6 +4677,8 @@ export type Database = {
           staff_role?: string | null
         }
         Update: {
+          client_id?: string | null
+          client_name?: string | null
           id?: string
           instance_id?: string
           organization_id?: string
@@ -4700,10 +4706,13 @@ export type Database = {
       company_obligation_instances: {
         Row: {
           admin_notes: string | null
+          assignee_staff_id: string | null
           attestation_signed_at: string | null
           attestation_signed_by_id: string | null
           attestation_signed_by_name: string | null
           attestation_text_snapshot: string | null
+          client_id: string | null
+          client_name: string | null
           completed_at: string | null
           completed_by_id: string | null
           completed_by_name: string | null
@@ -4724,10 +4733,13 @@ export type Database = {
         }
         Insert: {
           admin_notes?: string | null
+          assignee_staff_id?: string | null
           attestation_signed_at?: string | null
           attestation_signed_by_id?: string | null
           attestation_signed_by_name?: string | null
           attestation_text_snapshot?: string | null
+          client_id?: string | null
+          client_name?: string | null
           completed_at?: string | null
           completed_by_id?: string | null
           completed_by_name?: string | null
@@ -4748,10 +4760,13 @@ export type Database = {
         }
         Update: {
           admin_notes?: string | null
+          assignee_staff_id?: string | null
           attestation_signed_at?: string | null
           attestation_signed_by_id?: string | null
           attestation_signed_by_name?: string | null
           attestation_text_snapshot?: string | null
+          client_id?: string | null
+          client_name?: string | null
           completed_at?: string | null
           completed_by_id?: string | null
           completed_by_name?: string | null
@@ -4829,8 +4844,10 @@ export type Database = {
           organization_id: string
           reminder_days_before: number[]
           requires_individual_completion: boolean
+          scope: string
           source: string
           source_policy_section: string | null
+          target_service_codes: string[]
           title: string
           updated_at: string | null
         }
@@ -4854,8 +4871,10 @@ export type Database = {
           organization_id: string
           reminder_days_before?: number[]
           requires_individual_completion?: boolean
+          scope?: string
           source?: string
           source_policy_section?: string | null
+          target_service_codes?: string[]
           title: string
           updated_at?: string | null
         }
@@ -4879,8 +4898,10 @@ export type Database = {
           organization_id?: string
           reminder_days_before?: number[]
           requires_individual_completion?: boolean
+          scope?: string
           source?: string
           source_policy_section?: string | null
+          target_service_codes?: string[]
           title?: string
           updated_at?: string | null
         }

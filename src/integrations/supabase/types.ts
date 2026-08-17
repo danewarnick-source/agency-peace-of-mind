@@ -6655,6 +6655,7 @@ export type Database = {
           nectar_drafted: boolean
           nectar_drafted_confirmed_at: string | null
           nectar_drafted_confirmed_by: string | null
+          nectar_review_service_code: string | null
           organization_id: string
           outside_geofence_reason: string | null
           raw_clock_in: string | null
@@ -6739,6 +6740,7 @@ export type Database = {
           nectar_drafted?: boolean
           nectar_drafted_confirmed_at?: string | null
           nectar_drafted_confirmed_by?: string | null
+          nectar_review_service_code?: string | null
           organization_id: string
           outside_geofence_reason?: string | null
           raw_clock_in?: string | null
@@ -6823,6 +6825,7 @@ export type Database = {
           nectar_drafted?: boolean
           nectar_drafted_confirmed_at?: string | null
           nectar_drafted_confirmed_by?: string | null
+          nectar_review_service_code?: string | null
           organization_id?: string
           outside_geofence_reason?: string | null
           raw_clock_in?: string | null

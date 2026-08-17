@@ -4571,6 +4571,7 @@ export type Database = {
       }
       company_obligation_completions: {
         Row: {
+          admin_notes: string | null
           attestation_signed_at: string | null
           attestation_text_snapshot: string | null
           completed_at: string
@@ -4581,6 +4582,14 @@ export type Database = {
           is_manual_entry: boolean
           manual_entry_by: string | null
           manual_entry_by_name: string | null
+          nectar_confidence: number | null
+          nectar_extracted_cert_type: string | null
+          nectar_extracted_completed_date: string | null
+          nectar_extracted_expires_date: string | null
+          nectar_extracted_name: string | null
+          nectar_name_match: string | null
+          nectar_validation_reasons: string[]
+          nectar_validation_status: string | null
           notes: string | null
           organization_id: string
           staff_id: string
@@ -4589,6 +4598,7 @@ export type Database = {
           upload_path: string | null
         }
         Insert: {
+          admin_notes?: string | null
           attestation_signed_at?: string | null
           attestation_text_snapshot?: string | null
           completed_at?: string
@@ -4599,6 +4609,14 @@ export type Database = {
           is_manual_entry?: boolean
           manual_entry_by?: string | null
           manual_entry_by_name?: string | null
+          nectar_confidence?: number | null
+          nectar_extracted_cert_type?: string | null
+          nectar_extracted_completed_date?: string | null
+          nectar_extracted_expires_date?: string | null
+          nectar_extracted_name?: string | null
+          nectar_name_match?: string | null
+          nectar_validation_reasons?: string[]
+          nectar_validation_status?: string | null
           notes?: string | null
           organization_id: string
           staff_id: string
@@ -4607,6 +4625,7 @@ export type Database = {
           upload_path?: string | null
         }
         Update: {
+          admin_notes?: string | null
           attestation_signed_at?: string | null
           attestation_text_snapshot?: string | null
           completed_at?: string
@@ -4617,6 +4636,14 @@ export type Database = {
           is_manual_entry?: boolean
           manual_entry_by?: string | null
           manual_entry_by_name?: string | null
+          nectar_confidence?: number | null
+          nectar_extracted_cert_type?: string | null
+          nectar_extracted_completed_date?: string | null
+          nectar_extracted_expires_date?: string | null
+          nectar_extracted_name?: string | null
+          nectar_name_match?: string | null
+          nectar_validation_reasons?: string[]
+          nectar_validation_status?: string | null
           notes?: string | null
           organization_id?: string
           staff_id?: string
@@ -4643,7 +4670,21 @@ export type Database = {
             foreignKeyName: "company_obligation_completions_manual_entry_by_fkey"
             columns: ["manual_entry_by"]
             isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_obligation_completions_manual_entry_by_fkey"
+            columns: ["manual_entry_by"]
+            isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_obligation_completions_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
             referencedColumns: ["id"]
           },
           {
@@ -4688,10 +4729,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "company_obligation_instance_assignees_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "company_obligation_instance_assignees_instance_id_fkey"
             columns: ["instance_id"]
             isOneToOne: false
             referencedRelation: "company_obligation_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_obligation_instance_assignees_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
             referencedColumns: ["id"]
           },
           {
@@ -4787,10 +4842,45 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "company_obligation_instances_assignee_staff_id_fkey"
+            columns: ["assignee_staff_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_obligation_instances_assignee_staff_id_fkey"
+            columns: ["assignee_staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_obligation_instances_attestation_signed_by_id_fkey"
+            columns: ["attestation_signed_by_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "company_obligation_instances_attestation_signed_by_id_fkey"
             columns: ["attestation_signed_by_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_obligation_instances_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_obligation_instances_completed_by_id_fkey"
+            columns: ["completed_by_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
             referencedColumns: ["id"]
           },
           {
@@ -4839,6 +4929,8 @@ export type Database = {
           id: string
           is_locked: boolean
           linked_form_id: string | null
+          nectar_cert_type_label: string | null
+          nectar_keyword_groups: Json
           notify_manager_on_complete: boolean
           notify_manager_on_overdue: boolean
           organization_id: string
@@ -4866,6 +4958,8 @@ export type Database = {
           id?: string
           is_locked?: boolean
           linked_form_id?: string | null
+          nectar_cert_type_label?: string | null
+          nectar_keyword_groups?: Json
           notify_manager_on_complete?: boolean
           notify_manager_on_overdue?: boolean
           organization_id: string
@@ -4893,6 +4987,8 @@ export type Database = {
           id?: string
           is_locked?: boolean
           linked_form_id?: string | null
+          nectar_cert_type_label?: string | null
+          nectar_keyword_groups?: Json
           notify_manager_on_complete?: boolean
           notify_manager_on_overdue?: boolean
           organization_id?: string
@@ -4906,6 +5002,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "company_obligations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "company_obligations_created_by_fkey"
             columns: ["created_by"]
@@ -16144,6 +16247,54 @@ export type Database = {
           },
         ]
       }
+      sjd_assessment_selections: {
+        Row: {
+          assessment_start_date: string | null
+          assessment_type: string
+          client_id: string
+          id: string
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+          updated_by_name: string | null
+        }
+        Insert: {
+          assessment_start_date?: string | null
+          assessment_type?: string
+          client_id: string
+          id?: string
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+          updated_by_name?: string | null
+        }
+        Update: {
+          assessment_start_date?: string | null
+          assessment_type?: string
+          client_id?: string
+          id?: string
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          updated_by_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sjd_assessment_selections_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sjd_assessment_selections_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_assignments: {
         Row: {
           client_id: string
@@ -16403,6 +16554,13 @@ export type Database = {
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "staff_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_group_members_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "org_member_directory"
             referencedColumns: ["id"]
           },
           {
@@ -17948,6 +18106,53 @@ export type Database = {
             columns: ["source_document_id"]
             isOneToOne: false
             referencedRelation: "import_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      upi_attestations: {
+        Row: {
+          attested_at: string
+          attested_by: string
+          attested_by_name: string | null
+          client_id: string
+          created_at: string
+          id: string
+          kind: string
+          note_text: string | null
+          organization_id: string
+          period_label: string
+        }
+        Insert: {
+          attested_at?: string
+          attested_by: string
+          attested_by_name?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          kind: string
+          note_text?: string | null
+          organization_id: string
+          period_label?: string
+        }
+        Update: {
+          attested_at?: string
+          attested_by?: string
+          attested_by_name?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          note_text?: string | null
+          organization_id?: string
+          period_label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "upi_attestations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]

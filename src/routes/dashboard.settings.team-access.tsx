@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Lock, Mail, ShieldCheck } from "lucide-react";
+import { Lock, Mail, ShieldCheck, History } from "lucide-react";
 import { toast } from "sonner";
 import {
   listTeamAccess,
@@ -137,6 +137,14 @@ function TeamAccessPage() {
         <TabsList>
           <TabsTrigger value="members">Members</TabsTrigger>
           {canManageGroups && <TabsTrigger value="groups">Groups</TabsTrigger>}
+          <TabsTrigger value="role-history" asChild>
+            <Link
+              to="/dashboard/settings/role-audit"
+              className="inline-flex items-center gap-1"
+            >
+              <History className="h-3.5 w-3.5" /> Role history
+            </Link>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="members" className="space-y-6">

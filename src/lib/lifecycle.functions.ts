@@ -116,6 +116,20 @@ export const archiveEntity = createServerFn({ method: "POST" })
         .update({ active: false })
         .eq("user_id", data.id)
         .eq("organization_id", data.organizationId);
+
+      // Log the deactivation, then kill any still-live JWT sessions so the
+      // deactivated staffer can't keep hitting server functions that check
+      // membership via the admin client (which runs before RLS).
+      await supabaseAdmin.rpc("flag_member_deactivated", {
+        _org_id: data.organizationId,
+        _user_id: data.id,
+        _changed_by_user_id: context.userId,
+      }).then(({ error }) => {
+        if (error) console.error("flag_member_deactivated failed:", error.message);
+      });
+      await supabaseAdmin.auth.admin.signOut(data.id, "global").catch((e) =>
+        console.error("Failed to sign out deactivated user's sessions:", e),
+      );
     } else {
       const blocker = await clientActiveBlockers(data.id, data.organizationId);
       if (blocker) throw new Error(blocker);

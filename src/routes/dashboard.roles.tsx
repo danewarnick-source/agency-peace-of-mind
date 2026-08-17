@@ -1,10 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useAuth } from "@/hooks/use-auth";
 import { RequirePermission } from "@/components/rbac-guard";
+import { setMemberGrants } from "@/lib/team-access.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -59,13 +61,17 @@ function RolesPage() {
     },
   });
 
+  const setGrantsFn = useServerFn(setMemberGrants);
   const updateRole = useMutation({
-    mutationFn: async ({ memberId, role }: { memberId: string; role: Role }) => {
-      const { error } = await supabase
-        .from("organization_members")
-        .update({ role })
-        .eq("id", memberId);
-      if (error) throw error;
+    mutationFn: async ({ memberId, userId, role }: { memberId: string; userId: string; role: Role }) => {
+      await setGrantsFn({
+        data: {
+          organization_id: org!.organization_id,
+          membership_id: memberId,
+          target_user_id: userId,
+          explicit_role: role,
+        },
+      });
     },
     onSuccess: () => {
       toast.success("Role updated");
@@ -73,7 +79,12 @@ function RolesPage() {
       qc.invalidateQueries({ queryKey: ["members"] });
       qc.invalidateQueries({ queryKey: ["current-org"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) =>
+      toast.error(
+        e.message.includes("Unauthorized")
+          ? "Only organization admins can change user roles."
+          : e.message,
+      ),
   });
 
   const filtered = (members ?? []).filter((m) => {
@@ -174,7 +185,7 @@ function RolesPage() {
                         const next = val as Role;
                         if (next === role) return;
                         if (confirm(`Change ${m.profile?.full_name ?? "this user"}'s role to ${ROLE_LABEL[next]}?`)) {
-                          updateRole.mutate({ memberId: m.id, role: next });
+                          updateRole.mutate({ memberId: m.id, userId: m.user_id, role: next });
                         }
                       }}
                     >

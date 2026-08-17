@@ -138,6 +138,17 @@ export const createEmployeeManually = createServerFn({ method: "POST" })
       }, { onConflict: "organization_id,user_id" });
       if (memErr) throw new Error(memErr.message);
 
+      await supabaseAdmin.from("role_change_audit_log").insert({
+        organization_id: data.organizationId,
+        changed_by_user_id: context.userId,
+        changed_by_name: "Admin (staff creation)",
+        target_user_id: newUserId,
+        target_user_name: `${data.firstName} ${data.lastName}`.trim(),
+        previous_role: "none",
+        new_role: data.role,
+        change_method: "createEmployee",
+      });
+
       // Optional: assign training tracks
       if (data.trackIds.length) {
         const rows = data.trackIds.map((tid) => ({

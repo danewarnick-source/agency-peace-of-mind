@@ -2765,3 +2765,39 @@ Matches migration
 
 **What you'll see:** one new nullable `text` column on `evv_timesheets`. No
 existing rows are touched.
+
+---
+
+## ACTION — Role security audit: close role-escalation gaps + add audit trail (2026-08-17)
+
+**What this is for:** a security audit found several places a caller could
+reach `super_admin` or another elevated role without going through the
+admin-controlled `setMemberGrants` path — a self-insert RLS policy with no
+role check, no DB-level constraint on `invitations.role`, and no audit
+trail for role changes. This block closes those gaps and adds a
+`role_change_audit_log` table so every role change (manual, invitation,
+staff creation, deactivation) is recorded and visible to admins in-app.
+
+Paste the full contents of
+`supabase/migrations/20260817130000_role_security_hardening.sql` here —
+it's long (policy fix + constraint + new table/RLS + two function
+replacements), so it isn't duplicated in this doc.
+
+Before running: this block adds `CHECK (role IN ('admin','employee'))` to
+`public.invitations`. If any row in `invitations` currently has a role
+outside that set, the `ALTER TABLE ... ADD CONSTRAINT` will fail — run
+`SELECT DISTINCT role FROM public.invitations;` first and tell me if you
+see anything other than `admin`/`employee` so we can decide how to handle
+those rows before retrying.
+
+**What you'll see:**
+- The `self insert member` policy on `organization_members` is replaced —
+  self-inserts now require `role = 'employee'`.
+- A new `invitations_role_check` constraint on `invitations`.
+- A new empty table `public.role_change_audit_log` with RLS enabled (org
+  admins/managers and super admins can read; no direct inserts are
+  permitted — the app writes to it via the service role).
+- `public.flag_member_deactivated()` is created.
+- `public.accept_invitation()` is replaced (adds a role guard and
+  auto-revokes duplicate pending invites on acceptance). No existing
+  invitations or memberships are touched by the replacement itself.

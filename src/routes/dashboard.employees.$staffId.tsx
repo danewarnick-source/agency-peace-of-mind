@@ -68,6 +68,7 @@ import {
   updateStaffPii,
   getStaffTrainingRiskFlags,
 } from "@/lib/hr-staff.functions";
+import { setMemberGrants } from "@/lib/team-access.functions";
 import { useDeadlines, type DeadlineItem } from "@/hooks/use-deadlines";
 
 const PROFILE_TABS = ["record", "profile", "activity"] as const;
@@ -829,6 +830,7 @@ function ContactCard({
   onSaved: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const setGrantsFn = useServerFn(setMemberGrants);
   const [draft, setDraft] = useState({
     full_name: "",
     email: "",
@@ -899,16 +901,32 @@ function ContactCard({
 
       const { error: mErr } = await supabase
         .from("organization_members")
-        .update({ role: draft.role as "admin" | "committee_member" | "employee" | "manager" | "super_admin", active: draft.active })
+        .update({ active: draft.active })
         .eq("id", m.id);
       if (mErr) throw new Error(mErr.message);
+
+      if (draft.role !== m.role) {
+        await setGrantsFn({
+          data: {
+            organization_id: orgId,
+            membership_id: m.id,
+            target_user_id: staffId,
+            explicit_role: draft.role as "admin" | "committee_member" | "employee" | "manager" | "super_admin",
+          },
+        });
+      }
     },
     onSuccess: () => {
       toast.success("Saved");
       setEditing(false);
       onSaved();
     },
-    onError: (e) => toast.error((e as Error).message),
+    onError: (e) =>
+      toast.error(
+        (e as Error).message.includes("Unauthorized")
+          ? "Only organization admins can change user roles."
+          : (e as Error).message,
+      ),
   });
 
   return (

@@ -15274,6 +15274,70 @@ export type Database = {
         }
         Relationships: []
       }
+      role_change_audit_log: {
+        Row: {
+          change_method: string
+          changed_by_name: string
+          changed_by_user_id: string | null
+          created_at: string
+          id: string
+          ip_address: string | null
+          new_role: string
+          organization_id: string
+          previous_role: string
+          target_user_id: string | null
+          target_user_name: string
+        }
+        Insert: {
+          change_method: string
+          changed_by_name: string
+          changed_by_user_id?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          new_role: string
+          organization_id: string
+          previous_role: string
+          target_user_id?: string | null
+          target_user_name: string
+        }
+        Update: {
+          change_method?: string
+          changed_by_name?: string
+          changed_by_user_id?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          new_role?: string
+          organization_id?: string
+          previous_role?: string
+          target_user_id?: string | null
+          target_user_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_change_audit_log_changed_by_user_id_fkey"
+            columns: ["changed_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_change_audit_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_change_audit_log_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_permissions: {
         Row: {
           enabled: boolean
@@ -18505,6 +18569,10 @@ export type Database = {
           id: string
           support_coordinator_id: string
         }[]
+      }
+      flag_member_deactivated: {
+        Args: { _changed_by_user_id?: string; _org_id: string; _user_id: string }
+        Returns: undefined
       }
       generate_pba_audit_sample: { Args: { _org: string }; Returns: number }
       get_client_caps: {

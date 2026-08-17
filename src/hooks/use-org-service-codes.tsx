@@ -17,7 +17,7 @@ export function useOrgActiveServiceCodes(): { codes: Set<string>; isLoading: boo
         .eq("organization_id", orgId!)
         .eq("is_active", true);
       if (error) throw error;
-      return new Set((data ?? []).map((r: { code: string }) => r.code.toUpperCase()));
+      return new Set(((data ?? []) as unknown as Array<{ code: string }>).map((r) => r.code.toUpperCase()));
     },
   });
   return { codes: q.data ?? new Set<string>(), isLoading: q.isLoading };

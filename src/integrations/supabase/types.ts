@@ -2224,39 +2224,6 @@ export type Database = {
           },
         ]
       }
-      client_approved_location_audit: {
-        Row: {
-          action: string
-          actor_id: string | null
-          client_id: string
-          created_at: string
-          id: string
-          location_id: string | null
-          organization_id: string
-          snapshot: Json
-        }
-        Insert: {
-          action: string
-          actor_id?: string | null
-          client_id: string
-          created_at?: string
-          id?: string
-          location_id?: string | null
-          organization_id: string
-          snapshot: Json
-        }
-        Update: {
-          action?: string
-          actor_id?: string | null
-          client_id?: string
-          created_at?: string
-          id?: string
-          location_id?: string | null
-          organization_id?: string
-          snapshot?: Json
-        }
-        Relationships: []
-      }
       client_approved_locations: {
         Row: {
           address: string | null
@@ -5032,42 +4999,6 @@ export type Database = {
           },
         ]
       }
-      compliance_overrides: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          gap_key: string
-          gap_reference_date: string
-          gap_type: string
-          id: string
-          organization_id: string
-          reason: string
-          staff_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          gap_key: string
-          gap_reference_date: string
-          gap_type: string
-          id?: string
-          organization_id: string
-          reason: string
-          staff_id: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          gap_key?: string
-          gap_reference_date?: string
-          gap_type?: string
-          id?: string
-          organization_id?: string
-          reason?: string
-          staff_id?: string
-        }
-        Relationships: []
-      }
       contractor_monthly_pay: {
         Row: {
           additional_pay: number
@@ -5960,39 +5891,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      els_usage_ledger: {
-        Row: {
-          client_id: string
-          created_at: string
-          created_by: string | null
-          id: string
-          notes: string | null
-          organization_id: string
-          service_date: string
-          units: number
-        }
-        Insert: {
-          client_id: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          notes?: string | null
-          organization_id: string
-          service_date: string
-          units: number
-        }
-        Update: {
-          client_id?: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          notes?: string | null
-          organization_id?: string
-          service_date?: string
-          units?: number
-        }
-        Relationships: []
       }
       emar_log_addenda: {
         Row: {
@@ -8064,132 +7962,6 @@ export type Database = {
         }
         Relationships: []
       }
-      hhs_daily_records: {
-        Row: {
-          ai_compliance_feedback: string | null
-          ai_compliance_status: string | null
-          client_id: string
-          created_at: string
-          id: string
-          narrative: string
-          organization_id: string
-          pcsp_goals_addressed: string[]
-          provider_id: string
-          record_date: string
-          signature_data_url: string | null
-          updated_at: string
-        }
-        Insert: {
-          ai_compliance_feedback?: string | null
-          ai_compliance_status?: string | null
-          client_id: string
-          created_at?: string
-          id?: string
-          narrative: string
-          organization_id: string
-          pcsp_goals_addressed?: string[]
-          provider_id: string
-          record_date?: string
-          signature_data_url?: string | null
-          updated_at?: string
-        }
-        Update: {
-          ai_compliance_feedback?: string | null
-          ai_compliance_status?: string | null
-          client_id?: string
-          created_at?: string
-          id?: string
-          narrative?: string
-          organization_id?: string
-          pcsp_goals_addressed?: string[]
-          provider_id?: string
-          record_date?: string
-          signature_data_url?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      hhs_emar_logs_deprecated: {
-        Row: {
-          administered_at: string | null
-          attestation_signed: boolean
-          client_id: string
-          created_at: string
-          dosage: string | null
-          exception_reason: string | null
-          id: string
-          is_controlled: boolean
-          is_medication_error: boolean
-          is_prn: boolean
-          medication_id: string | null
-          medication_name: string
-          organization_id: string
-          pill_count_value: number | null
-          pill_count_verified: boolean | null
-          prn_reason: string | null
-          provider_id: string
-          record_date: string
-          route: string | null
-          scheduled_for: string
-          signature_attestation: string | null
-          staff_name: string | null
-          status: string
-          variance_note: string | null
-        }
-        Insert: {
-          administered_at?: string | null
-          attestation_signed?: boolean
-          client_id: string
-          created_at?: string
-          dosage?: string | null
-          exception_reason?: string | null
-          id?: string
-          is_controlled?: boolean
-          is_medication_error?: boolean
-          is_prn?: boolean
-          medication_id?: string | null
-          medication_name: string
-          organization_id: string
-          pill_count_value?: number | null
-          pill_count_verified?: boolean | null
-          prn_reason?: string | null
-          provider_id: string
-          record_date?: string
-          route?: string | null
-          scheduled_for: string
-          signature_attestation?: string | null
-          staff_name?: string | null
-          status: string
-          variance_note?: string | null
-        }
-        Update: {
-          administered_at?: string | null
-          attestation_signed?: boolean
-          client_id?: string
-          created_at?: string
-          dosage?: string | null
-          exception_reason?: string | null
-          id?: string
-          is_controlled?: boolean
-          is_medication_error?: boolean
-          is_prn?: boolean
-          medication_id?: string | null
-          medication_name?: string
-          organization_id?: string
-          pill_count_value?: number | null
-          pill_count_verified?: boolean | null
-          prn_reason?: string | null
-          provider_id?: string
-          record_date?: string
-          route?: string | null
-          scheduled_for?: string
-          signature_attestation?: string | null
-          staff_name?: string | null
-          status?: string
-          variance_note?: string | null
-        }
-        Relationships: []
-      }
       hhs_evacuation_drills: {
         Row: {
           client_id: string
@@ -9945,6 +9717,8 @@ export type Database = {
           id: string
           meeting_date: string | null
           minutes: string | null
+          minutes_document_name: string | null
+          minutes_document_path: string | null
           organization_id: string
           updated_at: string
         }
@@ -9956,6 +9730,8 @@ export type Database = {
           id?: string
           meeting_date?: string | null
           minutes?: string | null
+          minutes_document_name?: string | null
+          minutes_document_path?: string | null
           organization_id: string
           updated_at?: string
         }
@@ -9967,6 +9743,8 @@ export type Database = {
           id?: string
           meeting_date?: string | null
           minutes?: string | null
+          minutes_document_name?: string | null
+          minutes_document_path?: string | null
           organization_id?: string
           updated_at?: string
         }
@@ -11024,50 +10802,6 @@ export type Database = {
           },
         ]
       }
-      incident_sc_requests: {
-        Row: {
-          created_at: string
-          id: string
-          incident_id: string
-          organization_id: string
-          request_summary: string
-          requested_at: string
-          responded_at: string | null
-          responded_by: string | null
-          response_summary: string | null
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          incident_id: string
-          organization_id: string
-          request_summary: string
-          requested_at: string
-          responded_at?: string | null
-          responded_by?: string | null
-          response_summary?: string | null
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          incident_id?: string
-          organization_id?: string
-          request_summary?: string
-          requested_at?: string
-          responded_at?: string | null
-          responded_by?: string | null
-          response_summary?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "incident_sc_requests_incident_id_fkey"
-            columns: ["incident_id"]
-            isOneToOne: false
-            referencedRelation: "incident_reports"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       invitations: {
         Row: {
           accepted_at: string | null
@@ -11357,53 +11091,6 @@ export type Database = {
           },
         ]
       }
-      master_attestations: {
-        Row: {
-          attestation_text: string
-          id: string
-          organization_id: string
-          requirement_count: number
-          scope_codes: string[]
-          signed_at: string
-          signed_by: string
-          signed_by_name: string | null
-          superseded_at: string | null
-          version: number
-        }
-        Insert: {
-          attestation_text: string
-          id?: string
-          organization_id: string
-          requirement_count?: number
-          scope_codes?: string[]
-          signed_at?: string
-          signed_by: string
-          signed_by_name?: string | null
-          superseded_at?: string | null
-          version: number
-        }
-        Update: {
-          attestation_text?: string
-          id?: string
-          organization_id?: string
-          requirement_count?: number
-          scope_codes?: string[]
-          signed_at?: string
-          signed_by?: string
-          signed_by_name?: string | null
-          superseded_at?: string | null
-          version?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "master_attestations_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       medication_change_proposals: {
         Row: {
           applied_medication_id: string | null
@@ -11534,51 +11221,6 @@ export type Database = {
             columns: ["medication_id"]
             isOneToOne: false
             referencedRelation: "client_medications"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      module_progress: {
-        Row: {
-          assignment_id: string
-          completed: boolean
-          completed_at: string | null
-          id: string
-          module_id: string
-          quiz_score: number | null
-          user_id: string
-        }
-        Insert: {
-          assignment_id: string
-          completed?: boolean
-          completed_at?: string | null
-          id?: string
-          module_id: string
-          quiz_score?: number | null
-          user_id: string
-        }
-        Update: {
-          assignment_id?: string
-          completed?: boolean
-          completed_at?: string | null
-          id?: string
-          module_id?: string
-          quiz_score?: number | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "module_progress_assignment_id_fkey"
-            columns: ["assignment_id"]
-            isOneToOne: false
-            referencedRelation: "course_assignments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "module_progress_module_id_fkey"
-            columns: ["module_id"]
-            isOneToOne: false
-            referencedRelation: "course_modules"
             referencedColumns: ["id"]
           },
         ]
@@ -11989,44 +11631,6 @@ export type Database = {
             columns: ["requirement_id"]
             isOneToOne: false
             referencedRelation: "nectar_requirements"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      nectar_document_entities: {
-        Row: {
-          created_at: string
-          document_id: string
-          entity_id: string | null
-          entity_kind: string
-          entity_label: string | null
-          id: string
-          organization_id: string
-        }
-        Insert: {
-          created_at?: string
-          document_id: string
-          entity_id?: string | null
-          entity_kind: string
-          entity_label?: string | null
-          id?: string
-          organization_id: string
-        }
-        Update: {
-          created_at?: string
-          document_id?: string
-          entity_id?: string | null
-          entity_kind?: string
-          entity_label?: string | null
-          id?: string
-          organization_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "nectar_document_entities_document_id_fkey"
-            columns: ["document_id"]
-            isOneToOne: false
-            referencedRelation: "nectar_documents"
             referencedColumns: ["id"]
           },
         ]
@@ -15127,50 +14731,6 @@ export type Database = {
           },
         ]
       }
-      referral_purge_tombstones: {
-        Row: {
-          archive_reason: string | null
-          archived_at: string
-          decision_outcome: string | null
-          discarded: boolean
-          gmail_message_id: string | null
-          id: string
-          organization_id: string
-          purged_at: string
-          referral_id: string
-        }
-        Insert: {
-          archive_reason?: string | null
-          archived_at: string
-          decision_outcome?: string | null
-          discarded?: boolean
-          gmail_message_id?: string | null
-          id?: string
-          organization_id: string
-          purged_at?: string
-          referral_id: string
-        }
-        Update: {
-          archive_reason?: string | null
-          archived_at?: string
-          decision_outcome?: string | null
-          discarded?: boolean
-          gmail_message_id?: string | null
-          id?: string
-          organization_id?: string
-          purged_at?: string
-          referral_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "referral_purge_tombstones_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       referrals: {
         Row: {
           age: number | null
@@ -15296,86 +14856,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      requirement_bindings: {
-        Row: {
-          bound_by: string | null
-          created_at: string
-          engine_ref: string | null
-          id: string
-          native_feature: string | null
-          notes: string | null
-          requirement_id: string
-          satisfied_by: string
-          updated_at: string
-        }
-        Insert: {
-          bound_by?: string | null
-          created_at?: string
-          engine_ref?: string | null
-          id?: string
-          native_feature?: string | null
-          notes?: string | null
-          requirement_id: string
-          satisfied_by?: string
-          updated_at?: string
-        }
-        Update: {
-          bound_by?: string | null
-          created_at?: string
-          engine_ref?: string | null
-          id?: string
-          native_feature?: string | null
-          notes?: string | null
-          requirement_id?: string
-          satisfied_by?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "requirement_bindings_requirement_id_fkey"
-            columns: ["requirement_id"]
-            isOneToOne: true
-            referencedRelation: "nectar_requirements"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      respite_stays: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          end_date: string
-          host_home_id: string
-          id: string
-          notes: string | null
-          organization_id: string
-          respite_client_id: string
-          start_date: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          end_date: string
-          host_home_id: string
-          id?: string
-          notes?: string | null
-          organization_id: string
-          respite_client_id: string
-          start_date: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          end_date?: string
-          host_home_id?: string
-          id?: string
-          notes?: string | null
-          organization_id?: string
-          respite_client_id?: string
-          start_date?: string
-        }
-        Relationships: []
       }
       role_permissions: {
         Row: {
@@ -15891,104 +15371,6 @@ export type Database = {
             columns: ["shift_id"]
             isOneToOne: false
             referencedRelation: "evv_timesheets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      shift_mar_entries: {
-        Row: {
-          administered_at: string
-          client_id: string
-          client_medication_id: string
-          created_at: string
-          evv_timesheet_id: string | null
-          id: string
-          notes: string | null
-          organization_id: string
-          scheduled_shift_id: string | null
-          scheduled_time: string | null
-          staff_id: string
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          administered_at?: string
-          client_id: string
-          client_medication_id: string
-          created_at?: string
-          evv_timesheet_id?: string | null
-          id?: string
-          notes?: string | null
-          organization_id: string
-          scheduled_shift_id?: string | null
-          scheduled_time?: string | null
-          staff_id: string
-          status: string
-          updated_at?: string
-        }
-        Update: {
-          administered_at?: string
-          client_id?: string
-          client_medication_id?: string
-          created_at?: string
-          evv_timesheet_id?: string | null
-          id?: string
-          notes?: string | null
-          organization_id?: string
-          scheduled_shift_id?: string | null
-          scheduled_time?: string | null
-          staff_id?: string
-          status?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "shift_mar_entries_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "shift_mar_entries_client_medication_id_fkey"
-            columns: ["client_medication_id"]
-            isOneToOne: false
-            referencedRelation: "client_medications"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "shift_mar_entries_evv_timesheet_id_fkey"
-            columns: ["evv_timesheet_id"]
-            isOneToOne: false
-            referencedRelation: "evv_timesheets"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "shift_mar_entries_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "shift_mar_entries_scheduled_shift_id_fkey"
-            columns: ["scheduled_shift_id"]
-            isOneToOne: false
-            referencedRelation: "scheduled_shifts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "shift_mar_entries_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "org_member_directory"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "shift_mar_entries_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -16619,48 +16001,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      staff_nudges: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          gap_key: string
-          gap_reference_date: string | null
-          gap_type: string
-          id: string
-          message: string
-          organization_id: string
-          priority: string
-          read_at: string | null
-          staff_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          gap_key: string
-          gap_reference_date?: string | null
-          gap_type: string
-          id?: string
-          message: string
-          organization_id: string
-          priority?: string
-          read_at?: string | null
-          staff_id: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          gap_key?: string
-          gap_reference_date?: string | null
-          gap_type?: string
-          id?: string
-          message?: string
-          organization_id?: string
-          priority?: string
-          read_at?: string | null
-          staff_id?: string
-        }
-        Relationships: []
       }
       staff_other_assignments: {
         Row: {
@@ -18150,50 +17490,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "upi_attestations_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      user_capability_overrides: {
-        Row: {
-          capability_key: string
-          created_at: string
-          created_by: string | null
-          id: string
-          mode: string
-          organization_id: string
-          reason: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          capability_key: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          mode: string
-          organization_id: string
-          reason?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          capability_key?: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          mode?: string
-          organization_id?: string
-          reason?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_capability_overrides_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"

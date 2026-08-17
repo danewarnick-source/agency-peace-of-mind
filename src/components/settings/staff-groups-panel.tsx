@@ -525,7 +525,7 @@ export function StaffGroupsPanel({ orgId }: { orgId: string }) {
   const listFn = useServerFn(listStaffGroups);
   const createFn = useServerFn(createStaffGroup);
 
-  const { data: groups = [], isLoading } = useQuery({
+  const { data: groups = [], isLoading } = useQuery<GroupWithCount[]>({
     queryKey: ["staff-groups", orgId],
     enabled: !!orgId,
     queryFn: () => listFn({ data: { organizationId: orgId } }),

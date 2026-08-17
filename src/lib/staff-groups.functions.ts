@@ -416,11 +416,14 @@ export async function resolveGroupMembersInternal(
   if (dErr) throw new Error(dErr.message);
   if (rErr) throw new Error(rErr.message);
 
-  const nameById = new Map(
-    (dirRows ?? []).map((r: { id: string; full_name: string | null }) => [r.id, r.full_name ?? "Unknown"]),
+  const nameById = new Map<string, string>(
+    ((dirRows ?? []) as Array<{ id: string | null; full_name: string | null }>)
+      .filter((r) => !!r.id)
+      .map((r) => [r.id as string, r.full_name ?? "Unknown"] as [string, string]),
   );
-  const roleById = new Map(
-    (roleRows ?? []).map((r: { user_id: string; role: string }) => [r.user_id, r.role]),
+  const roleById = new Map<string, string>(
+    ((roleRows ?? []) as Array<{ user_id: string; role: string }>)
+      .map((r) => [r.user_id, r.role] as [string, string]),
   );
 
   const out: ResolvedStaffMember[] = [];

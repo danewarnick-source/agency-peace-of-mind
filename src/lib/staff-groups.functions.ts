@@ -405,7 +405,11 @@ export async function resolveGroupMembersInternal(
     .select("staff_id")
     .in("group_id", groupIds);
   if (error) throw new Error(error.message);
-  const staffIds = Array.from(new Set((memberRows ?? []).map((r: { staff_id: string }) => r.staff_id)));
+  const staffIds = Array.from(
+    new Set(
+      ((memberRows ?? []) as unknown as Array<{ staff_id: string }>).map((r) => r.staff_id),
+    ),
+  );
   if (!staffIds.length) return [];
 
   const [{ data: dirRows, error: dErr }, { data: roleRows, error: rErr }] = await Promise.all([

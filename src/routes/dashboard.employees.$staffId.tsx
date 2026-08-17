@@ -70,15 +70,24 @@ import {
 } from "@/lib/hr-staff.functions";
 import { setMemberGrants } from "@/lib/team-access.functions";
 import { useDeadlines, type DeadlineItem } from "@/hooks/use-deadlines";
+import { usePermissions } from "@/hooks/use-permissions";
+import { StaffPermissionsTab } from "@/components/employees/staff-permissions-tab";
+import { ALL_PERMISSIONS, type Permission } from "@/lib/rbac";
 
-const PROFILE_TABS = ["record", "profile", "activity"] as const;
+const PROFILE_TABS = ["record", "profile", "activity", "permissions"] as const;
 type ProfileTab = (typeof PROFILE_TABS)[number];
 
 export const Route = createFileRoute("/dashboard/employees/$staffId")({
-  validateSearch: (s: Record<string, unknown>): { tab?: ProfileTab } =>
-    typeof s.tab === "string" && (PROFILE_TABS as readonly string[]).includes(s.tab)
-      ? { tab: s.tab as ProfileTab }
-      : {},
+  validateSearch: (s: Record<string, unknown>): { tab?: ProfileTab; override_perm?: Permission } => {
+    const out: { tab?: ProfileTab; override_perm?: Permission } = {};
+    if (typeof s.tab === "string" && (PROFILE_TABS as readonly string[]).includes(s.tab)) {
+      out.tab = s.tab as ProfileTab;
+    }
+    if (typeof s.override_perm === "string" && (ALL_PERMISSIONS as readonly string[]).includes(s.override_perm)) {
+      out.override_perm = s.override_perm as Permission;
+    }
+    return out;
+  },
   component: () => (
     <RequirePermission perm="manage_users">
       <StaffProfilePage />
@@ -157,13 +166,15 @@ function CollapsibleSectionGroup({
 
 function StaffProfilePage() {
   const { staffId } = Route.useParams();
-  const { tab } = Route.useSearch();
+  const { tab, override_perm } = Route.useSearch();
   const { data: org } = useCurrentOrg();
   const { user } = useAuth();
   const router = useRouter();
   const qc = useQueryClient();
   const navigate = Route.useNavigate();
   const activeTab: ProfileTab = tab ?? "record";
+  const { can: canManagePermissions } = usePermissions();
+  const showPermissionsTab = canManagePermissions("manage_permissions");
 
   const orgId = org?.organization_id;
   const isSelf = user?.id === staffId;
@@ -401,6 +412,7 @@ function StaffProfilePage() {
           <TabsTrigger value="record">Staff record</TabsTrigger>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
+          {showPermissionsTab && <TabsTrigger value="permissions">Permissions</TabsTrigger>}
         </TabsList>
 
         {/* ----- STAFF RECORD (default) ----- */}
@@ -629,6 +641,19 @@ function StaffProfilePage() {
             </SectionPanel>
           </SectionGroup>
         </TabsContent>
+
+        {/* ----- PERMISSIONS (owner-only) ----- */}
+        {showPermissionsTab && (
+          <TabsContent value="permissions" className="mt-4 space-y-6">
+            {orgId && (
+              <StaffPermissionsTab
+                organizationId={orgId}
+                staffId={staffId}
+                initialOverridePermission={override_perm}
+              />
+            )}
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

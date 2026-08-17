@@ -15373,6 +15373,104 @@ export type Database = {
           },
         ]
       }
+      permission_audit_log: {
+        Row: {
+          change_type: string
+          changed_by_name: string
+          changed_by_user_id: string | null
+          created_at: string | null
+          id: string
+          new_value: boolean | null
+          organization_id: string
+          permission: string
+          previous_value: boolean | null
+          reason: string | null
+          role: string | null
+          target_user_id: string | null
+          target_user_name: string | null
+        }
+        Insert: {
+          change_type: string
+          changed_by_name: string
+          changed_by_user_id?: string | null
+          created_at?: string | null
+          id?: string
+          new_value?: boolean | null
+          organization_id: string
+          permission: string
+          previous_value?: boolean | null
+          reason?: string | null
+          role?: string | null
+          target_user_id?: string | null
+          target_user_name?: string | null
+        }
+        Update: {
+          change_type?: string
+          changed_by_name?: string
+          changed_by_user_id?: string | null
+          created_at?: string | null
+          id?: string
+          new_value?: boolean | null
+          organization_id?: string
+          permission?: string
+          previous_value?: boolean | null
+          reason?: string | null
+          role?: string | null
+          target_user_id?: string | null
+          target_user_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permission_audit_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scope_assignments: {
+        Row: {
+          created_at: string | null
+          id: string
+          organization_id: string
+          scope_ref_id: string | null
+          scope_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          organization_id: string
+          scope_ref_id?: string | null
+          scope_type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          organization_id?: string
+          scope_ref_id?: string | null
+          scope_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scope_assignments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scope_assignments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scheduled_shifts: {
         Row: {
           callout_reason: string | null
@@ -18016,46 +18114,63 @@ export type Database = {
           },
         ]
       }
-      user_capability_overrides: {
+      user_permission_overrides: {
         Row: {
-          capability_key: string
-          created_at: string
-          created_by: string | null
+          created_at: string | null
+          expires_at: string | null
+          granted: boolean
+          granted_by: string
+          granted_by_name: string
           id: string
-          mode: string
           organization_id: string
-          reason: string | null
-          updated_at: string
+          permission: string
+          reason: string
           user_id: string
         }
         Insert: {
-          capability_key: string
-          created_at?: string
-          created_by?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          granted: boolean
+          granted_by: string
+          granted_by_name: string
           id?: string
-          mode: string
           organization_id: string
-          reason?: string | null
-          updated_at?: string
+          permission: string
+          reason: string
           user_id: string
         }
         Update: {
-          capability_key?: string
-          created_at?: string
-          created_by?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          granted?: boolean
+          granted_by?: string
+          granted_by_name?: string
           id?: string
-          mode?: string
           organization_id?: string
-          reason?: string | null
-          updated_at?: string
+          permission?: string
+          reason?: string
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "user_capability_overrides_organization_id_fkey"
+            foreignKeyName: "user_permission_overrides_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

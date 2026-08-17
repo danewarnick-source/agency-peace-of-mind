@@ -19,6 +19,7 @@ import {
   type TeamMemberAccess,
 } from "@/lib/team-access.functions";
 import { StaffGroupsPanel } from "@/components/settings/staff-groups-panel";
+import { ScopeAssignmentsPanel } from "@/components/settings/scope-assignments-panel";
 
 export const Route = createFileRoute("/dashboard/settings/team-access")({
   head: () => ({ meta: [{ title: "Team access — HIVE" }] }),
@@ -137,6 +138,7 @@ function TeamAccessPage() {
         <TabsList>
           <TabsTrigger value="members">Members</TabsTrigger>
           {canManageGroups && <TabsTrigger value="groups">Groups</TabsTrigger>}
+          {canManage && <TabsTrigger value="scope">Scope</TabsTrigger>}
           <TabsTrigger value="role-history" asChild>
             <Link
               to="/dashboard/settings/role-audit"
@@ -265,6 +267,12 @@ function TeamAccessPage() {
             <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
               <StaffGroupsPanel orgId={org!.organization_id} />
             </div>
+          </TabsContent>
+        )}
+
+        {canManage && (
+          <TabsContent value="scope">
+            <ScopeAssignmentsPanel orgId={org!.organization_id} />
           </TabsContent>
         )}
       </Tabs>

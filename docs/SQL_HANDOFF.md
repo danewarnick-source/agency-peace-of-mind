@@ -2801,3 +2801,64 @@ those rows before retrying.
 - `public.accept_invitation()` is replaced (adds a role guard and
   auto-revokes duplicate pending invites on acceptance). No existing
   invitations or memberships are touched by the replacement itself.
+
+---
+
+## ACTION — Permission system rebuild: granular matrix + individual overrides + audit log + scope (2026-08-17)
+
+**What this is for:** the permissions rebuild expands `role_permissions`
+from ~29 coarse toggles to a full granular matrix (people/clients/
+scheduling/timesheets/documentation/compliance/incidents/medications/hrc/
+financial/organization), adds a per-user grant/deny override layer that
+`usePermissions()` now actually reads, a `permission_audit_log` for every
+change, and a `scope_assignments` table for restricting a supervisor's
+visible data. It does **not** touch the separate `rbac_roles` /
+`has_capability` capability system (pass 1) — that system already exists,
+is unused by any current UI, and is out of scope here.
+
+Paste the full contents of
+`supabase/migrations/20260817140000_permission_system_rebuild.sql` here —
+it's long (seed function + two new tables + policy changes + a check
+constraint update), so it isn't duplicated in this doc.
+
+Before running: this block does `DROP TABLE IF EXISTS
+public.user_capability_overrides CASCADE`. That table has zero
+application-code references (confirmed via repo-wide search — only
+`src/integrations/supabase/types.ts` mentions it), so dropping it does not
+remove any live functionality. If you have any manually-entered rows in
+that table you want preserved, tell me before running this block and we'll
+export them first.
+
+**What you'll see:**
+- `public.seed_org_role_permissions(_org uuid)` — new function. Backfills
+  a complete `role_permissions` matrix (every permission × every role,
+  `admin`/`super_admin` enabled, `manager`/`employee`/`committee_member`
+  per the `DEFAULT_MATRIX` in `src/lib/rbac.ts`) for every existing org,
+  using `ON CONFLICT DO NOTHING` so any permission your team has already
+  customized is left untouched. A new trigger seeds new orgs the same way
+  going forward.
+- `public.user_capability_overrides` is dropped (see note above).
+- New table `public.user_permission_overrides` — per-user permission
+  grant/deny rows with reason, granter, and optional expiry. RLS: org
+  owners (or platform admins) can read/write all rows for their org; a
+  user can read their own rows.
+- New table `public.permission_audit_log` — append-only history of every
+  role-permission or override change. RLS: org owners can read; direct
+  user inserts are blocked (the app writes via server functions).
+- `public.role_permissions` policies are replaced with equivalent
+  explicit-named ones (`org members read role permissions` / `owners
+  write role permissions`) — same access, clearer names, no behavior
+  change for existing rows.
+- New table `public.scope_assignments` — per-user data-scope restriction
+  (service code / staff group / client / all). RLS: org owners manage;
+  a user can read their own scope row.
+- `public.has_permission(_user_id, _org_id, _perm)` — the existing
+  server-side authorization RPC used by `src/lib/require-permission.ts`
+  across many server functions — is replaced to check
+  `user_permission_overrides` first (respecting expiry), before falling
+  back to `role_permissions` exactly as it did before. This makes granular
+  server-enforced permission gates respect individual overrides the same
+  way the client `usePermissions()` hook does.
+- `public.notifications`'s `type` check constraint gains one new allowed
+  value, `'permission_requested'`, for the staff "Request access" flow.
+  No existing notification rows are touched.

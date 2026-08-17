@@ -10,8 +10,13 @@ export function RequirePermission({ perm, children }: { perm: Permission; childr
   const allowed = can(perm);
   useEffect(() => {
     if (isLoading) return;
-    if (!allowed) navigate({ to: "/unauthorized" });
-  }, [isLoading, allowed, navigate]);
+    if (!allowed) {
+      navigate({
+        to: "/unauthorized",
+        search: { perm, page: typeof window !== "undefined" ? window.location.pathname : undefined },
+      });
+    }
+  }, [isLoading, allowed, navigate, perm]);
   if (isLoading || !allowed) {
     return <div className="text-sm text-muted-foreground">Loading…</div>;
   }

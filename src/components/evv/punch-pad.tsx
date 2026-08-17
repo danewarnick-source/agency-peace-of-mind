@@ -24,7 +24,7 @@ import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { computeEntryUnits } from "@/lib/billing-units";
 import { EvvConsentGate } from "@/components/evv/consent-gate";
 import { evaluateShiftNote, type CoachResult } from "@/lib/ai-coach.functions";
-import { draftShiftNote, draftVarianceJustification, answerProceduralQuestion, type ProceduralResult } from "@/lib/ai-coach.functions";
+import { draftVarianceJustification, answerProceduralQuestion, type ProceduralResult } from "@/lib/ai-coach.functions";
 import { NectarInfusionLock } from "@/components/nectar/nectar-infusion-lock";
 import { useNectarInfusion } from "@/hooks/use-nectar-infusion";
 import {
@@ -302,7 +302,6 @@ export function PunchPad({
   // approval, billing-units.ts reads corrected_clock_in/out instead of the
   // raw punches. Staff can see status on /dashboard/my-time-corrections.
   const [incidentFlag, setIncidentFlag] = useState(false);
-  const [attestAccurate, setAttestAccurate] = useState(false);
   const [scheduledMinutes, setScheduledMinutes] = useState<number | null>(null);
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [correctionIn, setCorrectionIn] = useState<string>("");   // datetime-local
@@ -316,24 +315,16 @@ export function PunchPad({
   const [aiFlagCount, setAiFlagCount]     = useState(0);
   const [allowException, setAllowException] = useState(false);
 
-  // ── NECTAR Progress-Note Assist (Infusion add-on) ──────────────────────────
+  // ── Voice dictation for the narrative textarea ──────────────────────────────
   const { enabled: nectarInfusionEnabled } = useNectarInfusion();
-  const [shorthand, setShorthand]             = useState("");
-  const [nectarDraft, setNectarDraft]         = useState<string | null>(null);
-  const [draftBusy, setDraftBusy]             = useState(false);
-  const [nectarUsed, setNectarUsed]           = useState(false);
-  // Original shorthand as typed/spoken at the moment NECTAR drafted from it —
-  // kept separate from `shorthand` (which the staff can keep editing) so the
-  // attestation always records what was actually handed to NECTAR.
-  const [nectarRawInput, setNectarRawInput]   = useState<string | null>(null);
-  // Per-paragraph "this is accurate" confirmation, keyed by paragraph index
-  // into the current narrative. Reset whenever the narrative text changes so
-  // an edited paragraph can't ride on a stale checkmark.
-  const [paragraphChecks, setParagraphChecks] = useState<Record<number, boolean>>({});
   const [isRecording, setIsRecording]         = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
+
+  // ── Staff attestation (Medicaid fraud statement) ────────────────────────────
+  const [attestationChecked, setAttestationChecked] = useState(false);
+  const [attestationTimestamp, setAttestationTimestamp] = useState<string | null>(null);
 
   // ── NECTAR Completeness Check (Infusion add-on) ────────────────────────────
   type CFlag = {
@@ -937,23 +928,8 @@ export function PunchPad({
     return t.split(/\s+/).filter(Boolean).length;
   }, [narrative]);
 
-  // NECTAR-expanded note review: split into paragraphs so staff confirm each
-  // one individually rather than blanket-attesting to the whole draft.
-  const narrativeParagraphs = useMemo(() => {
-    if (!nectarUsed) return [] as string[];
-    const t = narrative.trim();
-    if (!t) return [] as string[];
-    let parts = t.split(/\n\s*\n+/).map((p) => p.trim()).filter(Boolean);
-    if (parts.length <= 1) parts = t.split(/\n+/).map((p) => p.trim()).filter(Boolean);
-    return parts.length > 0 ? parts : [t];
-  }, [narrative, nectarUsed]);
-
   const hasGoalSelected    = baselineChecked || Object.values(checkedGoals).some(Boolean);
   const narrativeOk        = wordCount >= 50;
-  const draftConfirmed     =
-    nectarUsed && narrativeParagraphs.length > 0 &&
-    narrativeParagraphs.every((_, i) => !!paragraphChecks[i]);
-  const nectarConfirmOk    = !nectarUsed || draftConfirmed;
   const behaviorError      = behaviorEnabled ? validateBehaviorAnswers(behaviorAnswers) : null;
   const behaviorOk         = behaviorError === null;
   const liveDurationMs = active
@@ -985,8 +961,9 @@ export function PunchPad({
   // moot — the whole point is that they aren't.
   const longShiftOk = !isLongShift || longShiftAck || correctionOpen;
   const canSubmitCompliance =
-    hasGoalSelected && narrativeOk && nectarConfirmOk && behaviorOk &&
-    longShiftOk && triggersResolved && medDosesResolved && incidentAnswer !== null && !busy &&
+    hasGoalSelected && narrativeOk && behaviorOk &&
+    longShiftOk && triggersResolved && medDosesResolved &&
+    incidentAnswer !== null && !busy && attestationChecked &&
     (!correctionOpen || !correctionHasChange || correctionValid);
 
 
@@ -1000,12 +977,8 @@ export function PunchPad({
     setAiIterations(0);
     setAiFlagCount(0);
     setAllowException(false);
-    setShorthand("");
-    setNectarDraft(null);
-    setDraftBusy(false);
-    setNectarRawInput(null);
-    setParagraphChecks({});
-    setNectarUsed(false);
+    setAttestationChecked(false);
+    setAttestationTimestamp(null);
     setCompletenessRan(false);
     setCompletenessFlags([]);
     setDismissals({});
@@ -1106,16 +1079,6 @@ export function PunchPad({
           fix: { label: "Expand note" },
         });
       }
-      if (nectarUsed && !draftConfirmed) {
-        flags.push({
-          key: "nectar-unconfirmed",
-          type: "ai_unconfirmed",
-          severity: "hard",
-          message: "Confirm the NECTAR-drafted note accurately reflects the shift.",
-          fix: { label: "Review & confirm" },
-        });
-      }
-
       // Soft cross-checks (Infusion layer)
       const dollarMatches = narrative.match(/\$\s?\d+(?:\.\d{1,2})?/g) ?? [];
 
@@ -1228,7 +1191,7 @@ export function PunchPad({
           if (e.results[i].isFinal) finalText += e.results[i][0].transcript + " ";
         }
         if (finalText) {
-          setShorthand((prev) => (prev ? prev.trim() + " " : "") + finalText.trim());
+          setNarrative((prev) => (prev ? prev.trim() + " " : "") + finalText.trim());
         }
       };
       rec.onerror = () => stopRecording();
@@ -1239,48 +1202,6 @@ export function PunchPad({
     } catch {
       toast.error("Couldn't start voice input — please type instead.");
     }
-  }
-
-  async function runDraftWithNectar() {
-    if (!active) return;
-    const text = shorthand.trim();
-    if (text.length < 3) {
-      toast.error("Add a few words of shorthand first (e.g. 'park, soda $2, talked to 2 ppl').");
-      return;
-    }
-    stopRecording();
-    setDraftBusy(true);
-    try {
-      const selectedGoalsForAi = Object.entries(checkedGoals)
-        .filter(([, v]) => v)
-        .map(([k]) => k);
-      if (baselineChecked) selectedGoalsForAi.push("General baseline monitoring & safety oversight");
-
-      const clientFirst =
-        lockedClient?.name?.split(" ")?.[0] ??
-        caseload.find((c) => c.id === active.client_id)?.first_name ??
-        "the client";
-
-      const res = await draftShiftNote({
-        data: { shorthand: text, goals: selectedGoalsForAi, clientFirstName: clientFirst },
-      });
-      setNectarDraft(res.draft);
-      setNectarRawInput(text);
-      setParagraphChecks({});
-      setNectarUsed(true);
-    } catch (e) {
-      toast.error((e as Error).message || "NECTAR couldn't draft the note — please try again.");
-    } finally {
-      setDraftBusy(false);
-    }
-  }
-
-  function acceptNectarDraft() {
-    if (!nectarDraft) return;
-    setNarrative(nectarDraft);
-    setAiCoach(null);
-    setShowNarrativeError(false);
-    setParagraphChecks({});
   }
 
   async function handleDraftVariance(phase: "clock_in" | "clock_out") {
@@ -1349,6 +1270,38 @@ export function PunchPad({
       toast.error((e as Error).message || "NECTAR couldn't answer right now.");
     } finally {
       setAskBusy(false);
+    }
+  }
+
+  // Voluntary pre-submit review — same evaluateShiftNote call submitCompliance
+  // runs, but staff can trigger it any time the narrative has ≥20 words.
+  async function reviewWithNectar() {
+    if (!active) return;
+    setAiBusy(true);
+    try {
+      const selectedGoalsForAi = Object.entries(checkedGoals)
+        .filter(([, v]) => v)
+        .map(([k]) => k);
+      if (baselineChecked) selectedGoalsForAi.push("General baseline monitoring & safety oversight");
+
+      const clientFirst =
+        lockedClient?.name?.split(" ")?.[0] ??
+        caseload.find((c) => c.id === active.client_id)?.first_name ??
+        "the client";
+
+      const verdict = await evaluateShiftNote({
+        data: {
+          narrative: narrative.trim(),
+          goals: selectedGoalsForAi,
+          clientFirstName: clientFirst,
+          serviceCode: active.service_type_code,
+        },
+      });
+      setAiCoach(verdict);
+    } catch (e) {
+      toast.error((e as Error).message || "NECTAR coach unavailable — please try again.");
+    } finally {
+      setAiBusy(false);
     }
   }
 
@@ -1486,7 +1439,7 @@ export function PunchPad({
     pos: { lat: number; lng: number; acc: number } | null;
     outsideReason?: string;
     gpsBypassReason?: string;
-    aiStatus?: "Verified" | "Flagged" | "Exception";
+    aiStatus?: "Verified" | "Flagged" | "Exception" | "skipped_service_unavailable";
     aiFeedback?: string;
     aiIterationCount?: number;
     correction?: {
@@ -1533,41 +1486,38 @@ export function PunchPad({
       // Per-entry quarter-hour units (round-to-NEAREST); raw timestamps stay untouched.
       billed_units:         computeEntryUnits(active.clock_in_timestamp, clockOut),
     };
-    if (nectarUsed) {
-      update.nectar_drafted = true;
-      update.nectar_drafted_confirmed_at = clockOut;
-      update.nectar_drafted_confirmed_by = user.id;
+    // NECTAR no longer drafts notes — staff always write their own; this
+    // field stays false so downstream billing/audit views don't need a
+    // separate "never drafted" state.
+    update.nectar_drafted = false;
+    update.nectar_review_service_code = active.service_type_code;
+    update.attested_accurate = true;
+    update.attested_at = attestationTimestamp;
 
-      // Log the immutable Medicaid-fraud attestation and preserve the
-      // staff's original shorthand alongside NECTAR's expanded output —
-      // required before this shift's note can be treated as reviewed.
-      const rawInput = nectarRawInput ?? shorthand.trim();
-      const { data: attRow, error: attErr } = await supabase
-        .from("nectar_attestations")
-        .insert({
-          organization_id: org?.organization_id ?? null,
-          user_id: user.id,
-          user_display_name: user.email ?? null,
-          scope: "shift_note",
-          scope_ref_id: active.id,
-          scope_ref_type: "evv_timesheet",
-          statement:
-            "I confirm this shift note accurately reflects the services I personally provided on this date. " +
-            "I understand that submitting inaccurate documentation may constitute Medicaid fraud.",
-          context: { client_id: active.client_id },
-          original_staff_input: rawInput,
-          nectar_expanded_output: nectarDraft,
-          input_confirmed_at: clockOut,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any)
-        .select("id")
-        .single();
-      if (attErr || !attRow) {
-        toast.error(`Attestation log failed: ${attErr?.message ?? "unknown error"}`);
-        return;
-      }
-      update.nectar_raw_input = rawInput;
-      update.nectar_attestation_id = (attRow as { id: string }).id;
+    // Permanent legal record of the staff attestation — written for every
+    // submitted shift, not just ones NECTAR reviewed.
+    const { error: attErr } = await supabase
+      .from("nectar_attestations")
+      .insert({
+        organization_id: org?.organization_id ?? null,
+        user_id: user.id,
+        user_display_name: user.email ?? null,
+        scope: "shift_note",
+        scope_ref_id: active.id,
+        scope_ref_type: "evv_timesheet",
+        statement:
+          "I attest that this shift note is accurate and truthful, that it reflects services I personally provided, and that I understand submitting false Medicaid documentation constitutes fraud. Warning: Falsification of Medicaid service records is a federal offense under 18 U.S.C. § 1347.",
+        context: {
+          client_id: active.client_id,
+          service_code: active.service_type_code,
+          nectar_review_status: aiCoach?.status ?? "not_reviewed",
+        },
+        input_confirmed_at: attestationTimestamp,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+    if (attErr) {
+      toast.error(`Attestation log failed: ${attErr.message}`);
+      return;
     }
     if (args.outsideReason) update.outside_geofence_reason = args.outsideReason;
     if (args.gpsBypassReason) {
@@ -1818,10 +1768,6 @@ export function PunchPad({
       setShowNarrativeError(true);
       return;
     }
-    if (nectarUsed && !draftConfirmed) {
-      toast.error("Please review and confirm every paragraph of the NECTAR-drafted note before submitting.");
-      return;
-    }
     if (behaviorEnabled && behaviorError) {
       toast.error(`Behavior observations: ${behaviorError}`);
       return;
@@ -1888,6 +1834,8 @@ export function PunchPad({
     const isException     = !!opts?.exception;
     let aiVerdict: CoachResult | null = aiCoach;
     let iterationsToPersist = aiIterations;
+    let skippedServiceUnavailable = false;
+    let serviceErrorMsg = "";
 
     if (!isException && (!aiVerdict || aiVerdict.status !== "Verified")) {
       setAiBusy(true);
@@ -1907,6 +1855,7 @@ export function PunchPad({
             narrative: narrative.trim(),
             goals: selectedGoalsForAi,
             clientFirstName: clientFirst,
+            serviceCode: active.service_type_code,
           },
         });
         aiVerdict = verdict;
@@ -1922,15 +1871,32 @@ export function PunchPad({
           return;
         }
       } catch (e) {
-        toast.error((e as Error).message || "NECTAR coach unavailable — please try again.");
-        return;
+        const errMsg = (e as Error).message ?? "";
+        const isServiceError = errMsg.includes("rate limit") ||
+                               errMsg.includes("unavailable") ||
+                               errMsg.includes("429") ||
+                               errMsg.includes("AI error");
+        if (isServiceError) {
+          // NECTAR unavailable — allow submission with flag, do not block staff from clocking out
+          toast.warning("NECTAR review unavailable — submitting with service flag. Admin will review.");
+          skippedServiceUnavailable = true;
+          serviceErrorMsg = errMsg;
+          // Continue to submission — do not return
+        } else {
+          // Validation error or bad input — show and block
+          toast.error(errMsg || "NECTAR coach unavailable — please try again.");
+          return;
+        }
       } finally {
         setAiBusy(false);
       }
     }
 
-    const aiStatusForRow: "Verified" | "Exception" = isException ? "Exception" : "Verified";
-    const aiFeedbackForRow = isException
+    const aiStatusForRow: "Verified" | "Exception" | "skipped_service_unavailable" =
+      skippedServiceUnavailable ? "skipped_service_unavailable" : isException ? "Exception" : "Verified";
+    const aiFeedbackForRow = skippedServiceUnavailable
+      ? `NECTAR review skipped: ${serviceErrorMsg}`
+      : isException
       ? "🔴 Submitted with Exception Flag — NECTAR coaching not satisfied; pending admin review."
       : aiVerdict?.feedback ?? "Verified by NECTAR Documentation Coach.";
 
@@ -2229,7 +2195,7 @@ export function PunchPad({
                 <li>• Any spending or reimbursement entries logged before submitting</li>
               </ul>
               <p className="mt-1.5 text-[11px] text-[color:var(--navy-900)]/70">
-                Tip: you can draft the note from shorthand or voice at clock-out.
+                Tip: you can dictate the note by voice at clock-out.
               </p>
             </div>
           </NectarInfusionLock>
@@ -2840,111 +2806,18 @@ export function PunchPad({
                   )}
                 </div>
 
-                {/* NECTAR Progress-Note Assist (Infusion add-on) */}
-                <NectarInfusionLock
-                  featureName="Draft with NECTAR"
-                  benefit="Turn quick shorthand (or a voice memo) into a compliant, goal-aligned progress-note draft in seconds. You always review and confirm before it's attached to the timesheet."
-                >
-                  <div className="rounded-lg border-2 border-dashed border-[color:var(--amber-400)] bg-[color:var(--amber-50)]/60 px-3 py-3 sm:px-4">
-                    <div className="mb-2 flex items-center gap-2">
-                      <span
-                        className="inline-flex h-6 w-6 items-center justify-center text-[color:var(--amber-700)]"
-                        style={{ clipPath: "polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)", background: "linear-gradient(135deg, var(--amber-100), var(--amber-200))" }}
-                      >
-                        <Hexagon className="h-3 w-3" />
-                      </span>
-                      <div className="flex-1">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-700)]">NECTAR Infusion</div>
-                        <div className="text-sm font-semibold text-[color:var(--navy-900)]">Draft with NECTAR</div>
-                      </div>
-                    </div>
-                    <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">
-                      Jot quick shorthand or tap the mic — NECTAR expands it into a goal-aligned draft you review and confirm.
-                    </p>
-                    {activeClientGoals.length > 0 && (
-                      <div className="mb-2 rounded-md border border-[color:var(--amber-300)] bg-white/70 px-2.5 py-1.5 text-[11px] text-[color:var(--navy-900)]">
-                        <span className="font-semibold">PCSP goals to address:</span>{" "}
-                        {activeClientGoals.slice(0, 3).join("; ")}
-                        {activeClientGoals.length > 3 && ` (+${activeClientGoals.length - 3} more)`}
-                      </div>
-                    )}
-                    <Textarea
-                      rows={3}
-                      value={shorthand}
-                      onChange={(e) => setShorthand(e.target.value)}
-                      placeholder="e.g. went to park, Blake talked to two people, bought a soda $2, calm all shift"
-                      maxLength={4000}
-                      className="min-h-[72px] w-full resize-y bg-white text-sm"
-                    />
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={runDraftWithNectar}
-                        disabled={draftBusy || shorthand.trim().length < 3}
-                        className="min-h-[44px] bg-[color:var(--amber-600)] text-white hover:bg-[color:var(--amber-700)]"
-                      >
-                        {draftBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                        Draft with NECTAR
-                      </Button>
-                      {speechSupported && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => (isRecording ? stopRecording() : startRecording())}
-                          className={`min-h-[44px] border ${isRecording ? selectedPill : unselectedPill}`}
-                        >
-                          {isRecording ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
-                          {isRecording ? "Stop voice" : "Speak shorthand"}
-                        </Button>
-                      )}
-                    </div>
-                    {nectarDraft && (
-                      <div className="mt-3 rounded-md border-2 border-[color:var(--amber-500)] bg-white px-3 py-2.5 shadow-sm">
-                        <div className="mb-1.5 flex items-center gap-2">
-                          <Hexagon className="h-3.5 w-3.5 text-[color:var(--amber-600)]" fill="currentColor" />
-                          <span className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-700)]">
-                            NECTAR draft — review before confirming
-                          </span>
-                        </div>
-                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{nectarDraft}</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={acceptNectarDraft}
-                            className="min-h-[44px]"
-                          >
-                            <Pencil className="mr-2 h-3.5 w-3.5" />
-                            Use draft &amp; edit below
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => { setNectarDraft(null); setNectarUsed(false); setNectarRawInput(null); setParagraphChecks({}); }}
-                            className="min-h-[44px]"
-                          >
-                            Discard draft
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </NectarInfusionLock>
-
                 {/* Narrative */}
                 <div className="grid gap-2">
                   <Label htmlFor="evv-narrative">
                     📝 Mandatory Progress Note &amp; Narrative Log
-                    {nectarUsed && (
-                      <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-[color:var(--amber-400)] bg-[color:var(--amber-50)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--amber-700)]">
-                        <Hexagon className="h-2.5 w-2.5" fill="currentColor" /> AI-drafted — your review required
-                      </span>
-                    )}
                   </Label>
+                  {activeClientGoals.length > 0 && (
+                    <div className="rounded-md border border-border bg-muted/40 px-2.5 py-1.5 text-[11px] text-foreground">
+                      <span className="font-semibold">PCSP goals to address:</span>{" "}
+                      {activeClientGoals.slice(0, 3).join("; ")}
+                      {activeClientGoals.length > 3 && ` (+${activeClientGoals.length - 3} more)`}
+                    </div>
+                  )}
                   <Textarea
                     id="evv-narrative"
                     rows={7}
@@ -2953,14 +2826,27 @@ export function PunchPad({
                       setNarrative(e.target.value);
                       if (showNarrativeError) setShowNarrativeError(false);
                       if (aiCoach) setAiCoach(null);
-                      if (Object.keys(paragraphChecks).length > 0) setParagraphChecks({});
                     }}
                     placeholder="Describe client behaviors, choices, goal responses, and any incidents observed during this shift…"
                     maxLength={5000}
-                    className={`min-h-[160px] w-full resize-y ${nectarUsed && !draftConfirmed ? "border-[color:var(--amber-500)] bg-[color:var(--amber-50)]/30" : ""}`}
+                    className="min-h-[160px] w-full resize-y"
                   />
-                  <div className={`text-xs font-medium ${narrativeOk ? "text-emerald-600" : "text-muted-foreground"}`}>
-                    Word Count: {wordCount} / 50 words minimum
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className={`text-xs font-medium ${narrativeOk ? "text-emerald-600" : "text-muted-foreground"}`}>
+                      Word Count: {wordCount} / 50 words minimum
+                    </div>
+                    {speechSupported && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => (isRecording ? stopRecording() : startRecording())}
+                        className={`h-8 border ${isRecording ? selectedPill : unselectedPill}`}
+                      >
+                        {isRecording ? <MicOff className="mr-2 h-3.5 w-3.5" /> : <Mic className="mr-2 h-3.5 w-3.5" />}
+                        {isRecording ? "Stop voice" : "Dictate note"}
+                      </Button>
+                    )}
                   </div>
                   {showNarrativeError && !narrativeOk && (
                     <div className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-300">
@@ -2968,37 +2854,18 @@ export function PunchPad({
                       to satisfy state Medicaid auditing and DSPD billing validation criteria.
                     </div>
                   )}
-                  {nectarUsed && narrativeParagraphs.length > 0 && (
-                    <div className="mt-1 space-y-2 rounded-md border-2 border-[color:var(--amber-400)] bg-[color:var(--amber-50)]/60 px-3 py-2.5">
-                      <p className="text-xs font-semibold text-[color:var(--navy-900)]">
-                        Review each paragraph before submitting
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">
-                        NECTAR drafted a starting point — the final narrative is staff-owned. Confirm every
-                        paragraph accurately reflects what you personally did before you can submit.
-                      </p>
-                      {narrativeParagraphs.map((p, i) => (
-                        <label
-                          key={i}
-                          className="flex cursor-pointer items-start gap-2 rounded-md border border-[color:var(--amber-300)] bg-white px-3 py-2 text-xs"
-                        >
-                          <input
-                            type="checkbox"
-                            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[color:var(--amber-600)]"
-                            checked={!!paragraphChecks[i]}
-                            onChange={(e) =>
-                              setParagraphChecks((prev) => ({ ...prev, [i]: e.target.checked }))
-                            }
-                          />
-                          <span className="leading-relaxed text-[color:var(--navy-900)]">
-                            <span className="block whitespace-pre-wrap text-foreground">{p}</span>
-                            <span className="mt-1 block font-semibold">
-                              This accurately reflects what I personally did during this shift.
-                            </span>
-                          </span>
-                        </label>
-                      ))}
-                    </div>
+                  {wordCount >= 20 && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={reviewWithNectar}
+                      disabled={aiBusy}
+                      className="w-fit border-[color:var(--amber-600)]/60 text-[color:var(--amber-700)] hover:bg-[color:var(--amber-50)]"
+                    >
+                      {aiBusy ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-2 h-3.5 w-3.5" />}
+                      Review with NECTAR
+                    </Button>
                   )}
                 </div>
 
@@ -3399,6 +3266,49 @@ export function PunchPad({
                     </div>
                   </div>
                 )}
+
+                {/* Staff attestation — always visible, gates submission */}
+                <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3">
+                  <label className="flex cursor-pointer items-start gap-2.5 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[color:var(--amber-600)]"
+                      checked={attestationChecked}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setAttestationChecked(checked);
+                        if (checked && !attestationTimestamp) {
+                          setAttestationTimestamp(new Date().toISOString());
+                        }
+                      }}
+                    />
+                    <span className="leading-relaxed text-amber-900 dark:text-amber-100">
+                      I attest that this shift note is accurate and truthful, that it reflects services I
+                      personally provided, and that I understand submitting false Medicaid documentation
+                      constitutes fraud.
+                    </span>
+                  </label>
+                  <p className="mt-2 flex items-start gap-1.5 text-xs font-medium text-amber-800 dark:text-amber-200">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    Warning: Falsification of Medicaid service records is a federal offense under 18 U.S.C. § 1347
+                    and may result in exclusion, civil penalties, and criminal prosecution.
+                  </p>
+                  {attestationChecked && attestationTimestamp && (
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      Attested at{" "}
+                      {new Date(attestationTimestamp).toLocaleTimeString(undefined, {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}{" "}
+                      on{" "}
+                      {new Date(attestationTimestamp).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 

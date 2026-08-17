@@ -2744,3 +2744,24 @@ statements.
 (fewer if some titles already exist from a prior partial run — the
 `WHERE NOT EXISTS` guard skips those). No existing obligation rows are
 touched.
+
+---
+
+## ACTION — NECTAR review service-code column (2026-08-17)
+
+**What this is for:** the punch-pad clock-out NECTAR Documentation Coach
+review now records which service-code context it evaluated the note under
+(`nectar_review_service_code`). `evv_timesheets.attested_accurate`,
+`attested_at`, `ai_compliance_status`, `ai_compliance_feedback`, and
+`ai_coaching_iterations` already exist — only this one column is new.
+
+```sql
+ALTER TABLE public.evv_timesheets
+  ADD COLUMN IF NOT EXISTS nectar_review_service_code text;
+```
+
+Matches migration
+`supabase/migrations/20260817120000_add_nectar_review_service_code.sql`.
+
+**What you'll see:** one new nullable `text` column on `evv_timesheets`. No
+existing rows are touched.

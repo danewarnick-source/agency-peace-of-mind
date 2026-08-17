@@ -304,7 +304,7 @@ function MyObligationsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgId]);
 
-  const { data: instances = [], isLoading } = useQuery({
+  const { data: instances = [], isLoading } = useQuery<MyObligationInstanceRow[]>({
     queryKey: ["my-obligation-instances", orgId, user?.id],
     enabled: !!orgId && !!user,
     queryFn: () => listFn({ data: { organizationId: orgId! } }),

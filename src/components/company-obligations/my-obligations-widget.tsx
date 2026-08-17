@@ -216,7 +216,7 @@ export function MyObligationsWidget() {
   const orgId = org?.organization_id;
   const listFn = useServerFn(listMyObligationInstances);
 
-  const { data: instances = [] } = useQuery({
+  const { data: instances = [] } = useQuery<MyObligationInstanceRow[]>({
     queryKey: [MY_OBLIGATIONS_KEY, orgId, user?.id],
     enabled: !!orgId && !!user,
     queryFn: () => listFn({ data: { organizationId: orgId! } }),

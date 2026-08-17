@@ -53,7 +53,7 @@ function ObligationsTab({ orgId }: { orgId: string }) {
   const listFn = useServerFn(listCompanyObligations);
   const listGroupsFn = useServerFn(listStaffGroups);
 
-  const { data: obligations = [], isLoading } = useQuery<Array<CompanyObligationRow & { current_instance?: ObligationInstanceRow | null }>>({
+  const { data: obligations = [], isLoading } = useQuery<Array<CompanyObligationRow & { current_instance: ObligationInstanceRow | null }>>({
     queryKey: ["company-obligations", orgId],
     queryFn: () => listFn({ data: { organizationId: orgId } }),
     staleTime: 0,

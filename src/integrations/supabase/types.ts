@@ -9717,6 +9717,8 @@ export type Database = {
           id: string
           meeting_date: string | null
           minutes: string | null
+          minutes_document_name: string | null
+          minutes_document_path: string | null
           organization_id: string
           updated_at: string
         }
@@ -9728,6 +9730,8 @@ export type Database = {
           id?: string
           meeting_date?: string | null
           minutes?: string | null
+          minutes_document_name?: string | null
+          minutes_document_path?: string | null
           organization_id: string
           updated_at?: string
         }
@@ -9739,6 +9743,8 @@ export type Database = {
           id?: string
           meeting_date?: string | null
           minutes?: string | null
+          minutes_document_name?: string | null
+          minutes_document_path?: string | null
           organization_id?: string
           updated_at?: string
         }

@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { supabase } from "@/integrations/supabase/client";
+import { setMemberGrants } from "@/lib/team-access.functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -827,7 +829,7 @@ function RoleGranterStub({ orgId }: { orgId: string | null }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("organization_members")
-        .select("user_id, role, profiles(full_name, email)")
+        .select("id, user_id, role, profiles(full_name, email)")
         .eq("organization_id", orgId!)
         .eq("active", true)
         .limit(50);
@@ -845,17 +847,21 @@ function RoleGranterStub({ orgId }: { orgId: string | null }) {
     },
   });
 
+  const setGrantsFn = useServerFn(setMemberGrants);
   const apply = useMutation({
     mutationFn: async () => {
       if (!selectedUser || !orgId) throw new Error("Pick a user first");
+      const member = (members ?? []).find((m) => m.user_id === selectedUser);
+      if (!member) throw new Error("Selected user not found");
       const newRole = action === "grant" ? "committee_member" : "employee";
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any)
-        .from("organization_members")
-        .update({ role: newRole })
-        .eq("organization_id", orgId)
-        .eq("user_id", selectedUser);
-      if (error) throw error;
+      await setGrantsFn({
+        data: {
+          organization_id: orgId,
+          membership_id: member.id,
+          target_user_id: selectedUser,
+          explicit_role: newRole,
+        },
+      });
     },
     onSuccess: () => {
       toast.success(
@@ -865,7 +871,12 @@ function RoleGranterStub({ orgId }: { orgId: string | null }) {
       );
       qc.invalidateQueries({ queryKey: ["org-members-for-hrc", orgId] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) =>
+      toast.error(
+        e.message.includes("Unauthorized")
+          ? "Only organization admins can manage committee member roles."
+          : e.message,
+      ),
   });
 
   return (

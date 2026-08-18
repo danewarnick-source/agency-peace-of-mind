@@ -213,6 +213,7 @@ type Row = {
   // ── Review-by-exception (Timeclock pass) ────────────────────────────────
   review_status: string | null;
   attested_accurate: boolean | null;
+  attested_at: string | null;
   corrected_clock_in: string | null;
   corrected_clock_out: string | null;
   edit_reason: string | null;
@@ -402,6 +403,56 @@ function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
               {note.length > 0 ? note : <span className="italic text-muted-foreground">No narrative recorded.</span>}
             </p>
           </div>
+
+          {row.ai_compliance_status && (
+            <div>
+              <div className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <Bot className="h-4 w-4" />
+                NECTAR Review
+                <Badge
+                  variant="secondary"
+                  className={
+                    row.ai_compliance_status === "Verified"
+                      ? "bg-success/15 text-success"
+                      : row.ai_compliance_status === "skipped_service_unavailable"
+                      ? "bg-muted text-muted-foreground"
+                      : "bg-destructive/15 text-destructive"
+                  }
+                >
+                  {row.ai_compliance_status === "Verified"
+                    ? "Verified"
+                    : row.ai_compliance_status === "skipped_service_unavailable"
+                    ? "Skipped"
+                    : "Flagged"}
+                </Badge>
+              </div>
+              {row.ai_compliance_feedback && (
+                <p className="mt-1 text-sm leading-relaxed text-foreground/90">{row.ai_compliance_feedback}</p>
+              )}
+              {row.ai_coaching_iterations != null && (
+                <p className="mt-0.5 text-[11px] text-muted-foreground">Iterations: {row.ai_coaching_iterations}</p>
+              )}
+            </div>
+          )}
+
+          <div>
+            <div className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <ShieldCheck className="h-4 w-4" />
+              Staff Attestation
+            </div>
+            {row.attested_at ? (
+              <p className="mt-1 flex items-center gap-1.5 text-sm text-success">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Attested at {new Date(row.attested_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+              </p>
+            ) : (
+              <p className="mt-1 flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-300">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Not recorded
+              </p>
+            )}
+          </div>
+
           <div>
             <div className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
               <Target className="h-4 w-4" />
@@ -427,7 +478,7 @@ function InlineNotesRow({ row, colSpan }: { row: Row; colSpan: number }) {
 
 
 
-const SELECT_COLS = "id, staff_id, client_id, utah_medicaid_provider_id, utah_medicaid_member_id, service_type_code, shift_entry_type, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, gps_in_coordinates, gps_out_coordinates, outside_geofence_reason, gps_in_bypassed, gps_in_bypass_reason, gps_out_bypassed, gps_out_bypass_reason, status, shift_note_text, goals_completed, is_edited_by_admin, edited_by_admin_name, edit_audit_history_log, ai_compliance_status, ai_coaching_iterations, ai_compliance_feedback, matched_approved_location_id, matched_approved_location_label, reconciliation_status, reconciliation_attestation, reconciliation_review_notes, reconciliation_reviewed_by, reconciliation_reviewed_at, review_status, attested_accurate, corrected_clock_in, corrected_clock_out, edit_reason, edited_by, edited_at, incident_flag, reviewed_by, reviewed_at, review_note, clients(first_name,last_name,physical_address,medicaid_id,team_id)";
+const SELECT_COLS = "id, staff_id, client_id, utah_medicaid_provider_id, utah_medicaid_member_id, service_type_code, shift_entry_type, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, gps_in_coordinates, gps_out_coordinates, outside_geofence_reason, gps_in_bypassed, gps_in_bypass_reason, gps_out_bypassed, gps_out_bypass_reason, status, shift_note_text, goals_completed, is_edited_by_admin, edited_by_admin_name, edit_audit_history_log, ai_compliance_status, ai_coaching_iterations, ai_compliance_feedback, matched_approved_location_id, matched_approved_location_label, reconciliation_status, reconciliation_attestation, reconciliation_review_notes, reconciliation_reviewed_by, reconciliation_reviewed_at, review_status, attested_accurate, attested_at, corrected_clock_in, corrected_clock_out, edit_reason, edited_by, edited_at, incident_flag, reviewed_by, reviewed_at, review_note, clients(first_name,last_name,physical_address,medicaid_id,team_id)";
 
 async function hydrateStaff(list: Row[]) {
   const ids = Array.from(new Set(list.map((r) => r.staff_id)));

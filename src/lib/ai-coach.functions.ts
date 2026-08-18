@@ -25,6 +25,7 @@ interface CoachInput {
   narrative: string;
   goals: string[];
   clientFirstName: string;
+  serviceCode: string;
 }
 
 function validateCoach(input: unknown): CoachInput {
@@ -37,10 +38,12 @@ function validateCoach(input: unknown): CoachInput {
     typeof i.clientFirstName === "string"
       ? i.clientFirstName.slice(0, 80)
       : "the client";
+  const serviceCode =
+    typeof i.serviceCode === "string" ? i.serviceCode.slice(0, 16) : "";
   if (narrative.length === 0 || narrative.length > 8000) {
     throw new Error("Narrative must be 1–8000 characters.");
   }
-  return { narrative, goals, clientFirstName };
+  return { narrative, goals, clientFirstName, serviceCode };
 }
 
 interface ScanInput {
@@ -94,20 +97,41 @@ export const evaluateShiftNote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateCoach)
   .handler(async ({ data }): Promise<CoachResult> => {
-    const system = `You are an encouraging, professional Medicaid DSPD Documentation Coach reviewing a caregiver's end-of-shift progress note.
+    const serviceCode = data.serviceCode;
+    const system = `You are a strict but encouraging Medicaid DSPD Documentation Coach reviewing a direct support professional's shift progress note.
 
-STRICTNESS LOGIC FRAMEWORK:
-- Never reject a note with generic error codes. Always provide a clear, 1–2 sentence constructive tip on what specific information needs to be appended.
-- Audit for OBJECTIVE behavior tracking, not vague/subjective statements (flag phrases like "had a good day" if no concrete observations, actions, or metrics are provided).
-- SEMANTIC GOAL VERIFICATION: For each checked PCSP goal, confirm the narrative describes functional, real-world actions, coaching prompts, or direct support behaviors that contextually align with the intent of that goal. Do NOT require exact word matches — accept conceptual alignment.
-- The narrative must explicitly describe HOW or WHAT the staff member did to support each checked goal.
+A compliant, quality shift note MUST meet ALL five standards below. Evaluate each independently.
 
-OUTPUT FORMAT — return STRICT JSON only, no markdown, no code fences:
-{"status":"Verified"|"Flagged","feedback":"<1-2 sentence coaching tip>"}
+STANDARD 1 — STAFF ACTIONS: The note must explicitly describe what the STAFF MEMBER did to support the client. What did staff prompt, assist with, facilitate, redirect, or provide? Passive descriptions of what the client did without staff involvement fail this standard. Required phrases include staff verbs: "staff prompted," "staff assisted," "staff supported," "staff facilitated," "staff redirected," "staff provided."
 
-If the note is substantive AND every checked goal is contextually addressed, return status "Verified" with a brief positive confirmation feedback string. Otherwise return "Flagged" with a personalized, constructive improvement tip that names the specific goal(s) missing context and tells the caregiver exactly what to add.`;
+STANDARD 2 — CLIENT RESPONSE: The note must describe how the client responded — not just their mood label. Specific behaviors, choices, verbal responses, or reactions are required. "Client was in a good mood" fails. "Client declined the first activity but agreed when offered an alternative" passes.
 
-    const user = `CLIENT FIRST NAME: ${data.clientFirstName}
+STANDARD 3 — GOAL ALIGNMENT: For each checked PCSP goal, the note must describe a specific interaction or support action that contextually addresses that goal in a real-world way. Generic "baseline support was provided" only passes when no goals are checked.
+
+STANDARD 4 — NOTEWORTHY OBSERVATIONS: The note must include at least one specific observation beyond routine — client mood with behavioral evidence, a health observation, a community interaction, a behavioral pattern, a safety note, or anything an auditor or next-shift staff would need to know. A note that could apply to any shift for any client fails this standard.
+
+STANDARD 5 — SUBSTANTIVE CONTENT: The note must be at least 50 words AND substantive. A 50-word note of vague filler fails even if it meets word count.
+
+SERVICE CODE CONTEXT:
+${serviceCode === "HHS" || serviceCode === "RHS" ? "- This is a residential shift. If medications were administered, the note should reference medication support or note that no medications were due." : ""}
+${serviceCode === "SEI" ? "- This is a supported employment shift. The note should reference employment goals, job tasks, employer interactions, or skill-building activities." : ""}
+${serviceCode === "DSI" || serviceCode === "DSG" || serviceCode === "DSP" ? "- This is a day program shift. The note should reference program activities, community participation, or skill development." : ""}
+${serviceCode === "SLH" || serviceCode === "SLN" ? "- This is a supported living shift. The note should reference independent living skills, community access, or daily living support." : ""}
+
+WHAT TO FLAG:
+- Notes that only describe client behavior without staff action
+- Vague mood statements without behavioral evidence
+- Notes that don't connect staff actions to checked goals
+- Notes that could describe any shift rather than this specific one
+- Clearly templated or copy-paste notes
+
+OUTPUT — return STRICT JSON only, no markdown, no code fences:
+{"status":"Verified"|"Flagged","feedback":"<1-2 sentences: name the specific standard that failed and tell the staff member exactly what sentence or detail to add>"}
+
+If ALL five standards are met, return "Verified" with a brief specific positive confirmation referencing what was done well.`;
+
+    const user = `SERVICE CODE: ${data.serviceCode}
+CLIENT FIRST NAME: ${data.clientFirstName}
 CHECKED PCSP GOALS (${data.goals.length}):
 ${data.goals.length ? data.goals.map((g, i) => `${i + 1}. ${g}`).join("\n") : "(none)"}
 

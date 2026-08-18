@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Lock, Mail, ShieldCheck } from "lucide-react";
+import { Lock, Mail, ShieldCheck, History } from "lucide-react";
 import { toast } from "sonner";
 import {
   listTeamAccess,
@@ -19,6 +19,7 @@ import {
   type TeamMemberAccess,
 } from "@/lib/team-access.functions";
 import { StaffGroupsPanel } from "@/components/settings/staff-groups-panel";
+import { ScopeAssignmentsPanel } from "@/components/settings/scope-assignments-panel";
 
 export const Route = createFileRoute("/dashboard/settings/team-access")({
   head: () => ({ meta: [{ title: "Team access — HIVE" }] }),
@@ -137,6 +138,15 @@ function TeamAccessPage() {
         <TabsList>
           <TabsTrigger value="members">Members</TabsTrigger>
           {canManageGroups && <TabsTrigger value="groups">Groups</TabsTrigger>}
+          {canManage && <TabsTrigger value="scope">Scope</TabsTrigger>}
+          <TabsTrigger value="role-history" asChild>
+            <Link
+              to="/dashboard/settings/role-audit"
+              className="inline-flex items-center gap-1"
+            >
+              <History className="h-3.5 w-3.5" /> Role history
+            </Link>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="members" className="space-y-6">
@@ -257,6 +267,12 @@ function TeamAccessPage() {
             <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
               <StaffGroupsPanel orgId={org!.organization_id} />
             </div>
+          </TabsContent>
+        )}
+
+        {canManage && (
+          <TabsContent value="scope">
+            <ScopeAssignmentsPanel orgId={org!.organization_id} />
           </TabsContent>
         )}
       </Tabs>

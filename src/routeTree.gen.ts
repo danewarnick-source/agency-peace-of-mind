@@ -118,6 +118,7 @@ import { Route as DashboardSettingsTeamAccessRouteImport } from './routes/dashbo
 import { Route as DashboardSettingsSubscriptionRouteImport } from './routes/dashboard.settings.subscription'
 import { Route as DashboardSettingsServiceCodesRouteImport } from './routes/dashboard.settings.service-codes'
 import { Route as DashboardSettingsServiceCatalogRouteImport } from './routes/dashboard.settings.service-catalog'
+import { Route as DashboardSettingsRoleAuditRouteImport } from './routes/dashboard.settings.role-audit'
 import { Route as DashboardSettingsRetentionRouteImport } from './routes/dashboard.settings.retention'
 import { Route as DashboardSettingsLicensingRouteImport } from './routes/dashboard.settings.licensing'
 import { Route as DashboardSettingsGmailRouteImport } from './routes/dashboard.settings.gmail'
@@ -780,6 +781,12 @@ const DashboardSettingsServiceCatalogRoute =
   DashboardSettingsServiceCatalogRouteImport.update({
     id: '/service-catalog',
     path: '/service-catalog',
+    getParentRoute: () => DashboardSettingsRoute,
+  } as any)
+const DashboardSettingsRoleAuditRoute =
+  DashboardSettingsRoleAuditRouteImport.update({
+    id: '/role-audit',
+    path: '/role-audit',
     getParentRoute: () => DashboardSettingsRoute,
   } as any)
 const DashboardSettingsRetentionRoute =
@@ -1474,6 +1481,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/settings/gmail': typeof DashboardSettingsGmailRoute
   '/dashboard/settings/licensing': typeof DashboardSettingsLicensingRoute
   '/dashboard/settings/retention': typeof DashboardSettingsRetentionRoute
+  '/dashboard/settings/role-audit': typeof DashboardSettingsRoleAuditRoute
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
   '/dashboard/settings/service-codes': typeof DashboardSettingsServiceCodesRoute
   '/dashboard/settings/subscription': typeof DashboardSettingsSubscriptionRoute
@@ -1671,6 +1679,7 @@ export interface FileRoutesByTo {
   '/dashboard/settings/gmail': typeof DashboardSettingsGmailRoute
   '/dashboard/settings/licensing': typeof DashboardSettingsLicensingRoute
   '/dashboard/settings/retention': typeof DashboardSettingsRetentionRoute
+  '/dashboard/settings/role-audit': typeof DashboardSettingsRoleAuditRoute
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
   '/dashboard/settings/service-codes': typeof DashboardSettingsServiceCodesRoute
   '/dashboard/settings/subscription': typeof DashboardSettingsSubscriptionRoute
@@ -1876,6 +1885,7 @@ export interface FileRoutesById {
   '/dashboard/settings/gmail': typeof DashboardSettingsGmailRoute
   '/dashboard/settings/licensing': typeof DashboardSettingsLicensingRoute
   '/dashboard/settings/retention': typeof DashboardSettingsRetentionRoute
+  '/dashboard/settings/role-audit': typeof DashboardSettingsRoleAuditRoute
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
   '/dashboard/settings/service-codes': typeof DashboardSettingsServiceCodesRoute
   '/dashboard/settings/subscription': typeof DashboardSettingsSubscriptionRoute
@@ -2082,6 +2092,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/gmail'
     | '/dashboard/settings/licensing'
     | '/dashboard/settings/retention'
+    | '/dashboard/settings/role-audit'
     | '/dashboard/settings/service-catalog'
     | '/dashboard/settings/service-codes'
     | '/dashboard/settings/subscription'
@@ -2279,6 +2290,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/gmail'
     | '/dashboard/settings/licensing'
     | '/dashboard/settings/retention'
+    | '/dashboard/settings/role-audit'
     | '/dashboard/settings/service-catalog'
     | '/dashboard/settings/service-codes'
     | '/dashboard/settings/subscription'
@@ -2483,6 +2495,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/gmail'
     | '/dashboard/settings/licensing'
     | '/dashboard/settings/retention'
+    | '/dashboard/settings/role-audit'
     | '/dashboard/settings/service-catalog'
     | '/dashboard/settings/service-codes'
     | '/dashboard/settings/subscription'
@@ -3328,6 +3341,13 @@ declare module '@tanstack/react-router' {
       path: '/service-catalog'
       fullPath: '/dashboard/settings/service-catalog'
       preLoaderRoute: typeof DashboardSettingsServiceCatalogRouteImport
+      parentRoute: typeof DashboardSettingsRoute
+    }
+    '/dashboard/settings/role-audit': {
+      id: '/dashboard/settings/role-audit'
+      path: '/role-audit'
+      fullPath: '/dashboard/settings/role-audit'
+      preLoaderRoute: typeof DashboardSettingsRoleAuditRouteImport
       parentRoute: typeof DashboardSettingsRoute
     }
     '/dashboard/settings/retention': {
@@ -4224,6 +4244,7 @@ interface DashboardSettingsRouteChildren {
   DashboardSettingsGmailRoute: typeof DashboardSettingsGmailRoute
   DashboardSettingsLicensingRoute: typeof DashboardSettingsLicensingRoute
   DashboardSettingsRetentionRoute: typeof DashboardSettingsRetentionRoute
+  DashboardSettingsRoleAuditRoute: typeof DashboardSettingsRoleAuditRoute
   DashboardSettingsServiceCatalogRoute: typeof DashboardSettingsServiceCatalogRoute
   DashboardSettingsServiceCodesRoute: typeof DashboardSettingsServiceCodesRoute
   DashboardSettingsSubscriptionRoute: typeof DashboardSettingsSubscriptionRoute
@@ -4237,6 +4258,7 @@ const DashboardSettingsRouteChildren: DashboardSettingsRouteChildren = {
   DashboardSettingsGmailRoute: DashboardSettingsGmailRoute,
   DashboardSettingsLicensingRoute: DashboardSettingsLicensingRoute,
   DashboardSettingsRetentionRoute: DashboardSettingsRetentionRoute,
+  DashboardSettingsRoleAuditRoute: DashboardSettingsRoleAuditRoute,
   DashboardSettingsServiceCatalogRoute: DashboardSettingsServiceCatalogRoute,
   DashboardSettingsServiceCodesRoute: DashboardSettingsServiceCodesRoute,
   DashboardSettingsSubscriptionRoute: DashboardSettingsSubscriptionRoute,

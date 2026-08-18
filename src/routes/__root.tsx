@@ -8,8 +8,6 @@ import appCss from "../styles.css?url";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthProvider } from "@/hooks/use-auth";
 import { Toaster } from "@/components/ui/sonner";
-import { CelebrationProvider } from "@/components/celebrations/celebration-provider";
-import { GuidedTourProvider } from "@/components/nectar/guided-tour-provider";
 import { isChunkLoadError, tryAutoReloadOnce, clearChunkReloadGuard } from "@/lib/chunk-reload";
 
 function NotFoundComponent() {
@@ -25,7 +23,9 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
-  console.error(error);
+  if (!import.meta.env.PROD) console.error(error);
+  // In production: errors are caught here but not logged to console.
+  // Wire to an error tracking service (Sentry etc.) here when ready.
   const router = useRouter();
 
   // Chunk-load class only: try a one-time auto reload. If the loop guard
@@ -71,12 +71,34 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     if (location.pathname === "/reset-password") return;
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user?.id) return;
-    const { data } = await supabase
-      .from("profiles")
-      .select("must_change_password")
-      .eq("id", session.user.id)
-      .maybeSingle();
-    if (data?.must_change_password) {
+
+    // Reject sessions older than 24 hours as a defense-in-depth measure.
+    // Supabase handles token refresh automatically, but this catches edge cases
+    // where the client has a session object but the token is stale.
+    const issuedAt = (session as { user: { id: string }; created_at?: string }).created_at;
+    if (issuedAt) {
+      const sessionAge = Date.now() - new Date(issuedAt).getTime();
+      const MAX_SESSION_AGE = 24 * 60 * 60 * 1000; // 24 hours
+      if (sessionAge > MAX_SESSION_AGE) {
+        await supabase.auth.signOut();
+        throw redirect({ to: "/login", replace: true });
+      }
+    }
+
+    const [{ data: profile }, { data: memberships }] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("must_change_password, staff_type_keys")
+        .eq("id", session.user.id)
+        .maybeSingle(),
+      supabase
+        .from("organization_members")
+        .select("organization_id")
+        .eq("user_id", session.user.id)
+        .eq("active", true)
+        .limit(1),
+    ]);
+    if (profile?.must_change_password) {
       throw redirect({ to: "/reset-password" });
     }
 
@@ -86,12 +108,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     // re-check this on a mounted page, or it would forcibly interrupt an
     // already-loaded session mid-shift.
     if (location.pathname.startsWith("/sign-policy/")) return;
-    const { data: memberships } = await supabase
-      .from("organization_members")
-      .select("organization_id")
-      .eq("user_id", session.user.id)
-      .eq("active", true)
-      .limit(1);
     const orgId = memberships?.[0]?.organization_id;
     if (!orgId) return;
     const { data: gatingDocs } = await supabase
@@ -103,21 +119,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       .eq("requires_acknowledgment", true)
       .eq("gate_app_access", true);
     if (gatingDocs && gatingDocs.length > 0) {
-      let staffTypeKeys: string[] | null = null;
+      const staffTypeKeys = (profile?.staff_type_keys as string[] | null) ?? [];
       for (const doc of gatingDocs) {
         const groups = (doc.policy_assigned_groups as string[] | null) ?? [];
         const users = (doc.policy_assigned_users as string[] | null) ?? [];
         let inScope = users.includes(session.user.id);
         if (!inScope && groups.includes("all_staff")) inScope = true;
         if (!inScope && groups.length) {
-          if (staffTypeKeys === null) {
-            const { data: prof } = await supabase
-              .from("profiles")
-              .select("staff_type_keys")
-              .eq("id", session.user.id)
-              .maybeSingle();
-            staffTypeKeys = (prof?.staff_type_keys as string[] | null) ?? [];
-          }
           inScope = staffTypeKeys.some((k) => groups.includes(k));
         }
         if (!inScope) continue;
@@ -136,6 +144,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   },
   head: () => ({
     meta: [
+      {
+        "http-equiv": "Content-Security-Policy",
+        content: [
+          "default-src 'self'",
+          "font-src 'self' fonts.googleapis.com fonts.gstatic.com",
+          "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
+          "script-src 'self' 'unsafe-inline'",
+          "img-src 'self' data: https:",
+          "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.anthropic.com",
+          "frame-ancestors 'none'",
+          "object-src 'none'",
+        ].join("; "),
+      },
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { name: "theme-color", content: "#0d112b" },
@@ -203,18 +224,25 @@ function RootComponent() {
   // sw.js caches the app shell + hashed static assets — never API data.
   useEffect(() => {
     if (typeof window === "undefined" || !import.meta.env.PROD) return;
-    if (!("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.register("/sw.js").catch(() => { /* non-fatal */ });
+    const registerSW = () => {
+      if (!("serviceWorker" in navigator)) return;
+      navigator.serviceWorker.register("/sw.js").catch(() => {
+        // Non-fatal — SW unavailable, app works without it
+      });
+    };
+    // Defer until browser is idle to avoid blocking main thread during startup
+    if ("requestIdleCallback" in window) {
+      (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => void })
+        .requestIdleCallback(registerSW, { timeout: 5000 });
+    } else {
+      setTimeout(registerSW, 2000);
+    }
   }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <CelebrationProvider>
-          <GuidedTourProvider>
-            <Outlet />
-          </GuidedTourProvider>
-        </CelebrationProvider>
+        <Outlet />
         <Toaster richColors position="top-right" />
       </AuthProvider>
     </QueryClientProvider>

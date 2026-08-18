@@ -1848,6 +1848,77 @@ export const confirmFailedObligationCompletion = createServerFn({ method: "POST"
     return { instance: updatedInstance };
   });
 
+/**
+ * Admin "Notify outstanding →" action: reminds every assignee on an
+ * instance who has not yet submitted a completion. Used for evidence types
+ * an admin cannot complete on a staff member's behalf (attestation, form) —
+ * the admin's role there is to nudge, not to submit. Dedupes to once per
+ * instance/staff/day via recurrence_key.
+ */
+export const remindOutstandingAssignees = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    organizationId: z.string().uuid(),
+    instanceId: z.string().uuid(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { reminded: 0 };
+    await requireOrgMembership(supabase, userId, data.organizationId, "manager");
+
+    const { data: inst, error: iErr } = await supabase
+      .from("company_obligation_instances").select("*")
+      .eq("id", data.instanceId).eq("organization_id", data.organizationId).maybeSingle();
+    if (iErr) throw new Error(iErr.message);
+    if (!inst) throw new Error("Instance not found.");
+    const ob = await fetchObligation(supabase, data.organizationId, inst.obligation_id);
+
+    const [{ data: assignees, error: aErr }, { data: completions, error: cErr }] = await Promise.all([
+      supabase.from("company_obligation_instance_assignees")
+        .select("staff_id, staff_name").eq("instance_id", data.instanceId),
+      supabase.from("company_obligation_completions")
+        .select("staff_id").eq("instance_id", data.instanceId),
+    ]);
+    if (aErr) throw new Error(aErr.message);
+    if (cErr) throw new Error(cErr.message);
+
+    const completedIds = new Set((completions ?? []).map((c: { staff_id: string }) => c.staff_id));
+    const outstanding = (assignees ?? []).filter((a: { staff_id: string }) => !completedIds.has(a.staff_id));
+    if (!outstanding.length) return { reminded: 0 };
+
+    const today = new Date().toISOString().slice(0, 10);
+    const urgency = inst.status === "overdue" ? "critical" : "high";
+
+    const rows = (outstanding as Array<{ staff_id: string; staff_name: string }>).map((a) => ({
+      organization_id: data.organizationId,
+      recipient_user_id: a.staff_id,
+      recipient_role: "staff",
+      type: "company_obligation_reminder",
+      urgency,
+      title: `${ob.title} requires your attention`,
+      body: `${inst.period_key}. Please complete this in your My Obligations page.`
+        + `${ob.description ? " " + ob.description.slice(0, 120) : ""}`,
+      link_to: "/dashboard/my-obligations",
+      related_id: data.instanceId,
+      related_type: "company_obligation_instance",
+      recurrence_key: `obligation_admin_remind_${data.instanceId}_${a.staff_id}_${today}`,
+    }));
+
+    const { data: existing, error: exErr } = await supabase
+      .from("notifications").select("recurrence_key")
+      .eq("organization_id", data.organizationId)
+      .in("recurrence_key", rows.map((r) => r.recurrence_key));
+    if (exErr) throw new Error(exErr.message);
+    const existingKeys = new Set((existing ?? []).map((e: { recurrence_key: string }) => e.recurrence_key));
+    const toInsert = rows.filter((r) => !existingKeys.has(r.recurrence_key));
+    if (!toInsert.length) return { reminded: 0 };
+
+    const { error: insErr } = await supabase.from("notifications").insert(toInsert);
+    if (insErr) throw new Error(insErr.message);
+
+    return { reminded: toInsert.length };
+  });
+
 export const waiveInstance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({

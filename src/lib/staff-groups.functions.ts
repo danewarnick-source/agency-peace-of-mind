@@ -405,7 +405,11 @@ export async function resolveGroupMembersInternal(
     .select("staff_id")
     .in("group_id", groupIds);
   if (error) throw new Error(error.message);
-  const staffIds = Array.from(new Set((memberRows ?? []).map((r: { staff_id: string }) => r.staff_id)));
+  const staffIds = Array.from(
+    new Set(
+      ((memberRows ?? []) as unknown as Array<{ staff_id: string }>).map((r) => r.staff_id),
+    ),
+  );
   if (!staffIds.length) return [];
 
   const [{ data: dirRows, error: dErr }, { data: roleRows, error: rErr }] = await Promise.all([
@@ -416,11 +420,14 @@ export async function resolveGroupMembersInternal(
   if (dErr) throw new Error(dErr.message);
   if (rErr) throw new Error(rErr.message);
 
-  const nameById = new Map(
-    (dirRows ?? []).map((r: { id: string; full_name: string | null }) => [r.id, r.full_name ?? "Unknown"]),
+  const nameById = new Map<string, string>(
+    ((dirRows ?? []) as unknown as Array<{ id: string | null; full_name: string | null }>)
+      .filter((r) => !!r.id)
+      .map((r) => [r.id as string, r.full_name ?? "Unknown"] as [string, string]),
   );
-  const roleById = new Map(
-    (roleRows ?? []).map((r: { user_id: string; role: string }) => [r.user_id, r.role]),
+  const roleById = new Map<string, string>(
+    ((roleRows ?? []) as unknown as Array<{ user_id: string; role: string }>)
+      .map((r) => [r.user_id, r.role] as [string, string]),
   );
 
   const out: ResolvedStaffMember[] = [];

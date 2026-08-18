@@ -40,7 +40,7 @@ import {
   toggleObligationActive,
   type CompanyObligationRow,
 } from "@/lib/company-obligations.functions";
-import { listStaffGroups } from "@/lib/staff-groups.functions";
+import { listStaffGroups, type StaffGroupRow } from "@/lib/staff-groups.functions";
 
 type Cadence = CompanyObligationRow["cadence"];
 type EvidenceType = CompanyObligationRow["evidence_type"];
@@ -364,7 +364,7 @@ export function ObligationDrawer({
       });
   }, [open, obligation]);
 
-  const { data: groups = [] } = useQuery({
+  const { data: groups = [] } = useQuery<Array<StaffGroupRow & { member_count: number }>>({
     queryKey: ["staff-groups", orgId],
     enabled: open && !!orgId,
     queryFn: () => listGroupsFn({ data: { organizationId: orgId } }),

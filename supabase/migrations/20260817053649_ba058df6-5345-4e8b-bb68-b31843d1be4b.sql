@@ -1,0 +1,15 @@
+DROP TABLE IF EXISTS public.hhs_emar_logs_deprecated CASCADE;
+DROP TABLE IF EXISTS public.hhs_daily_records CASCADE;
+DROP TABLE IF EXISTS public.shift_mar_entries CASCADE;
+DROP TABLE IF EXISTS public.master_attestations CASCADE;
+DROP TABLE IF EXISTS public.module_progress CASCADE;
+DROP TABLE IF EXISTS public.staff_nudges CASCADE;
+DROP TABLE IF EXISTS public.user_capability_overrides CASCADE;
+DROP TABLE IF EXISTS public.requirement_bindings CASCADE;
+DROP TABLE IF EXISTS public.nectar_document_entities CASCADE;
+DROP TABLE IF EXISTS public.compliance_overrides CASCADE;
+DROP TABLE IF EXISTS public.client_approved_location_audit CASCADE;
+DROP TABLE IF EXISTS public.els_usage_ledger CASCADE;
+DROP TABLE IF EXISTS public.incident_sc_requests CASCADE;
+DROP TABLE IF EXISTS public.referral_purge_tombstones CASCADE;
+DROP TABLE IF EXISTS public.respite_stays CASCADE;

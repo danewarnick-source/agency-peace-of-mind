@@ -511,7 +511,7 @@ function MeetingsStub({ canManage, orgId }: { canManage: boolean; orgId: string 
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) throw error;
-      return (data ?? []) as HrcMeetingRow[];
+      return (data ?? []) as unknown as HrcMeetingRow[];
     },
   });
 

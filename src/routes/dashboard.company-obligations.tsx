@@ -12,10 +12,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Search, Plus, Upload, ClipboardList } from "lucide-react";
 import { listCompanyObligations } from "@/lib/company-obligations.functions";
-import { listStaffGroups } from "@/lib/staff-groups.functions";
+import { listStaffGroups, type StaffGroupRow } from "@/lib/staff-groups.functions";
 import { ObligationCard, type ObligationWithInstance } from "@/components/company-obligations/obligation-card";
 import { ObligationDrawer } from "@/components/company-obligations/obligation-drawer";
-import type { CompanyObligationRow } from "@/lib/company-obligations.functions";
+import type { CompanyObligationRow, ObligationInstanceRow } from "@/lib/company-obligations.functions";
 
 export const Route = createFileRoute("/dashboard/company-obligations")({
   head: () => ({ meta: [{ title: "Company Obligations — HIVE" }] }),
@@ -53,14 +53,14 @@ function ObligationsTab({ orgId }: { orgId: string }) {
   const listFn = useServerFn(listCompanyObligations);
   const listGroupsFn = useServerFn(listStaffGroups);
 
-  const { data: obligations = [], isLoading } = useQuery({
+  const { data: obligations = [], isLoading } = useQuery<Array<CompanyObligationRow & { current_instance: ObligationInstanceRow | null }>>({
     queryKey: ["company-obligations", orgId],
     queryFn: () => listFn({ data: { organizationId: orgId } }),
     staleTime: 0,
     refetchInterval: 60_000,
   });
 
-  const { data: groups = [] } = useQuery({
+  const { data: groups = [] } = useQuery<Array<StaffGroupRow & { member_count: number }>>({
     queryKey: ["staff-groups", orgId],
     queryFn: () => listGroupsFn({ data: { organizationId: orgId } }),
   });

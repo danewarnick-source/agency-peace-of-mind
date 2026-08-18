@@ -311,10 +311,15 @@ export async function snapshotAssigneesInternal(
     ]);
     if (dErr) throw new Error(dErr.message);
     if (rErr) throw new Error(rErr.message);
-    const nameById = new Map(
-      (dirRows ?? []).map((r: { id: string; full_name: string | null }) => [r.id, r.full_name ?? "Unknown"]),
+    const nameById = new Map<string, string>(
+      ((dirRows ?? []) as unknown as Array<{ id: string | null; full_name: string | null }>)
+        .filter((r) => !!r.id)
+        .map((r) => [r.id as string, r.full_name ?? "Unknown"] as [string, string]),
     );
-    const roleById = new Map((roleRows ?? []).map((r: { user_id: string; role: string }) => [r.user_id, r.role]));
+    const roleById = new Map<string, string>(
+      ((roleRows ?? []) as unknown as Array<{ user_id: string; role: string }>)
+        .map((r) => [r.user_id, r.role] as [string, string]),
+    );
     directMembers = directUserIds
       .map((uid: string) => {
         const role = roleById.get(uid);
@@ -458,10 +463,15 @@ async function resolveAllAssigneesInternal(
     ]);
     if (dErr) throw new Error(dErr.message);
     if (rErr) throw new Error(rErr.message);
-    const nameById = new Map(
-      (dirRows ?? []).map((r: { id: string; full_name: string | null }) => [r.id, r.full_name ?? "Unknown"]),
+    const nameById = new Map<string, string>(
+      ((dirRows ?? []) as unknown as Array<{ id: string | null; full_name: string | null }>)
+        .filter((r) => !!r.id)
+        .map((r) => [r.id as string, r.full_name ?? "Unknown"] as [string, string]),
     );
-    const roleById = new Map((roleRows ?? []).map((r: { user_id: string; role: string }) => [r.user_id, r.role]));
+    const roleById = new Map<string, string>(
+      ((roleRows ?? []) as unknown as Array<{ user_id: string; role: string }>)
+        .map((r) => [r.user_id, r.role] as [string, string]),
+    );
     directMembers = directUserIds
       .map((uid: string) => {
         const role = roleById.get(uid);
@@ -956,7 +966,7 @@ export const listMyObligationInstances = createServerFn({ method: "POST" })
         const obligation = obligationById.get(i.obligation_id);
         return obligation ? { ...i, obligation } : null;
       })
-      .filter((r): r is MyObligationInstanceRow => r !== null);
+      .filter((r: MyObligationInstanceRow | null): r is MyObligationInstanceRow => r !== null);
   });
 
 /** Obligation + instance context for the form-fill obligation banner. */

@@ -114,9 +114,6 @@ export const PERMISSION_SECTION_MAP: Record<string, string> = {
   manage_permissions: "organization",
 
   // --- Legacy permission set (kept: still gates existing routes) ---
-  manage_users: "people",
-  invite_users: "people",
-  remove_users: "people",
   manage_roles: "organization",
   assign_training: "people",
   create_courses: "people",
@@ -137,7 +134,6 @@ export const PERMISSION_SECTION_MAP: Record<string, string> = {
   view_referrals: "clients",
   manage_referrals: "clients",
   send_emails: "organization",
-  manage_schedule: "scheduling",
 };
 
 export const ALL_PERMISSIONS = Object.keys(PERMISSION_SECTION_MAP) as Permission[];
@@ -220,9 +216,6 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
   manage_permissions: "Manage permissions",
 
   // Legacy
-  manage_users: "Manage users (legacy)",
-  invite_users: "Invite users (legacy)",
-  remove_users: "Remove users (legacy)",
   manage_roles: "Manage roles & permissions (legacy)",
   assign_training: "Assign training",
   create_courses: "Create courses",
@@ -243,7 +236,6 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
   view_referrals: "View referrals (CRM)",
   manage_referrals: "Manage referrals (CRM)",
   send_emails: "Send emails (Resend rail)",
-  manage_schedule: "Manage schedule (create/edit shifts) (legacy)",
 };
 
 /** Default permission matrix used to seed org-specific role_permissions rows. */
@@ -267,9 +259,9 @@ export const DEFAULT_MATRIX: Record<Role, Permission[]> = {
     "view_hrc",
     "view_analytics",
     // Legacy set — preserves existing manager behavior
-    "invite_users", "assign_training", "view_team_reports", "approve_external_certs",
+    "assign_training", "view_team_reports", "approve_external_certs",
     "upload_external_certs", "view_own_training", "view_certifications",
-    "manage_schedule", "manage_incidents",
+    "manage_incidents",
   ],
 
   employee: [

@@ -5,6 +5,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
+import { requirePermission } from "@/lib/require-permission";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ALL_PERMISSIONS, PERMISSION_LABEL, type Permission } from "@/lib/rbac";
 
@@ -417,4 +418,54 @@ export const requestPermission = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     return { success: true };
+  });
+
+// ─── setScopeAssignments ─────────────────────────────────────────────────
+const ScopeTypeEnum = z.enum(["all", "service_code", "staff_group", "client"]);
+
+export const setScopeAssignments = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        targetUserId: z.string().uuid(),
+        scopeType: ScopeTypeEnum,
+        refIds: z.array(z.string()).default([]),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) throw new Error("Not authenticated");
+    await requirePermission(supabase, userId, data.organizationId, "manage_permissions");
+
+    const { error: delErr } = await supabase
+      .from("scope_assignments")
+      .delete()
+      .eq("organization_id", data.organizationId)
+      .eq("user_id", data.targetUserId);
+    if (delErr) throw new Error(delErr.message);
+
+    const rows =
+      data.scopeType === "all"
+        ? [{
+            organization_id: data.organizationId,
+            user_id: data.targetUserId,
+            scope_type: "all" as const,
+            scope_ref_id: null,
+          }]
+        : data.refIds.map((refId) => ({
+            organization_id: data.organizationId,
+            user_id: data.targetUserId,
+            scope_type: data.scopeType,
+            scope_ref_id: refId,
+          }));
+
+    if (rows.length) {
+      const { error } = await supabase.from("scope_assignments").insert(rows);
+      if (error) throw new Error(error.message);
+    }
+
+    return { scopeType: data.scopeType, refIds: data.scopeType === "all" ? [] : data.refIds };
   });

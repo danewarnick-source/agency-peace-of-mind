@@ -149,7 +149,7 @@ export const createHhpCueCard = createServerFn({ method: "POST" })
     if (!supabase || !userId) return null;
     await requireAnyPermission(supabase, userId, data.organization_id, [
       "manage_referrals",
-      "manage_users",
+      "edit_staff_records",
     ]);
     const { data: row, error } = await supabase
       .from("hhp_cue_cards")
@@ -202,7 +202,7 @@ export const updateHhpCueCard = createServerFn({ method: "POST" })
     if (!supabase || !userId) return { ok: false };
     await requireAnyPermission(supabase, userId, data.organization_id, [
       "manage_referrals",
-      "manage_users",
+      "edit_staff_records",
     ]);
 
     // Build partial patch — never null-out unset keys

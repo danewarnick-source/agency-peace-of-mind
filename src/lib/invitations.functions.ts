@@ -124,7 +124,7 @@ export const createInvitation = createServerFn({ method: "POST" })
       supabase as unknown as SupabaseClient,
       userId,
       data.organization_id,
-      "invite_users",
+      "invite_staff",
     );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -186,7 +186,7 @@ export const resendInvitation = createServerFn({ method: "POST" })
       supabase as unknown as SupabaseClient,
       userId,
       data.organization_id,
-      "invite_users",
+      "invite_staff",
     );
 
     const expires = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
@@ -235,7 +235,7 @@ export const revokeInvitation = createServerFn({ method: "POST" })
       supabase as unknown as SupabaseClient,
       userId,
       data.organization_id,
-      "invite_users",
+      "invite_staff",
     );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

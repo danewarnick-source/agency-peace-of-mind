@@ -163,8 +163,8 @@ export function useEffectivePermissions(userId: string | null) {
             granted: override.granted,
             source: override.granted ? "individual_grant" : "individual_deny",
             overrideDetails: {
-              by: override.granted_by_name,
-              reason: override.reason,
+              by: override.granted_by_name ?? "Unknown",
+              reason: override.reason ?? "",
               expires_at: override.expires_at ?? undefined,
             },
           };

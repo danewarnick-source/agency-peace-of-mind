@@ -15,7 +15,7 @@ import { type EmarStatus, normalizeEmarStatus, EMAR_STATUS_LABELS } from "@/lib/
 export const Route = createFileRoute("/dashboard/admin/emar-audit")({
   head: () => ({ meta: [{ title: "eMAR Audit — HIVE" }] }),
   component: () => (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="approve_shift_notes">
       <AuditPage />
     </RequirePermission>
   ),

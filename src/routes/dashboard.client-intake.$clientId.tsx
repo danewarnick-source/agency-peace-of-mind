@@ -23,7 +23,7 @@ import { FaceSheetInfoCard } from "@/components/clients/face-sheet-info-card";
 export const Route = createFileRoute("/dashboard/client-intake/$clientId")({
   head: () => ({ meta: [{ title: "New Client Intake — HIVE" }] }),
   component: () => (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="manage_client_intake">
       <IntakeRunner />
     </RequirePermission>
   ),

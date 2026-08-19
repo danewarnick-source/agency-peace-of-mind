@@ -814,7 +814,7 @@ function ExpandableRow({
 export function CommandCenter() {
   const { data: org } = useCurrentOrg();
   return (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="view_staff_records">
       {org && <CommandCenterInner orgId={org.organization_id} />}
     </RequirePermission>
   );

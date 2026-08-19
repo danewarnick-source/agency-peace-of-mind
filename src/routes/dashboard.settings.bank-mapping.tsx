@@ -16,7 +16,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/dashboard/settings/bank-mapping")({
   head: () => ({ meta: [{ title: "Bank Mapping — HIVE" }] }),
   component: () => (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="manage_organization_settings">
       <BankMappingPage />
     </RequirePermission>
   ),

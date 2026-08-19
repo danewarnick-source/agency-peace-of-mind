@@ -48,7 +48,7 @@ function genPassword(len = 14) {
 
 export const Route = createFileRoute("/dashboard/employees/")({
   component: () => (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="view_staff_records">
       <EmployeesPage />
     </RequirePermission>
   ),

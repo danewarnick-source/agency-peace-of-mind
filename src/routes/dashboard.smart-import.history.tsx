@@ -16,7 +16,7 @@ import { listImportJobs, discardImportJob } from "@/lib/smart-import-history.fun
 export const Route = createFileRoute("/dashboard/smart-import/history")({
   head: () => ({ meta: [{ title: "Smart Import — History" }] }),
   component: () => (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="view_staff_records">
       <HistoryPage />
     </RequirePermission>
   ),

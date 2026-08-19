@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/dashboard/pba-ledger")({
   head: () => ({ meta: [{ title: "PBA Trust Ledger — HIVE" }] }),
   component: () => (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="manage_billing">
       <PbaLedgerPage />
     </RequirePermission>
   ),

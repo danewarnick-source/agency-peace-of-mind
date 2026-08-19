@@ -5,7 +5,7 @@ import { ClientsPage } from "./dashboard.clients";
 export const Route = createFileRoute("/dashboard/clients/")({
   head: () => ({ meta: [{ title: "Client Directory — HIVE" }] }),
   component: () => (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="view_clients">
       <ClientsPage />
     </RequirePermission>
   ),

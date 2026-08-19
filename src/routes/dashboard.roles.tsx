@@ -19,7 +19,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/dashboard/roles")({
   head: () => ({ meta: [{ title: "Roles & permissions — HIVE" }] }),
   component: () => (
-    <RequirePermission perm="manage_roles">
+    <RequirePermission perm="manage_permissions">
       <RolesPage />
     </RequirePermission>
   ),

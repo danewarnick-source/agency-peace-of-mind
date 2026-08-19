@@ -43,7 +43,7 @@ import { lookupApprovalRequestsForFields, type ApprovalRequestRow } from "@/lib/
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/review")({
   head: () => ({ meta: [{ title: "Smart Import Review — NECTAR" }] }),
   component: () => (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="view_staff_records">
       <ReviewPage />
     </RequirePermission>
   ),

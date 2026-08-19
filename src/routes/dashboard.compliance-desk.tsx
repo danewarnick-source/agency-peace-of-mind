@@ -153,7 +153,7 @@ export const Route = createFileRoute("/dashboard/compliance-desk")({
     focus: typeof s.focus === "string" ? s.focus : undefined,
   }),
   component: () => (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="approve_timesheets">
       <ComplianceDeskPage />
     </RequirePermission>
   ),
@@ -161,7 +161,7 @@ export const Route = createFileRoute("/dashboard/compliance-desk")({
 
 export function ComplianceDeskWrapped() {
   return (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="approve_timesheets">
       <ComplianceDeskPage />
     </RequirePermission>
   );

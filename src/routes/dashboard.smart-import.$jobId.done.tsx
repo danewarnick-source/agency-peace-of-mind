@@ -23,7 +23,7 @@ import { FinalizeClientEditor } from "@/components/clients/finalize-client-edito
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/done")({
   head: () => ({ meta: [{ title: "Smart Import — Done" }] }),
   component: () => (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="view_staff_records">
       <DonePage />
     </RequirePermission>
   ),

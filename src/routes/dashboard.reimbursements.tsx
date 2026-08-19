@@ -35,7 +35,7 @@ type Row = Tables<"activity_reimbursement_requests"> & {
 
 function ReimbursementApprovalsPage() {
   return (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="manage_billing">
       <ApprovalsBody />
     </RequirePermission>
   );

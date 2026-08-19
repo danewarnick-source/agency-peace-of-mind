@@ -31,7 +31,7 @@ import { EmployeeLoansPanel } from "@/components/employee-loans/EmployeeLoansPan
 export const Route = createFileRoute("/dashboard/hr-admin")({
   head: () => ({ meta: [{ title: "HR Admin — HIVE" }] }),
   component: () => (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="view_staff_records">
       <HrAdminPage />
     </RequirePermission>
   ),

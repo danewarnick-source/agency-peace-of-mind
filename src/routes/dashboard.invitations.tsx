@@ -20,7 +20,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/dashboard/invitations")({
   head: () => ({ meta: [{ title: "Invitations — HIVE" }] }),
   component: () => (
-    <RequirePermission perm="invite_users">
+    <RequirePermission perm="invite_staff">
       <InvitationsPage />
     </RequirePermission>
   ),

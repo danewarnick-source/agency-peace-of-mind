@@ -19,7 +19,7 @@ function EmployeesHub() {
   const tabs: HubTab[] = [
     { key: "roster", label: "Roster", render: () => <EmployeesPage /> },
   ];
-  if (can("view_referrals") || can("manage_referrals") || can("manage_users")) {
+  if (can("view_referrals") || can("manage_referrals") || can("view_staff_records")) {
     tabs.push({
       key: "hosts",
       label: "Hosts",
@@ -30,7 +30,7 @@ function EmployeesHub() {
     key: "hr-admin",
     label: "HR Admin",
     render: () => (
-      <RequirePermission perm="manage_users">
+      <RequirePermission perm="view_staff_records">
         <HrAdminPage />
       </RequirePermission>
     ),
@@ -39,7 +39,7 @@ function EmployeesHub() {
     key: "loans",
     label: "Employee Loans",
     render: () => (
-      <RequirePermission perm="manage_users">
+      <RequirePermission perm="view_staff_records">
         <EmployeeLoansPage />
       </RequirePermission>
     ),

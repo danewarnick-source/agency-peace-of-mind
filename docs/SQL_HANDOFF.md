@@ -2928,13 +2928,26 @@ or `enabled=false` row denies access even to admins.
 
 `manage_users` is already listed in the `_all_perms` array of
 `seed_org_role_permissions()` (added in the 2026-08-17 permission-system
-migration, which backfilled every existing org with `admin`/`super_admin`
-set to `enabled=true` via `ON CONFLICT DO NOTHING`). If that migration
-ran cleanly, this should already be fixed — so **run the diagnostic block
-first** and only run the backfill block if it shows a gap. This is a
-data-only fix; no code changes.
+migration, which was supposed to backfill every existing org with
+`admin`/`super_admin` set to `enabled=true`). The diagnostic block below
+was run and confirmed the gap is real and platform-wide: **all 24 orgs**
+came back with no `role_permissions` row at all for `manage_users` on
+`admin` or `super_admin` — the 2026-08-17 backfill did not actually reach
+this key, for reasons the live DB doesn't show us from here.
 
-**Block 1 — diagnostic (read-only):**
+**Update:** this is now fixed two ways —
+1. Data: `supabase/migrations/20260819190000_seed_manage_users_admin.sql`
+   seeds `manage_users=true` for `admin` (and `super_admin`, for
+   audit-trail consistency) across all orgs.
+2. Code: `src/hooks/use-permissions.tsx`'s `can()` now short-circuits
+   `super_admin` to `true` unconditionally, mirroring the `super_admin`
+   shortcut that `public.has_permission()` (the server-side RPC used by
+   `src/lib/require-permission.ts`) already has. `super_admin` is
+   excluded from the editable matrix in `dashboard.permissions.tsx`, so
+   it must never depend on a `role_permissions` row existing — the
+   `admin` role still goes through the seeded matrix row.
+
+**Diagnostic block (already run, kept here for reference):**
 
 ```sql
 SELECT o.name AS organization_name, o.id AS organization_id,
@@ -2947,25 +2960,9 @@ LEFT JOIN public.role_permissions rp
 ORDER BY o.name, rp.role;
 ```
 
-**What you'll see:** one row per org per admin-type role that has a
-`role_permissions` row for `manage_users`, plus a row with `role = NULL`
-for any org that has no row at all (missing row = same effect as
-`enabled = false`, since `usePermissions()` treats "no row" as denied).
-Tell me what this returns — specifically whether True North Supports
-shows `enabled = true` for both `admin` and `super_admin` — before
-running Block 2.
-
-**Block 2 — backfill (only if Block 1 shows a gap for TNS):**
-
-```sql
-INSERT INTO public.role_permissions (organization_id, role, permission, enabled)
-SELECT o.id, r.role, 'manage_users', true
-FROM public.organizations o
-CROSS JOIN (VALUES ('admin'), ('super_admin')) AS r(role)
-ON CONFLICT (organization_id, role, permission)
-DO UPDATE SET enabled = true, updated_at = now()
-WHERE public.role_permissions.enabled = false;
-```
+**To apply the fix:** paste the full contents of
+`supabase/migrations/20260819190000_seed_manage_users_admin.sql` here and
+run it.
 
 **What you'll see:** a `manage_users` row with `enabled = true` for
 `admin` and `super_admin` in every org — inserted where the row was
@@ -2973,4 +2970,7 @@ missing, flipped to `true` where it existed but was disabled. Rows that
 were already `enabled = true` are left untouched (`DO UPDATE` only fires
 `WHERE enabled = false`, so `updated_at` doesn't churn on rows that don't
 need it). This does not touch `manager`, `employee`, or
-`committee_member` rows, and does not touch any other permission key.
+`committee_member` rows, and does not touch any other permission key. The
+`super_admin` code fix takes effect immediately on deploy and doesn't
+depend on this SQL running at all — the SQL is belt-and-suspenders for
+the `admin` role and for keeping the matrix table accurate.

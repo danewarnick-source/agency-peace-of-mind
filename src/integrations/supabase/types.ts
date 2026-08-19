@@ -13586,6 +13586,54 @@ export type Database = {
           },
         ]
       }
+      permission_audit_log: {
+        Row: {
+          change_type: string
+          changed_by_name: string | null
+          changed_by_user_id: string | null
+          created_at: string
+          id: string
+          new_value: boolean | null
+          organization_id: string
+          permission: string
+          previous_value: boolean | null
+          reason: string | null
+          role: string | null
+          target_user_id: string | null
+          target_user_name: string | null
+        }
+        Insert: {
+          change_type: string
+          changed_by_name?: string | null
+          changed_by_user_id?: string | null
+          created_at?: string
+          id?: string
+          new_value?: boolean | null
+          organization_id: string
+          permission: string
+          previous_value?: boolean | null
+          reason?: string | null
+          role?: string | null
+          target_user_id?: string | null
+          target_user_name?: string | null
+        }
+        Update: {
+          change_type?: string
+          changed_by_name?: string | null
+          changed_by_user_id?: string | null
+          created_at?: string
+          id?: string
+          new_value?: boolean | null
+          organization_id?: string
+          permission?: string
+          previous_value?: boolean | null
+          reason?: string | null
+          role?: string | null
+          target_user_id?: string | null
+          target_user_name?: string | null
+        }
+        Relationships: []
+      }
       platform_states: {
         Row: {
           code: string
@@ -14860,6 +14908,45 @@ export type Database = {
           },
         ]
       }
+      role_change_audit_log: {
+        Row: {
+          change_method: string | null
+          changed_by_name: string | null
+          changed_by_user_id: string | null
+          created_at: string
+          id: string
+          new_role: string | null
+          organization_id: string
+          previous_role: string | null
+          target_user_id: string | null
+          target_user_name: string | null
+        }
+        Insert: {
+          change_method?: string | null
+          changed_by_name?: string | null
+          changed_by_user_id?: string | null
+          created_at?: string
+          id?: string
+          new_role?: string | null
+          organization_id: string
+          previous_role?: string | null
+          target_user_id?: string | null
+          target_user_name?: string | null
+        }
+        Update: {
+          change_method?: string | null
+          changed_by_name?: string | null
+          changed_by_user_id?: string | null
+          created_at?: string
+          id?: string
+          new_role?: string | null
+          organization_id?: string
+          previous_role?: string | null
+          target_user_id?: string | null
+          target_user_name?: string | null
+        }
+        Relationships: []
+      }
       role_permissions: {
         Row: {
           enabled: boolean
@@ -15045,6 +15132,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      scope_assignments: {
+        Row: {
+          created_at: string
+          id: string
+          organization_id: string
+          scope_ref_id: string | null
+          scope_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          organization_id: string
+          scope_ref_id?: string | null
+          scope_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          organization_id?: string
+          scope_ref_id?: string | null
+          scope_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       service_codes: {
         Row: {
@@ -17518,6 +17635,48 @@ export type Database = {
         }
         Relationships: []
       }
+      user_permission_overrides: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          granted: boolean
+          granted_by: string | null
+          granted_by_name: string | null
+          id: string
+          organization_id: string
+          permission: string
+          reason: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          granted?: boolean
+          granted_by?: string | null
+          granted_by_name?: string | null
+          id?: string
+          organization_id: string
+          permission: string
+          reason?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          granted?: boolean
+          granted_by?: string | null
+          granted_by_name?: string | null
+          id?: string
+          organization_id?: string
+          permission?: string
+          reason?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_training_progress: {
         Row: {
           completed_at: string | null
@@ -18009,6 +18168,10 @@ export type Database = {
           id: string
           support_coordinator_id: string
         }[]
+      }
+      flag_member_deactivated: {
+        Args: { _changed_by_user_id: string; _org_id: string; _user_id: string }
+        Returns: undefined
       }
       generate_pba_audit_sample: { Args: { _org: string }; Returns: number }
       get_client_caps: {

@@ -2913,3 +2913,64 @@ obligations seed data). If that's changed, tell me before running.
   FAKE so they regenerate under the corrected assignee filter — only staff
   actually assigned to a client with a matching service code get an
   instance, instead of every member of the assigned group.
+
+---
+
+## ACTION — Diagnose + backfill `manage_users` in `role_permissions` (2026-08-19)
+
+**What this is for:** admins are hitting the unauthorized page on the
+employee profile, clients, and compliance-desk routes, which are all
+gated by `perm="manage_users"` (`RequirePermission` in
+`src/components/rbac-guard.tsx`). `usePermissions()` resolves permissions
+**only** from `role_permissions` for the current org — there is no
+runtime fallback to `DEFAULT_MATRIX` in `src/lib/rbac.ts` — so a missing
+or `enabled=false` row denies access even to admins.
+
+`manage_users` is already listed in the `_all_perms` array of
+`seed_org_role_permissions()` (added in the 2026-08-17 permission-system
+migration, which was supposed to backfill every existing org with
+`admin`/`super_admin` set to `enabled=true`). The diagnostic block below
+was run and confirmed the gap is real and platform-wide: **all 24 orgs**
+came back with no `role_permissions` row at all for `manage_users` on
+`admin` or `super_admin` — the 2026-08-17 backfill did not actually reach
+this key, for reasons the live DB doesn't show us from here.
+
+**Update:** this is now fixed two ways —
+1. Data: `supabase/migrations/20260819190000_seed_manage_users_admin.sql`
+   seeds `manage_users=true` for `admin` (and `super_admin`, for
+   audit-trail consistency) across all orgs.
+2. Code: `src/hooks/use-permissions.tsx`'s `can()` now short-circuits
+   `super_admin` to `true` unconditionally, mirroring the `super_admin`
+   shortcut that `public.has_permission()` (the server-side RPC used by
+   `src/lib/require-permission.ts`) already has. `super_admin` is
+   excluded from the editable matrix in `dashboard.permissions.tsx`, so
+   it must never depend on a `role_permissions` row existing — the
+   `admin` role still goes through the seeded matrix row.
+
+**Diagnostic block (already run, kept here for reference):**
+
+```sql
+SELECT o.name AS organization_name, o.id AS organization_id,
+       rp.role, rp.enabled
+FROM public.organizations o
+LEFT JOIN public.role_permissions rp
+  ON rp.organization_id = o.id
+ AND rp.permission = 'manage_users'
+ AND rp.role IN ('admin', 'super_admin')
+ORDER BY o.name, rp.role;
+```
+
+**To apply the fix:** paste the full contents of
+`supabase/migrations/20260819190000_seed_manage_users_admin.sql` here and
+run it.
+
+**What you'll see:** a `manage_users` row with `enabled = true` for
+`admin` and `super_admin` in every org — inserted where the row was
+missing, flipped to `true` where it existed but was disabled. Rows that
+were already `enabled = true` are left untouched (`DO UPDATE` only fires
+`WHERE enabled = false`, so `updated_at` doesn't churn on rows that don't
+need it). This does not touch `manager`, `employee`, or
+`committee_member` rows, and does not touch any other permission key. The
+`super_admin` code fix takes effect immediately on deploy and doesn't
+depend on this SQL running at all — the SQL is belt-and-suspenders for
+the `admin` role and for keeping the matrix table accurate.

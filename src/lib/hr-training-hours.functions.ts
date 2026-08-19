@@ -6,7 +6,8 @@
  * enforced_after_months, window='employment_year'). Hours come from BOTH:
  *  (a) signed `training_completions` whose mapped training topic carries a
  *      `default_hours` value (fallback 1.0 hr/topic when null), and
- *  (b) manual hour entries logged by an admin / team manager.
+ *  (b) manual hour entries logged by an admin / team manager, stored as
+ *      `ce_ledger` rows with source = 'manual_entry'.
  *
  * Evaluation is tenure-gated: before the staffer's 1-year anniversary the
  * status is `tracking_pre_tenure` (informational, NEVER a gap or audit
@@ -18,6 +19,7 @@
  * hours (mirrors the checklist completion policy).
  */
 import { createServerFn } from "@tanstack/react-start";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
@@ -256,11 +258,12 @@ export async function loadOrgAnnualHoursProgress(
     await Promise.all([
       sb.from("profiles").select("id, hire_date").in("id", staffIds),
       sb
-        .from("staff_training_hours_entries")
+        .from("ce_ledger")
         .select(
           "id, staff_id, requirement_id, entry_date, hours, note, created_by, created_at",
         )
         .eq("organization_id", organizationId)
+        .eq("source", "manual_entry")
         .in("staff_id", staffIds),
       sb
         .from("training_completions")
@@ -427,10 +430,11 @@ export const getStaffAnnualHoursDetail = createServerFn({ method: "GET" })
             .eq("id", data.staff_id)
             .maybeSingle(),
           sb
-            .from("staff_training_hours_entries")
+            .from("ce_ledger")
             .select("id, requirement_id, entry_date, hours, note, created_by, created_at")
             .eq("organization_id", data.organization_id)
             .eq("staff_id", data.staff_id)
+            .eq("source", "manual_entry")
             .order("entry_date", { ascending: false }),
           sb
             .from("training_completions")
@@ -557,17 +561,32 @@ export const addStaffHoursEntry = createServerFn({ method: "POST" })
       throw new Error("Forbidden: staff may not log own hours");
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any)
-      .from("staff_training_hours_entries")
-      .insert({
-        organization_id: data.organization_id,
-        staff_id: data.staff_id,
-        requirement_id: data.requirement_id,
-        entry_date: data.entry_date,
-        hours: data.hours,
-        note: data.note ?? null,
-        created_by: userId,
-      });
+    const sb = supabase as any;
+    const { data: creator } = await sb
+      .from("profiles")
+      .select("full_name")
+      .eq("id", userId)
+      .maybeSingle();
+    const { error } = await sb.from("ce_ledger").insert({
+      organization_id: data.organization_id,
+      staff_id: data.staff_id,
+      requirement_id: data.requirement_id,
+      entry_date: data.entry_date,
+      hours: data.hours,
+      active_minutes: Math.round(data.hours * 60),
+      title: data.note ?? "Manually logged training hours",
+      note: data.note ?? null,
+      type: "manual",
+      source: "manual_entry",
+      ce_year_start: `${data.entry_date.slice(0, 4)}-01-01`,
+      completed_at: `${data.entry_date}T00:00:00Z`,
+      attestation_text: "Training hours manually recorded by administrator.",
+      signature_name: creator?.full_name ?? "Admin",
+      content_hash: createHash("sha256")
+        .update(`${data.staff_id}:${data.entry_date}:${data.hours}:${data.note ?? ""}`)
+        .digest("hex"),
+      created_by: userId,
+    });
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -588,10 +607,11 @@ export const deleteStaffHoursEntry = createServerFn({ method: "POST" })
     await requireOrgMembership(supabase, userId, data.organization_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any)
-      .from("staff_training_hours_entries")
+      .from("ce_ledger")
       .delete()
       .eq("id", data.entry_id)
-      .eq("organization_id", data.organization_id);
+      .eq("organization_id", data.organization_id)
+      .eq("source", "manual_entry");
     if (error) throw new Error(error.message);
     return { ok: true };
   });

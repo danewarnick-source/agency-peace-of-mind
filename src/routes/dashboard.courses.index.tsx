@@ -9,6 +9,10 @@ import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { getMyOtherAssignmentsSummary } from "@/lib/other-assignments.functions";
 import { getMyCeStatus } from "@/lib/ce.functions";
 import { listMyPendingPolicies } from "@/lib/policy-signatures.functions";
+import {
+  getMyTrainingEnrollments,
+  type EnrollmentStatus,
+} from "@/lib/training-enrollments.functions";
 
 export const Route = createFileRoute("/dashboard/courses/")({ component: MyTrainings });
 
@@ -94,6 +98,13 @@ function MyTrainings() {
     queryFn: () => fetchCe(),
   });
   const ceApplies = !!ce?.ceApplies;
+
+  const fetchHiveEnrollments = useServerFn(getMyTrainingEnrollments);
+  const { data: hiveEnrollments } = useQuery({
+    enabled: !!user,
+    queryKey: ["my-hive-training-enrollments", user?.id],
+    queryFn: () => fetchHiveEnrollments(),
+  });
 
   return (
     <div className="space-y-4 pb-2">
@@ -264,6 +275,58 @@ function MyTrainings() {
           </div>
         </Link>
       </div>
+
+      {hiveEnrollments && hiveEnrollments.length > 0 && (
+        <div className="pt-2">
+          <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Hive Training Enrollments</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {hiveEnrollments.map((e) => (
+              <div key={e.id} className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold">{e.product_name}</span>
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
+                    {HIVE_ENROLLMENT_STATUS_LABEL[e.status]}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  {hiveEnrollmentStatusMessage(e.status, e.nectar_extracted_expires_date)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+const HIVE_ENROLLMENT_STATUS_LABEL: Record<EnrollmentStatus, string> = {
+  enrolled: "Enrolled",
+  link_sent: "Link sent",
+  completed: "Completed",
+  certificate_pending: "Cert pending",
+  certificate_uploaded: "Cert uploaded",
+  verified: "Verified",
+  cancelled: "Cancelled",
+};
+
+function hiveEnrollmentStatusMessage(status: EnrollmentStatus, expiresOn: string | null): string {
+  switch (status) {
+    case "enrolled":
+      return "Hive will contact you soon with your training link.";
+    case "link_sent":
+      return "Check your email — your training link has been sent.";
+    case "completed":
+      return "Training complete — your admin is filing your certificate.";
+    case "certificate_pending":
+      return "Waiting on certificate upload.";
+    case "certificate_uploaded":
+      return "Certificate uploaded, being verified.";
+    case "verified":
+      return expiresOn ? `✓ Verified — expires ${expiresOn}.` : "✓ Verified.";
+    case "cancelled":
+      return "Enrollment cancelled.";
+    default:
+      return "";
+  }
 }

@@ -16,6 +16,7 @@ import {
   Wrench,
   LayoutDashboard,
   BookOpen,
+  GraduationCap,
   type LucideIcon,
 } from "lucide-react";
 import type { ExecCapability } from "@/lib/exec-capabilities";
@@ -85,6 +86,7 @@ export const EXEC_DOMAINS: ExecDomain[] = [
       { to: "/dashboard/hive-exec/functionality", label: "IT / Functionality", icon: Wrench, capability: "support.manage" },
       { to: "/dashboard/hive-exec/messages", label: "Message Center", icon: Mail, capability: "support.manage" },
       { to: "/dashboard/hive-exec/nectar", label: "NECTAR", icon: Hexagon, capability: "steve.use" },
+      { to: "/dashboard/hive-exec/training", label: "Training", icon: GraduationCap, capability: "training.manage" },
     ],
   },
 ];

@@ -60,6 +60,7 @@ import { POSITIONS, type Position } from "@/lib/employee-positions";
 import { EmployeeDocumentsCard } from "@/components/employees/employee-documents-card";
 import { EmployeeFaceSheetButton } from "@/components/employees/employee-face-sheet-button";
 import { StaffHrChecklistCard } from "@/components/hr/staff-hr-checklist-card";
+import { StaffTrainingEnrollmentsCard } from "@/components/hr/staff-training-enrollments-card";
 import { CustomAttributesSection } from "@/components/custom-attributes-section";
 import { LifecyclePanel } from "@/components/lifecycle-panel";
 import { SuggestedTopicsInput } from "@/components/ce/suggested-topics-input";
@@ -439,6 +440,18 @@ function StaffProfilePage() {
                 view="checklist"
                 filter="all"
               />
+            </SectionPanel>
+          </CollapsibleSectionGroup>
+
+          <CollapsibleSectionGroup
+            storageKey={sectionStorageKey(staffId, "hive-training")}
+            label="Training"
+            hint="Hive Training enrollments and certificate status"
+            summary="Hive Training enrollments"
+            divider
+          >
+            <SectionPanel icon={GraduationCap} accent="sky">
+              <StaffTrainingEnrollmentsCard organizationId={orgId} staffId={staffId} />
             </SectionPanel>
           </CollapsibleSectionGroup>
 

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
+import { setScopeAssignments } from "@/lib/permissions.functions";
 
 type ScopeType = "all" | "service_code" | "staff_group" | "client";
 
@@ -162,6 +164,7 @@ function EditScopeDrawer({
   const [selected, setSelected] = useState<string[]>(member.refIds);
   const [clientSearch, setClientSearch] = useState("");
   const [saving, setSaving] = useState(false);
+  const setScopeFn = useServerFn(setScopeAssignments);
 
   const { data: clients = [] } = useQuery({
     queryKey: ["scope-client-search", orgId, clientSearch],
@@ -181,32 +184,14 @@ function EditScopeDrawer({
   const save = async () => {
     setSaving(true);
     try {
-      const { error: delErr } = await supabase
-        .from("scope_assignments")
-        .delete()
-        .eq("organization_id", orgId)
-        .eq("user_id", member.user_id);
-      if (delErr) throw new Error(delErr.message);
-
-      if (scopeType === "all") {
-        const { error } = await supabase.from("scope_assignments").insert({
-          organization_id: orgId,
-          user_id: member.user_id,
-          scope_type: "all",
-          scope_ref_id: null,
-        });
-        if (error) throw new Error(error.message);
-      } else if (selected.length) {
-        const { error } = await supabase.from("scope_assignments").insert(
-          selected.map((refId) => ({
-            organization_id: orgId,
-            user_id: member.user_id,
-            scope_type: scopeType,
-            scope_ref_id: refId,
-          })),
-        );
-        if (error) throw new Error(error.message);
-      }
+      await setScopeFn({
+        data: {
+          organizationId: orgId,
+          targetUserId: member.user_id,
+          scopeType,
+          refIds: scopeType === "all" ? [] : selected,
+        },
+      });
       toast.success("Scope updated");
       onSaved();
     } catch (e) {

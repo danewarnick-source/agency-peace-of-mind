@@ -163,7 +163,7 @@ export function EmployeeDocumentsCard({
         <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
           Employee documents
         </CardTitle>
-        <RequirePermission perm="manage_users">
+        <RequirePermission perm="edit_staff_records">
           <div className="flex items-center gap-2">
             <Select value={kind} onValueChange={setKind}>
               <SelectTrigger className="h-8 w-[180px] text-xs">
@@ -308,7 +308,7 @@ function DocRow({
           <div className="text-xs text-rose-700">NECTAR error: {doc.nectar_error}</div>
         )}
       </div>
-      <RequirePermission perm="manage_users">
+      <RequirePermission perm="edit_staff_records">
         <div className="flex flex-wrap items-center gap-1">
           <Button size="sm" variant="ghost" onClick={onOpen} title="Open">
             <Download className="h-3.5 w-3.5" />

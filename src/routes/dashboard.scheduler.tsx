@@ -263,7 +263,7 @@ function SchedulerBody({
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
   const { can } = usePermissions();
-  const canManageSchedule = can("manage_schedule");
+  const canManageSchedule = can("create_shifts");
   const [addOpen, setAddOpen] = useState(false);
   const [addPrefill, setAddPrefill] = useState<{ clientId?: string; code?: string; day?: Date } | null>(null);
   const [detailShiftId, setDetailShiftId] = useState<string | null>(null);
@@ -924,7 +924,7 @@ function AddShiftDialog({
     setWeekdays((prev) => prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n].sort());
 
   const { can } = usePermissions();
-  const canManageSchedule = can("manage_schedule");
+  const canManageSchedule = can("create_shifts");
 
   const saveMut = useMutation({
     mutationFn: async () => {
@@ -1196,7 +1196,7 @@ function ShiftDetailPanel({
     : [];
 
   const { can } = usePermissions();
-  const canManageSchedule = can("manage_schedule");
+  const canManageSchedule = can("create_shifts");
 
   const assign = useMutation({
     mutationFn: (newStaffId: string | null) => {

@@ -3003,3 +3003,70 @@ admin uploads a CPR cert and NECTAR reads an expiration date, a new
 instance is scheduled automatically from that date — no separate renewal
 obligation involved. The old "CPR/First Aid Certification — Renewal"
 obligation is gone.
+
+---
+
+## ACTION — Verify permission-system migration ran + retire 4 legacy permission keys (2026-08-19)
+
+**What this is for:** Prompt 2 of the permissions migration closed out the
+last routes/server-fns still gating on the four coarse legacy keys
+(`manage_users`, `manage_schedule`, `invite_users`, `remove_users`) —
+every one of those call sites now uses the matching granular key
+(`edit_staff_records`, `create_shifts`, `invite_staff`,
+`deactivate_staff`/n-a). `ALL_PERMISSIONS`/`DEFAULT_MATRIX` in
+`src/lib/rbac.ts` no longer list the four legacy keys at all.
+
+**Step 1 — confirm the 2026-08-17 permission-system migration actually
+ran.** Paste and run:
+
+```sql
+SELECT EXISTS (
+  SELECT 1 FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  WHERE n.nspname = 'public' AND p.proname = 'has_permission'
+) AS has_permission_exists,
+EXISTS (
+  SELECT 1 FROM information_schema.tables
+  WHERE table_schema = 'public' AND table_name = 'scope_assignments'
+) AS scope_assignments_exists,
+EXISTS (
+  SELECT 1 FROM information_schema.tables
+  WHERE table_schema = 'public' AND table_name = 'user_permission_overrides'
+) AS user_permission_overrides_exists;
+```
+
+If any column comes back `false`, the 2026-08-17 migration
+(`supabase/migrations/20260817140000_permission_system_rebuild.sql`,
+already documented above) has not been applied — paste and run its full
+contents first, then come back to Step 2. If all three are `true`, skip
+straight to Step 2.
+
+**Step 2 — retire the 4 legacy keys.** Paste and run the full contents of
+`supabase/migrations/20260819210000_retire_legacy_permission_keys.sql`.
+It:
+1. Redefines `seed_org_role_permissions()` to drop `manage_users`,
+   `manage_schedule`, `invite_users`, `remove_users` from the arrays it
+   seeds — new orgs stop getting rows for these keys.
+2. Deletes existing `role_permissions` and `user_permission_overrides`
+   rows for those 4 keys across every org — nothing in the codebase
+   checks them anymore, so they're just dead rows in the matrix UI.
+3. Redefines `has_permission()` to drop the same 4 keys from its
+   dead-code fallback `CASE` (only reachable for a role/permission pair
+   that predates `seed_org_role_permissions` — kept for safety, updated
+   for consistency).
+
+**What you'll see:** `SELECT DISTINCT permission FROM role_permissions
+WHERE permission IN ('manage_users','manage_schedule','invite_users','remove_users')`
+returns zero rows afterward. The permissions matrix UI
+(`dashboard.permissions.tsx`) no longer shows the 4 legacy toggles.
+Existing behavior for staff invites, shift creation, and staff-record
+editing is unchanged because every caller already moved to the granular
+equivalent key, which was already enabled for the same roles.
+
+**After this runs:** regenerate `src/integrations/supabase/types.ts` from
+the live schema (Lovable's type sync, or the Supabase CLI) so any new
+columns/tables are reflected — this migration doesn't add new tables, so
+a type regen isn't strictly required here, but do it if Step 1 above
+triggered running the 2026-08-17 migration for the first time (that one
+adds `scope_assignments`, `user_permission_overrides`,
+`permission_audit_log`).

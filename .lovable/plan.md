@@ -1,5 +1,10 @@
 # Getting the table count down: a realistic consolidation strategy
 
+## Blocker to clear first: four tables the code expects don't exist
+
+The build is currently failing because `scope-assignments-panel.tsx`, `use-permissions.tsx`, `employees.functions.ts` and `permissions.functions.ts` query `scope_assignments`, `user_permission_overrides`, `permission_audit_log`, and `role_change_audit_log`, plus a `flag_member_deactivated` function. A live check confirms **none of the four tables and neither the function exist in the database** — this is left over from the permissions work, not from schema cleanup. Step 0 of any consolidation work is deciding whether to create those four tables (they belong to the permissions/RBAC domain and would count against the target) or strip the code paths that reference them. I'd create them: the permission-override UI is real and currently dead.
+
+
 ## What the database actually looks like right now
 
 - **285 tables** in `public`.

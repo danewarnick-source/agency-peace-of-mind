@@ -20,6 +20,7 @@ const TABS: StaffTab[] = [
   { to: "/dashboard/schedule", label: "Schedule", icon: CalendarDays, exact: false, code: "schedule", feature: "evv_timesheets" },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck, exact: false, code: "logs" },
   { to: "/dashboard/ask-nectar", label: "Ask NECTAR", icon: Sparkles, exact: false, code: "nectar", feature: "nectar" },
+  { to: "/dashboard/my-obligations", label: "Obligations", icon: ClipboardCheck, exact: false, code: "obligations" },
   { to: "/dashboard/courses", label: "Trainings", icon: GraduationCap, exact: false, code: "courses", feature: "staff_onboarding" },
 ];
 

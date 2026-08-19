@@ -30,7 +30,9 @@ export function StaffTrainingStrip({
   trainings: StaffTrainingStatus[];
   hiveTrainingEnabled: boolean;
 }) {
-  if (trainings.length === 0) return null;
+  if (trainings.length === 0) {
+    return <p className="pt-2 text-[11px] text-muted-foreground">No training enrollments</p>;
+  }
   return (
     <div className="flex flex-wrap gap-1.5 pt-2">
       {trainings.map((t) => {

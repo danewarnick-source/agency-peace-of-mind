@@ -200,6 +200,29 @@ export function EmployeesPage() {
     },
   });
 
+  // Service codes each staff member is assigned to work, aggregated across
+  // all their client assignments — used on the mobile card list.
+  const { data: serviceCodesByStaff = new Map<string, string[]>() } = useQuery({
+    enabled: !!org,
+    queryKey: ["staff-service-codes", org?.organization_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("staff_assignments")
+        .select("staff_id, service_codes")
+        .eq("organization_id", org!.organization_id);
+      if (error) throw error;
+      const m = new Map<string, Set<string>>();
+      for (const row of (data ?? []) as Array<{ staff_id: string; service_codes: string[] | null }>) {
+        const set = m.get(row.staff_id) ?? new Set<string>();
+        for (const code of row.service_codes ?? []) set.add(code);
+        m.set(row.staff_id, set);
+      }
+      const out = new Map<string, string[]>();
+      for (const [staffId, set] of m) out.set(staffId, Array.from(set).sort());
+      return out;
+    },
+  });
+
   const { data: courses } = useQuery({
     queryKey: ["courses-mini"],
     queryFn: async () => {
@@ -407,7 +430,64 @@ export function EmployeesPage() {
       )}
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-        <div className="max-h-[calc(100vh-16rem)] overflow-auto">
+        {/* Mobile card list — the table overflows on small screens, so below
+            md we render the same roster as stacked cards instead. */}
+        <div className="block divide-y divide-border md:hidden">
+          {members?.map((m) => {
+            const name = m.profile?.full_name ?? "—";
+            const codes = serviceCodesByStaff.get(m.user_id) ?? [];
+            const openProfile = () => { window.location.href = `/dashboard/employees/${m.user_id}`; };
+            return (
+              <div
+                key={m.id}
+                className="flex cursor-pointer flex-col gap-2 p-4 active:bg-muted/50"
+                onClick={openProfile}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <PersonAvatar
+                      bucket="staff-photos"
+                      path={(m.profile as { photo_path?: string | null } | undefined)?.photo_path ?? null}
+                      name={name === "—" ? null : name}
+                      className="h-9 w-9 text-xs"
+                    />
+                    <p className="truncate font-bold">{name}</p>
+                  </div>
+                  <span
+                    className={
+                      "shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium " +
+                      (m.active
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                        : "bg-muted text-muted-foreground")
+                    }
+                  >
+                    {m.active ? "Active" : "Deactivated"}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="rounded-full bg-secondary px-2 py-0.5 text-xs uppercase">{m.role}</span>
+                  {codes.length ? (
+                    codes.map((code) => (
+                      <Badge key={code} variant="outline" className="font-mono text-[10px]">{code}</Badge>
+                    ))
+                  ) : (
+                    <span className="text-xs text-muted-foreground">No service codes</span>
+                  )}
+                </div>
+                <div className="flex items-center justify-end pt-1" data-no-row-nav onClick={(e) => e.stopPropagation()}>
+                  <a
+                    href={`/dashboard/employees/${m.user_id}?tab=checklist`}
+                    className="flex items-center gap-1 text-sm font-medium text-primary"
+                  >
+                    View <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="hidden max-h-[calc(100vh-16rem)] overflow-auto md:block">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-muted/80 backdrop-blur supports-[backdrop-filter]:bg-muted/60 text-xs uppercase tracking-wider text-muted-foreground">
               <tr>

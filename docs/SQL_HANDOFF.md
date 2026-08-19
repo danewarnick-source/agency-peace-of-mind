@@ -2974,3 +2974,32 @@ need it). This does not touch `manager`, `employee`, or
 `super_admin` code fix takes effect immediately on deploy and doesn't
 depend on this SQL running at all — the SQL is belt-and-suspenders for
 the `admin` role and for keeping the matrix table accurate.
+
+---
+
+## ACTION — Combine CPR Initial + Renewal into one obligation (2026-08-19, Fix 14)
+
+**What this is for:** Two CPR obligations was wrong — it's one continuous
+requirement (certify within 90 days of hire, renew every 2 years from the
+cert's own expiration date). This deletes the separate "Renewal"
+obligation, folds its renewal config onto the "Initial" obligation (now
+retitled "CPR & First Aid Certification"), and clears existing instances
+so they regenerate under the corrected combined config. The app code
+(`generatePerPersonInstancesInternal` for the first instance,
+`recordCompletion` for cert-expiration-driven renewals) already reads
+both `days_after_hire` and `every_n_months`/`from: cert_expiration` off
+the same `due_day_config` — no code change was needed there, only the
+`cadenceLabel`/`cadenceDescription` display strings.
+
+**To apply:** paste the full contents of
+`supabase/migrations/20260819200000_combine_cpr_initial_renewal.sql`
+here and run it.
+
+**What you'll see:** only one CPR obligation ("CPR & First Aid
+Certification") on the Company Obligations page, badge reading "Due 90
+days after hire · renews every 2 years from cert expiration", one
+instance per staff member due 90 days from their hire date. When an
+admin uploads a CPR cert and NECTAR reads an expiration date, a new
+instance is scheduled automatically from that date — no separate renewal
+obligation involved. The old "CPR/First Aid Certification — Renewal"
+obligation is gone.

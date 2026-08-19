@@ -3167,3 +3167,45 @@ add/delete UI, same numbers, just backed by `ce_ledger` now.
 **After this runs:** regenerate `src/integrations/supabase/types.ts` from
 the live schema — `ce_ledger` has 4 new columns and
 `staff_training_hours_entries` is gone.
+
+---
+
+## ACTION — New Hive Training enrollment system (2026-08-19)
+
+**What this is for:** Prompt 5's Part 3 — the catalog/purchase/enrollment
+system that replaces the dropped Hive Training commerce tables
+(`hive_training_orders` etc, batch 1 above). Three new tables:
+`training_products` (a fixed catalog: CPR & First Aid, MANDT, 30-Day
+Orientation — seeded in the migration), `training_purchases` (an org buys
+N seats of a product; `payment_status` starts `'invoice_pending'` — Stripe
+isn't wired up yet, Hive invoices separately), and `training_enrollments`
+(one row per staff member assigned a purchased seat, tracked through
+`enrolled → link_sent → completed → certificate_pending →
+certificate_uploaded → verified`).
+
+**Note:** three edge functions reference the now-dropped training-commerce
+tables and are dead code as of batch 1 above:
+`supabase/functions/training-stripe-webhook`,
+`supabase/functions/auto-renew-trainings`,
+`supabase/functions/create-training-checkout`. They were left in place
+(deleting deployed edge functions is out of scope for a SQL handoff) but
+will error if invoked — nothing in the app calls them anymore.
+
+**To apply:** paste the full contents of
+`supabase/migrations/20260819210000_hive_training_enrollment_system.sql`
+here and run it.
+
+**What you'll see:** three `CREATE TABLE` statements, one seed `INSERT`
+(3 catalog products), RLS enabled with policies on all three, and a
+partial unique index on `training_enrollments` that blocks duplicate
+*active* enrollments (same org + product + staff) but allows re-enrollment
+once a prior one reaches `verified` (renewals).
+
+**After this runs:** regenerate `src/integrations/supabase/types.ts` from
+the live schema — three new tables (`training_products`,
+`training_purchases`, `training_enrollments`) will appear. Until that
+regeneration happens, `src/lib/training-enrollments.functions.ts` reads
+these tables through an untyped Supabase client cast (same pattern used
+elsewhere in this codebase for tables ahead of the generated types), so
+the app works correctly either way — it's a type-safety gap, not a
+functional blocker.

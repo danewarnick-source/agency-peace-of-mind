@@ -110,6 +110,7 @@ import { Route as DashboardClientsIndexRouteImport } from './routes/dashboard.cl
 import { Route as DashboardBillingIndexRouteImport } from './routes/dashboard.billing.index'
 import { Route as SignEmployeeLoanTokenRouteImport } from './routes/sign.employee-loan.$token'
 import { Route as DashboardWorkspaceClientIdRouteImport } from './routes/dashboard.workspace.$clientId'
+import { Route as DashboardTrainingCatalogRouteImport } from './routes/dashboard.training.catalog'
 import { Route as DashboardTrainingIdRouteImport } from './routes/dashboard.training.$id'
 import { Route as DashboardTracksTrackSlugRouteImport } from './routes/dashboard.tracks.$trackSlug'
 import { Route as DashboardSmartImportHistoryRouteImport } from './routes/dashboard.smart-import.history'
@@ -134,6 +135,7 @@ import { Route as DashboardHubClientsRouteImport } from './routes/dashboard.hub.
 import { Route as DashboardHrAdminSettingsRouteImport } from './routes/dashboard.hr-admin.settings'
 import { Route as DashboardHomesTeamIdRouteImport } from './routes/dashboard.homes.$teamId'
 import { Route as DashboardHiveExecUpgradeRequestsRouteImport } from './routes/dashboard.hive-exec.upgrade-requests'
+import { Route as DashboardHiveExecTrainingRouteImport } from './routes/dashboard.hive-exec.training'
 import { Route as DashboardHiveExecTicketsRouteImport } from './routes/dashboard.hive-exec.tickets'
 import { Route as DashboardHiveExecStatesRouteImport } from './routes/dashboard.hive-exec.states'
 import { Route as DashboardHiveExecPlansRouteImport } from './routes/dashboard.hive-exec.plans'
@@ -737,6 +739,12 @@ const DashboardWorkspaceClientIdRoute =
     path: '/workspace/$clientId',
     getParentRoute: () => DashboardRoute,
   } as any)
+const DashboardTrainingCatalogRoute =
+  DashboardTrainingCatalogRouteImport.update({
+    id: '/training/catalog',
+    path: '/training/catalog',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardTrainingIdRoute = DashboardTrainingIdRouteImport.update({
   id: '/training/$id',
   path: '/training/$id',
@@ -870,6 +878,12 @@ const DashboardHiveExecUpgradeRequestsRoute =
   DashboardHiveExecUpgradeRequestsRouteImport.update({
     id: '/upgrade-requests',
     path: '/upgrade-requests',
+    getParentRoute: () => DashboardHiveExecRoute,
+  } as any)
+const DashboardHiveExecTrainingRoute =
+  DashboardHiveExecTrainingRouteImport.update({
+    id: '/training',
+    path: '/training',
     getParentRoute: () => DashboardHiveExecRoute,
   } as any)
 const DashboardHiveExecTicketsRoute =
@@ -1466,6 +1480,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/states': typeof DashboardHiveExecStatesRouteWithChildren
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
+  '/dashboard/hive-exec/training': typeof DashboardHiveExecTrainingRoute
   '/dashboard/hive-exec/upgrade-requests': typeof DashboardHiveExecUpgradeRequestsRoute
   '/dashboard/homes/$teamId': typeof DashboardHomesTeamIdRoute
   '/dashboard/hr-admin/settings': typeof DashboardHrAdminSettingsRoute
@@ -1490,6 +1505,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/smart-import/history': typeof DashboardSmartImportHistoryRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
+  '/dashboard/training/catalog': typeof DashboardTrainingCatalogRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
   '/sign/employee-loan/$token': typeof SignEmployeeLoanTokenRoute
   '/dashboard/billing/': typeof DashboardBillingIndexRoute
@@ -1664,6 +1680,7 @@ export interface FileRoutesByTo {
   '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/states': typeof DashboardHiveExecStatesRouteWithChildren
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
+  '/dashboard/hive-exec/training': typeof DashboardHiveExecTrainingRoute
   '/dashboard/hive-exec/upgrade-requests': typeof DashboardHiveExecUpgradeRequestsRoute
   '/dashboard/homes/$teamId': typeof DashboardHomesTeamIdRoute
   '/dashboard/hr-admin/settings': typeof DashboardHrAdminSettingsRoute
@@ -1688,6 +1705,7 @@ export interface FileRoutesByTo {
   '/dashboard/smart-import/history': typeof DashboardSmartImportHistoryRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
+  '/dashboard/training/catalog': typeof DashboardTrainingCatalogRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
   '/sign/employee-loan/$token': typeof SignEmployeeLoanTokenRoute
   '/dashboard/billing': typeof DashboardBillingIndexRoute
@@ -1870,6 +1888,7 @@ export interface FileRoutesById {
   '/dashboard/hive-exec/plans': typeof DashboardHiveExecPlansRoute
   '/dashboard/hive-exec/states': typeof DashboardHiveExecStatesRouteWithChildren
   '/dashboard/hive-exec/tickets': typeof DashboardHiveExecTicketsRoute
+  '/dashboard/hive-exec/training': typeof DashboardHiveExecTrainingRoute
   '/dashboard/hive-exec/upgrade-requests': typeof DashboardHiveExecUpgradeRequestsRoute
   '/dashboard/homes/$teamId': typeof DashboardHomesTeamIdRoute
   '/dashboard/hr-admin/settings': typeof DashboardHrAdminSettingsRoute
@@ -1894,6 +1913,7 @@ export interface FileRoutesById {
   '/dashboard/smart-import/history': typeof DashboardSmartImportHistoryRoute
   '/dashboard/tracks/$trackSlug': typeof DashboardTracksTrackSlugRoute
   '/dashboard/training/$id': typeof DashboardTrainingIdRoute
+  '/dashboard/training/catalog': typeof DashboardTrainingCatalogRoute
   '/dashboard/workspace/$clientId': typeof DashboardWorkspaceClientIdRoute
   '/sign/employee-loan/$token': typeof SignEmployeeLoanTokenRoute
   '/dashboard/billing/': typeof DashboardBillingIndexRoute
@@ -2077,6 +2097,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/states'
     | '/dashboard/hive-exec/tickets'
+    | '/dashboard/hive-exec/training'
     | '/dashboard/hive-exec/upgrade-requests'
     | '/dashboard/homes/$teamId'
     | '/dashboard/hr-admin/settings'
@@ -2101,6 +2122,7 @@ export interface FileRouteTypes {
     | '/dashboard/smart-import/history'
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
+    | '/dashboard/training/catalog'
     | '/dashboard/workspace/$clientId'
     | '/sign/employee-loan/$token'
     | '/dashboard/billing/'
@@ -2275,6 +2297,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/states'
     | '/dashboard/hive-exec/tickets'
+    | '/dashboard/hive-exec/training'
     | '/dashboard/hive-exec/upgrade-requests'
     | '/dashboard/homes/$teamId'
     | '/dashboard/hr-admin/settings'
@@ -2299,6 +2322,7 @@ export interface FileRouteTypes {
     | '/dashboard/smart-import/history'
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
+    | '/dashboard/training/catalog'
     | '/dashboard/workspace/$clientId'
     | '/sign/employee-loan/$token'
     | '/dashboard/billing'
@@ -2480,6 +2504,7 @@ export interface FileRouteTypes {
     | '/dashboard/hive-exec/plans'
     | '/dashboard/hive-exec/states'
     | '/dashboard/hive-exec/tickets'
+    | '/dashboard/hive-exec/training'
     | '/dashboard/hive-exec/upgrade-requests'
     | '/dashboard/homes/$teamId'
     | '/dashboard/hr-admin/settings'
@@ -2504,6 +2529,7 @@ export interface FileRouteTypes {
     | '/dashboard/smart-import/history'
     | '/dashboard/tracks/$trackSlug'
     | '/dashboard/training/$id'
+    | '/dashboard/training/catalog'
     | '/dashboard/workspace/$clientId'
     | '/sign/employee-loan/$token'
     | '/dashboard/billing/'
@@ -3287,6 +3313,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardWorkspaceClientIdRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/training/catalog': {
+      id: '/dashboard/training/catalog'
+      path: '/training/catalog'
+      fullPath: '/dashboard/training/catalog'
+      preLoaderRoute: typeof DashboardTrainingCatalogRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/training/$id': {
       id: '/dashboard/training/$id'
       path: '/training/$id'
@@ -3453,6 +3486,13 @@ declare module '@tanstack/react-router' {
       path: '/upgrade-requests'
       fullPath: '/dashboard/hive-exec/upgrade-requests'
       preLoaderRoute: typeof DashboardHiveExecUpgradeRequestsRouteImport
+      parentRoute: typeof DashboardHiveExecRoute
+    }
+    '/dashboard/hive-exec/training': {
+      id: '/dashboard/hive-exec/training'
+      path: '/training'
+      fullPath: '/dashboard/hive-exec/training'
+      preLoaderRoute: typeof DashboardHiveExecTrainingRouteImport
       parentRoute: typeof DashboardHiveExecRoute
     }
     '/dashboard/hive-exec/tickets': {
@@ -4170,6 +4210,7 @@ interface DashboardHiveExecRouteChildren {
   DashboardHiveExecPlansRoute: typeof DashboardHiveExecPlansRoute
   DashboardHiveExecStatesRoute: typeof DashboardHiveExecStatesRouteWithChildren
   DashboardHiveExecTicketsRoute: typeof DashboardHiveExecTicketsRoute
+  DashboardHiveExecTrainingRoute: typeof DashboardHiveExecTrainingRoute
   DashboardHiveExecUpgradeRequestsRoute: typeof DashboardHiveExecUpgradeRequestsRoute
   DashboardHiveExecIndexRoute: typeof DashboardHiveExecIndexRoute
 }
@@ -4196,6 +4237,7 @@ const DashboardHiveExecRouteChildren: DashboardHiveExecRouteChildren = {
   DashboardHiveExecPlansRoute: DashboardHiveExecPlansRoute,
   DashboardHiveExecStatesRoute: DashboardHiveExecStatesRouteWithChildren,
   DashboardHiveExecTicketsRoute: DashboardHiveExecTicketsRoute,
+  DashboardHiveExecTrainingRoute: DashboardHiveExecTrainingRoute,
   DashboardHiveExecUpgradeRequestsRoute: DashboardHiveExecUpgradeRequestsRoute,
   DashboardHiveExecIndexRoute: DashboardHiveExecIndexRoute,
 }
@@ -4395,6 +4437,7 @@ interface DashboardRouteChildren {
   DashboardHubKnowledgeRoute: typeof DashboardHubKnowledgeRoute
   DashboardShiftShiftIdRoute: typeof DashboardShiftShiftIdRoute
   DashboardTrainingIdRoute: typeof DashboardTrainingIdRoute
+  DashboardTrainingCatalogRoute: typeof DashboardTrainingCatalogRoute
   DashboardWorkspaceClientIdRoute: typeof DashboardWorkspaceClientIdRoute
   DashboardCoursesIndexRoute: typeof DashboardCoursesIndexRoute
   DashboardEmployeesIndexRoute: typeof DashboardEmployeesIndexRoute
@@ -4491,6 +4534,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardHubKnowledgeRoute: DashboardHubKnowledgeRoute,
   DashboardShiftShiftIdRoute: DashboardShiftShiftIdRoute,
   DashboardTrainingIdRoute: DashboardTrainingIdRoute,
+  DashboardTrainingCatalogRoute: DashboardTrainingCatalogRoute,
   DashboardWorkspaceClientIdRoute: DashboardWorkspaceClientIdRoute,
   DashboardCoursesIndexRoute: DashboardCoursesIndexRoute,
   DashboardEmployeesIndexRoute: DashboardEmployeesIndexRoute,

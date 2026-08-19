@@ -21,6 +21,7 @@ export const EXEC_CAPABILITIES = [
   "support.manage",
   "steve.use",
   "knowledge.manage",
+  "training.manage",
 ] as const;
 
 export type ExecCapability = (typeof EXEC_CAPABILITIES)[number];

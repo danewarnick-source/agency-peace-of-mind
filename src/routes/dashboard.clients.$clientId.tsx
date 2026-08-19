@@ -88,7 +88,7 @@ export const Route = createFileRoute("/dashboard/clients/$clientId")({
   head: () => ({ meta: [{ title: "Client Profile — HIVE" }] }),
   validateSearch: search,
   component: () => (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="view_clients">
       <ClientProfileHub />
     </RequirePermission>
   ),
@@ -193,7 +193,7 @@ function ClientProfileHub() {
       return (count ?? 0) > 0;
     },
   });
-  // Admin gate: this route is already admin-only (manage_users). Always show
+  // Admin gate: this route is already admin-only (view_clients). Always show
   // the MAR/eMAR sub-tab so an admin can add the first medication for a
   // client with none — MarEmarTab handles its own empty/add state.
   const showEmarSubTab = true;

@@ -23,7 +23,7 @@ import { getUnmetStaffMandates, recordStaffMandateOverride } from "@/lib/forms.f
 export const Route = createFileRoute("/dashboard/assignments")({
   head: () => ({ meta: [{ title: "Caseloads — HIVE" }] }),
   component: () => (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="view_staff_records">
       <AssignmentsPage />
     </RequirePermission>
   ),

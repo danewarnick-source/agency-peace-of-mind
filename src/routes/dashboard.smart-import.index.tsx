@@ -30,7 +30,7 @@ export const Route = createFileRoute("/dashboard/smart-import/")({
   head: () => ({ meta: [{ title: "Smart Import — NECTAR" }] }),
   validateSearch: (s) => SearchSchema.parse(s),
   component: () => (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="view_staff_records">
       <SmartImportPage />
     </RequirePermission>
   ),

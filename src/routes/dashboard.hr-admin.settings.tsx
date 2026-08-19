@@ -8,7 +8,7 @@ import { StaffTypesProposal } from "@/components/hr/staff-types-proposal";
 export const Route = createFileRoute("/dashboard/hr-admin/settings")({
   head: () => ({ meta: [{ title: "HR Settings — HIVE" }] }),
   component: () => (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="edit_staff_records">
       <HrSettingsPage />
     </RequirePermission>
   ),

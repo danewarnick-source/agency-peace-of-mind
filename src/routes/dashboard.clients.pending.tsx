@@ -26,7 +26,7 @@ import { clientPendingStatusLabel } from "@/lib/smart-import-status";
 export const Route = createFileRoute("/dashboard/clients/pending")({
   head: () => ({ meta: [{ title: "Pending Clients" }] }),
   component: () => (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="manage_client_intake">
       <PendingClientsPage />
     </RequirePermission>
   ),

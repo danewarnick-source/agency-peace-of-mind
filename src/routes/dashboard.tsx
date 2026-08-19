@@ -244,7 +244,7 @@ function DashboardLayout() {
 
   const role: Role = org?.role ?? "employee";
   const isCommitteeMember = role === "committee_member";
-  const isAdminCapable = !isCommitteeMember && (can("manage_users") || role === "admin" || role === "manager" || role === "super_admin");
+  const isAdminCapable = !isCommitteeMember && (can("view_staff_records") || role === "admin" || role === "manager" || role === "super_admin");
 
   // Fail-closed gate: a committee_member can ONLY access /dashboard/hrc.
   // Redirect away from anything else immediately.

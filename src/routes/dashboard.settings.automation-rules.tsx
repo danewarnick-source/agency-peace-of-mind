@@ -24,7 +24,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/dashboard/settings/automation-rules")({
   head: () => ({ meta: [{ title: "Automation Rules — HIVE" }] }),
   component: () => (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="manage_organization_settings">
       <AutomationRulesPage />
     </RequirePermission>
   ),

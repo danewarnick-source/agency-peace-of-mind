@@ -47,7 +47,7 @@ function ClientsHub() {
       key: "teams",
       label: "Teams & homes",
       render: () => (
-        <RequirePermission perm="manage_users">
+        <RequirePermission perm="view_clients">
           <TeamsPage />
         </RequirePermission>
       ),
@@ -61,7 +61,7 @@ function ClientsHub() {
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               PBA Trust Ledger
             </h3>
-            <RequirePermission perm="manage_users">
+            <RequirePermission perm="view_clients">
               <PbaLedgerPage />
             </RequirePermission>
           </section>

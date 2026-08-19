@@ -39,7 +39,9 @@ import {
 import { AlertTriangle, CheckCircle2, Circle, Lock, MoreHorizontal } from "lucide-react";
 import {
   confirmFailedObligationCompletion,
+  countObligationAssigneesMissingHireDate,
   deleteCompanyObligation,
+  listObligationAssignees,
   logObligationEvent,
   toggleObligationActive,
   type CompanyObligationRow,
@@ -80,12 +82,18 @@ export function cadenceLabel(ob: CompanyObligationRow): string {
       return "Quarterly · 1st of quarter";
     }
     case "annually": {
+      // every_n_months and anniversary_based obligations are stored with
+      // cadence='annually' but compute their interval from a per-staffer
+      // cert/hire date, not a shared calendar month/day — check these first.
       if (cfg.every_n_months !== undefined) {
         const n = Number(cfg.every_n_months);
         const from = cfg.from === "cert_expiration" ? "cert expiration" : "completion";
         return n === 24 ? `Every 2 years · from ${from}`
              : n === 12 ? `Annually · from ${from}`
              : `Every ${n} months · from ${from}`;
+      }
+      if (cfg.anniversary_based === true) {
+        return "Annually · from hire date";
       }
       const m = Number(cfg.month);
       const d = cfg.day_of_month;
@@ -184,24 +192,23 @@ function PerNameCompletion({
   obligation: ObligationWithInstance;
 }) {
   const instanceId = obligation.current_instance?.id;
+  const listAssigneesFn = useServerFn(listObligationAssignees);
   const { data } = useQuery({
-    queryKey: ["obligation-instance-detail", instanceId],
+    queryKey: ["obligation-instance-detail", instanceId, obligation.id],
     enabled: !!instanceId,
     queryFn: async () => {
-      const [{ data: assignees, error: aErr }, { data: completions, error: cErr }] = await Promise.all([
-        supabase
-          .from("company_obligation_instance_assignees")
-          .select("staff_id, staff_name")
-          .eq("instance_id", instanceId as string),
+      const [assignees, { data: completions, error: cErr }] = await Promise.all([
+        listAssigneesFn({ data: { organizationId: orgId, obligationId: obligation.id } }),
         supabase
           .from("company_obligation_completions")
           .select("id, staff_id, staff_name, completed_at, nectar_validation_status, nectar_validation_reasons, nectar_extracted_cert_type")
           .eq("instance_id", instanceId as string),
       ]);
-      if (aErr) throw new Error(aErr.message);
       if (cErr) throw new Error(cErr.message);
       return {
-        assignees: (assignees ?? []) as AssigneeRow[],
+        // Full resolved group roster, not just staff snapshotted onto this
+        // one instance — so staff added to the group later still appear.
+        assignees: assignees.map((a) => ({ staff_id: a.staff_id, staff_name: a.staff_name })) as AssigneeRow[],
         completions: (completions ?? []) as CompletionRow[],
       };
     },
@@ -424,6 +431,31 @@ function LogEventDialog({
   );
 }
 
+function HireDateWarning({ orgId, obligation }: { orgId: string; obligation: CompanyObligationRow }) {
+  const cfg = (obligation.due_day_config ?? {}) as Record<string, unknown>;
+  const usesHireDate = cfg.days_after_hire !== undefined || cfg.anniversary_based === true;
+  const countFn = useServerFn(countObligationAssigneesMissingHireDate);
+  const { data } = useQuery({
+    queryKey: ["obligation-missing-hire-date", obligation.id],
+    enabled: obligation.scope === "staff" && usesHireDate,
+    queryFn: () => countFn({ data: { organizationId: orgId, obligationId: obligation.id } }),
+  });
+
+  if (obligation.scope !== "staff" || !usesHireDate || !data?.missing) return null;
+
+  return (
+    <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-300/60 bg-amber-500/10 p-2.5 text-xs text-amber-900 dark:text-amber-200">
+      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <span>
+        {data.missing} staff member{data.missing === 1 ? "" : "s"} {data.missing === 1 ? "has" : "have"} no hire date —
+        due dates cannot be calculated for {data.missing === 1 ? "them" : "them"}.{" "}
+
+        <a href="/dashboard/employees" className="underline underline-offset-2">Set hire dates →</a>
+      </span>
+    </div>
+  );
+}
+
 export function ObligationCard({
   orgId,
   obligation,
@@ -568,6 +600,8 @@ export function ObligationCard({
             )}
           </div>
 
+          <HireDateWarning orgId={orgId} obligation={obligation} />
+
           <div className="mt-3">
             <InstanceStatusLine instance={obligation.current_instance} />
           </div>
@@ -619,6 +653,7 @@ export function ObligationCard({
         orgId={orgId}
         instanceId={obligation.current_instance?.id ?? null}
         attestationText={obligation.attestation_text}
+        evidenceType={obligation.evidence_type}
       />
       <ObligationHistorySheet
         open={historyOpen}

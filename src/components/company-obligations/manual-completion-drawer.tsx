@@ -44,13 +44,25 @@ export function ManualCompletionDrawer({
   orgId,
   instanceId,
   attestationText,
+  evidenceType,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   orgId: string;
   instanceId: string | null;
   attestationText?: string | null;
+  evidenceType?: "attestation" | "upload" | "upload_and_attestation" | "form" | null;
 }) {
+  // An attestation is a first-person statement — an admin cannot make one on
+  // a staff member's behalf, so this obligation can't be completed manually
+  // at all here (the staff member must attest themselves).
+  const attestationBlocked = evidenceType === "attestation";
+  // upload_and_attestation lets an admin file the document half, but the
+  // attestation half still requires the staff member personally, so
+  // "Attestation" is never an admin-selectable evidence choice.
+  const hideAttestationChoice = evidenceType === "attestation" || evidenceType === "upload_and_attestation";
+  const defaultChoice: EvidenceChoice = hideAttestationChoice ? "upload" : "attestation";
+
   const qc = useQueryClient();
   const { user } = useAuth();
   const recordFn = useServerFn(recordCompletion);
@@ -59,7 +71,7 @@ export function ManualCompletionDrawer({
   const [staffName, setStaffName] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [completedAt, setCompletedAt] = useState(() => toLocalDatetimeInputValue(new Date()));
-  const [evidenceChoice, setEvidenceChoice] = useState<EvidenceChoice>("attestation");
+  const [evidenceChoice, setEvidenceChoice] = useState<EvidenceChoice>(defaultChoice);
   const [attestConfirmed, setAttestConfirmed] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
@@ -69,11 +81,12 @@ export function ManualCompletionDrawer({
       setStaffId(null);
       setStaffName("");
       setCompletedAt(toLocalDatetimeInputValue(new Date()));
-      setEvidenceChoice("attestation");
+      setEvidenceChoice(defaultChoice);
       setAttestConfirmed(false);
       setFile(null);
       setNotes("");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const { data: directory = [] } = useQuery({
@@ -157,120 +170,141 @@ export function ManualCompletionDrawer({
           <SheetDescription>Record a completion on behalf of a staff member.</SheetDescription>
         </SheetHeader>
 
-        <div className="mt-4 space-y-4 pb-4">
-          <div className="grid gap-1.5">
-            <Label>Who completed it</Label>
-            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-              <PopoverTrigger asChild>
-                <Button type="button" variant="outline" className="justify-start font-normal">
-                  {staffName || "Select staff member…"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-72 p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Search staff…" />
-                  <CommandList>
-                    <CommandEmpty>No matches.</CommandEmpty>
-                    <CommandGroup>
-                      {directory.map((d) => (
-                        <CommandItem
-                          key={d.id}
-                          value={d.full_name ?? d.id}
-                          onSelect={() => {
-                            setStaffId(d.id);
-                            setStaffName(d.full_name ?? "Unnamed");
-                            setPickerOpen(false);
-                          }}
-                        >
-                          {d.full_name ?? "Unnamed"}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label>Date and time completed</Label>
-            <Input
-              type="datetime-local"
-              value={completedAt}
-              onChange={(e) => setCompletedAt(e.target.value)}
-            />
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label>Evidence type</Label>
-            <Select value={evidenceChoice} onValueChange={(v) => setEvidenceChoice(v as EvidenceChoice)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="attestation">Attestation</SelectItem>
-                <SelectItem value="upload">Upload</SelectItem>
-                <SelectItem value="notes">Notes only</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {evidenceChoice === "attestation" && (
-            <div className="grid gap-1.5">
-              <div className="rounded-md border border-border bg-muted/40 p-2.5 text-sm">
-                {attestationText || "No attestation text configured for this obligation."}
+        {attestationBlocked ? (
+          <>
+            <div className="mt-4 rounded-md border border-amber-300/60 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
+              This obligation requires the staff member to attest personally. Use the "Notify staff to attest"
+              button on the obligation card to send them a reminder.
+            </div>
+            <SheetFooter className="gap-2 sm:justify-end">
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button disabled title="Staff must attest personally.">Save completion</Button>
+            </SheetFooter>
+          </>
+        ) : (
+          <>
+            <div className="mt-4 space-y-4 pb-4">
+              <div className="grid gap-1.5">
+                <Label>Who completed it</Label>
+                <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button type="button" variant="outline" className="justify-start font-normal">
+                      {staffName || "Select staff member…"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72 p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search staff…" />
+                      <CommandList>
+                        <CommandEmpty>No matches.</CommandEmpty>
+                        <CommandGroup>
+                          {directory.map((d) => (
+                            <CommandItem
+                              key={d.id}
+                              value={d.full_name ?? d.id}
+                              onSelect={() => {
+                                setStaffId(d.id);
+                                setStaffName(d.full_name ?? "Unnamed");
+                                setPickerOpen(false);
+                              }}
+                            >
+                              {d.full_name ?? "Unnamed"}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
-              <label className="flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="mt-0.5"
-                  checked={attestConfirmed}
-                  onChange={(e) => setAttestConfirmed(e.target.checked)}
+
+              <div className="grid gap-1.5">
+                <Label>Date and time completed</Label>
+                <Input
+                  type="datetime-local"
+                  value={completedAt}
+                  onChange={(e) => setCompletedAt(e.target.value)}
                 />
-                I am confirming this on behalf of {staffName || "[selected staff]"}
-              </label>
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label>Evidence type</Label>
+                <Select value={evidenceChoice} onValueChange={(v) => setEvidenceChoice(v as EvidenceChoice)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {!hideAttestationChoice && <SelectItem value="attestation">Attestation</SelectItem>}
+                    <SelectItem value="upload">Upload</SelectItem>
+                    <SelectItem value="notes">Notes only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {evidenceType === "upload_and_attestation" && evidenceChoice === "upload" && (
+                <p className="text-xs text-muted-foreground">
+                  After filing the document, the staff member must still complete their personal attestation.
+                </p>
+              )}
+
+              {evidenceChoice === "attestation" && (
+                <div className="grid gap-1.5">
+                  <div className="rounded-md border border-border bg-muted/40 p-2.5 text-sm">
+                    {attestationText || "No attestation text configured for this obligation."}
+                  </div>
+                  <label className="flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={attestConfirmed}
+                      onChange={(e) => setAttestConfirmed(e.target.checked)}
+                    />
+                    I am confirming this on behalf of {staffName || "[selected staff]"}
+                  </label>
+                </div>
+              )}
+
+              {evidenceChoice === "upload" && (
+                <div className="grid gap-1.5">
+                  <Label>File</Label>
+                  <label className="flex min-h-[40px] cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted">
+                    <Upload className="h-3.5 w-3.5" />
+                    {file ? file.name : "Choose file…"}
+                    <input type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+                  </label>
+                </div>
+              )}
+
+              {needsNotes && (
+                <div className="grid gap-1.5">
+                  <Label>Notes</Label>
+                  <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} required />
+                </div>
+              )}
+
+              <div className="flex items-start gap-2 rounded-md border border-amber-300/60 bg-amber-500/10 p-2.5 text-xs text-amber-900 dark:text-amber-200">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>
+                  You are recording this on behalf of {staffName || "the selected staff member"}
+                  {staffName ? "." : " — select a staff member above."}
+                  {staffName && ` This entry will be marked as manually recorded by ${adminName}.`}
+                </span>
+              </div>
+
+              {!needsNotes && (
+                <div className="grid gap-1.5">
+                  <Label>Notes (optional)</Label>
+                  <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
+                </div>
+              )}
             </div>
-          )}
 
-          {evidenceChoice === "upload" && (
-            <div className="grid gap-1.5">
-              <Label>File</Label>
-              <label className="flex min-h-[40px] cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted">
-                <Upload className="h-3.5 w-3.5" />
-                {file ? file.name : "Choose file…"}
-                <input type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-              </label>
-            </div>
-          )}
-
-          {needsNotes && (
-            <div className="grid gap-1.5">
-              <Label>Notes</Label>
-              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} required />
-            </div>
-          )}
-
-          <div className="flex items-start gap-2 rounded-md border border-amber-300/60 bg-amber-500/10 p-2.5 text-xs text-amber-900 dark:text-amber-200">
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>
-              You are recording this on behalf of {staffName || "the selected staff member"}
-              {staffName ? "." : " — select a staff member above."}
-              {staffName && ` This entry will be marked as manually recorded by ${adminName}.`}
-            </span>
-          </div>
-
-          {!needsNotes && (
-            <div className="grid gap-1.5">
-              <Label>Notes (optional)</Label>
-              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </div>
-          )}
-        </div>
-
-        <SheetFooter className="gap-2 sm:justify-end">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={() => record.mutate()} disabled={!canSave || record.isPending}>
-            Save completion
-          </Button>
-        </SheetFooter>
+            <SheetFooter className="gap-2 sm:justify-end">
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button onClick={() => record.mutate()} disabled={!canSave || record.isPending}>
+                Save completion
+              </Button>
+            </SheetFooter>
+          </>
+        )}
       </SheetContent>
     </Sheet>
   );

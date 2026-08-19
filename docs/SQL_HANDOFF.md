@@ -2862,3 +2862,54 @@ export them first.
 - `public.notifications`'s `type` check constraint gains one new allowed
   value, `'permission_requested'`, for the staff "Request access" flow.
   No existing notification rows are touched.
+
+---
+
+## ACTION — Company Obligations follow-up fixes: urgency constraint, cadence data, instance regeneration (2026-08-19)
+
+**What this is for:** TNS review of the Company Obligations tracker turned
+up six issues: a stale `notifications.urgency` CHECK constraint rejecting
+the `'high'` value the reminder/notify code already sends; a wrong
+`cadence` value on CPR Renewal; stale obligation instances that need to
+regenerate under corrected due-date logic (CPR Initial's 90-day window, a
+new 30-day grace period for `days_after_hire: 0` obligations on existing
+staff, and corrected anniversary configs for Annual 12-Hour Continuing
+Education / Background Screening); and ACRE Training (and other
+service-code-targeted staff obligations) generating instances for staff who
+don't actually work with that service code.
+
+Paste the full contents of
+`supabase/migrations/20260819150921_obligations_followup_fixes.sql` here —
+it's a sequence of six independent blocks (constraint fix, cadence
+correction, three instance-regeneration deletes, two due_day_config
+corrections), so it isn't duplicated in this doc.
+
+Before running: this block assumes True North Supports FAKE's organization
+id is `7fabcf5d-f826-487f-8730-8b0c3f1969bb` (used throughout the existing
+obligations seed data). If that's changed, tell me before running.
+
+**What you'll see:**
+- `public.notifications_urgency_check` is replaced to allow
+  `('low','normal','high','urgent','critical')` — was
+  `('normal','urgent','critical')`. No existing notification rows are
+  touched; this only affects new inserts, which immediately stop failing
+  with "violates check constraint notifications_urgency_check".
+- CPR Renewal's `cadence` is corrected to `'annually'` for TNS FAKE (only
+  if it isn't already, and only if its `due_day_config` actually has
+  `every_n_months` set — a data-only change, no schema change).
+- CPR Initial's existing instances for TNS FAKE are deleted so
+  `listCompanyObligations`'s bootstrap regenerates them with the corrected
+  90-day `due_day_config` on next page load.
+- Instances for any obligation with `due_day_config->>'days_after_hire' =
+  '0'` are deleted for TNS FAKE, so they regenerate under the new 30-day
+  grace-period logic (existing staff get 30 days from when the obligation
+  was added to the platform, instead of being immediately overdue).
+- Annual 12-Hour Continuing Education and Background Screening — Annual
+  get their `due_day_config` corrected to include `anniversary_based: true`
+  (12-Hour also gets `start_year: 2`) if either field was missing, then
+  their instances are deleted so they regenerate correctly.
+- Instances for staff-scoped obligations targeting SEI/SED/SJD/SEE/HSQ/
+  PPS/CMP/CMS service codes (ACRE Training and similar) are deleted for TNS
+  FAKE so they regenerate under the corrected assignee filter — only staff
+  actually assigned to a client with a matching service code get an
+  instance, instead of every member of the assigned group.

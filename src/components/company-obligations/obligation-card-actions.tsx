@@ -370,7 +370,7 @@ function StaffRequiredActions({
             obligation={obligation}
             instanceId={instance.id}
             outstanding={outstanding}
-            label={obligation.evidence_type === "upload_and_attestation" ? "File upload for staff member →" : "File for staff member"}
+            label={obligation.evidence_type === "upload_and_attestation" ? "File document for staff member →" : "File document for staff member"}
           />
         )}
         {needsAttestation && (

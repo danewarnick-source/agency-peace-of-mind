@@ -2913,3 +2913,64 @@ obligations seed data). If that's changed, tell me before running.
   FAKE so they regenerate under the corrected assignee filter — only staff
   actually assigned to a client with a matching service code get an
   instance, instead of every member of the assigned group.
+
+---
+
+## ACTION — Diagnose + backfill `manage_users` in `role_permissions` (2026-08-19)
+
+**What this is for:** admins are hitting the unauthorized page on the
+employee profile, clients, and compliance-desk routes, which are all
+gated by `perm="manage_users"` (`RequirePermission` in
+`src/components/rbac-guard.tsx`). `usePermissions()` resolves permissions
+**only** from `role_permissions` for the current org — there is no
+runtime fallback to `DEFAULT_MATRIX` in `src/lib/rbac.ts` — so a missing
+or `enabled=false` row denies access even to admins.
+
+`manage_users` is already listed in the `_all_perms` array of
+`seed_org_role_permissions()` (added in the 2026-08-17 permission-system
+migration, which backfilled every existing org with `admin`/`super_admin`
+set to `enabled=true` via `ON CONFLICT DO NOTHING`). If that migration
+ran cleanly, this should already be fixed — so **run the diagnostic block
+first** and only run the backfill block if it shows a gap. This is a
+data-only fix; no code changes.
+
+**Block 1 — diagnostic (read-only):**
+
+```sql
+SELECT o.name AS organization_name, o.id AS organization_id,
+       rp.role, rp.enabled
+FROM public.organizations o
+LEFT JOIN public.role_permissions rp
+  ON rp.organization_id = o.id
+ AND rp.permission = 'manage_users'
+ AND rp.role IN ('admin', 'super_admin')
+ORDER BY o.name, rp.role;
+```
+
+**What you'll see:** one row per org per admin-type role that has a
+`role_permissions` row for `manage_users`, plus a row with `role = NULL`
+for any org that has no row at all (missing row = same effect as
+`enabled = false`, since `usePermissions()` treats "no row" as denied).
+Tell me what this returns — specifically whether True North Supports
+shows `enabled = true` for both `admin` and `super_admin` — before
+running Block 2.
+
+**Block 2 — backfill (only if Block 1 shows a gap for TNS):**
+
+```sql
+INSERT INTO public.role_permissions (organization_id, role, permission, enabled)
+SELECT o.id, r.role, 'manage_users', true
+FROM public.organizations o
+CROSS JOIN (VALUES ('admin'), ('super_admin')) AS r(role)
+ON CONFLICT (organization_id, role, permission)
+DO UPDATE SET enabled = true, updated_at = now()
+WHERE public.role_permissions.enabled = false;
+```
+
+**What you'll see:** a `manage_users` row with `enabled = true` for
+`admin` and `super_admin` in every org — inserted where the row was
+missing, flipped to `true` where it existed but was disabled. Rows that
+were already `enabled = true` are left untouched (`DO UPDATE` only fires
+`WHERE enabled = false`, so `updated_at` doesn't churn on rows that don't
+need it). This does not touch `manager`, `employee`, or
+`committee_member` rows, and does not touch any other permission key.

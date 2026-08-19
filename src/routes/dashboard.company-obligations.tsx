@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Upload, ClipboardList } from "lucide-react";
+import { Search, Plus, Upload, ClipboardList, CheckCircle2 } from "lucide-react";
 import { listCompanyObligations } from "@/lib/company-obligations.functions";
 import { listStaffGroups, type StaffGroupRow } from "@/lib/staff-groups.functions";
 import { ObligationCard, type ObligationWithInstance } from "@/components/company-obligations/obligation-card";
@@ -33,6 +33,17 @@ function isDueWithinDays(iso: string, days: number): boolean {
   const due = new Date(iso).getTime();
   const now = Date.now();
   return due >= now && due <= now + days * 86_400_000;
+}
+
+const FUTURE_WINDOW_DAYS = 120;
+
+function isWithinFutureWindow(o: CompanyObligationRow & { current_instance: ObligationInstanceRow | null }): boolean {
+  if (o.cadence === "per_event") return true; // trigger-based — always show
+  const inst = o.current_instance;
+  if (!inst) return true; // no instance yet — nothing to hide
+  if (inst.status === "overdue") return true;
+  if (!inst.due_at) return true; // hire date missing / due date not computable
+  return new Date(inst.due_at).getTime() <= Date.now() + FUTURE_WINDOW_DAYS * 86_400_000;
 }
 
 function StatCard({ label, count, tone }: { label: string; count: number; tone: "red" | "amber" | "green" }) {
@@ -110,6 +121,7 @@ function ObligationsTab({ orgId }: { orgId: string }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "paused">("all");
   const [scopeFilter, setScopeFilter] = useState<"all" | "org" | "staff" | "staff_per_client">("all");
+  const [showFuture, setShowFuture] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingObligation, setEditingObligation] = useState<CompanyObligationRow | null>(null);
 
@@ -141,10 +153,16 @@ function ObligationsTab({ orgId }: { orgId: string }) {
     if (filter === "active") list = list.filter((o) => o.active);
     if (filter === "paused") list = list.filter((o) => !o.active);
     if (scopeFilter !== "all") list = list.filter((o) => o.scope === scopeFilter);
+    if (!showFuture) list = list.filter(isWithinFutureWindow);
     const q = search.trim().toLowerCase();
     if (q) list = list.filter((o) => o.title.toLowerCase().includes(q));
     return [...list].sort((a, b) => (a.active === b.active ? 0 : a.active ? -1 : 1));
-  }, [obligations, filter, scopeFilter, search]);
+  }, [obligations, filter, scopeFilter, search, showFuture]);
+
+  const futureWindowLabel = useMemo(() => {
+    const d = new Date(Date.now() + FUTURE_WINDOW_DAYS * 86_400_000);
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }, []);
 
   const openCreate = () => {
     setEditingObligation(null);
@@ -239,7 +257,32 @@ function ObligationsTab({ orgId }: { orgId: string }) {
               </div>
             </div>
 
-            {filtered.length === 0 ? (
+            <button
+              type="button"
+              onClick={() => setShowFuture((v) => !v)}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              {showFuture
+                ? "Showing all obligations — Show only obligations due within 120 days →"
+                : `Showing obligations due within ${FUTURE_WINDOW_DAYS} days — Show all →`}
+            </button>
+
+            {filtered.length === 0 && !showFuture ? (
+              <div className="rounded-lg border border-dashed border-border p-8 text-center">
+                <CheckCircle2 className="mx-auto mb-3 h-8 w-8 text-success" />
+                <p className="font-medium text-foreground">No obligations due in the next {FUTURE_WINDOW_DAYS} days</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  All upcoming obligations are scheduled beyond {futureWindowLabel}.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowFuture(true)}
+                  className="mt-3 text-sm text-primary underline"
+                >
+                  Show all future obligations →
+                </button>
+              </div>
+            ) : filtered.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
                 No obligations match your filters.
               </div>

@@ -204,12 +204,18 @@ export function cadenceDescription(ob: Pick<CompanyObligationRow, "cadence" | "d
       return `Quarterly — due ${d === "last" ? "the last day" : ordinal(Number(d))} of the first month of the quarter`;
     }
     case "annually": {
+      // every_n_months and anniversary_based obligations are stored with
+      // cadence='annually' but compute their interval from a per-staffer
+      // cert/hire date, not a shared calendar month/day — check these first.
       if (cfg.every_n_months !== undefined) {
         const n = Number(cfg.every_n_months);
         const src = cfg.from === "cert_expiration" ? "cert expiration date" : "completion date";
         return n === 24
           ? `Every 2 years — renewal due on ${src}`
           : `Every ${n} months — renewal due on ${src}`;
+      }
+      if (cfg.anniversary_based === true) {
+        return "Annually — due on hire anniversary date";
       }
       const m = Number(cfg.month);
       const d = cfg.day_of_month;
@@ -500,7 +506,9 @@ async function generatePerPersonInstancesInternal(
   ob: CompanyObligationRow,
 ): Promise<ObligationInstanceRow[]> {
   const cfg = (ob.due_day_config ?? {}) as Record<string, unknown>;
-  const assignees = await resolveAllAssigneesInternal(supabase, organizationId, ob);
+  let assignees = await resolveAllAssigneesInternal(supabase, organizationId, ob);
+  if (!assignees.length) return [];
+  assignees = await filterAssigneesByServiceCodesInternal(supabase, organizationId, ob, assignees);
   if (!assignees.length) return [];
 
   const hireDates = await fetchAssigneeHireDates(supabase, assignees.map((a) => a.staff_id));
@@ -518,6 +526,14 @@ async function generatePerPersonInstancesInternal(
       const days = Number(cfg.days_after_hire);
       if (!Number.isFinite(days)) continue;
       due = addDaysUTC(basisDate, days);
+
+      // Grace period: if the obligation was added to the platform after this
+      // staff member's hire date, don't mark them immediately overdue — give
+      // them 30 days from the obligation's creation to comply instead.
+      const obCreatedAt = new Date(ob.created_at ?? todayUTC.toISOString());
+      if (due.getTime() < obCreatedAt.getTime()) {
+        due = addDaysUTC(obCreatedAt, 30);
+      }
     } else if (cfg.every_n_months !== undefined) {
       // First instance for a not-yet-certified assignee: give them a
       // reasonable window from hire before any cert exists. Later renewals
@@ -590,6 +606,39 @@ function arraysOverlapCaseInsensitive(target: string[], have: string[]): boolean
   if (!target.length) return true; // empty target list = applies to everyone
   const haveUpper = new Set(have.map((c) => c.toUpperCase()));
   return target.some((c) => haveUpper.has(c.toUpperCase()));
+}
+
+/**
+ * For scope='staff' obligations with a non-empty target_service_codes list
+ * (e.g. ACRE Training, SEI-only), only staff actively assigned to at least
+ * one client whose service_codes overlap the target list actually work in
+ * that service line — narrows a group-wide assignee list (e.g. "All Staff")
+ * down to the staff it should really apply to.
+ */
+async function filterAssigneesByServiceCodesInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  ob: CompanyObligationRow,
+  assignees: ResolvedStaffMember[],
+): Promise<ResolvedStaffMember[]> {
+  const targetCodes = (ob.target_service_codes ?? []).map((c: string) => c.toUpperCase());
+  if (ob.scope !== "staff" || !targetCodes.length || !assignees.length) return assignees;
+
+  const staffIds = assignees.map((a) => a.staff_id);
+  const { data: assignments, error } = await supabase
+    .from("staff_assignments")
+    .select("staff_id, service_codes")
+    .eq("organization_id", organizationId)
+    .in("staff_id", staffIds);
+  if (error) throw new Error(error.message);
+
+  const staffWithMatchingCode = new Set(
+    ((assignments ?? []) as Array<{ staff_id: string; service_codes: string[] | null }>)
+      .filter((a) => (a.service_codes ?? []).some((c: string) => targetCodes.includes(c.toUpperCase())))
+      .map((a) => a.staff_id),
+  );
+
+  return assignees.filter((a) => staffWithMatchingCode.has(a.staff_id));
 }
 
 async function fetchClientNamesInternal(supabase: AnySupabase, clientIds: string[]): Promise<Map<string, string>> {
@@ -1141,10 +1190,72 @@ export const listCompanyObligations = createServerFn({ method: "POST" })
       }
     }
 
-    return visibleObligations.map((o: CompanyObligationRow) => ({
+    // CPR Renewal is confusing to show alongside CPR Initial before anyone
+    // has actually completed the initial cert — hide it until then.
+    const finalObligations = visibleObligations.filter((o: CompanyObligationRow) => {
+      if (o.title !== "CPR/First Aid Certification — Renewal") return true;
+      const initialOb = visibleObligations.find(
+        (v: CompanyObligationRow) => v.title === "CPR/First Aid Certification — Initial",
+      );
+      if (!initialOb) return false;
+      return latestByObligation.get(initialOb.id)?.status === "completed";
+    });
+
+    return finalObligations.map((o: CompanyObligationRow) => ({
       ...o,
       current_instance: latestByObligation.get(o.id) ?? null,
     }));
+  });
+
+/** Full resolved assignee roster for an obligation (group membership +
+ *  direct assignees, filtered by target_service_codes where applicable) —
+ *  independent of any one instance's assignee snapshot, so staff who were
+ *  added to the group after an instance was created still show up as
+ *  "not yet submitted" instead of silently disappearing. */
+export const listObligationAssignees = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    organizationId: z.string().uuid(),
+    obligationId: z.string().uuid(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return [] as ResolvedStaffMember[];
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+
+    const ob = await fetchObligation(supabase, data.organizationId, data.obligationId);
+    const assignees = await resolveAllAssigneesInternal(supabase, data.organizationId, ob);
+    return filterAssigneesByServiceCodesInternal(supabase, data.organizationId, ob, assignees);
+  });
+
+/** Count of an obligation's assignees with no hire_date and no start_date on
+ *  file — those staff can't have a due date computed for days_after_hire /
+ *  anniversary_based cadences, so the admin needs a nudge to set one. */
+export const countObligationAssigneesMissingHireDate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    organizationId: z.string().uuid(),
+    obligationId: z.string().uuid(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { missing: 0 };
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+
+    const ob = await fetchObligation(supabase, data.organizationId, data.obligationId);
+    let assignees = await resolveAllAssigneesInternal(supabase, data.organizationId, ob);
+    assignees = await filterAssigneesByServiceCodesInternal(supabase, data.organizationId, ob, assignees);
+    if (!assignees.length) return { missing: 0 };
+
+    const { data: rows, error } = await supabase
+      .from("profiles")
+      .select("id, hire_date, start_date")
+      .in("id", assignees.map((a) => a.staff_id));
+    if (error) throw new Error(error.message);
+
+    const missing = ((rows ?? []) as Array<{ id: string; hire_date: string | null; start_date: string | null }>)
+      .filter((r) => !r.hire_date && !r.start_date).length;
+    return { missing };
   });
 
 export const getCompanyObligation = createServerFn({ method: "POST" })

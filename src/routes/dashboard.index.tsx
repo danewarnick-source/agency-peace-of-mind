@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -10,7 +10,6 @@ import { usePortalView } from "@/hooks/use-portal-view";
 import { useDeadlines } from "@/hooks/use-deadlines";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Clock, FileText, ArrowRight, Users, CheckCircle2, ShieldAlert, FileSignature } from "lucide-react";
-import { getHrComplianceMatrix } from "@/lib/hr-staff.functions";
 import { listMyPendingPolicies } from "@/lib/policy-signatures.functions";
 
 import { StaffClientGrid } from "@/components/staff-client-grid";
@@ -20,7 +19,6 @@ import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { TodayHero } from "@/components/staff-mobile/today-hero";
 import { AttentionStrip } from "@/components/staff-mobile/attention-strip";
 import { NectarOnboardingPanel } from "@/components/onboarding/nectar-onboarding-panel";
-import { StaffCompliancePanel } from "@/components/hr/staff-compliance-panel";
 import { PersonAvatar } from "@/components/person/person-avatar";
 import { MyObligationsWidget } from "@/components/company-obligations/my-obligations-widget";
 
@@ -156,15 +154,43 @@ type StaffAttentionRow = {
   pendingCount: number;
 };
 
+type ObligationAttentionInstance = { id: string; status: "pending" | "overdue"; due_at: string };
+type ObligationAssigneeRow = { instance_id: string; staff_id: string; staff_name: string };
+
 function AdminComplianceStatus() {
   const { data: org } = useCurrentOrg();
-  const [panelStaff, setPanelStaff] = useState<{ id: string; name: string } | null>(null);
-  const fetchMatrix = useServerFn(getHrComplianceMatrix);
+  const navigate = useNavigate();
 
-  const matrixQ = useQuery({
+  const obligationInstancesQ = useQuery({
     enabled: !!org,
-    queryKey: ["hr-matrix", org?.organization_id],
-    queryFn: () => fetchMatrix({ data: { organization_id: org!.organization_id } }),
+    queryKey: ["home-obligations-summary", org?.organization_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("company_obligation_instances")
+        .select("id, status, due_at")
+        .eq("organization_id", org!.organization_id)
+        .in("status", ["pending", "overdue"]);
+      if (error) throw new Error(error.message);
+      return (data ?? []) as ObligationAttentionInstance[];
+    },
+  });
+
+  const attentionInstanceIds = useMemo(
+    () => (obligationInstancesQ.data ?? []).map((i) => i.id),
+    [obligationInstancesQ.data],
+  );
+
+  const obligationAssigneesQ = useQuery({
+    enabled: !!org && attentionInstanceIds.length > 0,
+    queryKey: ["home-obligation-instance-assignees", org?.organization_id, attentionInstanceIds],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("company_obligation_instance_assignees")
+        .select("instance_id, staff_id, staff_name")
+        .in("instance_id", attentionInstanceIds);
+      if (error) throw new Error(error.message);
+      return (data ?? []) as ObligationAssigneeRow[];
+    },
   });
 
   const clientsQ = useQuery({
@@ -184,63 +210,36 @@ function AdminComplianceStatus() {
   const { overdue: overdueDeadlines, isLoading: deadlinesLoading } = useDeadlines();
 
   const staffMetrics = useMemo(() => {
-    const matrix = matrixQ.data;
-    if (!matrix) return null;
-    const today = Date.now();
-    const in60Ms = today + 60 * 86_400_000;
+    if (!obligationInstancesQ.data) return null;
+    const statusByInstance = new Map(obligationInstancesQ.data.map((i) => [i.id, i.status]));
+    const perStaff = new Map<string, { full_name: string; overdueCount: number; pendingCount: number }>();
 
-    let staffWithOverdue = 0;
-    let staffWithPending = 0;
-    const attentionRows: StaffAttentionRow[] = [];
-
-    for (const staff of matrix.staff) {
-      let overdueCount = 0;
-      let expiringCount = 0;
-      let pendingCount = 0;
-
-      for (const req of matrix.requirements) {
-        const cell = staff.cells[req.requirement_id];
-        if (!cell || cell.applicable === false) continue;
-        const status = cell.status as string;
-        const expMs = cell.expires_at ? new Date(cell.expires_at as string).getTime() : null;
-        const isExpired =
-          status === "expired" || (expMs !== null && expMs < today);
-        const isSoon =
-          expMs !== null && expMs >= today && expMs <= in60Ms;
-
-        if (isExpired) {
-          overdueCount++;
-        } else if (isSoon) {
-          expiringCount++;
-        } else if (status !== "complete" && status !== "waived") {
-          pendingCount++;
-        }
-      }
-
-      if (overdueCount > 0) staffWithOverdue++;
-      if (overdueCount > 0 || expiringCount > 0 || pendingCount > 0) {
-        staffWithPending++;
-        attentionRows.push({
-          staff_id: staff.staff_id,
-          full_name: staff.full_name,
-          overdueCount,
-          expiringCount,
-          pendingCount,
-        });
-      }
+    for (const a of obligationAssigneesQ.data ?? []) {
+      const status = statusByInstance.get(a.instance_id);
+      if (!status) continue;
+      const row = perStaff.get(a.staff_id) ?? { full_name: a.staff_name, overdueCount: 0, pendingCount: 0 };
+      if (status === "overdue") row.overdueCount++; else row.pendingCount++;
+      perStaff.set(a.staff_id, row);
     }
 
+    const attentionRows: StaffAttentionRow[] = Array.from(perStaff.entries()).map(([staff_id, r]) => ({
+      staff_id,
+      full_name: r.full_name,
+      overdueCount: r.overdueCount,
+      expiringCount: 0,
+      pendingCount: r.pendingCount,
+    }));
+
     // Sort: most severe first
-    attentionRows.sort((a, b) => (b.overdueCount - a.overdueCount) || (b.expiringCount - a.expiringCount));
+    attentionRows.sort((a, b) => (b.overdueCount - a.overdueCount) || (b.pendingCount - a.pendingCount));
 
     return {
-      staffWithOverdue,
-      staffWithPending,
-      totalStaff: matrix.staff.length,
+      staffWithOverdue: attentionRows.filter((r) => r.overdueCount > 0).length,
+      staffWithPending: attentionRows.length,
       attentionRows: attentionRows.slice(0, 5),
       allAttentionRows: attentionRows,
     };
-  }, [matrixQ.data]);
+  }, [obligationInstancesQ.data, obligationAssigneesQ.data]);
 
   const incompleteClientCount = useMemo(() => {
     return (clientsQ.data ?? []).filter(
@@ -253,7 +252,7 @@ function AdminComplianceStatus() {
   // excludes them, so no extra wiring is needed here.
   const overdueDeadlineCount = overdueDeadlines.length;
 
-  const isLoading = matrixQ.isLoading || clientsQ.isLoading || deadlinesLoading;
+  const isLoading = obligationInstancesQ.isLoading || clientsQ.isLoading || deadlinesLoading;
 
   if (isLoading) {
     return (
@@ -423,25 +422,15 @@ function AdminComplianceStatus() {
                   variant="outline"
                   className="h-7 shrink-0 text-xs"
                   onClick={() =>
-                    setPanelStaff({ id: row.staff_id, name: row.full_name })
+                    navigate({ to: "/dashboard/employees/$staffId", params: { staffId: row.staff_id } })
                   }
                 >
-                  View checklist
+                  View profile
                 </Button>
               </li>
             ))}
           </ul>
         </div>
-      )}
-
-      {org && panelStaff && (
-        <StaffCompliancePanel
-          open={!!panelStaff}
-          onOpenChange={(v) => !v && setPanelStaff(null)}
-          organizationId={org.organization_id}
-          staffId={panelStaff.id}
-          staffName={panelStaff.name}
-        />
       )}
     </div>
   );

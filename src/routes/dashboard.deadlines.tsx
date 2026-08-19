@@ -244,12 +244,18 @@ function DeadlineRow({ item, tone }: { item: DeadlineItem; tone: DeadlineItem["s
               item.title
             )}
             {item.source === "company_obligation" && (
-              <Badge
-                variant="outline"
-                className="ml-2 border-amber-400/60 bg-amber-500/10 text-amber-700 dark:border-amber-500/40 dark:text-amber-300"
-              >
-                Company policy
-              </Badge>
+              item.obligationSource === "sow" ? (
+                <Badge className="ml-2 border-transparent bg-blue-600 text-white hover:bg-blue-600">
+                  SOW — DHHS91172
+                </Badge>
+              ) : (
+                <Badge
+                  variant="outline"
+                  className="ml-2 border-amber-400/60 bg-amber-500/10 text-amber-700 dark:border-amber-500/40 dark:text-amber-300"
+                >
+                  Company policy
+                </Badge>
+              )
             )}
             {item.source === "summary" && item.summary?.requires_upi_attestation && (
               <Badge className="ml-2 bg-[#137182] text-white hover:bg-[#137182]">
@@ -265,7 +271,9 @@ function DeadlineRow({ item, tone }: { item: DeadlineItem; tone: DeadlineItem["s
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <span className={`text-xs font-mono ${toneText}`}>{fmtDue(item.dueAt)}</span>
+        <span className={`text-xs font-mono ${item.dueAtMissing ? "text-muted-foreground" : toneText}`}>
+          {item.dueAtMissing ? "No due date set" : fmtDue(item.dueAt)}
+        </span>
         <RowAction item={item} tone={tone} />
       </div>
     </li>

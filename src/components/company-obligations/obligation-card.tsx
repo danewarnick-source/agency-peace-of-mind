@@ -36,7 +36,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { AlertTriangle, CheckCircle2, Circle, Lock, MoreHorizontal } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, Circle, Lock, MoreHorizontal } from "lucide-react";
 import {
   confirmFailedObligationCompletion,
   countObligationAssigneesMissingHireDate,
@@ -214,6 +214,7 @@ function PerNameCompletion({
   orgId: string;
   obligation: ObligationWithInstance;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const instanceId = obligation.current_instance?.id;
   const listAssigneesFn = useServerFn(listObligationAssignees);
   const { data } = useQuery({
@@ -259,7 +260,7 @@ function PerNameCompletion({
     );
   }
 
-  return (
+  const listBody = (
     <div className="grid gap-1.5 text-xs sm:grid-cols-2">
       <div>
         <p className="font-medium text-muted-foreground">Completed:</p>
@@ -309,6 +310,23 @@ function PerNameCompletion({
       </div>
     </div>
   );
+
+  const totalAssigned = assignees.length;
+  const completedCount = completions.length;
+
+  return (
+    <div className="space-y-1.5">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex items-center gap-1 text-xs font-medium text-muted-foreground md:pointer-events-none"
+      >
+        {completedCount} of {totalAssigned} completed
+        <ChevronDown className={`h-3 w-3 shrink-0 transition-transform md:hidden ${expanded ? "rotate-180" : ""}`} />
+      </button>
+      <div className={`${expanded ? "block" : "hidden"} md:block`}>{listBody}</div>
+    </div>
+  );
 }
 
 type PerClientInstanceRow = {
@@ -327,6 +345,7 @@ type PerClientCompletionRow = { instance_id: string; staff_id: string; staff_nam
  *  lists every instance's staff/client pairing with its own status line —
  *  format: "✓ Jordan M. (for Marcus W.) — Aug 11, 4:32 PM". */
 function PerClientCompletion({ obligation }: { obligation: ObligationWithInstance }) {
+  const [expanded, setExpanded] = useState(false);
   const { data } = useQuery({
     queryKey: ["obligation-per-client-detail", obligation.id],
     queryFn: async () => {
@@ -366,11 +385,16 @@ function PerClientCompletion({ obligation }: { obligation: ObligationWithInstanc
 
   return (
     <div className="space-y-1.5">
-      <p className="text-xs font-medium text-muted-foreground">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex items-center gap-1 text-xs font-medium text-muted-foreground md:pointer-events-none"
+      >
         {doneCount} of {instances.length} completed
         {overdueCount > 0 && <span className="text-destructive"> · {overdueCount} overdue</span>}
-      </p>
-      <ul className="space-y-1 text-xs">
+        <ChevronDown className={`h-3 w-3 shrink-0 transition-transform md:hidden ${expanded ? "rotate-180" : ""}`} />
+      </button>
+      <ul className={`space-y-1 text-xs ${expanded ? "block" : "hidden"} md:block`}>
         {instances.map((inst) => {
           const assignee = assigneeByInstance.get(inst.id);
           const completion = completionByInstance.get(inst.id);
@@ -548,9 +572,9 @@ export function ObligationCard({
     : false;
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+    <div className="w-full rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-3">
+        <div className="min-w-0 flex-1">
           <h4 className="font-semibold">{obligation.title}</h4>
           {obligation.source_policy_section && (
             <p className="text-sm text-muted-foreground">{obligation.source_policy_section}</p>
@@ -558,7 +582,7 @@ export function ObligationCard({
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+            <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 self-end md:self-auto">
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -598,9 +622,9 @@ export function ObligationCard({
 
       <div className="mt-2 flex flex-wrap gap-1.5">
         {obligation.source === "sow" && (
-          <Badge className="gap-1 border-transparent bg-blue-600 text-white hover:bg-blue-600">
-            <Lock className="h-3 w-3" />
-            SOW — DHHS91172
+          <Badge className="max-w-full gap-1 border-transparent bg-blue-600 text-white hover:bg-blue-600">
+            <Lock className="h-3 w-3 shrink-0" />
+            <span className="truncate">SOW — DHHS91172</span>
           </Badge>
         )}
         <Badge variant="outline">{cadenceLabel(obligation)}</Badge>

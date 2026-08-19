@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { AlertTriangle, ClipboardList, CheckCircle2, Upload, ExternalLink } from "lucide-react";
+import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +18,7 @@ import {
   type MyObligationInstanceRow,
 } from "@/lib/company-obligations.functions";
 import { dueLabel } from "@/components/company-obligations/my-obligations-widget";
+import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 
 export const Route = createFileRoute("/dashboard/my-obligations")({
   head: () => ({ meta: [{ title: "My obligations — HIVE" }] }),
@@ -149,6 +151,7 @@ function OpenCard({
     { status: "passed" | "failed"; certType: string | null; expiresAt: string | null; reasons: string[] } | null
   >(null);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const needsUpload = ob.evidence_type === "upload" || ob.evidence_type === "upload_and_attestation";
   const needsAttestation = ob.evidence_type === "attestation" || ob.evidence_type === "upload_and_attestation";
   const canSubmit = ob.evidence_type === "form"
@@ -249,17 +252,33 @@ function OpenCard({
         ) : (
           <>
             {needsUpload && (
-              <label className="flex min-h-[64px] cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground hover:bg-muted">
-                <Upload className="h-4 w-4" />
-                {file ? file.name : "Drop file here or click to browse"}
-                <span className="text-[10px]">PDF, JPG, PNG, DOCX, XLSX, max 20MB</span>
+              <div className="flex min-h-[44px] items-center gap-2 rounded-lg border border-border px-3 py-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="min-h-[44px] shrink-0 gap-1.5"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4" />
+                  {file ? "Change file" : "Choose file"}
+                </Button>
+                <div className="min-w-0 flex-1 text-xs text-muted-foreground">
+                  {file ? (
+                    <span className="block truncate text-foreground">{file.name}</span>
+                  ) : (
+                    <span>No file selected</span>
+                  )}
+                  <span className="block text-[10px]">PDF, JPG, PNG, DOCX, XLSX, max 20MB</span>
+                </div>
                 <input
+                  ref={fileInputRef}
                   type="file"
                   className="hidden"
                   accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"
                   onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 />
-              </label>
+              </div>
             )}
             {needsUpload && (
               <input
@@ -272,15 +291,19 @@ function OpenCard({
             )}
             {needsAttestation && (
               <>
-                <div className="rounded-md border border-border bg-muted/40 p-2.5 text-sm">{ob.attestation_text}</div>
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={checked} onCheckedChange={(v) => setChecked(v === true)} />
+                <div className="rounded-md border border-border bg-muted/40 p-2.5 text-sm leading-relaxed">{ob.attestation_text}</div>
+                <label className="flex min-h-[44px] cursor-pointer items-center gap-2.5 rounded-md px-1 text-sm">
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={(v) => setChecked(v === true)}
+                    className="h-5 w-5 shrink-0"
+                  />
                   I confirm the above statement is accurate and true
                 </label>
               </>
             )}
             <div className="flex justify-end">
-              <Button disabled={!canSubmit || busy} onClick={submit}>
+              <Button className="min-h-[44px]" disabled={!canSubmit || busy} onClick={submit}>
                 {ob.evidence_type === "attestation" ? "Sign and submit" : "Submit"}
               </Button>
             </div>
@@ -364,14 +387,13 @@ function MyObligationsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <ClipboardList className="h-5 w-5 text-[#137182]" />
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">My obligations</h1>
-          <p className="text-sm text-muted-foreground">Company requirements assigned to you.</p>
-        </div>
-      </div>
+    <div className="w-full space-y-6">
+      <StaffPageHeader
+        eyebrow="Compliance"
+        eyebrowIcon={ClipboardList}
+        title="My Obligations"
+        subtitle="Company requirements assigned to you."
+      />
 
       <div className="flex flex-wrap gap-1.5 rounded-lg border border-border p-1">
         {([
@@ -393,12 +415,16 @@ function MyObligationsPage() {
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : instances.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+          No obligations assigned yet. Check with your administrator.
+        </div>
       ) : shown.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
           Nothing here.
         </div>
       ) : (
-        <div className="grid gap-3">
+        <div className="grid w-full gap-3">
           {(() => {
             const renderCard = (inst: MyObligationInstanceRow) => {
               if (isPendingReview(inst.id)) {
@@ -430,11 +456,11 @@ function MyObligationsPage() {
               }
             }
 
-            return groups.map((g) => (
+            return groups.map((g, i) => (
               g.clientLabel ? (
-                <div key={g.key} className="space-y-2 rounded-lg border border-dashed border-border p-2.5">
-                  <p className="px-1 text-xs font-semibold text-muted-foreground">For {g.clientLabel}</p>
-                  <div className="grid gap-3">{g.items.map(renderCard)}</div>
+                <div key={g.key} className={`space-y-2.5 ${i > 0 ? "border-t border-border pt-4" : ""}`}>
+                  <p className="px-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{g.clientLabel}</p>
+                  <div className="grid w-full gap-3">{g.items.map(renderCard)}</div>
                 </div>
               ) : (
                 g.items.map(renderCard)

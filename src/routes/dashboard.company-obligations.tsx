@@ -182,10 +182,10 @@ function ObligationsTab({ orgId }: { orgId: string }) {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard label="Overdue" count={stats.overdue} tone="red" />
-        <StatCard label="Due this week" count={stats.dueThisWeek} tone="amber" />
-        <StatCard label="Satisfied this period" count={stats.satisfiedThisMonth} tone="green" />
+      <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0">
+        <div className="min-w-[65%] shrink-0 sm:min-w-0"><StatCard label="Overdue" count={stats.overdue} tone={stats.overdue === 0 ? "green" : "red"} /></div>
+        <div className="min-w-[65%] shrink-0 sm:min-w-0"><StatCard label="Due this week" count={stats.dueThisWeek} tone="amber" /></div>
+        <div className="min-w-[65%] shrink-0 sm:min-w-0"><StatCard label="Satisfied this period" count={stats.satisfiedThisMonth} tone="green" /></div>
       </div>
 
       {isLoading ? (
@@ -227,8 +227,8 @@ function ObligationsTab({ orgId }: { orgId: string }) {
                     </button>
                   ))}
                 </div>
-                <div className="flex items-center gap-1.5 rounded-md border border-border p-0.5">
-                  <span className="pl-1.5 text-[11px] font-medium text-muted-foreground">By scope</span>
+                <div className="flex max-w-full items-center gap-1.5 overflow-x-auto rounded-md border border-border p-0.5">
+                  <span className="shrink-0 pl-1.5 text-[11px] font-medium text-muted-foreground">By scope</span>
                   {([
                     ["all", "All"],
                     ["org", "Org-level"],
@@ -239,7 +239,7 @@ function ObligationsTab({ orgId }: { orgId: string }) {
                       key={key}
                       type="button"
                       onClick={() => setScopeFilter(key)}
-                      className={`rounded px-2.5 py-1 text-xs font-medium ${scopeFilter === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"}`}
+                      className={`shrink-0 rounded px-2.5 py-1 text-xs font-medium ${scopeFilter === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"}`}
                     >
                       {label}
                     </button>

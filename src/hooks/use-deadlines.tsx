@@ -69,6 +69,13 @@ export type DeadlineItem = {
   cadenceReminder?: boolean;
   /** YYYY-MM period label, set on sei_upi_employment items so the row action can attest the right month. */
   periodLabel?: string;
+  /** company_obligation items only: the underlying obligation's source, so the
+   *  row can badge it "SOW — DHHS91172" (blue) vs "Company policy" (amber). */
+  obligationSource?: "sow" | "provider";
+  /** company_obligation items only: true when the instance has no due_at —
+   *  dueAt is set to a far-future sentinel so sorting/bucketing don't break,
+   *  and the row shows "No due date set" instead of a computed date. */
+  dueAtMissing?: boolean;
 };
 
 const DAY = 86_400_000;
@@ -1398,7 +1405,11 @@ export function useDeadlines() {
     for (const inst of companyObligationsQ.data?.rows ?? []) {
       const obligation = companyObligationsQ.data?.obligationsById.get(inst.obligation_id);
       if (!obligation) continue;
-      const due = new Date(inst.due_at);
+      const dueAtMissing = !inst.due_at;
+      // No due date on the instance — use a far-future sentinel so sort/
+      // bucketing stay well-defined; the row renders "No due date set"
+      // instead of a computed date via `dueAtMissing`.
+      const due = dueAtMissing ? new Date(now.getTime() + 100 * 365 * DAY) : new Date(inst.due_at);
       const daysLeft = (due.getTime() - now.getTime()) / DAY;
       out.push({
         key: `company_obligation_${inst.id}`,
@@ -1407,9 +1418,11 @@ export function useDeadlines() {
         subject: `Company policy — ${cadenceDescription(obligation)}`,
         subjectKind: "agency",
         dueAt: due,
-        status: inst.status === "overdue" ? "overdue" : daysLeft <= 7 ? "due_soon" : "upcoming",
+        status: dueAtMissing ? "upcoming" : inst.status === "overdue" ? "overdue" : daysLeft <= 7 ? "due_soon" : "upcoming",
         href: isAdminRole ? "/dashboard/company-obligations" : "/dashboard/my-obligations",
         instanceId: inst.id,
+        obligationSource: obligation.source,
+        dueAtMissing,
       });
     }
 

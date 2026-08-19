@@ -393,14 +393,14 @@ function AdminComplianceStatus() {
             {staffMetrics!.attentionRows.map((row) => (
               <li
                 key={row.staff_id}
-                className="flex items-center justify-between gap-3 px-3 py-2.5"
+                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:flex-nowrap sm:gap-3"
               >
-                <div className="flex min-w-0 items-center gap-2">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
                   <PersonAvatar
                     bucket="staff-photos"
                     path={null}
                     name={row.full_name}
-                    className="h-7 w-7 text-[10px]"
+                    className="h-7 w-7 shrink-0 text-[10px]"
                   />
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">{row.full_name}</div>

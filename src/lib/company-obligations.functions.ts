@@ -207,6 +207,13 @@ export function cadenceDescription(ob: Pick<CompanyObligationRow, "cadence" | "d
       // every_n_months and anniversary_based obligations are stored with
       // cadence='annually' but compute their interval from a per-staffer
       // cert/hire date, not a shared calendar month/day — check these first.
+      if (cfg.days_after_hire !== undefined && cfg.every_n_months !== undefined) {
+        const days = Number(cfg.days_after_hire);
+        const months = Number(cfg.every_n_months);
+        const src = cfg.from === "cert_expiration" ? "cert expiration date" : "completion date";
+        const renewalPart = months === 24 ? "every 2 years" : `every ${months} months`;
+        return `Due ${days} days after hire — renews ${renewalPart} from ${src}`;
+      }
       if (cfg.every_n_months !== undefined) {
         const n = Number(cfg.every_n_months);
         const src = cfg.from === "cert_expiration" ? "cert expiration date" : "completion date";
@@ -1190,18 +1197,7 @@ export const listCompanyObligations = createServerFn({ method: "POST" })
       }
     }
 
-    // CPR Renewal is confusing to show alongside CPR Initial before anyone
-    // has actually completed the initial cert — hide it until then.
-    const finalObligations = visibleObligations.filter((o: CompanyObligationRow) => {
-      if (o.title !== "CPR/First Aid Certification — Renewal") return true;
-      const initialOb = visibleObligations.find(
-        (v: CompanyObligationRow) => v.title === "CPR/First Aid Certification — Initial",
-      );
-      if (!initialOb) return false;
-      return latestByObligation.get(initialOb.id)?.status === "completed";
-    });
-
-    return finalObligations.map((o: CompanyObligationRow) => ({
+    return visibleObligations.map((o: CompanyObligationRow) => ({
       ...o,
       current_instance: latestByObligation.get(o.id) ?? null,
     }));

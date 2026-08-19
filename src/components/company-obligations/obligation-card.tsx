@@ -85,6 +85,13 @@ export function cadenceLabel(ob: CompanyObligationRow): string {
       // every_n_months and anniversary_based obligations are stored with
       // cadence='annually' but compute their interval from a per-staffer
       // cert/hire date, not a shared calendar month/day — check these first.
+      if (cfg.days_after_hire !== undefined && cfg.every_n_months !== undefined) {
+        const days = Number(cfg.days_after_hire);
+        const months = Number(cfg.every_n_months);
+        const from = cfg.from === "cert_expiration" ? "cert expiration" : "completion";
+        const renewalPart = months === 24 ? "2 years" : `${months} months`;
+        return `Due ${days} days after hire · renews every ${renewalPart} from ${from}`;
+      }
       if (cfg.every_n_months !== undefined) {
         const n = Number(cfg.every_n_months);
         const from = cfg.from === "cert_expiration" ? "cert expiration" : "completion";

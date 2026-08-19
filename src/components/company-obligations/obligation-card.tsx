@@ -547,19 +547,24 @@ export function ObligationCard({
         <>
           <div className="mt-3 flex flex-wrap items-center gap-1.5 text-sm">
             <span className="text-muted-foreground">Assigned to:</span>
-            {(obligation.assigned_to_groups ?? []).map((gid) => {
-              const g = groupNamesById.get(gid);
-              return (
-                <Badge key={gid} variant="secondary">
-                  {g ? `${g.name} (${g.member_count} members)` : "Unknown group"}
-                </Badge>
-              );
-            })}
-            {(obligation.assigned_to_users ?? []).map((uid) => (
-              <Badge key={uid} variant="secondary">{userNamesById.get(uid) ?? "Unknown"}</Badge>
-            ))}
-            {(obligation.assigned_to_groups ?? []).length === 0 && (obligation.assigned_to_users ?? []).length === 0 && (
-              <span className="text-muted-foreground">Nobody assigned</span>
+            {obligation.scope === "org" ? (
+              <span className="text-sm text-muted-foreground">Whole organization</span>
+            ) : (obligation.assigned_to_groups?.length || obligation.assigned_to_users?.length) ? (
+              <>
+                {(obligation.assigned_to_groups ?? []).map((gid) => {
+                  const g = groupNamesById.get(gid);
+                  return (
+                    <Badge key={gid} variant="secondary">
+                      {g ? `${g.name} (${g.member_count} members)` : "Unknown group"}
+                    </Badge>
+                  );
+                })}
+                {(obligation.assigned_to_users ?? []).map((uid) => (
+                  <Badge key={uid} variant="secondary">{userNamesById.get(uid) ?? "Unknown"}</Badge>
+                ))}
+              </>
+            ) : (
+              <span className="text-sm text-muted-foreground italic">No group assigned</span>
             )}
           </div>
 

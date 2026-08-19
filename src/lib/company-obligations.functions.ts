@@ -1080,7 +1080,30 @@ export const listCompanyObligations = createServerFn({ method: "POST" })
       .order("title", { ascending: true });
     if (error) throw new Error(error.message);
 
-    const obligationIds = (obligations ?? []).map((o: CompanyObligationRow) => o.id);
+    // Fetch active client service codes for this org — used to hide
+    // obligations whose target_service_codes don't apply to any active
+    // client (e.g. SOW-seeded obligations for service codes TNS doesn't run).
+    const { data: clientCodes, error: ccErr } = await supabase
+      .from("clients")
+      .select("authorized_dspd_codes")
+      .eq("organization_id", data.organizationId)
+      .eq("account_status", "active");
+    if (ccErr) throw new Error(ccErr.message);
+
+    const activeCodes = new Set(
+      (clientCodes ?? []).flatMap(
+        (c: { authorized_dspd_codes: string[] | null }) =>
+          (c.authorized_dspd_codes ?? []).map((code: string) => code.toUpperCase()),
+      ),
+    );
+
+    const visibleObligations = (obligations ?? []).filter((o: CompanyObligationRow) => {
+      const targets = (o.target_service_codes ?? []).map((c: string) => c.toUpperCase());
+      if (!targets.length) return true;
+      return targets.some((c: string) => activeCodes.has(c));
+    });
+
+    const obligationIds = visibleObligations.map((o: CompanyObligationRow) => o.id);
     const latestByObligation = new Map<string, ObligationInstanceRow>();
     if (obligationIds.length) {
       const { data: instances, error: iErr } = await supabase
@@ -1093,7 +1116,32 @@ export const listCompanyObligations = createServerFn({ method: "POST" })
       }
     }
 
-    return (obligations ?? []).map((o: CompanyObligationRow) => ({
+    // Auto-bootstrap: generate first instances for active obligations with
+    // no instance yet (e.g. obligations seeded via SQL migration, bypassing
+    // createCompanyObligation's normal post-insert instance generation).
+    const activeWithNoInstance = visibleObligations.filter(
+      (o: CompanyObligationRow) => o.active && !latestByObligation.has(o.id),
+    );
+    for (const ob of activeWithNoInstance) {
+      try {
+        await generateNextInstanceInternal(supabase, data.organizationId, ob.id);
+      } catch (e) {
+        console.warn(`[bootstrap] Could not generate instance for ${ob.id}:`, e);
+      }
+    }
+    if (activeWithNoInstance.length > 0 && obligationIds.length) {
+      const { data: freshInstances, error: fErr } = await supabase
+        .from("company_obligation_instances").select("*")
+        .in("obligation_id", obligationIds)
+        .order("created_at", { ascending: false });
+      if (fErr) throw new Error(fErr.message);
+      latestByObligation.clear();
+      for (const inst of (freshInstances ?? []) as ObligationInstanceRow[]) {
+        if (!latestByObligation.has(inst.obligation_id)) latestByObligation.set(inst.obligation_id, inst);
+      }
+    }
+
+    return visibleObligations.map((o: CompanyObligationRow) => ({
       ...o,
       current_instance: latestByObligation.get(o.id) ?? null,
     }));

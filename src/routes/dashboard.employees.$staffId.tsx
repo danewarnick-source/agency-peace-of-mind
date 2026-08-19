@@ -89,7 +89,7 @@ export const Route = createFileRoute("/dashboard/employees/$staffId")({
     return out;
   },
   component: () => (
-    <RequirePermission perm="manage_users">
+    <RequirePermission perm="edit_staff_records">
       <StaffProfilePage />
     </RequirePermission>
   ),
@@ -960,7 +960,7 @@ function ContactCard({
         <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
           Contact &amp; position
         </CardTitle>
-        <RequirePermission perm="manage_users">
+        <RequirePermission perm="edit_staff_records">
           <button
             type="button"
             aria-label="Edit contact"

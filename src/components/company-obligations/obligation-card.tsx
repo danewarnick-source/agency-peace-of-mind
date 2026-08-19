@@ -130,6 +130,22 @@ function evidenceLabel(t: CompanyObligationRow["evidence_type"]): string {
   }
 }
 
+/** Shared "Due in N days" / "Overdue — N days" phrasing for a single due_at,
+ *  used by both the per-name and per-client not-yet-submitted rows. */
+function dueStatusText(dueAt: string | null): { text: string; overdue: boolean } {
+  if (!dueAt) return { text: "not yet submitted", overdue: false };
+  const due = new Date(dueAt);
+  const now = new Date();
+  if (due < now) {
+    const days = Math.max(1, Math.ceil((now.getTime() - due.getTime()) / 86_400_000));
+    return { text: `Overdue — ${days} day${days === 1 ? "" : "s"}`, overdue: true };
+  }
+  const daysUntil = Math.ceil((due.getTime() - now.getTime()) / 86_400_000);
+  if (daysUntil === 0) return { text: "Due today", overdue: false };
+  if (daysUntil === 1) return { text: "Due tomorrow", overdue: false };
+  return { text: `Due in ${daysUntil} days`, overdue: false };
+}
+
 function InstanceStatusLine({ instance }: { instance: ObligationInstanceRow | null }) {
   if (!instance) {
     return <p className="text-sm text-muted-foreground">No instance yet</p>;
@@ -279,12 +295,15 @@ function PerNameCompletion({
           <p className="text-muted-foreground">None</p>
         ) : (
           <ul className="space-y-0.5">
-            {notSubmitted.map((a) => (
-              <li key={a.staff_id} className="flex items-center gap-1 text-muted-foreground">
-                <Circle className="h-3 w-3 shrink-0" />
-                <span className="truncate">{a.staff_name}</span>
-              </li>
-            ))}
+            {notSubmitted.map((a) => {
+              const { text, overdue } = dueStatusText(obligation.current_instance?.due_at ?? null);
+              return (
+                <li key={a.staff_id} className={`flex items-center gap-1 ${overdue ? "text-destructive" : "text-muted-foreground"}`}>
+                  {overdue ? <AlertTriangle className="h-3 w-3 shrink-0" /> : <Circle className="h-3 w-3 shrink-0" />}
+                  <span className="truncate">{a.staff_name} — {text}</span>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
@@ -342,25 +361,43 @@ function PerClientCompletion({ obligation }: { obligation: ObligationWithInstanc
 
   const assigneeByInstance = new Map(assignees.map((a) => [a.instance_id, a]));
   const completionByInstance = new Map(completions.map((c) => [c.instance_id, c]));
+  const doneCount = instances.filter((inst) => inst.status === "completed" || completionByInstance.has(inst.id)).length;
+  const overdueCount = instances.filter((inst) => inst.status === "overdue").length;
 
   return (
-    <ul className="space-y-1 text-xs">
-      {instances.map((inst) => {
-        const assignee = assigneeByInstance.get(inst.id);
-        const completion = completionByInstance.get(inst.id);
-        const done = inst.status === "completed" || !!completion;
-        const staffName = assignee?.staff_name ?? "Unknown staff";
-        const clientName = inst.client_name ?? "Unknown client";
-        return (
-          <li key={inst.id} className={`flex items-center gap-1 ${done ? "text-success" : "text-muted-foreground"}`}>
-            {done ? <CheckCircle2 className="h-3 w-3 shrink-0" /> : <Circle className="h-3 w-3 shrink-0" />}
-            <span className="truncate">
-              {staffName} (for {clientName}) — {done ? formatDate(completion?.completed_at ?? inst.completed_at) : "not yet submitted"}
-            </span>
-          </li>
-        );
-      })}
-    </ul>
+    <div className="space-y-1.5">
+      <p className="text-xs font-medium text-muted-foreground">
+        {doneCount} of {instances.length} completed
+        {overdueCount > 0 && <span className="text-destructive"> · {overdueCount} overdue</span>}
+      </p>
+      <ul className="space-y-1 text-xs">
+        {instances.map((inst) => {
+          const assignee = assigneeByInstance.get(inst.id);
+          const completion = completionByInstance.get(inst.id);
+          const done = inst.status === "completed" || !!completion;
+          const staffName = assignee?.staff_name ?? "Unknown staff";
+          const clientName = inst.client_name ?? "Unknown client";
+          const { text, overdue } = done ? { text: formatDate(completion?.completed_at ?? inst.completed_at), overdue: false } : dueStatusText(inst.due_at);
+          return (
+            <li
+              key={inst.id}
+              className={`flex items-center gap-1 ${done ? "text-success" : overdue ? "text-destructive" : "text-muted-foreground"}`}
+            >
+              {done ? (
+                <CheckCircle2 className="h-3 w-3 shrink-0" />
+              ) : overdue ? (
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+              ) : (
+                <Circle className="h-3 w-3 shrink-0" />
+              )}
+              <span className="truncate">
+                {staffName} (for {clientName}) — {text}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 

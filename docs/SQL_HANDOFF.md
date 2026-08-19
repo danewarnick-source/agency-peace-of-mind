@@ -3070,3 +3070,100 @@ a type regen isn't strictly required here, but do it if Step 1 above
 triggered running the 2026-08-17 migration for the first time (that one
 adds `scope_assignments`, `user_permission_overrides`,
 `permission_audit_log`).
+
+---
+
+## ACTION — Database cleanup batch 1 (revised): drop verified-dead tables (2026-08-19)
+
+**What this is for:** A cleanup pass asked to drop ~40 tables in three
+batches to get the schema under 150 tables. Before running anything, a
+full-codebase grep audit was run against every table in the proposed
+Batch 1 (`.from("...")` / `.rpc("...")` call sites in `src/**/*.{ts,tsx}`,
+not just a keyword search) and against all of Batch 2. Almost everything in
+the original list turned out to be **actively read/written by live code** —
+`celebration_events`/`celebration_acknowledgements`/`org_celebration_settings`/
+`user_celebration_mute` (`src/lib/celebrations.functions.ts`), `whiteboard_notes`
+(`src/lib/whiteboard-notes.functions.ts`), `user_ui_dismissals`
+(`src/lib/ui-dismissals.functions.ts`), the whole state-onboarding subsystem
+(`state_derived_requirements`, `state_structural_gaps`,
+`state_requirement_sources`, `state_templates`, `state_onboarding_sessions`,
+`hive_base_template_versions`, `provisioning_plan`, `provisioning_rules`,
+`platform_states` — used by `state-*.functions.ts`,
+`state-onboarding.functions.ts`, `state-base-versions.functions.ts`, and
+queried directly in `dashboard.tsx`), `agreement_requirements`
+(`src/lib/agreements.functions.ts`), the NECTAR compliance-flag/deadline
+engine (`nectar_compliance_flags`, `nectar_compliance_rules`,
+`nectar_compliance_rule_history`, `nectar_compliance_instances` — used in
+`nectar-compliance.functions.ts`, `compliance-resolution.ts`,
+`use-deadlines.tsx`, `authoritative-sources.functions.ts`), `general_shifts`
+(staff mobile clock, `use-general-shift.tsx` /
+`active-shift-bar.tsx`), `external_certifications`
+(`staff-qualifications.functions.ts`), and `functionality_reports` /
+`mcp_column_catalog` / `mcp_table_catalog` (MCP tooling). All of proposed
+Batch 2 (scheduling V2, training tracks, gmail ingestion, financial
+distributions) is likewise live and backs reachable `/dashboard/*` routes —
+none of it was dropped. `home_designations` was excluded outright per
+CLAUDE.md (Homes & Teams care-team role labels — never delete).
+
+Only 12 tables came back with **zero** query references anywhere in `src/`:
+the old Hive Training commerce tables, `master_attestations`,
+`referral_purge_tombstones`, `staff_nudges`, `user_capability_overrides`,
+`rbac_roles` (superseded by `role_permissions` — its only `src/` hit was a
+stale FK name in generated `types.ts`), `unfiled_items`, and
+`hhs_emar_logs_deprecated`. Row counts were **not** independently
+re-verified from this pass (no live DB access) — the migration only checked
+code references; the four boxes below still assume the original
+Batch-1 claim that they hold zero rows, so please confirm that before
+running if you have any doubt.
+
+**To apply:** paste the full contents of
+`supabase/migrations/20260819203000_drop_verified_dead_tables.sql`
+here and run it.
+
+**What you'll see:** twelve `DROP TABLE IF EXISTS ... CASCADE` statements,
+no errors. Table count drops by 12 (339 → 327), not the ~40 originally
+targeted — the remainder needs a real code-removal pass (removing the live
+call sites first) before it can be dropped safely, which is out of scope
+for this batch.
+
+---
+
+## ACTION — Database cleanup batch 3: fold staff_training_hours_entries into ce_ledger (2026-08-19)
+
+**What this is for:** `staff_training_hours_entries` (admin-logged manual
+training hours, one narrow feature) and `ce_ledger` (the CE record store)
+overlapped enough to consolidate. The migration adds `note`,
+`requirement_id`, `created_by`, `entry_date` columns to `ce_ledger`, copies
+every row from `staff_training_hours_entries` in as
+`source = 'manual_entry'` (title falls back to `'Manually logged training
+hours'` when `note` is blank), then drops the old table.
+
+**RLS note:** `ce_ledger` was designed as a self-attestation ledger — staff
+insert their own rows and nothing is ever updated/deleted. But
+`staff_training_hours_entries` is the opposite shape: admins/team-managers
+log hours ON BEHALF OF staff, and can edit/delete their own entries. Rather
+than weaken the self-attestation policies, the migration adds a *second*,
+`source = 'manual_entry'`-scoped INSERT policy and a DELETE policy (plus
+the `DELETE` grant, which `ce_ledger` didn't have before) so admin-logged
+rows keep working exactly like they did on the old table. Real CE
+self-attestation rows (`source <> 'manual_entry'`) stay fully immutable —
+no policy covers UPDATE/DELETE for them.
+
+`src/lib/hr-training-hours.functions.ts` and the rollup query in
+`src/lib/hr-staff.functions.ts` were updated in the same commit to read
+`ce_ledger` filtered by `source = 'manual_entry'` instead of
+`staff_training_hours_entries`.
+
+**To apply:** paste the full contents of
+`supabase/migrations/20260819203500_consolidate_training_hours_into_ce_ledger.sql`
+here and run it.
+
+**What you'll see:** an `ALTER TABLE` adding 4 columns, an `INSERT ...
+SELECT` copying every existing manual-hours row, two `CREATE POLICY`
+statements, one `GRANT DELETE`, then `DROP TABLE ... CASCADE`. The HR
+staff "annual training hours" tab and rollup are unaffected — same admin
+add/delete UI, same numbers, just backed by `ce_ledger` now.
+
+**After this runs:** regenerate `src/integrations/supabase/types.ts` from
+the live schema — `ce_ledger` has 4 new columns and
+`staff_training_hours_entries` is gone.

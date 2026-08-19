@@ -1240,9 +1240,10 @@ export const getHrComplianceMatrix = createServerFn({ method: "GET" })
           .eq("organization_id", data.organization_id)
           .in("staff_id", staffIds),
         sb
-          .from("staff_training_hours_entries")
+          .from("ce_ledger")
           .select("staff_id, requirement_id, entry_date, hours")
           .eq("organization_id", data.organization_id)
+          .eq("source", "manual_entry")
           .in("staff_id", staffIds),
         sb
           .from("training_completions")

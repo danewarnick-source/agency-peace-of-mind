@@ -14860,70 +14860,6 @@ export type Database = {
           },
         ]
       }
-      role_change_audit_log: {
-        Row: {
-          change_method: string
-          changed_by_name: string
-          changed_by_user_id: string | null
-          created_at: string
-          id: string
-          ip_address: string | null
-          new_role: string
-          organization_id: string
-          previous_role: string
-          target_user_id: string | null
-          target_user_name: string
-        }
-        Insert: {
-          change_method: string
-          changed_by_name: string
-          changed_by_user_id?: string | null
-          created_at?: string
-          id?: string
-          ip_address?: string | null
-          new_role: string
-          organization_id: string
-          previous_role: string
-          target_user_id?: string | null
-          target_user_name: string
-        }
-        Update: {
-          change_method?: string
-          changed_by_name?: string
-          changed_by_user_id?: string | null
-          created_at?: string
-          id?: string
-          ip_address?: string | null
-          new_role?: string
-          organization_id?: string
-          previous_role?: string
-          target_user_id?: string | null
-          target_user_name?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "role_change_audit_log_changed_by_user_id_fkey"
-            columns: ["changed_by_user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "role_change_audit_log_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "role_change_audit_log_target_user_id_fkey"
-            columns: ["target_user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       role_permissions: {
         Row: {
           enabled: boolean
@@ -14955,104 +14891,6 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      permission_audit_log: {
-        Row: {
-          change_type: string
-          changed_by_name: string
-          changed_by_user_id: string | null
-          created_at: string | null
-          id: string
-          new_value: boolean | null
-          organization_id: string
-          permission: string
-          previous_value: boolean | null
-          reason: string | null
-          role: string | null
-          target_user_id: string | null
-          target_user_name: string | null
-        }
-        Insert: {
-          change_type: string
-          changed_by_name: string
-          changed_by_user_id?: string | null
-          created_at?: string | null
-          id?: string
-          new_value?: boolean | null
-          organization_id: string
-          permission: string
-          previous_value?: boolean | null
-          reason?: string | null
-          role?: string | null
-          target_user_id?: string | null
-          target_user_name?: string | null
-        }
-        Update: {
-          change_type?: string
-          changed_by_name?: string
-          changed_by_user_id?: string | null
-          created_at?: string | null
-          id?: string
-          new_value?: boolean | null
-          organization_id?: string
-          permission?: string
-          previous_value?: boolean | null
-          reason?: string | null
-          role?: string | null
-          target_user_id?: string | null
-          target_user_name?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "permission_audit_log_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      scope_assignments: {
-        Row: {
-          created_at: string | null
-          id: string
-          organization_id: string
-          scope_ref_id: string | null
-          scope_type: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          organization_id: string
-          scope_ref_id?: string | null
-          scope_type: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          organization_id?: string
-          scope_ref_id?: string | null
-          scope_type?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "scope_assignments_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "scope_assignments_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -17662,67 +17500,6 @@ export type Database = {
           },
         ]
       }
-      user_permission_overrides: {
-        Row: {
-          created_at: string | null
-          expires_at: string | null
-          granted: boolean
-          granted_by: string
-          granted_by_name: string
-          id: string
-          organization_id: string
-          permission: string
-          reason: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          expires_at?: string | null
-          granted: boolean
-          granted_by: string
-          granted_by_name: string
-          id?: string
-          organization_id: string
-          permission: string
-          reason: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          expires_at?: string | null
-          granted?: boolean
-          granted_by?: string
-          granted_by_name?: string
-          id?: string
-          organization_id?: string
-          permission?: string
-          reason?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_permission_overrides_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_permission_overrides_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_permission_overrides_granted_by_fkey"
-            columns: ["granted_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       user_celebration_mute: {
         Row: {
           muted: boolean
@@ -18232,10 +18009,6 @@ export type Database = {
           id: string
           support_coordinator_id: string
         }[]
-      }
-      flag_member_deactivated: {
-        Args: { _changed_by_user_id?: string; _org_id: string; _user_id: string }
-        Returns: undefined
       }
       generate_pba_audit_sample: { Args: { _org: string }; Returns: number }
       get_client_caps: {

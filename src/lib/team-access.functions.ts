@@ -300,5 +300,14 @@ export const listRoleChangeAuditLog = createServerFn({ method: "GET" })
       .range(from, to);
     if (error) throw error;
 
-    return { rows: rows ?? [], hasMore: (rows ?? []).length === PAGE_SIZE };
+    const safeRows: RoleChangeAuditRow[] = (rows ?? []).map((r) => ({
+      id: r.id,
+      created_at: r.created_at,
+      changed_by_name: r.changed_by_name ?? "Unknown",
+      target_user_name: r.target_user_name ?? "Unknown",
+      previous_role: r.previous_role ?? "—",
+      new_role: r.new_role ?? "—",
+      change_method: r.change_method ?? "—",
+    }));
+    return { rows: safeRows, hasMore: safeRows.length === PAGE_SIZE };
   });

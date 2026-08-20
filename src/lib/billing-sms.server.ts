@@ -132,9 +132,6 @@ export async function sendBillingSms(input: SendBillingSmsInput): Promise<{
         console.error("[billing-sms:send-failed]", input.kind, input.orgId, sendError);
       }
     } else {
-      // Dev / no-Twilio: log the body so flows are testable.
-      // eslint-disable-next-line no-console
-      console.log("[billing-sms:would-send]", input.kind, input.orgId, "→", phone, body);
       sendOk = true;
       sendError = "logged_only_no_twilio_env";
     }

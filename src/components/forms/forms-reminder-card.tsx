@@ -8,7 +8,7 @@ import { FileText, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { listMyForms, getMyFormNotifications } from "@/lib/forms.functions";
 import {
-  periodKeyFor, dueDateFor, isOverdue,
+  periodKeyFor, formDueDateFor, isOverdue,
   type Frequency, type Schedule,
 } from "@/lib/forms-utils";
 
@@ -30,7 +30,7 @@ export function FormsReminderCard() {
     const done = subs.find((s) => s.form_id === f.id && s.period_key === periodKey);
     if (done) continue;
     due++;
-    if (isOverdue(dueDateFor(f.frequency, f.schedule))) overdue++;
+    if (isOverdue(formDueDateFor(f.frequency, f.schedule))) overdue++;
   }
   const unreadAssigned = (bell?.notifications ?? []).filter(
     (n: { read_at: string | null; type: string }) => !n.read_at && n.type === "form_assigned"

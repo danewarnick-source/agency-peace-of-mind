@@ -455,9 +455,6 @@ export async function extractChunkOnce(
   return { items: [], failures: [`${partLabel}: ${msg}`] };
 }
 
-/** @deprecated Kept as a thin alias so existing imports don't break. */
-export const extractChunkWithRetry = extractChunkOnce;
-
 export async function mapWithConcurrency<T, R>(
   items: T[],
   limit: number,
@@ -486,7 +483,7 @@ export async function extractRequirementsFromText(text: string): Promise<{
 
   const chunks = chunkDocumentText(text);
   const perChunk = await mapWithConcurrency(chunks, 1, (chunk, i) =>
-    extractChunkWithRetry(chunk, `PART ${i + 1} OF ${chunks.length}`),
+    extractChunkOnce(chunk, `PART ${i + 1} OF ${chunks.length}`),
   );
 
   const merged: Array<z.infer<typeof ReqItem>> = [];

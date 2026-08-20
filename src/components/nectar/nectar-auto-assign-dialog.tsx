@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAllClientBillingCodes } from "@/hooks/use-client-billing-codes";
-import { isDayProgramCode } from "@/lib/service-billing";
+import { isDayProgramCode } from "@/lib/day-program-billing";
 import {
   Dialog,
   DialogContent,

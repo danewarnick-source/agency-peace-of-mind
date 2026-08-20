@@ -21,7 +21,7 @@ import {
 } from "@/lib/forms.functions";
 import { pauseObligationsForArchivedForm } from "@/lib/company-obligations.functions";
 import {
-  periodKeyFor, dueDateFor, formatDue, describeFrequency, isOverdue,
+  periodKeyFor, formDueDateFor, formatDue, describeFrequency, isOverdue,
   type Frequency, type Schedule, type FormSettings,
 } from "@/lib/forms-utils";
 import { DeleteFormDialog } from "@/components/forms/delete-form-dialog";
@@ -282,7 +282,7 @@ function StaffList() {
       <Section title="Needs attention" subtitle="Submit before the due date for the current period.">
         <div className="grid gap-2 md:grid-cols-2">
           {buckets.due.map((f) => {
-            const due = dueDateFor(f.frequency, f.schedule);
+            const due = formDueDateFor(f.frequency, f.schedule);
             const overdue = isOverdue(due);
             return (
               <button key={f.id} type="button" onClick={() => setPickFor(f)}

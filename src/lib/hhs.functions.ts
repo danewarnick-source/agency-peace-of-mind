@@ -353,7 +353,7 @@ export const listPrnForms = createServerFn({ method: "POST" })
     };
   });
 
-export const listIncidents = createServerFn({ method: "POST" })
+export const listHhsIncidents = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => OrgInput.parse(i))
   .handler(async ({ data, context }) => {

@@ -8,7 +8,7 @@ import { getMyOtherAssignmentsSummary } from "@/lib/other-assignments.functions"
 import { listSmartImportReminders } from "@/lib/smart-import-reminders.functions";
 import { getMyClientTrainingStatuses } from "@/lib/client-specific-training.functions";
 import {
-  periodKeyFor, dueDateFor, isOverdue,
+  periodKeyFor, formDueDateFor, isOverdue,
   type Frequency, type Schedule,
 } from "@/lib/forms-utils";
 import { NectarPayPeriodCard } from "@/components/staff-mobile/nectar-pay-period-card";
@@ -57,7 +57,7 @@ export function AttentionStrip() {
     const done = subs.find((s) => s.form_id === f.id && s.period_key === periodKey);
     if (done) continue;
     due++;
-    if (isOverdue(dueDateFor(f.frequency, f.schedule))) overdue++;
+    if (isOverdue(formDueDateFor(f.frequency, f.schedule))) overdue++;
   }
   const unreadAssigned = (bell?.notifications ?? []).filter(
     (n: { read_at: string | null; type: string }) => !n.read_at && n.type === "form_assigned"

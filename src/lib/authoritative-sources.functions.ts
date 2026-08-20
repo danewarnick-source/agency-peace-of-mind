@@ -11,7 +11,7 @@ import {
   NON_OBLIGATION_KINDS,
   stripHtmlToText,
   extractRequirementsFromText,
-  extractChunkWithRetry,
+  extractChunkOnce,
   extractPolicySummary,
   chunkDocumentRanges,
   isTransientAIError,
@@ -1657,7 +1657,7 @@ export const processDraftChunk = createServerFn({ method: "POST" })
       .rpc("nectar_bump_draft_attempt", { p_job: data.jobId })
       .then(() => undefined, () => undefined);
     try {
-      const got = await extractChunkWithRetry(
+      const got = await extractChunkOnce(
         window,
         `PART ${data.chunkIndex + 1} OF ${ranges.length}`,
       );
@@ -2217,7 +2217,7 @@ export const recordAttestation = createServerFn({ method: "POST" })
     return { id: row.id as string, attestedAt: row.attested_at as string };
   });
 
-export const listAttestations = createServerFn({ method: "POST" })
+export const listRequirementAttestations = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
     z

@@ -591,7 +591,7 @@ export function isBaselineApplicable(
 }
 
 /** Compute due date (YYYY-MM-DD) from hire_date + due_days. */
-export function dueDateFor(
+export function trainingDueDateFor(
   t: BaselineTraining,
   hireDate: Date | null,
 ): string | null {

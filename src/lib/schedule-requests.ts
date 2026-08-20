@@ -13,7 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useAuth } from "@/hooks/use-auth";
-import { saveShift } from "@/lib/schedule-preview-mutations";
+import { saveShift } from "@/lib/scheduler/scheduler.functions";
 
 export type TimeOffRequest = {
   id: string;
@@ -263,19 +263,19 @@ export async function approveSwap(
 ) {
   // Reuse the existing mutation — same payload shape, same org guard.
   await saveShift({
-    id: req.shift_id,
-    organization_id: req.organization_id,
-    staff_id: resolvedToStaffId,
-    client_id: shift.client_id,
-    job_code: shift.job_code ?? "",
-    service_code: shift.service_code ?? shift.job_code ?? "",
-    shift_type: shift.shift_type,
-    starts_at: shift.starts_at,
-    ends_at: shift.ends_at,
-    notes: null,
-    status: shift.status,
-    published: shift.published,
-    created_by: deciderId,
+    data: {
+      id: req.shift_id,
+      organization_id: req.organization_id,
+      staff_id: resolvedToStaffId,
+      client_id: shift.client_id,
+      job_code: shift.job_code ?? "",
+      shift_type: shift.shift_type,
+      starts_at: shift.starts_at,
+      ends_at: shift.ends_at,
+      notes: null,
+      status: shift.status,
+      published: shift.published,
+    },
   });
   await patchRequest("shift_swap_requests", req.id, req.organization_id, {
     status: "approved",

@@ -2,7 +2,7 @@
  * CRM Phase A4 — HHP (Host Home Provider) Cue Cards.
  *
  * Hosts are NOT staff: they never clock, never appear in scheduling/EVV.
- * Cue cards are the matching input for the Whiteboard/A5 matcher.
+ * Cue cards are the matching input for the A5 matcher.
  *
  * Sourcing:
  *   - source = 'questionnaire' — auto-inserted by DB trigger when a form

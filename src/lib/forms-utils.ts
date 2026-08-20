@@ -269,7 +269,7 @@ export function periodKeyFor(freq: Frequency, when: Date = new Date()): string |
   }
 }
 
-export function dueDateFor(freq: Frequency, schedule: Schedule, when: Date = new Date()): Date | null {
+export function formDueDateFor(freq: Frequency, schedule: Schedule, when: Date = new Date()): Date | null {
   const y = when.getFullYear();
   const m = when.getMonth();
   switch (freq) {

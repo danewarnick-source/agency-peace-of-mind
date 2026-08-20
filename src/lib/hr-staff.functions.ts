@@ -28,7 +28,7 @@ import {
 import {
   BASELINE_STAFF_TRAININGS,
   baselineRequirementId,
-  dueDateFor,
+  trainingDueDateFor,
   isBaselineApplicable,
 } from "@/lib/staff-training-requirements";
 
@@ -64,7 +64,7 @@ function computeBaselineStatus(
   } else if (evidenceDocId) {
     status = "in_progress";
   } else {
-    const due = dueDateFor(t, hireDate);
+    const due = trainingDueDateFor(t, hireDate);
     if (due && new Date(`${due}T00:00:00Z`).getTime() < todayMs) {
       status = "expired";
     } else {

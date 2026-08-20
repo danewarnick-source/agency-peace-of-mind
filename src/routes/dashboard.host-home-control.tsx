@@ -17,7 +17,7 @@ import {
   listDailyRecords,
   listEmarLogs,
   listAttendance,
-  listIncidents,
+  listHhsIncidents,
   listPrnForms,
   markIncidentFiled,
 } from "@/lib/hhs.functions";
@@ -311,7 +311,7 @@ function AttendanceGridTab({ orgId, clientMap }: { orgId?: string; clientMap?: M
 }
 
 function ComplianceAuditsTab({ orgId, clientMap }: { orgId?: string; clientMap?: Map<string, ClientLite> }) {
-  const inc = useServerFn(listIncidents);
+  const inc = useServerFn(listHhsIncidents);
   const prn = useServerFn(listPrnForms);
   const qc = useQueryClient();
   const mark = useServerFn(markIncidentFiled);

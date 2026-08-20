@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Trash2, Loader2, Repeat } from "lucide-react";
 import {
@@ -17,15 +18,16 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
 import {
-  saveShift, deleteShift, saveWeeklyRecurringShift,
+  saveWeeklyRecurringShift,
   fetchSeriesIdsForward, updateSeries, deleteSeries,
   type ShiftDraft,
 } from "@/lib/schedule-preview-mutations";
+import { saveShift, deleteShift } from "@/lib/scheduler/scheduler.functions";
 import { isDaily, type ShiftRow, type ClientRow, type StaffRow } from "@/hooks/use-schedule-preview";
 import { staffHasTimeOffOverlap } from "@/lib/schedule-requests";
 import { AlertTriangle } from "lucide-react";
 import { useClientBillingCodes } from "@/hooks/use-client-billing-codes";
-import { isDayProgramCode } from "@/lib/service-billing";
+import { isDayProgramCode } from "@/lib/day-program-billing";
 
 export type EditorContext = {
   shift?: ShiftRow;        // existing
@@ -164,6 +166,9 @@ export function ShiftEditorDialog({
     setDows((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort()));
   }
 
+  const saveShiftFn = useServerFn(saveShift);
+  const deleteShiftFn = useServerFn(deleteShift);
+
   const save = useMutation({
     mutationFn: async () => {
       const baseDraft: ShiftDraft = {
@@ -206,7 +211,8 @@ export function ShiftEditorDialog({
           });
           return { kind: "series-update", count: ids.length };
         }
-        await saveShift(baseDraft);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await saveShiftFn({ data: baseDraft as any });
         return { kind: "single-update", count: 1 };
       }
 
@@ -219,7 +225,8 @@ export function ShiftEditorDialog({
         });
         return { kind: "series-create", count };
       }
-      await saveShift(baseDraft);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await saveShiftFn({ data: baseDraft as any });
       return { kind: "single-create", count: 1 };
     },
     onSuccess: (r) => {
@@ -250,7 +257,7 @@ export function ShiftEditorDialog({
         await deleteSeries(ids, orgId);
         return { count: ids.length };
       }
-      await deleteShift(editing.id, orgId);
+      await deleteShiftFn({ data: { id: editing.id, organization_id: orgId } });
       return { count: 1 };
     },
     onSuccess: (r) => {

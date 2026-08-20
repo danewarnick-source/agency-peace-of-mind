@@ -72,7 +72,7 @@ import {
 
   setRequirementReviewStatus,
   setSourceIgnoreState,
-  listAttestations,
+  listRequirementAttestations,
   ingestWebSource,
   explainRequirement,
   updatePolicyConfig,
@@ -3507,7 +3507,7 @@ function ManualRequirementDialog({ orgId }: { orgId: string }) {
 // ---------- Attestation log ----------
 
 function AttestationsPanel({ orgId }: { orgId: string }) {
-  const listFn = useServerFn(listAttestations);
+  const listFn = useServerFn(listRequirementAttestations);
   const { data, isLoading } = useQuery({
     queryKey: ["attestations", orgId],
     queryFn: () => listFn({ data: { organizationId: orgId, limit: 200 } }),

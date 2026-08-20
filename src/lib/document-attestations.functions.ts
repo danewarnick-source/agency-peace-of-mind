@@ -69,7 +69,7 @@ export const recordAttestation = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const listAttestations = createServerFn({ method: "GET" })
+export const listDocumentAttestations = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>
     z.object({

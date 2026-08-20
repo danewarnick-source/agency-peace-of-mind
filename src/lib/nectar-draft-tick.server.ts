@@ -5,7 +5,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
-import { extractChunkWithRetry, isTransientAIError } from "./authoritative-sources.server";
+import { extractChunkOnce, isTransientAIError } from "./authoritative-sources.server";
 
 const TICK_PATH = "/api/public/hooks/nectar-draft-tick";
 // Wall-clock budget per tick invocation. AI calls are I/O so this stays
@@ -176,7 +176,7 @@ async function processOneChunk(
     .rpc("nectar_bump_draft_attempt", { p_job: jobId })
     .then(() => undefined, () => undefined);
   try {
-    const got = await extractChunkWithRetry(
+    const got = await extractChunkOnce(
       windowText,
       `PART ${chunkIndex + 1} OF ${totalChunks}`,
     );

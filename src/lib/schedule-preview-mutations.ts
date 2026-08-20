@@ -104,7 +104,14 @@ function buildPayload(draft: ShiftDraft): Record<string, unknown> {
   };
 }
 
-export async function saveShift(draft: ShiftDraft) {
+/**
+ * Insert/update a single scheduled_shifts row from a preview draft.
+ * Private to this module — used only by saveWeeklyRecurringShift to
+ * materialize recurrence-tagged rows (is_recurring/recurrence_rule/
+ * recurrence_end_date), which the canonical `saveShift` in
+ * scheduler/scheduler.functions.ts does not model.
+ */
+async function upsertPreviewShift(draft: ShiftDraft) {
   const err = validateShiftDraft(draft);
   if (err) throw new Error(err);
 
@@ -137,16 +144,6 @@ export async function saveShift(draft: ShiftDraft) {
   }
   if (res.blocked) throw new Error("Blocked by compliance flag (Stop chosen)");
   return res.insertedIds[0];
-}
-
-export async function deleteShift(id: string, organizationId: string) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any)
-    .from("scheduled_shifts")
-    .delete()
-    .eq("id", id)
-    .eq("organization_id", organizationId); // org scope guard — never delete cross-org
-  if (error) throw error;
 }
 
 // =====================================================================
@@ -240,7 +237,7 @@ export async function saveWeeklyRecurringShift(
         recurrence_rule: "weekly",
         recurrence_end_date: endDate.toISOString(),
       };
-      await saveShift(draft);
+      await upsertPreviewShift(draft);
       inserted += 1;
     }
     cursor.setDate(cursor.getDate() + 7);

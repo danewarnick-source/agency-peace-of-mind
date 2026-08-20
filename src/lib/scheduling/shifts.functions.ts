@@ -258,21 +258,6 @@ export const updateShift = createServerFn({ method: "POST" })
     return row;
   });
 
-export const deleteShift = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: string; organization_id: string }) =>
-    z.object({ id: z.string().uuid(), organization_id: z.string().uuid() }).parse(d))
-  .handler(async ({ data, context }) => {
-    if (!context.supabase || !context.userId) return { ok: false };
-    const { error } = await context.supabase
-      .from("scheduled_shifts")
-      .delete()
-      .eq("id", data.id)
-      .eq("organization_id", data.organization_id);
-    if (error) throw error;
-    return { ok: true };
-  });
-
 export const publishShifts = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { ids: string[]; organization_id: string }) =>

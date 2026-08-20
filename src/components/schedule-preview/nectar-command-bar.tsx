@@ -19,8 +19,9 @@ import {
   type NectarProposal,
   type ProposedAction,
 } from "@/lib/nectar-schedule-actions.functions";
-import { saveShift } from "@/lib/schedule-preview-mutations";
-import { isDailyServiceCode, isDayProgramCode } from "@/lib/service-billing";
+import { saveShift } from "@/lib/scheduler/scheduler.functions";
+import { isDailyServiceCode } from "@/lib/service-billing";
+import { isDayProgramCode } from "@/lib/day-program-billing";
 import type { ClientRow, StaffRow, TeamRow, ShiftRow } from "@/hooks/use-schedule-preview";
 import { useAllClientBillingCodes } from "@/hooks/use-client-billing-codes";
 import { SCHED } from "./sched-ui";
@@ -148,6 +149,8 @@ export function NectarCommandBar({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const saveShiftFn = useServerFn(saveShift);
+
   const apply = useMutation({
     mutationFn: async (actions: ProposedAction[]) => {
       if (!orgId || !user?.id) throw new Error("Sign in required.");
@@ -160,56 +163,56 @@ export function NectarCommandBar({
       for (const a of actions) {
         try {
           if (a.op === "create") {
-            await saveShift({
-              organization_id: orgId,
-              staff_id: a.staff_id,
-              client_id: a.client_id,
-              job_code: a.job_code,
-              service_code: a.job_code,
-              shift_type: isDailyServiceCode(a.job_code) ? "daily_host_home" : "hourly",
-              starts_at: a.starts_at,
-              ends_at: a.ends_at,
-              notes: a.reason || null,
-              status: "pending",
-              published: false,
-              created_by: user.id,
+            await saveShiftFn({
+              data: {
+                organization_id: orgId,
+                staff_id: a.staff_id,
+                client_id: a.client_id,
+                job_code: a.job_code,
+                shift_type: isDailyServiceCode(a.job_code) ? "daily_host_home" : "hourly",
+                starts_at: a.starts_at,
+                ends_at: a.ends_at,
+                notes: a.reason || null,
+                status: "pending",
+                published: false,
+              },
             });
           } else if (a.op === "reassign") {
             const cur = shiftById.get(a.shift_id);
             if (!cur) throw new Error("Shift no longer exists");
-            await saveShift({
-              id: cur.id,
-              organization_id: orgId,
-              staff_id: a.to_staff_id,
-              client_id: cur.client_id!,
-              job_code: cur.job_code ?? "",
-              service_code: cur.service_code ?? cur.job_code ?? "",
-              shift_type: cur.shift_type ?? "hourly",
-              starts_at: cur.starts_at,
-              ends_at: cur.ends_at,
-              notes: null,
-              status: cur.status ?? "pending",
-              published: !!cur.published,
-              created_by: user.id,
+            await saveShiftFn({
+              data: {
+                id: cur.id,
+                organization_id: orgId,
+                staff_id: a.to_staff_id,
+                client_id: cur.client_id!,
+                job_code: cur.job_code ?? "",
+                shift_type: cur.shift_type ?? "hourly",
+                starts_at: cur.starts_at,
+                ends_at: cur.ends_at,
+                notes: null,
+                status: cur.status ?? "pending",
+                published: !!cur.published,
+              },
             });
           } else {
             const cur = shiftById.get(a.shift_id);
             if (!cur) throw new Error("Shift no longer exists");
             const job = a.patch.job_code ?? cur.job_code ?? "";
-            await saveShift({
-              id: cur.id,
-              organization_id: orgId,
-              staff_id: cur.staff_id!,
-              client_id: cur.client_id!,
-              job_code: job,
-              service_code: job,
-              shift_type: isDailyServiceCode(job) ? "daily_host_home" : "hourly",
-              starts_at: a.patch.starts_at ?? cur.starts_at,
-              ends_at: a.patch.ends_at ?? cur.ends_at,
-              notes: null,
-              status: cur.status ?? "pending",
-              published: !!cur.published,
-              created_by: user.id,
+            await saveShiftFn({
+              data: {
+                id: cur.id,
+                organization_id: orgId,
+                staff_id: cur.staff_id!,
+                client_id: cur.client_id!,
+                job_code: job,
+                shift_type: isDailyServiceCode(job) ? "daily_host_home" : "hourly",
+                starts_at: a.patch.starts_at ?? cur.starts_at,
+                ends_at: a.patch.ends_at ?? cur.ends_at,
+                notes: null,
+                status: cur.status ?? "pending",
+                published: !!cur.published,
+              },
             });
           }
           okCount++;

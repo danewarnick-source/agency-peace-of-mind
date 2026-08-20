@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { classesForCode, familyForCode, isDailyCode, maxRecommendedHours, minStaffAgeForCode } from "@/lib/scheduling/code-colors";
 import { useClientBillingCodes } from "@/hooks/use-client-billing-codes";
-import { isDayProgramCode } from "@/lib/service-billing";
+import { isDayProgramCode } from "@/lib/day-program-billing";
 import { rankStaffForShift } from "@/lib/scheduling/eligibility.functions";
 import { createShift } from "@/lib/scheduling/shifts.functions";
 import { postOpenShift } from "@/lib/scheduling/open-shifts.functions";

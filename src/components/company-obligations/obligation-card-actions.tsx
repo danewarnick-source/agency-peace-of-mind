@@ -555,6 +555,14 @@ function PerClientActions({ orgId, obligation }: { orgId: string; obligation: Ob
           {showOutstanding ? "Hide list" : "Who's outstanding?"}
         </button>
       </div>
+      {roster.length > 0 && (
+        <FileForStaffPanel
+          orgId={orgId}
+          obligation={obligation}
+          roster={roster}
+          label={`File document for staff (${roster.length})`}
+        />
+      )}
       {showOutstanding && (
         <ul className="space-y-1 rounded-md border border-border bg-muted/20 p-2 text-xs">
           {openInstances.map((i) => {

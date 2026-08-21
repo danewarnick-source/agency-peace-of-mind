@@ -8664,13 +8664,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "hive_training_assignments_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "hive_training_orders"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "hive_training_assignments_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -8682,56 +8675,6 @@ export type Database = {
             columns: ["seat_id"]
             isOneToOne: false
             referencedRelation: "hive_training_seats"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      hive_training_auto_renew_runs: {
-        Row: {
-          created_at: string
-          details: Json
-          error_message: string | null
-          id: string
-          organization_id: string
-          run_at: string
-          seats_purchased: number
-          staff_count: number
-          status: Database["public"]["Enums"]["hive_training_auto_renew_status"]
-          stripe_payment_intent_id: string | null
-          total_amount_cents: number
-        }
-        Insert: {
-          created_at?: string
-          details?: Json
-          error_message?: string | null
-          id?: string
-          organization_id: string
-          run_at?: string
-          seats_purchased?: number
-          staff_count?: number
-          status: Database["public"]["Enums"]["hive_training_auto_renew_status"]
-          stripe_payment_intent_id?: string | null
-          total_amount_cents?: number
-        }
-        Update: {
-          created_at?: string
-          details?: Json
-          error_message?: string | null
-          id?: string
-          organization_id?: string
-          run_at?: string
-          seats_purchased?: number
-          staff_count?: number
-          status?: Database["public"]["Enums"]["hive_training_auto_renew_status"]
-          stripe_payment_intent_id?: string | null
-          total_amount_cents?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "hive_training_auto_renew_runs_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -9020,140 +8963,6 @@ export type Database = {
           },
         ]
       }
-      hive_training_order_items: {
-        Row: {
-          catalog_id: string
-          created_at: string
-          id: string
-          order_id: string
-          quantity: number
-          unit_price_cents: number
-        }
-        Insert: {
-          catalog_id: string
-          created_at?: string
-          id?: string
-          order_id: string
-          quantity: number
-          unit_price_cents: number
-        }
-        Update: {
-          catalog_id?: string
-          created_at?: string
-          id?: string
-          order_id?: string
-          quantity?: number
-          unit_price_cents?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "hive_training_order_items_catalog_id_fkey"
-            columns: ["catalog_id"]
-            isOneToOne: false
-            referencedRelation: "hive_training_catalog"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "hive_training_order_items_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "hive_training_orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      hive_training_orders: {
-        Row: {
-          amount_cents: number
-          created_at: string
-          currency: string
-          id: string
-          model: Database["public"]["Enums"]["hive_training_order_model"]
-          organization_id: string
-          paid_at: string | null
-          purchaser_user_id: string
-          refunded_at: string | null
-          status: Database["public"]["Enums"]["hive_training_order_status"]
-          stripe_checkout_session_id: string | null
-          stripe_customer_id: string | null
-          stripe_payment_intent_id: string | null
-          updated_at: string
-        }
-        Insert: {
-          amount_cents?: number
-          created_at?: string
-          currency?: string
-          id?: string
-          model: Database["public"]["Enums"]["hive_training_order_model"]
-          organization_id: string
-          paid_at?: string | null
-          purchaser_user_id: string
-          refunded_at?: string | null
-          status?: Database["public"]["Enums"]["hive_training_order_status"]
-          stripe_checkout_session_id?: string | null
-          stripe_customer_id?: string | null
-          stripe_payment_intent_id?: string | null
-          updated_at?: string
-        }
-        Update: {
-          amount_cents?: number
-          created_at?: string
-          currency?: string
-          id?: string
-          model?: Database["public"]["Enums"]["hive_training_order_model"]
-          organization_id?: string
-          paid_at?: string | null
-          purchaser_user_id?: string
-          refunded_at?: string | null
-          status?: Database["public"]["Enums"]["hive_training_order_status"]
-          stripe_checkout_session_id?: string | null
-          stripe_customer_id?: string | null
-          stripe_payment_intent_id?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "hive_training_orders_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      hive_training_renewal_intents: {
-        Row: {
-          catalog_id: string
-          consumed_at: string | null
-          course_id: string
-          created_at: string
-          id: string
-          organization_id: string
-          stripe_session_id: string
-          user_id: string
-        }
-        Insert: {
-          catalog_id: string
-          consumed_at?: string | null
-          course_id: string
-          created_at?: string
-          id?: string
-          organization_id: string
-          stripe_session_id: string
-          user_id: string
-        }
-        Update: {
-          catalog_id?: string
-          consumed_at?: string | null
-          course_id?: string
-          created_at?: string
-          id?: string
-          organization_id?: string
-          stripe_session_id?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       hive_training_seats: {
         Row: {
           assigned_at: string | null
@@ -9197,13 +9006,6 @@ export type Database = {
             columns: ["catalog_id"]
             isOneToOne: false
             referencedRelation: "hive_training_catalog"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "hive_training_seats_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "hive_training_orders"
             referencedColumns: ["id"]
           },
           {
@@ -13286,13 +13088,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "organization_members_custom_role_id_fkey"
-            columns: ["custom_role_id"]
-            isOneToOne: false
-            referencedRelation: "rbac_roles"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "organization_members_manager_id_fkey"
             columns: ["manager_id"]
             isOneToOne: false
@@ -14470,47 +14265,6 @@ export type Database = {
           {
             foreignKeyName: "provisioning_rules_org_id_fkey"
             columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      rbac_roles: {
-        Row: {
-          capabilities: string[]
-          created_at: string
-          description: string | null
-          id: string
-          is_system: boolean
-          name: string
-          organization_id: string
-          updated_at: string
-        }
-        Insert: {
-          capabilities?: string[]
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_system?: boolean
-          name: string
-          organization_id: string
-          updated_at?: string
-        }
-        Update: {
-          capabilities?: string[]
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_system?: boolean
-          name?: string
-          organization_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "rbac_roles_organization_id_fkey"
-            columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
@@ -17504,71 +17258,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      unfiled_items: {
-        Row: {
-          filed_at: string | null
-          filed_by: string | null
-          filed_to: string | null
-          id: string
-          import_job_id: string
-          import_subject_id: string | null
-          org_id: string
-          source_document_id: string | null
-          text: string
-        }
-        Insert: {
-          filed_at?: string | null
-          filed_by?: string | null
-          filed_to?: string | null
-          id?: string
-          import_job_id: string
-          import_subject_id?: string | null
-          org_id: string
-          source_document_id?: string | null
-          text: string
-        }
-        Update: {
-          filed_at?: string | null
-          filed_by?: string | null
-          filed_to?: string | null
-          id?: string
-          import_job_id?: string
-          import_subject_id?: string | null
-          org_id?: string
-          source_document_id?: string | null
-          text?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "unfiled_items_import_job_id_fkey"
-            columns: ["import_job_id"]
-            isOneToOne: false
-            referencedRelation: "import_jobs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "unfiled_items_import_subject_id_fkey"
-            columns: ["import_subject_id"]
-            isOneToOne: false
-            referencedRelation: "import_subjects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "unfiled_items_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "unfiled_items_source_document_id_fkey"
-            columns: ["source_document_id"]
-            isOneToOne: false
-            referencedRelation: "import_documents"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       upi_attestations: {
         Row: {

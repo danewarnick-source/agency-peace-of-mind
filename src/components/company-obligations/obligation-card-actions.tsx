@@ -553,17 +553,8 @@ function PerClientActions({
                     <span> — {formatDueShort(i.due_at)}</span>
                   )}
                 </span>
-                {a && (
-                  <FileForInstanceButton
-                    orgId={orgId}
-                    obligation={obligation}
-                    instanceId={i.id}
-                    staffId={a.staff_id}
-                    staffName={a.staff_name}
-                    clientName={i.client_name}
-                  />
-                )}
               </li>
+
             );
           })}
         </ul>

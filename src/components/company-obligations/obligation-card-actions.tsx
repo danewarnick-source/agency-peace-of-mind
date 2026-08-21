@@ -181,65 +181,74 @@ function DirectCompletionActions({
   );
 }
 
-/** Admin files an upload on behalf of a specific not-yet-submitted staff
- *  member (e.g. a cert already on file). */
+/** Admin files an upload on behalf of one or many not-yet-submitted staff
+ *  members (e.g. certs already on file). Per-person obligations keep one
+ *  instance per staff member, so each selected person is recorded against
+ *  their own instance. */
 function FileForStaffPanel({
   orgId,
   obligation,
-  instanceId,
-  outstanding,
+  roster,
   label,
 }: {
   orgId: string;
   obligation: ObligationWithInstance;
-  instanceId: string;
-  outstanding: AssigneeRow[];
+  roster: RosterEntry[];
   label: string;
 }) {
   const qc = useQueryClient();
   const recordFn = useServerFn(recordCompletion);
   const [open, setOpen] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [staffId, setStaffId] = useState<string | null>(null);
-  const [staffName, setStaffName] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const adminName = useAdminName(orgId, open);
 
   const reset = () => {
     setOpen(false);
-    setStaffId(null);
-    setStaffName("");
+    setSelected(new Set());
     setFile(null);
   };
 
+  const targets = roster.filter((r) => selected.has(`${r.instance_id}:${r.staff_id}`));
+
   const submit = async () => {
-    if (!staffId || !file) return;
+    if (!targets.length || !file) return;
     setBusy(true);
+    const failures: string[] = [];
+    let ok = 0;
     try {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const path = `${orgId}/${obligation.id}/${instanceId}/${crypto.randomUUID()}-${safeName}`;
-      const { error: upErr } = await supabase.storage.from("obligation-evidence").upload(path, file);
-      if (upErr) throw new Error(upErr.message);
-      await recordFn({
-        data: {
-          organizationId: orgId,
-          instanceId,
-          evidenceTypeUsed: "upload",
-          uploadPath: path,
-          uploadFilename: file.name,
-          isManualEntry: true,
-          staffId,
-          staffName,
-          manualEntryByName: adminName,
-        },
-      });
-      toast.success(`Filed for ${staffName}`);
-      reset();
+      for (const t of targets) {
+        try {
+          const path = `${orgId}/${obligation.id}/${t.instance_id}/${crypto.randomUUID()}-${safeName}`;
+          const { error: upErr } = await supabase.storage.from("obligation-evidence").upload(path, file);
+          if (upErr) throw new Error(upErr.message);
+          await recordFn({
+            data: {
+              organizationId: orgId,
+              instanceId: t.instance_id,
+              evidenceTypeUsed: "upload",
+              uploadPath: path,
+              uploadFilename: file.name,
+              isManualEntry: true,
+              staffId: t.staff_id,
+              staffName: t.staff_name,
+              manualEntryByName: adminName,
+            },
+          });
+          ok += 1;
+        } catch (e) {
+          failures.push(`${t.staff_name}: ${(e as Error).message}`);
+        }
+      }
+      if (ok) toast.success(`Filed for ${ok} staff member${ok === 1 ? "" : "s"}`);
+      if (failures.length) toast.error(`Failed for ${failures.length}: ${failures[0]}`);
+      if (ok) reset();
       qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
-      qc.invalidateQueries({ queryKey: ["obligation-instance-detail", instanceId] });
-    } catch (e) {
-      toast.error((e as Error).message);
+      qc.invalidateQueries({ queryKey: ["obligation-instance-detail"] });
+      qc.invalidateQueries({ queryKey: ["obligation-outstanding-roster", obligation.id] });
+      qc.invalidateQueries({ queryKey: ["obligation-per-client-detail", obligation.id] });
     } finally {
       setBusy(false);
     }
@@ -247,7 +256,7 @@ function FileForStaffPanel({
 
   if (!open) {
     return (
-      <Button size="sm" variant="outline" disabled={!outstanding.length} onClick={() => setOpen(true)}>
+      <Button size="sm" variant="outline" disabled={!roster.length} onClick={() => setOpen(true)}>
         {label}
       </Button>
     );
@@ -255,48 +264,25 @@ function FileForStaffPanel({
 
   return (
     <div className="space-y-2 rounded-md border border-border bg-muted/20 p-2.5">
-      <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-        <PopoverTrigger asChild>
-          <Button type="button" variant="outline" size="sm" className="w-full justify-start font-normal">
-            {staffName || "Select staff member…"}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-72 p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Search staff…" />
-            <CommandList>
-              <CommandEmpty>No matches.</CommandEmpty>
-              <CommandGroup>
-                {outstanding.map((a) => (
-                  <CommandItem
-                    key={a.staff_id}
-                    value={a.staff_name}
-                    onSelect={() => {
-                      setStaffId(a.staff_id);
-                      setStaffName(a.staff_name);
-                      setPickerOpen(false);
-                    }}
-                  >
-                    {a.staff_name}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-      {staffName && (
-        <p className="text-xs text-muted-foreground">Filing for: {staffName}</p>
-      )}
+      <RosterMultiSelect roster={roster} selected={selected} onChange={setSelected} />
       <label className="flex min-h-[40px] cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted">
         <Upload className="h-3.5 w-3.5" />
         {file ? file.name : "Choose file…"}
         <input type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
       </label>
+      {targets.length > 1 && (
+        <p className="text-xs text-muted-foreground">
+          The same document will be filed for each of the {targets.length} selected staff members.
+        </p>
+      )}
       <div className="flex justify-end gap-2">
         <Button size="sm" variant="ghost" onClick={reset} disabled={busy}>Cancel</Button>
-        <Button size="sm" disabled={!staffId || !file || busy} onClick={submit}>
-          {staffName ? `File for ${staffName}` : "Submit"}
+        <Button size="sm" disabled={!targets.length || !file || busy} onClick={submit}>
+          {busy
+            ? "Filing…"
+            : targets.length
+              ? `File for ${targets.length} staff`
+              : "Submit"}
         </Button>
       </div>
     </div>

@@ -33,29 +33,6 @@ import {
 import type { ObligationWithInstance } from "./obligation-card";
 import { useOutstandingRoster, RosterMultiSelect, type RosterEntry } from "./outstanding-roster";
 
-type AssigneeRow = { staff_id: string; staff_name: string };
-type CompletionRow = { staff_id: string };
-
-function useInstanceAssignees(instanceId: string | undefined) {
-  return useQuery({
-    queryKey: ["obligation-instance-detail", instanceId],
-    enabled: !!instanceId,
-    queryFn: async () => {
-      const [{ data: assignees, error: aErr }, { data: completions, error: cErr }] = await Promise.all([
-        supabase.from("company_obligation_instance_assignees")
-          .select("staff_id, staff_name").eq("instance_id", instanceId as string),
-        supabase.from("company_obligation_completions")
-          .select("staff_id").eq("instance_id", instanceId as string),
-      ]);
-      if (aErr) throw new Error(aErr.message);
-      if (cErr) throw new Error(cErr.message);
-      return {
-        assignees: (assignees ?? []) as AssigneeRow[],
-        completions: (completions ?? []) as CompletionRow[],
-      };
-    },
-  });
-}
 
 function useAdminName(orgId: string, active: boolean) {
   const { user } = useAuth();

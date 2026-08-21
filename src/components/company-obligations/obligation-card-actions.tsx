@@ -475,6 +475,7 @@ function formatDueShort(dueAt: string): string {
 }
 
 function PerClientActions({ orgId, obligation }: { orgId: string; obligation: ObligationWithInstance }) {
+  const { data: roster = [] } = useOutstandingRoster(obligation.id);
   const { data } = useQuery({
     queryKey: ["obligation-per-client-detail", obligation.id],
     queryFn: async () => {

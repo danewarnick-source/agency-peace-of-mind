@@ -5,20 +5,19 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Search, Plus, Upload, ClipboardList, CheckCircle2, Building2, FolderOpen, Layers, FileWarning } from "lucide-react";
-import { listCompanyObligations, type ObligationListItem } from "@/lib/company-obligations.functions";
+import { listCompanyObligations, getOrgServiceFootprint, type ObligationListItem } from "@/lib/company-obligations.functions";
 import { listStaffGroups, type StaffGroupRow } from "@/lib/staff-groups.functions";
 import { ObligationCard, type ObligationWithInstance } from "@/components/company-obligations/obligation-card";
 import { ObligationDrawer } from "@/components/company-obligations/obligation-drawer";
 import { catalogFor } from "@/components/company-obligations/obligation-meta";
-import {
-  CATEGORY_LABEL,
-  type ObligationCategory,
-} from "@/lib/sow-obligation-catalog";
+import { AuditPartPanel, UnmappedDuties } from "@/components/company-obligations/audit-part-panel";
+import { AUDIT_PART_LABEL, DSPD_AUDIT_ITEMS, footprintIsKnown, itemApplies, type AuditPart } from "@/lib/dspd-audit-tool";
 
 export const Route = createFileRoute("/dashboard/company-obligations")({
   head: () => ({ meta: [{ title: "Compliance register — HIVE" }] }),
@@ -31,17 +30,6 @@ function isDueWithinDays(iso: string | null, days: number): boolean {
   const now = Date.now();
   return due >= now && due <= now + days * 86_400_000;
 }
-
-const CATEGORY_ORDER: ObligationCategory[] = [
-  "training",
-  "screening",
-  "client_docs",
-  "reporting",
-  "safety",
-  "licensing",
-  "employment",
-  "standing_records",
-];
 
 function StatCard({ label, count, tone, hint }: { label: string; count: number; tone: "red" | "amber" | "green" | "slate"; hint?: string }) {
   const toneClasses = {
@@ -97,6 +85,7 @@ function ObligationList({
 function ObligationsTab({ orgId }: { orgId: string }) {
   const listFn = useServerFn(listCompanyObligations);
   const listGroupsFn = useServerFn(listStaffGroups);
+  const footprintFn = useServerFn(getOrgServiceFootprint);
 
   const { data: obligations = [], isLoading } = useQuery<ObligationListItem[]>({
     queryKey: ["company-obligations", orgId],
@@ -108,6 +97,11 @@ function ObligationsTab({ orgId }: { orgId: string }) {
   const { data: groups = [] } = useQuery<Array<StaffGroupRow & { member_count: number }>>({
     queryKey: ["staff-groups", orgId],
     queryFn: () => listGroupsFn({ data: { organizationId: orgId } }),
+  });
+
+  const { data: footprint = { codes: [] as string[], hasAbiClients: false } } = useQuery({
+    queryKey: ["org-service-footprint", orgId],
+    queryFn: () => footprintFn({ data: { organizationId: orgId } }),
   });
 
   const assignedUserIds = useMemo(() => {
@@ -155,6 +149,7 @@ function ObligationsTab({ orgId }: { orgId: string }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "paused">("active");
   const [scopeFilter, setScopeFilter] = useState<"all" | "org" | "staff" | "staff_per_client">("all");
+  const [showNa, setShowNa] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingObligation, setEditingObligation] = useState<ObligationWithInstance | null>(null);
 
@@ -213,29 +208,14 @@ function ObligationsTab({ orgId }: { orgId: string }) {
       o.title.toLowerCase().includes(q)
       || (o.source_policy_section ?? "").toLowerCase().includes(q)
       || (catalog?.citation ?? "").toLowerCase().includes(q)
-      || (catalog?.category ? CATEGORY_LABEL[catalog.category].toLowerCase().includes(q) : false)
     );
   };
 
   const register = useMemo(() => obligations.filter(matchesFilters), [obligations, filter, scopeFilter, search]);
 
-  const groupedRegister = useMemo(() => {
-    const groups = new Map<string, ObligationListItem[]>();
-    for (const o of register) {
-      const cat = catalogFor(o)?.category ?? "uncategorized";
-      const list = groups.get(cat) ?? [];
-      list.push(o);
-      groups.set(cat, list);
-    }
-    const ordered: Array<{ key: string; label: string; items: ObligationListItem[] }> = [];
-    for (const cat of CATEGORY_ORDER) {
-      const items = groups.get(cat);
-      if (items?.length) ordered.push({ key: cat, label: CATEGORY_LABEL[cat], items });
-    }
-    const extra = groups.get("uncategorized");
-    if (extra?.length) ordered.push({ key: "uncategorized", label: "Provider-defined", items: extra });
-    return ordered;
-  }, [register]);
+  const applicableAuditCount = useMemo(() => {
+    return DSPD_AUDIT_ITEMS.filter((i) => itemApplies(i, footprint)).length;
+  }, [footprint]);
 
   const externalFilings = useMemo(() => {
     return obligations
@@ -273,14 +253,30 @@ function ObligationsTab({ orgId }: { orgId: string }) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-2xl text-sm text-muted-foreground">
-          This is a compliance register, not a to-do dump. Each SOW duty says where the work happens
-          (in HIVE vs a state portal), the real due-date rule, and who it applies to.
-          Duties for service codes this organization does not run are hidden.
+          Laid out like the DSPD In-depth Review Tool (DHHS91172). Rows for services this
+          program does not provide are hidden (N/A). The contractor must still meet the whole
+          contract for the services it actually runs.
         </p>
         <Button onClick={openCreate}>
           <Plus className="mr-1.5 h-4 w-4" /> New provider obligation
         </Button>
       </div>
+
+      {footprintIsKnown(footprint) ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">This program's services</span>
+          {footprint.codes.map((c) => (
+            <Badge key={c} variant="secondary">{c}</Badge>
+          ))}
+          {footprint.hasAbiClients && <Badge variant="outline">Serves ABI</Badge>}
+        </div>
+      ) : (
+        <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-950 dark:text-amber-100">
+          HIVE could not tell which service codes this program provides, so every review-tool
+          row is shown. Set awarded codes on the Company Profile (or add client authorizations)
+          to hide N/A items for services you do not run.
+        </p>
+      )}
 
       <div className="grid gap-2 rounded-xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
         <p className="flex items-start gap-2">
@@ -320,10 +316,14 @@ function ObligationsTab({ orgId }: { orgId: string }) {
         <p className="text-sm text-muted-foreground">Loading obligations…</p>
       ) : (
         <Tabs defaultValue="queue">
-          <TabsList className="flex flex-wrap">
+          <TabsList className="flex h-auto flex-wrap">
             <TabsTrigger value="queue">Work queue ({workQueue.length})</TabsTrigger>
-            <TabsTrigger value="register">Register ({register.length})</TabsTrigger>
+            <TabsTrigger value="I">{AUDIT_PART_LABEL.I}</TabsTrigger>
+            <TabsTrigger value="II">{AUDIT_PART_LABEL.II}</TabsTrigger>
+            <TabsTrigger value="III">{AUDIT_PART_LABEL.III}</TabsTrigger>
+            <TabsTrigger value="IV">{AUDIT_PART_LABEL.IV}</TabsTrigger>
             <TabsTrigger value="external">Filed outside HIVE ({externalFilings.length})</TabsTrigger>
+            <TabsTrigger value="other">Other duties</TabsTrigger>
           </TabsList>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -357,12 +357,19 @@ function ObligationsTab({ orgId }: { orgId: string }) {
                 </button>
               ))}
             </div>
+            <button
+              type="button"
+              onClick={() => setShowNa((v) => !v)}
+              className={`rounded-md border px-2.5 py-1 text-xs font-medium ${showNa ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:bg-accent"}`}
+            >
+              {showNa ? "Showing N/A items" : `Show N/A (${Math.max(0, DSPD_AUDIT_ITEMS.length - applicableAuditCount)} hidden)`}
+            </button>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search title or SOW citation…"
+                placeholder="Search title or citation…"
                 className="h-8 w-56 pl-8 text-sm"
               />
             </div>
@@ -384,26 +391,17 @@ function ObligationsTab({ orgId }: { orgId: string }) {
             />
           </TabsContent>
 
-          <TabsContent value="register" className="mt-4 space-y-8">
-            {groupedRegister.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-                No obligations match your filters.
-              </div>
-            ) : (
-              groupedRegister.map((group) => (
-                <section key={group.key} className="space-y-3">
-                  <h3 className="text-sm font-semibold text-muted-foreground">
-                    {group.label}
-                    <span className="ml-2 font-normal">({group.items.length})</span>
-                  </h3>
-                  <ObligationList
-                    {...listProps}
-                    items={group.items}
-                    empty={null}
-                  />
-                </section>
-              ))
-            )}
+          <TabsContent value="I" className="mt-4">
+            <AuditPartPanel part={"I" as AuditPart} footprint={footprint} includeNa={showNa} obligations={register} search={search} {...listProps} />
+          </TabsContent>
+          <TabsContent value="II" className="mt-4">
+            <AuditPartPanel part={"II" as AuditPart} footprint={footprint} includeNa={showNa} obligations={register} search={search} {...listProps} />
+          </TabsContent>
+          <TabsContent value="III" className="mt-4">
+            <AuditPartPanel part={"III" as AuditPart} footprint={footprint} includeNa={showNa} obligations={register} search={search} {...listProps} />
+          </TabsContent>
+          <TabsContent value="IV" className="mt-4">
+            <AuditPartPanel part={"IV" as AuditPart} footprint={footprint} includeNa={showNa} obligations={register} search={search} {...listProps} />
           </TabsContent>
 
           <TabsContent value="external" className="mt-4 space-y-4">
@@ -422,6 +420,10 @@ function ObligationsTab({ orgId }: { orgId: string }) {
                 </div>
               }
             />
+          </TabsContent>
+
+          <TabsContent value="other" className="mt-4">
+            <UnmappedDuties obligations={register} {...listProps} />
           </TabsContent>
         </Tabs>
       )}
@@ -475,8 +477,8 @@ function CompanyObligationsPage() {
         <div>
           <h2 className="text-base font-semibold">Compliance register</h2>
           <p className="text-sm text-muted-foreground">
-            DHHS91172 duties, with accurate due-date rules and a clear split between
-            what HIVE can collect and what must be filed elsewhere.
+            DHHS91172 In-depth Review Tool — only the rows that apply to the
+            services this program provides.
           </p>
         </div>
       </div>

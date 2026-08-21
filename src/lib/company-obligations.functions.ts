@@ -22,6 +22,7 @@ import {
   explainDueRule,
 } from "./obligation-due-dates";
 import { resolveDueRule, sowCatalogEntry } from "./sow-obligation-catalog";
+import { obligationAppliesToFootprint } from "./dspd-audit-tool";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -101,6 +102,78 @@ export type ObligationListItem = CompanyObligationRow & {
 
 function emptyRollup(): ObligationRollup {
   return { open_count: 0, overdue_count: 0, pending_count: 0, next_due_at: null, latest_completed_at: null };
+}
+
+export type OrgServiceFootprint = {
+  codes: string[];
+  hasAbiClients: boolean;
+};
+
+async function orgServiceFootprintInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+): Promise<OrgServiceFootprint> {
+  const codes = new Set<string>();
+  let hasAbiClients = false;
+
+  // Do NOT union the service_codes registry. That table is seeded with the
+  // full DSPD master list, so using it would show RHS/PPS/EPR rows to a
+  // Host Home + SEI program. Awarded codes + live authorizations only.
+
+  const orgAttempt = await supabase
+    .from("organizations").select("services_offered").eq("id", organizationId).maybeSingle();
+  if (!orgAttempt.error) {
+    const offered = (orgAttempt.data as { services_offered?: string[] | null } | null)?.services_offered ?? [];
+    for (const c of offered) codes.add(String(c).toUpperCase());
+  }
+
+  const outlineAttempt = await supabase
+    .from("provider_interest_outline").select("codes_held")
+    .eq("organization_id", organizationId);
+  if (!outlineAttempt.error) {
+    for (const row of (outlineAttempt.data ?? []) as Array<{ codes_held: string[] | null }>) {
+      for (const c of row.codes_held ?? []) codes.add(String(c).toUpperCase());
+    }
+  }
+
+  const clientAttempt = await supabase
+    .from("clients").select("authorized_dspd_codes, disability_category, has_abi")
+    .eq("organization_id", organizationId).eq("account_status", "active");
+  const clientRows = !clientAttempt.error
+    ? clientAttempt.data
+    : (await supabase
+        .from("clients").select("authorized_dspd_codes, disability_category")
+        .eq("organization_id", organizationId).eq("account_status", "active")).data;
+  if (clientRows) {
+    for (const c of clientRows as Array<{
+      authorized_dspd_codes: string[] | null;
+      disability_category: string | null;
+      has_abi?: boolean | null;
+    }>) {
+      for (const code of c.authorized_dspd_codes ?? []) codes.add(code.toUpperCase());
+      if (c.has_abi) hasAbiClients = true;
+      const cat = (c.disability_category ?? "").toLowerCase();
+      if (cat.includes("abi") || cat.includes("brain injury") || cat.includes("acquired brain")) {
+        hasAbiClients = true;
+      }
+    }
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const cbcAttempt = await supabase
+    .from("client_billing_codes")
+    .select("service_code, service_end_date")
+    .eq("organization_id", organizationId);
+  if (!cbcAttempt.error) {
+    for (const r of (cbcAttempt.data ?? []) as Array<{
+      service_code: string | null; service_end_date: string | null;
+    }>) {
+      if (r.service_end_date && r.service_end_date < today) continue;
+      if (r.service_code) codes.add(r.service_code.toUpperCase());
+    }
+  }
+
+  return { codes: Array.from(codes).sort(), hasAbiClients };
 }
 
 /** Most urgent open instance wins; otherwise the most recently created. */
@@ -1086,28 +1159,11 @@ export const listCompanyObligations = createServerFn({ method: "POST" })
       .order("title", { ascending: true });
     if (error) throw new Error(error.message);
 
-    // Fetch active client service codes for this org — used to hide
-    // obligations whose target_service_codes don't apply to any active
-    // client (e.g. SOW-seeded obligations for service codes TNS doesn't run).
-    const { data: clientCodes, error: ccErr } = await supabase
-      .from("clients")
-      .select("authorized_dspd_codes")
-      .eq("organization_id", data.organizationId)
-      .eq("account_status", "active");
-    if (ccErr) throw new Error(ccErr.message);
+    const footprint = await orgServiceFootprintInternal(supabase, data.organizationId);
 
-    const activeCodes = new Set(
-      (clientCodes ?? []).flatMap(
-        (c: { authorized_dspd_codes: string[] | null }) =>
-          (c.authorized_dspd_codes ?? []).map((code: string) => code.toUpperCase()),
-      ),
+    const visibleObligations = (obligations ?? []).filter((o: CompanyObligationRow) =>
+      obligationAppliesToFootprint(o.title, o.target_service_codes, footprint),
     );
-
-    const visibleObligations = (obligations ?? []).filter((o: CompanyObligationRow) => {
-      const targets = (o.target_service_codes ?? []).map((c: string) => c.toUpperCase());
-      if (!targets.length) return true;
-      return targets.some((c: string) => activeCodes.has(c));
-    });
 
     const obligationIds = visibleObligations.map((o: CompanyObligationRow) => o.id);
     const instancesByObligation = new Map<string, ObligationInstanceRow[]>();
@@ -1164,6 +1220,21 @@ export const listCompanyObligations = createServerFn({ method: "POST" })
         rollup: rows.length ? rollupFromInstances(rows) : emptyRollup(),
       };
     });
+  });
+
+/** Service codes this program actually provides: Company Profile
+ *  services_offered + provider_interest_outline.codes_held + active client
+ *  authorizations (authorized_dspd_codes and client_billing_codes / 1056).
+ *  Does not use the service_codes registry (that table is the full DSPD
+ *  master list). Drives N/A on the DSPD review-tool register. */
+export const getOrgServiceFootprint = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ organizationId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { codes: [] as string[], hasAbiClients: false };
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+    return orgServiceFootprintInternal(supabase, data.organizationId);
   });
 
 /** Full resolved assignee roster for an obligation (group membership +

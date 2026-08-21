@@ -291,109 +291,9 @@ function FileForStaffPanel({
   );
 }
 
-/** Compact variant of FileForStaffPanel for a single, already-known
- *  staff+client instance (staff_per_client scope) — no staff picker, the
- *  instance already knows which staff member it belongs to. */
-function FileForInstanceButton({
-  orgId,
-  obligation,
-  instanceId,
-  staffId,
-  staffName,
-  clientName,
-}: {
-  orgId: string;
-  obligation: ObligationWithInstance;
-  instanceId: string;
-  staffId: string;
-  staffName: string;
-  clientName: string | null;
-}) {
-  const qc = useQueryClient();
-  const recordFn = useServerFn(recordCompletion);
-  const [open, setOpen] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
-  const [busy, setBusy] = useState(false);
-  const adminName = useAdminName(orgId, open);
+// (Legacy single-staff "File evidence" button removed — all admin filing now
+// goes through the multi-select FileForStaffPanel roster.)
 
-  const reset = () => {
-    setOpen(false);
-    setFile(null);
-  };
-
-  const submit = async () => {
-    if (!file) return;
-    setBusy(true);
-    try {
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const path = `${orgId}/${obligation.id}/${instanceId}/${crypto.randomUUID()}-${safeName}`;
-      const { error: upErr } = await supabase.storage
-        .from("obligation-evidence")
-        .upload(path, file);
-      if (upErr) throw new Error(upErr.message);
-      await recordFn({
-        data: {
-          organizationId: orgId,
-          instanceId,
-          evidenceTypeUsed: "upload",
-          uploadPath: path,
-          uploadFilename: file.name,
-          isManualEntry: true,
-          staffId,
-          staffName,
-          manualEntryByName: adminName,
-        },
-      });
-      toast.success(`Filed for ${staffName}`);
-      reset();
-      qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
-      qc.invalidateQueries({ queryKey: ["obligation-per-client-detail", obligation.id] });
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  if (!open) {
-    return (
-      <Button
-        size="sm"
-        variant="outline"
-        className="h-6 px-2 text-xs"
-        onClick={() => setOpen(true)}
-      >
-        File evidence
-      </Button>
-    );
-  }
-
-  return (
-    <div className="space-y-2 rounded-md border border-border bg-muted/20 p-2.5">
-      <p className="text-xs text-muted-foreground">
-        Uploading evidence for: {staffName}
-        {clientName ? ` — ${clientName}` : ""}
-      </p>
-      <label className="flex min-h-[40px] cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted">
-        <Upload className="h-3.5 w-3.5" />
-        {file ? file.name : "Choose file…"}
-        <input
-          type="file"
-          className="hidden"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-        />
-      </label>
-      <div className="flex justify-end gap-2">
-        <Button size="sm" variant="ghost" onClick={reset} disabled={busy}>
-          Cancel
-        </Button>
-        <Button size="sm" disabled={!file || busy} onClick={submit}>
-          {`File for ${staffName}`}
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 function NotifyOutstandingButton({
   orgId,
@@ -653,17 +553,8 @@ function PerClientActions({
                     <span> — {formatDueShort(i.due_at)}</span>
                   )}
                 </span>
-                {a && (
-                  <FileForInstanceButton
-                    orgId={orgId}
-                    obligation={obligation}
-                    instanceId={i.id}
-                    staffId={a.staff_id}
-                    staffName={a.staff_name}
-                    clientName={i.client_name}
-                  />
-                )}
               </li>
+
             );
           })}
         </ul>

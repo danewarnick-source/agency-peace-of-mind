@@ -526,7 +526,9 @@ async function generatePerPersonInstancesInternal(
   const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
   const created: ObligationInstanceRow[] = [];
+  const failures: string[] = [];
   for (const a of assignees) {
+   try {
     const basisStr = hireDates.get(a.staff_id)?.basis_date;
     if (!basisStr) continue; // no hire_date/start_date/created_at on file — can't compute a due date
     const basisDate = new Date(`${basisStr.slice(0, 10)}T00:00:00Z`);
@@ -606,8 +608,22 @@ async function generatePerPersonInstancesInternal(
     );
     if (assErr) throw new Error(assErr.message);
 
-    await scheduleRemindersInternal(supabase, organizationId, inserted.id, ob);
+    // Reminder scheduling must never block instance creation.
+    try {
+      await scheduleRemindersInternal(supabase, organizationId, inserted.id, ob);
+    } catch (remErr) {
+      failures.push(`${a.staff_name} (reminders): ${(remErr as Error).message}`);
+    }
     created.push(inserted as ObligationInstanceRow);
+   } catch (err) {
+      // One bad staff row must not abort generation for everyone else.
+      failures.push(`${a.staff_name}: ${(err as Error).message}`);
+   }
+  }
+  if (failures.length) {
+    console.error(
+      `[obligations] per-person generation failed for ${failures.length} staff on ${ob.id}: ${failures.join(" | ")}`,
+    );
   }
   return created;
 }

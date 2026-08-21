@@ -224,12 +224,22 @@ function PerNameCompletion({
     queryKey: ["obligation-instance-detail", instanceId, obligation.id],
     enabled: !!instanceId,
     queryFn: async () => {
+      // Per-person obligations create one instance per staff member, so
+      // completions must be gathered across EVERY instance of the obligation
+      // — not just the card's current instance.
+      const { data: instRows, error: iErr } = await supabase
+        .from("company_obligation_instances")
+        .select("id")
+        .eq("obligation_id", obligation.id);
+      if (iErr) throw new Error(iErr.message);
+      const instanceIds = ((instRows ?? []) as Array<{ id: string }>).map((r) => r.id);
+
       const [assignees, { data: completions, error: cErr }] = await Promise.all([
         listAssigneesFn({ data: { organizationId: orgId, obligationId: obligation.id } }),
         supabase
           .from("company_obligation_completions")
           .select("id, staff_id, staff_name, completed_at, nectar_validation_status, nectar_validation_reasons, nectar_extracted_cert_type")
-          .eq("instance_id", instanceId as string),
+          .in("instance_id", instanceIds.length ? instanceIds : [instanceId as string]),
       ]);
       if (cErr) throw new Error(cErr.message);
       return {

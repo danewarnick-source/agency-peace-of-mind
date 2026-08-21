@@ -20,13 +20,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
 } from "@/components/ui/command";
 import { AlertTriangle, Upload } from "lucide-react";
 import { recordCompletion } from "@/lib/company-obligations.functions";
@@ -63,7 +70,8 @@ export function ManualCompletionDrawer({
   // upload_and_attestation lets an admin file the document half, but the
   // attestation half still requires the staff member personally, so
   // "Attestation" is never an admin-selectable evidence choice.
-  const hideAttestationChoice = evidenceType === "attestation" || evidenceType === "upload_and_attestation";
+  const hideAttestationChoice =
+    evidenceType === "attestation" || evidenceType === "upload_and_attestation";
   const defaultChoice: EvidenceChoice = hideAttestationChoice ? "upload" : "attestation";
 
   const qc = useQueryClient();
@@ -118,7 +126,10 @@ export function ManualCompletionDrawer({
     enabled: !!user,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("org_member_directory").select("full_name").eq("id", user!.id).maybeSingle();
+        .from("org_member_directory")
+        .select("full_name")
+        .eq("id", user!.id)
+        .maybeSingle();
       if (error) throw new Error(error.message);
       return data as { full_name: string | null } | null;
     },
@@ -150,7 +161,9 @@ export function ManualCompletionDrawer({
           if (evidenceChoice === "upload" && file) {
             const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
             const path = `${orgId}/manual/${t.instance_id}/${crypto.randomUUID()}-${safeName}`;
-            const { error: upErr } = await supabase.storage.from("obligation-evidence").upload(path, file);
+            const { error: upErr } = await supabase.storage
+              .from("obligation-evidence")
+              .upload(path, file);
             if (upErr) throw new Error(upErr.message);
             uploadPath = path;
             uploadFilename = file.name;
@@ -159,11 +172,18 @@ export function ManualCompletionDrawer({
             data: {
               organizationId: orgId,
               instanceId: t.instance_id,
-              evidenceTypeUsed: evidenceChoice === "attestation" ? "attestation" : evidenceChoice === "upload" ? "upload" : "manual",
+              evidenceTypeUsed:
+                evidenceChoice === "attestation"
+                  ? "attestation"
+                  : evidenceChoice === "upload"
+                    ? "upload"
+                    : "manual",
               uploadPath,
               uploadFilename,
-              attestationSignedAt: evidenceChoice === "attestation" ? new Date(completedAt).toISOString() : null,
-              attestationTextSnapshot: evidenceChoice === "attestation" ? (attestationText ?? null) : null,
+              attestationSignedAt:
+                evidenceChoice === "attestation" ? new Date(completedAt).toISOString() : null,
+              attestationTextSnapshot:
+                evidenceChoice === "attestation" ? (attestationText ?? null) : null,
               isManualEntry: true,
               staffId: t.staff_id,
               staffName: t.staff_name,
@@ -204,12 +224,16 @@ export function ManualCompletionDrawer({
         {attestationBlocked ? (
           <>
             <div className="mt-4 rounded-md border border-amber-300/60 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
-              This obligation requires the staff member to attest personally. Use the "Notify staff to attest"
-              button on the obligation card to send them a reminder.
+              This obligation requires the staff member to attest personally. Use the "Notify staff
+              to attest" button on the obligation card to send them a reminder.
             </div>
             <SheetFooter className="gap-2 sm:justify-end">
-              <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button disabled title="Staff must attest personally.">Save completion</Button>
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button disabled title="Staff must attest personally.">
+                Save completion
+              </Button>
             </SheetFooter>
           </>
         ) : (
@@ -264,10 +288,17 @@ export function ManualCompletionDrawer({
 
               <div className="grid gap-1.5">
                 <Label>Evidence type</Label>
-                <Select value={evidenceChoice} onValueChange={(v) => setEvidenceChoice(v as EvidenceChoice)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select
+                  value={evidenceChoice}
+                  onValueChange={(v) => setEvidenceChoice(v as EvidenceChoice)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {!hideAttestationChoice && <SelectItem value="attestation">Attestation</SelectItem>}
+                    {!hideAttestationChoice && (
+                      <SelectItem value="attestation">Attestation</SelectItem>
+                    )}
                     <SelectItem value="upload">Upload</SelectItem>
                     <SelectItem value="notes">Notes only</SelectItem>
                   </SelectContent>
@@ -276,7 +307,8 @@ export function ManualCompletionDrawer({
 
               {evidenceType === "upload_and_attestation" && evidenceChoice === "upload" && (
                 <p className="text-xs text-muted-foreground">
-                  After filing the document, the staff member must still complete their personal attestation.
+                  After filing the document, the staff member must still complete their personal
+                  attestation.
                 </p>
               )}
 
@@ -292,7 +324,8 @@ export function ManualCompletionDrawer({
                       checked={attestConfirmed}
                       onChange={(e) => setAttestConfirmed(e.target.checked)}
                     />
-                    I am confirming this on behalf of {targets.length ? targetLabel : "[selected staff]"}
+                    I am confirming this on behalf of{" "}
+                    {targets.length ? targetLabel : "[selected staff]"}
                   </label>
                 </div>
               )}
@@ -303,7 +336,11 @@ export function ManualCompletionDrawer({
                   <label className="flex min-h-[40px] cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted">
                     <Upload className="h-3.5 w-3.5" />
                     {file ? file.name : "Choose file…"}
-                    <input type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                    />
                   </label>
                 </div>
               )}
@@ -318,9 +355,11 @@ export function ManualCompletionDrawer({
               <div className="flex items-start gap-2 rounded-md border border-amber-300/60 bg-amber-500/10 p-2.5 text-xs text-amber-900 dark:text-amber-200">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>
-                  You are recording this on behalf of {targets.length ? targetLabel : "the selected staff member"}
+                  You are recording this on behalf of{" "}
+                  {targets.length ? targetLabel : "the selected staff member"}
                   {targets.length ? "." : " — select at least one staff member above."}
-                  {targets.length > 0 && ` This entry will be marked as manually recorded by ${adminName}.`}
+                  {targets.length > 0 &&
+                    ` This entry will be marked as manually recorded by ${adminName}.`}
                 </span>
               </div>
 
@@ -333,7 +372,9 @@ export function ManualCompletionDrawer({
             </div>
 
             <SheetFooter className="gap-2 sm:justify-end">
-              <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
               <Button onClick={() => record.mutate()} disabled={!canSave || record.isPending}>
                 Save completion
               </Button>

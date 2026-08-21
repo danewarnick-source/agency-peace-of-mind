@@ -18,11 +18,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
 } from "@/components/ui/command";
 import { Upload } from "lucide-react";
 import {
@@ -33,7 +36,6 @@ import {
 import type { ObligationWithInstance } from "./obligation-card";
 import { useOutstandingRoster, RosterMultiSelect, type RosterEntry } from "./outstanding-roster";
 
-
 function useAdminName(orgId: string, active: boolean) {
   const { user } = useAuth();
   const { data } = useQuery({
@@ -41,7 +43,10 @@ function useAdminName(orgId: string, active: boolean) {
     enabled: !!user && active,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("org_member_directory").select("full_name").eq("id", user!.id).maybeSingle();
+        .from("org_member_directory")
+        .select("full_name")
+        .eq("id", user!.id)
+        .maybeSingle();
       if (error) throw new Error(error.message);
       return data as { full_name: string | null } | null;
     },
@@ -67,8 +72,11 @@ function DirectCompletionActions({
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const needsUpload = obligation.evidence_type === "upload" || obligation.evidence_type === "upload_and_attestation";
-  const needsAttestation = obligation.evidence_type === "attestation" || obligation.evidence_type === "upload_and_attestation";
+  const needsUpload =
+    obligation.evidence_type === "upload" || obligation.evidence_type === "upload_and_attestation";
+  const needsAttestation =
+    obligation.evidence_type === "attestation" ||
+    obligation.evidence_type === "upload_and_attestation";
   const canSubmit = (!needsUpload || !!file) && (!needsAttestation || checked);
 
   const reset = () => {
@@ -85,7 +93,9 @@ function DirectCompletionActions({
       if (needsUpload && file) {
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
         const path = `${orgId}/${obligation.id}/${instance.id}/${crypto.randomUUID()}-${safeName}`;
-        const { error: upErr } = await supabase.storage.from("obligation-evidence").upload(path, file);
+        const { error: upErr } = await supabase.storage
+          .from("obligation-evidence")
+          .upload(path, file);
         if (upErr) throw new Error(upErr.message);
         uploadPath = path;
         uploadFilename = file.name;
@@ -115,8 +125,12 @@ function DirectCompletionActions({
 
   if (obligation.evidence_type === "form") {
     return (
-      <a href={`/dashboard/forms/${obligation.linked_form_id}/fill?obligation_instance=${instance.id}`}>
-        <Button size="sm" variant="outline">Complete form →</Button>
+      <a
+        href={`/dashboard/forms/${obligation.linked_form_id}/fill?obligation_instance=${instance.id}`}
+      >
+        <Button size="sm" variant="outline">
+          Complete form →
+        </Button>
       </a>
     );
   }
@@ -135,7 +149,11 @@ function DirectCompletionActions({
         <label className="flex min-h-[40px] cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted">
           <Upload className="h-3.5 w-3.5" />
           {file ? file.name : "Choose file…"}
-          <input type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          <input
+            type="file"
+            className="hidden"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          />
         </label>
       )}
       {needsAttestation && (
@@ -144,13 +162,15 @@ function DirectCompletionActions({
             {obligation.attestation_text || "No attestation text configured for this obligation."}
           </div>
           <label className="flex items-center gap-2 text-sm">
-            <Checkbox checked={checked} onCheckedChange={(v) => setChecked(v === true)} />
-            I confirm the above statement is accurate.
+            <Checkbox checked={checked} onCheckedChange={(v) => setChecked(v === true)} />I confirm
+            the above statement is accurate.
           </label>
         </>
       )}
       <div className="flex justify-end gap-2">
-        <Button size="sm" variant="ghost" onClick={reset} disabled={busy}>Cancel</Button>
+        <Button size="sm" variant="ghost" onClick={reset} disabled={busy}>
+          Cancel
+        </Button>
         <Button size="sm" disabled={!canSubmit || busy} onClick={submit}>
           {needsAttestation && !needsUpload ? "Submit attestation" : "Submit"}
         </Button>
@@ -200,7 +220,9 @@ function FileForStaffPanel({
       for (const t of targets) {
         try {
           const path = `${orgId}/${obligation.id}/${t.instance_id}/${crypto.randomUUID()}-${safeName}`;
-          const { error: upErr } = await supabase.storage.from("obligation-evidence").upload(path, file);
+          const { error: upErr } = await supabase.storage
+            .from("obligation-evidence")
+            .upload(path, file);
           if (upErr) throw new Error(upErr.message);
           await recordFn({
             data: {
@@ -246,7 +268,11 @@ function FileForStaffPanel({
       <label className="flex min-h-[40px] cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted">
         <Upload className="h-3.5 w-3.5" />
         {file ? file.name : "Choose file…"}
-        <input type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        <input
+          type="file"
+          className="hidden"
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        />
       </label>
       {targets.length > 1 && (
         <p className="text-xs text-muted-foreground">
@@ -254,13 +280,11 @@ function FileForStaffPanel({
         </p>
       )}
       <div className="flex justify-end gap-2">
-        <Button size="sm" variant="ghost" onClick={reset} disabled={busy}>Cancel</Button>
+        <Button size="sm" variant="ghost" onClick={reset} disabled={busy}>
+          Cancel
+        </Button>
         <Button size="sm" disabled={!targets.length || !file || busy} onClick={submit}>
-          {busy
-            ? "Filing…"
-            : targets.length
-              ? `File for ${targets.length} staff`
-              : "Submit"}
+          {busy ? "Filing…" : targets.length ? `File for ${targets.length} staff` : "Submit"}
         </Button>
       </div>
     </div>
@@ -303,7 +327,9 @@ function FileForInstanceButton({
     try {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
       const path = `${orgId}/${obligation.id}/${instanceId}/${crypto.randomUUID()}-${safeName}`;
-      const { error: upErr } = await supabase.storage.from("obligation-evidence").upload(path, file);
+      const { error: upErr } = await supabase.storage
+        .from("obligation-evidence")
+        .upload(path, file);
       if (upErr) throw new Error(upErr.message);
       await recordFn({
         data: {
@@ -331,7 +357,12 @@ function FileForInstanceButton({
 
   if (!open) {
     return (
-      <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => setOpen(true)}>
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-6 px-2 text-xs"
+        onClick={() => setOpen(true)}
+      >
         File evidence
       </Button>
     );
@@ -340,15 +371,22 @@ function FileForInstanceButton({
   return (
     <div className="space-y-2 rounded-md border border-border bg-muted/20 p-2.5">
       <p className="text-xs text-muted-foreground">
-        Uploading evidence for: {staffName}{clientName ? ` — ${clientName}` : ""}
+        Uploading evidence for: {staffName}
+        {clientName ? ` — ${clientName}` : ""}
       </p>
       <label className="flex min-h-[40px] cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted">
         <Upload className="h-3.5 w-3.5" />
         {file ? file.name : "Choose file…"}
-        <input type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        <input
+          type="file"
+          className="hidden"
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        />
       </label>
       <div className="flex justify-end gap-2">
-        <Button size="sm" variant="ghost" onClick={reset} disabled={busy}>Cancel</Button>
+        <Button size="sm" variant="ghost" onClick={reset} disabled={busy}>
+          Cancel
+        </Button>
         <Button size="sm" disabled={!file || busy} onClick={submit}>
           {`File for ${staffName}`}
         </Button>
@@ -393,7 +431,9 @@ function NotifyOutstandingButton({
       disabled={!outstandingCount || remind.isPending || notified}
       onClick={() => remind.mutate()}
     >
-      {notified ? `Notified ${outstandingCount} today` : (
+      {notified ? (
+        `Notified ${outstandingCount} today`
+      ) : (
         <>
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
           {label} {outstandingCount} outstanding →
@@ -423,8 +463,12 @@ function StaffRequiredActions({
     [roster],
   );
 
-  const needsUpload = obligation.evidence_type === "upload" || obligation.evidence_type === "upload_and_attestation";
-  const needsAttestation = obligation.evidence_type === "attestation" || obligation.evidence_type === "form" || obligation.evidence_type === "upload_and_attestation";
+  const needsUpload =
+    obligation.evidence_type === "upload" || obligation.evidence_type === "upload_and_attestation";
+  const needsAttestation =
+    obligation.evidence_type === "attestation" ||
+    obligation.evidence_type === "form" ||
+    obligation.evidence_type === "upload_and_attestation";
 
   return (
     <div className="space-y-2">
@@ -446,7 +490,11 @@ function StaffRequiredActions({
             orgId={orgId}
             instanceIds={openInstanceIds}
             outstandingCount={roster.length}
-            label={obligation.evidence_type === "upload_and_attestation" ? "Notify staff to attest" : "Notify"}
+            label={
+              obligation.evidence_type === "upload_and_attestation"
+                ? "Notify staff to attest"
+                : "Notify"
+            }
           />
         )}
       </div>
@@ -463,7 +511,13 @@ function StaffRequiredActions({
   );
 }
 
-type PerClientInstanceRow = { id: string; status: string; due_at: string; client_id: string | null; client_name: string | null };
+type PerClientInstanceRow = {
+  id: string;
+  status: string;
+  due_at: string;
+  client_id: string | null;
+  client_name: string | null;
+};
 type PerClientCompletionRow = { instance_id: string };
 type PerClientAssigneeRow = { instance_id: string; staff_id: string; staff_name: string };
 
@@ -474,7 +528,13 @@ function formatDueShort(dueAt: string): string {
     : `Due ${due.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
 }
 
-function PerClientActions({ orgId, obligation }: { orgId: string; obligation: ObligationWithInstance }) {
+function PerClientActions({
+  orgId,
+  obligation,
+}: {
+  orgId: string;
+  obligation: ObligationWithInstance;
+}) {
   const { data: roster = [] } = useOutstandingRoster(obligation.id);
   const { data } = useQuery({
     queryKey: ["obligation-per-client-detail", obligation.id],
@@ -485,12 +545,22 @@ function PerClientActions({ orgId, obligation }: { orgId: string; obligation: Ob
         .eq("obligation_id", obligation.id);
       if (iErr) throw new Error(iErr.message);
       const instanceIds = (instances ?? []).map((i: { id: string }) => i.id);
-      const [{ data: completions, error: cErr }, { data: assignees, error: asErr }] = instanceIds.length
-        ? await Promise.all([
-            supabase.from("company_obligation_completions").select("instance_id").in("instance_id", instanceIds),
-            supabase.from("company_obligation_instance_assignees").select("instance_id, staff_id, staff_name").in("instance_id", instanceIds),
-          ])
-        : [{ data: [], error: null }, { data: [], error: null }];
+      const [{ data: completions, error: cErr }, { data: assignees, error: asErr }] =
+        instanceIds.length
+          ? await Promise.all([
+              supabase
+                .from("company_obligation_completions")
+                .select("instance_id")
+                .in("instance_id", instanceIds),
+              supabase
+                .from("company_obligation_instance_assignees")
+                .select("instance_id, staff_id, staff_name")
+                .in("instance_id", instanceIds),
+            ])
+          : [
+              { data: [], error: null },
+              { data: [], error: null },
+            ];
       if (cErr) throw new Error(cErr.message);
       if (asErr) throw new Error(asErr.message);
       return {
@@ -524,7 +594,9 @@ function PerClientActions({ orgId, obligation }: { orgId: string; obligation: Ob
   const { instances, completions, assignees } = data;
   const assigneeByInstance = new Map(assignees.map((a) => [a.instance_id, a]));
   const completedInstanceIds = new Set(completions.map((c) => c.instance_id));
-  const doneCount = instances.filter((i) => i.status === "completed" || completedInstanceIds.has(i.id)).length;
+  const doneCount = instances.filter(
+    (i) => i.status === "completed" || completedInstanceIds.has(i.id),
+  ).length;
   const openInstances = instances.filter((i) => i.status === "pending" || i.status === "overdue");
   if (!openInstances.length) return null;
 
@@ -538,7 +610,9 @@ function PerClientActions({ orgId, obligation }: { orgId: string; obligation: Ob
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="text-muted-foreground">{doneCount} of {instances.length} completed</span>
+        <span className="text-muted-foreground">
+          {doneCount} of {instances.length} completed
+        </span>
         <Button
           size="sm"
           variant="outline"
@@ -612,7 +686,9 @@ export function ObligationCardActions({
   if (obligation.cadence === "per_event" && !obligation.current_instance) {
     return (
       <div className="mt-3 border-t border-border pt-3">
-        <Button size="sm" variant="outline" onClick={onLogEvent}>Log event</Button>
+        <Button size="sm" variant="outline" onClick={onLogEvent}>
+          Log event
+        </Button>
       </div>
     );
   }
@@ -632,7 +708,9 @@ export function ObligationCardActions({
     return (
       <div className="mt-3 space-y-2 border-t border-border pt-3">
         {obligation.scope !== "org" && (
-          <p className="text-xs text-muted-foreground">Completing this satisfies the obligation for all assigned staff.</p>
+          <p className="text-xs text-muted-foreground">
+            Completing this satisfies the obligation for all assigned staff.
+          </p>
         )}
         <DirectCompletionActions orgId={orgId} obligation={obligation} instance={instance} />
       </div>

@@ -46,16 +46,17 @@ export function useOutstandingRoster(obligationId: string | undefined, enabled =
       const ids = rows.map((i) => i.id);
       if (!ids.length) return [];
 
-      const [{ data: assignees, error: aErr }, { data: completions, error: cErr }] = await Promise.all([
-        supabase
-          .from("company_obligation_instance_assignees")
-          .select("instance_id, staff_id, staff_name")
-          .in("instance_id", ids),
-        supabase
-          .from("company_obligation_completions")
-          .select("instance_id, staff_id")
-          .in("instance_id", ids),
-      ]);
+      const [{ data: assignees, error: aErr }, { data: completions, error: cErr }] =
+        await Promise.all([
+          supabase
+            .from("company_obligation_instance_assignees")
+            .select("instance_id, staff_id, staff_name")
+            .in("instance_id", ids),
+          supabase
+            .from("company_obligation_completions")
+            .select("instance_id, staff_id")
+            .in("instance_id", ids),
+        ]);
       if (aErr) throw new Error(aErr.message);
       if (cErr) throw new Error(cErr.message);
 
@@ -66,7 +67,13 @@ export function useOutstandingRoster(obligationId: string | undefined, enabled =
       );
       const instById = new Map(rows.map((i) => [i.id, i]));
 
-      return ((assignees ?? []) as Array<{ instance_id: string; staff_id: string; staff_name: string | null }>)
+      return (
+        (assignees ?? []) as Array<{
+          instance_id: string;
+          staff_id: string;
+          staff_name: string | null;
+        }>
+      )
         .filter((a) => !done.has(`${a.instance_id}:${a.staff_id}`))
         .map((a) => {
           const inst = instById.get(a.instance_id);

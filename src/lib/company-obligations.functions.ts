@@ -10,6 +10,18 @@ import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { resolveGroupMembersInternal, type ResolvedStaffMember } from "./staff-groups.functions";
 import { runNectarCertOcrFromStoragePath } from "./nectar-cert-ocr";
 import { compareNames } from "./name-matching";
+import {
+  addDaysUTC,
+  addMonthsUTC,
+  addYearsUTC,
+  computePeriod,
+  endOfDayUTC,
+  formatShort,
+  isCalendarDueRule,
+  periodsToEnsure,
+  explainDueRule,
+} from "./obligation-due-dates";
+import { resolveDueRule, sowCatalogEntry } from "./sow-obligation-catalog";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -74,97 +86,63 @@ export type ObligationInstanceRow = {
   updated_at: string | null;
 };
 
-// ─── date / period helpers (all arithmetic in UTC, no timezone drift) ──────
+export type ObligationRollup = {
+  open_count: number;
+  overdue_count: number;
+  pending_count: number;
+  next_due_at: string | null;
+  latest_completed_at: string | null;
+};
 
-const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const MONTHS_FULL = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
+export type ObligationListItem = CompanyObligationRow & {
+  current_instance: ObligationInstanceRow | null;
+  rollup: ObligationRollup;
+};
 
-function addDaysUTC(d: Date, days: number): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + days));
+function emptyRollup(): ObligationRollup {
+  return { open_count: 0, overdue_count: 0, pending_count: 0, next_due_at: null, latest_completed_at: null };
 }
 
-function addYearsUTC(d: Date, years: number): Date {
-  return new Date(Date.UTC(d.getUTCFullYear() + years, d.getUTCMonth(), d.getUTCDate()));
+/** Most urgent open instance wins; otherwise the most recently created. */
+function pickCurrentInstance(instances: ObligationInstanceRow[]): ObligationInstanceRow | null {
+  if (!instances.length) return null;
+  const overdue = instances
+    .filter((i) => i.status === "overdue")
+    .sort((a, b) => new Date(a.due_at).getTime() - new Date(b.due_at).getTime());
+  if (overdue[0]) return overdue[0];
+  const pending = instances
+    .filter((i) => i.status === "pending")
+    .sort((a, b) => new Date(a.due_at).getTime() - new Date(b.due_at).getTime());
+  if (pending[0]) return pending[0];
+  return [...instances].sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())[0] ?? null;
 }
 
-function addMonthsUTC(d: Date, months: number): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, d.getUTCDate()));
-}
-
-function isoWeekday(d: Date): number {
-  const wd = d.getUTCDay();
-  return wd === 0 ? 7 : wd;
-}
-
-function nextWeekdayOnOrAfter(from: Date, weekday: number): Date {
-  let d = from;
-  for (let i = 0; i < 7; i++) {
-    if (isoWeekday(d) === weekday) return d;
-    d = addDaysUTC(d, 1);
+function rollupFromInstances(instances: ObligationInstanceRow[]): ObligationRollup {
+  let overdue_count = 0;
+  let pending_count = 0;
+  let next_due_at: string | null = null;
+  let latest_completed_at: string | null = null;
+  for (const inst of instances) {
+    if (inst.status === "overdue") overdue_count++;
+    if (inst.status === "pending") pending_count++;
+    if (inst.status === "pending" || inst.status === "overdue") {
+      if (!next_due_at || new Date(inst.due_at).getTime() < new Date(next_due_at).getTime()) {
+        next_due_at = inst.due_at;
+      }
+    }
+    if (inst.status === "completed" && inst.completed_at) {
+      if (!latest_completed_at || inst.completed_at > latest_completed_at) {
+        latest_completed_at = inst.completed_at;
+      }
+    }
   }
-  return d;
-}
-
-function mondayOfWeek(d: Date): Date {
-  return addDaysUTC(d, -(isoWeekday(d) - 1));
-}
-
-function lastDayOfMonth(year: number, month0: number): number {
-  return new Date(Date.UTC(year, month0 + 1, 0)).getUTCDate();
-}
-
-function monthlyOccurrence(year: number, month0: number, dayConfig: number | "last"): Date {
-  const day = dayConfig === "last" ? lastDayOfMonth(year, month0) : Math.min(dayConfig, lastDayOfMonth(year, month0));
-  return new Date(Date.UTC(year, month0, day));
-}
-
-function nextMonthlyOnOrAfter(from: Date, dayConfig: number | "last"): Date {
-  const occ = monthlyOccurrence(from.getUTCFullYear(), from.getUTCMonth(), dayConfig);
-  if (occ.getTime() >= from.getTime()) return occ;
-  return monthlyOccurrence(from.getUTCFullYear(), from.getUTCMonth() + 1, dayConfig);
-}
-
-const QUARTER_START_MONTHS0 = [0, 3, 6, 9]; // Jan, Apr, Jul, Oct (0-indexed)
-
-function nextQuarterOnOrAfter(
-  from: Date,
-  dayConfig: number | "last",
-): { due: Date; quarterNum: number; year: number } {
-  const year = from.getUTCFullYear();
-  for (const month0 of QUARTER_START_MONTHS0) {
-    const occ = monthlyOccurrence(year, month0, dayConfig);
-    if (occ.getTime() >= from.getTime()) return { due: occ, quarterNum: month0 / 3 + 1, year };
-  }
-  return { due: monthlyOccurrence(year + 1, 0, dayConfig), quarterNum: 1, year: year + 1 };
-}
-
-function nextAnnualOnOrAfter(from: Date, month1: number, dayConfig: number | "last"): Date {
-  const month0 = month1 - 1;
-  const occ = monthlyOccurrence(from.getUTCFullYear(), month0, dayConfig);
-  if (occ.getTime() >= from.getTime()) return occ;
-  return monthlyOccurrence(from.getUTCFullYear() + 1, month0, dayConfig);
-}
-
-function formatShort(d: Date): string {
-  return `${MONTHS_SHORT[d.getUTCMonth()]} ${String(d.getUTCDate()).padStart(2, "0")}, ${d.getUTCFullYear()}`;
-}
-
-function formatMonthYear(d: Date): string {
-  return `${MONTHS_FULL[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
-}
-
-function endOfDayUTC(d: Date): string {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59)).toISOString();
-}
-
-function normalizeDayConfig(v: unknown): number | "last" {
-  if (v === "last") return "last";
-  const n = Number(v);
-  if (!Number.isFinite(n) || n < 1 || n > 31) throw new Error("due_day_config.day_of_month must be 1-31 or 'last'.");
-  return n;
+  return {
+    open_count: overdue_count + pending_count,
+    overdue_count,
+    pending_count,
+    next_due_at,
+    latest_completed_at,
+  };
 }
 
 function cadenceShortLabel(cadence: string): string {
@@ -179,115 +157,13 @@ function cadenceShortLabel(cadence: string): string {
   }
 }
 
-const WEEKDAY_NAMES = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-
-function ordinal(n: number): string {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
-}
-
-/** Human cadence sentence for staff-facing surfaces, e.g. "Monthly — due 5th". */
-export function cadenceDescription(ob: Pick<CompanyObligationRow, "cadence" | "due_day_config">): string {
-  const cfg = (ob.due_day_config ?? {}) as Record<string, unknown>;
-  switch (ob.cadence) {
-    case "weekly": {
-      const wd = Number(cfg.weekday);
-      return `Weekly — due each ${WEEKDAY_NAMES[wd] ?? "week"}`;
-    }
-    case "monthly": {
-      const d = cfg.day_of_month;
-      return `Monthly — due ${d === "last" ? "the last day of the month" : ordinal(Number(d))}`;
-    }
-    case "quarterly": {
-      const d = cfg.day_of_month;
-      return `Quarterly — due ${d === "last" ? "the last day" : ordinal(Number(d))} of the first month of the quarter`;
-    }
-    case "annually": {
-      // every_n_months and anniversary_based obligations are stored with
-      // cadence='annually' but compute their interval from a per-staffer
-      // cert/hire date, not a shared calendar month/day — check these first.
-      if (cfg.days_after_hire !== undefined && cfg.every_n_months !== undefined) {
-        const days = Number(cfg.days_after_hire);
-        const months = Number(cfg.every_n_months);
-        const src = cfg.from === "cert_expiration" ? "cert expiration date" : "completion date";
-        const renewalPart = months === 24 ? "every 2 years" : `every ${months} months`;
-        return `Due ${days} days after hire — renews ${renewalPart} from ${src}`;
-      }
-      if (cfg.every_n_months !== undefined) {
-        const n = Number(cfg.every_n_months);
-        const src = cfg.from === "cert_expiration" ? "cert expiration date" : "completion date";
-        return n === 24
-          ? `Every 2 years — renewal due on ${src}`
-          : `Every ${n} months — renewal due on ${src}`;
-      }
-      if (cfg.anniversary_based === true) {
-        return "Annually — due on hire anniversary date";
-      }
-      const m = Number(cfg.month);
-      const d = cfg.day_of_month;
-      return `Annually — due ${MONTHS_SHORT[m - 1] ?? "?"} ${d === "last" ? "last day" : ordinal(Number(d))}`;
-    }
-    case "per_event":
-      return "Triggered per event — due within a set number of days";
-    case "one_time": {
-      if (cfg.days_after_assignment !== undefined) {
-        return `Due ${Number(cfg.days_after_assignment)} days after client assignment`;
-      }
-      if (cfg.days_after_hire !== undefined) {
-        return `One-time — due ${Number(cfg.days_after_hire)} days after hire`;
-      }
-      const dateStr = typeof cfg.date === "string" ? cfg.date : "";
-      return dateStr ? `One-time — due ${formatShort(new Date(`${dateStr}T00:00:00Z`))}` : "One-time";
-    }
-    default:
-      return ob.cadence;
-  }
-}
-
-type PeriodResult = { period_key: string; due_at: string } | null;
-
-function computePeriod(cadence: string, cfg: Record<string, unknown>, now: Date): PeriodResult {
-  switch (cadence) {
-    case "weekly": {
-      const weekday = Number(cfg.weekday);
-      if (!Number.isFinite(weekday) || weekday < 1 || weekday > 7) {
-        throw new Error("weekly cadence requires due_day_config.weekday (1=Mon..7=Sun).");
-      }
-      const due = nextWeekdayOnOrAfter(now, weekday);
-      const monday = mondayOfWeek(due);
-      return { period_key: `Week of ${formatShort(monday)}`, due_at: endOfDayUTC(due) };
-    }
-    case "monthly": {
-      const day = normalizeDayConfig(cfg.day_of_month);
-      const due = nextMonthlyOnOrAfter(now, day);
-      return { period_key: formatMonthYear(due), due_at: endOfDayUTC(due) };
-    }
-    case "quarterly": {
-      const day = normalizeDayConfig(cfg.day_of_month);
-      const { due, quarterNum, year } = nextQuarterOnOrAfter(now, day);
-      return { period_key: `Q${quarterNum} ${year}`, due_at: endOfDayUTC(due) };
-    }
-    case "annually": {
-      const month = Number(cfg.month);
-      if (!Number.isFinite(month) || month < 1 || month > 12) {
-        throw new Error("annually cadence requires due_day_config.month (1-12).");
-      }
-      const day = normalizeDayConfig(cfg.day_of_month);
-      const due = nextAnnualOnOrAfter(now, month, day);
-      return { period_key: `${due.getUTCFullYear()}`, due_at: endOfDayUTC(due) };
-    }
-    case "one_time": {
-      const dateStr = typeof cfg.date === "string" ? cfg.date : "";
-      if (!dateStr) throw new Error("one_time cadence requires due_day_config.date.");
-      const due = new Date(`${dateStr}T00:00:00Z`);
-      return { period_key: `Due ${formatShort(due)}`, due_at: endOfDayUTC(due) };
-    }
-    case "per_event":
-      return null;
-    default:
-      throw new Error(`Unknown cadence: ${cadence}`);
-  }
+/** Human cadence sentence for staff-facing surfaces. Prefers the SOW catalog. */
+export function cadenceDescription(ob: Pick<CompanyObligationRow, "title" | "cadence" | "due_day_config">): string {
+  const catalog = sowCatalogEntry(ob.title);
+  if (catalog) return explainDueRule(catalog.due_rule);
+  const rule = resolveDueRule(ob.title, ob.cadence, (ob.due_day_config ?? {}) as Record<string, unknown>);
+  if (rule) return explainDueRule(rule);
+  return cadenceShortLabel(ob.cadence);
 }
 
 // ─── internal helpers (share the caller's request-scoped supabase client) ──
@@ -440,6 +316,13 @@ export async function scheduleRemindersInternal(
  */
 function isPerPersonDueConfig(cfg: Record<string, unknown>): boolean {
   return cfg.days_after_hire !== undefined || cfg.anniversary_based === true || cfg.every_n_months !== undefined;
+}
+
+function isPerPersonObligation(ob: CompanyObligationRow): boolean {
+  if (ob.scope !== "staff") return false;
+  if (isPerPersonDueConfig((ob.due_day_config ?? {}) as Record<string, unknown>)) return true;
+  const rule = resolveDueRule(ob.title, ob.cadence, (ob.due_day_config ?? {}) as Record<string, unknown>);
+  return !!rule && (rule.kind === "days_after_hire" || rule.kind === "hire_anniversary" || rule.kind === "cert_expiration");
 }
 
 async function fetchAssigneeHireDates(
@@ -788,6 +671,70 @@ async function generatePerClientInstancesInternal(
   return created;
 }
 
+function dueUtcDay(iso: string): string {
+  return iso.slice(0, 10);
+}
+
+/**
+ * Shared (org-level) calendar periods: insert any missing current/next
+ * period. Matches an existing row by period_key OR by the same UTC due
+ * day so a catalog period-key rename does not duplicate a live instance.
+ */
+async function ensureSharedPeriodsInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  ob: CompanyObligationRow,
+  periods: Array<{ period_key: string; due_at: string }>,
+): Promise<ObligationInstanceRow | null> {
+  if (!periods.length) return null;
+
+  const { data: existingRows, error: exErr } = await supabase
+    .from("company_obligation_instances")
+    .select("*")
+    .eq("obligation_id", ob.id)
+    .is("assignee_staff_id", null);
+  if (exErr) throw new Error(exErr.message);
+  const existing = (existingRows ?? []) as ObligationInstanceRow[];
+
+  let last: ObligationInstanceRow | null = existing[0] ?? null;
+  for (const period of periods) {
+    const match = existing.find((row) =>
+      row.period_key === period.period_key
+      || dueUtcDay(row.due_at) === dueUtcDay(period.due_at),
+    );
+    if (match) {
+      last = match;
+      continue;
+    }
+
+    const { data: inserted, error: insErr } = await supabase
+      .from("company_obligation_instances")
+      .insert({
+        obligation_id: ob.id,
+        organization_id: organizationId,
+        period_key: period.period_key,
+        due_at: period.due_at,
+        status: "pending",
+      })
+      .select("*")
+      .maybeSingle();
+    if (insErr) {
+      if ((insErr as { code?: string }).code === "23505") continue;
+      throw new Error(insErr.message);
+    }
+    if (!inserted) continue;
+    last = inserted as ObligationInstanceRow;
+    existing.push(last);
+    await snapshotAssigneesInternal(supabase, organizationId, ob.id, last.id, ob);
+    try {
+      await scheduleRemindersInternal(supabase, organizationId, last.id, ob);
+    } catch (remErr) {
+      console.error(`[obligations] reminder schedule failed for ${ob.id}:`, remErr);
+    }
+  }
+  return last;
+}
+
 export async function generateNextInstanceInternal(
   supabase: AnySupabase,
   organizationId: string,
@@ -802,41 +749,25 @@ export async function generateNextInstanceInternal(
   }
 
   const dueCfg = (ob.due_day_config ?? {}) as Record<string, unknown>;
-  if (ob.scope === "staff" && isPerPersonDueConfig(dueCfg)) {
+  if (isPerPersonObligation(ob)) {
     const created = await generatePerPersonInstancesInternal(supabase, organizationId, ob);
     return created[0] ?? null;
   }
 
-  const period = computePeriod(ob.cadence, ob.due_day_config ?? {}, new Date());
+  const rule = resolveDueRule(ob.title, ob.cadence, dueCfg);
+  if (rule && (isCalendarDueRule(rule) || rule.kind === "fixed_date")) {
+    return ensureSharedPeriodsInternal(supabase, organizationId, ob, periodsToEnsure(rule));
+  }
+
+  let period: { period_key: string; due_at: string } | null = null;
+  try {
+    period = computePeriod(ob.cadence, dueCfg, new Date());
+  } catch (e) {
+    console.warn(`[obligations] could not compute period for ${ob.id} (${ob.title}):`, e);
+    return null;
+  }
   if (!period) return null;
-
-  const { data: existing, error: exErr } = await supabase
-    .from("company_obligation_instances")
-    .select("*")
-    .eq("obligation_id", obligationId)
-    .eq("period_key", period.period_key)
-    .maybeSingle();
-  if (exErr) throw new Error(exErr.message);
-  if (existing) return existing as ObligationInstanceRow;
-
-  const { data: inserted, error: insErr } = await supabase
-    .from("company_obligation_instances")
-    .insert({
-      obligation_id: obligationId,
-      organization_id: organizationId,
-      period_key: period.period_key,
-      due_at: period.due_at,
-      status: "pending",
-    })
-    .select("*")
-    .maybeSingle();
-  if (insErr) throw new Error(insErr.message);
-  if (!inserted) throw new Error("Failed to create obligation instance.");
-
-  await snapshotAssigneesInternal(supabase, organizationId, obligationId, inserted.id, ob);
-  await scheduleRemindersInternal(supabase, organizationId, inserted.id, ob);
-
-  return inserted as ObligationInstanceRow;
+  return ensureSharedPeriodsInternal(supabase, organizationId, ob, [period]);
 }
 
 export async function notifyObligationManagersInternal(
@@ -1144,7 +1075,7 @@ export const listCompanyObligations = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ organizationId: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
-    if (!supabase || !userId) return [] as Array<CompanyObligationRow & { current_instance: ObligationInstanceRow | null }>;
+    if (!supabase || !userId) return [] as ObligationListItem[];
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
 
     await checkAndMarkOverdueInternal(supabase, data.organizationId);
@@ -1179,47 +1110,60 @@ export const listCompanyObligations = createServerFn({ method: "POST" })
     });
 
     const obligationIds = visibleObligations.map((o: CompanyObligationRow) => o.id);
-    const latestByObligation = new Map<string, ObligationInstanceRow>();
+    const instancesByObligation = new Map<string, ObligationInstanceRow[]>();
     if (obligationIds.length) {
       const { data: instances, error: iErr } = await supabase
         .from("company_obligation_instances").select("*")
         .in("obligation_id", obligationIds)
-        .order("created_at", { ascending: false });
+        .order("due_at", { ascending: true });
       if (iErr) throw new Error(iErr.message);
       for (const inst of (instances ?? []) as ObligationInstanceRow[]) {
-        if (!latestByObligation.has(inst.obligation_id)) latestByObligation.set(inst.obligation_id, inst);
+        const list = instancesByObligation.get(inst.obligation_id) ?? [];
+        list.push(inst);
+        instancesByObligation.set(inst.obligation_id, list);
       }
     }
 
-    // Auto-bootstrap: generate first instances for active obligations with
-    // no instance yet (e.g. obligations seeded via SQL migration, bypassing
-    // createCompanyObligation's normal post-insert instance generation).
-    const activeWithNoInstance = visibleObligations.filter(
-      (o: CompanyObligationRow) => o.active && !latestByObligation.has(o.id),
-    );
-    for (const ob of activeWithNoInstance) {
+    // Ensure current + next calendar periods for org-level duties, and
+    // bootstrap staff duties that have no OPEN instance (so a completed
+    // anniversary year still generates the next one; new hires still get
+    // a first instance).
+    const needsGeneration = visibleObligations.filter((o: CompanyObligationRow) => {
+      if (!o.active) return false;
+      const rows = instancesByObligation.get(o.id) ?? [];
+      if (o.scope === "org") return true;
+      const hasOpen = rows.some((r) => r.status === "pending" || r.status === "overdue");
+      return !hasOpen;
+    });
+    for (const ob of needsGeneration) {
       try {
         await generateNextInstanceInternal(supabase, data.organizationId, ob.id);
       } catch (e) {
         console.warn(`[bootstrap] Could not generate instance for ${ob.id}:`, e);
       }
     }
-    if (activeWithNoInstance.length > 0 && obligationIds.length) {
+    if (needsGeneration.length > 0 && obligationIds.length) {
       const { data: freshInstances, error: fErr } = await supabase
         .from("company_obligation_instances").select("*")
         .in("obligation_id", obligationIds)
-        .order("created_at", { ascending: false });
+        .order("due_at", { ascending: true });
       if (fErr) throw new Error(fErr.message);
-      latestByObligation.clear();
+      instancesByObligation.clear();
       for (const inst of (freshInstances ?? []) as ObligationInstanceRow[]) {
-        if (!latestByObligation.has(inst.obligation_id)) latestByObligation.set(inst.obligation_id, inst);
+        const list = instancesByObligation.get(inst.obligation_id) ?? [];
+        list.push(inst);
+        instancesByObligation.set(inst.obligation_id, list);
       }
     }
 
-    return visibleObligations.map((o: CompanyObligationRow) => ({
-      ...o,
-      current_instance: latestByObligation.get(o.id) ?? null,
-    }));
+    return visibleObligations.map((o: CompanyObligationRow) => {
+      const rows = instancesByObligation.get(o.id) ?? [];
+      return {
+        ...o,
+        current_instance: pickCurrentInstance(rows),
+        rollup: rows.length ? rollupFromInstances(rows) : emptyRollup(),
+      };
+    });
   });
 
 /** Full resolved assignee roster for an obligation (group membership +

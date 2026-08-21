@@ -46,12 +46,18 @@ import {
   toggleObligationActive,
   type CompanyObligationRow,
   type ObligationInstanceRow,
+  type ObligationRollup,
 } from "@/lib/company-obligations.functions";
 import { ObligationHistorySheet } from "./obligation-history-sheet";
 import { ManualCompletionDrawer } from "./manual-completion-drawer";
 import { ObligationCardActions } from "./obligation-card-actions";
+import { CatalogBadges, RollupStatus, catalogFor } from "./obligation-meta";
+import { ObligationCatalogNote } from "./obligation-catalog-note";
 
-export type ObligationWithInstance = CompanyObligationRow & { current_instance: ObligationInstanceRow | null };
+export type ObligationWithInstance = CompanyObligationRow & {
+  current_instance: ObligationInstanceRow | null;
+  rollup?: ObligationRollup;
+};
 
 function formatDate(iso: string | null): string {
   if (!iso) return "";
@@ -229,7 +235,7 @@ function PerNameCompletion({
       // — not just the card's current instance.
       const { data: instRows, error: iErr } = await supabase
         .from("company_obligation_instances")
-        .select("id")
+        .select("id, due_at, assignee_staff_id, status")
         .eq("obligation_id", obligation.id);
       if (iErr) throw new Error(iErr.message);
       const instanceIds = ((instRows ?? []) as Array<{ id: string }>).map((r) => r.id);
@@ -242,11 +248,21 @@ function PerNameCompletion({
           .in("instance_id", instanceIds.length ? instanceIds : [instanceId as string]),
       ]);
       if (cErr) throw new Error(cErr.message);
+      const dueByStaff = new Map<string, string>();
+      for (const row of (instRows ?? []) as Array<{ assignee_staff_id: string | null; due_at: string; status: string }>) {
+        if (!row.assignee_staff_id) continue;
+        if (row.status !== "pending" && row.status !== "overdue") continue;
+        const prev = dueByStaff.get(row.assignee_staff_id);
+        if (!prev || new Date(row.due_at).getTime() < new Date(prev).getTime()) {
+          dueByStaff.set(row.assignee_staff_id, row.due_at);
+        }
+      }
       return {
         // Full resolved group roster, not just staff snapshotted onto this
         // one instance — so staff added to the group later still appear.
         assignees: assignees.map((a) => ({ staff_id: a.staff_id, staff_name: a.staff_name })) as AssigneeRow[],
         completions: (completions ?? []) as CompletionRow[],
+        dueByStaff,
       };
     },
   });
@@ -256,7 +272,7 @@ function PerNameCompletion({
   }
   if (!data) return null;
 
-  const { assignees, completions } = data;
+  const { assignees, completions, dueByStaff } = data;
   const completedIds = new Set(completions.map((c) => c.staff_id));
   const notSubmitted = assignees.filter((a) => !completedIds.has(a.staff_id));
   const isClosed = obligation.current_instance.status === "completed" || obligation.current_instance.status === "waived";
@@ -310,7 +326,7 @@ function PerNameCompletion({
         ) : (
           <ul className="space-y-0.5">
             {notSubmitted.map((a) => {
-              const { text, overdue } = dueStatusText(obligation.current_instance?.due_at ?? null);
+              const { text, overdue } = dueStatusText(dueByStaff.get(a.staff_id) ?? obligation.current_instance?.due_at ?? null);
               return (
                 <li key={a.staff_id} className={`flex items-center gap-1 ${overdue ? "text-destructive" : "text-muted-foreground"}`}>
                   {overdue ? <AlertTriangle className="h-3 w-3 shrink-0" /> : <Circle className="h-3 w-3 shrink-0" />}
@@ -640,6 +656,7 @@ export function ObligationCard({
             <span className="truncate">SOW — DHHS91172</span>
           </Badge>
         )}
+        <CatalogBadges ob={obligation} />
         <Badge variant="outline">{cadenceLabel(obligation)}</Badge>
         <Badge variant="outline">{evidenceLabel(obligation.evidence_type)}</Badge>
         <Badge variant="outline">
@@ -650,6 +667,8 @@ export function ObligationCard({
         </Badge>
         {!obligation.active && <Badge variant="outline" className="text-muted-foreground">Paused</Badge>}
       </div>
+
+      <ObligationCatalogNote obligation={obligation} />
 
       {formArchived ? (
         <div className="mt-3 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-2.5 text-sm text-destructive">
@@ -686,7 +705,11 @@ export function ObligationCard({
           <HireDateWarning orgId={orgId} obligation={obligation} />
 
           <div className="mt-3">
-            <InstanceStatusLine instance={obligation.current_instance} />
+            {obligation.rollup ? (
+              <RollupStatus rollup={obligation.rollup} reminderOnly={catalogFor(obligation)?.calendar_is_reminder_only} />
+            ) : (
+              <InstanceStatusLine instance={obligation.current_instance} />
+            )}
           </div>
 
           {obligation.scope === "org" ? null : (

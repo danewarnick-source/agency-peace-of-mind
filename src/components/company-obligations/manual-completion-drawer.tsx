@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/command";
 import { AlertTriangle, Upload } from "lucide-react";
 import { recordCompletion } from "@/lib/company-obligations.functions";
+import { useOutstandingRoster, RosterMultiSelect } from "./outstanding-roster";
 
 type EvidenceChoice = "attestation" | "upload" | "notes";
 
@@ -43,6 +44,7 @@ export function ManualCompletionDrawer({
   onOpenChange,
   orgId,
   instanceId,
+  obligationId,
   attestationText,
   evidenceType,
 }: {
@@ -50,6 +52,7 @@ export function ManualCompletionDrawer({
   onOpenChange: (v: boolean) => void;
   orgId: string;
   instanceId: string | null;
+  obligationId?: string;
   attestationText?: string | null;
   evidenceType?: "attestation" | "upload" | "upload_and_attestation" | "form" | null;
 }) {
@@ -70,6 +73,12 @@ export function ManualCompletionDrawer({
   const [staffId, setStaffId] = useState<string | null>(null);
   const [staffName, setStaffName] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Per-person obligations keep one instance per staff member, so the
+  // roster is gathered obligation-wide and each selected person is recorded
+  // against their own instance.
+  const { data: roster = [] } = useOutstandingRoster(obligationId, open);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const useRoster = !!obligationId && roster.length > 0;
   const [completedAt, setCompletedAt] = useState(() => toLocalDatetimeInputValue(new Date()));
   const [evidenceChoice, setEvidenceChoice] = useState<EvidenceChoice>(defaultChoice);
   const [attestConfirmed, setAttestConfirmed] = useState(false);
@@ -80,6 +89,7 @@ export function ManualCompletionDrawer({
     if (!open) {
       setStaffId(null);
       setStaffName("");
+      setSelected(new Set());
       setCompletedAt(toLocalDatetimeInputValue(new Date()));
       setEvidenceChoice(defaultChoice);
       setAttestConfirmed(false);
@@ -116,47 +126,68 @@ export function ManualCompletionDrawer({
   const adminName = adminProfile?.full_name ?? "an admin";
 
   const needsNotes = evidenceChoice === "notes";
+  const targets = useRoster
+    ? roster.filter((r) => selected.has(`${r.instance_id}:${r.staff_id}`))
+    : staffId
+      ? [{ instance_id: instanceId as string, staff_id: staffId, staff_name: staffName }]
+      : [];
+  const targetLabel =
+    targets.length === 1 ? targets[0]!.staff_name : `${targets.length} staff members`;
   const canSave =
-    !!staffId &&
+    targets.length > 0 &&
     (evidenceChoice !== "attestation" || attestConfirmed) &&
     (evidenceChoice !== "upload" || !!file) &&
     (evidenceChoice !== "notes" || notes.trim().length > 0);
 
   const record = useMutation({
     mutationFn: async () => {
-      let uploadPath: string | null = null;
-      let uploadFilename: string | null = null;
-      if (evidenceChoice === "upload" && file) {
-        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-        const path = `${orgId}/manual/${instanceId}/${crypto.randomUUID()}-${safeName}`;
-        const { error: upErr } = await supabase.storage.from("obligation-evidence").upload(path, file);
-        if (upErr) throw new Error(upErr.message);
-        uploadPath = path;
-        uploadFilename = file.name;
+      const failures: string[] = [];
+      let ok = 0;
+      for (const t of targets) {
+        try {
+          let uploadPath: string | null = null;
+          let uploadFilename: string | null = null;
+          if (evidenceChoice === "upload" && file) {
+            const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+            const path = `${orgId}/manual/${t.instance_id}/${crypto.randomUUID()}-${safeName}`;
+            const { error: upErr } = await supabase.storage.from("obligation-evidence").upload(path, file);
+            if (upErr) throw new Error(upErr.message);
+            uploadPath = path;
+            uploadFilename = file.name;
+          }
+          await recordFn({
+            data: {
+              organizationId: orgId,
+              instanceId: t.instance_id,
+              evidenceTypeUsed: evidenceChoice === "attestation" ? "attestation" : evidenceChoice === "upload" ? "upload" : "manual",
+              uploadPath,
+              uploadFilename,
+              attestationSignedAt: evidenceChoice === "attestation" ? new Date(completedAt).toISOString() : null,
+              attestationTextSnapshot: evidenceChoice === "attestation" ? (attestationText ?? null) : null,
+              isManualEntry: true,
+              staffId: t.staff_id,
+              staffName: t.staff_name,
+              manualEntryByName: adminName,
+              notes: notes.trim() || null,
+              completedAt: new Date(completedAt).toISOString(),
+            },
+          });
+          ok += 1;
+        } catch (e) {
+          failures.push(`${t.staff_name}: ${(e as Error).message}`);
+        }
       }
-      return recordFn({
-        data: {
-          organizationId: orgId,
-          instanceId: instanceId as string,
-          evidenceTypeUsed: evidenceChoice === "attestation" ? "attestation" : evidenceChoice === "upload" ? "upload" : "manual",
-          uploadPath,
-          uploadFilename,
-          attestationSignedAt: evidenceChoice === "attestation" ? new Date(completedAt).toISOString() : null,
-          attestationTextSnapshot: evidenceChoice === "attestation" ? (attestationText ?? null) : null,
-          isManualEntry: true,
-          staffId: staffId ?? undefined,
-          staffName: staffName || undefined,
-          manualEntryByName: adminName,
-          notes: notes.trim() || null,
-          completedAt: new Date(completedAt).toISOString(),
-        },
-      });
+      if (!ok) throw new Error(failures[0] ?? "Nothing recorded.");
+      if (failures.length) toast.error(`Failed for ${failures.length}: ${failures[0]}`);
+      return ok;
     },
-    onSuccess: () => {
-      toast.success("Manual completion recorded");
+    onSuccess: (ok: number) => {
+      toast.success(`Manual completion recorded for ${ok} staff member${ok === 1 ? "" : "s"}`);
       onOpenChange(false);
       qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
       qc.invalidateQueries({ queryKey: ["obligation-instance-detail"] });
+      qc.invalidateQueries({ queryKey: ["obligation-outstanding-roster"] });
+      qc.invalidateQueries({ queryKey: ["obligation-per-client-detail"] });
       qc.invalidateQueries({ queryKey: ["obligation-history"] });
     },
     onError: (e: Error) => toast.error(e.message),

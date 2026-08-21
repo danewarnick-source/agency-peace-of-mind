@@ -69,8 +69,6 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
           return new Response("Invalid JSON", { status: 400 });
         }
 
-        console.log("[stripe-webhook] received", { id: event.id, type: event.type });
-
         const obj = (event.data?.object ?? {}) as Record<string, unknown>;
         const customerId =
           typeof obj.customer === "string" ? (obj.customer as string) : null;
@@ -155,7 +153,7 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
             }
 
             default:
-              console.log("[stripe-webhook] unhandled event type", event.type);
+              break;
           }
         } catch (err) {
           console.error("[stripe-webhook] handler error", err);

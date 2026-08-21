@@ -99,10 +99,8 @@ export async function sendBillingEmail(ctx: BillingEmailContext): Promise<{
 
     const sender = await getSenderFor(ctx.orgId);
     if (!sender) {
-      // No verified sender configured — log only. Templates are ready; once
+      // No verified sender configured. Templates are ready; once
       // an email domain is set up this branch will switch to sending.
-      // eslint-disable-next-line no-console
-      console.log("[billing-email:no-sender]", ctx.kind, ctx.orgId, recipients.length, "recipient(s)");
       return { sent: false, recipients, reason: "no_sender_configured" };
     }
 

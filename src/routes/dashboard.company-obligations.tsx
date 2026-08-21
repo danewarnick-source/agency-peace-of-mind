@@ -148,8 +148,10 @@ function ObligationsTab({ orgId }: { orgId: string }) {
       });
   }, [obligations]);
 
+  const needsAttentionIds = useMemo(() => new Set(needsAttention.map((o) => o.id)), [needsAttention]);
+
   const filtered = useMemo(() => {
-    let list = obligations;
+    let list = obligations.filter((o) => !needsAttentionIds.has(o.id));
     if (filter === "active") list = list.filter((o) => o.active);
     if (filter === "paused") list = list.filter((o) => !o.active);
     if (scopeFilter !== "all") list = list.filter((o) => o.scope === scopeFilter);

@@ -12,7 +12,6 @@ import { Landmark, ArrowRight, ShieldCheck, Wand2, ListChecks, BookOpenCheck, Cr
 import { toast } from "sonner";
 import { CompanyOverviewSettings } from "@/components/company-overview-settings";
 import { OrgBrandingCard } from "@/components/settings/org-branding-card";
-import { CelebrationSettings } from "@/components/celebrations/celebration-settings";
 import { ShiftBehaviorToggleCard } from "@/components/evv/shift-behavior-toggle-card";
 import { getAccountContact, updateAccountContact } from "@/lib/hive-exec.functions";
 
@@ -197,8 +196,6 @@ function SettingsPage() {
       )}
 
       <OrgBrandingCard />
-
-      <CelebrationSettings isAdmin={org?.role === "admin" || org?.role === "super_admin"} />
 
       <ShiftBehaviorToggleCard isAdmin={org?.role === "admin" || org?.role === "super_admin"} />
 

@@ -652,6 +652,8 @@ export function ObligationCard({
             <span className="text-muted-foreground">Assigned to:</span>
             {obligation.scope === "org" ? (
               <span className="text-sm text-muted-foreground">Whole organization</span>
+            ) : obligation.scope === "staff_per_client" ? (
+              <span className="text-sm text-muted-foreground">All active staff+client assignments</span>
             ) : (obligation.assigned_to_groups?.length || obligation.assigned_to_users?.length) ? (
               <>
                 {(obligation.assigned_to_groups ?? []).map((gid) => {

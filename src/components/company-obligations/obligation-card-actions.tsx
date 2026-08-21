@@ -31,6 +31,7 @@ import {
   type ObligationInstanceRow,
 } from "@/lib/company-obligations.functions";
 import type { ObligationWithInstance } from "./obligation-card";
+import { useOutstandingRoster, RosterMultiSelect, type RosterEntry } from "./outstanding-roster";
 
 type AssigneeRow = { staff_id: string; staff_name: string };
 type CompletionRow = { staff_id: string };
@@ -654,7 +655,7 @@ export function ObligationCardActions({
 
   return (
     <div className="mt-3 border-t border-border pt-3">
-      <StaffRequiredActions orgId={orgId} obligation={obligation} instance={instance} onManualOpen={onManualOpen} />
+      <StaffRequiredActions orgId={orgId} obligation={obligation} onManualOpen={onManualOpen} />
     </div>
   );
 }

@@ -292,7 +292,7 @@ export function ManualCompletionDrawer({
                       checked={attestConfirmed}
                       onChange={(e) => setAttestConfirmed(e.target.checked)}
                     />
-                    I am confirming this on behalf of {staffName || "[selected staff]"}
+                    I am confirming this on behalf of {targets.length ? targetLabel : "[selected staff]"}
                   </label>
                 </div>
               )}
@@ -318,9 +318,9 @@ export function ManualCompletionDrawer({
               <div className="flex items-start gap-2 rounded-md border border-amber-300/60 bg-amber-500/10 p-2.5 text-xs text-amber-900 dark:text-amber-200">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>
-                  You are recording this on behalf of {staffName || "the selected staff member"}
-                  {staffName ? "." : " — select a staff member above."}
-                  {staffName && ` This entry will be marked as manually recorded by ${adminName}.`}
+                  You are recording this on behalf of {targets.length ? targetLabel : "the selected staff member"}
+                  {targets.length ? "." : " — select at least one staff member above."}
+                  {targets.length > 0 && ` This entry will be marked as manually recorded by ${adminName}.`}
                 </span>
               </div>
 

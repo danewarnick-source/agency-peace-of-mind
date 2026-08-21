@@ -109,6 +109,9 @@ export function cadenceLabel(ob: CompanyObligationRow): string {
     case "per_event":
       return "Per event";
     case "one_time": {
+      if (cfg.days_after_assignment !== undefined) {
+        return `Due ${Number(cfg.days_after_assignment)} days after client assignment`;
+      }
       if (cfg.days_after_hire !== undefined) {
         return `One-time · due ${Number(cfg.days_after_hire)} days after hire`;
       }
@@ -649,6 +652,8 @@ export function ObligationCard({
             <span className="text-muted-foreground">Assigned to:</span>
             {obligation.scope === "org" ? (
               <span className="text-sm text-muted-foreground">Whole organization</span>
+            ) : obligation.scope === "staff_per_client" ? (
+              <span className="text-sm text-muted-foreground">All active staff+client assignments</span>
             ) : (obligation.assigned_to_groups?.length || obligation.assigned_to_users?.length) ? (
               <>
                 {(obligation.assigned_to_groups ?? []).map((gid) => {

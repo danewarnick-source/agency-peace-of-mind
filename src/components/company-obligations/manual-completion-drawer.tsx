@@ -217,36 +217,40 @@ export function ManualCompletionDrawer({
             <div className="mt-4 space-y-4 pb-4">
               <div className="grid gap-1.5">
                 <Label>Who completed it</Label>
-                <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-                  <PopoverTrigger asChild>
-                    <Button type="button" variant="outline" className="justify-start font-normal">
-                      {staffName || "Select staff member…"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-72 p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Search staff…" />
-                      <CommandList>
-                        <CommandEmpty>No matches.</CommandEmpty>
-                        <CommandGroup>
-                          {directory.map((d) => (
-                            <CommandItem
-                              key={d.id}
-                              value={d.full_name ?? d.id}
-                              onSelect={() => {
-                                setStaffId(d.id);
-                                setStaffName(d.full_name ?? "Unnamed");
-                                setPickerOpen(false);
-                              }}
-                            >
-                              {d.full_name ?? "Unnamed"}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                {useRoster ? (
+                  <RosterMultiSelect roster={roster} selected={selected} onChange={setSelected} />
+                ) : (
+                  <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline" className="justify-start font-normal">
+                        {staffName || "Select staff member…"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72 p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search staff…" />
+                        <CommandList>
+                          <CommandEmpty>No matches.</CommandEmpty>
+                          <CommandGroup>
+                            {directory.map((d) => (
+                              <CommandItem
+                                key={d.id}
+                                value={d.full_name ?? d.id}
+                                onSelect={() => {
+                                  setStaffId(d.id);
+                                  setStaffName(d.full_name ?? "Unnamed");
+                                  setPickerOpen(false);
+                                }}
+                              >
+                                {d.full_name ?? "Unnamed"}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
 
               <div className="grid gap-1.5">

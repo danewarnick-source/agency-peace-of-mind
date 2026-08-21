@@ -231,6 +231,9 @@ export function cadenceDescription(ob: Pick<CompanyObligationRow, "cadence" | "d
     case "per_event":
       return "Triggered per event — due within a set number of days";
     case "one_time": {
+      if (cfg.days_after_assignment !== undefined) {
+        return `Due ${Number(cfg.days_after_assignment)} days after client assignment`;
+      }
       if (cfg.days_after_hire !== undefined) {
         return `One-time — due ${Number(cfg.days_after_hire)} days after hire`;
       }

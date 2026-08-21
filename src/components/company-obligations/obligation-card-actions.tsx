@@ -431,20 +431,19 @@ function NotifyOutstandingButton({
 function StaffRequiredActions({
   orgId,
   obligation,
-  instance,
   onManualOpen,
 }: {
   orgId: string;
   obligation: ObligationWithInstance;
-  instance: ObligationInstanceRow;
   onManualOpen: () => void;
 }) {
-  const { data } = useInstanceAssignees(instance.id);
-  const outstanding = useMemo(() => {
-    if (!data) return [];
-    const completedIds = new Set(data.completions.map((c) => c.staff_id));
-    return data.assignees.filter((a) => !completedIds.has(a.staff_id));
-  }, [data]);
+  // Per-person obligations spread their assignees across many instances, so
+  // the roster is gathered obligation-wide rather than from one instance.
+  const { data: roster = [] } = useOutstandingRoster(obligation.id);
+  const openInstanceIds = useMemo(
+    () => Array.from(new Set(roster.map((r) => r.instance_id))),
+    [roster],
+  );
 
   const needsUpload = obligation.evidence_type === "upload" || obligation.evidence_type === "upload_and_attestation";
   const needsAttestation = obligation.evidence_type === "attestation" || obligation.evidence_type === "form" || obligation.evidence_type === "upload_and_attestation";
@@ -456,16 +455,19 @@ function StaffRequiredActions({
           <FileForStaffPanel
             orgId={orgId}
             obligation={obligation}
-            instanceId={instance.id}
-            outstanding={outstanding}
-            label={obligation.evidence_type === "upload_and_attestation" ? "File document for staff member →" : "File document for staff member"}
+            roster={roster}
+            label={
+              obligation.evidence_type === "upload_and_attestation"
+                ? `File document for staff (${roster.length}) →`
+                : `File document for staff (${roster.length})`
+            }
           />
         )}
         {needsAttestation && (
           <NotifyOutstandingButton
             orgId={orgId}
-            instanceId={instance.id}
-            outstandingCount={outstanding.length}
+            instanceIds={openInstanceIds}
+            outstandingCount={roster.length}
             label={obligation.evidence_type === "upload_and_attestation" ? "Notify staff to attest" : "Notify"}
           />
         )}

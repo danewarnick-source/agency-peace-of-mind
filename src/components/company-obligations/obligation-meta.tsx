@@ -16,10 +16,16 @@ export function catalogFor(ob: Pick<CompanyObligationRow, "title">): SowCatalogE
   return sowCatalogEntry(ob.title);
 }
 
-export function dueExplanationFor(ob: Pick<CompanyObligationRow, "title" | "cadence" | "due_day_config">): string {
+export function dueExplanationFor(
+  ob: Pick<CompanyObligationRow, "title" | "cadence" | "due_day_config">,
+): string {
   const catalog = sowCatalogEntry(ob.title);
   if (catalog) return explainDueRule(catalog.due_rule);
-  const rule = resolveDueRule(ob.title, ob.cadence, (ob.due_day_config ?? {}) as Record<string, unknown>);
+  const rule = resolveDueRule(
+    ob.title,
+    ob.cadence,
+    (ob.due_day_config ?? {}) as Record<string, unknown>,
+  );
   return rule ? explainDueRule(rule) : "";
 }
 
@@ -61,7 +67,11 @@ export function CatalogBadges({ ob }: { ob: Pick<CompanyObligationRow, "title"> 
 
 export function formatDue(iso: string | null | undefined): string {
   if (!iso) return "No due date";
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 export function RollupStatus({
@@ -97,5 +107,9 @@ export function RollupStatus({
       </p>
     );
   }
-  return <p className="text-sm text-muted-foreground">No instance yet — due date cannot be computed until assignment data is in place.</p>;
+  return (
+    <p className="text-sm text-muted-foreground">
+      No instance yet — due date cannot be computed until assignment data is in place.
+    </p>
+  );
 }

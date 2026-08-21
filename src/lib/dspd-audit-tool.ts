@@ -58,7 +58,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "I-1-DSI",
     part: "I",
     number: "1",
-    prompt: "Current DHHS/OL Day Treatment license (4+ persons) or Day Support certification (3 or fewer) for DSI. Check OL/UCLAPP.",
+    prompt:
+      "Current DHHS/OL Day Treatment license (4+ persons) or Day Support certification (3 or fewer) for DSI. Check OL/UCLAPP.",
     citation: "SOW Article 8.5 (DSI)",
     applies_to_codes: ["DSI"],
     obligation_titles: [
@@ -72,7 +73,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "I-1-DSG",
     part: "I",
     number: "1",
-    prompt: "Current DHHS/OL Day Treatment license or Day Support certification for DSG/DSP. Check OL/UCLAPP.",
+    prompt:
+      "Current DHHS/OL Day Treatment license or Day Support certification for DSG/DSP. Check OL/UCLAPP.",
     citation: "SOW Article 7.5 (DSG & DSP)",
     applies_to_codes: ["DSG", "DSP"],
     obligation_titles: [
@@ -86,7 +88,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "I-1-RHS",
     part: "I",
     number: "1",
-    prompt: "Current DHHS/OL Residential Support license (4+) or certification (3 or fewer) for each RHS site. Check OL/UCLAPP.",
+    prompt:
+      "Current DHHS/OL Residential Support license (4+) or certification (3 or fewer) for each RHS site. Check OL/UCLAPP.",
     citation: "SOW Article 21.5 (RHS)",
     applies_to_codes: ["RHS"],
     obligation_titles: [
@@ -100,7 +103,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "I-2-HHS",
     part: "I",
     number: "2",
-    prompt: "Current health/safety inspections and DSPD Host Home Certification for each HHS home (initial and annual).",
+    prompt:
+      "Current health/safety inspections and DSPD Host Home Certification for each HHS home (initial and annual).",
     citation: "SOW Article 11.5 (HHS)",
     applies_to_codes: ["HHS"],
     obligation_titles: ["HHS Home Certification — Annual (DSPD Form)"],
@@ -122,7 +126,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "I-3",
     part: "I",
     number: "3",
-    prompt: "A Human Rights Committee is established, meets, and documents activities and attendance.",
+    prompt:
+      "A Human Rights Committee is established, meets, and documents activities and attendance.",
     citation: "SOW Article 1.21 (5)",
     applies_to_codes: [],
     obligation_titles: [],
@@ -146,7 +151,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "I-5",
     part: "I",
     number: "5",
-    prompt: "Incident reporting process is in place. Reports are submitted on contract timelines (USTEPS/UPI).",
+    prompt:
+      "Incident reporting process is in place. Reports are submitted on contract timelines (USTEPS/UPI).",
     citation: "SOW Article 1.27",
     applies_to_codes: [],
     obligation_titles: [],
@@ -170,7 +176,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "I-7",
     part: "I",
     number: "7",
-    prompt: "Process ensuring Contractor/Staff do not accept money or let a Person make purchases from Contractor/Staff.",
+    prompt:
+      "Process ensuring Contractor/Staff do not accept money or let a Person make purchases from Contractor/Staff.",
     citation: "SOW Article 1.28 (9) & (10)",
     applies_to_codes: [],
     obligation_titles: [],
@@ -214,7 +221,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "I-11",
     part: "I",
     number: "11",
-    prompt: "Loans from the Contractor to a Person of $2,000 or more are disclosed to DHHS Quality Assurance, with agreement, payment plan, and current accounting.",
+    prompt:
+      "Loans from the Contractor to a Person of $2,000 or more are disclosed to DHHS Quality Assurance, with agreement, payment plan, and current accounting.",
     citation: "SOW Article 1.28 (7)(G)",
     applies_to_codes: [],
     obligation_titles: [],
@@ -227,7 +235,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "I-12",
     part: "I",
     number: "12",
-    prompt: "Current General, Professional, and Automobile liability insurance at contracted minimums (Insurance Checklist).",
+    prompt:
+      "Current General, Professional, and Automobile liability insurance at contracted minimums (Insurance Checklist).",
     citation: "CST 29–36",
     applies_to_codes: [],
     obligation_titles: [],
@@ -253,7 +262,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "II-2",
     part: "II",
     number: "2",
-    prompt: "If the contractor provides medication support: a record of all medications taken (paper or electronic).",
+    prompt:
+      "If the contractor provides medication support: a record of all medications taken (paper or electronic).",
     citation: "SOW Article 1.23 (b–c)",
     applies_to_codes: [],
     obligation_titles: [],
@@ -266,7 +276,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "II-3",
     part: "II",
     number: "3",
-    prompt: "Support Strategies exist for the Person's PCSP goals. Every service maps to at least one strategy (BSP for BC; Medical Care Plan for nursing).",
+    prompt:
+      "Support Strategies exist for the Person's PCSP goals. Every service maps to at least one strategy (BSP for BC; Medical Care Plan for nursing).",
     citation: "SOW Article 1.24 (5)",
     applies_to_codes: [],
     obligation_titles: ["Support Strategies — [Client Name]"],
@@ -277,7 +288,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "II-4",
     part: "II",
     number: "4",
-    prompt: "Functional Behavior Assessment and Behavior Support Plan on file for Persons receiving BC1, BC2, or BC3.",
+    prompt:
+      "Functional Behavior Assessment and Behavior Support Plan on file for Persons receiving BC1, BC2, or BC3.",
     citation: "SOW Articles 3–5 (BC1/BC2/BC3)",
     applies_to_codes: ["BC1", "BC2", "BC3"],
     obligation_titles: [],
@@ -290,7 +302,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "II-5",
     part: "II",
     number: "5",
-    prompt: "Employment supports follow the Person's Competitive Integrated Employment goals in the PCSP.",
+    prompt:
+      "Employment supports follow the Person's Competitive Integrated Employment goals in the PCSP.",
     citation: "SOW Article 30 (SEI); also 9.2 (EPR), 28.2 (SED), 29 (SEE)",
     applies_to_codes: ["SEI", "EPR", "SED", "SEE"],
     obligation_titles: [
@@ -305,7 +318,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "II-6",
     part: "II",
     number: "6",
-    prompt: "Quarterly summaries completed per contract (monthly for SEI, CMP/CMS, PN1/PN2, SJD; monthly financials for PBA). Due 15 days after the period ends.",
+    prompt:
+      "Quarterly summaries completed per contract (monthly for SEI, CMP/CMS, PN1/PN2, SJD; monthly financials for PBA). Due 15 days after the period ends.",
     citation: "SOW Article 1.25",
     applies_to_codes: [],
     obligation_titles: [
@@ -322,7 +336,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "II-7",
     part: "II",
     number: "7",
-    prompt: "Signed statement that the Person (and representative, if any) received and had the grievance policy explained.",
+    prompt:
+      "Signed statement that the Person (and representative, if any) received and had the grievance policy explained.",
     citation: "SOW Article 1.10 (11)",
     applies_to_codes: [],
     obligation_titles: [],
@@ -335,7 +350,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "II-8",
     part: "II",
     number: "8",
-    prompt: "Human-rights documentation for any restriction: informed consent, assessed need, positive supports tried, less-intrusive methods, proportionate description, data review, time limits, and no-harm assurance.",
+    prompt:
+      "Human-rights documentation for any restriction: informed consent, assessed need, positive supports tried, less-intrusive methods, proportionate description, data review, time limits, and no-harm assurance.",
     citation: "SOW Article 1.20 & HCBS Settings Rule",
     applies_to_codes: [],
     obligation_titles: [],
@@ -348,7 +364,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "II-9",
     part: "II",
     number: "9",
-    prompt: "Inventory of the Person's belongings, reviewed at least annually ($50+ and items of significant value).",
+    prompt:
+      "Inventory of the Person's belongings, reviewed at least annually ($50+ and items of significant value).",
     citation: "SOW Article 11.3 (5) HHS; 31.3 SLH; also 20.3 PPS, 21.3 RHS",
     applies_to_codes: ["HHS", "SLH", "PPS", "RHS"],
     obligation_titles: [],
@@ -396,7 +413,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "II-PBA",
     part: "II",
     number: "PBA",
-    prompt: "PBA / representative-payee financial review: monthly records with the Person, monthly bank statements, independent monthly review, quarterly admin sample, and monthly report to the SC.",
+    prompt:
+      "PBA / representative-payee financial review: monthly records with the Person, monthly bank statements, independent monthly review, quarterly admin sample, and monthly report to the SC.",
     citation: "SOW Article 1.28 & 15.3",
     applies_to_codes: ["PBA"],
     condition: "if_pba",
@@ -408,7 +426,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "II-LOAN",
     part: "II",
     number: "Loans",
-    prompt: "Emergency loans only: SC notified within 24 hours, PCPT written approval, running accounting, monthly copy to Person/guardian/SC.",
+    prompt:
+      "Emergency loans only: SC notified within 24 hours, PCPT written approval, running accounting, monthly copy to Person/guardian/SC.",
     citation: "SOW Article 1.28 (7)",
     applies_to_codes: [],
     obligation_titles: [],
@@ -423,7 +442,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "III-1",
     part: "III",
     number: "1",
-    prompt: "Accurate attendance/timesheets for every instance of service: Person, date, service code, staff, summary note; start/end time for quarter-hour codes (and DSG/DSP).",
+    prompt:
+      "Accurate attendance/timesheets for every instance of service: Person, date, service code, staff, summary note; start/end time for quarter-hour codes (and DSG/DSP).",
     citation: "SOW Article 1.10 (7); CST 55 & 56",
     applies_to_codes: [],
     obligation_titles: [],
@@ -436,7 +456,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "III-2",
     part: "III",
     number: "2",
-    prompt: "Electronic Visit Verification for Companion, Homemaker, Respite (except RP4/RP5/RPS), Supported Living, and Personal Assistance.",
+    prompt:
+      "Electronic Visit Verification for Companion, Homemaker, Respite (except RP4/RP5/RPS), Supported Living, and Personal Assistance.",
     citation: "SOW Article 1.12",
     applies_to_codes: EVV_CODES,
     obligation_titles: [],
@@ -464,7 +485,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "IV-BG",
     part: "IV",
     number: "BG",
-    prompt: "Approved background screening from the Office of Background Processing, annually, per Utah Code 26B-2-120 and R501-14.",
+    prompt:
+      "Approved background screening from the Office of Background Processing, annually, per Utah Code 26B-2-120 and R501-14.",
     citation: "SOW Article 1.9 (2); CST 72",
     applies_to_codes: [],
     obligation_titles: ["Background Screening — Annual"],
@@ -497,7 +519,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "IV-2",
     part: "IV",
     number: "2",
-    prompt: "ACRE training, or USU Workplace Supports / Effective Job Coach training, before providing SEI (and EPR/SED/SEE if awarded).",
+    prompt:
+      "ACRE training, or USU Workplace Supports / Effective Job Coach training, before providing SEI (and EPR/SED/SEE if awarded).",
     citation: "SOW Article 30.5–30.6 (SEI); 9.5 EPR; 28.4 SED; 29.4 SEE",
     applies_to_codes: ["SEI", "EPR", "SED", "SEE"],
     obligation_titles: [
@@ -523,7 +546,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "IV-4",
     part: "IV",
     number: "4",
-    prompt: "Staff are trained at least annually on the Contractor's Emergency Management and Business Continuity Plan.",
+    prompt:
+      "Staff are trained at least annually on the Contractor's Emergency Management and Business Continuity Plan.",
     citation: "CST 46",
     applies_to_codes: [],
     obligation_titles: [],
@@ -534,7 +558,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "IV-5",
     part: "IV",
     number: "5",
-    prompt: "Written documentation of each staff member's successful completion of every required training area, verifiable by an external reviewer.",
+    prompt:
+      "Written documentation of each staff member's successful completion of every required training area, verifiable by an external reviewer.",
     citation: "SOW Article 1.8 (3)",
     applies_to_codes: [],
     obligation_titles: ["Training Documentation File — Maintained"],
@@ -545,7 +570,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "IV-6",
     part: "IV",
     number: "6",
-    prompt: "30-day (or before working alone) orientation: 911, medical/mental-health call, IR, seizures, missing person, choking, PBS, rights/ADA, ANE, HIPAA, ID.RC/ABI orientation, communicable disease, person-specific training, policy, DSPD philosophy, Medicaid 101, OIG fraud reporting, HCBS Settings Rule, crisis de-escalation, trauma-informed care, suicide prevention.",
+    prompt:
+      "30-day (or before working alone) orientation: 911, medical/mental-health call, IR, seizures, missing person, choking, PBS, rights/ADA, ANE, HIPAA, ID.RC/ABI orientation, communicable disease, person-specific training, policy, DSPD philosophy, Medicaid 101, OIG fraud reporting, HCBS Settings Rule, crisis de-escalation, trauma-informed care, suicide prevention.",
     citation: "SOW Article 1.8 (4) (A–W)",
     applies_to_codes: [],
     obligation_titles: [
@@ -559,7 +585,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "IV-7",
     part: "IV",
     number: "7",
-    prompt: "Within 90 days of hire: current First Aid, current CPR, and person-centered thinking and practices.",
+    prompt:
+      "Within 90 days of hire: current First Aid, current CPR, and person-centered thinking and practices.",
     citation: "SOW Article 1.8 (5)",
     applies_to_codes: [],
     obligation_titles: [
@@ -574,7 +601,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "IV-8",
     part: "IV",
     number: "8",
-    prompt: "Within 180 days: SOAR, MANDT, PART, CPI, Safety Care, or other DSPD-approved intervention training if the Person is likely to engage in aggressive, self-injurious, or destructive behavior. Keep current.",
+    prompt:
+      "Within 180 days: SOAR, MANDT, PART, CPI, Safety Care, or other DSPD-approved intervention training if the Person is likely to engage in aggressive, self-injurious, or destructive behavior. Keep current.",
     citation: "SOW Article 1.8 (6)",
     applies_to_codes: [],
     obligation_titles: ["Behavior Intervention Certification (SOAR/MANDT/PART/CPI/Safety Care)"],
@@ -585,7 +613,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "IV-9",
     part: "IV",
     number: "9",
-    prompt: "Minimum 12 hours of training each year in the second and subsequent years of employment (classroom and/or documented on-the-job skills).",
+    prompt:
+      "Minimum 12 hours of training each year in the second and subsequent years of employment (classroom and/or documented on-the-job skills).",
     citation: "SOW Article 1.8 (7)",
     applies_to_codes: [],
     obligation_titles: ["Annual 12-Hour Continuing Education"],
@@ -596,7 +625,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "IV-10",
     part: "IV",
     number: "10",
-    prompt: "Staff serving Persons with ABI complete ABI training before working alone (behavior effects, hospital-to-community transition, functional impact, health/medication, staff role, family perspective).",
+    prompt:
+      "Staff serving Persons with ABI complete ABI training before working alone (behavior effects, hospital-to-community transition, functional impact, health/medication, staff role, family perspective).",
     citation: "SOW Article 1.8 (ABI training)",
     applies_to_codes: [],
     condition: "if_abi_clients",
@@ -608,7 +638,8 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     id: "IV-USOR",
     part: "IV",
     number: "SEI-Q",
-    prompt: "Organization is an approved USOR vendor for job coaching, and SEI staff meet ACRE / USU Workplace Supports qualifications.",
+    prompt:
+      "Organization is an approved USOR vendor for job coaching, and SEI staff meet ACRE / USU Workplace Supports qualifications.",
     citation: "SOW Article 30.6",
     applies_to_codes: ["SEI"],
     obligation_titles: [
@@ -647,7 +678,10 @@ export function itemApplies(item: AuditItem, footprint: OrgFootprint): boolean {
 }
 
 /** Union of the seeded row's target_service_codes and the SOW catalog overlay. */
-export function obligationServiceTargets(title: string, dbTargets: string[] | null | undefined): string[] {
+export function obligationServiceTargets(
+  title: string,
+  dbTargets: string[] | null | undefined,
+): string[] {
   const catalog = sowCatalogEntry(title);
   const merged = [...(dbTargets ?? []), ...(catalog?.service_codes ?? [])];
   return [...new Set(merged.map((c) => c.toUpperCase()).filter(Boolean))];
@@ -675,8 +709,14 @@ export function obligationTitleMatches(actual: string, template: string): boolea
   return false;
 }
 
-export function itemsForPart(part: AuditPart, footprint: OrgFootprint, includeNa: boolean): AuditItem[] {
-  return DSPD_AUDIT_ITEMS.filter((i) => i.part === part).filter((i) => includeNa || itemApplies(i, footprint));
+export function itemsForPart(
+  part: AuditPart,
+  footprint: OrgFootprint,
+  includeNa: boolean,
+): AuditItem[] {
+  return DSPD_AUDIT_ITEMS.filter((i) => i.part === part).filter(
+    (i) => includeNa || itemApplies(i, footprint),
+  );
 }
 
 export function naReason(item: AuditItem, footprint: OrgFootprint): string | null {

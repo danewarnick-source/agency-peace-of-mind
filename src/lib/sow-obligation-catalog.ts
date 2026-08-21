@@ -12,11 +12,7 @@
 // Titles must match the seeded rows exactly. Provider-created obligations
 // (source = 'provider') have no catalog entry.
 
-import {
-  dueRuleFromConfig,
-  explainDueRule,
-  type DueRule,
-} from "./obligation-due-dates";
+import { dueRuleFromConfig, explainDueRule, type DueRule } from "./obligation-due-dates";
 
 export type ObligationCategory =
   | "training"
@@ -28,11 +24,7 @@ export type ObligationCategory =
   | "standing_records"
   | "employment";
 
-export type FulfillmentChannel =
-  | "in_hive"
-  | "external"
-  | "hybrid"
-  | "standing";
+export type FulfillmentChannel = "in_hive" | "external" | "hybrid" | "standing";
 
 export type ObligationOwner = "admin" | "manager" | "staff" | "host";
 
@@ -93,7 +85,8 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     due_rule: { kind: "days_after_hire", days: 30 },
     owner: "staff",
     service_codes: [],
-    evidence_standard: "Certificate covering HIPAA, ANE reporting, participant rights, HCBS settings rule, and emergency procedures.",
+    evidence_standard:
+      "Certificate covering HIPAA, ANE reporting, participant rights, HCBS settings rule, and emergency procedures.",
   },
   {
     title: "Annual 12-Hour Continuing Education",
@@ -105,7 +98,8 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     due_rule: { kind: "hire_anniversary", start_year: 2 },
     owner: "staff",
     service_codes: [],
-    evidence_standard: "Documentation of at least 12 DSPD-approved CE hours for the anniversary year.",
+    evidence_standard:
+      "Documentation of at least 12 DSPD-approved CE hours for the anniversary year.",
   },
   {
     title: "CPR/First Aid Certification — Initial",
@@ -141,7 +135,8 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     due_rule: { kind: "days_after_hire", days: 90 },
     owner: "staff",
     service_codes: [],
-    evidence_standard: "Proof of person-centered thinking and practices training within 90 days of hire.",
+    evidence_standard:
+      "Proof of person-centered thinking and practices training within 90 days of hire.",
   },
   {
     title: "Behavior Intervention Certification (SOAR/MANDT/PART/CPI/Safety Care)",
@@ -183,7 +178,8 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     citation: "DHHS91172 SOW §33.5",
     category: "employment",
     fulfillment: "in_hive",
-    fulfillment_note: "SJD staff have 60 days from hire. Applies only to staff assigned to an SJD client.",
+    fulfillment_note:
+      "SJD staff have 60 days from hire. Applies only to staff assigned to an SJD client.",
     due_rule: { kind: "days_after_hire", days: 60 },
     owner: "staff",
     service_codes: ["SJD"],
@@ -194,7 +190,8 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     citation: "DHHS91172 SOW §29.4 / §33.5",
     category: "employment",
     fulfillment: "in_hive",
-    fulfillment_note: "Required before providing SEE or SJD. Upload the USU Customized Employment certificate.",
+    fulfillment_note:
+      "Required before providing SEE or SJD. Upload the USU Customized Employment certificate.",
     due_rule: { kind: "days_after_hire", days: 0 },
     owner: "staff",
     service_codes: ["SEE", "SJD"],
@@ -221,7 +218,8 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     due_rule: { kind: "days_after_hire", days: 0 },
     owner: "staff",
     service_codes: ["HSQ"],
-    evidence_standard: "Training record on maintaining a clean, sanitary, and safe living environment.",
+    evidence_standard:
+      "Training record on maintaining a clean, sanitary, and safe living environment.",
   },
   {
     title: "DSPD New Caregiver Compensation Training — CMP/CMS",
@@ -367,7 +365,8 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     citation: "DHHS91172 SOW §8.5 / §7.5",
     category: "licensing",
     fulfillment: "external",
-    fulfillment_note: "Office of Licensing. Upload the certification; July 1 is a verification reminder.",
+    fulfillment_note:
+      "Office of Licensing. Upload the certification; July 1 is a verification reminder.",
     due_rule: { kind: "calendar_year", month: 7, day: 1 },
     owner: "admin",
     service_codes: ["DSG", "DSP", "EPR", "DSI"],
@@ -423,7 +422,8 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     due_rule: { kind: "calendar_year", month: 8, day: 30 },
     owner: "admin",
     service_codes: ["HHS"],
-    evidence_standard: "DSPD Google Form submission (persons served, community-setting %, QI activities).",
+    evidence_standard:
+      "DSPD Google Form submission (persons served, community-setting %, QI activities).",
   },
   {
     title: "SEI Monthly Summary — UPI Entry Attestation",
@@ -459,7 +459,8 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     due_rule: { kind: "days_after_event", days: 14 },
     owner: "admin",
     service_codes: ["SEI"],
-    evidence_standard: "UPI entry of employment support strategies within 2 weeks of the PCSP update.",
+    evidence_standard:
+      "UPI entry of employment support strategies within 2 weeks of the PCSP update.",
   },
   {
     title: "SJD Monthly Summary — UPI Entry Attestation",
@@ -506,7 +507,8 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     due_rule: { kind: "calendar_month", due_day: 15, period: "following_month" },
     owner: "admin",
     service_codes: ["CMP", "CMS"],
-    evidence_standard: "Monthly summaries completed and submitted to each client's Support Coordinator.",
+    evidence_standard:
+      "Monthly summaries completed and submitted to each client's Support Coordinator.",
   },
 
   // ── Site safety ─────────────────────────────────────────────────────────
@@ -568,7 +570,8 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     due_rule: { kind: "days_after_assignment", days: 30 },
     owner: "staff",
     service_codes: [],
-    evidence_standard: "Person-specific training covering disability/goals, medical/safety, PCSP/BSP/strategies, staff responsibilities, DNR/POLST and hospice if applicable.",
+    evidence_standard:
+      "Person-specific training covering disability/goals, medical/safety, PCSP/BSP/strategies, staff responsibilities, DNR/POLST and hospice if applicable.",
   },
   {
     title: "Support Strategies — [Client Name]",

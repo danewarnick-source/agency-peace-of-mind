@@ -6,12 +6,44 @@
 // quarter end) are first-class — they are not "the next 15th on the
 // calendar", which is the bug that made SOW due dates untrustworthy.
 
-const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const MONTHS_FULL = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+const MONTHS_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
-const WEEKDAY_NAMES = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const MONTHS_FULL = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+const WEEKDAY_NAMES = [
+  "",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
 
 export function addDaysUTC(d: Date, days: number): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + days));
@@ -48,7 +80,10 @@ export function lastDayOfMonth(year: number, month0: number): number {
 }
 
 export function monthlyOccurrence(year: number, month0: number, dayConfig: number | "last"): Date {
-  const day = dayConfig === "last" ? lastDayOfMonth(year, month0) : Math.min(dayConfig, lastDayOfMonth(year, month0));
+  const day =
+    dayConfig === "last"
+      ? lastDayOfMonth(year, month0)
+      : Math.min(dayConfig, lastDayOfMonth(year, month0));
   return new Date(Date.UTC(year, month0, day));
 }
 
@@ -61,7 +96,9 @@ export function formatMonthYear(d: Date): string {
 }
 
 export function endOfDayUTC(d: Date): string {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59)).toISOString();
+  return new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59),
+  ).toISOString();
 }
 
 export function utcDay(d: Date): Date {
@@ -71,7 +108,8 @@ export function utcDay(d: Date): Date {
 export function normalizeDayConfig(v: unknown): number | "last" {
   if (v === "last") return "last";
   const n = Number(v);
-  if (!Number.isFinite(n) || n < 1 || n > 31) throw new Error("due_day_config.day_of_month must be 1-31 or 'last'.");
+  if (!Number.isFinite(n) || n < 1 || n > 31)
+    throw new Error("due_day_config.day_of_month must be 1-31 or 'last'.");
   return n;
 }
 
@@ -170,13 +208,21 @@ function shiftQuarter(year: number, q0: number, delta: number): { year: number; 
 function followingMonthPeriods(now: Date, dueDay: number | "last"): PeriodResult[] {
   const today = utcDay(now);
   const thisDue = monthlyOccurrence(today.getUTCFullYear(), today.getUTCMonth(), dueDay);
-  const currentDue = thisDue.getTime() <= today.getTime()
-    ? thisDue
-    : monthlyOccurrence(today.getUTCFullYear(), today.getUTCMonth() - 1, dueDay);
-  const nextDue = monthlyOccurrence(currentDue.getUTCFullYear(), currentDue.getUTCMonth() + 1, dueDay);
+  const currentDue =
+    thisDue.getTime() <= today.getTime()
+      ? thisDue
+      : monthlyOccurrence(today.getUTCFullYear(), today.getUTCMonth() - 1, dueDay);
+  const nextDue = monthlyOccurrence(
+    currentDue.getUTCFullYear(),
+    currentDue.getUTCMonth() + 1,
+    dueDay,
+  );
 
   const toPeriod = (due: Date): PeriodResult => {
-    const service = addMonthsUTC(new Date(Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), 1)), -1);
+    const service = addMonthsUTC(
+      new Date(Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), 1)),
+      -1,
+    );
     return {
       period_key: formatMonthYear(service),
       due_at: endOfDayUTC(due),
@@ -188,10 +234,15 @@ function followingMonthPeriods(now: Date, dueDay: number | "last"): PeriodResult
 function sameMonthPeriods(now: Date, dueDay: number | "last"): PeriodResult[] {
   const today = utcDay(now);
   const thisDue = monthlyOccurrence(today.getUTCFullYear(), today.getUTCMonth(), dueDay);
-  const currentDue = thisDue.getTime() >= today.getTime()
-    ? thisDue
-    : monthlyOccurrence(today.getUTCFullYear(), today.getUTCMonth() + 1, dueDay);
-  const prevDue = monthlyOccurrence(currentDue.getUTCFullYear(), currentDue.getUTCMonth() - 1, dueDay);
+  const currentDue =
+    thisDue.getTime() >= today.getTime()
+      ? thisDue
+      : monthlyOccurrence(today.getUTCFullYear(), today.getUTCMonth() + 1, dueDay);
+  const prevDue = monthlyOccurrence(
+    currentDue.getUTCFullYear(),
+    currentDue.getUTCMonth() - 1,
+    dueDay,
+  );
   const toPeriod = (due: Date): PeriodResult => ({
     period_key: formatMonthYear(due),
     due_at: endOfDayUTC(due),
@@ -201,8 +252,8 @@ function sameMonthPeriods(now: Date, dueDay: number | "last"): PeriodResult[] {
   if (thisDue.getTime() < today.getTime()) {
     return [toPeriod(thisDue), toPeriod(currentDue)];
   }
-  return [toPeriod(prevDue), toPeriod(currentDue)].filter((p, i, arr) =>
-    arr.findIndex((x) => x.period_key === p.period_key) === i,
+  return [toPeriod(prevDue), toPeriod(currentDue)].filter(
+    (p, i, arr) => arr.findIndex((x) => x.period_key === p.period_key) === i,
   );
 }
 
@@ -211,7 +262,11 @@ function quarterAfterEndPeriods(now: Date, daysAfter: number): PeriodResult[] {
   const periods: PeriodResult[] = [];
   // Check the last two completed quarters + the quarter currently in progress.
   for (const delta of [-2, -1, 0]) {
-    const { year, q0 } = shiftQuarter(today.getUTCFullYear(), quarterIndex(today.getUTCMonth()), delta);
+    const { year, q0 } = shiftQuarter(
+      today.getUTCFullYear(),
+      quarterIndex(today.getUTCMonth()),
+      delta,
+    );
     const end = quarterEndDate(year, q0);
     const due = addDaysUTC(end, daysAfter);
     if (due.getTime() < addDaysUTC(today, -120).getTime()) continue;
@@ -228,7 +283,11 @@ function quarterEndPeriods(now: Date): PeriodResult[] {
   const today = utcDay(now);
   const periods: PeriodResult[] = [];
   for (const delta of [-1, 0]) {
-    const { year, q0 } = shiftQuarter(today.getUTCFullYear(), quarterIndex(today.getUTCMonth()), delta);
+    const { year, q0 } = shiftQuarter(
+      today.getUTCFullYear(),
+      quarterIndex(today.getUTCMonth()),
+      delta,
+    );
     const end = quarterEndDate(year, q0);
     const start = quarterStartDate(year, q0);
     periods.push({
@@ -242,9 +301,10 @@ function quarterEndPeriods(now: Date): PeriodResult[] {
 function annualPeriods(now: Date, month1: number, day: number | "last"): PeriodResult[] {
   const today = utcDay(now);
   const thisYear = monthlyOccurrence(today.getUTCFullYear(), month1 - 1, day);
-  const current = thisYear.getTime() >= today.getTime()
-    ? thisYear
-    : monthlyOccurrence(today.getUTCFullYear() + 1, month1 - 1, day);
+  const current =
+    thisYear.getTime() >= today.getTime()
+      ? thisYear
+      : monthlyOccurrence(today.getUTCFullYear() + 1, month1 - 1, day);
   const prev = monthlyOccurrence(current.getUTCFullYear() - 1, month1 - 1, day);
   const toPeriod = (due: Date): PeriodResult => ({
     period_key: `${due.getUTCFullYear()}`,
@@ -257,7 +317,8 @@ function annualPeriods(now: Date, month1: number, day: number | "last"): PeriodR
 function weeklyPeriods(now: Date, weekday: number): PeriodResult[] {
   const today = utcDay(now);
   const thisWeekDue = nextWeekdayOnOrAfter(mondayOfWeek(today), weekday);
-  const current = thisWeekDue.getTime() >= today.getTime() ? thisWeekDue : addDaysUTC(thisWeekDue, 7);
+  const current =
+    thisWeekDue.getTime() >= today.getTime() ? thisWeekDue : addDaysUTC(thisWeekDue, 7);
   const prev = addDaysUTC(current, -7);
   const toPeriod = (due: Date): PeriodResult => {
     const monday = mondayOfWeek(due);
@@ -319,10 +380,7 @@ export function nextPeriod(rule: DueRule, now: Date = new Date()): PeriodResult 
  * provider-created obligations and as a fallback when the SOW catalog has
  * no overlay. Catalog rules win when present.
  */
-export function dueRuleFromConfig(
-  cadence: string,
-  cfg: Record<string, unknown>,
-): DueRule | null {
+export function dueRuleFromConfig(cadence: string, cfg: Record<string, unknown>): DueRule | null {
   switch (cadence) {
     case "weekly": {
       const weekday = Number(cfg.weekday);
@@ -332,14 +390,18 @@ export function dueRuleFromConfig(
     case "monthly": {
       const day = cfg.day_of_month === "last" ? "last" : Number(cfg.day_of_month);
       if (day !== "last" && (!Number.isFinite(day) || day < 1 || day > 31)) return null;
-      const period = cfg.period === "following_month" || cfg.following_month === true
-        ? "following_month"
-        : "same_month";
+      const period =
+        cfg.period === "following_month" || cfg.following_month === true
+          ? "following_month"
+          : "same_month";
       return { kind: "calendar_month", due_day: day as number | "last", period };
     }
     case "quarterly": {
       if (cfg.days_after_period_end !== undefined) {
-        return { kind: "calendar_quarter", days_after_period_end: Number(cfg.days_after_period_end) };
+        return {
+          kind: "calendar_quarter",
+          days_after_period_end: Number(cfg.days_after_period_end),
+        };
       }
       if (cfg.at_period_end === true || cfg.day_of_month === "last") {
         return { kind: "calendar_quarter_end" };

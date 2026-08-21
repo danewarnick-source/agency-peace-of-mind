@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
@@ -10,14 +10,37 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, Plus, Upload, ClipboardList, CheckCircle2, Building2, FolderOpen, Layers, FileWarning } from "lucide-react";
-import { listCompanyObligations, getOrgServiceFootprint, type ObligationListItem } from "@/lib/company-obligations.functions";
+import {
+  Search,
+  Plus,
+  Upload,
+  ClipboardList,
+  CheckCircle2,
+  Building2,
+  FolderOpen,
+  Layers,
+  FileWarning,
+} from "lucide-react";
+import {
+  listCompanyObligations,
+  getOrgServiceFootprint,
+  type ObligationListItem,
+} from "@/lib/company-obligations.functions";
 import { listStaffGroups, type StaffGroupRow } from "@/lib/staff-groups.functions";
-import { ObligationCard, type ObligationWithInstance } from "@/components/company-obligations/obligation-card";
+import {
+  ObligationCard,
+  type ObligationWithInstance,
+} from "@/components/company-obligations/obligation-card";
 import { ObligationDrawer } from "@/components/company-obligations/obligation-drawer";
 import { catalogFor } from "@/components/company-obligations/obligation-meta";
 import { AuditPartPanel, UnmappedDuties } from "@/components/company-obligations/audit-part-panel";
-import { AUDIT_PART_LABEL, DSPD_AUDIT_ITEMS, footprintIsKnown, itemApplies, type AuditPart } from "@/lib/dspd-audit-tool";
+import {
+  AUDIT_PART_LABEL,
+  DSPD_AUDIT_ITEMS,
+  footprintIsKnown,
+  itemApplies,
+  type AuditPart,
+} from "@/lib/dspd-audit-tool";
 
 export const Route = createFileRoute("/dashboard/company-obligations")({
   head: () => ({ meta: [{ title: "Compliance register — HIVE" }] }),
@@ -31,7 +54,17 @@ function isDueWithinDays(iso: string | null, days: number): boolean {
   return due >= now && due <= now + days * 86_400_000;
 }
 
-function StatCard({ label, count, tone, hint }: { label: string; count: number; tone: "red" | "amber" | "green" | "slate"; hint?: string }) {
+function StatCard({
+  label,
+  count,
+  tone,
+  hint,
+}: {
+  label: string;
+  count: number;
+  tone: "red" | "amber" | "green" | "slate";
+  hint?: string;
+}) {
   const toneClasses = {
     red: "border-destructive/30 bg-destructive/5 text-destructive",
     amber: "border-warning/40 bg-warning/10 text-warning-foreground",
@@ -148,7 +181,9 @@ function ObligationsTab({ orgId }: { orgId: string }) {
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "paused">("active");
-  const [scopeFilter, setScopeFilter] = useState<"all" | "org" | "staff" | "staff_per_client">("all");
+  const [scopeFilter, setScopeFilter] = useState<"all" | "org" | "staff" | "staff_per_client">(
+    "all",
+  );
   const [showNa, setShowNa] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingObligation, setEditingObligation] = useState<ObligationWithInstance | null>(null);
@@ -163,7 +198,8 @@ function ObligationsTab({ orgId }: { orgId: string }) {
       overdueItems += o.rollup.overdue_count;
       if (o.rollup.pending_count > 0 && isDueWithinDays(o.rollup.next_due_at, 7)) dueThisWeek++;
       const channel = catalogFor(o)?.fulfillment;
-      if ((channel === "external" || channel === "hybrid") && o.rollup.open_count > 0) externalOpen++;
+      if ((channel === "external" || channel === "hybrid") && o.rollup.open_count > 0)
+        externalOpen++;
       if ((channel === "in_hive" || !channel) && o.rollup.open_count > 0) inHiveOpen++;
     }
     return { overdueItems, dueThisWeek, externalOpen, inHiveOpen };
@@ -178,9 +214,9 @@ function ObligationsTab({ orgId }: { orgId: string }) {
         if (q) {
           const catalog = catalogFor(o);
           const hit =
-            o.title.toLowerCase().includes(q)
-            || (o.source_policy_section ?? "").toLowerCase().includes(q)
-            || (catalog?.citation ?? "").toLowerCase().includes(q);
+            o.title.toLowerCase().includes(q) ||
+            (o.source_policy_section ?? "").toLowerCase().includes(q) ||
+            (catalog?.citation ?? "").toLowerCase().includes(q);
           if (!hit) return false;
         }
         if (o.rollup.overdue_count > 0) return true;
@@ -197,21 +233,24 @@ function ObligationsTab({ orgId }: { orgId: string }) {
       });
   }, [obligations, search, scopeFilter]);
 
-  const matchesFilters = (o: ObligationListItem) => {
-    if (filter === "active" && !o.active) return false;
-    if (filter === "paused" && o.active) return false;
-    if (scopeFilter !== "all" && o.scope !== scopeFilter) return false;
-    const q = search.trim().toLowerCase();
-    if (!q) return true;
-    const catalog = catalogFor(o);
-    return (
-      o.title.toLowerCase().includes(q)
-      || (o.source_policy_section ?? "").toLowerCase().includes(q)
-      || (catalog?.citation ?? "").toLowerCase().includes(q)
-    );
-  };
+  const matchesFilters = useCallback(
+    (o: ObligationListItem) => {
+      if (filter === "active" && !o.active) return false;
+      if (filter === "paused" && o.active) return false;
+      if (scopeFilter !== "all" && o.scope !== scopeFilter) return false;
+      const q = search.trim().toLowerCase();
+      if (!q) return true;
+      const catalog = catalogFor(o);
+      return (
+        o.title.toLowerCase().includes(q) ||
+        (o.source_policy_section ?? "").toLowerCase().includes(q) ||
+        (catalog?.citation ?? "").toLowerCase().includes(q)
+      );
+    },
+    [filter, scopeFilter, search],
+  );
 
-  const register = useMemo(() => obligations.filter(matchesFilters), [obligations, filter, scopeFilter, search]);
+  const register = useMemo(() => obligations.filter(matchesFilters), [obligations, matchesFilters]);
 
   const applicableAuditCount = useMemo(() => {
     return DSPD_AUDIT_ITEMS.filter((i) => itemApplies(i, footprint)).length;
@@ -225,12 +264,13 @@ function ObligationsTab({ orgId }: { orgId: string }) {
       })
       .filter(matchesFilters)
       .sort((a, b) => {
-        if (a.rollup.overdue_count !== b.rollup.overdue_count) return b.rollup.overdue_count - a.rollup.overdue_count;
+        if (a.rollup.overdue_count !== b.rollup.overdue_count)
+          return b.rollup.overdue_count - a.rollup.overdue_count;
         const aDue = a.rollup.next_due_at ? new Date(a.rollup.next_due_at).getTime() : Infinity;
         const bDue = b.rollup.next_due_at ? new Date(b.rollup.next_due_at).getTime() : Infinity;
         return aDue - bDue;
       });
-  }, [obligations, filter, scopeFilter, search]);
+  }, [obligations, matchesFilters]);
 
   const openCreate = () => {
     setEditingObligation(null);
@@ -253,9 +293,9 @@ function ObligationsTab({ orgId }: { orgId: string }) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Laid out like the DSPD In-depth Review Tool (DHHS91172). Rows for services this
-          program does not provide are hidden (N/A). The contractor must still meet the whole
-          contract for the services it actually runs.
+          Laid out like the DSPD In-depth Review Tool (DHHS91172). Rows for services this program
+          does not provide are hidden (N/A). The contractor must still meet the whole contract for
+          the services it actually runs.
         </p>
         <Button onClick={openCreate}>
           <Plus className="mr-1.5 h-4 w-4" /> New provider obligation
@@ -266,49 +306,83 @@ function ObligationsTab({ orgId }: { orgId: string }) {
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs font-medium text-muted-foreground">This program's services</span>
           {footprint.codes.map((c) => (
-            <Badge key={c} variant="secondary">{c}</Badge>
+            <Badge key={c} variant="secondary">
+              {c}
+            </Badge>
           ))}
           {footprint.hasAbiClients && <Badge variant="outline">Serves ABI</Badge>}
         </div>
       ) : (
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-950 dark:text-amber-100">
-          HIVE could not tell which service codes this program provides, so every review-tool
-          row is shown. Set awarded codes on the Company Profile (or add client authorizations)
-          to hide N/A items for services you do not run.
+          HIVE could not tell which service codes this program provides, so every review-tool row is
+          shown. Set awarded codes on the Company Profile (or add client authorizations) to hide N/A
+          items for services you do not run.
         </p>
       )}
 
       <div className="grid gap-2 rounded-xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
         <p className="flex items-start gap-2">
           <FolderOpen className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-700" />
-          <span><span className="font-medium text-foreground">Tracked in HIVE</span> — the artifact lives here (upload, form, attestation).</span>
+          <span>
+            <span className="font-medium text-foreground">Tracked in HIVE</span> — the artifact
+            lives here (upload, form, attestation).
+          </span>
         </p>
         <p className="flex items-start gap-2">
           <Building2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700" />
-          <span><span className="font-medium text-foreground">Filed outside HIVE</span> — UPI, OL, DSPD forms, USOR. HIVE only stores proof that it was done.</span>
+          <span>
+            <span className="font-medium text-foreground">Filed outside HIVE</span> — UPI, OL, DSPD
+            forms, USOR. HIVE only stores proof that it was done.
+          </span>
         </p>
         <p className="flex items-start gap-2">
           <Layers className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-700" />
-          <span><span className="font-medium text-foreground">HIVE + outside</span> — write or store here, then file in a state system.</span>
+          <span>
+            <span className="font-medium text-foreground">HIVE + outside</span> — write or store
+            here, then file in a state system.
+          </span>
         </p>
         <p className="flex items-start gap-2">
           <FileWarning className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-600" />
-          <span><span className="font-medium text-foreground">Standing record</span> — keep current. The calendar date is a verification reminder, not the legal due date.</span>
+          <span>
+            <span className="font-medium text-foreground">Standing record</span> — keep current. The
+            calendar date is a verification reminder, not the legal due date.
+          </span>
         </p>
       </div>
 
       <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-4 sm:overflow-visible sm:px-0 sm:pb-0">
         <div className="min-w-[65%] shrink-0 sm:min-w-0">
-          <StatCard label="Overdue items" count={stats.overdueItems} tone={stats.overdueItems === 0 ? "green" : "red"} hint="Open instances past due" />
+          <StatCard
+            label="Overdue items"
+            count={stats.overdueItems}
+            tone={stats.overdueItems === 0 ? "green" : "red"}
+            hint="Open instances past due"
+          />
         </div>
         <div className="min-w-[65%] shrink-0 sm:min-w-0">
-          <StatCard label="Due this week" count={stats.dueThisWeek} tone="amber" hint="Duties with an upcoming due date" />
+          <StatCard
+            label="Due this week"
+            count={stats.dueThisWeek}
+            tone="amber"
+            hint="Duties with an upcoming due date"
+          />
         </div>
         <div className="min-w-[65%] shrink-0 sm:min-w-0">
-          <StatCard label="In HIVE, still open" count={stats.inHiveOpen} tone="slate" hint="Artifacts HIVE can collect" />
+          <StatCard
+            label="In HIVE, still open"
+            count={stats.inHiveOpen}
+            tone="slate"
+            hint="Artifacts HIVE can collect"
+          />
         </div>
         <div className="min-w-[65%] shrink-0 sm:min-w-0">
-          <StatCard label="Outside filings open" count={stats.externalOpen} tone="amber" hint="UPI / OL / DSPD / USOR" />
+          <StatCard
+            label="Outside filings open"
+            count={stats.externalOpen}
+            tone="amber"
+            hint="UPI / OL / DSPD / USOR"
+          />
         </div>
       </div>
 
@@ -322,7 +396,9 @@ function ObligationsTab({ orgId }: { orgId: string }) {
             <TabsTrigger value="II">{AUDIT_PART_LABEL.II}</TabsTrigger>
             <TabsTrigger value="III">{AUDIT_PART_LABEL.III}</TabsTrigger>
             <TabsTrigger value="IV">{AUDIT_PART_LABEL.IV}</TabsTrigger>
-            <TabsTrigger value="external">Filed outside HIVE ({externalFilings.length})</TabsTrigger>
+            <TabsTrigger value="external">
+              Filed outside HIVE ({externalFilings.length})
+            </TabsTrigger>
             <TabsTrigger value="other">Other duties</TabsTrigger>
           </TabsList>
 
@@ -340,13 +416,17 @@ function ObligationsTab({ orgId }: { orgId: string }) {
               ))}
             </div>
             <div className="flex max-w-full items-center gap-1.5 overflow-x-auto rounded-md border border-border p-0.5">
-              <span className="shrink-0 pl-1.5 text-[11px] font-medium text-muted-foreground">Scope</span>
-              {([
-                ["all", "All"],
-                ["org", "Org"],
-                ["staff", "Per staff"],
-                ["staff_per_client", "Per staff+client"],
-              ] as const).map(([key, label]) => (
+              <span className="shrink-0 pl-1.5 text-[11px] font-medium text-muted-foreground">
+                Scope
+              </span>
+              {(
+                [
+                  ["all", "All"],
+                  ["org", "Org"],
+                  ["staff", "Per staff"],
+                  ["staff_per_client", "Per staff+client"],
+                ] as const
+              ).map(([key, label]) => (
                 <button
                   key={key}
                   type="button"
@@ -362,7 +442,9 @@ function ObligationsTab({ orgId }: { orgId: string }) {
               onClick={() => setShowNa((v) => !v)}
               className={`rounded-md border px-2.5 py-1 text-xs font-medium ${showNa ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:bg-accent"}`}
             >
-              {showNa ? "Showing N/A items" : `Show N/A (${Math.max(0, DSPD_AUDIT_ITEMS.length - applicableAuditCount)} hidden)`}
+              {showNa
+                ? "Showing N/A items"
+                : `Show N/A (${Math.max(0, DSPD_AUDIT_ITEMS.length - applicableAuditCount)} hidden)`}
             </button>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -382,7 +464,9 @@ function ObligationsTab({ orgId }: { orgId: string }) {
               empty={
                 <div className="rounded-lg border border-dashed border-border p-8 text-center">
                   <CheckCircle2 className="mx-auto mb-3 h-8 w-8 text-success" />
-                  <p className="font-medium text-foreground">Nothing overdue or due in the next 14 days</p>
+                  <p className="font-medium text-foreground">
+                    Nothing overdue or due in the next 14 days
+                  </p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Open the register to review later deadlines and standing records.
                   </p>
@@ -392,31 +476,59 @@ function ObligationsTab({ orgId }: { orgId: string }) {
           </TabsContent>
 
           <TabsContent value="I" className="mt-4">
-            <AuditPartPanel part={"I" as AuditPart} footprint={footprint} includeNa={showNa} obligations={register} search={search} {...listProps} />
+            <AuditPartPanel
+              part={"I" as AuditPart}
+              footprint={footprint}
+              includeNa={showNa}
+              obligations={register}
+              search={search}
+              {...listProps}
+            />
           </TabsContent>
           <TabsContent value="II" className="mt-4">
-            <AuditPartPanel part={"II" as AuditPart} footprint={footprint} includeNa={showNa} obligations={register} search={search} {...listProps} />
+            <AuditPartPanel
+              part={"II" as AuditPart}
+              footprint={footprint}
+              includeNa={showNa}
+              obligations={register}
+              search={search}
+              {...listProps}
+            />
           </TabsContent>
           <TabsContent value="III" className="mt-4">
-            <AuditPartPanel part={"III" as AuditPart} footprint={footprint} includeNa={showNa} obligations={register} search={search} {...listProps} />
+            <AuditPartPanel
+              part={"III" as AuditPart}
+              footprint={footprint}
+              includeNa={showNa}
+              obligations={register}
+              search={search}
+              {...listProps}
+            />
           </TabsContent>
           <TabsContent value="IV" className="mt-4">
-            <AuditPartPanel part={"IV" as AuditPart} footprint={footprint} includeNa={showNa} obligations={register} search={search} {...listProps} />
+            <AuditPartPanel
+              part={"IV" as AuditPart}
+              footprint={footprint}
+              includeNa={showNa}
+              obligations={register}
+              search={search}
+              {...listProps}
+            />
           </TabsContent>
 
           <TabsContent value="external" className="mt-4 space-y-4">
             <p className="text-sm text-muted-foreground">
-              These duties cannot be completed inside HIVE. The platform tracks the deadline,
-              the owner, and an attestation or upload after the filing is done in UPI, the
-              Office of Licensing, a DSPD Google Form, or USOR.
+              These duties cannot be completed inside HIVE. The platform tracks the deadline, the
+              owner, and an attestation or upload after the filing is done in UPI, the Office of
+              Licensing, a DSPD Google Form, or USOR.
             </p>
             <ObligationList
               {...listProps}
               items={externalFilings}
               empty={
                 <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-                  No outside-HIVE filings match your filters. (Some only appear when the org
-                  runs the related service code.)
+                  No outside-HIVE filings match your filters. (Some only appear when the org runs
+                  the related service code.)
                 </div>
               }
             />
@@ -477,8 +589,8 @@ function CompanyObligationsPage() {
         <div>
           <h2 className="text-base font-semibold">Compliance register</h2>
           <p className="text-sm text-muted-foreground">
-            DHHS91172 In-depth Review Tool — only the rows that apply to the
-            services this program provides.
+            DHHS91172 In-depth Review Tool — only the rows that apply to the services this program
+            provides.
           </p>
         </div>
       </div>

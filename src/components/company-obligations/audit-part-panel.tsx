@@ -69,17 +69,19 @@ export function AuditPartPanel({
       if (!includeNa && !itemApplies(i, footprint)) return false;
       if (!q) return true;
       return (
-        i.prompt.toLowerCase().includes(q)
-        || i.citation.toLowerCase().includes(q)
-        || i.number.toLowerCase().includes(q)
-        || i.note.toLowerCase().includes(q)
-        || i.applies_to_codes.some((c) => c.toLowerCase().includes(q))
+        i.prompt.toLowerCase().includes(q) ||
+        i.citation.toLowerCase().includes(q) ||
+        i.number.toLowerCase().includes(q) ||
+        i.note.toLowerCase().includes(q) ||
+        i.applies_to_codes.some((c) => c.toLowerCase().includes(q))
       );
     });
   }, [part, footprint, includeNa, search]);
 
   const linkedFor = (item: AuditItem) =>
-    obligations.filter((o) => item.obligation_titles.some((t) => obligationTitleMatches(o.title, t)));
+    obligations.filter((o) =>
+      item.obligation_titles.some((t) => obligationTitleMatches(o.title, t)),
+    );
 
   if (items.length === 0) {
     return (
@@ -142,13 +144,18 @@ function AuditItemRow({
   const [open, setOpen] = useState(false);
   const status = itemStatus(item, applies, linked);
   const Icon =
-    status.tone === "overdue" ? AlertTriangle
-    : status.tone === "met" || status.tone === "hive" ? CheckCircle2
-    : status.tone === "na" ? MinusCircle
-    : Circle;
+    status.tone === "overdue"
+      ? AlertTriangle
+      : status.tone === "met" || status.tone === "hive"
+        ? CheckCircle2
+        : status.tone === "na"
+          ? MinusCircle
+          : Circle;
 
   return (
-    <div className={`rounded-xl border bg-card p-4 shadow-[var(--shadow-card)] ${applies ? "border-border" : "border-dashed border-border/70 opacity-80"}`}>
+    <div
+      className={`rounded-xl border bg-card p-4 shadow-[var(--shadow-card)] ${applies ? "border-border" : "border-dashed border-border/70 opacity-80"}`}
+    >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -161,7 +168,9 @@ function AuditItemRow({
           <p className="mt-1.5 font-medium leading-snug">{item.prompt}</p>
           <p className="mt-1 text-xs text-muted-foreground">{item.citation}</p>
         </div>
-        <div className={`flex shrink-0 items-center gap-1.5 text-sm font-medium ${TONE_CLASS[status.tone]}`}>
+        <div
+          className={`flex shrink-0 items-center gap-1.5 text-sm font-medium ${TONE_CLASS[status.tone]}`}
+        >
           <Icon className="h-4 w-4" />
           {status.label}
         </div>
@@ -176,7 +185,10 @@ function AuditItemRow({
           <p className="mt-2 text-xs text-muted-foreground">{item.note}</p>
           {linked.map((o) => (
             <div key={o.id} className="mt-2">
-              <RollupStatus rollup={o.rollup} reminderOnly={catalogFor(o)?.calendar_is_reminder_only} />
+              <RollupStatus
+                rollup={o.rollup}
+                reminderOnly={catalogFor(o)?.calendar_is_reminder_only}
+              />
             </div>
           ))}
           <div className="mt-3 flex flex-wrap gap-2">
@@ -229,8 +241,11 @@ export function UnmappedDuties({
   publishedFormIds: Set<string>;
   onEdit: (ob: ObligationWithInstance) => void;
 }) {
-  const extra = obligations.filter((o) =>
-    !DSPD_AUDIT_ITEMS.some((i) => i.obligation_titles.some((t) => obligationTitleMatches(o.title, t))),
+  const extra = obligations.filter(
+    (o) =>
+      !DSPD_AUDIT_ITEMS.some((i) =>
+        i.obligation_titles.some((t) => obligationTitleMatches(o.title, t)),
+      ),
   );
   if (!extra.length) {
     return (
@@ -246,8 +261,8 @@ export function UnmappedDuties({
         <span className="ml-2 font-normal">({extra.length})</span>
       </h3>
       <p className="text-xs text-muted-foreground">
-        Provider-defined obligations, or SOW duties that are not a numbered row on the
-        in-depth review tool (for example SEI UPI employment-data attestations).
+        Provider-defined obligations, or SOW duties that are not a numbered row on the in-depth
+        review tool (for example SEI UPI employment-data attestations).
       </p>
       <div className="grid gap-3">
         {extra.map((o) => (

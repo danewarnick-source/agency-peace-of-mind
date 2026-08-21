@@ -106,8 +106,6 @@ export function ClientDischargeDialog({
     onSuccess: () => {
       toast.success(`${clientName} discharged. Audit entry recorded.`);
       qc.invalidateQueries({ queryKey: ["clients", organizationId] });
-      qc.invalidateQueries({ queryKey: ["whiteboard-clients", organizationId] });
-      qc.invalidateQueries({ queryKey: ["whiteboard"] });
       reset();
       setOpen(false);
       onDischarged?.();

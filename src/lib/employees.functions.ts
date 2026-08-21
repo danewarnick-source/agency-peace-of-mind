@@ -200,3 +200,107 @@ export const adminResetEmployeePassword = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/* ------------------------------------------------------------------ */
+/* Bulk hire-date maintenance                                          */
+/* ------------------------------------------------------------------ */
+
+const OrgInput = z.object({ organizationId: z.string().uuid() });
+
+export interface StaffHireDateRow {
+  userId: string;
+  name: string;
+  email: string | null;
+  role: string;
+  department: string | null;
+  hireDate: string | null;
+}
+
+export const listStaffHireDates = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => OrgInput.parse(d))
+  .handler(async ({ data, context }): Promise<StaffHireDateRow[]> => {
+    if (!context.userId) return [];
+    await assertOrgManager(context.userId, data.organizationId);
+
+    const { data: members, error } = await supabaseAdmin
+      .from("organization_members")
+      .select("user_id, role, job_title")
+      .eq("organization_id", data.organizationId)
+      .eq("active", true);
+    if (error) throw new Error(error.message);
+
+    const ids = (members ?? []).map((m) => m.user_id);
+    if (!ids.length) return [];
+
+    const { data: profiles } = await supabaseAdmin
+      .from("profiles")
+      .select("id, full_name, first_name, last_name, email, department, hire_date, start_date, is_active")
+      .in("id", ids);
+
+    const byId = new Map((profiles ?? []).map((p) => [p.id, p as any]));
+
+    return (members ?? [])
+      .map((m) => {
+        const p = byId.get(m.user_id);
+        if (p && p.is_active === false) return null;
+        const name =
+          (p?.full_name as string | null) ||
+          [p?.first_name, p?.last_name].filter(Boolean).join(" ") ||
+          (p?.email as string | null) ||
+          "Unknown";
+        return {
+          userId: m.user_id,
+          name,
+          email: (p?.email as string | null) ?? null,
+          role: m.role as string,
+          department: (p?.department as string | null) ?? (m.job_title as string | null) ?? null,
+          hireDate: ((p?.start_date ?? p?.hire_date) as string | null) ?? null,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a!.name.localeCompare(b!.name)) as StaffHireDateRow[];
+  });
+
+const BulkHireDateInput = z.object({
+  organizationId: z.string().uuid(),
+  updates: z
+    .array(
+      z.object({
+        userId: z.string().uuid(),
+        hireDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      }),
+    )
+    .min(1)
+    .max(500),
+});
+
+export const bulkSetStaffHireDates = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => BulkHireDateInput.parse(d))
+  .handler(async ({ data, context }) => {
+    if (!context.userId) return { updated: 0 };
+    await assertOrgManager(context.userId, data.organizationId);
+
+    const { data: members, error } = await supabaseAdmin
+      .from("organization_members")
+      .select("user_id")
+      .eq("organization_id", data.organizationId)
+      .eq("active", true)
+      .in("user_id", data.updates.map((u) => u.userId));
+    if (error) throw new Error(error.message);
+    const allowed = new Set((members ?? []).map((m) => m.user_id));
+
+    let updated = 0;
+    for (const u of data.updates) {
+      if (!allowed.has(u.userId)) continue;
+      const { error: upErr } = await supabaseAdmin
+        .from("profiles")
+        .update({ hire_date: u.hireDate, start_date: u.hireDate } as any)
+        .eq("id", u.userId);
+      if (upErr) throw new Error(upErr.message);
+      updated += 1;
+    }
+    return { updated };
+  });
+
+

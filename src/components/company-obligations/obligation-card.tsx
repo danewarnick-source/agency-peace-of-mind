@@ -547,7 +547,7 @@ function HireDateWarning({ orgId, obligation }: { orgId: string; obligation: Com
         {data.missing} staff member{data.missing === 1 ? "" : "s"} {data.missing === 1 ? "has" : "have"} no hire date —
         due dates cannot be calculated for {data.missing === 1 ? "them" : "them"}.{" "}
 
-        <a href="/dashboard/employees" className="underline underline-offset-2">Set hire dates →</a>
+        <a href="/dashboard/employees/hire-dates" className="underline underline-offset-2">Set hire dates →</a>
       </span>
     </div>
   );

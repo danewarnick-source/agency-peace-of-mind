@@ -38,7 +38,6 @@ import { useOrgFeatures } from "@/hooks/use-feature-enabled";
 import { BillingBanner } from "@/components/billing/billing-banner";
 import { DraftJobsProvider } from "@/components/nectar/draft-jobs-driver";
 import { DraftJobsHeaderPill } from "@/components/nectar/draft-jobs-header-pill";
-import { CelebrationProvider } from "@/components/celebrations/celebration-provider";
 import { GuidedTourProvider } from "@/components/nectar/guided-tour-provider";
 
 
@@ -407,7 +406,6 @@ function DashboardLayout() {
 
 
   return (
-    <CelebrationProvider>
     <GuidedTourProvider>
     <DraftJobsProvider>
     <div className="flex h-screen h-[100dvh] flex-col overflow-hidden">
@@ -595,7 +593,6 @@ function DashboardLayout() {
     </div>
     </DraftJobsProvider>
     </GuidedTourProvider>
-    </CelebrationProvider>
   );
 }
 

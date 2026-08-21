@@ -65,7 +65,6 @@ export const Route = createFileRoute("/api/public/hooks/billing-daily-check")({
 
         try {
           result.lock = await checkAndLockPastDueAccounts();
-          console.log("[billing-daily-check] locked", result.lock);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           console.error("[billing-daily-check] lock step failed", msg);
@@ -74,7 +73,6 @@ export const Route = createFileRoute("/api/public/hooks/billing-daily-check")({
 
         try {
           result.expiry = await checkCardExpiryWarnings();
-          console.log("[billing-daily-check] expiry warnings", result.expiry);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           console.error("[billing-daily-check] expiry step failed", msg);

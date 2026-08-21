@@ -37,25 +37,40 @@ jobs:
       STAGING_CLIENT_ID_WITH_PCSP: ${{ secrets.STAGING_CLIENT_ID_WITH_PCSP }}
 
     steps:
+      - name: Check staging credentials
+        id: creds
+        run: |
+          if [ -z "$STAGING_URL" ] || [ -z "$TEST_EMAIL" ] || [ -z "$TEST_PASSWORD" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::STAGING_URL / TEST_EMAIL / TEST_PASSWORD are not set; skipping Route Crawler."
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.creds.outputs.available == 'true'
 
       - name: Set up Node
+        if: steps.creds.outputs.available == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
       - name: Install dependencies
+        if: steps.creds.outputs.available == 'true'
         run: npm ci
 
       - name: Install Playwright browsers
+        if: steps.creds.outputs.available == 'true'
         run: npx playwright install chromium --with-deps
 
       - name: Run crawler
+        if: steps.creds.outputs.available == 'true'
         run: npx playwright test
 
       - name: Upload Playwright report
-        if: failure()
+        if: failure() && steps.creds.outputs.available == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report

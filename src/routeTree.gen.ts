@@ -165,6 +165,7 @@ import { Route as DashboardFinancialGrossRouteImport } from './routes/dashboard.
 import { Route as DashboardFinancialEmployeesRouteImport } from './routes/dashboard.financial.employees'
 import { Route as DashboardFinancialDistributionsRouteImport } from './routes/dashboard.financial.distributions'
 import { Route as DashboardFinancialContractorsRouteImport } from './routes/dashboard.financial.contractors'
+import { Route as DashboardEmployeesHireDatesRouteImport } from './routes/dashboard.employees.hire-dates'
 import { Route as DashboardEmployeesStaffIdRouteImport } from './routes/dashboard.employees.$staffId'
 import { Route as DashboardCoursesPersonRouteImport } from './routes/dashboard.courses.person'
 import { Route as DashboardCoursesOtherRouteImport } from './routes/dashboard.courses.other'
@@ -1052,6 +1053,12 @@ const DashboardFinancialContractorsRoute =
     path: '/contractors',
     getParentRoute: () => DashboardFinancialRoute,
   } as any)
+const DashboardEmployeesHireDatesRoute =
+  DashboardEmployeesHireDatesRouteImport.update({
+    id: '/employees/hire-dates',
+    path: '/employees/hire-dates',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardEmployeesStaffIdRoute =
   DashboardEmployeesStaffIdRouteImport.update({
     id: '/employees/$staffId',
@@ -1451,6 +1458,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/courses/other': typeof DashboardCoursesOtherRoute
   '/dashboard/courses/person': typeof DashboardCoursesPersonRoute
   '/dashboard/employees/$staffId': typeof DashboardEmployeesStaffIdRoute
+  '/dashboard/employees/hire-dates': typeof DashboardEmployeesHireDatesRoute
   '/dashboard/financial/contractors': typeof DashboardFinancialContractorsRoute
   '/dashboard/financial/distributions': typeof DashboardFinancialDistributionsRoute
   '/dashboard/financial/employees': typeof DashboardFinancialEmployeesRoute
@@ -1651,6 +1659,7 @@ export interface FileRoutesByTo {
   '/dashboard/courses/other': typeof DashboardCoursesOtherRoute
   '/dashboard/courses/person': typeof DashboardCoursesPersonRoute
   '/dashboard/employees/$staffId': typeof DashboardEmployeesStaffIdRoute
+  '/dashboard/employees/hire-dates': typeof DashboardEmployeesHireDatesRoute
   '/dashboard/financial/contractors': typeof DashboardFinancialContractorsRoute
   '/dashboard/financial/distributions': typeof DashboardFinancialDistributionsRoute
   '/dashboard/financial/employees': typeof DashboardFinancialEmployeesRoute
@@ -1859,6 +1868,7 @@ export interface FileRoutesById {
   '/dashboard/courses/other': typeof DashboardCoursesOtherRoute
   '/dashboard/courses/person': typeof DashboardCoursesPersonRoute
   '/dashboard/employees/$staffId': typeof DashboardEmployeesStaffIdRoute
+  '/dashboard/employees/hire-dates': typeof DashboardEmployeesHireDatesRoute
   '/dashboard/financial/contractors': typeof DashboardFinancialContractorsRoute
   '/dashboard/financial/distributions': typeof DashboardFinancialDistributionsRoute
   '/dashboard/financial/employees': typeof DashboardFinancialEmployeesRoute
@@ -2068,6 +2078,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses/other'
     | '/dashboard/courses/person'
     | '/dashboard/employees/$staffId'
+    | '/dashboard/employees/hire-dates'
     | '/dashboard/financial/contractors'
     | '/dashboard/financial/distributions'
     | '/dashboard/financial/employees'
@@ -2268,6 +2279,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses/other'
     | '/dashboard/courses/person'
     | '/dashboard/employees/$staffId'
+    | '/dashboard/employees/hire-dates'
     | '/dashboard/financial/contractors'
     | '/dashboard/financial/distributions'
     | '/dashboard/financial/employees'
@@ -2475,6 +2487,7 @@ export interface FileRouteTypes {
     | '/dashboard/courses/other'
     | '/dashboard/courses/person'
     | '/dashboard/employees/$staffId'
+    | '/dashboard/employees/hire-dates'
     | '/dashboard/financial/contractors'
     | '/dashboard/financial/distributions'
     | '/dashboard/financial/employees'
@@ -3698,6 +3711,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardFinancialContractorsRouteImport
       parentRoute: typeof DashboardFinancialRoute
     }
+    '/dashboard/employees/hire-dates': {
+      id: '/dashboard/employees/hire-dates'
+      path: '/employees/hire-dates'
+      fullPath: '/dashboard/employees/hire-dates'
+      preLoaderRoute: typeof DashboardEmployeesHireDatesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/employees/$staffId': {
       id: '/dashboard/employees/$staffId'
       path: '/employees/$staffId'
@@ -4429,6 +4449,7 @@ interface DashboardRouteChildren {
   DashboardCoursesOtherRoute: typeof DashboardCoursesOtherRoute
   DashboardCoursesPersonRoute: typeof DashboardCoursesPersonRoute
   DashboardEmployeesStaffIdRoute: typeof DashboardEmployeesStaffIdRoute
+  DashboardEmployeesHireDatesRoute: typeof DashboardEmployeesHireDatesRoute
   DashboardHhsHubClientIdRoute: typeof DashboardHhsHubClientIdRoute
   DashboardHubClientsRoute: typeof DashboardHubClientsRoute
   DashboardHubDocumentationRoute: typeof DashboardHubDocumentationRoute
@@ -4526,6 +4547,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCoursesOtherRoute: DashboardCoursesOtherRoute,
   DashboardCoursesPersonRoute: DashboardCoursesPersonRoute,
   DashboardEmployeesStaffIdRoute: DashboardEmployeesStaffIdRoute,
+  DashboardEmployeesHireDatesRoute: DashboardEmployeesHireDatesRoute,
   DashboardHhsHubClientIdRoute: DashboardHhsHubClientIdRoute,
   DashboardHubClientsRoute: DashboardHubClientsRoute,
   DashboardHubDocumentationRoute: DashboardHubDocumentationRoute,

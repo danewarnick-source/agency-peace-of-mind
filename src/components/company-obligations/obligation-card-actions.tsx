@@ -381,19 +381,26 @@ function FileForInstanceButton({
 
 function NotifyOutstandingButton({
   orgId,
-  instanceId,
+  instanceIds,
   outstandingCount,
   label,
 }: {
   orgId: string;
-  instanceId: string;
+  instanceIds: string[];
   outstandingCount: number;
   label: string;
 }) {
   const remindFn = useServerFn(remindOutstandingAssignees);
   const [notified, setNotified] = useState(false);
   const remind = useMutation({
-    mutationFn: () => remindFn({ data: { organizationId: orgId, instanceId } }),
+    mutationFn: async () => {
+      let reminded = 0;
+      for (const instanceId of instanceIds) {
+        const res = await remindFn({ data: { organizationId: orgId, instanceId } });
+        reminded += res.reminded;
+      }
+      return { reminded };
+    },
     onSuccess: (res) => {
       setNotified(true);
       toast.success(`Notified ${res.reminded} staff member${res.reminded === 1 ? "" : "s"}.`);

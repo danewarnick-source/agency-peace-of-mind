@@ -20,16 +20,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
 } from "@/components/ui/command";
 import { AlertTriangle, Upload } from "lucide-react";
 import { recordCompletion } from "@/lib/company-obligations.functions";
+import { useOutstandingRoster, RosterMultiSelect } from "./outstanding-roster";
 
 type EvidenceChoice = "attestation" | "upload" | "notes";
 
@@ -43,6 +51,7 @@ export function ManualCompletionDrawer({
   onOpenChange,
   orgId,
   instanceId,
+  obligationId,
   attestationText,
   evidenceType,
 }: {
@@ -50,6 +59,7 @@ export function ManualCompletionDrawer({
   onOpenChange: (v: boolean) => void;
   orgId: string;
   instanceId: string | null;
+  obligationId?: string;
   attestationText?: string | null;
   evidenceType?: "attestation" | "upload" | "upload_and_attestation" | "form" | null;
 }) {
@@ -60,7 +70,8 @@ export function ManualCompletionDrawer({
   // upload_and_attestation lets an admin file the document half, but the
   // attestation half still requires the staff member personally, so
   // "Attestation" is never an admin-selectable evidence choice.
-  const hideAttestationChoice = evidenceType === "attestation" || evidenceType === "upload_and_attestation";
+  const hideAttestationChoice =
+    evidenceType === "attestation" || evidenceType === "upload_and_attestation";
   const defaultChoice: EvidenceChoice = hideAttestationChoice ? "upload" : "attestation";
 
   const qc = useQueryClient();
@@ -70,6 +81,12 @@ export function ManualCompletionDrawer({
   const [staffId, setStaffId] = useState<string | null>(null);
   const [staffName, setStaffName] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Per-person obligations keep one instance per staff member, so the
+  // roster is gathered obligation-wide and each selected person is recorded
+  // against their own instance.
+  const { data: roster = [] } = useOutstandingRoster(obligationId, open);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const useRoster = !!obligationId && roster.length > 0;
   const [completedAt, setCompletedAt] = useState(() => toLocalDatetimeInputValue(new Date()));
   const [evidenceChoice, setEvidenceChoice] = useState<EvidenceChoice>(defaultChoice);
   const [attestConfirmed, setAttestConfirmed] = useState(false);
@@ -80,6 +97,7 @@ export function ManualCompletionDrawer({
     if (!open) {
       setStaffId(null);
       setStaffName("");
+      setSelected(new Set());
       setCompletedAt(toLocalDatetimeInputValue(new Date()));
       setEvidenceChoice(defaultChoice);
       setAttestConfirmed(false);
@@ -108,7 +126,10 @@ export function ManualCompletionDrawer({
     enabled: !!user,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("org_member_directory").select("full_name").eq("id", user!.id).maybeSingle();
+        .from("org_member_directory")
+        .select("full_name")
+        .eq("id", user!.id)
+        .maybeSingle();
       if (error) throw new Error(error.message);
       return data as { full_name: string | null } | null;
     },
@@ -116,47 +137,77 @@ export function ManualCompletionDrawer({
   const adminName = adminProfile?.full_name ?? "an admin";
 
   const needsNotes = evidenceChoice === "notes";
+  const targets = useRoster
+    ? roster.filter((r) => selected.has(`${r.instance_id}:${r.staff_id}`))
+    : staffId
+      ? [{ instance_id: instanceId as string, staff_id: staffId, staff_name: staffName }]
+      : [];
+  const targetLabel =
+    targets.length === 1 ? targets[0]!.staff_name : `${targets.length} staff members`;
   const canSave =
-    !!staffId &&
+    targets.length > 0 &&
     (evidenceChoice !== "attestation" || attestConfirmed) &&
     (evidenceChoice !== "upload" || !!file) &&
     (evidenceChoice !== "notes" || notes.trim().length > 0);
 
   const record = useMutation({
     mutationFn: async () => {
-      let uploadPath: string | null = null;
-      let uploadFilename: string | null = null;
-      if (evidenceChoice === "upload" && file) {
-        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-        const path = `${orgId}/manual/${instanceId}/${crypto.randomUUID()}-${safeName}`;
-        const { error: upErr } = await supabase.storage.from("obligation-evidence").upload(path, file);
-        if (upErr) throw new Error(upErr.message);
-        uploadPath = path;
-        uploadFilename = file.name;
+      const failures: string[] = [];
+      let ok = 0;
+      for (const t of targets) {
+        try {
+          let uploadPath: string | null = null;
+          let uploadFilename: string | null = null;
+          if (evidenceChoice === "upload" && file) {
+            const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+            const path = `${orgId}/manual/${t.instance_id}/${crypto.randomUUID()}-${safeName}`;
+            const { error: upErr } = await supabase.storage
+              .from("obligation-evidence")
+              .upload(path, file);
+            if (upErr) throw new Error(upErr.message);
+            uploadPath = path;
+            uploadFilename = file.name;
+          }
+          await recordFn({
+            data: {
+              organizationId: orgId,
+              instanceId: t.instance_id,
+              evidenceTypeUsed:
+                evidenceChoice === "attestation"
+                  ? "attestation"
+                  : evidenceChoice === "upload"
+                    ? "upload"
+                    : "manual",
+              uploadPath,
+              uploadFilename,
+              attestationSignedAt:
+                evidenceChoice === "attestation" ? new Date(completedAt).toISOString() : null,
+              attestationTextSnapshot:
+                evidenceChoice === "attestation" ? (attestationText ?? null) : null,
+              isManualEntry: true,
+              staffId: t.staff_id,
+              staffName: t.staff_name,
+              manualEntryByName: adminName,
+              notes: notes.trim() || null,
+              completedAt: new Date(completedAt).toISOString(),
+            },
+          });
+          ok += 1;
+        } catch (e) {
+          failures.push(`${t.staff_name}: ${(e as Error).message}`);
+        }
       }
-      return recordFn({
-        data: {
-          organizationId: orgId,
-          instanceId: instanceId as string,
-          evidenceTypeUsed: evidenceChoice === "attestation" ? "attestation" : evidenceChoice === "upload" ? "upload" : "manual",
-          uploadPath,
-          uploadFilename,
-          attestationSignedAt: evidenceChoice === "attestation" ? new Date(completedAt).toISOString() : null,
-          attestationTextSnapshot: evidenceChoice === "attestation" ? (attestationText ?? null) : null,
-          isManualEntry: true,
-          staffId: staffId ?? undefined,
-          staffName: staffName || undefined,
-          manualEntryByName: adminName,
-          notes: notes.trim() || null,
-          completedAt: new Date(completedAt).toISOString(),
-        },
-      });
+      if (!ok) throw new Error(failures[0] ?? "Nothing recorded.");
+      if (failures.length) toast.error(`Failed for ${failures.length}: ${failures[0]}`);
+      return ok;
     },
-    onSuccess: () => {
-      toast.success("Manual completion recorded");
+    onSuccess: (ok: number) => {
+      toast.success(`Manual completion recorded for ${ok} staff member${ok === 1 ? "" : "s"}`);
       onOpenChange(false);
       qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
       qc.invalidateQueries({ queryKey: ["obligation-instance-detail"] });
+      qc.invalidateQueries({ queryKey: ["obligation-outstanding-roster"] });
+      qc.invalidateQueries({ queryKey: ["obligation-per-client-detail"] });
       qc.invalidateQueries({ queryKey: ["obligation-history"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -173,12 +224,16 @@ export function ManualCompletionDrawer({
         {attestationBlocked ? (
           <>
             <div className="mt-4 rounded-md border border-amber-300/60 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
-              This obligation requires the staff member to attest personally. Use the "Notify staff to attest"
-              button on the obligation card to send them a reminder.
+              This obligation requires the staff member to attest personally. Use the "Notify staff
+              to attest" button on the obligation card to send them a reminder.
             </div>
             <SheetFooter className="gap-2 sm:justify-end">
-              <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button disabled title="Staff must attest personally.">Save completion</Button>
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button disabled title="Staff must attest personally.">
+                Save completion
+              </Button>
             </SheetFooter>
           </>
         ) : (
@@ -186,36 +241,40 @@ export function ManualCompletionDrawer({
             <div className="mt-4 space-y-4 pb-4">
               <div className="grid gap-1.5">
                 <Label>Who completed it</Label>
-                <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-                  <PopoverTrigger asChild>
-                    <Button type="button" variant="outline" className="justify-start font-normal">
-                      {staffName || "Select staff member…"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-72 p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Search staff…" />
-                      <CommandList>
-                        <CommandEmpty>No matches.</CommandEmpty>
-                        <CommandGroup>
-                          {directory.map((d) => (
-                            <CommandItem
-                              key={d.id}
-                              value={d.full_name ?? d.id}
-                              onSelect={() => {
-                                setStaffId(d.id);
-                                setStaffName(d.full_name ?? "Unnamed");
-                                setPickerOpen(false);
-                              }}
-                            >
-                              {d.full_name ?? "Unnamed"}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                {useRoster ? (
+                  <RosterMultiSelect roster={roster} selected={selected} onChange={setSelected} />
+                ) : (
+                  <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline" className="justify-start font-normal">
+                        {staffName || "Select staff member…"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72 p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search staff…" />
+                        <CommandList>
+                          <CommandEmpty>No matches.</CommandEmpty>
+                          <CommandGroup>
+                            {directory.map((d) => (
+                              <CommandItem
+                                key={d.id}
+                                value={d.full_name ?? d.id}
+                                onSelect={() => {
+                                  setStaffId(d.id);
+                                  setStaffName(d.full_name ?? "Unnamed");
+                                  setPickerOpen(false);
+                                }}
+                              >
+                                {d.full_name ?? "Unnamed"}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
 
               <div className="grid gap-1.5">
@@ -229,10 +288,17 @@ export function ManualCompletionDrawer({
 
               <div className="grid gap-1.5">
                 <Label>Evidence type</Label>
-                <Select value={evidenceChoice} onValueChange={(v) => setEvidenceChoice(v as EvidenceChoice)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select
+                  value={evidenceChoice}
+                  onValueChange={(v) => setEvidenceChoice(v as EvidenceChoice)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {!hideAttestationChoice && <SelectItem value="attestation">Attestation</SelectItem>}
+                    {!hideAttestationChoice && (
+                      <SelectItem value="attestation">Attestation</SelectItem>
+                    )}
                     <SelectItem value="upload">Upload</SelectItem>
                     <SelectItem value="notes">Notes only</SelectItem>
                   </SelectContent>
@@ -241,7 +307,8 @@ export function ManualCompletionDrawer({
 
               {evidenceType === "upload_and_attestation" && evidenceChoice === "upload" && (
                 <p className="text-xs text-muted-foreground">
-                  After filing the document, the staff member must still complete their personal attestation.
+                  After filing the document, the staff member must still complete their personal
+                  attestation.
                 </p>
               )}
 
@@ -257,7 +324,8 @@ export function ManualCompletionDrawer({
                       checked={attestConfirmed}
                       onChange={(e) => setAttestConfirmed(e.target.checked)}
                     />
-                    I am confirming this on behalf of {staffName || "[selected staff]"}
+                    I am confirming this on behalf of{" "}
+                    {targets.length ? targetLabel : "[selected staff]"}
                   </label>
                 </div>
               )}
@@ -268,7 +336,11 @@ export function ManualCompletionDrawer({
                   <label className="flex min-h-[40px] cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted">
                     <Upload className="h-3.5 w-3.5" />
                     {file ? file.name : "Choose file…"}
-                    <input type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                    />
                   </label>
                 </div>
               )}
@@ -283,9 +355,11 @@ export function ManualCompletionDrawer({
               <div className="flex items-start gap-2 rounded-md border border-amber-300/60 bg-amber-500/10 p-2.5 text-xs text-amber-900 dark:text-amber-200">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>
-                  You are recording this on behalf of {staffName || "the selected staff member"}
-                  {staffName ? "." : " — select a staff member above."}
-                  {staffName && ` This entry will be marked as manually recorded by ${adminName}.`}
+                  You are recording this on behalf of{" "}
+                  {targets.length ? targetLabel : "the selected staff member"}
+                  {targets.length ? "." : " — select at least one staff member above."}
+                  {targets.length > 0 &&
+                    ` This entry will be marked as manually recorded by ${adminName}.`}
                 </span>
               </div>
 
@@ -298,7 +372,9 @@ export function ManualCompletionDrawer({
             </div>
 
             <SheetFooter className="gap-2 sm:justify-end">
-              <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
               <Button onClick={() => record.mutate()} disabled={!canSave || record.isPending}>
                 Save completion
               </Button>

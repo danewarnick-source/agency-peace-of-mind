@@ -725,6 +725,7 @@ export function ObligationCard({
         onOpenChange={setManualOpen}
         orgId={orgId}
         instanceId={obligation.current_instance?.id ?? null}
+        obligationId={obligation.id}
         attestationText={obligation.attestation_text}
         evidenceType={obligation.evidence_type}
       />

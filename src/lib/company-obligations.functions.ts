@@ -526,7 +526,9 @@ async function generatePerPersonInstancesInternal(
   const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
   const created: ObligationInstanceRow[] = [];
+  const failures: string[] = [];
   for (const a of assignees) {
+   try {
     const basisStr = hireDates.get(a.staff_id)?.basis_date;
     if (!basisStr) continue; // no hire_date/start_date/created_at on file — can't compute a due date
     const basisDate = new Date(`${basisStr.slice(0, 10)}T00:00:00Z`);

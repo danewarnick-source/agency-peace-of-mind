@@ -143,7 +143,7 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     prompt: "Emergency Management and Business Continuity Plan is current (upload if updated).",
     citation: "CST 46",
     applies_to_codes: [],
-    obligation_titles: [],
+    obligation_titles: ["Emergency Management and Business Continuity Plan"],
     fulfillment: "standing",
     note: "Client Service Terms, not the SOW body. Keep the plan on file and train staff annually (see Part IV item 4).",
   },
@@ -191,7 +191,7 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     prompt: "Process for addressing staff conflict of interest.",
     citation: "CST 9 & 10",
     applies_to_codes: [],
-    obligation_titles: [],
+    obligation_titles: ["Staff Conflict of Interest Process"],
     fulfillment: "standing",
     note: "Client Service Terms. Policy on file; not a per-period upload unless the policy changes.",
   },
@@ -202,7 +202,7 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     prompt: "Discharge process for when a Person leaves services.",
     citation: "SOW Article 1.22 (c)",
     applies_to_codes: [],
-    obligation_titles: [],
+    obligation_titles: ["Person Discharge Process"],
     fulfillment: "standing",
     note: "Written discharge procedure. Triggered when a Person is discharged, not on a calendar.",
   },
@@ -213,7 +213,7 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     prompt: "Internal Quality Management Plan is followed and can be externally validated.",
     citation: "CST 50",
     applies_to_codes: [],
-    obligation_titles: [],
+    obligation_titles: ["Internal Quality Management Plan"],
     fulfillment: "standing",
     note: "Keep the IQMP on file. The auditor asks whether it is being followed, not whether a form was uploaded this month.",
   },
@@ -239,7 +239,7 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
       "Current General, Professional, and Automobile liability insurance at contracted minimums (Insurance Checklist).",
     citation: "CST 29–36",
     applies_to_codes: [],
-    obligation_titles: [],
+    obligation_titles: ["General, Professional, and Automobile Liability Insurance"],
     fulfillment: "standing",
     note: "Standing credential. Track expiration on the declarations page; there is no SOW anniversary date.",
   },
@@ -479,6 +479,20 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     fulfillment: "in_hive",
     note: "Nectar flags mismatches; a human attests before a claim goes out. HIVE does not auto-publish billing.",
   },
+  {
+    id: "III-HHS",
+    part: "III",
+    number: "HHS",
+    prompt:
+      "Each billed Host Home day is attendance Present with a daily note. No overnight stay = unbillable day.",
+    citation: "SOW Article 11; hhs_daily_records_v",
+    applies_to_codes: ["HHS"],
+    obligation_titles: [],
+    hive_href: "/dashboard/host-home-control",
+    hive_label: "Host home control",
+    fulfillment: "in_hive",
+    note: "A billable HHS day is Present + daily note. HIVE scores the last 30 days from the live daily-records view — it does not invent a second to-do.",
+  },
 
   // ── PART IV ─────────────────────────────────────────────────────────────
   {
@@ -500,7 +514,7 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     prompt: "Staff have signed the DHHS Code of Conduct on file.",
     citation: "CST 76",
     applies_to_codes: ["SLN", "SLH", "PPS", "HHS"],
-    obligation_titles: [],
+    obligation_titles: ["DHHS Code of Conduct — Signed"],
     fulfillment: "in_hive",
     note: "The paper tool limits this to SLN, SLH, PPS, and HHS. Keep the signed copy in the staff file.",
   },
@@ -550,7 +564,7 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
       "Staff are trained at least annually on the Contractor's Emergency Management and Business Continuity Plan.",
     citation: "CST 46",
     applies_to_codes: [],
-    obligation_titles: [],
+    obligation_titles: ["Annual Emergency Management Plan Training"],
     fulfillment: "in_hive",
     note: "Annual staff training on the plan in Part I item 4. Not the same as the 30-day orientation.",
   },
@@ -630,7 +644,7 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     citation: "SOW Article 1.8 (ABI training)",
     applies_to_codes: [],
     condition: "if_abi_clients",
-    obligation_titles: [],
+    obligation_titles: ["ABI Training — Before Working Alone"],
     fulfillment: "in_hive",
     note: "Only if this program serves one or more Persons with acquired brain injury. Required before working alone with those Persons.",
   },
@@ -727,4 +741,11 @@ export function naReason(item: AuditItem, footprint: OrgFootprint): string | nul
     return `Does not apply — this program does not provide ${item.applies_to_codes.join(", ")}.`;
   }
   return "Does not apply.";
+}
+
+export function itemAppliesToPerson(
+  item: AuditItem,
+  person: { service_codes: string[]; has_abi: boolean },
+): boolean {
+  return itemApplies(item, { codes: person.service_codes, hasAbiClients: person.has_abi });
 }

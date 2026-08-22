@@ -7,7 +7,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
-import { resolveGroupMembersInternal, type ResolvedStaffMember } from "./staff-groups.functions";
+import {
+  resolveGroupMembersInternal,
+  type ResolvedStaffMember,
+  ensureAllStaffGroupInternal,
+} from "./staff-groups.functions";
 import { runNectarCertOcrFromStoragePath } from "./nectar-cert-ocr";
 import { compareNames } from "./name-matching";
 import {
@@ -23,6 +27,14 @@ import {
 } from "./obligation-due-dates";
 import { resolveDueRule, sowCatalogEntry } from "./sow-obligation-catalog";
 import { obligationAppliesToFootprint } from "./dspd-audit-tool";
+import { STANDING_SOW_DUTIES } from "./standing-sow-duties";
+import {
+  dutyRequiresAbiCaseload,
+  dutyRequiresBehaviorCaseload,
+  dutyRequiresTransporter,
+  homePeriodKey,
+  perHomeServiceCode,
+} from "./obligation-assignee-rules";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -348,9 +360,10 @@ export async function snapshotAssigneesInternal(
   const byId = new Map<string, ResolvedStaffMember>();
   for (const m of [...groupMembers, ...directMembers]) byId.set(m.staff_id, m);
   const all = Array.from(byId.values());
+  const filtered = await filterAssigneesByDutyInternal(supabase, organizationId, ob, all);
 
-  if (all.length) {
-    const rows = all.map((m) => ({
+  if (filtered.length) {
+    const rows = filtered.map((m) => ({
       instance_id: instanceId,
       organization_id: organizationId,
       staff_id: m.staff_id,
@@ -363,7 +376,7 @@ export async function snapshotAssigneesInternal(
     if (error) throw new Error(error.message);
   }
 
-  return all;
+  return filtered;
 }
 
 export async function scheduleRemindersInternal(
@@ -554,7 +567,7 @@ async function generatePerPersonInstancesInternal(
   const cfg = (ob.due_day_config ?? {}) as Record<string, unknown>;
   let assignees = await resolveAllAssigneesInternal(supabase, organizationId, ob);
   if (!assignees.length) return [];
-  assignees = await filterAssigneesByServiceCodesInternal(supabase, organizationId, ob, assignees);
+  assignees = await filterAssigneesByDutyInternal(supabase, organizationId, ob, assignees);
   if (!assignees.length) return [];
 
   const hireDates = await fetchAssigneeHireDates(
@@ -708,6 +721,120 @@ async function filterAssigneesByServiceCodesInternal(
   );
 
   return assignees.filter((a) => staffWithMatchingCode.has(a.staff_id));
+}
+
+/**
+ * Narrow All Staff (or a broad group) down to the people the SOW actually
+ * names: transporters, behavior-caseload staff, ABI caseload. Empty result
+ * means the duty is N/A for this program right now — do not generate
+ * instances for everyone.
+ */
+async function filterAssigneesByDutyInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  ob: CompanyObligationRow,
+  assignees: ResolvedStaffMember[],
+): Promise<ResolvedStaffMember[]> {
+  const next = await filterAssigneesByServiceCodesInternal(supabase, organizationId, ob, assignees);
+  if (!next.length) return next;
+
+  if (dutyRequiresTransporter(ob.title)) {
+    const staffIds = next.map((a) => a.staff_id);
+    const [{ data: assignments, error: aErr }, { data: transport, error: tErr }] =
+      await Promise.all([
+        supabase
+          .from("staff_assignments")
+          .select("staff_id, service_codes")
+          .eq("organization_id", organizationId)
+          .in("staff_id", staffIds),
+        supabase
+          .from("day_program_transport")
+          .select("transport_staff_id")
+          .in("transport_staff_id", staffIds),
+      ]);
+    if (aErr) throw new Error(aErr.message);
+    if (tErr) throw new Error(tErr.message);
+    const keep = new Set<string>();
+    for (const row of (assignments ?? []) as Array<{
+      staff_id: string;
+      service_codes: string[] | null;
+    }>) {
+      if ((row.service_codes ?? []).some((c) => c.toUpperCase() === "MTP")) keep.add(row.staff_id);
+    }
+    for (const row of (transport ?? []) as Array<{ transport_staff_id: string | null }>) {
+      if (row.transport_staff_id) keep.add(row.transport_staff_id);
+    }
+    return next.filter((a) => keep.has(a.staff_id));
+  }
+
+  if (dutyRequiresBehaviorCaseload(ob.title)) {
+    const [{ data: bsc, error: bErr }, { data: targets, error: tErr }] = await Promise.all([
+      supabase
+        .from("behavior_support_clients")
+        .select("client_id")
+        .eq("organization_id", organizationId)
+        .eq("features_enabled", true),
+      supabase
+        .from("client_target_behaviors")
+        .select("client_id")
+        .eq("organization_id", organizationId),
+    ]);
+    if (bErr) throw new Error(bErr.message);
+    if (tErr) throw new Error(tErr.message);
+    const clientIds = [
+      ...new Set([
+        ...((bsc ?? []) as Array<{ client_id: string }>).map((r) => r.client_id),
+        ...((targets ?? []) as Array<{ client_id: string }>).map((r) => r.client_id),
+      ]),
+    ];
+    if (!clientIds.length) return [];
+    const staffIds = next.map((a) => a.staff_id);
+    const { data: assignments, error: aErr } = await supabase
+      .from("staff_assignments")
+      .select("staff_id, client_id")
+      .eq("organization_id", organizationId)
+      .in("staff_id", staffIds)
+      .in("client_id", clientIds);
+    if (aErr) throw new Error(aErr.message);
+    const keep = new Set(
+      ((assignments ?? []) as Array<{ staff_id: string }>).map((r) => r.staff_id),
+    );
+    return next.filter((a) => keep.has(a.staff_id));
+  }
+
+  if (dutyRequiresAbiCaseload(ob.title)) {
+    const staffIds = next.map((a) => a.staff_id);
+    const [{ data: abiClients, error: cErr }, { data: flagged, error: pErr }] = await Promise.all([
+      supabase
+        .from("clients")
+        .select("id")
+        .eq("organization_id", organizationId)
+        .eq("account_status", "active")
+        .eq("has_abi", true),
+      supabase
+        .from("profiles")
+        .select("id, requires_abi")
+        .in("id", staffIds)
+        .eq("requires_abi", true),
+    ]);
+    if (cErr) throw new Error(cErr.message);
+    if (pErr) throw new Error(pErr.message);
+    const keep = new Set(((flagged ?? []) as Array<{ id: string }>).map((r) => r.id));
+    const abiIds = ((abiClients ?? []) as Array<{ id: string }>).map((r) => r.id);
+    if (abiIds.length) {
+      const { data: assignments, error: aErr } = await supabase
+        .from("staff_assignments")
+        .select("staff_id")
+        .eq("organization_id", organizationId)
+        .in("staff_id", staffIds)
+        .in("client_id", abiIds);
+      if (aErr) throw new Error(aErr.message);
+      for (const r of (assignments ?? []) as Array<{ staff_id: string }>) keep.add(r.staff_id);
+    }
+    return next.filter((a) => keep.has(a.staff_id));
+  }
+
+  return next;
 }
 
 async function fetchClientNamesInternal(
@@ -912,6 +1039,156 @@ async function ensureSharedPeriodsInternal(
   return last;
 }
 
+async function listHomesForServiceInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  serviceCode: string,
+): Promise<Array<{ id: string; team_name: string }>> {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: codes, error: cErr } = await supabase
+    .from("client_billing_codes")
+    .select("client_id, service_end_date, authorization_pending")
+    .eq("organization_id", organizationId)
+    .eq("service_code", serviceCode);
+  if (cErr) throw new Error(cErr.message);
+  const clientIds = [
+    ...new Set(
+      (
+        (codes ?? []) as Array<{
+          client_id: string;
+          service_end_date: string | null;
+          authorization_pending: boolean | null;
+        }>
+      )
+        .filter(
+          (r) => !r.authorization_pending && !(r.service_end_date && r.service_end_date < today),
+        )
+        .map((r) => r.client_id),
+    ),
+  ];
+  if (!clientIds.length) return [];
+  const { data: clients, error: clErr } = await supabase
+    .from("clients")
+    .select("id, team_id")
+    .eq("organization_id", organizationId)
+    .eq("account_status", "active")
+    .in("id", clientIds);
+  if (clErr) throw new Error(clErr.message);
+  const teamIds = [
+    ...new Set(
+      ((clients ?? []) as Array<{ team_id: string | null }>)
+        .map((c) => c.team_id)
+        .filter((id): id is string => !!id),
+    ),
+  ];
+  if (!teamIds.length) return [];
+  const { data: teams, error: tErr } = await supabase
+    .from("teams")
+    .select("id, team_name")
+    .eq("organization_id", organizationId)
+    .in("id", teamIds);
+  if (tErr) throw new Error(tErr.message);
+  return ((teams ?? []) as Array<{ id: string; team_name: string | null }>).map((t) => ({
+    id: t.id,
+    team_name: t.team_name || "Home",
+  }));
+}
+
+/**
+ * One shared instance per home × period. Matches by period_key or by
+ * event_description = team_id. An existing org-wide instance (no team id)
+ * on the same due day is absorbed by the first home so we don't double-count.
+ */
+async function generatePerHomeInstancesInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  ob: CompanyObligationRow,
+): Promise<ObligationInstanceRow[]> {
+  const code = perHomeServiceCode(ob.title);
+  if (!code) return [];
+  const homes = await listHomesForServiceInternal(supabase, organizationId, code);
+  if (!homes.length) return [];
+
+  const dueCfg = (ob.due_day_config ?? {}) as Record<string, unknown>;
+  const rule = resolveDueRule(ob.title, ob.cadence, dueCfg);
+  let periods: Array<{ period_key: string; due_at: string }> = [];
+  if (rule && (isCalendarDueRule(rule) || rule.kind === "fixed_date")) {
+    periods = periodsToEnsure(rule);
+  } else {
+    const period = computePeriod(ob.cadence, dueCfg, new Date());
+    if (period) periods = [period];
+  }
+  if (!periods.length) return [];
+
+  const { data: existingRows, error: exErr } = await supabase
+    .from("company_obligation_instances")
+    .select("*")
+    .eq("obligation_id", ob.id)
+    .is("assignee_staff_id", null);
+  if (exErr) throw new Error(exErr.message);
+  const existing = (existingRows ?? []) as ObligationInstanceRow[];
+  const created: ObligationInstanceRow[] = [];
+
+  for (const home of homes) {
+    for (const period of periods) {
+      const desiredKey = homePeriodKey(home.team_name, home.id, period.period_key);
+      const match = existing.find(
+        (row) =>
+          row.period_key === desiredKey ||
+          (row.event_description === home.id && dueUtcDay(row.due_at) === dueUtcDay(period.due_at)),
+      );
+      if (match) continue;
+
+      const orphan = existing.find(
+        (row) => !row.event_description && dueUtcDay(row.due_at) === dueUtcDay(period.due_at),
+      );
+      if (orphan) {
+        const { data: updated, error: upErr } = await supabase
+          .from("company_obligation_instances")
+          .update({ period_key: desiredKey, event_description: home.id })
+          .eq("id", orphan.id)
+          .select("*")
+          .maybeSingle();
+        if (upErr) throw new Error(upErr.message);
+        if (updated) {
+          const next = updated as ObligationInstanceRow;
+          const idx = existing.findIndex((r) => r.id === orphan.id);
+          if (idx >= 0) existing[idx] = next;
+          created.push(next);
+        }
+        continue;
+      }
+
+      const { data: inserted, error: insErr } = await supabase
+        .from("company_obligation_instances")
+        .insert({
+          obligation_id: ob.id,
+          organization_id: organizationId,
+          period_key: desiredKey,
+          due_at: period.due_at,
+          status: "pending",
+          event_description: home.id,
+        })
+        .select("*")
+        .maybeSingle();
+      if (insErr) {
+        if ((insErr as { code?: string }).code === "23505") continue;
+        throw new Error(insErr.message);
+      }
+      if (!inserted) continue;
+      const row = inserted as ObligationInstanceRow;
+      existing.push(row);
+      created.push(row);
+      try {
+        await scheduleRemindersInternal(supabase, organizationId, row.id, ob);
+      } catch (remErr) {
+        console.error(`[obligations] reminder schedule failed for ${ob.id}:`, remErr);
+      }
+    }
+  }
+  return created;
+}
+
 export async function generateNextInstanceInternal(
   supabase: AnySupabase,
   organizationId: string,
@@ -922,6 +1199,11 @@ export async function generateNextInstanceInternal(
 
   if (ob.scope === "staff_per_client") {
     const created = await generatePerClientInstancesInternal(supabase, organizationId, ob);
+    return created[0] ?? null;
+  }
+
+  if (perHomeServiceCode(ob.title)) {
+    const created = await generatePerHomeInstancesInternal(supabase, organizationId, ob);
     return created[0] ?? null;
   }
 
@@ -1305,6 +1587,53 @@ const obligationInputSchema = z.object({
     .default([]),
 });
 
+async function ensureStandingDutiesInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+): Promise<void> {
+  const { data: existing, error: exErr } = await supabase
+    .from("company_obligations")
+    .select("title")
+    .eq("organization_id", organizationId);
+  if (exErr) throw new Error(exErr.message);
+  const have = new Set(((existing ?? []) as Array<{ title: string }>).map((r) => r.title));
+  const missing = STANDING_SOW_DUTIES.filter((d) => !have.has(d.title));
+  if (!missing.length) return;
+
+  let allStaffId: string | null = null;
+  if (missing.some((d) => d.assign_all_staff)) {
+    allStaffId = await ensureAllStaffGroupInternal(supabase, organizationId);
+  }
+
+  for (const d of missing) {
+    const { error: insErr } = await supabase.from("company_obligations").insert({
+      organization_id: organizationId,
+      title: d.title,
+      description: d.description,
+      source_policy_section: d.source_policy_section,
+      cadence: d.cadence,
+      due_day_config: d.due_day_config,
+      reminder_days_before: d.reminder_days_before,
+      evidence_type: d.evidence_type,
+      attestation_text: d.attestation_text,
+      requires_individual_completion: d.requires_individual_completion,
+      assigned_to_groups: d.assign_all_staff && allStaffId ? [allStaffId] : [],
+      assigned_to_users: [],
+      assignee_role: d.assignee_role,
+      scope: d.scope,
+      target_service_codes: d.target_service_codes,
+      notify_manager_on_complete: true,
+      notify_manager_on_overdue: true,
+      active: true,
+      source: "sow",
+      is_locked: true,
+    });
+    if (insErr) {
+      console.warn(`[obligations] could not seed "${d.title}":`, insErr.message);
+    }
+  }
+}
+
 export const listCompanyObligations = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ organizationId: z.string().uuid() }).parse(i))
@@ -1314,6 +1643,11 @@ export const listCompanyObligations = createServerFn({ method: "POST" })
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
 
     await checkAndMarkOverdueInternal(supabase, data.organizationId);
+    try {
+      await ensureStandingDutiesInternal(supabase, data.organizationId);
+    } catch (e) {
+      console.warn("[obligations] standing-duty bootstrap failed:", e);
+    }
 
     const { data: obligations, error } = await supabase
       .from("company_obligations")
@@ -1424,7 +1758,7 @@ export const listObligationAssignees = createServerFn({ method: "POST" })
 
     const ob = await fetchObligation(supabase, data.organizationId, data.obligationId);
     const assignees = await resolveAllAssigneesInternal(supabase, data.organizationId, ob);
-    return filterAssigneesByServiceCodesInternal(supabase, data.organizationId, ob, assignees);
+    return filterAssigneesByDutyInternal(supabase, data.organizationId, ob, assignees);
   });
 
 /** Count of an obligation's assignees with no hire_date and no start_date on
@@ -1447,12 +1781,7 @@ export const countObligationAssigneesMissingHireDate = createServerFn({ method: 
 
     const ob = await fetchObligation(supabase, data.organizationId, data.obligationId);
     let assignees = await resolveAllAssigneesInternal(supabase, data.organizationId, ob);
-    assignees = await filterAssigneesByServiceCodesInternal(
-      supabase,
-      data.organizationId,
-      ob,
-      assignees,
-    );
+    assignees = await filterAssigneesByDutyInternal(supabase, data.organizationId, ob, assignees);
     if (!assignees.length) return { missing: 0 };
 
     const { data: rows, error } = await supabase
@@ -2540,4 +2869,153 @@ export const waiveInstance = createServerFn({ method: "POST" })
     await resolveInstanceNotifications(supabase, data.instanceId);
 
     return { ok: true };
+  });
+
+/**
+ * PCSP upload / activation starts the Support Strategies clock (30 days)
+ * for every staff member currently assigned to the Person. Safe to call
+ * more than once — open instances are not duplicated.
+ */
+export async function onPcspActivatedInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  clientId: string,
+): Promise<void> {
+  const { data: obligations, error } = await supabase
+    .from("company_obligations")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("active", true)
+    .eq("cadence", "per_event");
+  if (error) throw new Error(error.message);
+
+  const matches = ((obligations ?? []) as CompanyObligationRow[]).filter((o) =>
+    o.title.startsWith("Support Strategies"),
+  );
+  for (const ob of matches) {
+    await generateEventInstancesForClientInternal(supabase, organizationId, ob, clientId);
+  }
+}
+
+async function generateEventInstancesForClientInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+  ob: CompanyObligationRow,
+  clientId: string,
+): Promise<void> {
+  const cfg = (ob.due_day_config ?? {}) as Record<string, unknown>;
+  const days = Number(cfg.days_after_trigger ?? cfg.days_after_event ?? 30);
+  const todayUTC = new Date(
+    Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()),
+  );
+  const due = addDaysUTC(todayUTC, Number.isFinite(days) ? days : 30);
+
+  const { data: assignments, error: aErr } = await supabase
+    .from("staff_assignments")
+    .select("staff_id, service_codes")
+    .eq("organization_id", organizationId)
+    .eq("client_id", clientId);
+  if (aErr) throw new Error(aErr.message);
+  const qualifying = (
+    (assignments ?? []) as Array<{ staff_id: string; service_codes: string[] | null }>
+  ).filter((a) =>
+    arraysOverlapCaseInsensitive(ob.target_service_codes ?? [], a.service_codes ?? []),
+  );
+  if (!qualifying.length) return;
+
+  const names = await fetchClientNamesInternal(supabase, [clientId]);
+  const clientName = names.get(clientId) ?? "Client";
+  const staffIds = Array.from(new Set(qualifying.map((a) => a.staff_id)));
+  const { data: dirRows, error: dErr } = await supabase
+    .from("org_member_directory")
+    .select("id, full_name")
+    .in("id", staffIds);
+  if (dErr) throw new Error(dErr.message);
+  const staffNameById = new Map(
+    ((dirRows ?? []) as Array<{ id: string; full_name: string | null }>).map((r) => [
+      r.id,
+      r.full_name ?? "Unknown",
+    ]),
+  );
+
+  const periodKey = `${clientName} — PCSP ${formatShort(todayUTC)}`;
+  const eventDescription = `PCSP activated ${todayUTC.toISOString().slice(0, 10)}`;
+
+  for (const a of qualifying) {
+    const { data: existingOpen, error: openErr } = await supabase
+      .from("company_obligation_instances")
+      .select("id")
+      .eq("obligation_id", ob.id)
+      .eq("assignee_staff_id", a.staff_id)
+      .eq("client_id", clientId)
+      .in("status", ["pending", "overdue"])
+      .maybeSingle();
+    if (openErr) throw new Error(openErr.message);
+    if (existingOpen) continue;
+
+    const { data: inserted, error: insErr } = await supabase
+      .from("company_obligation_instances")
+      .insert({
+        obligation_id: ob.id,
+        organization_id: organizationId,
+        period_key: periodKey,
+        due_at: endOfDayUTC(due),
+        status: "pending",
+        assignee_staff_id: a.staff_id,
+        client_id: clientId,
+        client_name: clientName,
+        event_description: eventDescription,
+      })
+      .select("*")
+      .maybeSingle();
+    if (insErr) {
+      if ((insErr as { code?: string }).code === "23505") continue;
+      throw new Error(insErr.message);
+    }
+    if (!inserted) continue;
+
+    const { error: assErr } = await supabase.from("company_obligation_instance_assignees").upsert(
+      [
+        {
+          instance_id: inserted.id,
+          organization_id: organizationId,
+          staff_id: a.staff_id,
+          staff_name: staffNameById.get(a.staff_id) ?? "Unknown",
+          staff_role: "employee",
+          client_id: clientId,
+          client_name: clientName,
+        },
+      ],
+      { onConflict: "instance_id,staff_id", ignoreDuplicates: true },
+    );
+    if (assErr) throw new Error(assErr.message);
+    try {
+      await scheduleRemindersInternal(supabase, organizationId, inserted.id, ob);
+    } catch (remErr) {
+      console.error(`[obligations] reminder schedule failed for ${ob.id}:`, remErr);
+    }
+  }
+}
+
+export const onPcspActivated = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        organizationId: z.string().uuid(),
+        clientId: z.string().uuid(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return { ok: false };
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+    try {
+      await onPcspActivatedInternal(supabase, data.organizationId, data.clientId);
+      return { ok: true };
+    } catch (e) {
+      console.warn("[obligations] PCSP event clock failed:", e);
+      return { ok: false };
+    }
   });

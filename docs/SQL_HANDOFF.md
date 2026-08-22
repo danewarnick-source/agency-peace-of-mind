@@ -3209,3 +3209,55 @@ these tables through an untyped Supabase client cast (same pattern used
 elsewhere in this codebase for tables ahead of the generated types), so
 the app works correctly either way — it's a type-safety gap, not a
 functional blocker.
+
+---
+
+## ACTION — Standing SOW duties for the DSPD review tool (2026-08-22)
+
+**Clear the editor before pasting.**
+
+**What this is for:** Completes the Compliance register after PR 133.
+Seeds eight standing / previously-untracked DHHS91172 duties for True
+North Supports (`7fabcf5d-f826-487f-8730-8b0c3f1969bb`). The app also
+inserts these the first time an org opens the register; this block is
+the live-DB copy so TNS does not have to wait for that visit.
+
+Titles (must match the catalog exactly):
+- Emergency Management and Business Continuity Plan
+- Annual Emergency Management Plan Training
+- Staff Conflict of Interest Process
+- Person Discharge Process
+- Internal Quality Management Plan
+- General, Professional, and Automobile Liability Insurance
+- DHHS Code of Conduct — Signed
+- ABI Training — Before Working Alone
+
+Every insert is `WHERE NOT EXISTS` on `(organization_id, title)`.
+
+**To apply:** paste the full contents of
+`supabase/migrations/20260822010000_seed_standing_sow_duties.sql`
+here and run it.
+
+**What you'll see:** `Success. No rows returned` (a `DO $$` block).
+
+**Confirm (paste this next, after clearing the editor):**
+
+```sql
+SELECT string_agg(title, ' | ' ORDER BY title) AS standing_titles
+FROM public.company_obligations
+WHERE organization_id = '7fabcf5d-f826-487f-8730-8b0c3f1969bb'
+  AND title IN (
+    'Emergency Management and Business Continuity Plan',
+    'Annual Emergency Management Plan Training',
+    'Staff Conflict of Interest Process',
+    'Person Discharge Process',
+    'Internal Quality Management Plan',
+    'General, Professional, and Automobile Liability Insurance',
+    'DHHS Code of Conduct — Signed',
+    'ABI Training — Before Working Alone'
+  );
+```
+
+You should see one row with all eight titles joined by ` | `. If any
+title is missing, re-run the seed block (it is idempotent).
+

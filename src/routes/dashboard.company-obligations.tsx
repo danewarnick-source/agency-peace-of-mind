@@ -26,6 +26,8 @@ import {
   getOrgServiceFootprint,
   type ObligationListItem,
 } from "@/lib/company-obligations.functions";
+import { getAuditEvidenceSnapshot } from "@/lib/audit-evidence.functions";
+import { EMPTY_AUDIT_EVIDENCE, type AuditEvidenceSnapshot } from "@/lib/audit-evidence";
 import { listStaffGroups, type StaffGroupRow } from "@/lib/staff-groups.functions";
 import {
   ObligationCard,
@@ -119,6 +121,7 @@ function ObligationsTab({ orgId }: { orgId: string }) {
   const listFn = useServerFn(listCompanyObligations);
   const listGroupsFn = useServerFn(listStaffGroups);
   const footprintFn = useServerFn(getOrgServiceFootprint);
+  const evidenceFn = useServerFn(getAuditEvidenceSnapshot);
 
   const { data: obligations = [], isLoading } = useQuery<ObligationListItem[]>({
     queryKey: ["company-obligations", orgId],
@@ -135,6 +138,12 @@ function ObligationsTab({ orgId }: { orgId: string }) {
   const { data: footprint = { codes: [] as string[], hasAbiClients: false } } = useQuery({
     queryKey: ["org-service-footprint", orgId],
     queryFn: () => footprintFn({ data: { organizationId: orgId } }),
+  });
+
+  const { data: evidence = EMPTY_AUDIT_EVIDENCE } = useQuery<AuditEvidenceSnapshot>({
+    queryKey: ["audit-evidence", orgId],
+    queryFn: () => evidenceFn({ data: { organizationId: orgId } }),
+    staleTime: 30_000,
   });
 
   const assignedUserIds = useMemo(() => {
@@ -185,6 +194,7 @@ function ObligationsTab({ orgId }: { orgId: string }) {
     "all",
   );
   const [showNa, setShowNa] = useState(false);
+  const [personId, setPersonId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingObligation, setEditingObligation] = useState<ObligationWithInstance | null>(null);
 
@@ -482,6 +492,7 @@ function ObligationsTab({ orgId }: { orgId: string }) {
               includeNa={showNa}
               obligations={register}
               search={search}
+              evidence={evidence}
               {...listProps}
             />
           </TabsContent>
@@ -492,6 +503,9 @@ function ObligationsTab({ orgId }: { orgId: string }) {
               includeNa={showNa}
               obligations={register}
               search={search}
+              evidence={evidence}
+              selectedPersonId={personId}
+              onSelectPerson={setPersonId}
               {...listProps}
             />
           </TabsContent>
@@ -502,6 +516,7 @@ function ObligationsTab({ orgId }: { orgId: string }) {
               includeNa={showNa}
               obligations={register}
               search={search}
+              evidence={evidence}
               {...listProps}
             />
           </TabsContent>
@@ -512,6 +527,7 @@ function ObligationsTab({ orgId }: { orgId: string }) {
               includeNa={showNa}
               obligations={register}
               search={search}
+              evidence={evidence}
               {...listProps}
             />
           </TabsContent>

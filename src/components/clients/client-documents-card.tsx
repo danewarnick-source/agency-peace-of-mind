@@ -2,14 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import {
-  FileText,
-  Loader2,
-  Sparkles,
-  Upload,
-  ExternalLink,
-  X,
-} from "lucide-react";
+import { FileText, Loader2, Sparkles, Upload, ExternalLink, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +47,9 @@ const CLIENT_DOC_TYPES = [
   { value: "hrc_approval", label: "HRR / HRC / Rights Restriction" },
   { value: "certification", label: "Consent" },
   { value: "room_board_agreement", label: "Room and Board Agreement (HHS)" },
+  { value: "lease_agreement", label: "Lease agreement (RHS)" },
+  { value: "medical_exam", label: "Medical examination record" },
+  { value: "dental_exam", label: "Dental examination record" },
   { value: "other", label: "Other" },
 ];
 
@@ -98,8 +94,17 @@ export function ClientDocumentsCard({
   const getDocFn = useServerFn(getDocument);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [offerDocId, setOfferDocId] = useState<string | null>(null);
-  const [preview, setPreview] = useState<{ fileName: string; mimeType: string | null; signedUrl: string } | null>(null);
-  const [dating, setDating] = useState<{ id: string; kind: "client" | "nectar"; documentType: string; documentTypeLabel: string } | null>(null);
+  const [preview, setPreview] = useState<{
+    fileName: string;
+    mimeType: string | null;
+    signedUrl: string;
+  } | null>(null);
+  const [dating, setDating] = useState<{
+    id: string;
+    kind: "client" | "nectar";
+    documentType: string;
+    documentTypeLabel: string;
+  } | null>(null);
 
   const invalidateAll = () => {
     qc.invalidateQueries({ queryKey: ["client-docs", orgId, clientId] });
@@ -129,32 +134,37 @@ export function ClientDocumentsCard({
           .eq("client_id", clientId)
           .order("uploaded_at", { ascending: false }),
       ]);
-      const nectarDocs: DocRow[] = (nectarRes?.documents ?? []).map((d: Record<string, unknown>) => ({
-        id: d.id as string,
-        document_type: (d.document_type as string) ?? "other",
-        title: (d.title as string) ?? (d.file_name as string) ?? "Document",
-        version: (d.version as number) ?? 1,
-        fiscal_year: (d.fiscal_year as string | null) ?? null,
-        file_name: (d.file_name as string) ?? "",
-        parse_status: (d.parse_status as string) ?? "",
-        mime_type: (d.mime_type as string | null) ?? null,
-        uploaded_by_name: (d.uploaded_by_name as string | null) ?? null,
-        created_at: (d.created_at as string) ?? new Date().toISOString(),
-        source: "nectar",
-      }));
-      const clientDocs: DocRow[] = ((clientRes.data ?? []) as Array<Record<string, unknown>>).map((d) => ({
-        id: d.id as string,
-        document_type: ((d.document_type as string) ?? "other").toLowerCase(),
-        title: ((d.document_type as string) ?? "Document").toUpperCase() + " — " + clientName,
-        version: 1,
-        fiscal_year: null,
-        file_name: (d.file_name as string) ?? "",
-        parse_status: "",
-        uploaded_by_name: null,
-        created_at: ((d.uploaded_at as string) ?? (d.created_at as string) ?? new Date().toISOString()),
-        source: "client",
-        storage_path: ((d.storage_path as string) ?? (d.file_url as string)) ?? "",
-      }));
+      const nectarDocs: DocRow[] = (nectarRes?.documents ?? []).map(
+        (d: Record<string, unknown>) => ({
+          id: d.id as string,
+          document_type: (d.document_type as string) ?? "other",
+          title: (d.title as string) ?? (d.file_name as string) ?? "Document",
+          version: (d.version as number) ?? 1,
+          fiscal_year: (d.fiscal_year as string | null) ?? null,
+          file_name: (d.file_name as string) ?? "",
+          parse_status: (d.parse_status as string) ?? "",
+          mime_type: (d.mime_type as string | null) ?? null,
+          uploaded_by_name: (d.uploaded_by_name as string | null) ?? null,
+          created_at: (d.created_at as string) ?? new Date().toISOString(),
+          source: "nectar",
+        }),
+      );
+      const clientDocs: DocRow[] = ((clientRes.data ?? []) as Array<Record<string, unknown>>).map(
+        (d) => ({
+          id: d.id as string,
+          document_type: ((d.document_type as string) ?? "other").toLowerCase(),
+          title: ((d.document_type as string) ?? "Document").toUpperCase() + " — " + clientName,
+          version: 1,
+          fiscal_year: null,
+          file_name: (d.file_name as string) ?? "",
+          parse_status: "",
+          uploaded_by_name: null,
+          created_at:
+            (d.uploaded_at as string) ?? (d.created_at as string) ?? new Date().toISOString(),
+          source: "client",
+          storage_path: (d.storage_path as string) ?? (d.file_url as string) ?? "",
+        }),
+      );
       const merged = [...nectarDocs, ...clientDocs].sort((a, b) =>
         (b.created_at ?? "").localeCompare(a.created_at ?? ""),
       );
@@ -168,7 +178,10 @@ export function ClientDocumentsCard({
     mutationFn: async (row: DocRow) => {
       if (row.source === "client") {
         if (row.storage_path) {
-          await supabase.storage.from("client-documents").remove([row.storage_path]).catch(() => null);
+          await supabase.storage
+            .from("client-documents")
+            .remove([row.storage_path])
+            .catch(() => null);
         }
         const { error } = await supabase.from("client_documents").delete().eq("id", row.id);
         if (error) throw error;
@@ -182,7 +195,6 @@ export function ClientDocumentsCard({
     },
     onError: (e: Error) => toast.error(e.message),
   });
-
 
   return (
     <Card>
@@ -214,11 +226,15 @@ export function ClientDocumentsCard({
           <NectarDocumentActionsDialog
             documentId={offerDocId}
             open={!!offerDocId}
-            onOpenChange={(v) => { if (!v) setOfferDocId(null); }}
+            onOpenChange={(v) => {
+              if (!v) setOfferDocId(null);
+            }}
           />
           <DocumentEffectiveDatingDialog
             open={!!dating}
-            onOpenChange={(v) => { if (!v) setDating(null); }}
+            onOpenChange={(v) => {
+              if (!v) setDating(null);
+            }}
             organizationId={orgId}
             kind={dating?.kind ?? "client"}
             documentId={dating?.id ?? null}
@@ -229,16 +245,17 @@ export function ClientDocumentsCard({
           />
           <DocumentPreviewDialog
             open={!!preview}
-            onOpenChange={(v) => { if (!v) setPreview(null); }}
+            onOpenChange={(v) => {
+              if (!v) setPreview(null);
+            }}
             doc={preview}
           />
         </div>
         <p className="text-xs text-muted-foreground">
-          Guardian papers, PCSP, 1056, intake/referrals, assessments, consents.
-          NECTAR parses each file on upload — billing fields from a PCSP/1056
-          flow into the billing layer; the file itself stays here and appears in{" "}
-          <span className="font-medium text-foreground">Company Docs</span> tagged
-          to {clientName}.
+          Guardian papers, PCSP, 1056, intake/referrals, assessments, consents. NECTAR parses each
+          file on upload — billing fields from a PCSP/1056 flow into the billing layer; the file
+          itself stays here and appears in{" "}
+          <span className="font-medium text-foreground">Company Docs</span> tagged to {clientName}.
         </p>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -249,8 +266,7 @@ export function ClientDocumentsCard({
         )}
         {!isLoading && docs.length === 0 && (
           <div className="rounded-lg border border-dashed border-border/60 bg-card/30 p-4 text-center text-xs text-muted-foreground">
-            No client documents yet. Upload a PCSP, 1056, or intake to seed
-            NECTAR for {clientName}.
+            No client documents yet. Upload a PCSP, 1056, or intake to seed NECTAR for {clientName}.
           </div>
         )}
         {docs.map((d) => (
@@ -267,10 +283,14 @@ export function ClientDocumentsCard({
                     {d.document_type.replace(/_/g, " ")}
                   </Badge>
                   {d.fiscal_year && (
-                    <Badge variant="outline" className="text-[10px]">{d.fiscal_year}</Badge>
+                    <Badge variant="outline" className="text-[10px]">
+                      {d.fiscal_year}
+                    </Badge>
                   )}
                   {d.version > 1 && (
-                    <Badge variant="outline" className="text-[10px]">v{d.version}</Badge>
+                    <Badge variant="outline" className="text-[10px]">
+                      v{d.version}
+                    </Badge>
                   )}
                   <ParseStatus status={d.parse_status} />
                 </div>
@@ -291,7 +311,11 @@ export function ClientDocumentsCard({
                       .from("client-documents")
                       .createSignedUrl(d.storage_path, 300);
                     if (signed?.signedUrl) {
-                      setPreview({ fileName: d.file_name, mimeType: d.mime_type ?? null, signedUrl: signed.signedUrl });
+                      setPreview({
+                        fileName: d.file_name,
+                        mimeType: d.mime_type ?? null,
+                        signedUrl: signed.signedUrl,
+                      });
                     } else toast.error("Could not generate a link for this file.");
                     return;
                   }
@@ -299,7 +323,8 @@ export function ClientDocumentsCard({
                     const res = await getDocFn({ data: { documentId: d.id } });
                     const url = (res as { signedUrl?: string | null })?.signedUrl;
                     const mime =
-                      ((res as { document?: { mime_type?: string | null } })?.document?.mime_type ?? d.mime_type) ??
+                      (res as { document?: { mime_type?: string | null } })?.document?.mime_type ??
+                      d.mime_type ??
                       null;
                     if (url) {
                       setPreview({ fileName: d.file_name, mimeType: mime, signedUrl: url });
@@ -354,7 +379,12 @@ function ParseStatus({ status }: { status: string }) {
         <Loader2 className="mr-1 h-2.5 w-2.5 animate-spin" /> {status}
       </Badge>
     );
-  if (status === "failed") return <Badge variant="destructive" className="text-[10px]">parse failed</Badge>;
+  if (status === "failed")
+    return (
+      <Badge variant="destructive" className="text-[10px]">
+        parse failed
+      </Badge>
+    );
   return null;
 }
 
@@ -396,7 +426,10 @@ function UploadDocDialog({
         const path = `${orgId}/${clientId}/pcsp/${Date.now()}_${safe}`;
         const up = await supabase.storage
           .from("client-documents")
-          .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
+          .upload(path, file, {
+            contentType: file.type || "application/octet-stream",
+            upsert: false,
+          });
         if (up.error) throw up.error;
         const att = await attachClient({
           data: {
@@ -431,7 +464,9 @@ function UploadDocDialog({
         toast.success(`PCSP uploaded — visible in Care and Files`);
         const newId = pcsp.id;
         const chosenType = docType;
-        setTitle(""); setFile(null); setFiscalYear("");
+        setTitle("");
+        setFile(null);
+        setFiscalYear("");
         onOpenChange(false);
         onUploaded(newId, "client", chosenType);
         return;
@@ -451,7 +486,9 @@ function UploadDocDialog({
           : `Uploaded — NECTAR extracted ${extractedN} field${extractedN === 1 ? "" : "s"}${sugN > 0 ? ` · ${sugN} need review` : ""}`,
       );
       const chosenType = docType;
-      setTitle(""); setFile(null); setFiscalYear("");
+      setTitle("");
+      setFile(null);
+      setFiscalYear("");
       onOpenChange(false);
       onUploaded(r.document?.id, "nectar", chosenType);
     },
@@ -481,10 +518,14 @@ function UploadDocDialog({
           <div className="space-y-1">
             <Label>Document type</Label>
             <Select value={docType} onValueChange={setDocType}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {CLIENT_DOC_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -509,7 +550,9 @@ function UploadDocDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
           <Button
             disabled={!file || mut.isPending}
             onClick={() => mut.mutate()}

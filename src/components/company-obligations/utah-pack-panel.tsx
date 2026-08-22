@@ -1,10 +1,18 @@
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
+import {
   PACK_STATUS_LABEL,
-  UTAH_DSPD_COVERAGE,
   UTAH_DSPD_PACK,
   coverageCounts,
   packIntegrityErrors,
+  sectionedCoverage,
   type PackCoverageRow,
   type PackCoverageStatus,
 } from "@/lib/utah-dspd-pack";
@@ -17,23 +25,36 @@ const STATUS_TONE: Record<PackCoverageStatus, string> = {
   gap: "border-transparent bg-destructive/15 text-destructive",
 };
 
-const SOURCE_LABEL: Record<PackCoverageRow["source"], string> = {
-  sow: "Scope of Work",
-  cst: "Client Service Terms",
-  review_tool: "In-depth Review Tool",
-};
-
 function StatusBadge({ status }: { status: PackCoverageStatus }) {
   return <Badge className={STATUS_TONE[status]}>{PACK_STATUS_LABEL[status]}</Badge>;
+}
+
+function CoverageRow({ row }: { row: PackCoverageRow }) {
+  return (
+    <div className="grid gap-1 px-3 py-2.5 sm:grid-cols-[9rem_1fr_auto]">
+      <p className="text-xs font-medium text-muted-foreground">{row.citation}</p>
+      <div>
+        <p className="text-sm font-medium text-foreground">{row.title}</p>
+        <p className="text-xs text-muted-foreground">{row.note}</p>
+        {row.catalog_titles && row.catalog_titles.length > 0 && (
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Duty: {row.catalog_titles.join(" · ")}
+          </p>
+        )}
+      </div>
+      <div className="sm:justify-self-end">
+        <StatusBadge status={row.status} />
+      </div>
+    </div>
+  );
 }
 
 export function UtahPackPanel() {
   const counts = coverageCounts();
   const integrity = packIntegrityErrors();
-  const bySource = (["sow", "cst", "review_tool"] as const).map((source) => ({
-    source,
-    rows: UTAH_DSPD_COVERAGE.filter((r) => r.source === source),
-  }));
+  const sections = useMemo(() => sectionedCoverage(), []);
+  const allIds = useMemo(() => sections.map((s) => s.id), [sections]);
+  const [open, setOpen] = useState<string[]>([]);
 
   return (
     <div className="space-y-6">
@@ -71,9 +92,8 @@ export function UtahPackPanel() {
 
       {counts.gap === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No open pack gaps. Article 1 contractor shalls are either a locked duty, a live HIVE
-          artifact, a when-applicable file, or an intentional omit (definitions, operational
-          constraints, event-only cooperation).
+          Open one section at a time. Article 1 follows the SOW. TNS-awarded codes are marked. Other
+          codes stay encoded for the next tenant — TNS should not complete those rows.
         </p>
       ) : (
         <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -94,33 +114,54 @@ export function UtahPackPanel() {
         </div>
       )}
 
-      {bySource.map(({ source, rows }) => (
-        <section key={source} className="space-y-2">
-          <h3 className="text-sm font-semibold text-foreground">
-            {SOURCE_LABEL[source]}
-            <span className="ml-2 font-normal text-muted-foreground">({rows.length})</span>
-          </h3>
-          <div className="divide-y divide-border rounded-xl border border-border">
-            {rows.map((row) => (
-              <div key={row.id} className="grid gap-1 px-3 py-2.5 sm:grid-cols-[9rem_1fr_auto]">
-                <p className="text-xs font-medium text-muted-foreground">{row.citation}</p>
-                <div>
-                  <p className="text-sm font-medium text-foreground">{row.title}</p>
-                  <p className="text-xs text-muted-foreground">{row.note}</p>
-                  {row.catalog_titles && row.catalog_titles.length > 0 && (
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      Duty: {row.catalog_titles.join(" · ")}
-                    </p>
-                  )}
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={() => setOpen(allIds)}>
+          Expand all
+        </Button>
+        <Button type="button" variant="outline" size="sm" onClick={() => setOpen([])}>
+          Collapse all
+        </Button>
+      </div>
+
+      <Accordion type="multiple" value={open} onValueChange={setOpen} className="space-y-2">
+        {sections.map((section) => {
+          const local = coverageCounts(section.rows);
+          return (
+            <AccordionItem
+              key={section.id}
+              value={section.id}
+              className="overflow-hidden rounded-xl border border-border border-b-0 px-3"
+            >
+              <AccordionTrigger className="py-3 hover:no-underline">
+                <div className="flex min-w-0 flex-1 flex-col items-start gap-1 pr-3 text-left">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-sm font-semibold text-foreground">{section.title}</span>
+                    <Badge variant="secondary">{section.rows.length}</Badge>
+                    {section.tnsPrimary && <Badge variant="outline">TNS</Badge>}
+                    {local.gap > 0 && (
+                      <Badge className={STATUS_TONE.gap}>
+                        {local.gap} gap{local.gap === 1 ? "" : "s"}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs font-normal text-muted-foreground">{section.hint}</p>
+                  <p className="text-[11px] font-normal text-muted-foreground">
+                    {local.encoded} encoded · {local.live_artifact} live · {local.when_applicable}{" "}
+                    when applicable · {local.intentional_omit} omitted
+                  </p>
                 </div>
-                <div className="sm:justify-self-end">
-                  <StatusBadge status={row.status} />
+              </AccordionTrigger>
+              <AccordionContent className="pb-0">
+                <div className="-mx-3 divide-y divide-border border-t border-border">
+                  {section.rows.map((row) => (
+                    <CoverageRow key={row.id} row={row} />
+                  ))}
                 </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      ))}
+              </AccordionContent>
+            </AccordionItem>
+          );
+        })}
+      </Accordion>
     </div>
   );
 }

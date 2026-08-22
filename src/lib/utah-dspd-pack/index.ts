@@ -13,8 +13,17 @@
 import { allSowCatalogEntries } from "../sow-obligation-catalog";
 import { DSPD_AUDIT_ITEMS } from "../dspd-audit-tool";
 import { UTAH_DSPD_COVERAGE, type PackCoverageRow, type PackCoverageStatus } from "./coverage";
+import { unsectionedRowIds } from "./sections";
 
 export { UTAH_DSPD_COVERAGE, type PackCoverageRow, type PackCoverageStatus } from "./coverage";
+export {
+  PACK_SECTIONS,
+  packSectionId,
+  rowsForSection,
+  sectionedCoverage,
+  type PackSection,
+  type PackSectionId,
+} from "./sections";
 
 export const UTAH_DSPD_PACK_ID = "utah-dspd-dhhs91172";
 
@@ -96,6 +105,10 @@ export function packIntegrityErrors(): string[] {
     if (!coveredAudit.has(item.id)) {
       errors.push(`review-tool row has no coverage row: ${item.id}`);
     }
+  }
+
+  for (const id of unsectionedRowIds()) {
+    errors.push(`coverage row has no review section: ${id}`);
   }
 
   return errors;

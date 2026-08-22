@@ -1,17 +1,33 @@
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, CheckCircle2, Circle, AlertTriangle, MinusCircle } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ArrowRight, CheckCircle2, Circle, AlertTriangle, MinusCircle, Home } from "lucide-react";
 import {
   AUDIT_PART_HINT,
   DSPD_AUDIT_ITEMS,
   itemApplies,
+  itemAppliesToPerson,
   naReason,
   obligationTitleMatches,
   type AuditItem,
   type AuditPart,
   type OrgFootprint,
 } from "@/lib/dspd-audit-tool";
+import {
+  EMPTY_AUDIT_EVIDENCE,
+  personVerdictForItem,
+  toneFromVerdict,
+  type AuditEvidenceItem,
+  type AuditEvidenceSnapshot,
+  type PersonAuditEvidence,
+} from "@/lib/audit-evidence";
 import { FulfillmentBadge, RollupStatus, catalogFor } from "./obligation-meta";
 import { ObligationCard, type ObligationWithInstance } from "./obligation-card";
 import type { ObligationListItem } from "@/lib/company-obligations.functions";
@@ -20,8 +36,12 @@ function itemStatus(
   item: AuditItem,
   applies: boolean,
   linked: ObligationListItem[],
+  live: AuditEvidenceItem | null,
 ): { tone: "na" | "overdue" | "open" | "met" | "hive" | "gap"; label: string } {
   if (!applies) return { tone: "na", label: "N/A" };
+  if (live && live.verdict !== "unknown") {
+    return { tone: toneFromVerdict(live.verdict), label: live.label };
+  }
   const overdue = linked.reduce((n, o) => n + o.rollup.overdue_count, 0);
   const open = linked.reduce((n, o) => n + o.rollup.open_count, 0);
   if (overdue > 0) return { tone: "overdue", label: `${overdue} overdue` };
@@ -51,6 +71,9 @@ export function AuditPartPanel({
   publishedFormIds,
   onEdit,
   search = "",
+  evidence = EMPTY_AUDIT_EVIDENCE,
+  selectedPersonId = null,
+  onSelectPerson,
 }: {
   part: AuditPart;
   footprint: OrgFootprint;
@@ -62,11 +85,20 @@ export function AuditPartPanel({
   publishedFormIds: Set<string>;
   onEdit: (ob: ObligationWithInstance) => void;
   search?: string;
+  evidence?: AuditEvidenceSnapshot;
+  selectedPersonId?: string | null;
+  onSelectPerson?: (id: string | null) => void;
 }) {
+  const person = useMemo(
+    () => evidence.people.find((p) => p.client_id === selectedPersonId) ?? null,
+    [evidence.people, selectedPersonId],
+  );
+
   const items = useMemo(() => {
     const q = search.trim().toLowerCase();
     return DSPD_AUDIT_ITEMS.filter((i) => i.part === part).filter((i) => {
-      if (!includeNa && !itemApplies(i, footprint)) return false;
+      const applies = person ? itemAppliesToPerson(i, person) : itemApplies(i, footprint);
+      if (!includeNa && !applies) return false;
       if (!q) return true;
       return (
         i.prompt.toLowerCase().includes(q) ||
@@ -76,46 +108,109 @@ export function AuditPartPanel({
         i.applies_to_codes.some((c) => c.toLowerCase().includes(q))
       );
     });
-  }, [part, footprint, includeNa, search]);
+  }, [part, footprint, includeNa, search, person]);
 
   const linkedFor = (item: AuditItem) =>
     obligations.filter((o) =>
       item.obligation_titles.some((t) => obligationTitleMatches(o.title, t)),
     );
 
-  if (items.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-        {search.trim()
-          ? "No review-tool rows in this part match your search."
-          : "No review-tool rows in this part apply to the services this program provides. Use Show N/A to see the hidden rows."}
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">{AUDIT_PART_HINT[part]}</p>
-      <div className="grid gap-3">
-        {items.map((item) => {
-          const applies = itemApplies(item, footprint);
-          const linked = linkedFor(item);
-          return (
-            <AuditItemRow
-              key={item.id}
-              item={item}
-              applies={applies}
-              linked={linked}
-              orgId={orgId}
-              groupNamesById={groupNamesById}
-              userNamesById={userNamesById}
-              publishedFormIds={publishedFormIds}
-              onEdit={onEdit}
-              footprint={footprint}
-            />
-          );
-        })}
+      {part === "II" && onSelectPerson && (
+        <PersonPacketPicker
+          people={evidence.people}
+          selectedPersonId={selectedPersonId}
+          onSelectPerson={onSelectPerson}
+        />
+      )}
+      {items.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+          {search.trim()
+            ? "No review-tool rows in this part match your search."
+            : person
+              ? "No review-tool rows in this part apply to this Person's services."
+              : "No review-tool rows in this part apply to the services this program provides. Use Show N/A to see the hidden rows."}
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {items.map((item) => {
+            const applies = person
+              ? itemAppliesToPerson(item, person)
+              : itemApplies(item, footprint);
+            const linked = linkedFor(item);
+            const live = person
+              ? personVerdictForItem(item, person)
+              : (evidence.items[item.id] ?? null);
+            return (
+              <AuditItemRow
+                key={item.id}
+                item={item}
+                applies={applies}
+                linked={linked}
+                live={live}
+                orgId={orgId}
+                groupNamesById={groupNamesById}
+                userNamesById={userNamesById}
+                publishedFormIds={publishedFormIds}
+                onEdit={onEdit}
+                footprint={
+                  person
+                    ? { codes: person.service_codes, hasAbiClients: person.has_abi }
+                    : footprint
+                }
+                homes={
+                  item.id === "I-2-HHS"
+                    ? evidence.homes.filter((h) => h.service_code === "HHS")
+                    : item.id.startsWith("I-") && item.applies_to_codes.includes("RHS")
+                      ? evidence.homes.filter((h) => h.service_code === "RHS")
+                      : []
+                }
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PersonPacketPicker({
+  people,
+  selectedPersonId,
+  onSelectPerson,
+}: {
+  people: PersonAuditEvidence[];
+  selectedPersonId: string | null;
+  onSelectPerson: (id: string | null) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/20 p-3 sm:flex-row sm:items-center">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">Person packet</p>
+        <p className="text-xs text-muted-foreground">
+          The paper tool is one packet per Person. Agency view scores everyone; pick a Person to see
+          their file.
+        </p>
       </div>
+      <Select
+        value={selectedPersonId ?? "agency"}
+        onValueChange={(v) => onSelectPerson(v === "agency" ? null : v)}
+      >
+        <SelectTrigger className="w-full sm:w-72">
+          <SelectValue placeholder="All people (agency view)" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="agency">All people (agency view)</SelectItem>
+          {people.map((p) => (
+            <SelectItem key={p.client_id} value={p.client_id}>
+              {p.full_name}
+              {p.service_codes.length ? ` · ${p.service_codes.join(", ")}` : ""}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
@@ -124,25 +219,29 @@ function AuditItemRow({
   item,
   applies,
   linked,
+  live,
   orgId,
   groupNamesById,
   userNamesById,
   publishedFormIds,
   onEdit,
   footprint,
+  homes,
 }: {
   item: AuditItem;
   applies: boolean;
   linked: ObligationListItem[];
+  live: AuditEvidenceItem | null;
   orgId: string;
   groupNamesById: Map<string, { name: string; member_count: number }>;
   userNamesById: Map<string, string>;
   publishedFormIds: Set<string>;
   onEdit: (ob: ObligationWithInstance) => void;
   footprint: OrgFootprint;
+  homes: AuditEvidenceSnapshot["homes"];
 }) {
   const [open, setOpen] = useState(false);
-  const status = itemStatus(item, applies, linked);
+  const status = itemStatus(item, applies, linked, live);
   const Icon =
     status.tone === "overdue"
       ? AlertTriangle
@@ -183,6 +282,20 @@ function AuditItemRow({
       {applies && (
         <>
           <p className="mt-2 text-xs text-muted-foreground">{item.note}</p>
+          {live?.detail && <p className="mt-1 text-xs text-muted-foreground">{live.detail}</p>}
+          {homes.length > 0 && (
+            <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+              {homes.map((h) => (
+                <li key={`${h.team_id}-${h.service_code}`} className="flex items-center gap-1.5">
+                  <Home className="h-3 w-3" />
+                  {h.team_name}
+                  <span>
+                    ({h.client_count} Person{h.client_count === 1 ? "" : "s"})
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
           {linked.map((o) => (
             <div key={o.id} className="mt-2">
               <RollupStatus
@@ -192,9 +305,9 @@ function AuditItemRow({
             </div>
           ))}
           <div className="mt-3 flex flex-wrap gap-2">
-            {item.hive_href && (
+            {(live?.href || item.hive_href) && (
               <Button size="sm" variant="outline" asChild>
-                <a href={item.hive_href}>
+                <a href={live?.href || item.hive_href}>
                   {item.hive_label ?? "Open in HIVE"} <ArrowRight className="ml-1 h-3.5 w-3.5" />
                 </a>
               </Button>

@@ -8,10 +8,15 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { z } from "zod";
 import { applyExtractedFieldsToClient } from "@/lib/client-import-schema";
-import { validateClientDraft, filterBlocking, normalizeGuardianFields, type ClientDraft } from "@/lib/import-validation";
+import {
+  validateClientDraft,
+  filterBlocking,
+  normalizeGuardianFields,
+  type ClientDraft,
+} from "@/lib/import-validation";
 import { fetchTenantIdentity, type TenantIdentity } from "@/lib/service-classification";
 import { BASELINE_STAFF_TRAININGS, isBaselineApplicable } from "@/lib/staff-training-requirements";
-
+import { onPcspActivatedInternal } from "@/lib/company-obligations.functions";
 
 const JobId = z.object({ jobId: z.string().uuid() });
 
@@ -109,7 +114,10 @@ function coerceProfileValue(column: string, raw: string | null): unknown {
   const value = (raw ?? "").trim();
   if (!value) return null;
   if (PROFILE_ARRAY_COLS.has(column)) {
-    return value.split(",").map((s) => s.trim()).filter(Boolean);
+    return value
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
   return value;
 }
@@ -151,8 +159,11 @@ function coerceClientValue(column: string, raw: string | null): unknown {
     try {
       const parsed = JSON.parse(value) as { bool?: unknown } | boolean;
       if (typeof parsed === "boolean") return parsed;
-      if (parsed && typeof parsed === "object" && typeof parsed.bool === "boolean") return parsed.bool;
-    } catch { /* plain string below */ }
+      if (parsed && typeof parsed === "object" && typeof parsed.bool === "boolean")
+        return parsed.bool;
+    } catch {
+      /* plain string below */
+    }
     if (/^(true|yes|y|1)$/i.test(value)) return true;
     if (/^(false|no|n|0)$/i.test(value)) return false;
     return null;
@@ -160,9 +171,18 @@ function coerceClientValue(column: string, raw: string | null): unknown {
   if (CLIENT_ARRAY_COLS.has(column)) {
     try {
       const parsed = JSON.parse(value);
-      if (Array.isArray(parsed)) return parsed.map(String).map((s) => s.trim()).filter(Boolean);
-    } catch { /* comma/newline list below */ }
-    return value.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
+      if (Array.isArray(parsed))
+        return parsed
+          .map(String)
+          .map((s) => s.trim())
+          .filter(Boolean);
+    } catch {
+      /* comma/newline list below */
+    }
+    return value
+      .split(/[\n,;]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
   if (CLIENT_DATE_COLS.has(column)) return value.slice(0, 10);
   return value;
@@ -234,179 +254,301 @@ export const commitSingleSubject = createServerFn({ method: "POST" })
 // subject (workspace per-row finalize); without it, all ready subjects in
 // the job are attempted as before.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function runJobCommit(sbIn: any, userId: string, jobId: string, opts?: { subjectId?: string }) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sb = sbIn as any;
+export async function runJobCommit(
+  sbIn: any,
+  userId: string,
+  jobId: string,
+  opts?: { subjectId?: string },
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = sbIn as any;
 
-    const { data: job, error: jerr } = await sb
-      .from("import_jobs")
-      .select("id, org_id, mode, status, source, target_org_id, provider_signoff_at")
-      .eq("id", jobId)
-      .single();
-    if (jerr || !job) throw new Error("Job not found");
+  const { data: job, error: jerr } = await sb
+    .from("import_jobs")
+    .select("id, org_id, mode, status, source, target_org_id, provider_signoff_at")
+    .eq("id", jobId)
+    .single();
+  if (jerr || !job) throw new Error("Job not found");
 
-    if (job.source === "white_glove") {
-      if (!job.target_org_id) throw new Error("White-glove job missing target company.");
-      if (!job.provider_signoff_at) {
-        throw new Error("Provider sign-off required before commit.");
-      }
-      const { data: isAdmin } = await sb.rpc("has_org_role", {
-        _org: job.target_org_id, _user: userId, _role: "admin",
+  if (job.source === "white_glove") {
+    if (!job.target_org_id) throw new Error("White-glove job missing target company.");
+    if (!job.provider_signoff_at) {
+      throw new Error("Provider sign-off required before commit.");
+    }
+    const { data: isAdmin } = await sb.rpc("has_org_role", {
+      _org: job.target_org_id,
+      _user: userId,
+      _role: "admin",
+    });
+    if (!isAdmin) {
+      throw new Error("Only the receiving company's admin can commit a white-glove migration.");
+    }
+  }
+
+  let subjectsQ = sb.from("import_subjects").select("*").eq("import_job_id", jobId);
+  if (opts?.subjectId) subjectsQ = subjectsQ.eq("id", opts.subjectId);
+  const { data: subjects } = await subjectsQ;
+
+  const orgId = (job.source === "white_glove" ? job.target_org_id : job.org_id) as string;
+  const results: Array<{
+    subjectId: string;
+    display_name: string;
+    committed: boolean;
+    record_id: string | null;
+    gaps: string[];
+    error?: string;
+  }> = [];
+
+  const tenantIdentity: TenantIdentity = orgId
+    ? await fetchTenantIdentity(sb, orgId)
+    : { codesHeld: [], names: [] };
+
+  for (const subj of subjects ?? []) {
+    const gaps: string[] = [];
+
+    if (subj.committed_at) {
+      results.push({
+        subjectId: subj.id,
+        display_name: subj.display_name,
+        committed: true,
+        record_id: subj.committed_record_id,
+        gaps: ["already committed"],
       });
-      if (!isAdmin) {
-        throw new Error("Only the receiving company's admin can commit a white-glove migration.");
-      }
+      continue;
+    }
+    if (subj.review_status !== "ready") {
+      results.push({
+        subjectId: subj.id,
+        display_name: subj.display_name,
+        committed: false,
+        record_id: null,
+        gaps: ["not marked ready"],
+      });
+      continue;
+    }
+    if (subj.review_decision === "skip") {
+      await sb
+        .from("import_subjects")
+        .update({ committed_at: new Date().toISOString(), commit_error: "skipped by admin" })
+        .eq("id", subj.id);
+      await audit(
+        sb,
+        jobId,
+        orgId,
+        subj.id,
+        "Subject skipped (admin decision)",
+        "admin_override",
+        userId,
+        "skip_subject",
+      );
+      results.push({
+        subjectId: subj.id,
+        display_name: subj.display_name,
+        committed: true,
+        record_id: null,
+        gaps: ["skipped"],
+      });
+      continue;
     }
 
-    let subjectsQ = sb
-      .from("import_subjects")
-      .select("*")
-      .eq("import_job_id", jobId);
-    if (opts?.subjectId) subjectsQ = subjectsQ.eq("id", opts.subjectId);
-    const { data: subjects } = await subjectsQ;
+    // Never silent-merge two different people. An ambiguous match without an
+    // explicit admin decision must block at commit time.
+    if (subj.match_status === "ambiguous" && !subj.review_decision) {
+      const msg = "Ambiguous match — admin must pick update vs create_new.";
+      await sb.from("import_subjects").update({ commit_error: msg }).eq("id", subj.id);
+      await audit(sb, jobId, orgId, subj.id, msg, "admin_override", userId, "ambiguous_unresolved");
+      results.push({
+        subjectId: subj.id,
+        display_name: subj.display_name,
+        committed: false,
+        record_id: null,
+        gaps: [msg],
+      });
+      continue;
+    }
 
-    const orgId = (job.source === "white_glove" ? job.target_org_id : job.org_id) as string;
-    const results: Array<{
-      subjectId: string;
-      display_name: string;
-      committed: boolean;
-      record_id: string | null;
-      gaps: string[];
-      error?: string;
-    }> = [];
-
-    const tenantIdentity: TenantIdentity = orgId
-      ? await fetchTenantIdentity(sb, orgId)
-      : { codesHeld: [], names: [] };
-
-    for (const subj of subjects ?? []) {
-      const gaps: string[] = [];
-
-      if (subj.committed_at) {
-        results.push({ subjectId: subj.id, display_name: subj.display_name, committed: true, record_id: subj.committed_record_id, gaps: ["already committed"] });
-        continue;
-      }
-      if (subj.review_status !== "ready") {
-        results.push({ subjectId: subj.id, display_name: subj.display_name, committed: false, record_id: null, gaps: ["not marked ready"] });
-        continue;
-      }
-      if (subj.review_decision === "skip") {
-        await sb.from("import_subjects").update({ committed_at: new Date().toISOString(), commit_error: "skipped by admin" }).eq("id", subj.id);
-        await audit(sb, jobId, orgId, subj.id, "Subject skipped (admin decision)", "admin_override", userId, "skip_subject");
-        results.push({ subjectId: subj.id, display_name: subj.display_name, committed: true, record_id: null, gaps: ["skipped"] });
-        continue;
-      }
-
-      // Never silent-merge two different people. An ambiguous match without an
-      // explicit admin decision must block at commit time.
-      if (subj.match_status === "ambiguous" && !subj.review_decision) {
-        const msg = "Ambiguous match — admin must pick update vs create_new.";
+    // ── Triple-check validation gate (pre-write) ───────────────────────
+    // Reuse the same validator the review screen uses; honor admin overrides.
+    try {
+      const { data: subjFields } = await sb
+        .from("extracted_fields")
+        .select("target_field, value")
+        .eq("import_subject_id", subj.id)
+        .is("dismissed_at", null);
+      const draft = buildClientDraftFromFields(subjFields ?? []);
+      const { issues } = validateClientDraft(draft, { tenant: tenantIdentity });
+      const overrides = (subj.validation_overrides as Record<string, boolean>) ?? {};
+      const blocking = filterBlocking(issues, overrides);
+      if (blocking.length > 0) {
+        const msg = `NECTAR validation blocked commit: ${blocking.map((b) => b.message).join(" | ")}`;
         await sb.from("import_subjects").update({ commit_error: msg }).eq("id", subj.id);
-        await audit(sb, jobId, orgId, subj.id, msg, "admin_override", userId, "ambiguous_unresolved");
-        results.push({ subjectId: subj.id, display_name: subj.display_name, committed: false, record_id: null, gaps: [msg] });
+        await audit(sb, jobId, orgId, subj.id, msg, "admin_override", userId, "validation_blocked");
+        results.push({
+          subjectId: subj.id,
+          display_name: subj.display_name,
+          committed: false,
+          record_id: null,
+          gaps: blocking.map((b) => b.message),
+        });
         continue;
       }
+    } catch (e) {
+      // A validator failure must NEVER silently allow a commit. Log + skip.
+      const msg = `Validator threw: ${(e as Error).message}`;
+      await audit(sb, jobId, orgId, subj.id, msg, "admin_override", userId, "validation_error");
+      results.push({
+        subjectId: subj.id,
+        display_name: subj.display_name,
+        committed: false,
+        record_id: null,
+        gaps: [msg],
+      });
+      continue;
+    }
 
-      // ── Triple-check validation gate (pre-write) ───────────────────────
-      // Reuse the same validator the review screen uses; honor admin overrides.
-      try {
-        const { data: subjFields } = await sb
-          .from("extracted_fields")
-          .select("target_field, value")
-          .eq("import_subject_id", subj.id)
-          .is("dismissed_at", null);
-        const draft = buildClientDraftFromFields(subjFields ?? []);
-        const { issues } = validateClientDraft(draft, { tenant: tenantIdentity });
-        const overrides = (subj.validation_overrides as Record<string, boolean>) ?? {};
-        const blocking = filterBlocking(issues, overrides);
-        if (blocking.length > 0) {
-          const msg = `NECTAR validation blocked commit: ${blocking.map((b) => b.message).join(" | ")}`;
-          await sb.from("import_subjects").update({ commit_error: msg }).eq("id", subj.id);
-          await audit(sb, jobId, orgId, subj.id, msg, "admin_override", userId, "validation_blocked");
-          results.push({ subjectId: subj.id, display_name: subj.display_name, committed: false, record_id: null, gaps: blocking.map((b) => b.message) });
-          continue;
-        }
-      } catch (e) {
-        // A validator failure must NEVER silently allow a commit. Log + skip.
-        const msg = `Validator threw: ${(e as Error).message}`;
-        await audit(sb, jobId, orgId, subj.id, msg, "admin_override", userId, "validation_error");
-        results.push({ subjectId: subj.id, display_name: subj.display_name, committed: false, record_id: null, gaps: [msg] });
-        continue;
+    try {
+      const { data: fields } = await sb
+        .from("extracted_fields")
+        .select("*")
+        .eq("import_subject_id", subj.id)
+        .neq("status", "ignored")
+        .is("dismissed_at", null);
+      const fieldsList = fields ?? [];
+
+      let recordId: string | null = null;
+
+      if (subj.subject_type === "client") {
+        recordId = await commitClient(
+          sb,
+          orgId,
+          subj,
+          fieldsList,
+          jobId,
+          userId,
+          gaps,
+          tenantIdentity,
+        );
+      } else {
+        recordId = await commitEmployee(sb, orgId, subj, fieldsList, jobId, userId, gaps);
       }
 
+      if (!recordId) throw new Error("Failed to produce target record id");
 
-      try {
-        const { data: fields } = await sb.from("extracted_fields")
-          .select("*").eq("import_subject_id", subj.id).neq("status", "ignored").is("dismissed_at", null);
-        const fieldsList = fields ?? [];
+      await attachCustomAttributes(
+        sb,
+        orgId,
+        subj,
+        recordId,
+        fieldsList.filter((f: { is_custom_attribute: boolean }) => f.is_custom_attribute),
+        jobId,
+        userId,
+      );
+      await commitCerts(sb, orgId, subj, recordId, jobId, userId, gaps);
+      await commitUnfiled(sb, subj, recordId, jobId, userId);
+      await applyProvisioning(sb, orgId, subj, recordId, jobId, userId, gaps);
 
-        let recordId: string | null = null;
-
-        if (subj.subject_type === "client") {
-          recordId = await commitClient(sb, orgId, subj, fieldsList, jobId, userId, gaps, tenantIdentity);
-        } else {
-          recordId = await commitEmployee(sb, orgId, subj, fieldsList, jobId, userId, gaps);
-        }
-
-        if (!recordId) throw new Error("Failed to produce target record id");
-
-        await attachCustomAttributes(sb, orgId, subj, recordId, fieldsList.filter((f: { is_custom_attribute: boolean }) => f.is_custom_attribute), jobId, userId);
-        await commitCerts(sb, orgId, subj, recordId, jobId, userId, gaps);
-        await commitUnfiled(sb, subj, recordId, jobId, userId);
-        await applyProvisioning(sb, orgId, subj, recordId, jobId, userId, gaps);
-
-        await sb.from("import_subjects").update({
+      await sb
+        .from("import_subjects")
+        .update({
           committed_record_id: recordId,
           committed_at: new Date().toISOString(),
           review_status: "approved",
           commit_error: null,
-        }).eq("id", subj.id);
+        })
+        .eq("id", subj.id);
 
-        await audit(sb, jobId, orgId, subj.id, `Committed ${subj.subject_type} record`, "admin_override", userId, "commit_subject");
-        results.push({ subjectId: subj.id, display_name: subj.display_name, committed: true, record_id: recordId, gaps });
-      } catch (e) {
-        const msg = (e as Error).message || String(e);
-        await sb.from("import_subjects").update({ commit_error: msg }).eq("id", subj.id);
-        await audit(sb, jobId, orgId, subj.id, `Commit failed: ${msg}`, "admin_override", userId, "commit_failed");
-        results.push({ subjectId: subj.id, display_name: subj.display_name, committed: false, record_id: null, gaps, error: msg });
-      }
+      await audit(
+        sb,
+        jobId,
+        orgId,
+        subj.id,
+        `Committed ${subj.subject_type} record`,
+        "admin_override",
+        userId,
+        "commit_subject",
+      );
+      results.push({
+        subjectId: subj.id,
+        display_name: subj.display_name,
+        committed: true,
+        record_id: recordId,
+        gaps,
+      });
+    } catch (e) {
+      const msg = (e as Error).message || String(e);
+      await sb.from("import_subjects").update({ commit_error: msg }).eq("id", subj.id);
+      await audit(
+        sb,
+        jobId,
+        orgId,
+        subj.id,
+        `Commit failed: ${msg}`,
+        "admin_override",
+        userId,
+        "commit_failed",
+      );
+      results.push({
+        subjectId: subj.id,
+        display_name: subj.display_name,
+        committed: false,
+        record_id: null,
+        gaps,
+        error: msg,
+      });
     }
+  }
 
-    await applyAssignmentMap(sb, orgId, jobId, userId);
+  await applyAssignmentMap(sb, orgId, jobId, userId);
 
-    // When committing a single subject in isolation, results only describes
-    // that subject — re-check job-wide pending count before marking the whole
-    // job committed.
-    let jobCommitted = (results || []).filter((r) => !r.committed).length === 0;
-    if (jobCommitted && opts?.subjectId) {
-      const { count: stillOpenJobWide } = await sb
-        .from("import_subjects")
-        .select("id", { count: "exact", head: true })
-        .eq("import_job_id", jobId)
-        .is("committed_at", null)
-        .is("discarded_at", null);
-      jobCommitted = (stillOpenJobWide ?? 0) === 0;
-    }
-    if (jobCommitted) {
-      await sb.from("import_jobs").update({
+  // When committing a single subject in isolation, results only describes
+  // that subject — re-check job-wide pending count before marking the whole
+  // job committed.
+  let jobCommitted = (results || []).filter((r) => !r.committed).length === 0;
+  if (jobCommitted && opts?.subjectId) {
+    const { count: stillOpenJobWide } = await sb
+      .from("import_subjects")
+      .select("id", { count: "exact", head: true })
+      .eq("import_job_id", jobId)
+      .is("committed_at", null)
+      .is("discarded_at", null);
+    jobCommitted = (stillOpenJobWide ?? 0) === 0;
+  }
+  if (jobCommitted) {
+    await sb
+      .from("import_jobs")
+      .update({
         status: "committed",
         committed_at: new Date().toISOString(),
         committed_by: userId,
-      }).eq("id", jobId);
-    }
+      })
+      .eq("id", jobId);
+  }
 
-    return { results, jobCommitted };
+  return { results, jobCommitted };
 }
-
-
 
 // --------------------------------------------------------------
 async function commitClient(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sb: any,
   orgId: string,
-  subj: { id: string; matched_record_id: string | null; review_decision: string | null; display_name: string; validation_overrides?: Record<string, boolean> | null },
-  fields: Array<{ id: string; target_field: string; field_key?: string | null; value: string | null; source_document_id: string | null; source_snippet: string | null; provenance: string; is_custom_attribute: boolean }>,
+  subj: {
+    id: string;
+    matched_record_id: string | null;
+    review_decision: string | null;
+    display_name: string;
+    validation_overrides?: Record<string, boolean> | null;
+  },
+  fields: Array<{
+    id: string;
+    target_field: string;
+    field_key?: string | null;
+    value: string | null;
+    source_document_id: string | null;
+    source_snippet: string | null;
+    provenance: string;
+    is_custom_attribute: boolean;
+  }>,
   jobId: string,
   userId: string,
   gaps: string[],
@@ -418,7 +560,11 @@ async function commitClient(
     const col = CLIENT_COL[f.target_field];
     if (!col) continue;
     const coerced = coerceClientValue(col, f.value);
-    if (coerced !== null && coerced !== undefined && !(Array.isArray(coerced) && coerced.length === 0)) {
+    if (
+      coerced !== null &&
+      coerced !== undefined &&
+      !(Array.isArray(coerced) && coerced.length === 0)
+    ) {
       mapped[col] = coerced;
     }
   }
@@ -436,17 +582,16 @@ async function commitClient(
     // Coerce string booleans first so normalizeGuardianFields sees real bools.
     if (m.is_own_guardian === "true") m.is_own_guardian = true;
     else if (m.is_own_guardian === "false") m.is_own_guardian = false;
-    if (
-      defaultSelf &&
-      (m.is_own_guardian === undefined || m.is_own_guardian === null)
-    ) {
+    if (defaultSelf && (m.is_own_guardian === undefined || m.is_own_guardian === null)) {
       m.is_own_guardian = true;
     }
-    normalizeGuardianFields(m as ClientDraft & {
-      guardian_phone?: string | null;
-      guardian_relationship?: string | null;
-      guardian_email?: string | null;
-    });
+    normalizeGuardianFields(
+      m as ClientDraft & {
+        guardian_phone?: string | null;
+        guardian_relationship?: string | null;
+        guardian_email?: string | null;
+      },
+    );
   };
 
   // Resilient writer: PostgREST rejects the whole payload if any key is
@@ -464,7 +609,16 @@ async function commitClient(
       if (m && m[1] in p) {
         const stripped = m[1];
         delete p[stripped];
-        await audit(sb, jobId, orgId, subj.id, `Skipped unknown column on clients: ${stripped}`, "admin_override", userId, "skipped_unknown_column");
+        await audit(
+          sb,
+          jobId,
+          orgId,
+          subj.id,
+          `Skipped unknown column on clients: ${stripped}`,
+          "admin_override",
+          userId,
+          "skipped_unknown_column",
+        );
         continue;
       }
       throw new Error(`clients insert: ${msg}`);
@@ -477,14 +631,27 @@ async function commitClient(
     let p: Record<string, any> = { ...payload };
     for (let attempt = 0; attempt < 8; attempt++) {
       if (Object.keys(p).length === 0) return;
-      const { error } = await sb.from("clients").update(p).eq("id", id).eq("organization_id", orgId);
+      const { error } = await sb
+        .from("clients")
+        .update(p)
+        .eq("id", id)
+        .eq("organization_id", orgId);
       if (!error) return;
       const msg = error.message ?? "unknown";
       const m = msg.match(/Could not find the '([^']+)' column/);
       if (m && m[1] in p) {
         const stripped = m[1];
         delete p[stripped];
-        await audit(sb, jobId, orgId, subj.id, `Skipped unknown column on clients: ${stripped}`, "admin_override", userId, "skipped_unknown_column");
+        await audit(
+          sb,
+          jobId,
+          orgId,
+          subj.id,
+          `Skipped unknown column on clients: ${stripped}`,
+          "admin_override",
+          userId,
+          "skipped_unknown_column",
+        );
         continue;
       }
       throw new Error(`clients update: ${msg}`);
@@ -499,7 +666,16 @@ async function commitClient(
       normalize(mapped, false);
       await updateClient(recordId, mapped);
     }
-    await audit(sb, jobId, orgId, subj.id, `Updated existing client (${Object.keys(mapped).length} fields)`, "admin_override", userId, "update_client");
+    await audit(
+      sb,
+      jobId,
+      orgId,
+      subj.id,
+      `Updated existing client (${Object.keys(mapped).length} fields)`,
+      "admin_override",
+      userId,
+      "update_client",
+    );
   } else {
     // Create new — require name fallback
     if (!mapped.first_name && !mapped.last_name) {
@@ -517,24 +693,27 @@ async function commitClient(
     await audit(sb, jobId, orgId, subj.id, "Created new client", "source", userId, "create_client");
   }
 
-
-
   // Provenance rows for each core field
   for (const f of fields) {
     if (f.is_custom_attribute) continue;
     const col = CLIENT_COL[f.target_field];
     if (!col) continue;
-    await sb.from("import_field_provenance").upsert({
-      import_job_id: jobId,
-      import_subject_id: subj.id,
-      org_id: orgId,
-      target_table: "clients",
-      target_record_id: recordId,
-      target_field: col,
-      source_document_id: f.source_document_id,
-      source_snippet: f.source_snippet,
-      provenance: ["source", "inferred", "rule", "admin_override"].includes(f.provenance) ? f.provenance : "inferred",
-    }, { onConflict: "target_table,target_record_id,target_field,import_job_id" });
+    await sb.from("import_field_provenance").upsert(
+      {
+        import_job_id: jobId,
+        import_subject_id: subj.id,
+        org_id: orgId,
+        target_table: "clients",
+        target_record_id: recordId,
+        target_field: col,
+        source_document_id: f.source_document_id,
+        source_snippet: f.source_snippet,
+        provenance: ["source", "inferred", "rule", "admin_override"].includes(f.provenance)
+          ? f.provenance
+          : "inferred",
+      },
+      { onConflict: "target_table,target_record_id,target_field,import_job_id" },
+    );
   }
 
   // Surface fields that had no mapping (gaps)
@@ -562,13 +741,24 @@ async function commitClient(
         const v = f.value;
         if (v == null || String(v).trim() === "") return base;
         const s = String(v).trim();
-        if ((f.field_key || f.target_field) === "billing_code_row" || (f.field_key || f.target_field) === "client_medication") {
-          try { base.value_json = JSON.parse(s); return base; } catch { /* fall through */ }
+        if (
+          (f.field_key || f.target_field) === "billing_code_row" ||
+          (f.field_key || f.target_field) === "client_medication"
+        ) {
+          try {
+            base.value_json = JSON.parse(s);
+            return base;
+          } catch {
+            /* fall through */
+          }
         }
         if (s.startsWith("[") || s.startsWith("{")) {
           try {
             const j = JSON.parse(s);
-            if (Array.isArray(j)) { base.value_array = j.map(String); return base; }
+            if (Array.isArray(j)) {
+              base.value_array = j.map(String);
+              return base;
+            }
             if (j && typeof j === "object") {
               if (typeof (j as { bool?: unknown }).bool === "boolean") {
                 base.value_bool = (j as { bool: boolean }).bool;
@@ -577,17 +767,20 @@ async function commitClient(
               base.value_json = j;
               return base;
             }
-          } catch { /* fall through */ }
+          } catch {
+            /* fall through */
+          }
         }
         base.value_text = s;
         return base;
       });
     // Infer source document type from the extracted fields (good enough for the
     // authoritative-source rules — see client-import-schema for full semantics).
-    const inferredType: "1056_budget" | "pcsp" | "other" =
-      norm.some((n) => n.field_key === "form_1056_number" || n.field_key === "form_1056_approved_date")
-        ? "1056_budget"
-        : norm.some((n) => n.field_key === "pcsp_goal" || n.field_key === "pcsp_has_medications")
+    const inferredType: "1056_budget" | "pcsp" | "other" = norm.some(
+      (n) => n.field_key === "form_1056_number" || n.field_key === "form_1056_approved_date",
+    )
+      ? "1056_budget"
+      : norm.some((n) => n.field_key === "pcsp_goal" || n.field_key === "pcsp_has_medications")
         ? "pcsp"
         : "other";
     const apply = await applyExtractedFieldsToClient({
@@ -606,9 +799,16 @@ async function commitClient(
     gaps.push(...apply.suggested.map((s) => `Review: ${s}`));
   } catch (err) {
     gaps.push(`Autofill warning: ${(err as Error).message}`);
-    await audit(sb, jobId, orgId, subj.id,
+    await audit(
+      sb,
+      jobId,
+      orgId,
+      subj.id,
       `Autofill failed: ${(err as Error).message}`,
-      "admin_override", userId, "autofill_error");
+      "admin_override",
+      userId,
+      "autofill_error",
+    );
   }
 
   // The visible Profile > Contacts card reads client_emergency_contacts, not
@@ -618,7 +818,16 @@ async function commitClient(
     await seedEmergencyContacts(sb, orgId, recordId, fields);
   } catch (err) {
     gaps.push(`Contacts warning: ${(err as Error).message}`);
-    await audit(sb, jobId, orgId, subj.id, `Emergency contacts seed failed: ${(err as Error).message}`, "admin_override", userId, "contacts_seed_error");
+    await audit(
+      sb,
+      jobId,
+      orgId,
+      subj.id,
+      `Emergency contacts seed failed: ${(err as Error).message}`,
+      "admin_override",
+      userId,
+      "contacts_seed_error",
+    );
   }
 
   // ─── PCSP single-source-of-truth ──────────────────────────────────────
@@ -630,18 +839,23 @@ async function commitClient(
   // file_name already exists for this client.
   try {
     const pcspFieldPrefix = (k: string) => k.startsWith("pcsp_");
-    const pcspDocIds = Array.from(new Set(
-      fields
-        .filter((f) => pcspFieldPrefix(f.target_field) && f.source_document_id)
-        .map((f) => f.source_document_id as string),
-    ));
+    const pcspDocIds = Array.from(
+      new Set(
+        fields
+          .filter((f) => pcspFieldPrefix(f.target_field) && f.source_document_id)
+          .map((f) => f.source_document_id as string),
+      ),
+    );
     if (pcspDocIds.length > 0) {
       const { data: importDocs } = await sb
         .from("import_documents")
         .select("id, storage_path, file_name, file_type")
         .in("id", pcspDocIds);
       for (const doc of (importDocs ?? []) as Array<{
-        id: string; storage_path: string; file_name: string; file_type: string | null;
+        id: string;
+        storage_path: string;
+        file_name: string;
+        file_type: string | null;
       }>) {
         if (!doc?.storage_path) continue;
         const { data: existing } = await sb
@@ -681,6 +895,11 @@ async function commitClient(
           gaps.push(`PCSP register failed (${doc.file_name}): ${insErr.message}`);
         }
       }
+      try {
+        await onPcspActivatedInternal(sb, orgId, recordId);
+      } catch (err) {
+        gaps.push(`Support Strategies clock warning: ${(err as Error).message}`);
+      }
     }
   } catch (err) {
     gaps.push(`PCSP carry-over warning: ${(err as Error).message}`);
@@ -697,7 +916,8 @@ async function seedEmergencyContacts(
   fields: Array<{ target_field: string; value: string | null; is_custom_attribute: boolean }>,
 ) {
   const active = fields.filter((f) => !f.is_custom_attribute);
-  const valueOf = (key: string) => active.find((f) => f.target_field === key)?.value?.trim() || null;
+  const valueOf = (key: string) =>
+    active.find((f) => f.target_field === key)?.value?.trim() || null;
   const rows = [
     {
       name: valueOf("emergency_contact_name"),
@@ -718,10 +938,23 @@ async function seedEmergencyContacts(
     .eq("organization_id", orgId)
     .eq("client_id", clientId);
   if (existingErr) throw new Error(existingErr.message);
-  const seen = new Set((existing ?? []).map((r: { name: string; phone: string | null }) => `${r.name.trim().toLowerCase()}|${(r.phone ?? "").trim().toLowerCase()}`));
+  const seen = new Set(
+    (existing ?? []).map(
+      (r: { name: string; phone: string | null }) =>
+        `${r.name.trim().toLowerCase()}|${(r.phone ?? "").trim().toLowerCase()}`,
+    ),
+  );
   const inserts = rows
-    .filter((r) => !seen.has(`${r.name!.trim().toLowerCase()}|${(r.phone ?? "").trim().toLowerCase()}`))
-    .map((r) => ({ organization_id: orgId, client_id: clientId, name: r.name!, phone: r.phone, relationship: r.relationship }));
+    .filter(
+      (r) => !seen.has(`${r.name!.trim().toLowerCase()}|${(r.phone ?? "").trim().toLowerCase()}`),
+    )
+    .map((r) => ({
+      organization_id: orgId,
+      client_id: clientId,
+      name: r.name!,
+      phone: r.phone,
+      relationship: r.relationship,
+    }));
   if (!inserts.length) return;
   const { error } = await sb.from("client_emergency_contacts").insert(inserts);
   if (error) throw new Error(error.message);
@@ -739,23 +972,42 @@ function buildClientDraftFromFields(
     const v = (r.value ?? "").trim();
     if (!v) continue;
     switch (r.target_field) {
-      case "first_name": d.first_name = v; break;
-      case "last_name": d.last_name = v; break;
+      case "first_name":
+        d.first_name = v;
+        break;
+      case "last_name":
+        d.last_name = v;
+        break;
       case "physical_address":
       case "address":
-        d.physical_address = v; break;
-      case "medicaid_id": d.medicaid_id = v; break;
+        d.physical_address = v;
+        break;
+      case "medicaid_id":
+        d.medicaid_id = v;
+        break;
       case "date_of_birth":
       case "dob":
-        d.date_of_birth = v; break;
-      case "admission_date": d.admission_date = v; break;
-      case "discharge_date": d.discharge_date = v; break;
-      case "form_1056_approved_date": d.form_1056_approved_date = v; break;
-      case "is_own_guardian":
-        try { d.is_own_guardian = !!(JSON.parse(v) as { bool?: boolean }).bool; }
-        catch { d.is_own_guardian = v === "true"; }
+        d.date_of_birth = v;
         break;
-      case "guardian_name": d.guardian_name = v; break;
+      case "admission_date":
+        d.admission_date = v;
+        break;
+      case "discharge_date":
+        d.discharge_date = v;
+        break;
+      case "form_1056_approved_date":
+        d.form_1056_approved_date = v;
+        break;
+      case "is_own_guardian":
+        try {
+          d.is_own_guardian = !!(JSON.parse(v) as { bool?: boolean }).bool;
+        } catch {
+          d.is_own_guardian = v === "true";
+        }
+        break;
+      case "guardian_name":
+        d.guardian_name = v;
+        break;
       case "billing_code_row":
         try {
           const j = JSON.parse(v) as Record<string, unknown>;
@@ -763,14 +1015,17 @@ function buildClientDraftFromFields(
             codes.push({
               service_code: String(j.service_code).toUpperCase(),
               rate: typeof j.rate === "number" ? j.rate : Number(j.rate) || null,
-              max_units: typeof j.max_units === "number" ? j.max_units : Number(j.max_units) || null,
+              max_units:
+                typeof j.max_units === "number" ? j.max_units : Number(j.max_units) || null,
               unit_type: j.unit_type ? String(j.unit_type) : null,
               plan_start: j.plan_start ? String(j.plan_start).slice(0, 10) : null,
               plan_end: j.plan_end ? String(j.plan_end).slice(0, 10) : null,
               provider_name: j.provider_name ? String(j.provider_name) : null,
             });
           }
-        } catch { /* malformed row — validator only checks codes it can read */ }
+        } catch {
+          /* malformed row — validator only checks codes it can read */
+        }
         break;
     }
   }
@@ -778,15 +1033,26 @@ function buildClientDraftFromFields(
   return d;
 }
 
-
-
 // --------------------------------------------------------------
 async function commitEmployee(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sb: any,
   orgId: string,
-  subj: { id: string; matched_record_id: string | null; review_decision: string | null; display_name: string },
-  fields: Array<{ id: string; target_field: string; value: string | null; source_document_id: string | null; source_snippet: string | null; provenance: string; is_custom_attribute: boolean }>,
+  subj: {
+    id: string;
+    matched_record_id: string | null;
+    review_decision: string | null;
+    display_name: string;
+  },
+  fields: Array<{
+    id: string;
+    target_field: string;
+    value: string | null;
+    source_document_id: string | null;
+    source_snippet: string | null;
+    provenance: string;
+    is_custom_attribute: boolean;
+  }>,
   jobId: string,
   userId: string,
   gaps: string[],
@@ -795,7 +1061,16 @@ async function commitEmployee(
   if (!subj.matched_record_id || subj.review_decision !== "update") {
     // Create new path: queue an invitation gap and skip profile creation.
     gaps.push("Invitation required — auth user must be created via the invitation flow.");
-    await audit(sb, jobId, orgId, subj.id, "Employee marked for invitation (no auth user created here)", "admin_override", userId, "queue_invite");
+    await audit(
+      sb,
+      jobId,
+      orgId,
+      subj.id,
+      "Employee marked for invitation (no auth user created here)",
+      "admin_override",
+      userId,
+      "queue_invite",
+    );
     // Use a placeholder uuid so downstream provenance still links; but we can't insert without a real auth user — return null id to signal partial.
     // To remain "advisory, never blocks", we mark the subject as committed with no record_id.
     return null;
@@ -816,23 +1091,37 @@ async function commitEmployee(
     const { error } = await sb.from("profiles").update(mapped).eq("id", recordId);
     if (error) throw new Error(`profiles update: ${error.message}`);
   }
-  await audit(sb, jobId, orgId, subj.id, `Updated existing employee (${Object.keys(mapped).length} fields)`, "admin_override", userId, "update_employee");
+  await audit(
+    sb,
+    jobId,
+    orgId,
+    subj.id,
+    `Updated existing employee (${Object.keys(mapped).length} fields)`,
+    "admin_override",
+    userId,
+    "update_employee",
+  );
 
   for (const f of fields) {
     if (f.is_custom_attribute) continue;
     const col = PROFILE_COL[f.target_field];
     if (!col) continue;
-    await sb.from("import_field_provenance").upsert({
-      import_job_id: jobId,
-      import_subject_id: subj.id,
-      org_id: orgId,
-      target_table: "profiles",
-      target_record_id: recordId,
-      target_field: col,
-      source_document_id: f.source_document_id,
-      source_snippet: f.source_snippet,
-      provenance: ["source", "inferred", "rule", "admin_override"].includes(f.provenance) ? f.provenance : "inferred",
-    }, { onConflict: "target_table,target_record_id,target_field,import_job_id" });
+    await sb.from("import_field_provenance").upsert(
+      {
+        import_job_id: jobId,
+        import_subject_id: subj.id,
+        org_id: orgId,
+        target_table: "profiles",
+        target_record_id: recordId,
+        target_field: col,
+        source_document_id: f.source_document_id,
+        source_snippet: f.source_snippet,
+        provenance: ["source", "inferred", "rule", "admin_override"].includes(f.provenance)
+          ? f.provenance
+          : "inferred",
+      },
+      { onConflict: "target_table,target_record_id,target_field,import_job_id" },
+    );
   }
   return recordId;
 }
@@ -844,28 +1133,43 @@ async function attachCustomAttributes(
   orgId: string,
   subj: { id: string; subject_type: "client" | "employee" },
   recordId: string,
-  customFields: Array<{ target_field: string; value: string | null; source_document_id: string | null; source_snippet: string | null; provenance: string }>,
+  customFields: Array<{
+    target_field: string;
+    value: string | null;
+    source_document_id: string | null;
+    source_snippet: string | null;
+    provenance: string;
+  }>,
   jobId: string,
   userId: string,
 ) {
   for (const f of customFields) {
     // Ensure definition exists
-    const { data: def } = await sb.from("custom_field_definitions")
-      .upsert({
-        organization_id: orgId,
-        entity_kind: subj.subject_type,
-        field_key: f.target_field,
-        field_label: f.target_field.replace(/_/g, " "),
-        data_type: "text",
-        source: "import",
-        created_by: userId,
-      }, { onConflict: "organization_id,entity_kind,field_key" })
-      .select("id").single();
+    const { data: def } = await sb
+      .from("custom_field_definitions")
+      .upsert(
+        {
+          organization_id: orgId,
+          entity_kind: subj.subject_type,
+          field_key: f.target_field,
+          field_label: f.target_field.replace(/_/g, " "),
+          data_type: "text",
+          source: "import",
+          created_by: userId,
+        },
+        { onConflict: "organization_id,entity_kind,field_key" },
+      )
+      .select("id")
+      .single();
     if (!def) continue;
 
     // Upsert value
-    const { data: existing } = await sb.from("custom_field_values")
-      .select("id").eq("definition_id", def.id).eq("entity_id", recordId).maybeSingle();
+    const { data: existing } = await sb
+      .from("custom_field_values")
+      .select("id")
+      .eq("definition_id", def.id)
+      .eq("entity_id", recordId)
+      .maybeSingle();
     if (existing) {
       await sb.from("custom_field_values").update({ value_text: f.value }).eq("id", existing.id);
     } else {
@@ -878,17 +1182,22 @@ async function attachCustomAttributes(
       });
     }
 
-    await sb.from("import_field_provenance").upsert({
-      import_job_id: jobId,
-      import_subject_id: subj.id,
-      org_id: orgId,
-      target_table: "custom_field_values",
-      target_record_id: recordId,
-      target_field: f.target_field,
-      source_document_id: f.source_document_id,
-      source_snippet: f.source_snippet,
-      provenance: ["source", "inferred", "rule", "admin_override"].includes(f.provenance) ? f.provenance : "inferred",
-    }, { onConflict: "target_table,target_record_id,target_field,import_job_id" });
+    await sb.from("import_field_provenance").upsert(
+      {
+        import_job_id: jobId,
+        import_subject_id: subj.id,
+        org_id: orgId,
+        target_table: "custom_field_values",
+        target_record_id: recordId,
+        target_field: f.target_field,
+        source_document_id: f.source_document_id,
+        source_snippet: f.source_snippet,
+        provenance: ["source", "inferred", "rule", "admin_override"].includes(f.provenance)
+          ? f.provenance
+          : "inferred",
+      },
+      { onConflict: "target_table,target_record_id,target_field,import_job_id" },
+    );
   }
 }
 
@@ -904,21 +1213,38 @@ async function commitCerts(
   gaps: string[],
 ) {
   if (!recordId) return;
-  const { data: certs } = await sb.from("import_cert_documents").select("*").eq("import_subject_id", subj.id);
+  const { data: certs } = await sb
+    .from("import_cert_documents")
+    .select("*")
+    .eq("import_subject_id", subj.id);
   for (const c of certs ?? []) {
     if (subj.subject_type === "employee") {
       // external_certifications expects user_id; record_id IS the user_id for employees
-      await sb.from("external_certifications").insert({
-        user_id: recordId,
-        organization_id: orgId,
-        cert_type: c.cert_key,
-        // verification_status / expires would map per existing schema if those columns exist; keep minimal
-      }).select("id").maybeSingle().catch(() => null);
+      await sb
+        .from("external_certifications")
+        .insert({
+          user_id: recordId,
+          organization_id: orgId,
+          cert_type: c.cert_key,
+          // verification_status / expires would map per existing schema if those columns exist; keep minimal
+        })
+        .select("id")
+        .maybeSingle()
+        .catch(() => null);
     }
     if (c.state === "provisional") {
       gaps.push(`Cert "${c.cert_key}" provisional — reminder queued`);
     }
-    await audit(sb, jobId, orgId, subj.id, `Cert ${c.cert_key} → ${c.state} on commit`, c.state === "verified" ? "source" : "admin_override", userId, "commit_cert");
+    await audit(
+      sb,
+      jobId,
+      orgId,
+      subj.id,
+      `Cert ${c.cert_key} → ${c.state} on commit`,
+      c.state === "verified" ? "source" : "admin_override",
+      userId,
+      "commit_cert",
+    );
   }
 }
 
@@ -931,18 +1257,34 @@ async function commitUnfiled(
   jobId: string,
   userId: string,
 ) {
-  const { data: items } = await sb.from("unfiled_items").select("*").eq("import_subject_id", subj.id);
+  const { data: items } = await sb
+    .from("unfiled_items")
+    .select("*")
+    .eq("import_subject_id", subj.id);
   for (const it of items ?? []) {
     if (!it.filed_to) continue; // unassigned scraps persist as recoverable
     // For clients we append the scrap to special_directions as a tagged note.
     if (recordId && subj.subject_type === "client") {
       const tag = `[${it.filed_to}]`;
-      const { data: c } = await sb.from("clients").select("special_directions").eq("id", recordId).maybeSingle();
+      const { data: c } = await sb
+        .from("clients")
+        .select("special_directions")
+        .eq("id", recordId)
+        .maybeSingle();
       const existing = (c?.special_directions ?? "").trim();
       const next = existing ? `${existing}\n${tag} ${it.text}` : `${tag} ${it.text}`;
       await sb.from("clients").update({ special_directions: next }).eq("id", recordId);
     }
-    await audit(sb, jobId, it.org_id, subj.id, `Filed scrap under "${it.filed_to}"`, "admin_override", userId, "file_scrap");
+    await audit(
+      sb,
+      jobId,
+      it.org_id,
+      subj.id,
+      `Filed scrap under "${it.filed_to}"`,
+      "admin_override",
+      userId,
+      "file_scrap",
+    );
   }
 }
 
@@ -958,29 +1300,55 @@ async function applyProvisioning(
   gaps: string[],
 ) {
   if (!recordId) return;
-  const { data: plan } = await sb.from("provisioning_plan").select("*")
-    .eq("subject_id", subj.id).is("committed_at", null);
+  const { data: plan } = await sb
+    .from("provisioning_plan")
+    .select("*")
+    .eq("subject_id", subj.id)
+    .is("committed_at", null);
   for (const p of plan ?? []) {
     if (p.state === "na") {
-      await sb.from("provisioning_plan").update({ committed_at: new Date().toISOString() }).eq("id", p.id);
-      await audit(sb, jobId, orgId, subj.id, `Plan ${p.target_module} → N/A (admin)`, "admin_override", userId, "plan_na");
+      await sb
+        .from("provisioning_plan")
+        .update({ committed_at: new Date().toISOString() })
+        .eq("id", p.id);
+      await audit(
+        sb,
+        jobId,
+        orgId,
+        subj.id,
+        `Plan ${p.target_module} → N/A (admin)`,
+        "admin_override",
+        userId,
+        "plan_na",
+      );
       continue;
     }
     try {
       if (p.planned_action === "enable_feature" && subj.subject_type === "client") {
         // Toggle on the per-client feature_config jsonb (existing column)
-        const { data: c } = await sb.from("clients").select("feature_config").eq("id", recordId).maybeSingle();
+        const { data: c } = await sb
+          .from("clients")
+          .select("feature_config")
+          .eq("id", recordId)
+          .maybeSingle();
         const fc = (c?.feature_config ?? {}) as Record<string, boolean>;
         fc[p.target_module] = true;
         await sb.from("clients").update({ feature_config: fc }).eq("id", recordId);
-      } else if (p.planned_action === "create_draft" && p.target_module === "behavior_plan" && subj.subject_type === "client") {
+      } else if (
+        p.planned_action === "create_draft" &&
+        p.target_module === "behavior_plan" &&
+        subj.subject_type === "client"
+      ) {
         // BSP as draft (features_enabled=false). bc_code required — guess Tier 1 default.
-        const { error } = await sb.from("behavior_support_clients").upsert({
-          organization_id: orgId,
-          client_id: recordId,
-          bc_code: "BC1",
-          features_enabled: false,
-        }, { onConflict: "client_id" });
+        const { error } = await sb.from("behavior_support_clients").upsert(
+          {
+            organization_id: orgId,
+            client_id: recordId,
+            bc_code: "BC1",
+            features_enabled: false,
+          },
+          { onConflict: "client_id" },
+        );
         if (error) throw new Error(`BSP draft: ${error.message}`);
       } else if (p.planned_action === "activate_requirements") {
         // Reuses existing nectar_requirements / staff_checklist_completion — no row to write here;
@@ -989,9 +1357,21 @@ async function applyProvisioning(
       } else {
         gaps.push(`Plan ${p.planned_action}/${p.target_module} noted (no automatic action)`);
       }
-      await sb.from("provisioning_plan").update({ committed_at: new Date().toISOString() }).eq("id", p.id);
+      await sb
+        .from("provisioning_plan")
+        .update({ committed_at: new Date().toISOString() })
+        .eq("id", p.id);
       const trace: AuditTrace = p.state === "added_by_admin" ? "admin_override" : "rule";
-      await audit(sb, jobId, orgId, subj.id, `Provisioned ${p.target_module} (${p.planned_action})`, trace, userId, "provision");
+      await audit(
+        sb,
+        jobId,
+        orgId,
+        subj.id,
+        `Provisioned ${p.target_module} (${p.planned_action})`,
+        trace,
+        userId,
+        "provision",
+      );
     } catch (e) {
       gaps.push(`Provisioning ${p.target_module} failed: ${(e as Error).message}`);
     }
@@ -1006,18 +1386,29 @@ async function applyAssignmentMap(
   jobId: string,
   userId: string,
 ) {
-  const { data: rows } = await sb.from("assignment_map")
-    .select("*").eq("import_job_id", jobId).eq("status", "confirmed");
+  const { data: rows } = await sb
+    .from("assignment_map")
+    .select("*")
+    .eq("import_job_id", jobId)
+    .eq("status", "confirmed");
   for (const r of rows ?? []) {
     // Resolve real ids from subjects' committed_record_id
     let staffId = r.staff_record_id;
     let clientId = r.client_record_id;
     if (!staffId && r.staff_subject_id) {
-      const { data: s } = await sb.from("import_subjects").select("committed_record_id").eq("id", r.staff_subject_id).maybeSingle();
+      const { data: s } = await sb
+        .from("import_subjects")
+        .select("committed_record_id")
+        .eq("id", r.staff_subject_id)
+        .maybeSingle();
       staffId = s?.committed_record_id ?? null;
     }
     if (!clientId && r.client_subject_id) {
-      const { data: c } = await sb.from("import_subjects").select("committed_record_id").eq("id", r.client_subject_id).maybeSingle();
+      const { data: c } = await sb
+        .from("import_subjects")
+        .select("committed_record_id")
+        .eq("id", r.client_subject_id)
+        .maybeSingle();
       clientId = c?.committed_record_id ?? null;
     }
     if (!staffId || !clientId) continue;
@@ -1026,11 +1417,11 @@ async function applyAssignmentMap(
     // Per assignment_map.service_codes: NULL = all of the client's authorized
     // codes (default); a populated array scopes to those codes; an empty array
     // is invalid (treat as NULL).
-    const codes: string[] | null = Array.isArray(r.service_codes) && r.service_codes.length > 0
-      ? r.service_codes
-      : null;
+    const codes: string[] | null =
+      Array.isArray(r.service_codes) && r.service_codes.length > 0 ? r.service_codes : null;
     // Existing row? Update service_codes (don't error on the unique pair).
-    const { data: prior } = await sb.from("staff_assignments")
+    const { data: prior } = await sb
+      .from("staff_assignments")
       .select("id, service_codes")
       .eq("organization_id", orgId)
       .eq("staff_id", staffId)
@@ -1038,7 +1429,8 @@ async function applyAssignmentMap(
       .maybeSingle();
     let writeError: { message: string } | null = null;
     if (prior?.id) {
-      const { error } = await sb.from("staff_assignments")
+      const { error } = await sb
+        .from("staff_assignments")
         .update({ service_codes: codes, is_group_home_assignment: isGroupHome })
         .eq("id", prior.id);
       writeError = error;
@@ -1054,16 +1446,36 @@ async function applyAssignmentMap(
       writeError = error;
     }
     if (!writeError) {
-      await sb.from("assignment_map").update({ staff_record_id: staffId, client_record_id: clientId }).eq("id", r.id);
-      await audit(sb, jobId, orgId, null, `Wired assignment ${r.relation_type}${codes ? ` (codes: ${codes.join(", ")})` : ""}`, "admin_override", userId, "wire_assignment");
+      await sb
+        .from("assignment_map")
+        .update({ staff_record_id: staffId, client_record_id: clientId })
+        .eq("id", r.id);
+      await audit(
+        sb,
+        jobId,
+        orgId,
+        null,
+        `Wired assignment ${r.relation_type}${codes ? ` (codes: ${codes.join(", ")})` : ""}`,
+        "admin_override",
+        userId,
+        "wire_assignment",
+      );
     }
-
   }
 }
 
 // --------------------------------------------------------------
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function audit(sb: any, jobId: string, orgId: string, subjectId: string | null, item: string, traces_to: AuditTrace, userId: string, action: string) {
+async function audit(
+  sb: any,
+  jobId: string,
+  orgId: string,
+  subjectId: string | null,
+  item: string,
+  traces_to: AuditTrace,
+  userId: string,
+  action: string,
+) {
   await sb.from("import_audit").insert({
     import_job_id: jobId,
     org_id: orgId,
@@ -1085,42 +1497,72 @@ export const getDoneReadout = createServerFn({ method: "POST" })
     if (!context.supabase || !context.userId) return { job: null, subjects: [], audit: [] };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
-    const { data: job } = await sb.from("import_jobs")
-      .select("id, status, mode, committed_at, submitted_at").eq("id", data.jobId).single();
+    const { data: job } = await sb
+      .from("import_jobs")
+      .select("id, status, mode, committed_at, submitted_at")
+      .eq("id", data.jobId)
+      .single();
     if (!job) throw new Error("Job not found");
 
-    const { data: subjects } = await sb.from("import_subjects")
-      .select("id, display_name, subject_type, match_status, review_decision, review_status, committed_at, committed_record_id, commit_error")
-      .eq("import_job_id", data.jobId).order("created_at");
+    const { data: subjects } = await sb
+      .from("import_subjects")
+      .select(
+        "id, display_name, subject_type, match_status, review_decision, review_status, committed_at, committed_record_id, commit_error",
+      )
+      .eq("import_job_id", data.jobId)
+      .order("created_at");
 
     const subjectSummaries: Array<{
-      id: string; display_name: string; subject_type: string; committed: boolean;
-      record_id: string | null; error: string | null; review_status: string;
-      requirements_met: number; requirements_total: number; gaps: string[];
-      staff_training?: { required: number; conditional_active: number; decisions_needed: number; hire_date_missing: boolean };
+      id: string;
+      display_name: string;
+      subject_type: string;
+      committed: boolean;
+      record_id: string | null;
+      error: string | null;
+      review_status: string;
+      requirements_met: number;
+      requirements_total: number;
+      gaps: string[];
+      staff_training?: {
+        required: number;
+        conditional_active: number;
+        decisions_needed: number;
+        hire_date_missing: boolean;
+      };
     }> = [];
 
     for (const s of subjects ?? []) {
-      const { data: certs } = await sb.from("import_cert_documents")
-        .select("cert_key, state, expiry_date").eq("import_subject_id", s.id);
+      const { data: certs } = await sb
+        .from("import_cert_documents")
+        .select("cert_key, state, expiry_date")
+        .eq("import_subject_id", s.id);
       const total = (certs ?? []).length;
       const met = (certs ?? []).filter((c: { state: string }) => c.state === "verified").length;
       const gaps: string[] = [];
       for (const c of certs ?? []) {
         if (c.state === "provisional") gaps.push(`${c.cert_key} provisional — reminder queued`);
         else if (c.state === "unverified") gaps.push(`${c.cert_key} pending`);
-        else if (c.expiry_date && new Date(c.expiry_date).getTime() < Date.now()) gaps.push(`${c.cert_key} expired`);
+        else if (c.expiry_date && new Date(c.expiry_date).getTime() < Date.now())
+          gaps.push(`${c.cert_key} expired`);
       }
       if (s.commit_error) gaps.unshift(s.commit_error);
 
-      let staffTraining: { required: number; conditional_active: number; decisions_needed: number; hire_date_missing: boolean } | undefined;
+      let staffTraining:
+        | {
+            required: number;
+            conditional_active: number;
+            decisions_needed: number;
+            hire_date_missing: boolean;
+          }
+        | undefined;
       if (s.subject_type === "employee" && s.committed_record_id) {
         const { data: prof } = await sb
           .from("profiles")
           .select("hire_date, start_date, staff_type_keys, requires_deescalation, requires_abi")
           .eq("id", s.committed_record_id)
           .maybeSingle();
-        const hireDateStr = (prof?.start_date as string | null) ?? (prof?.hire_date as string | null) ?? null;
+        const hireDateStr =
+          (prof?.start_date as string | null) ?? (prof?.hire_date as string | null) ?? null;
         const ctx = {
           hireDate: hireDateStr ? new Date(`${hireDateStr}T00:00:00Z`) : null,
           requiresDeescalation: (prof?.requires_deescalation as boolean | undefined) !== false,
@@ -1128,7 +1570,9 @@ export const getDoneReadout = createServerFn({ method: "POST" })
           // The import doesn't wire service-code assignments, so imported
           // staff_type values (e.g. "SLN, HHS") stand in for assigned codes —
           // same trigger logic getStaffChecklist uses once codes are assigned.
-          assignedCodes: ((prof?.staff_type_keys as string[] | null) ?? []).map((c) => c.toUpperCase()),
+          assignedCodes: ((prof?.staff_type_keys as string[] | null) ?? []).map((c) =>
+            c.toUpperCase(),
+          ),
         };
         const applicable = BASELINE_STAFF_TRAININGS.filter((t) => isBaselineApplicable(t, ctx));
         const required = applicable.filter((t) => t.conditional === "all").length;
@@ -1145,7 +1589,10 @@ export const getDoneReadout = createServerFn({ method: "POST" })
           decisions_needed: decisionsNeeded,
           hire_date_missing: !hireDateStr,
         };
-        if (!hireDateStr) gaps.push("No hire date — training deadlines cannot be calculated. Set hire date on their profile.");
+        if (!hireDateStr)
+          gaps.push(
+            "No hire date — training deadlines cannot be calculated. Set hire date on their profile.",
+          );
       }
 
       subjectSummaries.push({
@@ -1163,9 +1610,12 @@ export const getDoneReadout = createServerFn({ method: "POST" })
       });
     }
 
-    const { data: auditTrail } = await sb.from("import_audit")
+    const { data: auditTrail } = await sb
+      .from("import_audit")
       .select("id, item, traces_to, actor, action, created_at")
-      .eq("import_job_id", data.jobId).order("created_at", { ascending: false }).limit(200);
+      .eq("import_job_id", data.jobId)
+      .order("created_at", { ascending: false })
+      .limit(200);
 
     return { job, subjects: subjectSummaries, audit: auditTrail ?? [] };
   });

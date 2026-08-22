@@ -21,34 +21,91 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { previewClientUpdateFromDocument, applySelectedClientFields } from "@/lib/import-checklist.functions";
+import {
+  previewClientUpdateFromDocument,
+  applySelectedClientFields,
+} from "@/lib/import-checklist.functions";
 import { reclaimExternalCodesAsOurs } from "@/lib/client-billing-fix.functions";
 import { AddCodesControl } from "@/components/clients/add-codes-control";
 import { BillingCodesDetail } from "@/components/clients/billing-codes-detail";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
-
-
 
 import { ClientBudgetPanel } from "@/components/clients/client-budget-panel";
 import { ClientMealPlannerMount } from "@/components/clients/client-meal-planner-mount";
 import { ChoreChartForClient } from "@/components/chores/chore-chart-mount";
 
 import { CaseloadEditor } from "@/components/clients/caseload-editor";
-import { SectionPanel, SectionGroup, CareSection, CareGroup } from "@/components/clients/section-panel";
+import {
+  SectionPanel,
+  SectionGroup,
+  CareSection,
+  CareGroup,
+} from "@/components/clients/section-panel";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
 import { FaceSheetButton } from "@/components/clients/face-sheet-button";
-import { SectionsView, ClientSpecificTrainingCard, GoalsEditor, PublishConfirmDialog } from "@/components/clients/client-specific-training-card";
+import {
+  SectionsView,
+  ClientSpecificTrainingCard,
+  GoalsEditor,
+  PublishConfirmDialog,
+} from "@/components/clients/client-specific-training-card";
 import { FieldVisibilityToggle } from "@/components/clients/visibility-toggles";
 import { CodeAssignedStaff } from "@/components/clients/code-assigned-staff";
 import { CustomFieldsForSection } from "@/components/clients/custom-fields-panel";
 import { TargetBehaviorsPanel } from "@/components/clients/target-behaviors-panel";
 import { computeRestrictionCompletion, type RestrictionRecord } from "@/lib/hrc-restrictions";
 import { Scale } from "lucide-react";
-import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, Pill, RefreshCw, Sparkles, Trash2, Upload, UserCircle2, Target, ShieldCheck, GraduationCap, HeartHandshake, Users, UtensilsCrossed, ListChecks, UserCircle, FileUp, Clock, FileText, AlertOctagon, ClipboardList, Home as HomeIcon, CalendarClock, Wallet, FolderOpen, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  Pencil,
+  Pill,
+  RefreshCw,
+  Sparkles,
+  Trash2,
+  Upload,
+  UserCircle2,
+  Target,
+  ShieldCheck,
+  GraduationCap,
+  HeartHandshake,
+  Users,
+  UtensilsCrossed,
+  ListChecks,
+  UserCircle,
+  FileUp,
+  Clock,
+  FileText,
+  AlertOctagon,
+  ClipboardList,
+  Home as HomeIcon,
+  CalendarClock,
+  Wallet,
+  FolderOpen,
+  X,
+} from "lucide-react";
 import { clientFeatureVisible, useClientFeature } from "@/lib/client-features";
 import { MarEmarTab } from "@/components/workspace/mar-emar-tab";
 import {
@@ -67,19 +124,45 @@ import {
   type CSTReviewQuestion,
 } from "@/lib/client-specific-training.functions";
 import { useClientBillingCodes } from "@/hooks/use-client-billing-codes";
+import { onPcspActivated } from "@/lib/company-obligations.functions";
 import { computeSupportStrategyCoverage } from "@/lib/support-strategy-coverage";
 
-type ProfileTab = "identity" | "care-plan" | "billing" | "files" | "activity" | "operations" | "compliance";
+type ProfileTab =
+  | "identity"
+  | "care-plan"
+  | "billing"
+  | "files"
+  | "activity"
+  | "operations"
+  | "compliance";
 
 const search = z.object({
   tab: z
     .enum([
       // canonical four + siblings
-      "identity", "care-plan", "billing", "files", "activity", "operations", "compliance",
+      "identity",
+      "care-plan",
+      "billing",
+      "files",
+      "activity",
+      "operations",
+      "compliance",
       // legacy deep-link values kept for backwards compat
-      "profile", "care", "funds", "pcsp",
-      "overview", "plan", "codes", "caseload", "shifts", "logs", "incidents",
-      "summaries", "hhcert", "deadlines", "documents",
+      "profile",
+      "care",
+      "funds",
+      "pcsp",
+      "overview",
+      "plan",
+      "codes",
+      "caseload",
+      "shifts",
+      "logs",
+      "incidents",
+      "summaries",
+      "hhcert",
+      "deadlines",
+      "documents",
     ])
     .optional(),
 });
@@ -100,8 +183,16 @@ export const Route = createFileRoute("/dashboard/clients/$clientId")({
 function resolveTab(raw: string | undefined): ProfileTab {
   if (!raw) return "identity";
   // canonical
-  if (raw === "identity" || raw === "care-plan" || raw === "billing" || raw === "files" ||
-      raw === "activity" || raw === "operations" || raw === "compliance") return raw;
+  if (
+    raw === "identity" ||
+    raw === "care-plan" ||
+    raw === "billing" ||
+    raw === "files" ||
+    raw === "activity" ||
+    raw === "operations" ||
+    raw === "compliance"
+  )
+    return raw;
   // legacy
   if (raw === "profile" || raw === "overview") return "identity";
   if (raw === "care" || raw === "plan") return "care-plan";
@@ -113,7 +204,15 @@ function resolveTab(raw: string | undefined): ProfileTab {
   return "identity";
 }
 
-function CollapsibleSimpleCard({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
+function CollapsibleSimpleCard({
+  title,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <Card>
@@ -156,7 +255,9 @@ function ClientProfileHub() {
       const { data, error } = await supabase
         .from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select("id, first_name, last_name, phone_number, physical_address, date_of_birth, medicaid_id, account_status, authorized_dspd_codes, pcsp_goals, job_code, special_directions, emergency_contact_name, emergency_contact_phone, emergency_contact_instructions, emergency_contact_2_name, emergency_contact_2_phone, emergency_contact_2_instructions, level_of_need, form_1056_number, form_1056_approved_date, grievance_acknowledged, grievance_signed_date, rights_restrictions, dnr_status, dnr_location, polst_status, palliative_care_status, hospice_status, team_id, admin_hours_per_week, feature_config, support_coordinator_name, support_coordinator_email, support_coordinator_phone, disability_category, bsp_status, diagnoses, advanced_directives, admission_date, discharge_date" as any)
+        .select(
+          "id, first_name, last_name, phone_number, physical_address, date_of_birth, medicaid_id, account_status, authorized_dspd_codes, pcsp_goals, job_code, special_directions, emergency_contact_name, emergency_contact_phone, emergency_contact_instructions, emergency_contact_2_name, emergency_contact_2_phone, emergency_contact_2_instructions, level_of_need, form_1056_number, form_1056_approved_date, grievance_acknowledged, grievance_signed_date, rights_restrictions, dnr_status, dnr_location, polst_status, palliative_care_status, hospice_status, team_id, admin_hours_per_week, feature_config, support_coordinator_name, support_coordinator_email, support_coordinator_phone, disability_category, bsp_status, diagnoses, advanced_directives, admission_date, discharge_date" as any,
+        )
         .eq("id", clientId)
         .maybeSingle();
       if (error) throw error;
@@ -171,8 +272,8 @@ function ClientProfileHub() {
   const codes: string[] = Array.isArray(client?.job_code)
     ? (client?.job_code as string[])
     : Array.isArray(client?.authorized_dspd_codes)
-    ? (client?.authorized_dspd_codes as string[])
-    : [];
+      ? (client?.authorized_dspd_codes as string[])
+      : [];
   const featureClient = client
     ? {
         feature_config: (client.feature_config as Record<string, boolean> | null) ?? null,
@@ -197,7 +298,9 @@ function ClientProfileHub() {
   // the MAR/eMAR sub-tab so an admin can add the first medication for a
   // client with none — MarEmarTab handles its own empty/add state.
   const showEmarSubTab = true;
-  void emarFeatureEnabled; void hasMedMonitoringCode; void hasMedications;
+  void emarFeatureEnabled;
+  void hasMedMonitoringCode;
+  void hasMedications;
 
   const disabilityCategory = client?.disability_category as string | null | undefined;
 
@@ -205,16 +308,24 @@ function ClientProfileHub() {
     <div className="container mx-auto max-w-7xl px-4 py-6 space-y-6">
       {/* Back nav + client header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => router.navigate({ to: "/dashboard/hub/clients" })}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.navigate({ to: "/dashboard/hub/clients" })}
+        >
           <ArrowLeft className="h-4 w-4 mr-1" /> Client directory
         </Button>
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold truncate">{fullName}</h1>
           <div className="flex flex-wrap gap-2 mt-1 text-xs text-muted-foreground">
             {client?.medicaid_id ? <span>Medicaid #{String(client.medicaid_id)}</span> : null}
-            {client?.account_status ? <Badge variant="outline">{String(client.account_status)}</Badge> : null}
+            {client?.account_status ? (
+              <Badge variant="outline">{String(client.account_status)}</Badge>
+            ) : null}
             {isHostHome ? <Badge variant="secondary">Host home</Badge> : null}
-            {disabilityCategory === "ABI" && <Badge className="bg-amber-100 text-amber-800 border border-amber-200">ABI</Badge>}
+            {disabilityCategory === "ABI" && (
+              <Badge className="bg-amber-100 text-amber-800 border border-amber-200">ABI</Badge>
+            )}
             {disabilityCategory === "ID-RC" && <Badge variant="outline">ID/RC</Badge>}
             <FaceSheetButton clientId={clientId} variant="pill" />
           </div>
@@ -266,11 +377,13 @@ function ClientProfileHub() {
                   <PlanGoalsPanel client={client} clientId={clientId} orgId={orgId} />
                 </CareSection>
               </CareGroup>
-
             </TabsContent>
 
             <TabsContent value="behaviors" className="space-y-6">
-              <CareGroup label="Target Behaviors" hint="Named behaviors staff should recognize and document — surfaces in clock-out behavior observations">
+              <CareGroup
+                label="Target Behaviors"
+                hint="Named behaviors staff should recognize and document — surfaces in clock-out behavior observations"
+              >
                 <CareSection icon={ClipboardList} accent="amber">
                   {orgId ? (
                     <TargetBehaviorsPanel clientId={clientId} orgId={orgId} />
@@ -282,7 +395,10 @@ function ClientProfileHub() {
             </TabsContent>
 
             <TabsContent value="medications" className="space-y-6">
-              <CareGroup label="Medications" hint="Medication list & eMAR — same record staff use on shift">
+              <CareGroup
+                label="Medications"
+                hint="Medication list & eMAR — same record staff use on shift"
+              >
                 <CareSection icon={Pill} accent="rose">
                   <MarEmarTab clientId={clientId} clientName={fullName} />
                 </CareSection>
@@ -295,7 +411,10 @@ function ClientProfileHub() {
         {/* BILLING — sole home for authorized codes, per-code rates,
             annual authorization units, and budget. */}
         <TabsContent value="billing" className="space-y-10">
-          <SectionGroup label="Authorizations & budget" hint="Billing codes, rates, annual units, and remaining funds">
+          <SectionGroup
+            label="Authorizations & budget"
+            hint="Billing codes, rates, annual units, and remaining funds"
+          >
             <SectionPanel icon={ShieldCheck} accent="emerald">
               <BillingCodesPanel clientId={clientId} />
             </SectionPanel>
@@ -308,7 +427,10 @@ function ClientProfileHub() {
 
         {/* FILES — sole home for uploaded source documents (incl. PCSPs). */}
         <TabsContent value="files" className="space-y-10">
-          <SectionGroup label="Documents" hint="Uploaded files for this client — PCSPs, 1056s, intake, and more">
+          <SectionGroup
+            label="Documents"
+            hint="Uploaded files for this client — PCSPs, 1056s, intake, and more"
+          >
             <SectionPanel icon={FolderOpen} accent="sky">
               <ClientDocumentsCard clientId={clientId} clientName={fullName} />
             </SectionPanel>
@@ -420,9 +542,19 @@ function TrainingSetupBadge({ clientId }: { clientId: string }) {
   );
 }
 
-function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; clientId: string; orgId?: string }) {
+function PlanGoalsPanel({
+  client,
+  clientId,
+  orgId,
+}: {
+  client: ClientRow;
+  clientId: string;
+  orgId?: string;
+}) {
   const qc = useQueryClient();
-  const codes = Array.isArray(client?.authorized_dspd_codes) ? (client!.authorized_dspd_codes as string[]) : [];
+  const codes = Array.isArray(client?.authorized_dspd_codes)
+    ? (client!.authorized_dspd_codes as string[])
+    : [];
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -430,6 +562,7 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
   const extractFn = useServerFn(extractPcspGoalsForTraining);
   const updateCST = useServerFn(updateClientSpecificTraining);
   const draftBlankCST = useServerFn(draftClientSpecificTrainingBlank);
+  const pcspClockFn = useServerFn(onPcspActivated);
   const { data: cstData } = useQuery({
     queryKey: ["client-specific-training", clientId],
     queryFn: () => getCST({ data: { clientId } }),
@@ -449,7 +582,8 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
     staleTime: 30_000,
   });
 
-  const extractedGoals = ((cstData?.training as { goals?: CSTGoal[] } | null)?.goals ?? []) as CSTGoal[];
+  const extractedGoals = ((cstData?.training as { goals?: CSTGoal[] } | null)?.goals ??
+    []) as CSTGoal[];
   const goalIsIncomplete = (g: CSTGoal) => !g.supports?.trim() || !g.details?.trim();
   const missingLabel = (g: CSTGoal) => {
     const ms = !g.supports?.trim();
@@ -474,8 +608,13 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
         if (!tid) throw new Error("Could not create training record");
       }
       await updateCST({ data: { id: tid, goals: draftGoals } });
-      const flat = draftGoals.map((g) => g.goal).filter((g): g is string => !!g && g.trim().length > 0);
-      const { error } = await supabase.from("clients").update({ pcsp_goals: flat }).eq("id", clientId);
+      const flat = draftGoals
+        .map((g) => g.goal)
+        .filter((g): g is string => !!g && g.trim().length > 0);
+      const { error } = await supabase
+        .from("clients")
+        .update({ pcsp_goals: flat })
+        .eq("id", clientId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -490,10 +629,11 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
   });
 
   function startManualEntry() {
-    setDraftGoals([{ id: crypto.randomUUID(), goal: "", supports: "", details: "", job_codes: [] } as CSTGoal]);
+    setDraftGoals([
+      { id: crypto.randomUUID(), goal: "", supports: "", details: "", job_codes: [] } as CSTGoal,
+    ]);
     setEditingGoals(true);
   }
-
 
   async function syncFlatGoals() {
     const res = await getCST({ data: { clientId } });
@@ -544,6 +684,13 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
         storage_path: path,
       });
       if (insErr) throw insErr;
+      if (orgId) {
+        try {
+          await pcspClockFn({ data: { organizationId: orgId, clientId } });
+        } catch {
+          /* Event clock must not block the PCSP upload. */
+        }
+      }
       // PCSP is one document shown in both Care and Files — refresh both.
       qc.invalidateQueries({ queryKey: ["client-docs", orgId, clientId] });
       qc.invalidateQueries({ queryKey: ["client-has-pcsp", clientId] });
@@ -588,7 +735,10 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
                   type="button"
                   size="sm"
                   variant="ghost"
-                  onClick={() => { setEditingGoals(false); setDraftGoals(null); }}
+                  onClick={() => {
+                    setEditingGoals(false);
+                    setDraftGoals(null);
+                  }}
                   disabled={saveGoalsMut.isPending}
                 >
                   Cancel
@@ -624,7 +774,11 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
                     disabled={busy}
                     className="gap-2"
                   >
-                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    {busy ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" />
+                    )}
                     {busy ? "Extracting…" : "Extract goals from existing PCSP"}
                   </Button>
                 ) : (
@@ -634,7 +788,11 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
                     disabled={busy || !orgId}
                     className="gap-2"
                   >
-                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    {busy ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" />
+                    )}
                     {busy ? "Extracting…" : "Upload PCSP & extract goals (NECTAR)"}
                   </Button>
                 )}
@@ -659,7 +817,10 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
                     type="button"
                     size="icon"
                     variant="ghost"
-                    onClick={() => { setDraftGoals(structuredClone(extractedGoals)); setEditingGoals(true); }}
+                    onClick={() => {
+                      setDraftGoals(structuredClone(extractedGoals));
+                      setEditingGoals(true);
+                    }}
                     disabled={busy}
                     aria-label="Edit goals"
                     className="h-7 w-7"
@@ -674,14 +835,19 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
                     disabled={busy}
                     className="gap-1"
                   >
-                    {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                    {busy ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3" />
+                    )}
                     Re-extract from PCSP
                   </Button>
                 </div>
               </div>
               {incompleteCount > 0 && (
                 <p className="text-xs text-amber-700 dark:text-amber-400">
-                  {incompleteCount} of {extractedGoals.length} goals need supports or details — click the pencil to add them.
+                  {incompleteCount} of {extractedGoals.length} goals need supports or details —
+                  click the pencil to add them.
                 </p>
               )}
               <ul className="space-y-2">
@@ -722,15 +888,24 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
                               ⚠ {missingLabel(g)}
                             </span>
                           )}
-                          {Array.isArray(g.job_codes) && g.job_codes.map((c, j) => (
-                            <Badge key={`${c}-${j}`} variant="outline" className="text-[10px]">{c}</Badge>
-                          ))}
+                          {Array.isArray(g.job_codes) &&
+                            g.job_codes.map((c, j) => (
+                              <Badge key={`${c}-${j}`} variant="outline" className="text-[10px]">
+                                {c}
+                              </Badge>
+                            ))}
                         </div>
                       )}
                       {isOpen && (
                         <div className="mt-2 space-y-1 pl-5 text-xs text-muted-foreground">
-                          <p><span className="font-medium text-foreground">Supports:</span> {g.supports?.trim() ? g.supports : "—"}</p>
-                          <p><span className="font-medium text-foreground">Details:</span> {g.details?.trim() ? g.details : "—"}</p>
+                          <p>
+                            <span className="font-medium text-foreground">Supports:</span>{" "}
+                            {g.supports?.trim() ? g.supports : "—"}
+                          </p>
+                          <p>
+                            <span className="font-medium text-foreground">Details:</span>{" "}
+                            {g.details?.trim() ? g.details : "—"}
+                          </p>
                         </div>
                       )}
                     </li>
@@ -745,19 +920,30 @@ function PlanGoalsPanel({ client, clientId, orgId }: { client: ClientRow; client
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">Authorized DSPD codes</CardTitle>
           <Button asChild variant="ghost" size="sm">
-            <Link to="/dashboard/clients/$clientId" params={{ clientId }} search={{ tab: "billing" }}>
+            <Link
+              to="/dashboard/clients/$clientId"
+              params={{ clientId }}
+              search={{ tab: "billing" }}
+            >
               Manage in Billing →
             </Link>
           </Button>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           <p className="text-xs text-muted-foreground">
-            Read-only reference. Codes, rates, dates, and staff assignments are managed on the Billing tab.
+            Read-only reference. Codes, rates, dates, and staff assignments are managed on the
+            Billing tab.
           </p>
           <div className="flex flex-wrap gap-1.5">
             {codes.length === 0 ? (
               <span className="text-muted-foreground">None.</span>
-            ) : codes.map((c) => <Badge key={c} variant="outline">{c}</Badge>)}
+            ) : (
+              codes.map((c) => (
+                <Badge key={c} variant="outline">
+                  {c}
+                </Badge>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
@@ -785,7 +971,14 @@ function SSStatusBadge({ status, version }: { status: string; version: number })
   );
 }
 
-function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; clientId: string; orgId?: string }) {
+function SupportStrategiesPanel({
+  clientId,
+  orgId,
+}: {
+  client: ClientRow;
+  clientId: string;
+  orgId?: string;
+}) {
   const qc = useQueryClient();
   const getSS = useServerFn(getSupportStrategiesTraining);
   const draftSS = useServerFn(draftSupportStrategies);
@@ -824,10 +1017,15 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
   });
 
   type SSRow = {
-    id: string; title: string; content: CSTContent;
+    id: string;
+    title: string;
+    content: CSTContent;
     review_questions: CSTReviewQuestion[] | null;
-    status: string; version: number;
-    approved_by: string | null; approved_at: string | null; updated_at: string;
+    status: string;
+    version: number;
+    approved_by: string | null;
+    approved_at: string | null;
+    updated_at: string;
   };
   const training = (data?.training ?? null) as SSRow | null;
 
@@ -855,7 +1053,10 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
 
   const publishMut = useMutation({
     mutationFn: (id: string) => publishFn({ data: { id } }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey }); toast.success("Support strategies published."); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey });
+      toast.success("Support strategies published.");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -901,11 +1102,15 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
         <DialogHeader>
           <DialogTitle>Upload the PCSP first</DialogTitle>
           <DialogDescription>
-            This client has no PCSP on file. Support strategies and client-specific training are built from the PCSP, so you'll need to upload it before drafting. Add it under the client's Files tab.
+            This client has no PCSP on file. Support strategies and client-specific training are
+            built from the PCSP, so you'll need to upload it before drafting. Add it under the
+            client's Files tab.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setShowPcspPrompt(false)}>Got it</Button>
+          <Button variant="outline" onClick={() => setShowPcspPrompt(false)}>
+            Got it
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -920,31 +1125,49 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Support strategies are required for each PCSP goal (SOW §1.24). NECTAR pulls your goals verbatim; you write the staff instructions.
+              Support strategies are required for each PCSP goal (SOW §1.24). NECTAR pulls your
+              goals verbatim; you write the staff instructions.
             </p>
             {!pcspReady && (
               <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
-                Upload a PCSP to get started — drafting is disabled until a PCSP is on file (add it from the client's Files tab).
+                Upload a PCSP to get started — drafting is disabled until a PCSP is on file (add it
+                from the client's Files tab).
               </div>
             )}
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" onClick={() => pcspReady ? draftMut.mutate("nectar") : setShowPcspPrompt(true)} disabled={draftMut.isPending}>
-                {draftMut.isPending
-                  ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  : <Sparkles className="mr-1.5 h-3.5 w-3.5 text-amber-500" />}
+              <Button
+                size="sm"
+                onClick={() => (pcspReady ? draftMut.mutate("nectar") : setShowPcspPrompt(true))}
+                disabled={draftMut.isPending}
+              >
+                {draftMut.isPending ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-1.5 h-3.5 w-3.5 text-amber-500" />
+                )}
                 Build from PCSP goals (NECTAR)
               </Button>
-              <Button size="sm" variant="outline" onClick={() => pcspReady ? draftMut.mutate("blank") : setShowPcspPrompt(true)} disabled={draftMut.isPending}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => (pcspReady ? draftMut.mutate("blank") : setShowPcspPrompt(true))}
+                disabled={draftMut.isPending}
+              >
                 Write manually
               </Button>
               <Button
-                size="sm" variant="outline"
-                onClick={() => pcspReady ? fileInputRef.current?.click() : setShowPcspPrompt(true)}
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  pcspReady ? fileInputRef.current?.click() : setShowPcspPrompt(true)
+                }
                 disabled={uploading || !orgId}
               >
-                {uploading
-                  ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  : <Upload className="mr-1.5 h-3.5 w-3.5" />}
+                {uploading ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Upload className="mr-1.5 h-3.5 w-3.5" />
+                )}
                 Upload document
               </Button>
               {fileInput}
@@ -960,7 +1183,8 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
 
   if (isUploadDoc(content)) {
     const linkItem = content.sections[0].items[0];
-    const fileName = linkItem.kind === "link" ? (linkItem.links[0]?.label ?? "document") : "document";
+    const fileName =
+      linkItem.kind === "link" ? (linkItem.links[0]?.label ?? "document") : "document";
     return (
       <>
         <Card>
@@ -972,42 +1196,65 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
                 aria-label={bodyOpen ? "Collapse" : "Expand"}
                 className="rounded p-1 hover:bg-muted"
               >
-                {bodyOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                {bodyOpen ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
               </button>
               <CardTitle className="text-base">Support strategies</CardTitle>
             </div>
             <SSStatusBadge status={training.status} version={training.version} />
           </CardHeader>
           {bodyOpen && (
-          <CardContent className="space-y-3">
-            <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 p-3 text-sm">
-              <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
-              <div className="min-w-0">
-                <p className="font-medium truncate">{fileName}</p>
-                <p className="text-xs text-muted-foreground">Uploaded provider document</p>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 p-3 text-sm">
+                <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-medium truncate">{fileName}</p>
+                  <p className="text-xs text-muted-foreground">Uploaded provider document</p>
+                </div>
               </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {training.status !== "published" && (
-                <Button size="sm" onClick={() => pcspReady ? setShowPublishDialog(true) : setShowPcspPrompt(true)} disabled={publishMut.isPending}>
-                  {publishMut.isPending
-                    ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                    : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
-                  Approve & Publish
+              <div className="flex flex-wrap gap-2">
+                {training.status !== "published" && (
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      pcspReady ? setShowPublishDialog(true) : setShowPcspPrompt(true)
+                    }
+                    disabled={publishMut.isPending}
+                  >
+                    {publishMut.isPending ? (
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                    )}
+                    Approve & Publish
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    pcspReady ? fileInputRef.current?.click() : setShowPcspPrompt(true)
+                  }
+                  disabled={uploading || !orgId}
+                >
+                  {uploading ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  Replace
                 </Button>
+                {fileInput}
+              </div>
+              {!pcspReady && (
+                <p className="text-xs text-amber-700">
+                  Upload a PCSP to get started — publishing is disabled until a PCSP is on file.
+                </p>
               )}
-              <Button size="sm" variant="outline" onClick={() => pcspReady ? fileInputRef.current?.click() : setShowPcspPrompt(true)} disabled={uploading || !orgId}>
-                {uploading
-                  ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  : <Upload className="mr-1.5 h-3.5 w-3.5" />}
-                Replace
-              </Button>
-              {fileInput}
-            </div>
-            {!pcspReady && (
-              <p className="text-xs text-amber-700">Upload a PCSP to get started — publishing is disabled until a PCSP is on file.</p>
-            )}
-          </CardContent>
+            </CardContent>
           )}
         </Card>
         {pcspDialog}
@@ -1037,7 +1284,11 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
               aria-label={bodyOpen ? "Collapse" : "Expand"}
               className="rounded p-1 hover:bg-muted"
             >
-              {bodyOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              {bodyOpen ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
             </button>
             <CardTitle className="text-base">Support strategies</CardTitle>
           </div>
@@ -1045,41 +1296,82 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
             <SSStatusBadge status={training.status} version={training.version} />
             {!editing ? (
               <>
-                <Button variant="outline" size="sm" onClick={() => {
-                  if (!pcspReady) { setShowPcspPrompt(true); return; }
-                  setDraftContent(structuredClone(content));
-                  setEditing(true);
-                }}>Edit</Button>
                 <Button
-                  variant="outline" size="sm"
+                  variant="outline"
+                  size="sm"
                   onClick={() => {
-                    if (!pcspReady) { setShowPcspPrompt(true); return; }
-                    if (window.confirm("Rebuild from current PCSP goals? The existing draft will be replaced.")) {
+                    if (!pcspReady) {
+                      setShowPcspPrompt(true);
+                      return;
+                    }
+                    setDraftContent(structuredClone(content));
+                    setEditing(true);
+                  }}
+                >
+                  Edit
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (!pcspReady) {
+                      setShowPcspPrompt(true);
+                      return;
+                    }
+                    if (
+                      window.confirm(
+                        "Rebuild from current PCSP goals? The existing draft will be replaced.",
+                      )
+                    ) {
                       draftMut.mutate("rebuild");
                     }
                   }}
                   disabled={draftMut.isPending}
                 >
-                  {draftMut.isPending
-                    ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                    : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
+                  {draftMut.isPending ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                  )}
                   Rebuild from goals
                 </Button>
                 {training.status !== "published" && (
-                  <Button size="sm" onClick={() => pcspReady ? setShowPublishDialog(true) : setShowPcspPrompt(true)} disabled={publishMut.isPending}>
-                    {publishMut.isPending
-                      ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                      : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      pcspReady ? setShowPublishDialog(true) : setShowPcspPrompt(true)
+                    }
+                    disabled={publishMut.isPending}
+                  >
+                    {publishMut.isPending ? (
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                    )}
                     Approve & Publish
                   </Button>
                 )}
               </>
             ) : (
               <>
-                <Button variant="ghost" size="sm" onClick={() => { setEditing(false); setDraftContent(null); }}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditing(false);
+                    setDraftContent(null);
+                  }}
+                >
                   Cancel
                 </Button>
-                <Button size="sm" onClick={() => { if (training && draftContent) updateMut.mutate({ id: training.id, content: draftContent }); }} disabled={updateMut.isPending}>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (training && draftContent)
+                      updateMut.mutate({ id: training.id, content: draftContent });
+                  }}
+                  disabled={updateMut.isPending}
+                >
                   {updateMut.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                   Save
                 </Button>
@@ -1088,23 +1380,24 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
           </div>
         </CardHeader>
         {bodyOpen && (
-        <CardContent className="space-y-4">
-          {!pcspReady && (
-            <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
-              Upload a PCSP to get started — editing and publishing are disabled until a PCSP is on file (add it from the client's Files tab).
-            </div>
-          )}
-          {training.status === "published" && (
-            <SupportStrategyCoveragePanel clientId={clientId} sections={content.sections} />
-          )}
-          <SectionsView
-            content={workingContent}
-            editing={editing}
-            onChange={setDraftContent}
-            clientId={clientId}
-            showJobCodes
-          />
-        </CardContent>
+          <CardContent className="space-y-4">
+            {!pcspReady && (
+              <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
+                Upload a PCSP to get started — editing and publishing are disabled until a PCSP is
+                on file (add it from the client's Files tab).
+              </div>
+            )}
+            {training.status === "published" && (
+              <SupportStrategyCoveragePanel clientId={clientId} sections={content.sections} />
+            )}
+            <SectionsView
+              content={workingContent}
+              editing={editing}
+              onChange={setDraftContent}
+              clientId={clientId}
+              showJobCodes
+            />
+          </CardContent>
         )}
       </Card>
       {pcspDialog}
@@ -1123,31 +1416,52 @@ function SupportStrategiesPanel({ clientId, orgId }: { client: ClientRow; client
 
 // SOW §1.24(5): every active, non-exempt billing code must be covered by at
 // least one published Support Strategy section's job_codes.
-function SupportStrategyCoveragePanel({ clientId, sections }: { clientId: string; sections: CSTSection[] }) {
+function SupportStrategyCoveragePanel({
+  clientId,
+  sections,
+}: {
+  clientId: string;
+  sections: CSTSection[];
+}) {
   const { data: billingCodes } = useClientBillingCodes(clientId);
   const coverage = useMemo(
-    () => computeSupportStrategyCoverage((billingCodes ?? []).map((c) => c.service_code), sections),
+    () =>
+      computeSupportStrategyCoverage(
+        (billingCodes ?? []).map((c) => c.service_code),
+        sections,
+      ),
     [billingCodes, sections],
   );
   if (coverage.covered.length === 0 && coverage.gaps.length === 0) return null;
   return (
     <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-2">
-      <p className="text-xs font-medium text-muted-foreground">Service code coverage (SOW §1.24(5))</p>
+      <p className="text-xs font-medium text-muted-foreground">
+        Service code coverage (SOW §1.24(5))
+      </p>
       <div className="flex flex-wrap gap-1.5">
         {coverage.covered.map((c) => (
-          <span key={c} className="inline-flex items-center gap-1 rounded bg-emerald-100 text-emerald-800 px-1.5 py-0.5 text-xs font-mono">
-            <CheckCircle2 className="h-3 w-3" />{c}
+          <span
+            key={c}
+            className="inline-flex items-center gap-1 rounded bg-emerald-100 text-emerald-800 px-1.5 py-0.5 text-xs font-mono"
+          >
+            <CheckCircle2 className="h-3 w-3" />
+            {c}
           </span>
         ))}
         {coverage.gaps.map((c) => (
-          <span key={c} className="inline-flex items-center gap-1 rounded bg-red-100 text-red-800 px-1.5 py-0.5 text-xs font-mono">
-            <AlertTriangle className="h-3 w-3" />{c}
+          <span
+            key={c}
+            className="inline-flex items-center gap-1 rounded bg-red-100 text-red-800 px-1.5 py-0.5 text-xs font-mono"
+          >
+            <AlertTriangle className="h-3 w-3" />
+            {c}
           </span>
         ))}
       </div>
       {coverage.gaps.length > 0 && (
         <p className="text-xs text-red-700">
-          {coverage.gaps.join(", ")} {coverage.gaps.length === 1 ? "is" : "are"} not covered by any support strategy.
+          {coverage.gaps.join(", ")} {coverage.gaps.length === 1 ? "is" : "are"} not covered by any
+          support strategy.
         </p>
       )}
     </div>
@@ -1187,9 +1501,15 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
         .eq("training_type", "person_centered")
         .maybeSingle();
       if (error) throw error;
-      return data as { id: string; status: string; version: number; updated_at: string | null; approved_at: string | null; review_questions: Array<{ id: string; tab?: string; prompt: string }> | null } | null;
+      return data as {
+        id: string;
+        status: string;
+        version: number;
+        updated_at: string | null;
+        approved_at: string | null;
+        review_questions: Array<{ id: string; tab?: string; prompt: string }> | null;
+      } | null;
     },
-
   });
 
   const createMut = useMutation({
@@ -1223,7 +1543,11 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
               aria-label={bodyOpen ? "Collapse" : "Expand"}
               className="rounded p-1 hover:bg-muted"
             >
-              {bodyOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              {bodyOpen ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
             </button>
             <UserCircle2 className="h-4 w-4 text-muted-foreground" />
             <CardTitle className="text-base">Person-Centered Thinking</CardTitle>
@@ -1235,43 +1559,66 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
               </Badge>
             )}
             {!training && !q.isLoading && (
-              <Button size="sm" onClick={() => pcspReady ? createMut.mutate() : setShowPcspPrompt(true)} disabled={createMut.isPending}>
-                {createMut.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+              <Button
+                size="sm"
+                onClick={() => (pcspReady ? createMut.mutate() : setShowPcspPrompt(true))}
+                disabled={createMut.isPending}
+              >
+                {createMut.isPending ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                )}
                 Create profile
               </Button>
             )}
             {training && training.status !== "published" && (
-              <Button size="sm" onClick={() => pcspReady ? setShowPublish(true) : setShowPcspPrompt(true)} disabled={publishMut.isPending}>
-                {publishMut.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
+              <Button
+                size="sm"
+                onClick={() => (pcspReady ? setShowPublish(true) : setShowPcspPrompt(true))}
+                disabled={publishMut.isPending}
+              >
+                {publishMut.isPending ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                )}
                 Review & Publish
               </Button>
             )}
-
           </div>
         </CardHeader>
         {bodyOpen && (
           <CardContent className="text-sm text-muted-foreground space-y-3">
             {!pcspReady && (
               <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
-                Upload a PCSP to get started — this profile is part of the PCSP-derived workflow. Creating and publishing are disabled until a PCSP is on file (add it from the client's Files tab).
+                Upload a PCSP to get started — this profile is part of the PCSP-derived workflow.
+                Creating and publishing are disabled until a PCSP is on file (add it from the
+                client's Files tab).
               </div>
             )}
             {q.isLoading ? (
-              <span className="inline-flex items-center gap-2"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…</span>
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+              </span>
             ) : !training ? (
               <p>
                 A person-centered profile is completed by staff together with the client, capturing
-                who they are and how they want to be supported. Create the profile to publish the
-                10 standard questions for staff to complete.
+                who they are and how they want to be supported. Create the profile to publish the 10
+                standard questions for staff to complete.
               </p>
             ) : training.status === "published" ? (
               <p>
-                Published{training.approved_at ? ` on ${new Date(training.approved_at).toLocaleDateString()}` : ""}.
-                Staff can complete the profile from their client training list.
+                Published
+                {training.approved_at
+                  ? ` on ${new Date(training.approved_at).toLocaleDateString()}`
+                  : ""}
+                . Staff can complete the profile from their client training list.
               </p>
             ) : (
               <p>
-                Review the questions and publish to assign this profile to staff for completion with the person.
+                Review the questions and publish to assign this profile to staff for completion with
+                the person.
               </p>
             )}
           </CardContent>
@@ -1294,11 +1641,15 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
           <DialogHeader>
             <DialogTitle>Upload the PCSP first</DialogTitle>
             <DialogDescription>
-              This client has no PCSP on file. The Person-Centered Profile is part of the PCSP-derived workflow, so upload the PCSP before creating or publishing. Add it under the client's Files tab.
+              This client has no PCSP on file. The Person-Centered Profile is part of the
+              PCSP-derived workflow, so upload the PCSP before creating or publishing. Add it under
+              the client's Files tab.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPcspPrompt(false)}>Got it</Button>
+            <Button variant="outline" onClick={() => setShowPcspPrompt(false)}>
+              Got it
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1322,9 +1673,10 @@ function BillingCodesPanel({ clientId }: { clientId: string }) {
       if (cErr) throw cErr;
       if (eErr) throw eErr;
       const known = new Set(
-        (Array.isArray(client?.authorized_dspd_codes) ? (client!.authorized_dspd_codes as string[]) : []).map((c) =>
-          c.toUpperCase(),
-        ),
+        (Array.isArray(client?.authorized_dspd_codes)
+          ? (client!.authorized_dspd_codes as string[])
+          : []
+        ).map((c) => c.toUpperCase()),
       );
       const missing = Array.from(
         new Set((ext ?? []).map((r) => String(r.service_code ?? "").toUpperCase()).filter(Boolean)),
@@ -1354,8 +1706,10 @@ function BillingCodesPanel({ clientId }: { clientId: string }) {
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-50/60 px-4 py-2.5 text-xs text-amber-900 dark:bg-amber-950/20 dark:text-amber-200">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
           <span className="min-w-0">
-            {reclaimableCodes.length} code{reclaimableCodes.length === 1 ? "" : "s"} from this client's PCSP {reclaimableCodes.length === 1 ? "isn't" : "aren't"} authorized here:{" "}
-            <span className="font-medium">{reclaimableCodes.join(", ")}</span>. Smart Import may have filed {reclaimableCodes.length === 1 ? "it" : "them"} as another provider's.
+            {reclaimableCodes.length} code{reclaimableCodes.length === 1 ? "" : "s"} from this
+            client's PCSP {reclaimableCodes.length === 1 ? "isn't" : "aren't"} authorized here:{" "}
+            <span className="font-medium">{reclaimableCodes.join(", ")}</span>. Smart Import may
+            have filed {reclaimableCodes.length === 1 ? "it" : "them"} as another provider's.
           </span>
           <Button
             type="button"
@@ -1392,7 +1746,6 @@ function BillingCodesPanel({ clientId }: { clientId: string }) {
   );
 }
 
-
 function ShiftsPanel({ clientId, orgId }: { clientId: string; orgId?: string }) {
   const q = useQuery({
     enabled: !!orgId,
@@ -1400,7 +1753,9 @@ function ShiftsPanel({ clientId, orgId }: { clientId: string; orgId?: string }) 
     queryFn: async () => {
       const { data, error } = await supabase
         .from("evv_timesheets")
-        .select("id, service_type_code, status, clock_in_timestamp, clock_out_timestamp, staff_id, billed_units")
+        .select(
+          "id, service_type_code, status, clock_in_timestamp, clock_out_timestamp, staff_id, billed_units",
+        )
         .eq("organization_id", orgId!)
         .eq("client_id", clientId)
         .order("clock_in_timestamp", { ascending: false })
@@ -1412,15 +1767,24 @@ function ShiftsPanel({ clientId, orgId }: { clientId: string; orgId?: string }) 
   });
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Recent shifts (last 200)</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="text-base">Recent shifts (last 200)</CardTitle>
+      </CardHeader>
       <CardContent className="p-0">
         <ReadOnlyTable
           loading={q.isLoading}
           empty="No shifts recorded for this client."
           rows={q.data ?? []}
           columns={[
-            { header: "Date", cell: (r) => r.clock_in_timestamp ? new Date(r.clock_in_timestamp).toLocaleDateString() : "—" },
-            { header: "Code", cell: (r) => <code className="font-mono">{r.service_type_code ?? "—"}</code> },
+            {
+              header: "Date",
+              cell: (r) =>
+                r.clock_in_timestamp ? new Date(r.clock_in_timestamp).toLocaleDateString() : "—",
+            },
+            {
+              header: "Code",
+              cell: (r) => <code className="font-mono">{r.service_type_code ?? "—"}</code>,
+            },
             { header: "Status", cell: (r) => <Badge variant="outline">{r.status ?? "—"}</Badge> },
             { header: "Units", cell: (r) => r.billed_units ?? "—" },
           ]}
@@ -1449,7 +1813,9 @@ function DailyLogsPanel({ clientId, orgId }: { clientId: string; orgId?: string 
   });
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Daily logs (last 100)</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="text-base">Daily logs (last 100)</CardTitle>
+      </CardHeader>
       <CardContent className="p-0">
         <ReadOnlyTable
           loading={q.isLoading}
@@ -1458,8 +1824,14 @@ function DailyLogsPanel({ clientId, orgId }: { clientId: string; orgId?: string 
           columns={[
             { header: "Date", cell: (r) => r.log_date ?? "—" },
             { header: "Status", cell: (r) => <Badge variant="outline">{r.status ?? "—"}</Badge> },
-            { header: "Submitted", cell: (r) => r.submitted_at ? new Date(r.submitted_at).toLocaleDateString() : "—" },
-            { header: "Narrative", cell: (r) => <span className="line-clamp-2 max-w-md">{r.narrative ?? "—"}</span> },
+            {
+              header: "Submitted",
+              cell: (r) => (r.submitted_at ? new Date(r.submitted_at).toLocaleDateString() : "—"),
+            },
+            {
+              header: "Narrative",
+              cell: (r) => <span className="line-clamp-2 max-w-md">{r.narrative ?? "—"}</span>,
+            },
           ]}
         />
       </CardContent>
@@ -1474,7 +1846,9 @@ function IncidentsPanel({ clientId, orgId }: { clientId: string; orgId?: string 
     queryFn: async () => {
       const { data, error } = await supabase
         .from("incident_reports")
-        .select("id, incident_date, incident_types, status, is_abuse_neglect, is_fatality, report_number")
+        .select(
+          "id, incident_date, incident_types, status, is_abuse_neglect, is_fatality, report_number",
+        )
         .eq("organization_id", orgId!)
         .eq("client_id", clientId)
         .order("incident_date", { ascending: false })
@@ -1486,7 +1860,9 @@ function IncidentsPanel({ clientId, orgId }: { clientId: string; orgId?: string 
   });
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Incidents</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="text-base">Incidents</CardTitle>
+      </CardHeader>
       <CardContent className="p-0">
         <ReadOnlyTable
           loading={q.isLoading}
@@ -1494,8 +1870,17 @@ function IncidentsPanel({ clientId, orgId }: { clientId: string; orgId?: string 
           rows={q.data ?? []}
           columns={[
             { header: "Date", cell: (r) => r.incident_date ?? "—" },
-            { header: "Report #", cell: (r) => <code className="font-mono text-xs">{r.report_number ?? "—"}</code> },
-            { header: "Types", cell: (r) => Array.isArray(r.incident_types) ? (r.incident_types as string[]).join(", ") || "—" : "—" },
+            {
+              header: "Report #",
+              cell: (r) => <code className="font-mono text-xs">{r.report_number ?? "—"}</code>,
+            },
+            {
+              header: "Types",
+              cell: (r) =>
+                Array.isArray(r.incident_types)
+                  ? (r.incident_types as string[]).join(", ") || "—"
+                  : "—",
+            },
             {
               header: "Flags",
               cell: (r) => (
@@ -1514,7 +1899,15 @@ function IncidentsPanel({ clientId, orgId }: { clientId: string; orgId?: string 
   );
 }
 
-function SummariesPanel({ clientId, orgId, client }: { clientId: string; orgId?: string; client: ClientRow }) {
+function SummariesPanel({
+  clientId,
+  orgId,
+  client,
+}: {
+  clientId: string;
+  orgId?: string;
+  client: ClientRow;
+}) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const q = useQuery({
@@ -1523,7 +1916,9 @@ function SummariesPanel({ clientId, orgId, client }: { clientId: string; orgId?:
     queryFn: async () => {
       const { data, error } = await supabase
         .from("client_progress_summaries")
-        .select("id, summary_kind, period_kind, period_label, period_start, period_end, status, finalized_at, due_date")
+        .select(
+          "id, summary_kind, period_kind, period_label, period_start, period_end, status, finalized_at, due_date",
+        )
         .eq("organization_id", orgId!)
         .eq("client_id", clientId)
         .order("period_end", { ascending: false })
@@ -1552,11 +1947,20 @@ function SummariesPanel({ clientId, orgId, client }: { clientId: string; orgId?:
           empty="No progress summaries on file."
           rows={q.data ?? []}
           columns={[
-            { header: "Kind", cell: (r) => <Badge variant="outline">{r.summary_kind ?? "—"}</Badge> },
+            {
+              header: "Kind",
+              cell: (r) => <Badge variant="outline">{r.summary_kind ?? "—"}</Badge>,
+            },
             { header: "Cadence", cell: (r) => r.period_kind ?? "—" },
-            { header: "Period", cell: (r) => r.period_label ?? `${r.period_start ?? "—"} → ${r.period_end ?? "—"}` },
+            {
+              header: "Period",
+              cell: (r) => r.period_label ?? `${r.period_start ?? "—"} → ${r.period_end ?? "—"}`,
+            },
             { header: "Status", cell: (r) => r.status ?? "—" },
-            { header: "Finalized", cell: (r) => r.finalized_at ? new Date(r.finalized_at).toLocaleDateString() : "—" },
+            {
+              header: "Finalized",
+              cell: (r) => (r.finalized_at ? new Date(r.finalized_at).toLocaleDateString() : "—"),
+            },
             {
               header: "",
               cell: (r) => (
@@ -1588,7 +1992,11 @@ function SummariesPanel({ clientId, orgId, client }: { clientId: string; orgId?:
 }
 
 function NewSummaryDialog({
-  clientId, orgId, serviceCodes, onClose, onCreated,
+  clientId,
+  orgId,
+  serviceCodes,
+  onClose,
+  onCreated,
 }: {
   clientId: string;
   orgId: string;
@@ -1677,11 +2085,19 @@ function NewSummaryDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="bg-background rounded-lg shadow-lg w-full max-w-md p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-background rounded-lg shadow-lg w-full max-w-md p-5 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div>
           <h3 className="text-base font-semibold">New progress summary</h3>
-          <p className="text-xs text-muted-foreground">Creates a draft row; open the editor to pre-fill from logs and finalize.</p>
+          <p className="text-xs text-muted-foreground">
+            Creates a draft row; open the editor to pre-fill from logs and finalize.
+          </p>
         </div>
         <div className="space-y-3 text-sm">
           <div className="grid grid-cols-2 gap-2">
@@ -1701,7 +2117,9 @@ function NewSummaryDialog({
               <select
                 className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
                 value={summaryKind}
-                onChange={(e) => setSummaryKind(e.target.value as "narrative" | "financial_statement")}
+                onChange={(e) =>
+                  setSummaryKind(e.target.value as "narrative" | "financial_statement")
+                }
               >
                 <option value="narrative">Narrative (progress)</option>
                 <option value="financial_statement">Financial statement</option>
@@ -1716,7 +2134,11 @@ function NewSummaryDialog({
           ) : (
             <label className="block space-y-1">
               <span className="text-xs font-medium">Quarter (YYYY-Q#)</span>
-              <Input value={quarter} onChange={(e) => setQuarter(e.target.value)} placeholder="2026-Q1" />
+              <Input
+                value={quarter}
+                onChange={(e) => setQuarter(e.target.value)}
+                placeholder="2026-Q1"
+              />
             </label>
           )}
           <label className="flex items-center gap-2 text-xs">
@@ -1729,14 +2151,17 @@ function NewSummaryDialog({
           </label>
         </div>
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button onClick={submit} disabled={saving}>{saving ? "Creating…" : "Create draft"}</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={saving}>
+            {saving ? "Creating…" : "Create draft"}
+          </Button>
         </div>
       </div>
     </div>
   );
 }
-
 
 function HostHomeCertPanel({ clientId, orgId }: { clientId: string; orgId?: string }) {
   const q = useQuery({
@@ -1756,7 +2181,9 @@ function HostHomeCertPanel({ clientId, orgId }: { clientId: string; orgId?: stri
   });
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Host-home certifications</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="text-base">Host-home certifications</CardTitle>
+      </CardHeader>
       <CardContent className="p-0">
         <ReadOnlyTable
           loading={q.isLoading}
@@ -1766,7 +2193,10 @@ function HostHomeCertPanel({ clientId, orgId }: { clientId: string; orgId?: stri
             { header: "Inspection", cell: (r) => r.inspection_date ?? "—" },
             { header: "Cert type", cell: (r) => r.cert_type ?? "—" },
             { header: "Next due", cell: (r) => r.next_due_date ?? "—" },
-            { header: "Determination", cell: (r) => <Badge variant="outline">{r.determination ?? "—"}</Badge> },
+            {
+              header: "Determination",
+              cell: (r) => <Badge variant="outline">{r.determination ?? "—"}</Badge>,
+            },
             { header: "Inspector", cell: (r) => r.inspector_name ?? "—" },
           ]}
         />
@@ -1792,22 +2222,33 @@ function RightsRestrictionsPanel({ clientId }: { clientId: string }) {
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Rights restrictions</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="text-base">Rights restrictions</CardTitle>
+      </CardHeader>
       <CardContent>
         {isLoading ? (
           <div className="text-sm text-muted-foreground">Loading…</div>
         ) : !data?.length ? (
-          <div className="text-sm text-muted-foreground">No active rights restrictions on file.</div>
+          <div className="text-sm text-muted-foreground">
+            No active rights restrictions on file.
+          </div>
         ) : (
           <ul className="space-y-2">
             {data.map((r) => {
               const completion = computeRestrictionCompletion(r);
               return (
-                <li key={r.id} className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-sm">
+                <li
+                  key={r.id}
+                  className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-sm"
+                >
                   <span className="min-w-0 truncate font-medium">{r.restriction_title}</span>
                   <Badge
                     variant={completion.isComplete ? "default" : "outline"}
-                    className={completion.isComplete ? "shrink-0 bg-emerald-600 hover:bg-emerald-600" : "shrink-0 border-amber-400 text-amber-800"}
+                    className={
+                      completion.isComplete
+                        ? "shrink-0 bg-emerald-600 hover:bg-emerald-600"
+                        : "shrink-0 border-amber-400 text-amber-800"
+                    }
                   >
                     {completion.completedCount}/{completion.total} documented
                   </Badge>
@@ -1818,7 +2259,10 @@ function RightsRestrictionsPanel({ clientId }: { clientId: string }) {
         )}
         <p className="mt-3 text-xs text-muted-foreground">
           Full 8-element documentation is managed on the{" "}
-          <Link className="underline" to="/dashboard/hrc">Human Rights Committee page</Link>.
+          <Link className="underline" to="/dashboard/hrc">
+            Human Rights Committee page
+          </Link>
+          .
         </p>
       </CardContent>
     </Card>
@@ -1828,9 +2272,12 @@ function RightsRestrictionsPanel({ clientId }: { clientId: string }) {
 function DeadlinesPanel({ clientId }: { clientId: string }) {
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Deadlines</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="text-base">Deadlines</CardTitle>
+      </CardHeader>
       <CardContent className="text-sm text-muted-foreground">
-        Client-scoped deadlines are tracked centrally. Open the deadlines desk and filter by this client.{" "}
+        Client-scoped deadlines are tracked centrally. Open the deadlines desk and filter by this
+        client.{" "}
         <Link className="underline" to="/dashboard/deadlines" search={{ client: clientId }}>
           Open deadlines →
         </Link>
@@ -1839,21 +2286,30 @@ function DeadlinesPanel({ clientId }: { clientId: string }) {
   );
 }
 
-
 // ─── Tiny shared bits ─────────────────────────────────────────────────────────
 
 function SkeletonCard() {
   return (
     <Card>
-      <CardContent className="py-10 text-center text-sm text-muted-foreground">Loading…</CardContent>
+      <CardContent className="py-10 text-center text-sm text-muted-foreground">
+        Loading…
+      </CardContent>
     </Card>
   );
 }
 
 type Col<R> = { header: string; cell: (row: R) => React.ReactNode };
 function ReadOnlyTable<R extends Record<string, unknown>>({
-  rows, columns, loading, empty,
-}: { rows: R[]; columns: Col<R>[]; loading?: boolean; empty: string }) {
+  rows,
+  columns,
+  loading,
+  empty,
+}: {
+  rows: R[];
+  columns: Col<R>[];
+  loading?: boolean;
+  empty: string;
+}) {
   if (loading) {
     return <div className="py-10 text-center text-sm text-muted-foreground">Loading…</div>;
   }
@@ -1865,13 +2321,17 @@ function ReadOnlyTable<R extends Record<string, unknown>>({
       <Table>
         <TableHeader>
           <TableRow>
-            {columns.map((c) => <TableHead key={c.header}>{c.header}</TableHead>)}
+            {columns.map((c) => (
+              <TableHead key={c.header}>{c.header}</TableHead>
+            ))}
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.map((r, i) => (
             <TableRow key={(r.id as string) ?? i}>
-              {columns.map((c) => <TableCell key={c.header}>{c.cell(r)}</TableCell>)}
+              {columns.map((c) => (
+                <TableCell key={c.header}>{c.cell(r)}</TableCell>
+              ))}
             </TableRow>
           ))}
         </TableBody>
@@ -1969,9 +2429,7 @@ function UpdateInfoFromDocumentCard({ clientId, orgId }: { clientId: string; org
   const applyMut = useMutation({
     mutationFn: async () => {
       if (!proposals) return { appliedCount: 0 } as { appliedCount: number };
-      const fields = proposals
-        .filter((p) => checked[p.field_key])
-        .map((p) => p.field);
+      const fields = proposals.filter((p) => checked[p.field_key]).map((p) => p.field);
       if (!fields.length) return { appliedCount: 0 } as { appliedCount: number };
       return applyFn({ data: { clientId, fields } });
     },
@@ -1986,9 +2444,7 @@ function UpdateInfoFromDocumentCard({ clientId, orgId }: { clientId: string; org
     onError: (e: unknown) => toast.error((e as Error).message || "Failed to apply updates"),
   });
 
-  const selectedCount = proposals
-    ? proposals.filter((p) => checked[p.field_key]).length
-    : 0;
+  const selectedCount = proposals ? proposals.filter((p) => checked[p.field_key]).length : 0;
 
   return (
     <Card>
@@ -1996,10 +2452,18 @@ function UpdateInfoFromDocumentCard({ clientId, orgId }: { clientId: string; org
         <div>
           <CardTitle className="text-base">Update info from document</CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
-            Upload a PCSP, 1056, or intake document and review NECTAR's proposed changes before applying.
+            Upload a PCSP, 1056, or intake document and review NECTAR's proposed changes before
+            applying.
           </p>
         </div>
-        <Button size="sm" onClick={() => { reset(); setOpen(true); }} disabled={!orgId}>
+        <Button
+          size="sm"
+          onClick={() => {
+            reset();
+            setOpen(true);
+          }}
+          disabled={!orgId}
+        >
           <Upload className="h-4 w-4 mr-1" /> Update info from document (NECTAR)
         </Button>
       </CardHeader>
@@ -2014,7 +2478,8 @@ function UpdateInfoFromDocumentCard({ clientId, orgId }: { clientId: string; org
           <DialogHeader>
             <DialogTitle>Update client info from document</DialogTitle>
             <DialogDescription>
-              NECTAR extracts proposed updates. Nothing is written to the client until you click "Apply selected".
+              NECTAR extracts proposed updates. Nothing is written to the client until you click
+              "Apply selected".
             </DialogDescription>
           </DialogHeader>
 
@@ -2050,11 +2515,17 @@ function UpdateInfoFromDocumentCard({ clientId, orgId }: { clientId: string; org
                   disabled={uploading || previewing || !orgId}
                 >
                   {uploading ? (
-                    <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Uploading…</>
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Uploading…
+                    </>
                   ) : previewing ? (
-                    <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Extracting…</>
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Extracting…
+                    </>
                   ) : (
-                    <><Upload className="h-4 w-4 mr-1" /> Choose document</>
+                    <>
+                      <Upload className="h-4 w-4 mr-1" /> Choose document
+                    </>
                   )}
                 </Button>
                 <p className="text-xs text-muted-foreground mt-2">PDF, DOCX, or TXT</p>
@@ -2069,8 +2540,24 @@ function UpdateInfoFromDocumentCard({ clientId, orgId }: { clientId: string; org
                 <div>{reason}</div>
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => { setReason(null); }}>Try another file</Button>
-                <Button size="sm" onClick={() => { setOpen(false); reset(); }}>Close</Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setReason(null);
+                  }}
+                >
+                  Try another file
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setOpen(false);
+                    reset();
+                  }}
+                >
+                  Close
+                </Button>
               </div>
             </div>
           )}
@@ -2084,7 +2571,8 @@ function UpdateInfoFromDocumentCard({ clientId, orgId }: { clientId: string; org
               ) : (
                 <>
                   <div className="text-xs text-muted-foreground">
-                    Review proposed changes. Pre-checked rows are fields where the document differs from the current value. Untick anything you don't want applied.
+                    Review proposed changes. Pre-checked rows are fields where the document differs
+                    from the current value. Untick anything you don't want applied.
                   </div>
                   <div className="border rounded-md divide-y max-h-[50vh] overflow-y-auto">
                     {proposals.map((p) => (
@@ -2103,15 +2591,24 @@ function UpdateInfoFromDocumentCard({ clientId, orgId }: { clientId: string; org
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-medium">{p.label}</span>
                             {p.changed ? (
-                              <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700">changed</Badge>
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] border-amber-300 text-amber-700"
+                              >
+                                changed
+                              </Badge>
                             ) : (
-                              <Badge variant="outline" className="text-[10px]">unchanged</Badge>
+                              <Badge variant="outline" className="text-[10px]">
+                                unchanged
+                              </Badge>
                             )}
                           </div>
                           <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                             <div>
                               <div className="text-muted-foreground">Current</div>
-                              <div className="break-words">{p.currentValue ?? <span className="text-muted-foreground">—</span>}</div>
+                              <div className="break-words">
+                                {p.currentValue ?? <span className="text-muted-foreground">—</span>}
+                              </div>
                             </div>
                             <div>
                               <div className="text-muted-foreground">From document</div>
@@ -2125,14 +2622,25 @@ function UpdateInfoFromDocumentCard({ clientId, orgId }: { clientId: string; org
                 </>
               )}
               <DialogFooter className="gap-2">
-                <Button variant="outline" size="sm" onClick={() => { setOpen(false); reset(); }}>Cancel</Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setOpen(false);
+                    reset();
+                  }}
+                >
+                  Cancel
+                </Button>
                 <Button
                   size="sm"
                   onClick={() => applyMut.mutate()}
                   disabled={applyMut.isPending || selectedCount === 0}
                 >
                   {applyMut.isPending ? (
-                    <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Applying…</>
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Applying…
+                    </>
                   ) : (
                     <>Apply selected ({selectedCount})</>
                   )}

@@ -518,7 +518,7 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     category: "safety",
     fulfillment: "in_hive",
     fulfillment_note:
-      "Drills happen at the home. Upload the drill log in HIVE. Due by the last day of the quarter — not the first day of the next quarter.",
+      "Drills happen at the home. Upload the drill log in HIVE. Due by the last day of the quarter — not the first day of the next quarter. HIVE opens one instance per active HHS home.",
     due_rule: { kind: "calendar_quarter_end" },
     owner: "manager",
     service_codes: ["HHS"],
@@ -552,7 +552,7 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     category: "safety",
     fulfillment: "hybrid",
     fulfillment_note:
-      "Inspect each HHS home using the DSPD Host Home Certification form (outside HIVE), then upload the completed form. This should eventually be one instance per home — today it is tracked org-wide as a single annual packet.",
+      "Inspect each HHS home using the DSPD Host Home Certification form (outside HIVE), then upload the completed form. HIVE opens one instance per active HHS home — not a single agency packet.",
     due_rule: { kind: "calendar_year", month: 7, day: 1 },
     owner: "admin",
     service_codes: ["HHS"],
@@ -584,6 +584,110 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     owner: "manager",
     service_codes: [],
     evidence_standard: "Support Strategies submitted to the SC within 30 days of PCSP activation.",
+  },
+
+  // ── Standing duties (seeded on first register open + SQL handoff) ────────
+  {
+    title: "Emergency Management and Business Continuity Plan",
+    citation: "CST 46",
+    category: "standing_records",
+    fulfillment: "standing",
+    fulfillment_note:
+      "Keep the plan on file. There is no SOW anniversary. Annual staff training on the plan is a separate duty.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard: "Current Emergency Management and Business Continuity Plan.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Annual Emergency Management Plan Training",
+    citation: "CST 46",
+    category: "training",
+    fulfillment: "in_hive",
+    fulfillment_note:
+      "Upload the training record. Due on each hire anniversary. Separate from the 30-day orientation.",
+    due_rule: { kind: "hire_anniversary", start_year: 1 },
+    owner: "staff",
+    service_codes: [],
+    evidence_standard:
+      "Documented annual training on the Emergency Management and Business Continuity Plan.",
+  },
+  {
+    title: "Staff Conflict of Interest Process",
+    citation: "CST 9 & 10",
+    category: "standing_records",
+    fulfillment: "standing",
+    fulfillment_note: "A written process the auditor can read. Not a recurring calendar duty.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard: "Written staff conflict-of-interest process.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Person Discharge Process",
+    citation: "DHHS91172 SOW §1.22(c)",
+    category: "standing_records",
+    fulfillment: "standing",
+    fulfillment_note:
+      "Written discharge procedure. Triggered when a Person is discharged, not on a calendar.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard: "Written Person-discharge procedure.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Internal Quality Management Plan",
+    citation: "CST 50",
+    category: "standing_records",
+    fulfillment: "standing",
+    fulfillment_note: "Keep the IQMP on file. The auditor asks whether it is being followed.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard: "Internal Quality Management Plan that can be externally validated.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "General, Professional, and Automobile Liability Insurance",
+    citation: "CST 29–36",
+    category: "licensing",
+    fulfillment: "external",
+    fulfillment_note:
+      "Issued by the carrier. Upload declarations pages in HIVE. July 1 is a verification reminder — the real due date is the printed expiration.",
+    due_rule: { kind: "calendar_year", month: 7, day: 1 },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard:
+      "Current General, Professional, and Automobile liability insurance at contracted minimums.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "DHHS Code of Conduct — Signed",
+    citation: "CST 76",
+    category: "standing_records",
+    fulfillment: "in_hive",
+    fulfillment_note:
+      "Applies to staff assigned to SLN, SLH, HHS, or PPS. Upload the signed copy. Due 30 days after hire.",
+    due_rule: { kind: "days_after_hire", days: 30 },
+    owner: "staff",
+    service_codes: ["SLN", "SLH", "HHS", "PPS"],
+    evidence_standard: "Signed DHHS Code of Conduct in the staff file.",
+  },
+  {
+    title: "ABI Training — Before Working Alone",
+    citation: "DHHS91172 SOW §1.8 (ABI training)",
+    category: "training",
+    fulfillment: "in_hive",
+    fulfillment_note:
+      "Required before working alone with a Person with acquired brain injury. HIVE only assigns this to staff on an ABI caseload (or flagged requires_abi). Upload the training record.",
+    due_rule: { kind: "days_after_hire", days: 0 },
+    owner: "staff",
+    service_codes: [],
+    evidence_standard:
+      "ABI training covering behavior effects, hospital-to-community transition, functional impact, health/medication, staff role, and family perspective.",
   },
 ];
 

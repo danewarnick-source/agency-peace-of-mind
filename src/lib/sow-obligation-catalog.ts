@@ -46,6 +46,14 @@ export type SowCatalogEntry = {
    * reminder to verify the file.
    */
   calendar_is_reminder_only?: boolean;
+  /**
+   * always (default) = every org in this jurisdiction, unless service_codes
+   * exclude them. when_applicable = the SOW itself says "when applicable" or
+   * the duty depends on an operational fact (OL-licensed site, volunteers,
+   * governing board). The row stays visible until that fact is recorded.
+   */
+  applicability?: "always" | "when_applicable";
+  applicability_note?: string;
 };
 
 export const CATEGORY_LABEL: Record<ObligationCategory, string> = {
@@ -77,7 +85,7 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
   // ── Staff training ──────────────────────────────────────────────────────
   {
     title: "30-Day New Hire Orientation Training",
-    citation: "DHHS91172 SOW §1.8(4) / §1.9",
+    citation: "DHHS91172 SOW §1.8(4)",
     category: "training",
     fulfillment: "in_hive",
     fulfillment_note:
@@ -237,7 +245,7 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
   // ── Screening & credentials ─────────────────────────────────────────────
   {
     title: "Background Screening — Annual",
-    citation: "DHHS91172 SOW §1.10",
+    citation: "DHHS91172 SOW §1.9(2)",
     category: "screening",
     fulfillment: "hybrid",
     fulfillment_note:
@@ -249,7 +257,7 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
   },
   {
     title: "Medicaid Fraud & Abuse Exclusion Screening — Annual",
-    citation: "DHHS91172 SOW §1.11",
+    citation: "DHHS91172 SOW §1.9(7)",
     category: "screening",
     fulfillment: "hybrid",
     fulfillment_note:
@@ -403,12 +411,15 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     category: "licensing",
     fulfillment: "standing",
     fulfillment_note:
-      "Keep current zoning, Life Safety Code, and fire/health documentation for licensed or certified sites. Upload in HIVE. July 1 is an annual verification reminder.",
+      "Keep current zoning, Life Safety Code, and fire/health documentation for licensed or certified sites. Upload in HIVE. July 1 is an annual verification reminder. SOW says 'when applicable' — this is an OL-site fact, not a service-code hide.",
     due_rule: { kind: "calendar_year", month: 7, day: 1 },
     owner: "admin",
     service_codes: [],
     evidence_standard: "Current zoning / Life Safety Code / fire-safety documentation.",
     calendar_is_reminder_only: true,
+    applicability: "when_applicable",
+    applicability_note:
+      "Applies when the contractor operates an OL-licensed or OL-certified site. Not the same as awarded service codes. Until the org records that fact on the Company Profile, this row stays visible.",
   },
 
   // ── State reporting (external portals) ──────────────────────────────────
@@ -688,6 +699,235 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     service_codes: [],
     evidence_standard:
       "ABI training covering behavior effects, hospital-to-community transition, functional impact, health/medication, staff role, and family perspective.",
+  },
+
+  // ── Contractor-level Article 1 duties (encoded pack, 2026-08-22) ─────────
+  {
+    title: "DHHS Medicaid 101 Training — Contractor",
+    citation: "DHHS91172 SOW §1.7(1)",
+    category: "training",
+    fulfillment: "hybrid",
+    fulfillment_note:
+      "This is the contractor-level Medicaid 101 — not the staff orientation topic in §1.8(4). Complete DHHS Medicaid 101 within 30 days of a fully executed contract and annually thereafter. Upload the completion record. Staff still receive the applicable portions in orientation.",
+    due_rule: { kind: "calendar_year", month: 7, day: 31 },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard:
+      "DHHS Medicaid 101 completion for the current contract year (initial window is 30 days from contract execution; DHHS91172 year starts July 1).",
+  },
+  {
+    title: "Utah Medicaid Provider Manuals — Annual Memo",
+    citation: "DHHS91172 SOW §1.7(2)–(4)",
+    category: "standing_records",
+    fulfillment: "hybrid",
+    fulfillment_note:
+      "Read the Utah Medicaid provider manuals and rules (medicaid.utah.gov) within 90 days of contract execution and annually thereafter. File a memo certifying familiarity. The same annual review covers DSPD R539 and DHHS rules (§1.7(3)–(4)).",
+    due_rule: { kind: "calendar_year", month: 9, day: 28 },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard:
+      "Signed contractor memo that the Utah Medicaid provider manuals, Medicaid rules, DSPD R539, and applicable DHHS rules have been read and are on file.",
+  },
+  {
+    title: "Volunteer Training File — When Volunteers Are Used",
+    citation: "DHHS91172 SOW §1.6",
+    category: "training",
+    fulfillment: "standing",
+    fulfillment_note:
+      "Friends and natural supports the Person chooses are not volunteers. When the contractor uses regularly scheduled volunteers, they must meet staff qualifications, may not replace staff hours, and must complete the §1.6(3) topics before supporting Persons. Upload the training file. Overnight volunteer stays need written Person/guardian permission.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard:
+      "Written training records for each regularly scheduled volunteer covering Person-specific needs, ANE/rights, confidentiality, emergencies, the services they will provide, and applicable contractor policies.",
+    calendar_is_reminder_only: true,
+    applicability: "when_applicable",
+    applicability_note:
+      "Applies only when this contractor uses regularly scheduled volunteers. Natural supports the Person chooses are not volunteers.",
+  },
+  {
+    title: "USTEPS and UPI Contractor Accounts",
+    citation: "DHHS91172 SOW §1.4(2) / §1.15",
+    category: "licensing",
+    fulfillment: "external",
+    fulfillment_note:
+      "Keep a current USTEPS and UPI account, DSPD form 0-9 (company designee) and at least one form 0-8 (individual user). HIVE does not provision UPI. 1056 accept/reject within 15 days is a live authorization workflow, not this row.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard:
+      "Active USTEPS/UPI access plus current 0-9 company designee and 0-8 individual user forms.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Medicaid Provider Enrollment — Current",
+    citation: "DHHS91172 SOW §1.4(1) / §1.13",
+    category: "licensing",
+    fulfillment: "external",
+    fulfillment_note:
+      "Stay enrolled as a Medicaid provider for the Community Support, Community Transition, and ABI waivers (DIH / DSPD Medicaid Enrollment Manager). Upload current enrollment proof. HIVE cannot enroll the contractor.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard: "Current Medicaid provider enrollment for the awarded waivers.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Medicaid Provider Change Notifications",
+    citation: "DHHS91172 SOW §1.13(2)–(3)",
+    category: "reporting",
+    fulfillment: "external",
+    fulfillment_note:
+      "Notify dspdcontracts@utah.gov within 7 calendar days of phone/address/email changes. Notify the DSPD Contract Program Manager within 30 calendar days of ownership, legal name, or EIN changes. Log the notice here after it is sent. Also produce Medicaid provider documents within 7 days of a written DSPD request.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard:
+      "Written notice to DSPD on the contract timelines, or a standing file showing who to notify and that no unreported change is outstanding.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "No Gifts or Purchases-from-Staff Process",
+    citation: "DHHS91172 SOW §1.28(9)–(10)",
+    category: "standing_records",
+    fulfillment: "standing",
+    fulfillment_note:
+      "A written process the auditor can read: contractor and staff do not accept money from a Person and do not let a Person make purchases from the contractor or staff. Not a recurring calendar class.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard:
+      "Written process prohibiting acceptance of money and purchases from contractor/staff.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Governing or Policy-Making Board Records",
+    citation: "DHHS91172 SOW §1.14",
+    category: "standing_records",
+    fulfillment: "standing",
+    fulfillment_note:
+      "If the contractor has a governing or policy-making board: keep by-laws, meet at least quarterly, and keep minutes with membership and attendance. Skip this row only after recording that the org has no such board.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard: "By-laws plus quarterly board minutes with membership and attendance.",
+    calendar_is_reminder_only: true,
+    applicability: "when_applicable",
+    applicability_note:
+      "Applies only if the contractor is governed by a governing or policy-making board.",
+  },
+  {
+    title: "Personnel Policies and Job Descriptions",
+    citation: "DHHS91172 SOW §1.17",
+    category: "standing_records",
+    fulfillment: "standing",
+    fulfillment_note:
+      "Written personnel policies and a job description for each staff position (duties, responsibilities, minimum qualifications). Upload the current set. Not a per-period class.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard:
+      "Current personnel policies and written job descriptions for every staff position.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Operating Policies and Procedures",
+    citation: "DHHS91172 SOW §1.18",
+    category: "standing_records",
+    fulfillment: "standing",
+    fulfillment_note:
+      "Written operating policies covering staff/supervisory responsibilities, transportation (if provided), staff and Person grievances, and emergency procedures for injury, illness, mental-health decline, or death. Upload the current set.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard: "Current operating policies covering the elements in SOW §1.18.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Human Rights Plan",
+    citation: "DHHS91172 SOW §1.21",
+    category: "standing_records",
+    fulfillment: "standing",
+    fulfillment_note:
+      "A written Human Rights Plan (HCBS Settings Rule) — separate from the live HRC roster and restriction records. N/A only if the contractor provides solely CHA, HSQ, or PBA.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard:
+      "Human Rights Plan covering rights training, ANE prevention, modification process, high-risk review, and the HRC.",
+    calendar_is_reminder_only: true,
+    applicability: "when_applicable",
+    applicability_note:
+      "Required unless the contractor only provides CHA, HSQ, or PBA. TNS (HHS/SLH/SLN/SEI/DSI) must keep this on file.",
+  },
+  {
+    title: "Health Support Policies and Procedures",
+    citation: "DHHS91172 SOW §1.23",
+    category: "standing_records",
+    fulfillment: "standing",
+    fulfillment_note:
+      "Written health-support policies for Persons' medical needs. Day-to-day medical, dental, and medication records are live Person artifacts — this row is the contractor policy file.",
+    due_rule: { kind: "standing" },
+    owner: "admin",
+    service_codes: [],
+    evidence_standard: "Current health support policies and procedures.",
+    calendar_is_reminder_only: true,
+  },
+  {
+    title: "Housemate Informed-Choice Discussion",
+    citation: "DHHS91172 SOW §1.35",
+    category: "client_docs",
+    fulfillment: "in_hive",
+    fulfillment_note:
+      "For HHS, PPS, or RHS: document an informed discussion about who the Person lives with and household accommodations. Required at placement and any housemate change on or after July 1, 2026.",
+    due_rule: { kind: "standing" },
+    owner: "manager",
+    service_codes: ["HHS", "PPS", "RHS"],
+    evidence_standard:
+      "Written informed-choice discussion notes for each residential Person, updated when a housemate changes.",
+    calendar_is_reminder_only: true,
+    applicability: "when_applicable",
+    applicability_note:
+      "Triggered at placement and whenever a housemate changes on or after July 1, 2026.",
+  },
+  {
+    title: "DSI Annual Outcome Report — Google Form Submission",
+    citation: "DHHS91172 SOW §8.6",
+    category: "reporting",
+    fulfillment: "external",
+    fulfillment_note:
+      "Fiscal-year Day Supports outcome report via the DSPD Google Form by August 30. Attest here after submitting. HIVE cannot transmit the form.",
+    due_rule: { kind: "calendar_year", month: 8, day: 30 },
+    owner: "admin",
+    service_codes: ["DSI"],
+    evidence_standard:
+      "DSPD Google Form submission (persons served, social-opportunity / skill / satisfaction measures, QI activities).",
+  },
+  {
+    title: "SEI Annual Outcome Report — Google Form Submission",
+    citation: "DHHS91172 SOW §30.7",
+    category: "reporting",
+    fulfillment: "external",
+    fulfillment_note:
+      "Fiscal-year SEI outcome report via the DSPD Google Form by August 30. Separate from the monthly UPI summary attestation.",
+    due_rule: { kind: "calendar_year", month: 8, day: 30 },
+    owner: "admin",
+    service_codes: ["SEI"],
+    evidence_standard:
+      "DSPD Google Form submission (persons served, CIE count, wages, weekly hours, SEI support hours, QI activities).",
+  },
+  {
+    title: "Supported Living Annual Outcome Report — Google Form Submission",
+    citation: "DHHS91172 SOW §31.5 / §32.7",
+    category: "reporting",
+    fulfillment: "external",
+    fulfillment_note:
+      "One fiscal-year Supported Living outcome report (SLH and/or SLN) via the DSPD Google Form by August 30. Attest here after submitting.",
+    due_rule: { kind: "calendar_year", month: 8, day: 30 },
+    owner: "admin",
+    service_codes: ["SLH", "SLN"],
+    evidence_standard:
+      "DSPD Google Form submission (persons served, community-setting stability %, QI activities).",
   },
 ];
 

@@ -180,7 +180,7 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
       "Process ensuring Contractor/Staff do not accept money or let a Person make purchases from Contractor/Staff.",
     citation: "SOW Article 1.28 (9) & (10)",
     applies_to_codes: [],
-    obligation_titles: [],
+    obligation_titles: ["No Gifts or Purchases-from-Staff Process"],
     fulfillment: "standing",
     note: "A written process the auditor can read. Not a recurring calendar duty.",
   },

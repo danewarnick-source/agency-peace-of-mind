@@ -61,6 +61,9 @@ export function CatalogBadges({ ob }: { ob: Pick<CompanyObligationRow, "title"> 
       <FulfillmentBadge channel={catalog.fulfillment} />
       <Badge variant="outline">{CATEGORY_LABEL[catalog.category]}</Badge>
       <Badge variant="secondary">Owner: {OWNER_LABEL[catalog.owner]}</Badge>
+      {catalog.applicability === "when_applicable" && (
+        <Badge variant="outline">When applicable</Badge>
+      )}
     </>
   );
 }

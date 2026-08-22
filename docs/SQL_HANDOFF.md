@@ -3261,3 +3261,53 @@ WHERE organization_id = '7fabcf5d-f826-487f-8730-8b0c3f1969bb'
 You should see one row with all eight titles joined by ` | `. If any
 title is missing, re-run the seed block (it is idempotent).
 
+---
+
+## ACTION — Utah DSPD pack duties (2026-08-22)
+
+**Clear the editor before pasting.**
+
+**What this is for:** Encodes the remaining DHHS91172 contractor-file
+duties that were catalog gaps after the standing-duty seed (Medicaid 101,
+manuals memo, USTEPS/UPI, enrollment, volunteer file, policies, Human
+Rights Plan, outcome reports, etc.). The app also inserts these the first
+time an org opens the register; this block is the live-DB copy for TNS.
+
+Every insert is `WHERE NOT EXISTS` on `(organization_id, title)`.
+
+**To apply:** paste the full contents of
+`supabase/migrations/20260822020000_seed_utah_dspd_pack_duties.sql`
+here and run it.
+
+**What you'll see:** `Success. No rows returned` (a `DO $$` block).
+
+**Confirm (paste this next, after clearing the editor):**
+
+```sql
+SELECT string_agg(title, ' | ' ORDER BY title) AS pack_titles,
+       count(*) AS n
+FROM public.company_obligations
+WHERE organization_id = '7fabcf5d-f826-487f-8730-8b0c3f1969bb'
+  AND title IN (
+    'DHHS Medicaid 101 Training — Contractor',
+    'Utah Medicaid Provider Manuals — Annual Memo',
+    'Volunteer Training File — When Volunteers Are Used',
+    'USTEPS and UPI Contractor Accounts',
+    'Medicaid Provider Enrollment — Current',
+    'Medicaid Provider Change Notifications',
+    'No Gifts or Purchases-from-Staff Process',
+    'Governing or Policy-Making Board Records',
+    'Personnel Policies and Job Descriptions',
+    'Operating Policies and Procedures',
+    'Human Rights Plan',
+    'Health Support Policies and Procedures',
+    'Housemate Informed-Choice Discussion',
+    'DSI Annual Outcome Report — Google Form Submission',
+    'SEI Annual Outcome Report — Google Form Submission',
+    'Supported Living Annual Outcome Report — Google Form Submission'
+  );
+```
+
+You should see `n = 16` and all sixteen titles joined by ` | `. If any
+title is missing, re-run the seed block (it is idempotent).
+

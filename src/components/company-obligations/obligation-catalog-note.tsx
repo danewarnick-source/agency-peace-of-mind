@@ -31,6 +31,12 @@ export function ObligationCatalogNote({ obligation }: { obligation: CompanyOblig
           {catalog.evidence_standard}
         </p>
       )}
+      {catalog?.applicability === "when_applicable" && catalog.applicability_note && (
+        <p>
+          <span className="font-medium text-foreground">When this applies: </span>
+          {catalog.applicability_note}
+        </p>
+      )}
     </div>
   );
 }

@@ -36,6 +36,7 @@ import {
 import { ObligationDrawer } from "@/components/company-obligations/obligation-drawer";
 import { catalogFor } from "@/components/company-obligations/obligation-meta";
 import { AuditPartPanel, UnmappedDuties } from "@/components/company-obligations/audit-part-panel";
+import { UtahPackPanel } from "@/components/company-obligations/utah-pack-panel";
 import {
   AUDIT_PART_LABEL,
   DSPD_AUDIT_ITEMS,
@@ -43,6 +44,7 @@ import {
   itemApplies,
   type AuditPart,
 } from "@/lib/dspd-audit-tool";
+import { UTAH_DSPD_PACK } from "@/lib/utah-dspd-pack";
 
 export const Route = createFileRoute("/dashboard/company-obligations")({
   head: () => ({ meta: [{ title: "Compliance register — HIVE" }] }),
@@ -572,11 +574,12 @@ function PolicyLibraryTab() {
     <Card>
       <CardContent className="space-y-4 p-6">
         <p className="text-sm text-muted-foreground">
-          Upload your company's policies and procedures so NECTAR can index them and you can
-          reference specific sections when defining provider obligations.
+          State PDFs live in Authoritative Sources. That shelf is Nectar's reading copy — it does
+          not drive this register. Company policies that satisfy a Part I row are uploaded on that
+          duty, not in a third library.
         </p>
         <Button onClick={() => navigate({ to: "/dashboard/authoritative-sources" })}>
-          <Upload className="mr-1.5 h-4 w-4" /> Upload document
+          <Upload className="mr-1.5 h-4 w-4" /> Authoritative Sources
         </Button>
       </CardContent>
     </Card>
@@ -605,8 +608,8 @@ function CompanyObligationsPage() {
         <div>
           <h2 className="text-base font-semibold">Compliance register</h2>
           <p className="text-sm text-muted-foreground">
-            DHHS91172 In-depth Review Tool — only the rows that apply to the services this program
-            provides.
+            {UTAH_DSPD_PACK.contract} pack {UTAH_DSPD_PACK.version} — In-depth Review Tool rows for
+            the services this program provides.
           </p>
         </div>
       </div>
@@ -614,10 +617,14 @@ function CompanyObligationsPage() {
       <Tabs defaultValue="obligations">
         <TabsList>
           <TabsTrigger value="obligations">Obligations</TabsTrigger>
-          <TabsTrigger value="policy-library">Policy library</TabsTrigger>
+          <TabsTrigger value="utah-pack">Utah pack</TabsTrigger>
+          <TabsTrigger value="policy-library">Authoritative Sources</TabsTrigger>
         </TabsList>
         <TabsContent value="obligations">
           <ObligationsTab orgId={org.organization_id} />
+        </TabsContent>
+        <TabsContent value="utah-pack">
+          <UtahPackPanel />
         </TabsContent>
         <TabsContent value="policy-library">
           <PolicyLibraryTab />

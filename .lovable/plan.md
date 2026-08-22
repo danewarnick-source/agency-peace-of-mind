@@ -1,122 +1,111 @@
 # Switch the backend from Lovable Cloud to your own Supabase
 
-## What "Supabase only" means here
+## The key constraint (verified from Lovable docs)
 
-This switches the **backend** — database, auth, storage, and edge functions — from Lovable Cloud's managed Supabase to a Supabase project you own. You get the full dashboard, SQL editor, and direct connection strings, and you manage backups, monitoring, upgrades, and billing.
+You **cannot** convert this project in place. Lovable Cloud and a connected (your own) Supabase account are mutually exclusive on a single project, and there's no automatic migration. So the move is:
 
-Supabase does **not** host the web app itself. The React app keeps running where it runs today: Lovable preview/publish and/or your AWS deployment (`deploy-aws.yml`). So "everything to Supabase" = the data/auth/storage/function layer, not app hosting.
+1. Export the database from Lovable Cloud.
+2. Create a **new Lovable project** connected to your own Supabase, and push this repo's code to it.
+3. Import the data, redeploy edge functions + secrets, reconfigure auth, transfer storage.
+4. Verify, then repoint the domain and cut over.
+5. Only after you're stable do you "Remove Lovable Cloud" on the old project (irreversible).
 
-## Reversibility (the one rule that shapes this whole plan)
+The app itself (React/TanStack code) carries over via GitHub — you're not rebuilding it, just re-homing it. Your team operates the new Supabase (backups, monitoring, billing).
 
-You can back out at any point **until you click "Remove Lovable Cloud,"** which is permanent and deletes the Cloud instance. So:
+## Reversibility (shapes the whole plan)
 
-- We keep Lovable Cloud fully running (DB, auth, edge functions, storage) the entire time.
-- We build and verify the new Supabase project in parallel.
-- You personally sign off on a verification checklist.
-- Only then — and optionally after keeping Cloud as a read-only safety net for a week — do you click "Remove Lovable Cloud."
-
-Until that click, reverting is: point the app back at the Lovable Cloud env values. No data loss.
-
-## Who does what
-
-- **You (in dashboards/CLI):** create the Supabase project, run the export/import, set GitHub + edge-function secrets, reconfigure auth provider/hooks, transfer storage files, click the final Remove.
-- **Me (in code):** swap the Google sign-in off the Lovable broker, remove the dead `lovable.auth` wrapper, fix the `parse-receipt-ocr` AI-key dependency, and update `deploy-aws.yml`/secrets references.
+You can back out at **any point until you click "Remove Lovable Cloud"** on the old project. Until then the old project keeps running as a live safety net; reverting = keep using the old project / repoint the domain back. "Remove Lovable Cloud" permanently deletes the old Cloud database, storage, auth, and edge functions — do it last, optionally after pausing (not deleting) for a week.
 
 ---
 
-## Phase 1 — Prepare the new Supabase project (you)
+## Phase 0 — Fix the pre-existing build errors (me, first)
 
-1. Create a Supabase project in your own org. Pick a paid plan suitable for production (you own backups/uptime now).
-2. Note the region (keep it close to your users / AWS region).
-3. Enable the extensions the schema depends on, before import: `vector`, `pg_cron`, `pg_net`, `pgcrypto`, and any others the dump references. (The import will error on missing extensions.)
-4. Do **not** create tables manually — the import brings the full schema.
+The app currently does not build: `src/lib/utah-dspd-pack/coverage.ts` has many `TS2741` errors — `PackCoverageRow` requires a `note` field that the data rows don't provide. This is unrelated to the migration but blocks every commit/push (CLAUDE.md requires a green build before pushing `src/routeTree.gen.ts`). Fix it first: make `note` optional on `PackCoverageRow` (or add `note` to the rows), verify `npm run build` passes. **This is a prerequisite for all code edits below.**
+
+## Phase 1 — Create your Supabase project (you)
+
+1. Create a Supabase project in your own org, production-appropriate plan, region near your users/AWS.
+2. Enable extensions before import: `vector`, `pg_cron`, `pg_net`, `pgcrypto` (+ any others the dump references).
+3. Do **not** create tables manually — the import brings the full schema.
 
 ## Phase 2 — Export from Lovable Cloud (you)
 
-1. Lovable → Cloud tab → Overview → Advanced settings → **Export project data**. This downloads the full DB (schema + data + RLS policies + functions/triggers + cron jobs).
-2. The export does **not** include: storage files, edge function code, or secrets. Handle those in later phases.
-3. Keep this export safe; it's your source of truth (the `supabase/migrations/` folder in the repo is known to be out of sync with the live DB, so do **not** rely on it for the import).
+1. Current project → Cloud tab → Overview → Advanced settings → **Export project data** (full DB: schema + data + RLS + functions/triggers + cron).
+2. Not included: storage files, edge function code, secrets (handled in later phases).
+3. The export dump is the source of truth — the repo's `supabase/migrations/` is known out of sync; don't rely on it for import.
 
-## Phase 3 — Import into the new project (you)
+## Phase 3 — Import into your Supabase (you)
 
-1. Restore the dump into the new project (Supabase CLI `db push` / `psql` / the dashboard SQL editor, per the dump format Lovable gives you).
-2. Verify after import: extensions enabled, all tables present, RLS policies present, functions/triggers present, `cron.jobs` present.
-3. Spot-check row counts on key tables (clients, evv_timesheets, profiles, etc.) against the export.
+1. Restore the dump (Supabase CLI / `psql` / dashboard SQL editor, per the dump format).
+2. Verify: extensions, tables, RLS policies, functions/triggers, `cron.jobs` all present.
+3. Spot-check row counts (clients, evv_timesheets, profiles) against the export.
 
-## Phase 4 — Connect external Supabase to Lovable (you + me)
+## Phase 4 — Create the new Lovable project + connect your Supabase (you + me)
 
-1. In Lovable, connect your Supabase account/project (Settings → Supabase / Cloud). Lovable regenerates `.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID`, and server `SUPABASE_URL`/`SUPABASE_PUBLISHABLE_KEY`).
-2. The service role key is now **yours to own** (Lovable no longer injects it). Set it where the app runtime needs it:
-   - GitHub Actions secrets for the AWS deploy: `SUPABASE_SERVICE_ROLE_KEY` (new), plus update `SUPABASE_URL`, `VITE_SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID` to the new project's values.
-   - Edge-function secret `SUPABASE_SERVICE_ROLE_KEY` (Phase 6).
-3. I'll run `supabase--rebind_secrets` to refresh the sandbox binding once the connection is live.
+1. In Lovable, create a **new project** and connect your Supabase account during setup (Cloud and connected-Supabase are mutually exclusive, so it must be a fresh project).
+2. Link the new project to this GitHub repo so the codebase loads (import from GitHub).
+3. Lovable regenerates env for the new project (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID`, server `SUPABASE_URL`/`SUPABASE_PUBLISHABLE_KEY`). You now own the **service role key** — set it as a secret where the app runtime and edge functions need it.
+4. I'll run `supabase--rebind_secrets` after connection and confirm the new project builds green.
 
-## Phase 5 — Code edits (me)
+## Phase 5 — Code edits (me, on the repo — applies to whichever project loads it)
 
-1. **Google sign-in** — `src/routes/login.tsx`: replace `lovable.auth.signInWithOAuth("google", …)` with `supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } })`. The current `redirect_uri` points at `/dashboard` (a protected route); switch it to a public origin and redirect after the session hydrates, per the auth guidance. Google provider gets configured in your Supabase dashboard (Phase 8).
-2. **Remove the Lovable auth broker** — delete usage of `src/integrations/lovable` (`@lovable.dev/cloud-auth-js`) from `login.tsx`. The MCP `@lovable.dev/mcp-js` stack stays (build-time library, not Cloud-coupled).
-3. **`parse-receipt-ocr` AI-key fix** — this edge function reads `LOVABLE_API_KEY` (the Lovable AI Gateway), which is auto-provisioned only inside the Lovable app runtime, not on an external Supabase edge function. Two options (your call):
-   - (a) Set `LOVABLE_API_KEY` manually as an edge-function secret in your project, or
-   - (b) Move the OCR call into a `createServerFn` so it uses the provisioned `LOVABLE_API_KEY` in the app runtime (cleaner; recommended). I'll do (b) unless you prefer (a).
-4. **`deploy-aws.yml`** — confirm `SUPABASE_SERVICE_ROLE_KEY` is passed as an env var from GitHub secrets (it isn't today, because Lovable injected it). Add it so the AWS-deployed worker can do privileged operations.
+1. **Google sign-in** — `src/routes/login.tsx`: replace `lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/dashboard" })` with `supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } })`. Fix the redirect off the protected `/dashboard` to a public origin; navigate after the session hydrates. Google provider configured in your Supabase dashboard (Phase 8).
+2. **Remove the Lovable auth broker** — drop `@lovable.dev/cloud-auth-js` usage from `login.tsx` (`src/integrations/lovable`). Keep `@lovable.dev/mcp-js` (build-time library, works with any Supabase — not Cloud-coupled).
+3. **`parse-receipt-ocr` AI key** — this edge function reads `LOVABLE_API_KEY` (Lovable AI Gateway), auto-provisioned only in the app runtime, not on an external Supabase edge function. Default: move the OCR call into a `createServerFn` so it uses the provisioned `LOVABLE_API_KEY` (cleaner, follows the no-new-edge-function rule). Alternative: set `LOVABLE_API_KEY` manually as an edge-function secret. Tell me if you prefer the alternative.
+4. **`deploy-aws.yml`** — add `SUPABASE_SERVICE_ROLE_KEY` from GitHub secrets as a deploy env var (it's absent today because Lovable injected it). Needed only if you keep the AWS self-host path running.
 
 ## Phase 6 — Edge functions + secrets (you)
 
-There are 13 edge functions in `supabase/functions/`. On external Supabase you deploy them yourself.
+13 edge functions in `supabase/functions/`. On external Supabase you deploy them yourself.
 
-1. Deploy all 13 via `supabase functions deploy <name>` (or a GitHub Action). The code is already in the repo.
-2. Set edge-function secrets in the new project. Known secrets to carry over: `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `BEDROCK_MODEL_ID`, `RESEND_API_KEY`, Stripe keys, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and (per Phase 5) `LOVABLE_API_KEY` if you keep `parse-receipt-ocr` as an edge function.
-3. Reconfigure the **auth hook** (`auth-send-email`, used for custom email sending via Resend) in Supabase Auth settings, including its hook secret.
+1. `supabase functions deploy <name>` for all 13 (or a GitHub Action).
+2. Set edge-function secrets: `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `BEDROCK_MODEL_ID`, `RESEND_API_KEY`, Stripe keys, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `LOVABLE_API_KEY` only if you keep `parse-receipt-ocr` as an edge function.
+3. Reconfigure the **auth hook** (`auth-send-email`, custom email via Resend) in Auth settings, incl. its hook secret.
 
 ## Phase 7 — Storage file transfer (you)
 
-1. The DB export brings bucket definitions and `storage.objects` RLS policies, but **not the files**.
-2. Download files from Lovable → Cloud tab → Storage, per bucket.
-3. Re-upload to the matching buckets in the new project. Confirm object paths match the rows referenced by the DB.
+1. DB export brings bucket definitions + `storage.objects` RLS policies, but **not the files**.
+2. Download files from old project → Cloud tab → Storage, per bucket; re-upload to matching buckets in your project.
+3. Confirm object paths match the DB references.
 
 ## Phase 8 — Auth reconfiguration (you)
 
-1. Enable the **Google** provider in your Supabase dashboard (Auth → Providers). Use the same Google OAuth client you use today, with the redirect URI set to your app's published/preview URL.
-2. Reconfigure email templates / custom email hook if you rely on the Resend hook.
-3. **User passwords are not exported.** Plan a one-time password reset for every staff member (they'll get a reset email). This happens at cutover (Phase 10).
+1. Enable **Google** in Auth → Providers (same Google OAuth client, redirect URI = your app's published/preview URL).
+2. Reconfigure email templates / custom email hook (Resend).
+3. **User passwords are not exported** — plan a one-time password reset email to all staff at cutover.
 
-## Phase 9 — Verify against the app (you + me)
+## Phase 9 — Verify on the new project (you + me)
 
-Before cutover, run through the app pointed at the new backend:
-- Sign in (email + Google), confirm session + RLS scoping.
-- Load dashboard, clients, shifts/timesheets, billing, incidents, compliance/obligations.
-- Trigger one edge function (e.g., a receipt OCR or a training checkout) end-to-end.
-- Confirm storage file reads (client documents, audit packages).
-- Confirm pg_cron jobs exist and their target URLs still resolve to your reachable app URL.
-- Confirm the MCP server authenticates against the new project's issuer.
-I'll help by running targeted server-function checks and reading logs.
+Before cutover: sign in (email + Google) with correct RLS scoping; load dashboard, clients, shifts/timesheets, billing, incidents, compliance; run one edge function end-to-end; read a storage file; confirm pg_cron jobs exist and their target URLs resolve to a reachable app URL; confirm the MCP server authenticates against the new project's issuer. I'll run targeted server-function checks and read logs.
 
 ## Phase 10 — Cutover (you, maintenance window)
 
-1. Pick a low-traffic window. Freeze writes (or put up a maintenance banner).
-2. Take a **final delta export** from Lovable Cloud (catches anything written since Phase 2) and import it, so the new backend is current.
-3. Re-transfer any storage files added since Phase 7.
-4. Switch the app to the new backend (it already is, if Phase 4 is done) and send password-reset emails to all staff.
-5. Smoke-test the live flows.
+1. Low-traffic window; freeze writes / maintenance banner.
+2. Final delta export from old Cloud + import (catches anything since Phase 2); re-transfer any new storage files.
+3. Repoint the published URL / custom domain to the new project; send password-reset emails to all staff.
+4. Smoke-test live flows.
 
-## Phase 11 — Remove Lovable Cloud (you, last, optional delay)
+## Phase 11 — Remove Lovable Cloud on the old project (you, last)
 
-1. Only after the verification checklist passes and you've run on the new backend for a few days.
-2. Optional: keep Lovable Cloud **paused** (not removed) for a week as a read-only safety net. `supabase--pause` can pause it.
-3. When confident: Lovable → Cloud tab → Overview → Advanced settings → **Remove Lovable Cloud**. This is permanent and deletes the instance + data. Take a final export first as an offline archive.
+1. Only after stable running on the new backend for a few days. Optional: pause the old Cloud (`supabase--pause`) for a week first.
+2. Then: old project → Cloud tab → Overview → Advanced → **Remove Lovable Cloud**. Permanent; deletes DB/storage/auth/edge functions. Take a final export as an offline archive first.
 
 ---
 
-## Decisions / risks to flag
+## Decisions / risks
 
-- **`parse-receipt-ocr` + `LOVABLE_API_KEY`** — won't auto-port; needs Phase 5 decision (manual secret vs. move to a server fn). Tell me which.
-- **Service role key is now yours** — it bypasses RLS. Treat as a critical secret: never commit it, rotate if leaked, scope edge functions that use it.
-- **pg_cron target URLs** — verify the cron jobs point at a reachable app URL (published domain or AWS). Reconfigure if the URL changed.
-- **MCP auth** — the MCP server's OAuth issuer is built from `VITE_SUPABASE_PROJECT_ID`; it will point at the new project. Verify the MCP flow still authenticates after the switch.
-- **SQL workflow change** — once you own the dashboard, the `docs/SQL_HANDOFF.md` human-runs-SQL workflow can be replaced by you running SQL directly in your dashboard. I can still apply migrations via chat if the connected integration supports it; otherwise SQL is yours to run. We'll confirm which chat DB tools remain after the switch.
-- **AWS self-host** — `deploy-aws.yml` needs `SUPABASE_SERVICE_ROLE_KEY` added to GitHub secrets (Phase 4/5). On the plus side, the AWS deployment can finally do privileged operations it couldn't before.
+- **`parse-receipt-ocr` + `LOVABLE_API_KEY`** — needs Phase 5 decision (default: move to a server fn).
+- **Service role key is now yours** — it bypasses RLS. Treat as critical: never commit, rotate if leaked, scope the edge functions that use it.
+- **pg_cron target URLs** — verify cron jobs point at a reachable app URL after the domain move.
+- **Published URL / custom domain** — the `agency-peace-of-mind.lovable.app` subdomain belongs to the old project; the new project gets a new publish URL and you re-point any custom domain.
+- **Project history/plans** — don't transfer to the new Lovable project; code does (via GitHub).
+- **SQL workflow change** — once you own the dashboard, the `docs/SQL_HANDOFF.md` human-runs-SQL workflow can be replaced by running SQL directly in your dashboard.
 
-## Out of scope (not changing)
+## Alternative path (if you'd rather drop Lovable entirely)
 
-- App hosting (Lovable publish + AWS) — Supabase doesn't host the web app.
-- The `@lovable.dev/mcp-js` and `@lovable.dev/vite-tanstack-config` build libraries — these are npm packages, not Cloud-coupled.
+**Option B — fully self-host on AWS + your own Supabase.** You already deploy via `deploy-aws.yml`. Point that AWS deployment at your Supabase (all `SUPABASE_*` env incl. service role), import data, deploy edge functions via CLI, and stop using Lovable hosting. Cost: you lose Lovable's in-chat editing/preview/publish for this project — you'd develop via your own env + GitHub + AWS. I defaulted to the new-project path (above) because it preserves the chat-based development you rely on; say the word if you'd rather go full self-host.
+
+## Out of scope
+
+- App hosting stays on Lovable (new project) unless you choose Option B — Supabase doesn't host the web app.
+- `@lovable.dev/mcp-js` / `@lovable.dev/vite-tanstack-config` build libraries stay (npm packages, not Cloud-coupled).

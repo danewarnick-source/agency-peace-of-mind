@@ -687,7 +687,9 @@ async function commitClient(
     normalize(mapped, true);
     mapped.organization_id = orgId;
     mapped.account_status = "active";
-    mapped.intake_status = "pending";
+    // Start intake so the directory badge and intake runner stay consistent
+    // with Create & Start Intake from Add Client.
+    mapped.intake_status = "in_progress";
     const row = await insertClient(mapped);
     recordId = row.id;
     await audit(sb, jobId, orgId, subj.id, "Created new client", "source", userId, "create_client");

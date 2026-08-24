@@ -769,6 +769,7 @@ function AddClientDialog({
   const [addr, setAddr]           = useState("");
   const [medicaidId, setMedicaidId] = useState("");
   const [jobCodes, setJobCodes]   = useState<string[]>([]);
+  const [codesMenuOpen, setCodesMenuOpen] = useState(false);
   const [radius, setRadius]       = useState(1000);
   const [pinning, setPinning]     = useState(false);
   const [isOwnGuardian, setIsOwnGuardian] = useState(true);
@@ -778,7 +779,41 @@ function AddClientDialog({
   const [gEmail, setGEmail]       = useState("");
 
   const guardianInvalid = !isOwnGuardian && (!gName.trim() || !gPhone.trim());
-  const canSubmit = first.trim() && last.trim() && addr.trim() && jobCodes.length > 0 && medicaidId.trim() && !guardianInvalid;
+
+  function missingRequiredMessage(): string | null {
+    const missing: string[] = [];
+    if (!first.trim()) missing.push("first name");
+    if (!last.trim()) missing.push("last name");
+    if (!medicaidId.trim()) missing.push("Medicaid ID");
+    if (!addr.trim()) missing.push("service address");
+    if (jobCodes.length === 0) missing.push("at least one DSPD billing code");
+    if (guardianInvalid) missing.push("guardian name and phone");
+    if (missing.length === 0) return null;
+    return `Please complete: ${missing.join(", ")}.`;
+  }
+
+  function submit() {
+    const msg = missingRequiredMessage();
+    if (msg) {
+      toast.error(msg);
+      return;
+    }
+    onSubmit({
+      first_name: first.trim(), last_name: last.trim(),
+      phone_number: phone.trim(), physical_address: addr.trim(),
+      pcsp_goals: [], job_code: jobCodes,
+      medicaid_id: medicaidId.trim(), geofence_radius_feet: radius,
+      special_directions: "", date_of_birth: "",
+      emergency_contact_name: "", emergency_contact_phone: "",
+      profile_photo_url: "",
+      is_own_guardian: isOwnGuardian,
+      guardian_name: isOwnGuardian ? "" : gName.trim(),
+      guardian_phone: isOwnGuardian ? "" : gPhone.trim(),
+      guardian_relationship: isOwnGuardian ? "" : gRel.trim(),
+      guardian_email: isOwnGuardian ? "" : gEmail.trim(),
+      intake_mode: mode!,
+    });
+  }
 
   if (!mode) {
     return (
@@ -816,7 +851,15 @@ function AddClientDialog({
   }
 
   return (
-    <DialogContent className="max-h-[90vh] overflow-y-auto max-w-lg">
+    <DialogContent
+      className="max-h-[90vh] overflow-y-auto max-w-lg"
+      onEscapeKeyDown={(e) => {
+        if (codesMenuOpen) {
+          e.preventDefault();
+          setCodesMenuOpen(false);
+        }
+      }}
+    >
       <DialogHeader>
         <DialogTitle>
           {mode === "intake" ? "New Client — Begin Intake" : "New Client — Save as Draft"}
@@ -870,7 +913,7 @@ function AddClientDialog({
         </div>
         <div className="grid gap-1.5">
           <Label className="text-xs font-semibold">Authorized DSPD Billing Codes *</Label>
-          <DspdCodesMultiSelect value={jobCodes} onChange={setJobCodes} />
+          <DspdCodesMultiSelect value={jobCodes} onChange={setJobCodes} onOpenChange={setCodesMenuOpen} />
         </div>
         <div className="grid gap-1.5">
           <Label className="text-xs font-semibold">EVV Geofence Radius</Label>
@@ -916,24 +959,7 @@ function AddClientDialog({
         </div>
       </div>
       <DialogFooter>
-        <Button
-          onClick={() => onSubmit({
-            first_name: first.trim(), last_name: last.trim(),
-            phone_number: phone.trim(), physical_address: addr.trim(),
-            pcsp_goals: [], job_code: jobCodes,
-            medicaid_id: medicaidId.trim(), geofence_radius_feet: radius,
-            special_directions: "", date_of_birth: "",
-            emergency_contact_name: "", emergency_contact_phone: "",
-            profile_photo_url: "",
-            is_own_guardian: isOwnGuardian,
-            guardian_name: isOwnGuardian ? "" : gName.trim(),
-            guardian_phone: isOwnGuardian ? "" : gPhone.trim(),
-            guardian_relationship: isOwnGuardian ? "" : gRel.trim(),
-            guardian_email: isOwnGuardian ? "" : gEmail.trim(),
-            intake_mode: mode,
-          })}
-          disabled={!canSubmit || pending}
-        >
+        <Button onClick={submit} disabled={pending}>
           {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {mode === "intake" ? "Create & Start Intake" : "Create draft client"}
         </Button>

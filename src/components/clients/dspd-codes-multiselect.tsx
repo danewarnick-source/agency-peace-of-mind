@@ -8,20 +8,44 @@ import { cn } from "@/lib/utils";
 interface Props {
   value: string[];
   onChange: (next: string[]) => void;
+  /** Called whenever the dropdown open state changes (so a parent Dialog can ignore Escape). */
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function DspdCodesMultiSelect({ value, onChange }: Props) {
+export function DspdCodesMultiSelect({ value, onChange, onOpenChange }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
+  const setOpenBoth = (next: boolean) => {
+    setOpen(next);
+    onOpenChange?.(next);
+  };
+
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        onOpenChange?.(false);
+      }
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
+  }, [onOpenChange]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // Close the dropdown only — do not let Escape bubble to a parent Dialog.
+      e.preventDefault();
+      e.stopPropagation();
+      setOpen(false);
+      onOpenChange?.(false);
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [open, onOpenChange]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -39,7 +63,7 @@ export function DspdCodesMultiSelect({ value, onChange }: Props) {
       {/* Chip / input frame */}
       <div
         className="flex min-h-[48px] flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-2 py-1.5 text-sm cursor-text"
-        onClick={() => setOpen(true)}
+        onClick={() => setOpenBoth(true)}
       >
         {value.length === 0 && (
           <span className="px-1 text-muted-foreground">Search & select authorized codes…</span>
@@ -78,7 +102,7 @@ export function DspdCodesMultiSelect({ value, onChange }: Props) {
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            setOpen((o) => !o);
+            setOpenBoth(!open);
           }}
           className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent"
           aria-label="Toggle DSPD code list"

@@ -9,8 +9,136 @@ import { z } from "zod";
 import { Buffer } from "node:buffer";
 
 
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { gatewayFetch, assertBedrockConfigured, friendlyAiErrorMessage } from "@/lib/ai-bedrock.server";
 import { parseDocumentWithAI, extractGoalsOnly, documentLikelyHasGoals, CORE_CLIENT_FIELD_KEYS } from "@/lib/document-extraction";
+
+function digitsOnly(v: string | null | undefined): string {
+  return (v ?? "").replace(/\D/g, "");
+}
+
+function normName(v: string | null | undefined): string {
+  return (v ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Collapse in-job duplicate people (e.g. PCSP + facesheet that filename-keyed
+ * differently). Prefer medicaid_id; else first+last(+dob). Keep the subject
+ * with more extracted fields and move the rest onto it.
+ */
+async function mergeInJobDuplicateClientSubjects(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  jobId: string,
+  orgId: string,
+  subjects: Array<{ id: string; display_name: string }>,
+): Promise<Array<{ id: string; display_name: string }>> {
+  if (subjects.length < 2) return subjects;
+
+  type FieldRow = { id: string; target_field: string; value: string | null };
+  const bySubject = new Map<string, FieldRow[]>();
+  for (const s of subjects) {
+    const { data: fields } = await sb
+      .from("extracted_fields")
+      .select("id, target_field, value")
+      .eq("import_subject_id", s.id);
+    bySubject.set(s.id, (fields ?? []) as FieldRow[]);
+  }
+
+  const identityOf = (sid: string): { medicaid: string; nameKey: string } => {
+    const fields = bySubject.get(sid) ?? [];
+    const map = new Map(fields.map((f) => [f.target_field, f.value ?? ""]));
+    const medicaid = digitsOnly(map.get("medicaid_id"));
+    let first = normName(map.get("first_name"));
+    let last = normName(map.get("last_name"));
+    const full = normName(map.get("full_name"));
+    if ((!first || !last) && full) {
+      const parts = full.split(" ").filter(Boolean);
+      if (parts.length >= 2) {
+        first = first || parts[0];
+        last = last || parts.slice(1).join(" ");
+      }
+    }
+    const dob = (map.get("date_of_birth") ?? "").trim();
+    const nameKey = first && last ? `${first}|${last}|${dob}` : "";
+    return { medicaid, nameKey };
+  };
+
+  const clusters: string[][] = [];
+  const used = new Set<string>();
+  for (const s of subjects) {
+    if (used.has(s.id)) continue;
+    const a = identityOf(s.id);
+    const group = [s.id];
+    used.add(s.id);
+    for (const other of subjects) {
+      if (used.has(other.id)) continue;
+      const b = identityOf(other.id);
+      const sameMedicaid = a.medicaid.length >= 8 && a.medicaid === b.medicaid;
+      const sameName = !!a.nameKey && a.nameKey === b.nameKey;
+      if (sameMedicaid || sameName) {
+        group.push(other.id);
+        used.add(other.id);
+      }
+    }
+    clusters.push(group);
+  }
+
+  const kept: Array<{ id: string; display_name: string }> = [];
+  for (const group of clusters) {
+    if (group.length === 1) {
+      const one = subjects.find((s) => s.id === group[0])!;
+      kept.push(one);
+      continue;
+    }
+    // Prefer the subject with the most fields (usually the PCSP).
+    group.sort((a, b) => (bySubject.get(b)?.length ?? 0) - (bySubject.get(a)?.length ?? 0));
+    const keeperId = group[0];
+    const keeper = subjects.find((s) => s.id === keeperId)!;
+    const keeperFields = bySubject.get(keeperId) ?? [];
+    const have = new Set(keeperFields.map((f) => f.target_field));
+
+    for (const dupId of group.slice(1)) {
+      const dupFields = bySubject.get(dupId) ?? [];
+      for (const f of dupFields) {
+        if (have.has(f.target_field)) continue;
+        await sb
+          .from("extracted_fields")
+          .update({ import_subject_id: keeperId })
+          .eq("id", f.id);
+        have.add(f.target_field);
+      }
+      await sb
+        .from("unfiled_items")
+        .update({ import_subject_id: keeperId })
+        .eq("import_subject_id", dupId);
+      // Drop leftover field rows still on the duplicate, then the subject.
+      await sb.from("extracted_fields").delete().eq("import_subject_id", dupId);
+      await sb.from("unfiled_items").delete().eq("import_subject_id", dupId);
+      await sb.from("import_subjects").delete().eq("id", dupId);
+    }
+
+    const mergedName =
+      keeper.display_name && keeper.display_name !== "Unnamed"
+        ? keeper.display_name
+        : subjects.find((s) => group.includes(s.id) && s.display_name !== "Unnamed")?.display_name ||
+          keeper.display_name;
+    if (mergedName !== keeper.display_name) {
+      await sb.from("import_subjects").update({ display_name: mergedName }).eq("id", keeperId);
+    }
+    kept.push({ id: keeperId, display_name: mergedName });
+
+    await sb.from("import_audit").insert({
+      import_job_id: jobId,
+      org_id: orgId,
+      item: `Merged ${group.length} duplicate subjects into one person (${mergedName})`,
+      traces_to: "rule",
+      actor: null,
+      action: "merge_duplicate_subjects",
+    });
+  }
+
+  return kept;
+}
 
 // ----- Input schemas -----
 const ModeEnum = z.enum(["employee", "client"]);
@@ -284,7 +412,13 @@ export const runSmartExtraction = createServerFn({ method: "POST" })
     await sb.from("import_jobs").update({ status: "extracting" }).eq("id", data.jobId);
 
     try {
-      const allSubjects: Array<{ id: string; display_name: string }> = [];
+      try {
+        assertBedrockConfigured();
+      } catch (e) {
+        throw new Error(friendlyAiErrorMessage(401, (e as Error).message));
+      }
+
+      let allSubjects: Array<{ id: string; display_name: string }> = [];
 
       // ---- Roster batches: one subject per row ----
       for (const batch of data.rosterBatches) {
@@ -528,6 +662,15 @@ export const runSmartExtraction = createServerFn({ method: "POST" })
         );
       }
 
+      // Collapse facesheet+PCSP (etc.) that landed as separate people in this job.
+      if (mode === "client") {
+        allSubjects = await mergeInJobDuplicateClientSubjects(
+          sb,
+          data.jobId,
+          data.organizationId,
+          allSubjects,
+        );
+      }
 
       // ---- Dedup / match (read-only against real tables) ----
       let matchedCount = 0;

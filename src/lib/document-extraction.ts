@@ -7,7 +7,7 @@
 // =============================================================
 
 import { z } from "zod";
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { gatewayFetch, friendlyAiErrorMessage } from "@/lib/ai-bedrock.server";
 
 export const FieldOut = z.object({
   field_key: z.string().min(1).max(80),
@@ -338,14 +338,13 @@ export async function parseDocumentWithAI(
     // surfacing to users as "AI returned malformed JSON". Give real headroom.
     max_tokens: 16000,
   });
-  if (res.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
+  if (res.status === 429) throw new Error(friendlyAiErrorMessage(429, "Throttled"));
   if (res.status === 401)
-    throw new Error(
-      "AWS Bedrock credentials are not configured (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / BEDROCK_MODEL_ID).",
-    );
+    throw new Error(friendlyAiErrorMessage(401, "AWS Bedrock credentials are not configured"));
   if (!res.ok) {
     const t = await res.text().catch(() => "");
-    throw new Error(`AI gateway error ${res.status}: ${t.slice(0, 200)}`);
+    console.error(`[document-extraction] AI gateway ${res.status}: ${t.slice(0, 600)}`);
+    throw new Error(friendlyAiErrorMessage(res.status, t));
   }
   const body = (await res.json()) as {
     choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
@@ -435,10 +434,11 @@ export async function extractGoalsOnly(documentText: string): Promise<ParseOutT>
     response_format: { type: "json_object" },
     max_tokens: 12000,
   });
-  if (res.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
+  if (res.status === 429) throw new Error(friendlyAiErrorMessage(429, "Throttled"));
   if (!res.ok) {
     const t = await res.text().catch(() => "");
-    throw new Error(`AI gateway error ${res.status}: ${t.slice(0, 200)}`);
+    console.error(`[document-extraction] goals AI gateway ${res.status}: ${t.slice(0, 600)}`);
+    throw new Error(friendlyAiErrorMessage(res.status, t));
   }
   const body = (await res.json()) as {
     choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;

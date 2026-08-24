@@ -85,6 +85,39 @@ function getModelId(): string {
   return id;
 }
 
+/** Throw early (before uploads) when Bedrock env is incomplete. */
+export function assertBedrockConfigured(): void {
+  if (!process.env.AWS_REGION?.trim()) {
+    throw new BedrockError(500, "AWS_REGION is not configured.");
+  }
+  getModelId();
+  // Force credential resolution the same way gatewayFetch does.
+  getClient();
+}
+
+/**
+ * Short staff-facing copy for AI/Bedrock failures. Keep raw detail in logs only.
+ */
+export function friendlyAiErrorMessage(status: number, raw: string): string {
+  const t = raw || "";
+  if (status === 401 || /not configured|AccessDenied|UnrecognizedClient|InvalidSignature/i.test(t)) {
+    return "Document AI isn't configured on this deployment. An admin needs to set AWS Bedrock credentials (AWS_REGION, BEDROCK_MODEL_ID, and access keys). You can still use Add Client manually.";
+  }
+  if (status === 429 || /Throttl/i.test(t)) {
+    return "Document AI is busy right now. Wait a minute and try again.";
+  }
+  if (/on-demand throughput|inference profile/i.test(t)) {
+    return "Document AI model id is wrong for this account. Use an inference profile id (for example us.anthropic.claude-…) in BEDROCK_MODEL_ID, then redeploy.";
+  }
+  if (status >= 500 || /BedrockError|InternalServer/i.test(t)) {
+    return "Document AI is temporarily unavailable. Try again shortly, or use Add Client manually.";
+  }
+  if (status === 400) {
+    return "Document AI rejected this request. Check the model id and try a clearer PDF, or use Add Client manually.";
+  }
+  return "Could not read these documents with AI. Try again, or use Add Client manually.";
+}
+
 function splitSystem(messages: ChatMessage[]): {
   system: string;
   convo: Message[];

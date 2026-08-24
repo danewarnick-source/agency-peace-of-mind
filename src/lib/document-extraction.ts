@@ -40,7 +40,7 @@ export type ParseOutT = z.infer<typeof ParseOut>;
 // attribute. Keep in lockstep with client-import-schema.ts.
 export const CORE_CLIENT_FIELD_KEYS = new Set<string>([
   // Person
-  "first_name", "last_name", "full_name", "dob", "medicaid_id", "phone", "plan_year",
+  "first_name", "last_name", "full_name", "middle_name", "dob", "medicaid_id", "phone", "plan_year",
   "disability_category", "admission_date", "discharge_date", "pcsp_expiration_date",
   // Address
   "physical_address",
@@ -109,7 +109,9 @@ OUTPUT CONTRACT — Return STRICT JSON only, using exactly this envelope:
   "title": "Person-Centered Support Plan",
   "fields": [
     { "field_key": "first_name", "field_group": "person", "value_text": "Marcus", "confidence": 0.95 },
+    { "field_key": "middle_name", "field_group": "person", "value_text": "T.", "confidence": 0.9 },
     { "field_key": "last_name",  "field_group": "person", "value_text": "Rivera", "confidence": 0.95 },
+    { "field_key": "full_name",  "field_group": "person", "value_text": "Marcus T. Rivera", "confidence": 0.95 },
     { "field_key": "medicaid_id","field_group": "person", "value_text": "1029384756", "confidence": 0.95 },
     { "field_key": "billing_code_row", "field_group": "billing_code",
       "value_json": { "service_code": "SLH", "unit_type": "15 min", "max_units": 5000 }, "confidence": 0.9 }
@@ -133,7 +135,10 @@ Each extracted field has: field_key, field_group, optional value_text / value_nu
 - Structured rows (per-code billing authorizations) in value_json.
 
 Common field_key values to extract when present (use field_group to bucket related fields):
-  Person (group "person"): first_name, last_name, dob (value_date), medicaid_id, phone, plan_year,
+  Person (group "person"): first_name, last_name, middle_name (value_text — middle name or
+    initial such as "T" or "T."; omit if absent), full_name (value_text — COMPLETE legal name
+    including middle initial when present, e.g. "Marcus T. Rivera"; never drop the middle),
+    dob (value_date), medicaid_id, phone, plan_year,
     disability_category (value_text: exactly "ID-RC" or "ABI" — read from the population/diagnosis
     section of the PCSP; ID-RC = Intellectual Disability / Related Condition, ABI = Acquired Brain
     Injury; omit this field entirely if the document does not state the population),

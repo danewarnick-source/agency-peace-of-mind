@@ -17,6 +17,7 @@ import {
 import { fetchTenantIdentity, type TenantIdentity } from "@/lib/service-classification";
 import { BASELINE_STAFF_TRAININGS, isBaselineApplicable } from "@/lib/staff-training-requirements";
 import { onPcspActivatedInternal } from "@/lib/company-obligations.functions";
+import { enrichNamesFromFull } from "@/lib/person-name";
 
 const JobId = z.object({ jobId: z.string().uuid() });
 
@@ -682,6 +683,19 @@ async function commitClient(
       const parts = (subj.display_name || "Imported").split(/\s+/);
       mapped.first_name = parts[0] ?? "Imported";
       mapped.last_name = parts.slice(1).join(" ") || "Client";
+    }
+    // Preserve middle initial when full_name / display_name is richer than first+last.
+    {
+      const full =
+        (fields.find((f) => f.target_field === "full_name")?.value as string | undefined) ||
+        subj.display_name;
+      const enriched = enrichNamesFromFull(
+        mapped.first_name as string | undefined,
+        mapped.last_name as string | undefined,
+        full,
+      );
+      if (enriched.first_name) mapped.first_name = enriched.first_name;
+      if (enriched.last_name) mapped.last_name = enriched.last_name;
     }
     // Default to self-guardian on new clients unless a real guardian is named.
     normalize(mapped, true);

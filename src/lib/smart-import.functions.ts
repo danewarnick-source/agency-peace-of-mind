@@ -11,6 +11,7 @@ import { Buffer } from "node:buffer";
 
 import { gatewayFetch, assertBedrockConfigured, friendlyAiErrorMessage } from "@/lib/ai-bedrock.server";
 import { parseDocumentWithAI, extractGoalsOnly, documentLikelyHasGoals, CORE_CLIENT_FIELD_KEYS } from "@/lib/document-extraction";
+import { enrichNamesFromFull, firstNameWithMiddle, formatPersonName } from "@/lib/person-name";
 
 function digitsOnly(v: string | null | undefined): string {
   return (v ?? "").replace(/\D/g, "");
@@ -998,12 +999,71 @@ async function aiExtractFieldsFromText(
     });
   }
 
-  // Derive a display name from extracted person fields.
+  // Derive a display name from extracted person fields — keep middle initials.
   const get = (k: string) => out.find((r) => r.target_field === k)?.value;
   const full = get("full_name");
   const fn = get("first_name");
+  const mn = get("middle_name");
   const ln = get("last_name");
-  const display = (full || `${fn ?? ""} ${ln ?? ""}`.trim() || "Imported client").trim();
+
+  const enriched = enrichNamesFromFull(
+    mn ? firstNameWithMiddle(fn ?? "", mn) : fn,
+    ln,
+    full,
+  );
+
+  // Ensure first_name on the client row keeps the middle initial (no middle_name column).
+  const firstIdx = out.findIndex((r) => r.target_field === "first_name");
+  if (enriched.first_name) {
+    if (firstIdx >= 0) out[firstIdx] = { ...out[firstIdx], value: enriched.first_name };
+    else {
+      out.push({
+        target_field: "first_name",
+        value: enriched.first_name,
+        status: "placed",
+        confidence: 0.9,
+        snippet: enriched.display_name,
+        provenance: "inferred",
+        is_custom: false,
+      });
+    }
+  }
+  if (enriched.last_name) {
+    const lastIdx = out.findIndex((r) => r.target_field === "last_name");
+    if (lastIdx >= 0 && !out[lastIdx].value) out[lastIdx] = { ...out[lastIdx], value: enriched.last_name };
+    else if (lastIdx < 0) {
+      out.push({
+        target_field: "last_name",
+        value: enriched.last_name,
+        status: "placed",
+        confidence: 0.9,
+        snippet: enriched.display_name,
+        provenance: "inferred",
+        is_custom: false,
+      });
+    }
+  }
+  // Always keep a full_name field for review / intake prefill.
+  const fullIdx = out.findIndex((r) => r.target_field === "full_name");
+  if (enriched.display_name) {
+    if (fullIdx >= 0) out[fullIdx] = { ...out[fullIdx], value: enriched.display_name };
+    else {
+      out.push({
+        target_field: "full_name",
+        value: enriched.display_name,
+        status: "placed",
+        confidence: 0.9,
+        snippet: enriched.display_name,
+        provenance: "inferred",
+        is_custom: false,
+      });
+    }
+  }
+
+  const display =
+    enriched.display_name ||
+    formatPersonName(fn ?? "", mn ?? "", ln ?? "") ||
+    "Imported client";
 
   return { display_name: display, fields: out, unfiled };
 }

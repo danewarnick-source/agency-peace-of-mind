@@ -152,9 +152,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
           "script-src 'self' 'unsafe-inline'",
           "img-src 'self' data: https:",
-          "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.anthropic.com",
-          "frame-ancestors 'none'",
+          // Nominatim geocode + Supabase + Vercel analytics/ingest. Do NOT put
+          // frame-ancestors here — browsers ignore it on <meta http-equiv> and
+          // log a console warning; set that directive via HTTP headers only.
+          "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.vercel.app https://vercel.live https://nominatim.openstreetmap.org https://api.anthropic.com",
           "object-src 'none'",
+          "base-uri 'self'",
+          "form-action 'self'",
         ].join("; "),
       },
       { charSet: "utf-8" },

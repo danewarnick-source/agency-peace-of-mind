@@ -603,6 +603,34 @@ function DashboardLayout() {
  * to unmount/remount the entire sidebar on every parent render, which made
  * sidebar nav clicks fail intermittently.
  */
+function CompanyClientsBridge({
+  setView,
+  onNavigate,
+}: {
+  setView: (v: PV) => void;
+  onNavigate?: () => void;
+}) {
+  const navigate = useNavigate();
+  return (
+    <button
+      type="button"
+      className="mt-3 flex w-full items-center justify-center gap-2 rounded-md border border-[#f4a93a]/40 bg-[#f4a93a]/10 px-3 py-2 text-xs font-semibold text-[#f4a93a] hover:bg-[#f4a93a]/20"
+      onClick={() => {
+        // Switch to company Admin portal and open Clients — hive-exec
+        // nav intentionally excludes PHI; this is the explicit bridge.
+        setView("admin");
+        onNavigate?.();
+        window.setTimeout(() => {
+          void navigate({ to: "/dashboard/hub/clients" });
+        }, 50);
+      }}
+    >
+      <Contact2 className="h-3.5 w-3.5" />
+      Open company Clients
+    </button>
+  );
+}
+
 function SidebarBody({
   user,
   role,
@@ -728,6 +756,10 @@ function SidebarBody({
               )}
             </SelectContent>
           </Select>
+
+          {isHiveExecView && isAdminCapable && (
+            <CompanyClientsBridge setView={setView} onNavigate={onNavigate} />
+          )}
 
           {isStatePreview && (
             <div className="mt-3 space-y-2 rounded-md border border-[#f4a93a]/30 bg-[#f4a93a]/[0.06] p-2">

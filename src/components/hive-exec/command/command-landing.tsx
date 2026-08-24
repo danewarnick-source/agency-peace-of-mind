@@ -1,10 +1,11 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Sparkles, ShieldCheck, FileSignature, Wrench, DollarSign, Building2, AlertTriangle, ShieldAlert } from "lucide-react";
+import { Sparkles, ShieldCheck, FileSignature, Wrench, DollarSign, Building2, AlertTriangle, ShieldAlert, Contact2 } from "lucide-react";
 import { getCommandMetrics, getNeedsYouSummary } from "@/lib/exec-command.functions";
 import { SteveDockPanel } from "@/components/hive-exec/command/steve-panel";
-
+import { usePortalView } from "@/hooks/use-portal-view";
+import { useCurrentOrg } from "@/hooks/use-org";
 
 function fmtMoney(cents: number): string {
   return `$${(cents / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
@@ -15,7 +16,11 @@ export function CommandCenterLanding() {
   const needsFn = useServerFn(getNeedsYouSummary);
   const metricsQ = useQuery({ queryKey: ["exec-cmd-metrics"], queryFn: () => metricsFn(), refetchInterval: 60_000 });
   const needsQ = useQuery({ queryKey: ["exec-cmd-needs"], queryFn: () => needsFn(), refetchInterval: 60_000 });
-  
+  const { setView } = usePortalView();
+  const navigate = useNavigate();
+  const { data: org } = useCurrentOrg();
+  const canOpenCompanyClients =
+    org?.role === "admin" || org?.role === "super_admin" || org?.role === "manager";
 
   const m = metricsQ.data;
   const n = needsQ.data;
@@ -30,10 +35,27 @@ export function CommandCenterLanding() {
               <h1 className="font-display text-2xl font-bold tracking-tight">Executive Command Center</h1>
               <p className="mt-1 text-sm text-white/80">Platform operations</p>
             </div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-[#fed7aa] bg-[#0f1b3d] px-3 py-1.5 text-xs font-medium text-[#fed7aa]">
-              <ShieldAlert className="h-3.5 w-3.5" />
-              Account and billing only — no client records or PHI
-            </span>
+            <div className="flex flex-col items-end gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full border border-[#fed7aa] bg-[#0f1b3d] px-3 py-1.5 text-xs font-medium text-[#fed7aa]">
+                <ShieldAlert className="h-3.5 w-3.5" />
+                Account and billing only — no client records or PHI
+              </span>
+              {canOpenCompanyClients && (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-md border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20"
+                  onClick={() => {
+                    setView("admin");
+                    window.setTimeout(() => {
+                      void navigate({ to: "/dashboard/hub/clients" });
+                    }, 50);
+                  }}
+                >
+                  <Contact2 className="h-3.5 w-3.5" />
+                  Open company Clients (Admin View)
+                </button>
+              )}
+            </div>
           </div>
         </section>
 

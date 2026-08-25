@@ -348,6 +348,11 @@ function DashboardLayout() {
     refetchInterval: 60_000,
   });
 
+  // Must stay above any conditional return — Rules of Hooks.
+  const { totalCount: complianceActionCount } = useActionRequiredQueue(
+    isAdminCapable ? org?.organization_id ?? null : null,
+  );
+
   const currentPreviewState = isStatePreview
     ? states.find((s) => s.code === stateCode) ?? null
     : null;
@@ -380,9 +385,6 @@ function DashboardLayout() {
     allNav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ?? "Dashboard";
   const isStaffView = effectiveView === "staff";
   const inboxUnread = unreadQ.data?.count ?? 0;
-  const { totalCount: complianceActionCount } = useActionRequiredQueue(
-    isAdminCapable ? org?.organization_id : null,
-  );
 
   const sidebarProps: Omit<SidebarBodyProps, "onNavigate"> = {
     user,

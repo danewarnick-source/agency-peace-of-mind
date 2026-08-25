@@ -119,6 +119,7 @@ import { Route as DashboardSettingsServiceCodesRouteImport } from './routes/dash
 import { Route as DashboardSettingsServiceCatalogRouteImport } from './routes/dashboard.settings.service-catalog'
 import { Route as DashboardSettingsRoleAuditRouteImport } from './routes/dashboard.settings.role-audit'
 import { Route as DashboardSettingsRetentionRouteImport } from './routes/dashboard.settings.retention'
+import { Route as DashboardSettingsPhiAccessAuditRouteImport } from './routes/dashboard.settings.phi-access-audit'
 import { Route as DashboardSettingsLicensingRouteImport } from './routes/dashboard.settings.licensing'
 import { Route as DashboardSettingsGmailRouteImport } from './routes/dashboard.settings.gmail'
 import { Route as DashboardSettingsEmailRouteImport } from './routes/dashboard.settings.email'
@@ -786,6 +787,12 @@ const DashboardSettingsRetentionRoute =
     path: '/retention',
     getParentRoute: () => DashboardSettingsRoute,
   } as any)
+const DashboardSettingsPhiAccessAuditRoute =
+  DashboardSettingsPhiAccessAuditRouteImport.update({
+    id: '/phi-access-audit',
+    path: '/phi-access-audit',
+    getParentRoute: () => DashboardSettingsRoute,
+  } as any)
 const DashboardSettingsLicensingRoute =
   DashboardSettingsLicensingRouteImport.update({
     id: '/licensing',
@@ -1443,6 +1450,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/settings/email': typeof DashboardSettingsEmailRoute
   '/dashboard/settings/gmail': typeof DashboardSettingsGmailRoute
   '/dashboard/settings/licensing': typeof DashboardSettingsLicensingRoute
+  '/dashboard/settings/phi-access-audit': typeof DashboardSettingsPhiAccessAuditRoute
   '/dashboard/settings/retention': typeof DashboardSettingsRetentionRoute
   '/dashboard/settings/role-audit': typeof DashboardSettingsRoleAuditRoute
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
@@ -1636,6 +1644,7 @@ export interface FileRoutesByTo {
   '/dashboard/settings/email': typeof DashboardSettingsEmailRoute
   '/dashboard/settings/gmail': typeof DashboardSettingsGmailRoute
   '/dashboard/settings/licensing': typeof DashboardSettingsLicensingRoute
+  '/dashboard/settings/phi-access-audit': typeof DashboardSettingsPhiAccessAuditRoute
   '/dashboard/settings/retention': typeof DashboardSettingsRetentionRoute
   '/dashboard/settings/role-audit': typeof DashboardSettingsRoleAuditRoute
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
@@ -1837,6 +1846,7 @@ export interface FileRoutesById {
   '/dashboard/settings/email': typeof DashboardSettingsEmailRoute
   '/dashboard/settings/gmail': typeof DashboardSettingsGmailRoute
   '/dashboard/settings/licensing': typeof DashboardSettingsLicensingRoute
+  '/dashboard/settings/phi-access-audit': typeof DashboardSettingsPhiAccessAuditRoute
   '/dashboard/settings/retention': typeof DashboardSettingsRetentionRoute
   '/dashboard/settings/role-audit': typeof DashboardSettingsRoleAuditRoute
   '/dashboard/settings/service-catalog': typeof DashboardSettingsServiceCatalogRoute
@@ -2039,6 +2049,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/email'
     | '/dashboard/settings/gmail'
     | '/dashboard/settings/licensing'
+    | '/dashboard/settings/phi-access-audit'
     | '/dashboard/settings/retention'
     | '/dashboard/settings/role-audit'
     | '/dashboard/settings/service-catalog'
@@ -2232,6 +2243,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/email'
     | '/dashboard/settings/gmail'
     | '/dashboard/settings/licensing'
+    | '/dashboard/settings/phi-access-audit'
     | '/dashboard/settings/retention'
     | '/dashboard/settings/role-audit'
     | '/dashboard/settings/service-catalog'
@@ -2432,6 +2444,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/email'
     | '/dashboard/settings/gmail'
     | '/dashboard/settings/licensing'
+    | '/dashboard/settings/phi-access-audit'
     | '/dashboard/settings/retention'
     | '/dashboard/settings/role-audit'
     | '/dashboard/settings/service-catalog'
@@ -3289,6 +3302,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsRetentionRouteImport
       parentRoute: typeof DashboardSettingsRoute
     }
+    '/dashboard/settings/phi-access-audit': {
+      id: '/dashboard/settings/phi-access-audit'
+      path: '/phi-access-audit'
+      fullPath: '/dashboard/settings/phi-access-audit'
+      preLoaderRoute: typeof DashboardSettingsPhiAccessAuditRouteImport
+      parentRoute: typeof DashboardSettingsRoute
+    }
     '/dashboard/settings/licensing': {
       id: '/dashboard/settings/licensing'
       path: '/licensing'
@@ -4137,6 +4157,7 @@ interface DashboardSettingsRouteChildren {
   DashboardSettingsEmailRoute: typeof DashboardSettingsEmailRoute
   DashboardSettingsGmailRoute: typeof DashboardSettingsGmailRoute
   DashboardSettingsLicensingRoute: typeof DashboardSettingsLicensingRoute
+  DashboardSettingsPhiAccessAuditRoute: typeof DashboardSettingsPhiAccessAuditRoute
   DashboardSettingsRetentionRoute: typeof DashboardSettingsRetentionRoute
   DashboardSettingsRoleAuditRoute: typeof DashboardSettingsRoleAuditRoute
   DashboardSettingsServiceCatalogRoute: typeof DashboardSettingsServiceCatalogRoute
@@ -4151,6 +4172,7 @@ const DashboardSettingsRouteChildren: DashboardSettingsRouteChildren = {
   DashboardSettingsEmailRoute: DashboardSettingsEmailRoute,
   DashboardSettingsGmailRoute: DashboardSettingsGmailRoute,
   DashboardSettingsLicensingRoute: DashboardSettingsLicensingRoute,
+  DashboardSettingsPhiAccessAuditRoute: DashboardSettingsPhiAccessAuditRoute,
   DashboardSettingsRetentionRoute: DashboardSettingsRetentionRoute,
   DashboardSettingsRoleAuditRoute: DashboardSettingsRoleAuditRoute,
   DashboardSettingsServiceCatalogRoute: DashboardSettingsServiceCatalogRoute,

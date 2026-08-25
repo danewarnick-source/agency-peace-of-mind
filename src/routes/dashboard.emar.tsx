@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +21,7 @@ import { EmarLegalBanner } from "@/components/workspace/emar-chart";
 import { usePermissions } from "@/hooks/use-permissions";
 import { logMedicationPass } from "@/lib/emar-pass.functions";
 import { type EmarStatus, normalizeEmarStatus } from "@/lib/emar-status";
+import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
 
 export const Route = createFileRoute("/dashboard/emar")({
   head: () => ({ meta: [{ title: "Today's Pass — HIVE eMAR" }] }),
@@ -69,6 +70,8 @@ function EmarPage() {
   const isAdminLike = role === "admin" || role === "program_manager" || role === "manager";
   const qc = useQueryClient();
   const [selected, setSelected] = useState<DueRow | null>(null);
+  const recordAccessFn = useServerFn(recordPhiAccess);
+  const emarPageAuditLogged = useRef(false);
 
   const serviceContext = activeShift?.service_type_code || "general";
 
@@ -145,6 +148,20 @@ function EmarPage() {
 
   const rows = pageData?.rows ?? [];
   const headers = pageData?.headers ?? {};
+
+  useEffect(() => {
+    if (!org?.organization_id || emarPageAuditLogged.current || isLoading) return;
+    emarPageAuditLogged.current = true;
+    void recordAccessFn({
+      data: {
+        organizationId: org.organization_id,
+        resourceType: "emar",
+        action: "view",
+        detail: "emar-due-page",
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+      },
+    });
+  }, [org?.organization_id, isLoading, recordAccessFn]);
 
   const todayStart = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d.toISOString(); }, []);
   const todayEnd = useMemo(() => { const d = new Date(); d.setHours(24,0,0,0); return d.toISOString(); }, []);

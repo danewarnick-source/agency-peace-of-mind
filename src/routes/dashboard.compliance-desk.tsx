@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState, type MouseEvent } from "react";
+import { Fragment, useEffect, useMemo, useState, useRef, useCallback, type MouseEvent } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -35,6 +35,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { Home as HomeIcon } from "lucide-react";
 import { CheckboxMultiSelect } from "@/components/ui/checkbox-multi-select";
 import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
+import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
 
 // Rendered as the dedicated "Geofence Validation Status" column on both
 // the Pending Approvals Ledger and the Approved Timesheets Archive.
@@ -301,6 +302,39 @@ function useRowExpansion() {
   const expandAll = (ids: string[]) => setExpanded(new Set(ids));
   const collapseAll = () => setExpanded(new Set());
   return { expanded, isExpanded, toggle, expandAll, collapseAll };
+}
+
+function useEvvTimesheetPhiAudit() {
+  const { data: org } = useCurrentOrg();
+  const recordAccess = useServerFn(recordPhiAccess);
+  const logged = useRef(new Set<string>());
+  const auditView = useCallback((row: Pick<Row, "id" | "client_id">) => {
+    const orgId = org?.organization_id;
+    if (!orgId || logged.current.has(row.id)) return;
+    logged.current.add(row.id);
+    void recordAccess({
+      data: {
+        organizationId: orgId,
+        resourceType: "evv_timesheet",
+        resourceId: row.id,
+        clientId: row.client_id,
+        action: "view",
+        detail: "compliance-desk-row-expand",
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+      },
+    });
+  }, [org?.organization_id, recordAccess]);
+
+  const toggleWithAudit = useCallback(
+    (exp: ReturnType<typeof useRowExpansion>, row: Pick<Row, "id" | "client_id">) => {
+      const wasOpen = exp.isExpanded(row.id);
+      exp.toggle(row.id);
+      if (!wasOpen) auditView(row);
+    },
+    [auditView],
+  );
+
+  return { toggleWithAudit };
 }
 
 function ExpandControls({
@@ -1045,6 +1079,7 @@ function UnifiedSearchResults({
   }, [matches, rowMap]);
 
   const exp = useRowExpansion();
+  const { toggleWithAudit } = useEvvTimesheetPhiAudit();
   const allIds = useMemo(() => ranked.map((r) => r.row.id), [ranked]);
 
   return (
@@ -1133,7 +1168,7 @@ function UnifiedSearchResults({
               return (
                 <Fragment key={r.id}>
                   <TableRow
-                    onClick={() => exp.toggle(r.id)}
+                    onClick={() => toggleWithAudit(exp, r)}
                     role="button"
                     aria-expanded={open}
                     className="cursor-pointer hover:bg-muted/40 [&>td]:border-b-0 [&>td]:py-1.5"
@@ -1219,6 +1254,7 @@ function PendingTable({
   description?: string;
 }) {
   const exp = useRowExpansion();
+  const { toggleWithAudit } = useEvvTimesheetPhiAudit();
   const allIds = useMemo(() => rows.map((r) => r.id), [rows]);
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
@@ -1258,7 +1294,7 @@ function PendingTable({
               return (
               <Fragment key={r.id}>
               <TableRow
-                onClick={() => exp.toggle(r.id)}
+                onClick={() => toggleWithAudit(exp, r)}
                 role="button"
                 aria-expanded={open}
                 className="cursor-pointer hover:bg-muted/40 [&>td]:border-b-0 [&>td]:py-1.5"
@@ -1805,6 +1841,7 @@ function ArchiveTable({
   const exportLabel = variant === "evv" ? "Export Utah DHHS EVV CSV" : "Export Payroll CSV";
 
   const exp = useRowExpansion();
+  const { toggleWithAudit } = useEvvTimesheetPhiAudit();
   const allIds = useMemo(() => filtered.map((r) => r.id), [filtered]);
   const showBillingCol = variant === "evv";
   const colSpan = showBillingCol ? 12 : 11;
@@ -1916,7 +1953,7 @@ function ArchiveTable({
               return (
                 <Fragment key={r.id}>
                 <TableRow
-                  onClick={() => exp.toggle(r.id)}
+                  onClick={() => toggleWithAudit(exp, r)}
                   role="button"
                   aria-expanded={open}
                   className="cursor-pointer hover:bg-muted/40 [&>td]:border-b-0 [&>td]:py-1.5"
@@ -2278,6 +2315,7 @@ function ReconcileTable({
   };
 
   const exp = useRowExpansion();
+  const { toggleWithAudit } = useEvvTimesheetPhiAudit();
   const allIds = useMemo(() => filtered.map((r) => r.id), [filtered]);
 
   return (
@@ -2337,7 +2375,7 @@ function ReconcileTable({
               return (
                 <Fragment key={r.id}>
                 <TableRow
-                  onClick={() => exp.toggle(r.id)}
+                  onClick={() => toggleWithAudit(exp, r)}
                   role="button"
                   aria-expanded={open}
                   className="cursor-pointer hover:bg-muted/40 [&>td]:border-b-0 [&>td]:py-1.5"

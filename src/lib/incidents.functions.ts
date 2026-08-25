@@ -18,6 +18,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { createIncidentInstances, resolveComplianceRequirement } from "@/lib/compliance-resolution";
+import { logPhiAccess } from "@/lib/phi-access-audit.server";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -252,12 +253,22 @@ export const getIncidentDetail = createServerFn({ method: "GET" })
     const { data: row, error } = await supabase
       .from("incident_reports")
       .select(
-        "id, occurred_at, location, description, prevention_strategies, guardian_notified_method, guardian_notified_by, guardian_notified_details, upi_submitted_by, upi_submitted_attestation_text, upi_submitted_signed_name, upi_submitted_signed_title, created_at, details, witnessed_directly, reported_to_reporter_by, restraint_used, aps_notified_at, aps_notified_by, aps_reference, ai_review_status, ai_review_issues, ai_review_at",
+        "id, client_id, occurred_at, location, description, prevention_strategies, guardian_notified_method, guardian_notified_by, guardian_notified_details, upi_submitted_by, upi_submitted_attestation_text, upi_submitted_signed_name, upi_submitted_signed_title, created_at, details, witnessed_directly, reported_to_reporter_by, restraint_used, aps_notified_at, aps_notified_by, aps_reference, ai_review_status, ai_review_issues, ai_review_at",
       )
       .eq("organization_id", m.organization_id)
       .eq("id", data.id)
       .single();
     if (error) throw new Error(error.message);
+    void logPhiAccess({
+      supabaseUserClient: supabase,
+      userId,
+      organizationId: data.organization_id,
+      resourceType: "incident",
+      resourceId: data.id,
+      clientId: (row as { client_id?: string | null }).client_id ?? null,
+      action: "view",
+      detail: "getIncidentDetail",
+    });
     return { incident: row };
   });
 
@@ -462,6 +473,14 @@ export const signIncidentPhotos = createServerFn({ method: "POST" })
     await getMembership(supabase, userId, data.organization_id);
 
     if (!data.paths.length) return { urls: {} as Record<string, string> };
+    void logPhiAccess({
+      supabaseUserClient: supabase,
+      userId,
+      organizationId: data.organization_id,
+      resourceType: "incident",
+      action: "view",
+      detail: `signIncidentPhotos:${data.paths.length}`,
+    });
     const out: Record<string, string> = {};
     for (const p of data.paths) {
       const { data: signed } = await supabase.storage

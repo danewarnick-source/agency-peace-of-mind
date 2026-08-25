@@ -7,7 +7,7 @@
 // Tabs: Overview / Plan & goals / Billing codes / Shifts / Daily logs /
 // Incidents / Summaries / Host-home cert / Deadlines / Documents.
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -47,6 +47,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
+import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
 
 import { ClientBudgetPanel } from "@/components/clients/client-budget-panel";
 import { ClientMealPlannerMount } from "@/components/clients/client-meal-planner-mount";
@@ -240,6 +241,24 @@ function ClientProfileHub() {
   const { data: org } = useCurrentOrg();
   const router = useRouter();
   const orgId = org?.organization_id;
+  const recordAccessFn = useServerFn(recordPhiAccess);
+  const chartAuditLogged = useRef(false);
+
+  useEffect(() => {
+    if (!orgId || !clientId || chartAuditLogged.current) return;
+    chartAuditLogged.current = true;
+    void recordAccessFn({
+      data: {
+        organizationId: orgId,
+        resourceType: "client_chart",
+        resourceId: clientId,
+        clientId,
+        action: "view",
+        detail: "admin-client-profile-hub",
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+      },
+    });
+  }, [orgId, clientId, recordAccessFn]);
 
   const activeTab = resolveTab(rawTab);
 

@@ -28,10 +28,12 @@ export function verifyCronSecret(request: Request): boolean {
 export function verifyAlbOriginSecret(request: Request): boolean {
   const expected = process.env.ALB_ORIGIN_VERIFY_SECRET?.trim() || "";
   if (!expected) return true; // not configured — skip (local / Vercel)
-  const provided =
+  const provided = (
     request.headers.get("x-origin-verify") ??
     request.headers.get("x-cloudfront-secret") ??
-    "";
+    ""
+  ).trim();
+  if (!provided) return false; // secret configured — missing header is forbidden
   const a = Buffer.from(provided);
   const b = Buffer.from(expected);
   if (a.length !== b.length) return false;

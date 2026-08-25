@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
   AlertTriangle, Check, ChevronDown, ChevronUp, Pencil, Plus, Upload, X,
@@ -28,7 +29,6 @@ import {
   computeRestrictionCompletion,
   type RestrictionRecord,
 } from "@/lib/hrc-restrictions";
-import { useServerFn } from "@tanstack/react-start";
 import {
   listRhsHospitalizationDays,
   setRhsHospitalizationDay,
@@ -49,6 +49,7 @@ import {
 } from "@/components/ui/select";
 import { listUpiAttestations, recordUpiAttestation } from "@/lib/upi-attestations.functions";
 import { formatPeriodMonthYear } from "@/lib/progress-summaries";
+import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
 
 type ClientRow = Record<string, unknown>;
 type DocRow = { id: string; document_type: string | null; file_name: string | null; storage_path: string | null; uploaded_at: string | null };
@@ -189,6 +190,8 @@ export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; 
   return (
     <div className="space-y-4">
       <RecordCompletenessBar
+        clientId={clientId}
+        orgId={orgId!}
         client={client}
         docs={docs}
         restriction={primaryRestriction}
@@ -746,9 +749,10 @@ function CardShell({
 // ── Record completeness bar ────────────────────────────────────────────────
 
 function RecordCompletenessBar({
-  client, docs, restriction, isHhs, showElsSchoolDocs, onOpenFiles, onContinueIntake,
-}: { client: ClientRow; docs: DocRow[]; restriction: RestrictionRecord | null; isHhs: boolean; showElsSchoolDocs: boolean; onOpenFiles: () => void; onContinueIntake: () => void }) {
+  clientId, orgId, client, docs, restriction, isHhs, showElsSchoolDocs, onOpenFiles, onContinueIntake,
+}: { clientId: string; orgId: string; client: ClientRow; docs: DocRow[]; restriction: RestrictionRecord | null; isHhs: boolean; showElsSchoolDocs: boolean; onOpenFiles: () => void; onContinueIntake: () => void }) {
   const [open, setOpen] = useState(false);
+  const recordAccessFn = useServerFn(recordPhiAccess);
 
   const isOwnGuardian = client.is_own_guardian === true;
   const dnrStatus = (client.dnr_status as string | null) ?? null;
@@ -809,6 +813,17 @@ function RecordCompletenessBar({
     try {
       const { data, error } = await supabase.storage.from("client-documents").createSignedUrl(doc.storage_path, 60);
       if (error || !data?.signedUrl) throw error ?? new Error("No URL");
+      void recordAccessFn({
+        data: {
+          organizationId: orgId,
+          resourceType: "client_document",
+          resourceId: doc.id,
+          clientId,
+          action: "download",
+          detail: doc.file_name ?? doc.document_type ?? undefined,
+          userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+        },
+      });
       window.open(data.signedUrl, "_blank");
     } catch {
       onOpenFiles();

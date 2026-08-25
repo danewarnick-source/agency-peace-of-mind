@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -32,9 +33,9 @@ import {
   evaluateShiftNote, scanNoteForTriggers,
   type CoachResult, type ScanResult,
 } from "@/lib/ai-coach.functions";
-import { useServerFn } from "@tanstack/react-start";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
+import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
 
 export const Route = createFileRoute("/dashboard/daily-logs")({
   head: () => ({ meta: [{ title: "Daily Logs — HIVE" }] }),
@@ -900,6 +901,26 @@ function AdminAuditQueue() {
   const qc = useQueryClient();
   const [active, setActive] = useState<AdminLog | null>(null);
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("pending");
+  const [denialReason, setDenialReason] = useState("");
+  const recordAccessFn = useServerFn(recordPhiAccess);
+
+  const openLogDetail = (log: AdminLog) => {
+    setDenialReason("");
+    setActive(log);
+    if (org?.organization_id) {
+      void recordAccessFn({
+        data: {
+          organizationId: org.organization_id,
+          resourceType: "daily_log",
+          resourceId: log.id,
+          clientId: log.client_id,
+          action: "view",
+          detail: "daily-logs-admin-detail",
+          userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+        },
+      });
+    }
+  };
 
   const { data: logs = [], isLoading } = useQuery({
     enabled: !!org,
@@ -942,7 +963,6 @@ function AdminAuditQueue() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const [denialReason, setDenialReason] = useState("");
   const denyMut = useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
       const { error } = await supabase.from("daily_logs")
@@ -1033,7 +1053,7 @@ function AdminAuditQueue() {
                 </TableHeader>
                 <TableBody>
                   {rows.map((r) => (
-                    <TableRow key={r.id} onClick={() => { setActive(r); setDenialReason(""); }}
+                    <TableRow key={r.id} onClick={() => openLogDetail(r)}
                       className="cursor-pointer hover:bg-muted/40">
                       <TableCell className="font-medium">
                         {r.profiles?.full_name ?? r.profiles?.email ?? "—"}

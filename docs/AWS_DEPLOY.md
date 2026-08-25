@@ -60,8 +60,10 @@ long-running Node HTTP server (nitro's `node-server` preset) — plus
    3. In CloudFront, add a custom origin header on the SSR origin:
       - Header name: `x-origin-verify`
       - Value: the same secret
-   4. The Nitro plugin `src/nitro-plugins/alb-origin-verify.ts` rejects any
-      request missing that header when the env var is set (403).
+   4. The Nitro plugin `src/nitro-plugins/alb-origin-verify.ts` **fail-closes**
+      when `ALB_ORIGIN_VERIFY_SECRET` is set: any request missing or mismatching
+      `x-origin-verify` gets 403. When the env var is unset (local / Vercel-only),
+      verification is skipped.
 
    Alternative: restrict ALB security-group inbound to CloudFront prefix lists
    only (AWS-managed CloudFront prefix list). Combining both is best.

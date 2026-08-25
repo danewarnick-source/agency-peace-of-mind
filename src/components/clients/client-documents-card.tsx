@@ -36,6 +36,7 @@ import { NectarDocumentActionsDialog } from "@/components/nectar/document-action
 import { DocumentPreviewDialog } from "./document-preview-dialog";
 import { DocumentEffectiveDatingDialog } from "@/components/documents/document-effective-dating-dialog";
 import { OutdatedDocumentsSection } from "@/components/documents/outdated-documents-section";
+import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
 
 const CLIENT_DOC_TYPES = [
   { value: "pcsp", label: "PCSP" },
@@ -92,6 +93,7 @@ export function ClientDocumentsCard({
   const queryFn = useServerFn(queryDocuments);
   const delFn = useServerFn(deleteDocument);
   const getDocFn = useServerFn(getDocument);
+  const recordAccessFn = useServerFn(recordPhiAccess);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [offerDocId, setOfferDocId] = useState<string | null>(null);
   const [preview, setPreview] = useState<{
@@ -112,6 +114,21 @@ export function ClientDocumentsCard({
     qc.invalidateQueries({ queryKey: ["client-has-pcsp", clientId] });
     qc.invalidateQueries({ queryKey: ["client-specific-training", clientId] });
     qc.invalidateQueries({ queryKey: ["outdated-docs"] });
+  };
+
+  const auditDocumentOpen = (docId: string, detail?: string | null) => {
+    if (!orgId) return;
+    void recordAccessFn({
+      data: {
+        organizationId: orgId,
+        resourceType: "client_document",
+        resourceId: docId,
+        clientId,
+        action: "download",
+        detail: detail ?? undefined,
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+      },
+    });
   };
 
   const { data, isLoading } = useQuery({
@@ -311,6 +328,7 @@ export function ClientDocumentsCard({
                       .from("client-documents")
                       .createSignedUrl(d.storage_path, 300);
                     if (signed?.signedUrl) {
+                      auditDocumentOpen(d.id, d.file_name);
                       setPreview({
                         fileName: d.file_name,
                         mimeType: d.mime_type ?? null,
@@ -327,6 +345,7 @@ export function ClientDocumentsCard({
                       d.mime_type ??
                       null;
                     if (url) {
+                      auditDocumentOpen(d.id, d.file_name);
                       setPreview({ fileName: d.file_name, mimeType: mime, signedUrl: url });
                     } else toast.error("Could not generate a link for this file.");
                   } catch (e) {

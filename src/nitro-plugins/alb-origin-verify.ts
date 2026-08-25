@@ -1,8 +1,9 @@
 /**
  * Nitro request hook: reject direct ALB hits when ALB_ORIGIN_VERIFY_SECRET is set.
  * CloudFront must inject header `x-origin-verify: <secret>`.
- * Fail-open when the env var is unset (local / Vercel).
+ * Fail-open when the env var is unset (local / Vercel); fail-closed when set.
  */
+import { createError } from "h3";
 import { verifyAlbOriginSecret } from "../lib/cron-auth";
 
 export default defineNitroPlugin((nitroApp) => {
@@ -18,9 +19,11 @@ export default defineNitroPlugin((nitroApp) => {
     }
     const fake = new Request("http://local", { headers });
     if (!verifyAlbOriginSecret(fake)) {
-      event.node.res.statusCode = 403;
-      event.node.res.setHeader("content-type", "application/json");
-      event.node.res.end(JSON.stringify({ error: "forbidden" }));
+      throw createError({
+        status: 403,
+        statusMessage: "Forbidden",
+        message: "forbidden",
+      });
     }
   });
 });

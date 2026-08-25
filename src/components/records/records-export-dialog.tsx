@@ -9,6 +9,7 @@
 // DHHS EVV export stays a fixed, non-customizable format matching the
 // state's required specification.
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
@@ -17,6 +18,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
 import { downloadCsv } from "@/lib/utah-evv-export";
+import { useCurrentOrg } from "@/hooks/use-org";
+import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
 
 export interface ExportRow {
   recordType: "Billable" | "Non-billable";
@@ -77,6 +80,8 @@ export function RecordsExportDialog({
   to: string;
 }) {
   const [selected, setSelected] = useState<Set<string>>(defaultSelected);
+  const { data: org } = useCurrentOrg();
+  const recordAccessFn = useServerFn(recordPhiAccess);
 
   const toggle = (key: string) => {
     setSelected((prev) => {
@@ -101,6 +106,17 @@ export function RecordsExportDialog({
     const body = [header.join(",")].concat(
       rows.map((r) => selectedFields.map((f) => esc(f.get(r))).join(",")),
     ).join("\r\n");
+    if (org?.organization_id) {
+      void recordAccessFn({
+        data: {
+          organizationId: org.organization_id,
+          resourceType: "other",
+          action: "export",
+          detail: `records-csv:${from}_${to}`,
+          userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+        },
+      });
+    }
     downloadCsv(`records-export_${from}_${to}.csv`, body);
     onClose();
   };

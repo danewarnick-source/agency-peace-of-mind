@@ -1,15 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -212,8 +208,7 @@ function SectionBlock({
 
 export function ActionRequiredPanel({ orgId }: { orgId: string }) {
   const qc = useQueryClient();
-  const { sections, totalCount, checkedAt, isLoading, obligations } =
-    useActionRequiredQueue(orgId);
+  const { sections, totalCount, checkedAt, isLoading, obligations } = useActionRequiredQueue(orgId);
 
   const listGroupsFn = useServerFn(listStaffGroups);
   const { data: groups = [] } = useQuery<Array<StaffGroupRow & { member_count: number }>>({
@@ -267,11 +262,22 @@ export function ActionRequiredPanel({ orgId }: { orgId: string }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<ObligationWithInstance | null>(null);
   const [notifyingKey, setNotifyingKey] = useState<string | null>(null);
+  const focusPanelRef = useRef<HTMLDivElement | null>(null);
 
   const focusObligation = useMemo(
     () => obligations.find((o) => o.id === focusObligationId) ?? null,
     [obligations, focusObligationId],
   );
+
+  // The "Complete" panel renders once, above the section lists, so clicking
+  // a row's action button (which may be far down a long queue) needs to
+  // scroll the panel into view — otherwise it looks like the button did
+  // nothing.
+  useEffect(() => {
+    if (focusObligationId) {
+      focusPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [focusObligationId]);
 
   const notifyAttest = useMutation({
     mutationFn: async (item: ActionRequiredItem) => {
@@ -343,18 +349,11 @@ export function ActionRequiredPanel({ orgId }: { orgId: string }) {
         {totalCount === 1 ? "" : "s"}.
       </p>
 
-      {sections.map((section) => (
-        <SectionBlock
-          key={section.id}
-          section={section}
-          onObligation={(item) => setFocusObligationId(item.obligation?.id ?? null)}
-          onNotifyAttest={(item) => notifyAttest.mutate(item)}
-          notifyingKey={notifyingKey}
-        />
-      ))}
-
       {focusObligation && (
-        <div className="space-y-2 rounded-xl border border-border bg-muted/20 p-3">
+        <div
+          ref={focusPanelRef}
+          className="space-y-2 rounded-xl border border-primary/40 bg-primary/5 p-3 ring-1 ring-primary/20 scroll-mt-20"
+        >
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm font-semibold">Complete: {focusObligation.title}</p>
             <Button
@@ -379,6 +378,16 @@ export function ActionRequiredPanel({ orgId }: { orgId: string }) {
           />
         </div>
       )}
+
+      {sections.map((section) => (
+        <SectionBlock
+          key={section.id}
+          section={section}
+          onObligation={(item) => setFocusObligationId(item.obligation?.id ?? null)}
+          onNotifyAttest={(item) => notifyAttest.mutate(item)}
+          notifyingKey={notifyingKey}
+        />
+      ))}
 
       <ObligationDrawer
         open={drawerOpen}

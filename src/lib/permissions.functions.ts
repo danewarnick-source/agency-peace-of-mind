@@ -12,7 +12,7 @@ import { ALL_PERMISSIONS, PERMISSION_LABEL, type Permission } from "@/lib/rbac";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
 
-const EDITABLE_ROLES = ["admin", "manager", "employee", "committee_member"] as const;
+const EDITABLE_ROLES = ["admin", "program_manager", "manager", "employee", "committee_member"] as const;
 const EditableRoleEnum = z.enum(EDITABLE_ROLES);
 const PermissionEnum = z.custom<Permission>(
   (v) => typeof v === "string" && (ALL_PERMISSIONS as string[]).includes(v),

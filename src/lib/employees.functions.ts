@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-const RoleEnum = z.enum(["admin", "manager", "employee"]);
+const RoleEnum = z.enum(["admin", "program_manager", "manager", "employee", "committee_member"]);
 
 const CreateEmployeeInput = z.object({
   organizationId: z.string().uuid(),
@@ -36,7 +36,7 @@ async function assertOrgManager(actorId: string, orgId: string) {
     .eq("active", true)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  if (!data || !["admin", "manager", "super_admin"].includes(data.role)) {
+  if (!data || !["admin", "program_manager", "manager"].includes(data.role)) {
     throw new Error("Forbidden: insufficient permissions for this organization");
   }
 }

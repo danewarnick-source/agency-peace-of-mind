@@ -13,7 +13,7 @@ export async function assertOrgAdmin(
     .select("role")
     .eq("organization_id", organizationId)
     .eq("user_id", userId)
-    .in("role", ["super_admin", "admin", "manager"])
+    .in("role", ["admin", "program_manager", "manager"])
     .maybeSingle();
   if (!data) throw new Error("Forbidden — org admin/manager only");
 }
@@ -47,7 +47,7 @@ export async function assertPackageAccess(
     .select("role")
     .eq("organization_id", p.organization_id)
     .eq("user_id", userId)
-    .in("role", ["super_admin", "admin", "manager"])
+    .in("role", ["admin", "program_manager", "manager"])
     .maybeSingle();
   if (adminRow) return { organizationId: p.organization_id };
 

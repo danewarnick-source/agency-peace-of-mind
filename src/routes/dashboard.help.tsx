@@ -56,7 +56,7 @@ function loadRecent(): string[] {
 function HelpPage() {
   const { data: org } = useCurrentOrg();
   const role = org?.role ?? "employee";
-  const isAdmin = role === "admin" || role === "manager" || role === "super_admin";
+  const isAdmin = role === "admin" || role === "program_manager" || role === "manager";
   const starters = isAdmin ? STARTERS_ADMIN : STARTERS_STAFF;
   const navigate = useNavigate();
 

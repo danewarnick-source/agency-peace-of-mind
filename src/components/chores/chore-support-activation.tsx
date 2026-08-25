@@ -75,7 +75,7 @@ export function ChoreSupportGate({
   const { session } = useAuth();
   const qc = useQueryClient();
   const supportQ = useChoreSupport(clientId);
-  const canEdit = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
+  const canEdit = org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
 
   const [reason, setReason] = useState<ChoreSupportRow["reason"]>("intake_need");
   const [goalNote, setGoalNote] = useState("");

@@ -105,7 +105,7 @@ function SettingsPage() {
   };
 
   const isAdmin = org?.role === "admin";
-  const canBillingContact = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
+  const canBillingContact = org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -191,16 +191,16 @@ function SettingsPage() {
         </div>
       </section>
 
-      {(org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin") && (
+      {(org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager") && (
         <CompanyOverviewSettings />
       )}
 
       <OrgBrandingCard />
 
-      <ShiftBehaviorToggleCard isAdmin={org?.role === "admin" || org?.role === "super_admin"} />
+      <ShiftBehaviorToggleCard isAdmin={org?.role === "admin"} />
 
 
-      {(org?.role === "admin" || org?.role === "super_admin") && (
+      {(org?.role === "admin") && (
         <Link to="/dashboard/settings/team-access" className="group lg:col-span-2">
           <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition hover:border-primary/40 hover:bg-accent/30">
             <div className="flex items-start gap-4">
@@ -245,7 +245,7 @@ function SettingsPage() {
         </Link>
       )}
 
-      {(org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin") && (
+      {(org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager") && (
         <Link to="/dashboard/settings/service-codes" className="group lg:col-span-2">
           <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition hover:border-primary/40 hover:bg-accent/30">
             <div className="flex items-start gap-4">
@@ -261,7 +261,7 @@ function SettingsPage() {
       )}
 
 
-      {(org?.role === "admin" || org?.role === "super_admin") && (
+      {(org?.role === "admin") && (
         <Link to="/dashboard/settings/subscription" className="group lg:col-span-2">
           <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition hover:border-primary/40 hover:bg-accent/30">
             <div className="flex items-start gap-4">
@@ -276,7 +276,7 @@ function SettingsPage() {
         </Link>
       )}
 
-      {(org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin") && (
+      {(org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager") && (
         <Link to="/dashboard/settings/email" className="group lg:col-span-2">
           <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition hover:border-primary/40 hover:bg-accent/30">
             <div className="flex items-start gap-4">
@@ -291,7 +291,7 @@ function SettingsPage() {
         </Link>
       )}
 
-      {(org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin") && (
+      {(org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager") && (
         <Link to="/dashboard/settings/retention" className="group lg:col-span-2">
           <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition hover:border-primary/40 hover:bg-accent/30">
             <div className="flex items-start gap-4">
@@ -306,7 +306,7 @@ function SettingsPage() {
         </Link>
       )}
 
-      {(org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin") && (
+      {(org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager") && (
         <Link to="/dashboard/settings/licensing" className="group lg:col-span-2">
           <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition hover:border-primary/40 hover:bg-accent/30">
             <div className="flex items-start gap-4">
@@ -321,7 +321,7 @@ function SettingsPage() {
         </Link>
       )}
 
-      {(org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin") && (
+      {(org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager") && (
         <Link to="/dashboard/settings/gmail" className="group lg:col-span-2">
           <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition hover:border-primary/40 hover:bg-accent/30">
             <div className="flex items-start gap-4">

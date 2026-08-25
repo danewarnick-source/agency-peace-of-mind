@@ -117,7 +117,7 @@ interface MembershipRow { organization_id: string; role: string }
 
 // Shared helper: super_admin is deprecated (collapsed into admin) but still
 // accepted defensively so any lingering legacy row keeps access.
-const ADMIN_LIKE_ROLES = new Set(["admin", "manager", "owner", "super_admin"]);
+const ADMIN_LIKE_ROLES = new Set(["admin", "program_manager", "manager", "owner"]);
 
 async function getCallerOrg(
   supabase: ReturnType<typeof getSupabase>,

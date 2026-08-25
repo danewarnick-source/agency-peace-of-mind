@@ -59,7 +59,7 @@ function ClientsHub() {
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Client Loan Ledger
             </h3>
-            <RequireRole roles={["admin", "super_admin"]}>
+            <RequireRole roles={["admin"]}>
               <ClientLoansPage />
             </RequireRole>
           </section>

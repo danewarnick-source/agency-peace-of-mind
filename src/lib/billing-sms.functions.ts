@@ -28,7 +28,7 @@ async function ensureOrgAdmin(
     .maybeSingle();
   if (error) throw new Error(error.message);
   const role = (data as { role?: string } | null)?.role ?? null;
-  if (role !== "admin" && role !== "super_admin") {
+  if (role !== "admin") {
     throw new Error("Only org admins may update the billing contact number.");
   }
 }

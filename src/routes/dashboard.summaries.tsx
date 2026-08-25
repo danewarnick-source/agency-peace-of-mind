@@ -54,7 +54,7 @@ function SummariesPage() {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id ?? null;
   const role = org?.role;
-  const isAdmin = role === "admin" || role === "super_admin" || role === "manager";
+  const isAdmin = role === "admin" || role === "program_manager" || role === "manager";
 
   const ensureFn = useServerFn(ensureCurrentSummaryPeriods);
   const listFn = useServerFn(listAllSummaries);

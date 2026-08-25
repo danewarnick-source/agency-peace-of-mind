@@ -26,7 +26,7 @@ export function FormsHubTab({ clientId, clientName }: { clientId: string; client
   const fetchList = useServerFn(listClientForms);
   const { data: org } = useCurrentOrg();
   const role = org?.role;
-  const isManager = role === "admin" || role === "manager" || role === "super_admin";
+  const isManager = role === "admin" || role === "program_manager" || role === "manager";
   const { can } = usePermissions();
   const canManageIncidents = can("manage_incidents");
   const [incidentOpen, setIncidentOpen] = useState(false);

@@ -180,7 +180,7 @@ export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; 
     .map((r) => r.service_start_date)
     .filter((d): d is string => !!d)
     .sort()[0] ?? null;
-  const isOrgAdmin = org?.role === "admin" || org?.role === "super_admin" || org?.role === "manager";
+  const isOrgAdmin = org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
 
   if (clientQ.isLoading || !client) {
     return <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Loading…</CardContent></Card>;

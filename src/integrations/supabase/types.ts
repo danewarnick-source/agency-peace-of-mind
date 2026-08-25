@@ -18212,6 +18212,7 @@ export type Database = {
       app_role:
         | "admin"
         | "manager"
+        | "program_manager"
         | "employee"
         | "super_admin"
         | "committee_member"
@@ -18421,6 +18422,7 @@ export const Constants = {
       app_role: [
         "admin",
         "manager",
+        "program_manager",
         "employee",
         "super_admin",
         "committee_member",

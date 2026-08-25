@@ -588,7 +588,7 @@ function PolicyLibraryTab() {
 
 function CompanyObligationsPage() {
   const { data: org, isLoading } = useCurrentOrg();
-  const canAccess = org?.role === "admin" || org?.role === "super_admin" || org?.role === "manager";
+  const canAccess = org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
 
   if (isLoading) {
     return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;

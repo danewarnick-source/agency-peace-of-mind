@@ -9,15 +9,23 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
-export type AppRole = "employee" | "manager" | "admin" | "super_admin";
+export type AppRole =
+  | "employee"
+  | "committee_member"
+  | "manager"
+  | "program_manager"
+  | "admin"
+  | "super_admin";
 
-// Strictly ascending privilege ordering, mirroring the DB app_role enum
-// and the existing has_org_role / is_org_admin_or_manager helpers.
+// Strictly ascending privilege. program_manager sits above manager so
+// minRole = "manager" also admits program_manager and admin.
 const ROLE_RANK: Record<AppRole, number> = {
   employee: 1,
+  committee_member: 1,
   manager: 2,
-  admin: 3,
-  super_admin: 4,
+  program_manager: 3,
+  admin: 4,
+  super_admin: 5,
 };
 
 const UUID_RE =

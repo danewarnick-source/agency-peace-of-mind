@@ -7,7 +7,7 @@ import { RequireRole } from "@/components/rbac-guard";
 
 export const Route = createFileRoute("/dashboard/team")({
   component: () => (
-    <RequireRole roles={["admin", "manager", "super_admin"]}>
+    <RequireRole roles={["admin", "program_manager", "manager"]}>
       <TeamPage />
     </RequireRole>
   ),

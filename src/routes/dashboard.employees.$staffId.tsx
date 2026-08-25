@@ -949,7 +949,7 @@ function ContactCard({
             organization_id: orgId,
             membership_id: m.id,
             target_user_id: staffId,
-            explicit_role: draft.role as "admin" | "committee_member" | "employee" | "manager" | "super_admin",
+            explicit_role: draft.role as "admin" | "program_manager" | "committee_member" | "employee" | "manager",
           },
         });
       }
@@ -1082,8 +1082,10 @@ function ContactCard({
                 <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="employee">Staff</SelectItem>
-                  <SelectItem value="manager">Manager</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="manager">Supervisor</SelectItem>
+                  <SelectItem value="program_manager">Program Manager</SelectItem>
+                  <SelectItem value="admin">Owner</SelectItem>
+                  <SelectItem value="committee_member">Committee Member</SelectItem>
                 </SelectContent>
               </Select>
             </div>

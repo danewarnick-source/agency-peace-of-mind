@@ -66,7 +66,7 @@ function EmarPage() {
   const { user } = useAuth();
   const { data: activeShift } = useActiveShift();
   const { role } = usePermissions();
-  const isAdminLike = role === "admin" || role === "manager" || role === "super_admin";
+  const isAdminLike = role === "admin" || role === "program_manager" || role === "manager";
   const qc = useQueryClient();
   const [selected, setSelected] = useState<DueRow | null>(null);
 

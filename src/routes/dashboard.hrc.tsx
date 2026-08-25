@@ -38,7 +38,7 @@ function ScaffoldNotice() {
 export function HrcPage() {
   const { data: org } = useCurrentOrg();
   const role = (org?.role ?? "employee") as Role;
-  const canManage = role === "admin" || role === "manager" || role === "super_admin";
+  const canManage = role === "admin" || role === "program_manager" || role === "manager";
   const isCommittee = role === "committee_member";
 
   return (

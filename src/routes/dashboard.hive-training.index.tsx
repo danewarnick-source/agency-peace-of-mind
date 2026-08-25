@@ -92,7 +92,7 @@ function HiveTrainingHub() {
   }
 
 
-  const realIsAdmin = ["admin", "manager", "super_admin"].includes(org.role);
+  const realIsAdmin = ["admin", "program_manager", "manager"].includes(org.role);
   const isAdmin = realIsAdmin && view !== "staff" && view !== "staff_mobile";
 
   return (

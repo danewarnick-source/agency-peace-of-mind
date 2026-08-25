@@ -1312,7 +1312,7 @@ export function PunchPad({
   // freeze trigger, raise/resolve fns) and detector registry are UNTOUCHED.
   const { role } = usePermissions();
   const canOverrideCompliance =
-    role === "admin" || role === "manager" || role === "super_admin";
+    role === "admin" || role === "program_manager" || role === "manager";
   const detectBillingConflict = useServerFn(checkBillingEntry);
   const detectStaffPrereq = useServerFn(checkStaffPrerequisite);
   const raiseComplianceFlagFn = useServerFn(raiseComplianceFlag);

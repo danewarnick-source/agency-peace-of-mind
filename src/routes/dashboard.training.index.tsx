@@ -23,7 +23,7 @@ type Module = {
 function CourseLibrary() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
-  const isAdmin = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
+  const isAdmin = org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
   const [selectedUser, setSelectedUser] = useState<string>("");
 
   const getMyTrainingsFn = useServerFn(getMyClientTrainingStatuses);

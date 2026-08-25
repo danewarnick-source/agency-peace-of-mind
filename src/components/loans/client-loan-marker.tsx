@@ -13,7 +13,7 @@ import { getClientLoanMarkers } from "@/lib/client-loans.functions";
 export function ClientLoanMarker({ clientId }: { clientId: string }) {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
-  const isAdminCapable = org?.role === "admin" || org?.role === "super_admin";
+  const isAdminCapable = org?.role === "admin";
   const fetchMarkers = useServerFn(getClientLoanMarkers);
   const q = useQuery({
     enabled: !!orgId && isAdminCapable,

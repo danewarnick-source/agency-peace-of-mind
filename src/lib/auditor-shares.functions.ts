@@ -9,7 +9,7 @@ async function assertAdmin(supabase: any, userId: string, orgId: string) {
     .eq("organization_id", orgId)
     .eq("user_id", userId)
     .maybeSingle();
-  if (!data?.active || !["admin", "manager", "super_admin"].includes(data.role)) {
+  if (!data?.active || !["admin", "program_manager", "manager"].includes(data.role)) {
     throw new Error("Only admins or managers can manage auditor shares.");
   }
 }
@@ -238,7 +238,7 @@ export const getAuditorShareView = createServerFn({ method: "POST" })
         .eq("organization_id", share.organization_id)
         .eq("user_id", userId)
         .maybeSingle();
-      isAdmin = !!m?.active && ["admin", "manager", "super_admin"].includes(m.role);
+      isAdmin = !!m?.active && ["admin", "program_manager", "manager"].includes(m.role);
     }
     if (!isRecipient && !isAdmin) {
       await supabase.from("auditor_share_access_log").insert({

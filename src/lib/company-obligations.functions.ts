@@ -348,9 +348,9 @@ export async function snapshotAssigneesInternal(
       .map((uid: string) => {
         const role = roleById.get(uid);
         if (!role) return null;
-        if (ob.assignee_role === "managers_only" && !["manager", "super_admin"].includes(role))
+        if (ob.assignee_role === "managers_only" && !["manager", "program_manager", "admin"].includes(role))
           return null;
-        if (ob.assignee_role === "admin_only" && !["admin", "super_admin"].includes(role))
+        if (ob.assignee_role === "admin_only" && !["admin"].includes(role))
           return null;
         return { staff_id: uid, staff_name: nameById.get(uid) ?? "Unknown", staff_role: role };
       })
@@ -539,9 +539,9 @@ async function resolveAllAssigneesInternal(
       .map((uid: string) => {
         const role = roleById.get(uid);
         if (!role) return null;
-        if (ob.assignee_role === "managers_only" && !["manager", "super_admin"].includes(role))
+        if (ob.assignee_role === "managers_only" && !["manager", "program_manager", "admin"].includes(role))
           return null;
-        if (ob.assignee_role === "admin_only" && !["admin", "super_admin"].includes(role))
+        if (ob.assignee_role === "admin_only" && !["admin"].includes(role))
           return null;
         return { staff_id: uid, staff_name: nameById.get(uid) ?? "Unknown", staff_role: role };
       })
@@ -1297,7 +1297,7 @@ export async function notifyObligationManagersInternal(
       .select("user_id, role")
       .eq("organization_id", organizationId)
       .eq("active", true)
-      .in("role", ["admin", "super_admin"]);
+      .in("role", ["admin"]);
     if (adErr) throw new Error(adErr.message);
     for (const a of (admins ?? []) as Array<{ user_id: string }>) recipientIds.add(a.user_id);
   }
@@ -2051,7 +2051,7 @@ export const pauseObligationsForArchivedForm = createServerFn({ method: "POST" }
       .select("user_id")
       .eq("organization_id", data.organizationId)
       .eq("active", true)
-      .in("role", ["admin", "super_admin"]);
+      .in("role", ["admin"]);
     if (adErr) throw new Error(adErr.message);
 
     if (admins?.length) {
@@ -2612,7 +2612,7 @@ async function resolveAdminRecipients(
       .select("user_id, role")
       .eq("organization_id", organizationId)
       .eq("active", true)
-      .in("role", ["admin", "super_admin"]);
+      .in("role", ["admin"]);
     if (adErr) throw new Error(adErr.message);
     for (const a of (admins ?? []) as Array<{ user_id: string }>) recipientIds.add(a.user_id);
   }

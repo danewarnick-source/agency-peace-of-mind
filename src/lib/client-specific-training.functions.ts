@@ -8,7 +8,7 @@ import { z } from "zod";
 type AnySupabase = any;
 
 function adminGuard(role: string | undefined) {
-  if (!role || !["admin", "manager", "super_admin"].includes(role)) {
+  if (!role || !["admin", "program_manager", "manager"].includes(role)) {
     throw new Error("Forbidden: admin access required.");
   }
 }
@@ -1197,7 +1197,7 @@ async function assertStaffMayViewClient(
   role: string,
   clientId: string,
 ): Promise<void> {
-  if (["admin", "manager", "super_admin"].includes(role)) return;
+  if (["admin", "program_manager", "manager"].includes(role)) return;
   // Direct assignment first (cheap).
   const { data: direct } = await supabase
     .from("staff_assignments")
@@ -1478,7 +1478,7 @@ export const getMyClientTrainingStatuses = createServerFn({ method: "GET" })
     const m = await getMembership(supabase, userId);
 
     let clientIds: string[] = [];
-    if (["admin", "manager", "super_admin"].includes(m.role)) {
+    if (["admin", "program_manager", "manager"].includes(m.role)) {
       // Admins: show all clients that have at least one training row.
       const { data: rows } = await supabase
         .from("client_specific_trainings")

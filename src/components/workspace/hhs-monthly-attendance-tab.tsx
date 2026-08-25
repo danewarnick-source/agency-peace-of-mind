@@ -32,7 +32,7 @@ export function HhsMonthlyAttendanceTab({
   clientName: string;
 }) {
   const { data: org } = useCurrentOrg();
-  const canCertify = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
+  const canCertify = org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
   const qc = useQueryClient();
 
   const [anchor, setAnchor] = useState(() => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d; });

@@ -101,7 +101,7 @@ export const Route = createFileRoute("/dashboard")({
       const membership =
         memberships.find((m) => m.organization_id === activeOrgId) ?? memberships[0];
       const orgId = membership.organization_id;
-      const isAdmin = membership.role === "admin" || membership.role === "super_admin";
+      const isAdmin = membership.role === "admin";
 
       const { data: sub } = await supabase
         .from("org_subscriptions")
@@ -243,7 +243,7 @@ function DashboardLayout() {
 
   const role: Role = org?.role ?? "employee";
   const isCommitteeMember = role === "committee_member";
-  const isAdminCapable = !isCommitteeMember && (can("view_staff_records") || role === "admin" || role === "manager" || role === "super_admin");
+  const isAdminCapable = !isCommitteeMember && (can("view_staff_records") || role === "admin" || role === "program_manager" || role === "manager");
 
   // Fail-closed gate: a committee_member can ONLY access /dashboard/hrc.
   // Redirect away from anything else immediately.
@@ -293,7 +293,7 @@ function DashboardLayout() {
   const hiveTrainingEntitled = hasAddon("hive_training");
   const { isEnabled: isFeatureOn } = useOrgFeatures();
   const nav: NavItem[] = baseNav
-    .filter((n) => !n.perm || can(n.perm) || role === "admin" || role === "super_admin")
+    .filter((n) => !n.perm || can(n.perm) || role === "admin")
     // Legacy add-on tier gate still applies to HIVE Training (paid entitlement).
     .filter((n) => hiveTrainingEntitled || n.to !== "/dashboard/hive-training")
     // Master-Controller gating: keep item visible; mark isLocked when feature is OFF.

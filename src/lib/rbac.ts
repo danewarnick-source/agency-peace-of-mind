@@ -1,8 +1,10 @@
-export type Role = "super_admin" | "admin" | "manager" | "employee" | "committee_member";
+export type Role = "super_admin" | "admin" | "program_manager" | "manager" | "employee" | "committee_member";
+export type ProviderRole = Exclude<Role, "super_admin">;
 
 export const ROLE_LABEL: Record<Role, string> = {
-  super_admin: "Platform Admin", // internal only, never shown in provider UI
+  super_admin: "Platform Admin", // Hive-internal only — never assignable in provider UI
   admin: "Owner",
+  program_manager: "Program Manager",
   manager: "Supervisor",
   employee: "Staff",
   committee_member: "Committee Member",
@@ -10,11 +12,30 @@ export const ROLE_LABEL: Record<Role, string> = {
 
 export const ROLE_HOME: Record<Role, string> = {
   super_admin: "/super-admin",
-  admin: "/admin",
-  manager: "/manager",
+  admin: "/dashboard",
+  program_manager: "/dashboard",
+  manager: "/dashboard",
   employee: "/employee",
   committee_member: "/dashboard/hrc",
 };
+
+/** Strictly ascending privilege. Used by require-org and role gates. */
+export const ROLE_RANK: Record<Role, number> = {
+  employee: 1,
+  committee_member: 1,
+  manager: 2,
+  program_manager: 3,
+  admin: 4,
+  super_admin: 5,
+};
+
+export const PROVIDER_ROLES: ProviderRole[] = [
+  "admin",
+  "program_manager",
+  "manager",
+  "employee",
+  "committee_member",
+];
 
 /** Section labels for the UI — used to group permissions in the matrix. */
 export const PERMISSION_SECTIONS: Record<string, string> = {
@@ -238,11 +259,30 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
   send_emails: "Send emails (Resend rail)",
 };
 
-/** Default permission matrix used to seed org-specific role_permissions rows. */
-export const DEFAULT_MATRIX: Record<Role, Permission[]> = {
-  super_admin: [...ALL_PERMISSIONS],
-
+/** Default permission matrix used to seed org-specific role_permissions rows.
+ *  super_admin is Hive-internal (is_hive_executive) and has no matrix entry. */
+export const DEFAULT_MATRIX: Record<ProviderRole, Permission[]> = {
   admin: [...ALL_PERMISSIONS], // owner starts with everything on
+
+  program_manager: [
+    "invite_staff", "view_staff_records", "edit_staff_records",
+    "view_staff_documents", "upload_staff_documents", "approve_staff_documents",
+    "view_clients", "edit_client_records", "manage_client_intake", "view_client_medical",
+    "view_client_documents", "manage_client_documents", "manage_client_goals",
+    "view_schedule", "create_shifts", "edit_shifts", "delete_shifts",
+    "approve_shift_swaps", "manage_recurring_shifts",
+    "view_own_timesheets", "view_team_timesheets", "view_all_timesheets", "approve_timesheets",
+    "edit_timesheets", "export_evv",
+    "submit_shift_notes", "edit_shift_notes", "approve_shift_notes", "view_daily_logs",
+    "submit_daily_logs", "approve_daily_logs", "submit_forms", "view_form_submissions",
+    "approve_form_submissions",
+    "view_compliance_dashboard", "complete_obligations", "file_staff_documents",
+    "manage_obligations",
+    "report_incidents", "view_incidents", "manage_incidents",
+    "view_emar", "submit_emar",
+    "view_hrc", "manage_hrc",
+    "view_billing", "view_payroll", "view_analytics", "export_reports",
+  ],
 
   manager: [
     // New granular set — operational access, not financial or org settings
@@ -280,7 +320,12 @@ export const DEFAULT_MATRIX: Record<Role, Permission[]> = {
 
 export function defaultCan(role: Role | undefined | null, perm: Permission): boolean {
   if (!role) return false;
+  if (role === "super_admin") return true;
   return DEFAULT_MATRIX[role].includes(perm);
+}
+
+export function isHiveInternalRole(role: string | null | undefined): boolean {
+  return role === "super_admin";
 }
 
 export function hasAnyRole(role: Role | undefined | null, roles: Role[]): boolean {

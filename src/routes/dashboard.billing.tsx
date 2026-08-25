@@ -30,7 +30,7 @@ export const Route = createFileRoute("/dashboard/billing")({
   validateSearch: (s: Record<string, unknown>): { focus?: string } =>
     typeof s.focus === "string" ? { focus: s.focus } : {},
   component: () => (
-    <RequireRole roles={["admin", "manager", "super_admin"]}>
+    <RequireRole roles={["admin", "program_manager", "manager"]}>
       <BillingLayout />
     </RequireRole>
   ),

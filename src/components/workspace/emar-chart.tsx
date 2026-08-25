@@ -322,7 +322,7 @@ export function ClientSafetyEditor({
 /** Eligibility gate — rendered when the client is NOT flagged for self-admin support. */
 export function EmarEligibilityGate({ client }: { client: ClientSafety }) {
   const { role } = usePermissions();
-  const isAdmin = role === "admin" || role === "manager" || role === "super_admin";
+  const isAdmin = role === "admin" || role === "program_manager" || role === "manager";
   return (
     <div className="space-y-4">
       <EmarLegalBanner />

@@ -63,7 +63,7 @@ export function MealSupportGate({
   const { session } = useAuth();
   const qc = useQueryClient();
   const supportQ = useMealSupport(clientId);
-  const canEdit = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
+  const canEdit = org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
 
   const [reason, setReason] = useState<MealSupportRow["reason"]>("intake_need");
   const [goalNote, setGoalNote] = useState("");

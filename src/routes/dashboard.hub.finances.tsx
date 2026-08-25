@@ -46,12 +46,12 @@ function FinancesHub() {
   const role = org?.role;
 
   // Billing card is admin/manager (matches Billing section RequireRole).
-  const canSeeBilling = role === "admin" || role === "manager" || role === "super_admin";
+  const canSeeBilling = role === "admin" || role === "program_manager" || role === "manager";
   // Financial card snapshot mirrors the Financial tab gates.
   const canSeeFinancialNumbers = can("view_financial_tns_gross");
 
   // The billed-revenue server-fn requires admin org membership.
-  const canReadBilledRevenue = role === "admin" || role === "super_admin";
+  const canReadBilledRevenue = role === "admin";
 
   const now = new Date();
   const year = now.getFullYear();

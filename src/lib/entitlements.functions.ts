@@ -29,7 +29,7 @@ export const getMyEntitlements = createServerFn({ method: "GET" })
       .eq("user_id", userId)
       .eq("active", true);
 
-    const rank: Record<string, number> = { super_admin: 0, admin: 1, manager: 2, employee: 3 };
+    const rank: Record<string, number> = { admin: 0, program_manager: 1, manager: 2, employee: 3 };
     const sorted = [...((memberships ?? []) as Array<{ organization_id: string; role: string }>)].sort(
       (a, b) => (rank[a.role] ?? 9) - (rank[b.role] ?? 9),
     );

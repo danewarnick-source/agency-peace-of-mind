@@ -27,7 +27,7 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
 
   const role: Role = org?.role ?? "employee";
   const isAdminCapable =
-    can("edit_staff_records") || role === "admin" || role === "manager" || role === "super_admin";
+    can("edit_staff_records") || role === "admin" || role === "program_manager" || role === "manager";
 
   const signOut = async () => {
     await supabase.auth.signOut();

@@ -3,7 +3,7 @@
 // splitter (?tss-serverfn-split) breaks sibling module-scope references
 // from within handler bodies. See docs/tanstack-serverfn-splitting.
 import { z } from "zod";
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { assertBedrockConfigured, gatewayFetch } from "@/lib/ai-bedrock.server";
 import {
   acquireBedrockSlot,
   recordBedrockTokens,
@@ -478,8 +478,7 @@ export async function extractRequirementsFromText(text: string): Promise<{
   chunkCount: number;
   chunkFailures: string[];
 }> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
+  assertBedrockConfigured();
 
   const chunks = chunkDocumentText(text);
   const perChunk = await mapWithConcurrency(chunks, 1, (chunk, i) =>

@@ -20,7 +20,7 @@ import {
   EXTERNAL_REGEX,
   matchFeatureLink,
 } from "./authoritative-sources.server";
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { assertBedrockConfigured, gatewayFetch } from "@/lib/ai-bedrock.server";
 import { classifyServiceCodes } from "./nectar-code-classifier";
 
 // =============================================================
@@ -2289,8 +2289,7 @@ export const explainRequirement = createServerFn({ method: "POST" })
         (doc?.title as string | null) ?? (doc?.file_name as string | null) ?? null;
     }
 
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
+    assertBedrockConfigured();
 
     const userBody = `SOURCE DOCUMENT: ${sourceTitle ?? "—"}
 CITATION: ${req.source_citation ?? "—"}

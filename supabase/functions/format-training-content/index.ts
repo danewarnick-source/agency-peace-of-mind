@@ -56,9 +56,6 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!apiKey) return json({ error: "Missing LOVABLE_API_KEY" }, 500);
-
     const body = await req.json().catch(() => ({}));
     const kind: "policies" | "person" = body.kind === "person" ? "person" : "policies";
     const personLabel: string | undefined = body.personLabel;
@@ -81,7 +78,6 @@ Deno.serve(async (req) => {
     });
 
     if (aiRes.status === 429) return json({ error: "Rate limited. Try again in a moment." }, 429);
-    if (aiRes.status === 402) return json({ error: "AI credits exhausted. Please add credits in workspace settings." }, 402);
     if (!aiRes.ok) {
       const txt = await aiRes.text();
       return json({ error: `AI gateway error (${aiRes.status})`, detail: txt.slice(0, 500) }, 500);

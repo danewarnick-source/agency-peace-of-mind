@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { gatewayFetch, assertBedrockConfigured } from "@/lib/ai-bedrock.server";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,8 +65,7 @@ function validateScan(input: unknown): ScanInput {
 }
 
 async function callAI(system: string, user: string): Promise<string> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured.");
+  assertBedrockConfigured();
 
   // Forward the incoming request's abort signal so a client-side cancellation
   // (e.g. the 20s incident-report timeout) actually stops the Bedrock call
@@ -82,7 +81,6 @@ async function callAI(system: string, user: string): Promise<string> {
     }, { signal: getRequest()?.signal });
 
   if (res.status === 429) throw new Error("AI rate limit reached. Please retry in a moment.");
-  if (res.status === 402) throw new Error("AI workspace credits exhausted. Please add credits.");
   if (!res.ok) throw new Error(`AI error (${res.status}).`);
 
   const json = (await res.json()) as {

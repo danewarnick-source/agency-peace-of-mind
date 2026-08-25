@@ -50,9 +50,21 @@ long-running Node HTTP server (nitro's `node-server` preset) — plus
 
 1. **ALB URL is directly reachable.** The Application Load Balancer in front
    of ECS is a public endpoint — CloudFront sits in front of it, but nothing
-   stops someone hitting the ALB directly. Before this carries real PHI
-   traffic, add a shared-secret header that CloudFront injects and the app
-   validates, or restrict ALB access to CloudFront's IP ranges.
+   stops someone hitting the ALB directly **unless you set
+   `ALB_ORIGIN_VERIFY_SECRET`**.
+
+   **Required before real PHI traffic on AWS:**
+
+   1. Generate a long random secret (e.g. `openssl rand -hex 32`).
+   2. Set it on the ECS task / Lambda as env `ALB_ORIGIN_VERIFY_SECRET`.
+   3. In CloudFront, add a custom origin header on the SSR origin:
+      - Header name: `x-origin-verify`
+      - Value: the same secret
+   4. The Nitro plugin `src/nitro-plugins/alb-origin-verify.ts` rejects any
+      request missing that header when the env var is set (403).
+
+   Alternative: restrict ALB security-group inbound to CloudFront prefix lists
+   only (AWS-managed CloudFront prefix list). Combining both is best.
 2. **ECS Fargate runs continuously.** You're billed for the task the whole
    time it's running. At 0.25 vCPU / 512 MB this is ~$9/month; at 1 vCPU /
    2 GB ~$73/month. Scale down `desiredCount` to 0 if you need to pause.

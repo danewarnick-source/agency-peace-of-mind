@@ -3,7 +3,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
 import { onStaffAssignmentCreatedInternal } from "@/lib/staff-assignment-hooks.functions";
+import { gatewayFetch, assertBedrockConfigured } from "@/lib/ai-bedrock.server";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Setup tool A — bulk caseload editor (client → staff[])
@@ -405,8 +407,10 @@ export const nectarDraftShifts = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { supabase } = context as any;
-    if (!supabase) return { drafts: [] };
+    const { supabase, userId } = context as any;
+    if (!supabase || !userId) return { drafts: [] };
+    await requireOrgMembership(supabase, userId, data.organization_id, "employee");
+    assertBedrockConfigured();
 
     const [staffRes, clientsRes, authsRes] = await Promise.all([
       supabase
@@ -453,9 +457,6 @@ export const nectarDraftShifts = createServerFn({ method: "POST" })
       authsByClient.set(a.client_id, set);
     }
 
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("AI gateway not configured.");
-
     const system = `You are Nectar, a scheduling assistant for HIVE.
 Output strict JSON with shape: {"drafts": [{"staff_name": string|null, "client_name": string|null, "service_code": string|null, "starts_at": string|null, "ends_at": string|null, "notes": string|null}]}.
 Use ISO8601 UTC for starts_at/ends_at. The current week starts on ${data.week_start_iso}.
@@ -466,25 +467,16 @@ STAFF: ${JSON.stringify(staffList.map((s) => s.name))}
 CLIENTS: ${JSON.stringify(clientList.map((c) => c.name))}
 SERVICE CODES: ["SLH","SLN","COM","PAC","RP2","RP4","RP5","HHS","RHS","DSI","DSG","DSP","SEI","CHA","HSQ","PM1"]`;
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model: "bedrock",
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: data.prompt },
-        ],
-        response_format: { type: "json_object" },
-      }),
+    const aiRes = await gatewayFetch({
+      model: "bedrock",
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: data.prompt },
+      ],
+      response_format: { type: "json_object" },
     });
     if (!aiRes.ok) {
       const txt = await aiRes.text().catch(() => "");
-      if (aiRes.status === 402)
-        throw new Error("Nectar credits exhausted — add credits in Workspace billing.");
       if (aiRes.status === 429)
         throw new Error("Nectar is rate-limited — try again shortly.");
       throw new Error(`Nectar error: ${txt.slice(0, 200)}`);

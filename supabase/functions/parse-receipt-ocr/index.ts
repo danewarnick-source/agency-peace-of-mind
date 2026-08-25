@@ -37,9 +37,6 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
-
     // Defense-in-depth: verify_jwt=true already enforces this, but require the
     // authorization header explicitly so any misconfiguration fails closed.
     const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");

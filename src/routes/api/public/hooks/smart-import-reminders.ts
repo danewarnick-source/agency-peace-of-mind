@@ -1,25 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { verifyCronSecret } from "@/lib/cron-auth";
 
 /**
  * Recurring sweep for Smart Import reminders. Advisory only — never blocks.
  *
- * Runs on a pg_cron schedule. For every org with open import jobs:
- *   - rebuild reminders for unresolved flags / provisional certs /
- *     unverified certs / expiring certs / unanswered NECTAR questions
- *   - escalate urgency when a deadline is within 14 days
- *
- * Authentication: bypassed under /api/public/* on published sites, but we
- * still require the Supabase anon `apikey` header as a soft gate so external
- * traffic with no header is rejected.
+ * Auth: NECTAR_CRON_SECRET via x-cron-secret / Bearer (same as gmail-ingest).
  */
 export const Route = createFileRoute("/api/public/hooks/smart-import-reminders")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const apikey = request.headers.get("apikey") || request.headers.get("x-api-key");
-        const expected = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-        if (!apikey || !expected || apikey !== expected) {
+        if (!verifyCronSecret(request)) {
           return new Response("Unauthorized", { status: 401 });
         }
 

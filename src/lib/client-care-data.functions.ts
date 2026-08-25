@@ -24,6 +24,8 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
+import { logPhiAccess } from "@/lib/phi-access-audit.functions";
 import { queryOptions } from "@tanstack/react-query";
 import type { CSTGoal } from "./client-specific-training.functions";
 import {
@@ -347,6 +349,24 @@ export const getClientCareData = createServerFn({ method: "GET" })
 
 
     if (clientRes.error) throw clientRes.error;
+    const clientRow = clientRes.data as { organization_id?: string | null } | null;
+    const organizationIdForAccess = clientRow?.organization_id;
+    if (!organizationIdForAccess) {
+      throw new Error("Client not found or not accessible");
+    }
+    await requireOrgMembership(supabase, userId, organizationIdForAccess, "employee");
+    void logPhiAccess({
+      supabaseUserClient: supabase,
+      userId,
+      organizationId: organizationIdForAccess,
+      resourceType: "client_chart",
+      resourceId: clientId,
+      clientId,
+      action: "view",
+      detail: "getClientCareData",
+    });
+
+    // Continue with existing response assembly below.
     if (!clientRes.data) throw new Error("Client not found");
     if (cstRes.error) throw cstRes.error;
     if (medsRes.error) throw medsRes.error;

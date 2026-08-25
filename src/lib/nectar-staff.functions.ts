@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { assertBedrockConfigured, gatewayFetch } from "@/lib/ai-bedrock.server";
 
 /**
  * NECTAR Staff — a scoped, lower-privilege assistant for the staff app.
@@ -151,8 +151,7 @@ function bestExcerpt(text: string | null, kw: string[]): string {
 }
 
 async function callAI(system: string, user: string): Promise<string> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured.");
+  assertBedrockConfigured();
   const res = await gatewayFetch({
       model: "bedrock",
       messages: [

@@ -15,6 +15,7 @@ import { Route as SuperAdminRouteImport } from './routes/super-admin'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as MfaSetupRouteImport } from './routes/mfa-setup'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as ManagerRouteImport } from './routes/manager'
 import { Route as LoginRouteImport } from './routes/login'
@@ -244,6 +245,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
   path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MfaSetupRoute = MfaSetupRouteImport.update({
+  id: '/mfa-setup',
+  path: '/mfa-setup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const McpRoute = McpRouteImport.update({
@@ -1353,6 +1359,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/manager': typeof ManagerRoute
   '/mcp': typeof McpRoute
+  '/mfa-setup': typeof MfaSetupRoute
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
@@ -1560,6 +1567,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/manager': typeof ManagerRoute
   '/mcp': typeof McpRoute
+  '/mfa-setup': typeof MfaSetupRoute
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
@@ -1763,6 +1771,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/manager': typeof ManagerRoute
   '/mcp': typeof McpRoute
+  '/mfa-setup': typeof MfaSetupRoute
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
@@ -1973,6 +1982,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/manager'
     | '/mcp'
+    | '/mfa-setup'
     | '/pricing'
     | '/reset-password'
     | '/signup'
@@ -2180,6 +2190,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/manager'
     | '/mcp'
+    | '/mfa-setup'
     | '/pricing'
     | '/reset-password'
     | '/signup'
@@ -2382,6 +2393,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/manager'
     | '/mcp'
+    | '/mfa-setup'
     | '/pricing'
     | '/reset-password'
     | '/signup'
@@ -2591,6 +2603,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ManagerRoute: typeof ManagerRoute
   McpRoute: typeof McpRoute
+  MfaSetupRoute: typeof MfaSetupRoute
   PricingRoute: typeof PricingRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
@@ -2659,6 +2672,13 @@ declare module '@tanstack/react-router' {
       path: '/pricing'
       fullPath: '/pricing'
       preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mfa-setup': {
+      id: '/mfa-setup'
+      path: '/mfa-setup'
+      fullPath: '/mfa-setup'
+      preLoaderRoute: typeof MfaSetupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mcp': {
@@ -4587,6 +4607,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ManagerRoute: ManagerRoute,
   McpRoute: McpRoute,
+  MfaSetupRoute: MfaSetupRoute,
   PricingRoute: PricingRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,

@@ -11,7 +11,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { createHash } from "crypto";
 
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { assertBedrockConfigured, gatewayFetch } from "@/lib/ai-bedrock.server";
 
 // ──────────────── Types ────────────────────────────────────────────────────
 
@@ -201,8 +201,7 @@ function meetsFullHourFloor(steps: CeStep[]): boolean {
 // ──────────────── Nectar AI call ───────────────────────────────────────────
 
 async function callNectarForCe(prompt: string): Promise<{ steps: CeStep[]; materialShort: boolean; topicsNeedingSources: string[]; adminNotes: string }> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured.");
+  assertBedrockConfigured();
 
   const system = `You are NECTAR, a coaching engine that builds a monthly Continuing Education review for an experienced DSPD direct-support staff member.
 

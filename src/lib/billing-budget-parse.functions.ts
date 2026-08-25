@@ -2,11 +2,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { assertBedrockConfigured, gatewayFetch } from "@/lib/ai-bedrock.server";
 
 /**
  * Server function: parse a client's 1056 budget or PCSP form using NECTAR
- * (Lovable AI / Gemini) and return the Plan Budget table rows so the UI can
+ * (AWS Bedrock) and return the Plan Budget table rows so the UI can
  * preview them and write them to client_billing_codes.
  *
  * Caller provides the storage path inside the `client-documents` bucket; we
@@ -57,8 +57,7 @@ export const parseClientBudgetDocument = createServerFn({ method: "POST" })
     const base64 = buf.toString("base64");
     const dataUrl = `data:${data.mimeType};base64,${base64}`;
 
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("AI gateway is not configured.");
+    assertBedrockConfigured();
 
     const system = `You extract the "Plan Budget" table from Utah DSPD 1056 budget forms and PCSP (Person-Centered Support Plan) forms.
 Return strict JSON matching this TypeScript type:

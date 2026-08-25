@@ -11,7 +11,7 @@ export const ROLE_LABEL: Record<Role, string> = {
 };
 
 export const ROLE_HOME: Record<Role, string> = {
-  super_admin: "/super-admin",
+  super_admin: "/dashboard/hive-exec",
   admin: "/dashboard",
   program_manager: "/dashboard",
   manager: "/dashboard",
@@ -320,7 +320,7 @@ export const DEFAULT_MATRIX: Record<ProviderRole, Permission[]> = {
 
 export function defaultCan(role: Role | undefined | null, perm: Permission): boolean {
   if (!role) return false;
-  if (role === "super_admin") return true;
+  if (role === "super_admin") return false;
   return DEFAULT_MATRIX[role].includes(perm);
 }
 

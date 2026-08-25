@@ -268,7 +268,7 @@ export const STATE_INVENTORY: InventoryItem[] = [
     kind: "config",
     label: "Form 520 (state billing claim)",
     utah_value: "Form 520",
-    source: "src/routes/dashboard.billing-520.tsx, dashboard.billing.form520.tsx",
+    source: "src/routes/dashboard.billing.form520.tsx",
     extracted: false,
   },
   {

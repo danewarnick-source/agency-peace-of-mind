@@ -8,25 +8,9 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
+import { ROLE_RANK, type Role } from "@/lib/rbac";
 
-export type AppRole =
-  | "employee"
-  | "committee_member"
-  | "manager"
-  | "program_manager"
-  | "admin"
-  | "super_admin";
-
-// Strictly ascending privilege. program_manager sits above manager so
-// minRole = "manager" also admits program_manager and admin.
-const ROLE_RANK: Record<AppRole, number> = {
-  employee: 1,
-  committee_member: 1,
-  manager: 2,
-  program_manager: 3,
-  admin: 4,
-  super_admin: 5,
-};
+export type AppRole = Role;
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

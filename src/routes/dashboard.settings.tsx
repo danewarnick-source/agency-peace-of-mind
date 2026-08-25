@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Landmark, ArrowRight, ShieldCheck, Wand2, ListChecks, BookOpenCheck, CreditCard, Mail, Inbox, UserCircle2, Building2, Receipt, BadgeCheck } from "lucide-react";
+import { Landmark, ArrowRight, ShieldCheck, Wand2, ListChecks, BookOpenCheck, CreditCard, Mail, Inbox, UserCircle2, Building2, Receipt, BadgeCheck, UserCog, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { CompanyOverviewSettings } from "@/components/company-overview-settings";
 import { OrgBrandingCard } from "@/components/settings/org-branding-card";
@@ -208,6 +208,36 @@ function SettingsPage() {
               <div>
                 <h2 className="text-base font-semibold">Team access</h2>
                 <p className="mt-1 text-sm text-muted-foreground">Invite teammates by email and grant any combination of Staff, Admin, Company Executive, and (for HIVE staff) HIVE Executive roles per login.</p>
+              </div>
+            </div>
+            <ArrowRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />
+          </div>
+        </Link>
+      )}
+
+      {(org?.role === "admin") && (
+        <Link to="/dashboard/roles" className="group lg:col-span-2">
+          <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition hover:border-primary/40 hover:bg-accent/30">
+            <div className="flex items-start gap-4">
+              <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary"><UserCog className="h-5 w-5" /></div>
+              <div>
+                <h2 className="text-base font-semibold">Member roles</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Assign Owner, Program Manager, Supervisor, Staff, or Committee Member to each person in this company.</p>
+              </div>
+            </div>
+            <ArrowRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />
+          </div>
+        </Link>
+      )}
+
+      {(org?.role === "admin") && (
+        <Link to="/dashboard/permissions" className="group lg:col-span-2">
+          <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition hover:border-primary/40 hover:bg-accent/30">
+            <div className="flex items-start gap-4">
+              <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary"><SlidersHorizontal className="h-5 w-5" /></div>
+              <div>
+                <h2 className="text-base font-semibold">Permission matrix</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Turn features on or off for each company role. Per-person exceptions stay on the employee record.</p>
               </div>
             </div>
             <ArrowRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />

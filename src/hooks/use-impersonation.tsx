@@ -55,7 +55,7 @@ export function useImpersonation() {
 
 /**
  * Decorates an insert/update payload with an `impersonated_by` audit flag when
- * a Super-Admin is currently acting as another user. Use:
+ * a Hive Executive is currently acting as another user. Use:
  *   supabase.from('foo').insert(withImpersonationMeta({ ... }))
  */
 export function withImpersonationMeta<T extends Record<string, unknown>>(payload: T): T {

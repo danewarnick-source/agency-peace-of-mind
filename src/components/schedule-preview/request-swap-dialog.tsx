@@ -39,19 +39,22 @@ export function RequestSwapDialog({
     queryKey: ["org-staff-picker", orgId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("profiles")
-        .select("id, first_name, last_name, full_name")
-        .eq("tenant_id", orgId!);
+        .from("organization_members")
+        .select("user_id")
+        .eq("organization_id", orgId!)
+        .eq("active", true);
       if (error) throw error;
-      return (data ?? [])
-        .map((p) => ({
-          id: p.id as string,
-          name:
-            (p.full_name?.trim() as string) ||
-            [p.first_name, p.last_name].filter(Boolean).join(" ").trim() ||
-            "Staff",
-        }))
-        .filter((p) => p.id !== user?.id);
+      const ids = (data ?? []).map((m) => m.user_id).filter((id) => id !== user?.id);
+      if (ids.length === 0) return [];
+      const { data: profs, error: pErr } = await supabase
+        .from("org_member_directory")
+        .select("id, full_name")
+        .in("id", ids);
+      if (pErr) throw pErr;
+      return (profs ?? []).map((p) => ({
+        id: p.id as string,
+        name: (p.full_name?.trim() as string) || "Staff",
+      }));
     },
   });
 

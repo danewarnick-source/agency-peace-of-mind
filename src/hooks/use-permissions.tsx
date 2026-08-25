@@ -87,13 +87,7 @@ export function usePermissions() {
     const override = (overrides ?? []).find((o) => o.permission === perm);
     if (override !== undefined) return override.granted;
 
-    // Mirrors public.has_permission()'s super_admin shortcut: platform
-    // owners aren't in the editable role_permissions matrix
-    // (EDITABLE_ROLES in dashboard.permissions.tsx excludes super_admin),
-    // so they must never depend on a matrix row existing.
-    if (role === "super_admin") return true;
-
-    if (matrix) return !!matrix[role as ProviderRole]?.[perm];
+    if (matrix && role !== "super_admin") return !!matrix[role as ProviderRole]?.[perm];
 
     return false;
   };

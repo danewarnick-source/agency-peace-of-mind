@@ -6,7 +6,7 @@ import { z } from "zod";
 import type { FormField, FormSettings, Schedule, Frequency } from "./forms-utils";
 import { periodKeyFor } from "./forms-utils";
 
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { assertBedrockConfigured, gatewayFetch } from "@/lib/ai-bedrock.server";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -1516,8 +1516,7 @@ export const nectarDraftForm = createServerFn({ method: "POST" })
     if (!supabase || !userId) return { draft: null };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured.");
+    assertBedrockConfigured();
     const system = `You are NECTAR, drafting a CUSTOM FORM for a HIPAA-conscious DSPD agency. Output STRICT JSON only — no markdown.
 Schema:
 {
@@ -1589,8 +1588,7 @@ export const nectarDraftFormFromPdf = createServerFn({ method: "POST" })
     if (!supabase || !userId) return { draft: null, lowConfidence: false, confidenceNotes: "" };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured.");
+    assertBedrockConfigured();
 
     const system = `You are NECTAR. You are given a PDF of an EXISTING paper/digital form used by a DSPD agency. Extract the form's STRUCTURE (sections, questions, input types) and re-express it as a HIVE custom form. Output STRICT JSON only — no markdown.
 
@@ -1701,8 +1699,7 @@ export const nectarDraftNotification = createServerFn({ method: "POST" })
     if (!supabase || !userId) return { draft: null };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured.");
+    assertBedrockConfigured();
     const required = (data.fields as FormField[]).filter((f) => f.required).map((f) => f.label);
     const system = `You are NECTAR, drafting a friendly, plain-language in-app notification telling agency staff that a new form has been assigned to them. Output STRICT JSON: { "title": "...", "body": "..." }. The body is 3–6 short sentences. Cover: what the form is for, how often + when it's due (use the provided cadence and schedule), where to find it ("in your Forms list"), and step-by-step what's needed (mention required questions if listed). No markdown. Title ≤80 chars. Body ≤900 chars.`;
     const userMsg = `Form name: ${data.name}
@@ -1746,8 +1743,7 @@ export const nectarProposeRouting = createServerFn({ method: "POST" })
     if (!supabase || !userId) return { proposal: null };
     const m = await getMembership(supabase, userId);
     adminGuard(m.role);
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured.");
+    assertBedrockConfigured();
 
     const allowed = [
       "general_submission",

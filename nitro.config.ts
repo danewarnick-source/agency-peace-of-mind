@@ -18,6 +18,9 @@ export default defineNitroConfig(
         // full cause chain as a single line so CloudWatch doesn't collapse it.
         // Remove once the server function 500s are root-caused.
         errorHandler: "./src/nitro-plugins/error-handler",
+        // Reject direct ALB access when ALB_ORIGIN_VERIFY_SECRET is configured
+        // (CloudFront must inject x-origin-verify). See docs/AWS_DEPLOY.md.
+        plugins: ["./src/nitro-plugins/alb-origin-verify"],
       }
     : {},
 );

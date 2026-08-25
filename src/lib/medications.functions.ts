@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { gatewayFetch, assertBedrockConfigured } from "@/lib/ai-bedrock.server";
 
 const MedSchema = z.object({
   medication_name: z.string().min(1).max(200),
@@ -20,13 +20,12 @@ const ParseInput = z.object({
   text: z.string().optional(),
 });
 
-/** Use Lovable AI Gateway to parse a physician order (image or text) into structured meds. */
+/** Parse a physician order (image or text) into structured meds via AWS Bedrock. */
 export const parseMedicationsAI = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => ParseInput.parse(d))
   .handler(async ({ data }) => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("LOVABLE_API_KEY not configured");
+    assertBedrockConfigured();
 
     const userContent: Array<Record<string, unknown>> = [
       {
@@ -91,8 +90,7 @@ export const parseMedicationsAI = createServerFn({ method: "POST" })
     if (!res.ok) {
       const t = await res.text();
       if (res.status === 429) throw new Error("AI rate limit — try again shortly.");
-      if (res.status === 402) throw new Error("AI credits exhausted. Add funds in Lovable AI.");
-      throw new Error(`AI gateway error: ${res.status} ${t.slice(0, 200)}`);
+      throw new Error(`AI error: ${res.status} ${t.slice(0, 200)}`);
     }
     const j = await res.json();
     const call = j.choices?.[0]?.message?.tool_calls?.[0];

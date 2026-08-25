@@ -14,7 +14,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { assertBedrockConfigured, gatewayFetch } from "@/lib/ai-bedrock.server";
 
 // --- Public shapes ----------------------------------------------------------
 
@@ -126,8 +126,7 @@ const AiResponse = z.object({
 });
 
 async function callNectar(systemPrompt: string, userPrompt: string) {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
+  assertBedrockConfigured();
   const res = await gatewayFetch({
       model: "bedrock",
       messages: [

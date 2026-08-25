@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { anchorsForPrompt, findAnchor } from "@/lib/nectar/tour-anchors";
 
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { assertBedrockConfigured, gatewayFetch } from "@/lib/ai-bedrock.server";
 
 export interface GuideStep {
   /** Anchor id from TOUR_ANCHORS (must exist). */
@@ -40,8 +40,7 @@ function strField(v: unknown, max = 2000): string {
 }
 
 async function callAi(messages: Array<{ role: string; content: string }>) {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("AI gateway is not configured.");
+  assertBedrockConfigured();
   const res = await gatewayFetch({
       model: "bedrock",
       messages,

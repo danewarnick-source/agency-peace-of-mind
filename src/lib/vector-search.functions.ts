@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 
-import { gatewayFetch, gatewayEmbeddingsFetch } from "@/lib/ai-bedrock.server";
+import { assertBedrockConfigured, gatewayEmbeddingsFetch, gatewayFetch } from "@/lib/ai-bedrock.server";
 
 const EMBED_MODEL = "google/gemini-embedding-001";
 const EMBED_DIMS = 1536;
@@ -41,8 +41,7 @@ function validateBackfill(input: unknown): BackfillInput {
 }
 
 async function embed(text: string): Promise<number[]> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured.");
+  assertBedrockConfigured();
   const res = await gatewayEmbeddingsFetch({ model: EMBED_MODEL, input: text.slice(0, 8000), dimensions: EMBED_DIMS });
   if (res.status === 429) throw new Error("AI rate limit reached. Please retry shortly.");
   if (res.status === 402) throw new Error("AI workspace credits exhausted.");
@@ -66,8 +65,7 @@ type RouterResult = {
 };
 
 async function routeQueryWithLLM(query: string): Promise<RouterResult> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured.");
+  assertBedrockConfigured();
   const today = new Date().toISOString().slice(0, 10);
 
   const system = `You are a SQL router for a caregiver timesheet ledger. Today is ${today}.

@@ -36,14 +36,15 @@
 // -----------------------------------------------------------------------------
 
 import { createFileRoute } from "@tanstack/react-router";
+import { verifyCronSecret } from "@/lib/cron-auth";
 
 export const Route = createFileRoute("/api/public/hooks/billing-daily-check")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const apiKey = request.headers.get("apikey") ?? "";
-        const expected = process.env.SUPABASE_PUBLISHABLE_KEY ?? "";
-        if (!expected || apiKey !== expected) {
+        // Require shared cron secret (NECTAR_CRON_SECRET). Do not accept the
+        // publishable anon key — it is shipped to every browser.
+        if (!verifyCronSecret(request)) {
           return new Response(JSON.stringify({ error: "unauthorized" }), {
             status: 401,
             headers: { "Content-Type": "application/json" },

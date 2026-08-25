@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { assertBedrockConfigured, gatewayFetch } from "@/lib/ai-bedrock.server";
 
 type ExtractedItem = {
   sub_folder: "staff" | "client" | "admin" | "other";
@@ -52,8 +52,7 @@ const ExtractionSchema = z.object({
 });
 
 async function callLovableAI(letterText: string) {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
+  assertBedrockConfigured();
   const res = await gatewayFetch({
       model: "bedrock",
       messages: [

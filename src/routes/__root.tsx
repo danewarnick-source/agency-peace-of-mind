@@ -69,6 +69,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     // Running here (not in a useEffect) means the Outlet never renders
     // protected content — the redirect fires synchronously during navigation.
     if (location.pathname === "/reset-password") return;
+    if (location.pathname === "/mfa-setup") return;
+    if (location.pathname === "/login" || location.pathname === "/signup") return;
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user?.id) return;
 
@@ -93,13 +95,26 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         .maybeSingle(),
       supabase
         .from("organization_members")
-        .select("organization_id")
+        .select("organization_id, role")
         .eq("user_id", session.user.id)
         .eq("active", true)
-        .limit(1),
+        .limit(5),
     ]);
     if (profile?.must_change_password) {
       throw redirect({ to: "/reset-password" });
+    }
+
+    // MFA required for admin / manager / super_admin before accessing the app.
+    // Only enforce when Supabase MFA APIs are available; if the call fails,
+    // do not lock the org out of care delivery.
+    const elevated = (memberships ?? []).some((m) =>
+      ["admin", "manager", "super_admin"].includes((m as { role?: string }).role ?? ""),
+    );
+    if (elevated) {
+      const { data: aal, error: aalErr } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (!aalErr && aal && aal.currentLevel !== "aal2") {
+        throw redirect({ to: "/mfa-setup" });
+      }
     }
 
     // Gate app access on unsigned required provider policies. Exempted from
@@ -155,7 +170,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           // Nominatim geocode + Supabase + Vercel analytics/ingest. Do NOT put
           // frame-ancestors here — browsers ignore it on <meta http-equiv> and
           // log a console warning; set that directive via HTTP headers only.
-          "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.vercel.app https://vercel.live https://nominatim.openstreetmap.org https://api.anthropic.com",
+          "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.vercel.app https://vercel.live https://nominatim.openstreetmap.org",
           "object-src 'none'",
           "base-uri 'self'",
           "form-action 'self'",

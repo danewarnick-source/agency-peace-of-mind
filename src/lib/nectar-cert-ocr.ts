@@ -3,6 +3,8 @@
 // and a short summary used for keyword-group validation. Extracted from
 // staff-training-requirements.functions.ts (no behavior change) so it can
 // also be used against obligation-evidence uploads for Company Obligations.
+import { gatewayFetch, assertBedrockConfigured } from "@/lib/ai-bedrock.server";
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
 
@@ -92,8 +94,7 @@ export async function runNectarCertOcrFromStoragePath(
   const mime = (mimeType || "").toLowerCase() || guessMimeFromName(fileName) || "image/jpeg";
   const base64 = base64Encode(buf);
 
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
+  assertBedrockConfigured();
 
   const keywordHint = training.validation.required_keyword_groups
     .map((g) => `- ${g.label}: any of [${g.any_of.join(", ")}]`)
@@ -138,21 +139,11 @@ If a field is not clearly visible on the document, return null for that field. D
     throw new Error(`Unsupported certificate type for OCR: ${mime}`);
   }
 
-  const aiRes = await fetch(
-    "https://ai.gateway.lovable.dev/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Lovable-API-Key": apiKey,
-      },
-      body: JSON.stringify({
-        model: "bedrock",
-        messages: [{ role: "user", content: contentBlocks }],
-        response_format: { type: "json_object" },
-      }),
-    },
-  );
+  const aiRes = await gatewayFetch({
+    model: "bedrock",
+    messages: [{ role: "user", content: contentBlocks }],
+    response_format: { type: "json_object" },
+  });
   if (!aiRes.ok) {
     const t = await aiRes.text();
     throw new Error(`Nectar OCR ${aiRes.status}: ${t.slice(0, 200)}`);

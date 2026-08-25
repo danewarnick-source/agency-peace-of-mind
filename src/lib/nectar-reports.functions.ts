@@ -5,7 +5,7 @@ import { computeEntryUnits } from "@/lib/billing-units";
 const roundHours = (h: number): number => Math.round(h * 10) / 10;
 import { isDailyServiceCode } from "@/lib/service-billing";
 
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { assertBedrockConfigured, gatewayFetch } from "@/lib/ai-bedrock.server";
 
 // ───── Public types ──────────────────────────────────────────────────────────
 
@@ -94,8 +94,7 @@ function fullName(p?: ProfileRow): string {
 // ───── AI plan extraction ───────────────────────────────────────────────────
 
 async function planFromPrompt(prompt: string): Promise<NectarReportPlan> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured.");
+  assertBedrockConfigured();
 
   const today = new Date().toISOString().slice(0, 10);
   const system = `You translate an admin's plain-language reporting request into a strict JSON plan for the HIVE NECTAR report builder.

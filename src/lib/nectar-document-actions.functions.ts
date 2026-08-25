@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { assertBedrockConfigured, gatewayFetch } from "@/lib/ai-bedrock.server";
 
 import {
   DETECTED_TYPES,
@@ -84,8 +84,7 @@ async function classifyWithAI(
   text: string,
   fileName: string,
 ): Promise<{ type: DetectedDocType; confidence: number; reason: string }> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) return { type: "unknown", confidence: 0, reason: "no_api_key" };
+  assertBedrockConfigured();
   const snippet = (text || "").slice(0, 12000);
   const res = await gatewayFetch({
       model: "bedrock",
@@ -204,8 +203,7 @@ type DraftItem = {
 };
 
 async function extractChecklistItems(text: string): Promise<DraftItem[]> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) return [];
+  assertBedrockConfigured();
   const res = await gatewayFetch({
       model: "bedrock",
       messages: [

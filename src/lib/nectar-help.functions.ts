@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { assertBedrockConfigured, gatewayFetch } from "@/lib/ai-bedrock.server";
 
 export interface NectarHelpReply {
   answer: string;
@@ -54,8 +54,7 @@ STAFF AREA (employee/host_family):
 ROLE RULES: Staff & host-family NEVER see billing rates, dollar amounts, the 520 view, or other clients' data.`;
 
 async function callAI(system: string, user: string): Promise<string> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured.");
+  assertBedrockConfigured();
   const res = await gatewayFetch({
       model: "bedrock",
       messages: [

@@ -5,6 +5,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireOrgMembership } from "@/integrations/supabase/require-org";
+import { gatewayFetch, assertBedrockConfigured } from "@/lib/ai-bedrock.server";
 
 type DraftShift = {
   staff_id: string | null;
@@ -41,6 +43,8 @@ export const nectarImportSchedule = createServerFn({ method: "POST" })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { supabase, userId } = context as any;
     if (!supabase || !userId) return { drafts: [] };
+    await requireOrgMembership(supabase, userId, data.organization_id, "employee");
+    assertBedrockConfigured();
 
     const approxBytes = Math.floor((data.file_b64.length * 3) / 4);
     if (approxBytes > MAX_BYTES) {
@@ -91,9 +95,6 @@ export const nectarImportSchedule = createServerFn({ method: "POST" })
       set.add((a.service_code ?? "").toUpperCase());
       authsByClient.set(a.client_id, set);
     }
-
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("AI gateway not configured.");
 
     const mime = (data.file_mime || "").toLowerCase();
     const isPdf = mime === "application/pdf" || data.file_name.toLowerCase().endsWith(".pdf");
@@ -157,25 +158,16 @@ SERVICE CODES: ["SLH","SLN","COM","PAC","RP2","RP4","RP5","HHS","RHS","DSI","DSG
       );
     }
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model: "bedrock",
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userContent },
-        ],
-        response_format: { type: "json_object" },
-      }),
+    const aiRes = await gatewayFetch({
+      model: "bedrock",
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userContent },
+      ],
+      response_format: { type: "json_object" },
     });
     if (!aiRes.ok) {
       const txt = await aiRes.text().catch(() => "");
-      if (aiRes.status === 402)
-        throw new Error("Nectar credits exhausted — add credits in Workspace billing.");
       if (aiRes.status === 429)
         throw new Error("Nectar is rate-limited — try again shortly.");
       throw new Error(`Nectar couldn't read this file: ${txt.slice(0, 200)}`);

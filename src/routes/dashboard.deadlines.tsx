@@ -18,7 +18,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useDeadlines, groupRegisterDutyRows, type DeadlineItem, type DeadlineLane } from "@/hooks/use-deadlines";
+import { useDeadlines, type DeadlineItem, type DeadlineLane } from "@/hooks/use-deadlines";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { attestSummaryUpiEntered } from "@/lib/progress-summaries.functions";
 
@@ -62,7 +62,7 @@ function fmtDue(d: Date): string {
 }
 
 function DeadlinesPage() {
-  const { items, isLoading } = useDeadlines();
+  const { overdue, dueSoon, upcoming, isLoading } = useDeadlines();
   const [showUpcoming, setShowUpcoming] = useState(false);
   const { client: selectedClient, lane: selectedLane } = Route.useSearch();
   const navigate = useNavigate({ from: "/dashboard/deadlines" });
@@ -75,7 +75,7 @@ function DeadlinesPage() {
 
   const clientOptions = useMemo(() => {
     const seen = new Map<string, string>();
-    for (const it of items) {
+    for (const it of [...overdue, ...dueSoon, ...upcoming]) {
       if (it.subjectKind === "client" && it.clientId && !seen.has(it.clientId)) {
         seen.set(it.clientId, it.subject);
       }
@@ -83,22 +83,18 @@ function DeadlinesPage() {
     return [...seen.entries()]
       .map(([id, label]) => ({ id, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [items]);
+  }, [overdue, dueSoon, upcoming]);
 
-  const calendar = useMemo(() => {
-    const filtered = items.filter((i) => {
+  const applyFilter = (list: DeadlineItem[]) =>
+    list.filter((i) => {
       if (selectedLane && i.lane !== selectedLane) return false;
-      if (selectedClient) {
-        return i.clientId === selectedClient || (i.clientIds?.includes(selectedClient) ?? false);
-      }
+      if (selectedClient && i.clientId !== selectedClient) return false;
       return true;
     });
-    return groupRegisterDutyRows(filtered);
-  }, [items, selectedClient, selectedLane]);
 
-  const overdueF = calendar.filter((i) => i.status === "overdue");
-  const dueSoonF = calendar.filter((i) => i.status === "due_soon");
-  const upcomingF = calendar.filter((i) => i.status === "upcoming");
+  const overdueF = applyFilter(overdue);
+  const dueSoonF = applyFilter(dueSoon);
+  const upcomingF = applyFilter(upcoming);
 
   const setLane = (lane: DeadlineLane | undefined) => {
     navigate({
@@ -118,8 +114,7 @@ function DeadlinesPage() {
             Deadlines
           </h1>
           <p className="text-sm text-muted-foreground">
-            What is late or due soon. Person-level work (who still owes CPR, who files the form)
-            lives on the compliance register — Deadlines does not repeat that roster.
+            Who is late or due soon — the same clocks as the compliance register, in date order.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -191,10 +186,8 @@ function DeadlinesPage() {
       </div>
 
       <p className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-        <span className="font-medium text-foreground">Compliance</span> is the duty (the CPR card,
-        Johnny’s due date, the upload).{" "}
-        <span className="font-medium text-foreground">Deadlines</span> is the calendar (CPR is due
-        9/15 — N staff). Add a weekly meeting or weekly form with{" "}
+        Same source as Compliance, two jobs: the register is the duty (upload, roster, citation);
+        Deadlines is the calendar (Johnny, CPR, 9/15). Add a weekly meeting or weekly form with{" "}
         <span className="font-medium text-foreground">Add company policy</span>.
       </p>
 
@@ -378,13 +371,11 @@ function RowAction({ item }: { item: DeadlineItem }) {
 
   if (item.href) {
     const label =
-      item.source === "company_obligation"
-        ? "Open register"
-        : item.subjectKind === "staff"
-          ? "View staff"
-          : item.subjectKind === "agency"
-            ? "Open"
-            : "View client";
+      item.subjectKind === "staff"
+        ? "View staff"
+        : item.subjectKind === "agency" || item.source === "company_obligation"
+          ? "Open"
+          : "View client";
     return (
       <div className="flex items-center gap-2">
         <Button asChild size="sm" variant="outline">

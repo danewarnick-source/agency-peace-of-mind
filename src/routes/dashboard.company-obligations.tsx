@@ -48,11 +48,16 @@ import {
   obligationTitleMatches,
   type AuditPart,
 } from "@/lib/dspd-audit-tool";
-import { UTAH_DSPD_PACK } from "@/lib/utah-dspd-pack";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type CompanyObligationsTab = "overview" | "action-required";
+type CompanyObligationsTab = "obligations" | "utah-pack" | "policy-library" | "action-required";
+const COMPANY_OBLIGATIONS_TABS: CompanyObligationsTab[] = [
+  "obligations",
+  "utah-pack",
+  "policy-library",
+  "action-required",
+];
 
 type CompanyObligationsSearch = {
   tab?: CompanyObligationsTab;
@@ -65,8 +70,12 @@ function parseCompanyObligationsSearch(s: Record<string, unknown>): CompanyOblig
   const obligation =
     typeof s.obligation === "string" && UUID_RE.test(s.obligation) ? s.obligation : undefined;
   const tabRaw = typeof s.tab === "string" ? s.tab : undefined;
+  // "overview" is a legacy value from before the Overview subtab was
+  // flattened away — treat it as the default (obligations) tab.
   const tab: CompanyObligationsTab | undefined =
-    tabRaw === "action-required" ? "action-required" : tabRaw === "overview" ? "overview" : undefined;
+    tabRaw && COMPANY_OBLIGATIONS_TABS.includes(tabRaw as CompanyObligationsTab)
+      ? (tabRaw as CompanyObligationsTab)
+      : undefined;
   return {
     ...(tab ? { tab } : {}),
     ...(openNew ? { new: true as const } : {}),
@@ -253,7 +262,8 @@ function ObligationsTab({
   const navigate = useNavigate();
 
   const focusObligation = useMemo(
-    () => (focusObligationId ? obligations.find((o) => o.id === focusObligationId) ?? null : null),
+    () =>
+      focusObligationId ? (obligations.find((o) => o.id === focusObligationId) ?? null) : null,
     [obligations, focusObligationId],
   );
 
@@ -722,39 +732,6 @@ function PolicyLibraryTab() {
   );
 }
 
-function OverviewPanel({
-  orgId,
-  openNew,
-  focusObligationId,
-}: {
-  orgId: string;
-  openNew?: boolean;
-  focusObligationId?: string;
-}) {
-  return (
-    <Tabs defaultValue="obligations">
-      <TabsList>
-        <TabsTrigger value="obligations">Obligations</TabsTrigger>
-        <TabsTrigger value="utah-pack">Utah pack</TabsTrigger>
-        <TabsTrigger value="policy-library">Authoritative Sources</TabsTrigger>
-      </TabsList>
-      <TabsContent value="obligations">
-        <ObligationsTab
-          orgId={orgId}
-          openNew={openNew}
-          focusObligationId={focusObligationId}
-        />
-      </TabsContent>
-      <TabsContent value="utah-pack">
-        <UtahPackPanel />
-      </TabsContent>
-      <TabsContent value="policy-library">
-        <PolicyLibraryTab />
-      </TabsContent>
-    </Tabs>
-  );
-}
-
 function CompanyObligationsPage() {
   const navigate = useNavigate({ from: "/dashboard/company-obligations" });
   const { data: org, isLoading } = useCurrentOrg();
@@ -764,7 +741,7 @@ function CompanyObligationsPage() {
   const { totalCount: actionCount } = useActionRequiredQueue(
     canAccess ? org?.organization_id : null,
   );
-  const activeTab: CompanyObligationsTab = tab === "action-required" ? "action-required" : "overview";
+  const activeTab: CompanyObligationsTab = tab ?? "obligations";
 
   if (isLoading) {
     return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
@@ -783,27 +760,27 @@ function CompanyObligationsPage() {
         <ClipboardList className="h-5 w-5 text-primary" />
         <div>
           <h2 className="text-base font-semibold">Compliance register</h2>
-          <p className="text-sm text-muted-foreground">
-            {UTAH_DSPD_PACK.contract} pack {UTAH_DSPD_PACK.version} — In-depth Review Tool rows for
-            the services this program provides.
-          </p>
         </div>
       </div>
 
       <Tabs
         value={activeTab}
         onValueChange={(v) => {
-          const next = v === "action-required" ? "action-required" : "overview";
+          const next = COMPANY_OBLIGATIONS_TABS.includes(v as CompanyObligationsTab)
+            ? (v as CompanyObligationsTab)
+            : "obligations";
           navigate({
             search: (prev) => ({
               ...prev,
-              tab: next === "overview" ? undefined : next,
+              tab: next === "obligations" ? undefined : next,
             }),
           });
         }}
       >
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsList className="flex h-auto flex-wrap">
+          <TabsTrigger value="obligations">Obligations</TabsTrigger>
+          <TabsTrigger value="utah-pack">Utah pack</TabsTrigger>
+          <TabsTrigger value="policy-library">Authoritative Sources</TabsTrigger>
           <TabsTrigger value="action-required" className="gap-1.5">
             {actionCount > 0 ? (
               <>
@@ -826,12 +803,18 @@ function CompanyObligationsPage() {
             )}
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="overview" className="mt-4">
-          <OverviewPanel
+        <TabsContent value="obligations" className="mt-4">
+          <ObligationsTab
             orgId={org.organization_id}
             openNew={openNew}
             focusObligationId={focusObligationId}
           />
+        </TabsContent>
+        <TabsContent value="utah-pack" className="mt-4">
+          <UtahPackPanel />
+        </TabsContent>
+        <TabsContent value="policy-library" className="mt-4">
+          <PolicyLibraryTab />
         </TabsContent>
         <TabsContent value="action-required" className="mt-4">
           <ActionRequiredPanel orgId={org.organization_id} />

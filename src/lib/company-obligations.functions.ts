@@ -349,10 +349,12 @@ export async function snapshotAssigneesInternal(
       .map((uid: string) => {
         const role = roleById.get(uid);
         if (!role) return null;
-        if (ob.assignee_role === "managers_only" && !["manager", "program_manager", "admin"].includes(role))
+        if (
+          ob.assignee_role === "managers_only" &&
+          !["manager", "program_manager", "admin"].includes(role)
+        )
           return null;
-        if (ob.assignee_role === "admin_only" && !["admin"].includes(role))
-          return null;
+        if (ob.assignee_role === "admin_only" && !["admin"].includes(role)) return null;
         return { staff_id: uid, staff_name: nameById.get(uid) ?? "Unknown", staff_role: role };
       })
       .filter((m): m is ResolvedStaffMember => m !== null);
@@ -546,10 +548,12 @@ async function resolveAllAssigneesInternal(
       .map((uid: string) => {
         const role = roleById.get(uid);
         if (!role) return null;
-        if (ob.assignee_role === "managers_only" && !["manager", "program_manager", "admin"].includes(role))
+        if (
+          ob.assignee_role === "managers_only" &&
+          !["manager", "program_manager", "admin"].includes(role)
+        )
           return null;
-        if (ob.assignee_role === "admin_only" && !["admin"].includes(role))
-          return null;
+        if (ob.assignee_role === "admin_only" && !["admin"].includes(role)) return null;
         return { staff_id: uid, staff_name: nameById.get(uid) ?? "Unknown", staff_role: role };
       })
       .filter((m): m is ResolvedStaffMember => m !== null);
@@ -989,6 +993,29 @@ function dueUtcDay(iso: string): string {
 }
 
 /**
+ * Org-wide floor for shared calendar periods: a period that closed before
+ * this org actually started using HIVE cannot have been tracked here, so it
+ * should never be manufactured as an overdue instance. Same convention as
+ * ensureCurrentSummaryPeriods in progress-summaries.functions.ts. Defaults
+ * to organizations.created_at when go_live_date is unset.
+ */
+async function fetchOrgGoLiveDate(
+  supabase: AnySupabase,
+  organizationId: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("organizations")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .select("go_live_date, created_at" as any)
+    .eq("id", organizationId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  const org = data as unknown as { go_live_date: string | null; created_at: string | null } | null;
+  const raw = org?.go_live_date ?? org?.created_at ?? null;
+  return raw ? raw.slice(0, 10) : null;
+}
+
+/**
  * Shared (org-level) calendar periods: insert any missing current/next
  * period. Matches an existing row by period_key OR by the same UTC due
  * day so a catalog period-key rename does not duplicate a live instance.
@@ -1001,6 +1028,17 @@ async function ensureSharedPeriodsInternal(
 ): Promise<ObligationInstanceRow | null> {
   if (!periods.length) return null;
 
+  // Drop any period that closed before the org went live on HIVE — e.g. the
+  // "most recently elapsed" occurrence of an annual duty that hasn't yet
+  // come due this year is a full prior cycle, which predates go-live for a
+  // newly onboarded org. Keep at least one period (the latest) so a duty
+  // still gets an instance even if every candidate period is that old.
+  const goLiveDate = await fetchOrgGoLiveDate(supabase, organizationId);
+  const effectivePeriods = goLiveDate
+    ? periods.filter((p) => dueUtcDay(p.due_at) >= goLiveDate)
+    : periods;
+  const finalPeriods = effectivePeriods.length ? effectivePeriods : periods.slice(-1);
+
   const { data: existingRows, error: exErr } = await supabase
     .from("company_obligation_instances")
     .select("*")
@@ -1010,7 +1048,7 @@ async function ensureSharedPeriodsInternal(
   const existing = (existingRows ?? []) as ObligationInstanceRow[];
 
   let last: ObligationInstanceRow | null = existing[0] ?? null;
-  for (const period of periods) {
+  for (const period of finalPeriods) {
     const match = existing.find(
       (row) =>
         row.period_key === period.period_key || dueUtcDay(row.due_at) === dueUtcDay(period.due_at),
@@ -1799,7 +1837,10 @@ export const listDeadlineObligationInstances = createServerFn({ method: "POST" }
     if (mErr) throw new Error(mErr.message);
     const role = (memberRow as { role?: string } | null)?.role ?? "";
     const isAdminRole =
-      role === "admin" || role === "program_manager" || role === "manager" || role === "super_admin";
+      role === "admin" ||
+      role === "program_manager" ||
+      role === "manager" ||
+      role === "super_admin";
 
     const { visibleObligations, instancesByObligation } =
       await bootstrapVisibleObligationInstancesInternal(supabase, data.organizationId);

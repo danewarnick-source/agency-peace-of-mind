@@ -296,7 +296,6 @@ function FileForStaffPanel({
 // (Legacy single-staff "File evidence" button removed — all admin filing now
 // goes through the multi-select FileForStaffPanel roster.)
 
-
 function NotifyOutstandingButton({
   orgId,
   instanceIds,
@@ -423,13 +422,6 @@ type PerClientInstanceRow = {
 type PerClientCompletionRow = { instance_id: string };
 type PerClientAssigneeRow = { instance_id: string; staff_id: string; staff_name: string };
 
-function formatDueShort(dueAt: string): string {
-  const due = new Date(dueAt);
-  return due < new Date()
-    ? "Overdue"
-    : `Due ${due.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
-}
-
 function PerClientActions({
   orgId,
   obligation,
@@ -475,7 +467,6 @@ function PerClientActions({
 
   const remindFn = useServerFn(remindOutstandingAssignees);
   const [notified, setNotified] = useState(false);
-  const [showOutstanding, setShowOutstanding] = useState(false);
   const remind = useMutation({
     mutationFn: async (openInstanceIds: string[]) => {
       let total = 0;
@@ -524,13 +515,6 @@ function PerClientActions({
         >
           {notified ? "Notified today" : `Notify ${openInstances.length} outstanding →`}
         </Button>
-        <button
-          type="button"
-          className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
-          onClick={() => setShowOutstanding((v) => !v)}
-        >
-          {showOutstanding ? "Hide list" : "Who's outstanding?"}
-        </button>
       </div>
       {roster.length > 0 && (
         <FileForStaffPanel
@@ -539,27 +523,6 @@ function PerClientActions({
           roster={roster}
           label={`File document for staff (${roster.length})`}
         />
-      )}
-      {showOutstanding && (
-        <ul className="space-y-1 rounded-md border border-border bg-muted/20 p-2 text-xs">
-          {openInstances.map((i) => {
-            const a = assigneeByInstance.get(i.id);
-            const staffName = a?.staff_name ?? "Unknown staff";
-            return (
-              <li key={i.id} className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-muted-foreground">
-                  {staffName} (for {i.client_name ?? "Unknown client"})
-                  {i.status === "overdue" ? (
-                    <span className="text-destructive"> — Overdue</span>
-                  ) : (
-                    <span> — {formatDueShort(i.due_at)}</span>
-                  )}
-                </span>
-              </li>
-
-            );
-          })}
-        </ul>
       )}
     </div>
   );

@@ -45,6 +45,26 @@ const WEEKDAY_NAMES = [
   "Sunday",
 ];
 
+/**
+ * Compliance clocks for imported staff must not open already-years-overdue
+ * because their real-world hire_date predates HIVE. Use the later of
+ * hire/start and the day the profile was created on the platform.
+ * Hire date is still stored for HR; this only affects obligation due math.
+ */
+export function effectiveComplianceStartDate(opts: {
+  hire_date: string | null | undefined;
+  start_date: string | null | undefined;
+  platform_created_at: string | null | undefined;
+}): string | null {
+  const hireOrStart = (opts.hire_date ?? opts.start_date)?.slice(0, 10) || null;
+  const platform = opts.platform_created_at?.slice(0, 10) || null;
+  if (!hireOrStart && !platform) return null;
+  if (!hireOrStart) return platform;
+  if (!platform) return hireOrStart;
+  // YYYY-MM-DD compares lexicographically as chronology.
+  return hireOrStart >= platform ? hireOrStart : platform;
+}
+
 export function addDaysUTC(d: Date, days: number): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + days));
 }
@@ -165,12 +185,12 @@ export function explainDueRule(rule: DueRule): string {
     }
     case "days_after_hire":
       return rule.days === 0
-        ? "Required before the staff member provides services (or within a 30-day grace window if they were already employed when this requirement was added)."
-        : `Due ${rule.days} days after the staff member's hire date.`;
+        ? "Required before the staff member provides services (or within a 30-day window from when they were added to HIVE / when this requirement was added, whichever is later)."
+        : `Due ${rule.days} days after the staff member's compliance start (the later of hire date and the day they were added to HIVE).`;
     case "hire_anniversary":
       return rule.start_year <= 1
-        ? "Due on each hire-date anniversary."
-        : `Due on the hire-date anniversary starting year ${rule.start_year} (the year after hire).`;
+        ? "Due on each anniversary of the staff member's compliance start (later of hire date and HIVE add date)."
+        : `Due on the compliance-start anniversary beginning year ${rule.start_year}.`;
     case "cert_expiration":
       return `Due on the expiration date printed on the current certificate. If that date cannot be read, renewal defaults to ${rule.fallback_months} months from the last verified upload.`;
     case "days_after_assignment":

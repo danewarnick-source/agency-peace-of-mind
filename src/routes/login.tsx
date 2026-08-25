@@ -98,8 +98,9 @@ function LoginPage() {
     let cancelled = false;
     (async () => {
       // If a same-origin `next` path was preserved (e.g. MCP OAuth consent),
-      // honor it and skip the exec-route resolution.
-      if (nextPath) {
+      // honor it and skip the exec-route resolution. Never bounce back to the
+      // retired MFA page.
+      if (nextPath && nextPath !== "/mfa-setup" && !nextPath.startsWith("/mfa-setup?")) {
         if (!cancelled) window.location.replace(nextPath);
         return;
       }

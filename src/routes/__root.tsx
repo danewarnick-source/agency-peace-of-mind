@@ -69,7 +69,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     // Running here (not in a useEffect) means the Outlet never renders
     // protected content — the redirect fires synchronously during navigation.
     if (location.pathname === "/reset-password") return;
-    if (location.pathname === "/mfa-setup") return;
+    // MFA is disabled — never leave people on /mfa-setup (old bookmarks /
+    // stale clients). Send them to the dashboard instead of short-circuiting.
+    if (location.pathname === "/mfa-setup") {
+      throw redirect({ to: "/dashboard", replace: true });
+    }
     if (location.pathname === "/login" || location.pathname === "/signup") return;
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user?.id) return;

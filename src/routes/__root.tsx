@@ -104,18 +104,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       throw redirect({ to: "/reset-password" });
     }
 
-    // MFA required for admin / manager / super_admin before accessing the app.
-    // Only enforce when Supabase MFA APIs are available; if the call fails,
-    // do not lock the org out of care delivery.
-    const elevated = (memberships ?? []).some((m) =>
-      ["admin", "manager", "super_admin"].includes((m as { role?: string }).role ?? ""),
-    );
-    if (elevated) {
-      const { data: aal, error: aalErr } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (!aalErr && aal && aal.currentLevel !== "aal2") {
-        throw redirect({ to: "/mfa-setup" });
-      }
-    }
+    // MFA is off until real PHI launch. Planned: email one-time code after
+    // password (not authenticator-app TOTP). Do not re-enable the AAL2 gate
+    // here without that flow.
 
     // Gate app access on unsigned required provider policies. Exempted from
     // itself the same way /reset-password is exempted. IMPORTANT: this only

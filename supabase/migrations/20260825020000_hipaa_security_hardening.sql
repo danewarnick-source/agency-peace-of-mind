@@ -111,6 +111,7 @@ SET search_path = public
 AS $$
   SELECT
     public.is_super_admin(auth.uid())
+    OR public.is_hive_executive(auth.uid())
     OR EXISTS (
       SELECT 1 FROM public.clients c
        WHERE c.id = _client_id
@@ -141,6 +142,7 @@ CREATE POLICY "caseload or admin read clients"
 DROP POLICY IF EXISTS "org members read meds" ON public.client_medications;
 DROP POLICY IF EXISTS "members read client_medications" ON public.client_medications;
 DROP POLICY IF EXISTS "org members read client medications" ON public.client_medications;
+DROP POLICY IF EXISTS "members read meds" ON public.client_medications;
 
 CREATE POLICY "caseload or admin read client_medications"
   ON public.client_medications FOR SELECT TO authenticated
@@ -149,6 +151,7 @@ CREATE POLICY "caseload or admin read client_medications"
 DROP POLICY IF EXISTS "org members read emar" ON public.emar_logs;
 DROP POLICY IF EXISTS "members read emar_logs" ON public.emar_logs;
 DROP POLICY IF EXISTS "org members read emar logs" ON public.emar_logs;
+DROP POLICY IF EXISTS "members read emar" ON public.emar_logs;
 
 CREATE POLICY "caseload or admin read emar_logs"
   ON public.emar_logs FOR SELECT TO authenticated
@@ -157,6 +160,7 @@ CREATE POLICY "caseload or admin read emar_logs"
 DROP POLICY IF EXISTS "org members read timesheets" ON public.evv_timesheets;
 DROP POLICY IF EXISTS "org members read evv_timesheets" ON public.evv_timesheets;
 DROP POLICY IF EXISTS "members read timesheets" ON public.evv_timesheets;
+DROP POLICY IF EXISTS "staff read own or managers read all evv" ON public.evv_timesheets;
 
 CREATE POLICY "own staff, caseload, or admin read evv_timesheets"
   ON public.evv_timesheets FOR SELECT TO authenticated

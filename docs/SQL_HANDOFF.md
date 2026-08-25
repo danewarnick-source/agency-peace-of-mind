@@ -3431,6 +3431,7 @@ SET search_path = public
 AS $$
   SELECT
     public.is_super_admin(auth.uid())
+    OR public.is_hive_executive(auth.uid())
     OR EXISTS (
       SELECT 1 FROM public.clients c
        WHERE c.id = _client_id
@@ -3460,6 +3461,7 @@ CREATE POLICY "caseload or admin read clients"
 DROP POLICY IF EXISTS "org members read meds" ON public.client_medications;
 DROP POLICY IF EXISTS "members read client_medications" ON public.client_medications;
 DROP POLICY IF EXISTS "org members read client medications" ON public.client_medications;
+DROP POLICY IF EXISTS "members read meds" ON public.client_medications;
 DROP POLICY IF EXISTS "caseload or admin read client_medications" ON public.client_medications;
 CREATE POLICY "caseload or admin read client_medications"
   ON public.client_medications FOR SELECT TO authenticated
@@ -3468,6 +3470,7 @@ CREATE POLICY "caseload or admin read client_medications"
 DROP POLICY IF EXISTS "org members read emar" ON public.emar_logs;
 DROP POLICY IF EXISTS "members read emar_logs" ON public.emar_logs;
 DROP POLICY IF EXISTS "org members read emar logs" ON public.emar_logs;
+DROP POLICY IF EXISTS "members read emar" ON public.emar_logs;
 DROP POLICY IF EXISTS "caseload or admin read emar_logs" ON public.emar_logs;
 CREATE POLICY "caseload or admin read emar_logs"
   ON public.emar_logs FOR SELECT TO authenticated
@@ -3476,6 +3479,7 @@ CREATE POLICY "caseload or admin read emar_logs"
 DROP POLICY IF EXISTS "org members read timesheets" ON public.evv_timesheets;
 DROP POLICY IF EXISTS "org members read evv_timesheets" ON public.evv_timesheets;
 DROP POLICY IF EXISTS "members read timesheets" ON public.evv_timesheets;
+DROP POLICY IF EXISTS "staff read own or managers read all evv" ON public.evv_timesheets;
 DROP POLICY IF EXISTS "own staff, caseload, or admin read evv_timesheets" ON public.evv_timesheets;
 CREATE POLICY "own staff, caseload, or admin read evv_timesheets"
   ON public.evv_timesheets FOR SELECT TO authenticated
@@ -3672,15 +3676,11 @@ You should see `can_access_client_phi=1`, `client_photos_public=false`, `inciden
 
 ## ACTION — Ops notes after HIPAA hardening SQL (2026-08-25)
 
-**Not SQL — do these in dashboards / env:**
+**Status (applied directly to owned Supabase `dhrrukdcigiiqksibdfb` on 2026-08-25):**
 
-1. **Supabase Auth → MFA:** Enable TOTP MFA for the project (Authentication → Providers / Multi-factor). Admins/managers are redirected to `/mfa-setup` until AAL2.
-2. **Cron secrets:** Set `NECTAR_CRON_SECRET` (same value) on the app and update pg_cron / external schedulers for:
-   - `/api/public/hooks/billing-daily-check`
-   - `/api/public/hooks/smart-import-reminders`
-   - (already required) gmail-ingest / nectar-schedules  
-   Header: `x-cron-secret: <secret>` (or `Authorization: Bearer <secret>`).  
-   **Stop sending the publishable anon key as `apikey` for these hooks.**
-3. **AWS ALB:** Set `ALB_ORIGIN_VERIFY_SECRET` on ECS and inject `x-origin-verify` from CloudFront (see `docs/AWS_DEPLOY.md`).
-4. **Bedrock only for PHI AI:** Ensure `AWS_REGION`, `BEDROCK_MODEL_ID`, and credentials are set. `LOVABLE_API_KEY` is no longer accepted as the PHI AI path.
+1. **SQL:** HIPAA hardening migration applied via Management API. Confirm checks passed (`can_access_client_phi=1`, private photo buckets, `phi_access_audit_log` present, caseload SELECT on clients). Leftover org-wide member SELECT policies on meds/eMAR/EVV were dropped. `can_access_client_phi` includes `is_hive_executive` for platform break-glass.
+2. **MFA:** TOTP enroll + verify enabled; `mfa_allow_low_aal=false`. Admins/managers still enroll at `/mfa-setup` until AAL2.
+3. **Cron secrets:** `NECTAR_CRON_SECRET` and `ALB_ORIGIN_VERIFY_SECRET` stored in Supabase Vault. pg_cron jobs scheduled against `https://agency-peace-of-mind.vercel.app` for billing-daily-check, smart-import-reminders, gmail-ingest, nectar-schedules (header `x-cron-secret` from vault). **Still required:** set the *same* `NECTAR_CRON_SECRET` value on the Vercel (and/or ECS) app runtime — vault alone does not inject into Node env.
+4. **AWS ALB:** Vault has `ALB_ORIGIN_VERIFY_SECRET`; set the same on ECS + CloudFront `x-origin-verify` before PHI on AWS (see `docs/AWS_DEPLOY.md`). Skip on Vercel-only.
+5. **Bedrock only for PHI AI:** Ensure `AWS_REGION`, `BEDROCK_MODEL_ID`, and credentials are set. `LOVABLE_API_KEY` is no longer accepted as the PHI AI path.
 

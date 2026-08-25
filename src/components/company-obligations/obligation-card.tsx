@@ -58,8 +58,9 @@ import {
 import { ObligationHistorySheet } from "./obligation-history-sheet";
 import { ManualCompletionDrawer } from "./manual-completion-drawer";
 import { ObligationCardActions } from "./obligation-card-actions";
-import { CatalogBadges, RollupStatus, catalogFor } from "./obligation-meta";
+import { FulfillmentBadge, RollupStatus, catalogFor, fulfillmentFor } from "./obligation-meta";
 import { ObligationCatalogNote } from "./obligation-catalog-note";
+import { CATEGORY_LABEL, OWNER_LABEL } from "@/lib/sow-obligation-catalog";
 import { cn } from "@/lib/utils";
 
 export type ObligationWithInstance = CompanyObligationRow & {
@@ -659,12 +660,72 @@ function HireDateWarning({
       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
       <span>
         {data.missing} staff member{data.missing === 1 ? "" : "s"}{" "}
-        {data.missing === 1 ? "has" : "have"} no hire date on file. Compliance
-        clocks use the day they were added to HIVE until a hire date is set.{" "}
+        {data.missing === 1 ? "has" : "have"} no hire date on file. Compliance clocks use the day
+        they were added to HIVE until a hire date is set.{" "}
         <a href="/dashboard/employees/hire-dates" className="underline underline-offset-2">
           Set hire dates →
         </a>
       </span>
+    </div>
+  );
+}
+
+/**
+ * Collapsed by default. Everything that explains *why* this duty exists and
+ * how HIVE handles it — cadence rule, evidence expected, scope, citation,
+ * category, owner — moves here instead of cluttering the card's default
+ * view with badges. Only the tracking-method badge stays always visible.
+ */
+function ObligationDetailsDisclosure({ obligation }: { obligation: ObligationWithInstance }) {
+  const [open, setOpen] = useState(false);
+  const catalog = catalogFor(obligation);
+  return (
+    <div className="mt-3 border-t border-border pt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+      >
+        {open ? "Hide details" : "Details & SOW explanation"}
+        <ChevronDown
+          className={`h-3 w-3 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2">
+          <div className="flex flex-wrap gap-1.5">
+            <Badge variant="outline">{cadenceLabel(obligation)}</Badge>
+            <Badge variant="outline">{evidenceLabel(obligation.evidence_type)}</Badge>
+            <Badge variant="outline">
+              {obligation.scope === "org"
+                ? "Org-level"
+                : obligation.scope === "staff_per_client"
+                  ? "Per staff+client"
+                  : "Per staff"}
+            </Badge>
+            <Badge variant="secondary">
+              {obligation.requires_individual_completion
+                ? "Everyone individually"
+                : "Any one person"}
+            </Badge>
+            {catalog && <Badge variant="outline">{CATEGORY_LABEL[catalog.category]}</Badge>}
+            {catalog && <Badge variant="secondary">Owner: {OWNER_LABEL[catalog.owner]}</Badge>}
+            {catalog?.applicability === "when_applicable" && (
+              <Badge variant="outline">When applicable</Badge>
+            )}
+          </div>
+          {catalog?.citation && (
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Citation: </span>
+              {catalog.citation}
+            </p>
+          )}
+          {obligation.description && (
+            <p className="text-xs text-muted-foreground">{obligation.description}</p>
+          )}
+          <ObligationCatalogNote obligation={obligation} />
+        </div>
+      )}
     </div>
   );
 }
@@ -734,7 +795,15 @@ export function ObligationCard({
     >
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-3">
         <div className="min-w-0 flex-1">
-          <h4 className="font-semibold">{obligation.title}</h4>
+          <h4 className="flex items-center gap-1.5 font-semibold">
+            {obligation.source === "sow" && (
+              <Lock
+                className="h-3.5 w-3.5 shrink-0 text-blue-600"
+                aria-label="State-required (SOW DHHS91172)"
+              />
+            )}
+            <span className="truncate">{obligation.title}</span>
+          </h4>
           {obligation.source_policy_section && (
             <p className="text-sm text-muted-foreground">{obligation.source_policy_section}</p>
           )}
@@ -794,34 +863,14 @@ export function ObligationCard({
         </DropdownMenu>
       </div>
 
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {obligation.source === "sow" && (
-          <Badge className="max-w-full gap-1 border-transparent bg-blue-600 text-white hover:bg-blue-600">
-            <Lock className="h-3 w-3 shrink-0" />
-            <span className="truncate">SOW — DHHS91172</span>
-          </Badge>
-        )}
-        <CatalogBadges ob={obligation} />
-        <Badge variant="outline">{cadenceLabel(obligation)}</Badge>
-        <Badge variant="outline">{evidenceLabel(obligation.evidence_type)}</Badge>
-        <Badge variant="outline">
-          {obligation.scope === "org"
-            ? "Org-level"
-            : obligation.scope === "staff_per_client"
-              ? "Per staff+client"
-              : "Per staff"}
-        </Badge>
-        <Badge variant="secondary">
-          {obligation.requires_individual_completion ? "Everyone individually" : "Any one person"}
-        </Badge>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <FulfillmentBadge channel={fulfillmentFor(obligation)} />
         {!obligation.active && (
           <Badge variant="outline" className="text-muted-foreground">
             Paused
           </Badge>
         )}
       </div>
-
-      <ObligationCatalogNote obligation={obligation} />
 
       {formArchived ? (
         <div className="mt-3 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-2.5 text-sm text-destructive">
@@ -883,6 +932,8 @@ export function ObligationCard({
               )}
             </div>
           )}
+
+          <ObligationDetailsDisclosure obligation={obligation} />
 
           <ObligationCardActions
             orgId={orgId}

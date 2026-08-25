@@ -16,6 +16,16 @@ export function catalogFor(ob: Pick<CompanyObligationRow, "title">): SowCatalogE
   return sowCatalogEntry(ob.title);
 }
 
+/**
+ * How this duty is tracked, for the small badge shown on every card.
+ * Provider-created obligations have no SOW catalog entry, but every
+ * evidence_type HIVE supports (attestation/upload/form) stores the artifact
+ * here, so they default to "in_hive" rather than showing nothing.
+ */
+export function fulfillmentFor(ob: Pick<CompanyObligationRow, "title">): FulfillmentChannel {
+  return sowCatalogEntry(ob.title)?.fulfillment ?? "in_hive";
+}
+
 export function dueExplanationFor(
   ob: Pick<CompanyObligationRow, "title" | "cadence" | "due_day_config">,
 ): string {

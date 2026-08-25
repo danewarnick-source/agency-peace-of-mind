@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { getAgencyHealthSnapshot } from "@/lib/agency-health.functions";
-import { CheckCircle2, AlertTriangle, ShieldAlert } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { getAgencyHealthSnapshot, type HealthMetric } from "@/lib/agency-health.functions";
+import { CheckCircle2, AlertTriangle, ShieldAlert, ArrowRight } from "lucide-react";
 
 type Tier = {
   label: string;
@@ -22,9 +23,9 @@ function tierFor(score: number): Tier {
       border: "border-success/25",
       badge: "bg-success/12 text-success border-success/25",
     };
-  if (score >= 80)
+  if (score >= 75)
     return {
-      label: "Warning",
+      label: "Watch",
       ring: "stroke-warning",
       text: "text-warning-foreground",
       bg: "bg-warning/8",
@@ -69,63 +70,45 @@ function RadialRing({ score, tier }: { score: number; tier: Tier }) {
   );
 }
 
-function MetricRow({ label, score, detail }: { label: string; score: number; detail: string }) {
-  const t = tierFor(score);
-  const Icon = score >= 90 ? CheckCircle2 : score >= 80 ? AlertTriangle : ShieldAlert;
-  return (
-    <li className="flex items-start gap-3 rounded-lg border border-border bg-card p-3">
-      <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${t.text}`} strokeWidth={1.75} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-medium leading-tight text-foreground">{label}</p>
-          <span
-            className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold tabular-nums ${t.badge}`}
-          >
-            {score}%
-          </span>
-        </div>
-        <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
-      </div>
-    </li>
-  );
+function parseLink(link: string): { to: string; search?: Record<string, string> } {
+  const [path, qs] = link.split("?");
+  if (!qs) return { to: path };
+  const search: Record<string, string> = {};
+  for (const part of qs.split("&")) {
+    const [k, v] = part.split("=");
+    if (k) search[decodeURIComponent(k)] = decodeURIComponent(v ?? "");
+  }
+  return { to: path, search };
 }
 
-function Column({
-  title,
-  icon,
-  overall,
-  items,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  overall: number;
-  items: { label: string; score: number; detail: string }[];
-}) {
-  const t = tierFor(overall);
+function MetricRow({ m }: { m: HealthMetric }) {
+  const t = tierFor(m.score);
+  const Icon = m.score >= 90 ? CheckCircle2 : m.score >= 75 ? AlertTriangle : ShieldAlert;
+  const { to, search } = parseLink(m.link);
   return (
-    <div className={`flex flex-col gap-4 rounded-lg border ${t.border} ${t.bg} p-5`}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-accent/10 text-accent">
-            {icon}
-          </span>
-          <h3 className="text-sm font-semibold tracking-tight text-foreground">{title}</h3>
+    <li>
+      <Link
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        to={to as any}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        search={search as any}
+        className="flex items-start gap-3 rounded-lg border border-border bg-card p-3 transition hover:border-primary/40"
+      >
+        <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${t.text}`} strokeWidth={1.75} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium leading-tight text-foreground">{m.label}</p>
+            <span className={`text-sm font-semibold tabular-nums ${t.text}`}>{m.score}%</span>
+          </div>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {m.total === 0 && m.score === 100
+              ? "No active items — compliant"
+              : `${m.passing} of ${m.total} passing`}
+          </p>
         </div>
-        <span
-          className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-wide ${t.badge}`}
-        >
-          {t.label}
-        </span>
-      </div>
-      <div className="flex items-center justify-center py-2">
-        <RadialRing score={overall} tier={t} />
-      </div>
-      <ul className="space-y-2">
-        {items.map((it) => (
-          <MetricRow key={it.label} {...it} />
-        ))}
-      </ul>
-    </div>
+        <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+      </Link>
+    </li>
   );
 }
 
@@ -136,6 +119,9 @@ export function AgencyHealthSnapshot({ organizationId }: { organizationId: strin
     queryFn: () => fetchFn({ data: { organizationId } }),
   });
 
+  const tier = data ? tierFor(data.overall) : null;
+  const visible = data?.metrics.filter((m) => m.applicable) ?? [];
+
   return (
     <section className="rounded-lg border border-border bg-card p-5 shadow-card">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -144,67 +130,30 @@ export function AgencyHealthSnapshot({ organizationId }: { organizationId: strin
             <ShieldAlert className="h-4 w-4" strokeWidth={1.75} />
           </span>
           <h2 className="text-lg font-semibold tracking-tight text-foreground">
-            Agency Health Snapshot
+            Audit Readiness Score
           </h2>
         </div>
-        <span className="text-[11px] text-muted-foreground">Global · last 30 days</span>
+        <span className="text-[11px] text-muted-foreground">DSPD SOW · weighted</span>
       </div>
 
-      {isLoading || !data ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          {[0, 1].map((i) => (
-            <div
-              key={i}
-              className="h-[420px] animate-pulse rounded-lg border border-border bg-muted/40"
-            />
-          ))}
-        </div>
+      {isLoading || !data || !tier ? (
+        <div className="h-[420px] animate-pulse rounded-lg border border-border bg-muted/40" />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          <Column
-            title="Client Records Health"
-            icon={<CheckCircle2 className="h-4 w-4" strokeWidth={1.75} />}
-            overall={data.client.overall}
-            items={[
-              {
-                label: "Daily Progress Note Fulfillment",
-                score: data.client.daily.score,
-                detail: `${data.client.daily.passing}/${data.client.daily.total} logs pass the 50-character threshold`,
-              },
-              {
-                label: "Medication Protocol Compliance",
-                score: data.client.medication.score,
-                detail: `${data.client.medication.passing}/${data.client.medication.total} doses signed with timestamp & no variance`,
-              },
-              {
-                label: "Monthly Attendance Matrix Verification",
-                score: data.client.attendance.score,
-                detail: `${data.client.attendance.passing}/${data.client.attendance.total} billable tiles signed & legally attested`,
-              },
-            ]}
-          />
-          <Column
-            title="Employee Documentation Health"
-            icon={<CheckCircle2 className="h-4 w-4" strokeWidth={1.75} />}
-            overall={data.employee.overall}
-            items={[
-              {
-                label: "EVV Geofence Validation",
-                score: data.employee.geofence.score,
-                detail: `${data.employee.geofence.passing}/${data.employee.geofence.total} clock-ins within GPS boundary`,
-              },
-              {
-                label: "Medication Administration Accuracy",
-                score: data.employee.emarAccuracy.score,
-                detail: `${data.employee.emarAccuracy.passing}/${data.employee.emarAccuracy.total} eMAR passes with signed attestation`,
-              },
-              {
-                label: "SOW Credentials Compliance",
-                score: data.employee.credentials.score,
-                detail: `${data.employee.credentials.passing}/${data.employee.credentials.total} active staff with approved credentials (Utah Code §26B-2-120)`,
-              },
-            ]}
-          />
+        <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
+          <div className={`flex flex-col items-center rounded-xl border ${tier.border} ${tier.bg} p-4`}>
+            <RadialRing score={data.overall} tier={tier} />
+            <span className={`mt-2 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${tier.badge}`}>
+              {tier.label}
+            </span>
+            <p className="mt-2 text-center text-xs text-muted-foreground">
+              {visible.length} applicable metric{visible.length === 1 ? "" : "s"}
+            </p>
+          </div>
+          <ul className="max-h-[28rem] space-y-2 overflow-y-auto pr-1">
+            {visible.map((m) => (
+              <MetricRow key={m.key} m={m} />
+            ))}
+          </ul>
         </div>
       )}
     </section>

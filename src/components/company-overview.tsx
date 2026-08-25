@@ -164,6 +164,12 @@ function QuickActions() {
 }
 
 // ─── KPI strip ───────────────────────────────────────────────────────────────
+function metricByKey(raw: AgencyHealthSnapshot | undefined, key: string): { score: number; passing: number; total: number } | null {
+  const m = raw?.metrics?.find((x) => x.key === key && x.applicable);
+  if (!m) return null;
+  return { score: m.score, passing: m.passing, total: m.total };
+}
+
 function useHealthMetrics(orgId: string): { metrics: HealthMetrics | null; isLoading: boolean; raw: AgencyHealthSnapshot | undefined } {
   const fetchFn = useServerFn(getAgencyHealthSnapshot);
   const { data, isLoading } = useQuery({
@@ -174,13 +180,15 @@ function useHealthMetrics(orgId: string): { metrics: HealthMetrics | null; isLoa
   const metrics = useMemo<HealthMetrics | null>(() => {
     if (!data) return null;
     const d = data as AgencyHealthSnapshot;
-    const audit = Math.round((d.client.daily.score + d.client.medication.score + d.client.attendance.score) / 3);
+    const evv = metricByKey(d, "evv_documentation");
+    const docs = metricByKey(d, "daily_progress_notes");
+    const staff = metricByKey(d, "staff_obligations");
     return {
-      audit,
-      evv: d.employee.geofence.score,
-      docs: Math.round((d.client.daily.score + d.employee.emarAccuracy.score) / 2),
-      creds: d.employee.credentials.score,
-      overall: Math.round((d.client.overall + d.employee.overall) / 2),
+      audit: d.overall,
+      evv: evv?.score ?? 0,
+      docs: docs?.score ?? 0,
+      creds: staff?.score ?? 0,
+      overall: d.overall,
     };
   }, [data]);
   return { metrics, isLoading, raw: data as AgencyHealthSnapshot | undefined };
@@ -235,40 +243,40 @@ function KpiStrip({ metrics, raw, isLoading }: { metrics: HealthMetrics | null; 
       </section>
     );
   }
-  const staffMissingCreds = Math.max(0, raw.employee.credentials.total - raw.employee.credentials.passing);
-  const evvOut = Math.max(0, raw.employee.geofence.total - raw.employee.geofence.passing);
-  const docGaps = Math.max(0, raw.client.daily.total - raw.client.daily.passing)
-    + Math.max(0, raw.employee.emarAccuracy.total - raw.employee.emarAccuracy.passing);
-  const auditGaps = Math.max(0, raw.client.medication.total - raw.client.medication.passing)
-    + Math.max(0, raw.client.attendance.total - raw.client.attendance.passing);
+  const evv = metricByKey(raw, "evv_documentation");
+  const docs = metricByKey(raw, "daily_progress_notes");
+  const staff = metricByKey(raw, "staff_obligations");
+  const evvGaps = evv ? Math.max(0, evv.total - evv.passing) : 0;
+  const docGaps = docs ? Math.max(0, docs.total - docs.passing) : 0;
+  const staffGaps = staff ? Math.max(0, staff.total - staff.passing) : 0;
 
   const specs: KpiSpec[] = [
     {
       icon: ShieldCheck, label: "Audit readiness", value: metrics.audit,
-      nextAction: auditGaps ? `Review ${auditGaps} record${auditGaps === 1 ? "" : "s"}` : "Open Records Desk",
-      to: "/dashboard/hub/documentation", search: { tab: "audit", focus: "audit-readiness" },
+      nextAction: "Open audit metrics",
+      to: "/dashboard/company-obligations",
     },
     {
-      icon: MapPin, label: "EVV match", value: metrics.evv,
-      nextAction: evvOut ? `Investigate ${evvOut} clock-in${evvOut === 1 ? "" : "s"}` : "Open EVV & timesheets",
-      to: "/dashboard/hub/documentation", search: { tab: "records", focus: "evv-out-of-bounds" },
+      icon: MapPin, label: "EVV documentation", value: metrics.evv,
+      nextAction: evvGaps ? `Fix ${evvGaps} shift${evvGaps === 1 ? "" : "s"}` : "Open Compliance Desk",
+      to: "/dashboard/compliance-desk",
     },
     {
-      icon: FileCheck2, label: "Documentation", value: metrics.docs,
-      nextAction: docGaps ? `Review ${docGaps} doc${docGaps === 1 ? "" : "s"}` : "Open Documentation",
+      icon: FileCheck2, label: "Daily notes", value: metrics.docs,
+      nextAction: docGaps ? `Review ${docGaps} note${docGaps === 1 ? "" : "s"}` : "Open Documentation",
       to: "/dashboard/hub/documentation", search: { tab: "records", focus: "doc-gaps" },
     },
     {
-      icon: BadgeCheck, label: "Credentials current", value: metrics.creds,
-      nextAction: staffMissingCreds
-        ? `Review ${staffMissingCreds} staff`
-        : "Open Compliance",
-      to: "/dashboard/certifications", search: { focus: "creds-expiring" },
+      icon: BadgeCheck, label: "Staff obligations", value: metrics.creds,
+      nextAction: staffGaps
+        ? `Complete ${staffGaps} item${staffGaps === 1 ? "" : "s"}`
+        : "Open Obligations",
+      to: "/dashboard/company-obligations",
     },
     {
       icon: Activity, label: "Overall compliance", value: metrics.overall,
       nextAction: "Open compliance overview",
-      to: "/dashboard/hub/documentation", search: { tab: "records", focus: "compliance-overview" },
+      to: "/dashboard/hub/documentation", search: { tab: "audit", focus: "compliance-overview" },
     },
   ];
   return (

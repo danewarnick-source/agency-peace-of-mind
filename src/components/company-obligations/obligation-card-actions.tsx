@@ -115,6 +115,7 @@ function DirectCompletionActions({
       toast.success("Completed");
       reset();
       qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
+      qc.invalidateQueries({ queryKey: ["deadlines"] });
       qc.invalidateQueries({ queryKey: ["obligation-instance-detail", instance.id] });
     } catch (e) {
       toast.error((e as Error).message);
@@ -246,6 +247,7 @@ function FileForStaffPanel({
       if (failures.length) toast.error(`Failed for ${failures.length}: ${failures[0]}`);
       if (ok) reset();
       qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
+      qc.invalidateQueries({ queryKey: ["deadlines"] });
       qc.invalidateQueries({ queryKey: ["obligation-instance-detail"] });
       qc.invalidateQueries({ queryKey: ["obligation-outstanding-roster", obligation.id] });
       qc.invalidateQueries({ queryKey: ["obligation-per-client-detail", obligation.id] });

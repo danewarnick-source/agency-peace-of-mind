@@ -235,6 +235,7 @@ function ConfirmNectarOverrideButton({
       toast.success(`Confirmed ${staffName}'s upload`);
       qc.invalidateQueries({ queryKey: ["obligation-instance-detail", instanceId] });
       qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
+      qc.invalidateQueries({ queryKey: ["deadlines"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -591,6 +592,7 @@ function LogEventDialog({
       onOpenChange(false);
       setDescription("");
       qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
+      qc.invalidateQueries({ queryKey: ["deadlines"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -698,6 +700,7 @@ export function ObligationCard({
     onSuccess: () => {
       toast.success(obligation.active ? "Obligation paused" : "Obligation resumed");
       qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
+      qc.invalidateQueries({ queryKey: ["deadlines"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -708,6 +711,7 @@ export function ObligationCard({
       toast.success("Obligation deleted");
       setConfirmDelete(false);
       qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
+      qc.invalidateQueries({ queryKey: ["deadlines"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

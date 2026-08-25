@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
@@ -48,6 +48,10 @@ import { UTAH_DSPD_PACK } from "@/lib/utah-dspd-pack";
 
 export const Route = createFileRoute("/dashboard/company-obligations")({
   head: () => ({ meta: [{ title: "Compliance register — HIVE" }] }),
+  validateSearch: (s: Record<string, unknown>): { new?: boolean } => {
+    const on = s.new === "1" || s.new === 1 || s.new === true;
+    return on ? { new: true } : {};
+  },
   component: CompanyObligationsPage,
 });
 
@@ -119,7 +123,7 @@ function ObligationList({
   );
 }
 
-function ObligationsTab({ orgId }: { orgId: string }) {
+function ObligationsTab({ orgId, openNew }: { orgId: string; openNew?: boolean }) {
   const listFn = useServerFn(listCompanyObligations);
   const listGroupsFn = useServerFn(listStaffGroups);
   const footprintFn = useServerFn(getOrgServiceFootprint);
@@ -199,6 +203,13 @@ function ObligationsTab({ orgId }: { orgId: string }) {
   const [personId, setPersonId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingObligation, setEditingObligation] = useState<ObligationWithInstance | null>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!openNew) return;
+    setEditingObligation(null);
+    setDrawerOpen(true);
+  }, [openNew]);
 
   const stats = useMemo(() => {
     let overdueItems = 0;
@@ -310,7 +321,7 @@ function ObligationsTab({ orgId }: { orgId: string }) {
           the services it actually runs.
         </p>
         <Button onClick={openCreate}>
-          <Plus className="mr-1.5 h-4 w-4" /> New provider obligation
+          <Plus className="mr-1.5 h-4 w-4" /> New company policy
         </Button>
       </div>
 
@@ -560,7 +571,10 @@ function ObligationsTab({ orgId }: { orgId: string }) {
 
       <ObligationDrawer
         open={drawerOpen}
-        onOpenChange={setDrawerOpen}
+        onOpenChange={(open) => {
+          setDrawerOpen(open);
+          if (!open && openNew) navigate({ to: "/dashboard/company-obligations", search: {} });
+        }}
         orgId={orgId}
         obligation={editingObligation}
       />
@@ -588,6 +602,7 @@ function PolicyLibraryTab() {
 
 function CompanyObligationsPage() {
   const { data: org, isLoading } = useCurrentOrg();
+  const { new: openNew } = Route.useSearch();
   const canAccess = org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
 
   if (isLoading) {
@@ -621,7 +636,7 @@ function CompanyObligationsPage() {
           <TabsTrigger value="policy-library">Authoritative Sources</TabsTrigger>
         </TabsList>
         <TabsContent value="obligations">
-          <ObligationsTab orgId={org.organization_id} />
+          <ObligationsTab orgId={org.organization_id} openNew={openNew} />
         </TabsContent>
         <TabsContent value="utah-pack">
           <UtahPackPanel />

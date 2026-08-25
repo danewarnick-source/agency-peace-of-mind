@@ -1634,6 +1634,86 @@ async function ensureStandingDutiesInternal(
   }
 }
 
+async function loadInstancesByObligation(
+  supabase: AnySupabase,
+  obligationIds: string[],
+): Promise<Map<string, ObligationInstanceRow[]>> {
+  const instancesByObligation = new Map<string, ObligationInstanceRow[]>();
+  if (!obligationIds.length) return instancesByObligation;
+  const { data: instances, error: iErr } = await supabase
+    .from("company_obligation_instances")
+    .select("*")
+    .in("obligation_id", obligationIds)
+    .order("due_at", { ascending: true });
+  if (iErr) throw new Error(iErr.message);
+  for (const inst of (instances ?? []) as ObligationInstanceRow[]) {
+    const list = instancesByObligation.get(inst.obligation_id) ?? [];
+    list.push(inst);
+    instancesByObligation.set(inst.obligation_id, list);
+  }
+  return instancesByObligation;
+}
+
+/**
+ * Shared bootstrap for the compliance register and the Deadlines page:
+ * mark overdue, seed standing SOW duties, hide N/A service codes, and
+ * generate the current/next calendar instances so clocks exist.
+ */
+async function bootstrapVisibleObligationInstancesInternal(
+  supabase: AnySupabase,
+  organizationId: string,
+): Promise<{
+  visibleObligations: CompanyObligationRow[];
+  instancesByObligation: Map<string, ObligationInstanceRow[]>;
+}> {
+  await checkAndMarkOverdueInternal(supabase, organizationId);
+  try {
+    await ensureStandingDutiesInternal(supabase, organizationId);
+  } catch (e) {
+    console.warn("[obligations] standing-duty bootstrap failed:", e);
+  }
+
+  const { data: obligations, error } = await supabase
+    .from("company_obligations")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .order("title", { ascending: true });
+  if (error) throw new Error(error.message);
+
+  const footprint = await orgServiceFootprintInternal(supabase, organizationId);
+
+  const visibleObligations = (obligations ?? []).filter((o: CompanyObligationRow) =>
+    obligationAppliesToFootprint(o.title, o.target_service_codes, footprint),
+  );
+
+  const obligationIds = visibleObligations.map((o: CompanyObligationRow) => o.id);
+  let instancesByObligation = await loadInstancesByObligation(supabase, obligationIds);
+
+  // Ensure current + next calendar periods for org-level duties, and
+  // bootstrap staff duties that have no OPEN instance (so a completed
+  // anniversary year still generates the next one; new hires still get
+  // a first instance).
+  const needsGeneration = visibleObligations.filter((o: CompanyObligationRow) => {
+    if (!o.active) return false;
+    const rows = instancesByObligation.get(o.id) ?? [];
+    if (o.scope === "org") return true;
+    const hasOpen = rows.some((r) => r.status === "pending" || r.status === "overdue");
+    return !hasOpen;
+  });
+  for (const ob of needsGeneration) {
+    try {
+      await generateNextInstanceInternal(supabase, organizationId, ob.id);
+    } catch (e) {
+      console.warn(`[bootstrap] Could not generate instance for ${ob.id}:`, e);
+    }
+  }
+  if (needsGeneration.length > 0) {
+    instancesByObligation = await loadInstancesByObligation(supabase, obligationIds);
+  }
+
+  return { visibleObligations, instancesByObligation };
+}
+
 export const listCompanyObligations = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ organizationId: z.string().uuid() }).parse(i))
@@ -1642,74 +1722,8 @@ export const listCompanyObligations = createServerFn({ method: "POST" })
     if (!supabase || !userId) return [] as ObligationListItem[];
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
 
-    await checkAndMarkOverdueInternal(supabase, data.organizationId);
-    try {
-      await ensureStandingDutiesInternal(supabase, data.organizationId);
-    } catch (e) {
-      console.warn("[obligations] standing-duty bootstrap failed:", e);
-    }
-
-    const { data: obligations, error } = await supabase
-      .from("company_obligations")
-      .select("*")
-      .eq("organization_id", data.organizationId)
-      .order("title", { ascending: true });
-    if (error) throw new Error(error.message);
-
-    const footprint = await orgServiceFootprintInternal(supabase, data.organizationId);
-
-    const visibleObligations = (obligations ?? []).filter((o: CompanyObligationRow) =>
-      obligationAppliesToFootprint(o.title, o.target_service_codes, footprint),
-    );
-
-    const obligationIds = visibleObligations.map((o: CompanyObligationRow) => o.id);
-    const instancesByObligation = new Map<string, ObligationInstanceRow[]>();
-    if (obligationIds.length) {
-      const { data: instances, error: iErr } = await supabase
-        .from("company_obligation_instances")
-        .select("*")
-        .in("obligation_id", obligationIds)
-        .order("due_at", { ascending: true });
-      if (iErr) throw new Error(iErr.message);
-      for (const inst of (instances ?? []) as ObligationInstanceRow[]) {
-        const list = instancesByObligation.get(inst.obligation_id) ?? [];
-        list.push(inst);
-        instancesByObligation.set(inst.obligation_id, list);
-      }
-    }
-
-    // Ensure current + next calendar periods for org-level duties, and
-    // bootstrap staff duties that have no OPEN instance (so a completed
-    // anniversary year still generates the next one; new hires still get
-    // a first instance).
-    const needsGeneration = visibleObligations.filter((o: CompanyObligationRow) => {
-      if (!o.active) return false;
-      const rows = instancesByObligation.get(o.id) ?? [];
-      if (o.scope === "org") return true;
-      const hasOpen = rows.some((r) => r.status === "pending" || r.status === "overdue");
-      return !hasOpen;
-    });
-    for (const ob of needsGeneration) {
-      try {
-        await generateNextInstanceInternal(supabase, data.organizationId, ob.id);
-      } catch (e) {
-        console.warn(`[bootstrap] Could not generate instance for ${ob.id}:`, e);
-      }
-    }
-    if (needsGeneration.length > 0 && obligationIds.length) {
-      const { data: freshInstances, error: fErr } = await supabase
-        .from("company_obligation_instances")
-        .select("*")
-        .in("obligation_id", obligationIds)
-        .order("due_at", { ascending: true });
-      if (fErr) throw new Error(fErr.message);
-      instancesByObligation.clear();
-      for (const inst of (freshInstances ?? []) as ObligationInstanceRow[]) {
-        const list = instancesByObligation.get(inst.obligation_id) ?? [];
-        list.push(inst);
-        instancesByObligation.set(inst.obligation_id, list);
-      }
-    }
+    const { visibleObligations, instancesByObligation } =
+      await bootstrapVisibleObligationInstancesInternal(supabase, data.organizationId);
 
     return visibleObligations.map((o: CompanyObligationRow) => {
       const rows = instancesByObligation.get(o.id) ?? [];
@@ -1717,6 +1731,136 @@ export const listCompanyObligations = createServerFn({ method: "POST" })
         ...o,
         current_instance: pickCurrentInstance(rows),
         rollup: rows.length ? rollupFromInstances(rows) : emptyRollup(),
+      };
+    });
+  });
+
+/** How far ahead the Deadlines page looks for still-open obligation clocks. */
+export const DEADLINE_OBLIGATION_HORIZON_DAYS = 45;
+
+export type DeadlineObligationItem = {
+  instance_id: string;
+  obligation_id: string;
+  title: string;
+  /** Seeded / catalog title before "[Client Name]" substitution. */
+  catalog_title: string;
+  period_key: string;
+  due_at: string | null;
+  status: "pending" | "overdue";
+  source: "sow" | "provider";
+  cadence: CompanyObligationRow["cadence"];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  due_day_config: any;
+  source_policy_section: string | null;
+  evidence_type: CompanyObligationRow["evidence_type"];
+  linked_form_id: string | null;
+  scope: CompanyObligationRow["scope"];
+  assignee_staff_id: string | null;
+  assignee_staff_name: string | null;
+  client_id: string | null;
+  client_name: string | null;
+};
+
+/**
+ * Open obligation instances for the Deadlines page. Same register as
+ * Compliance (SOW + provider/internal policy), footprint-filtered, with
+ * current periods generated. Staff only see instances they are assigned to.
+ */
+export const listDeadlineObligationInstances = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ organizationId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
+    if (!supabase || !userId) return [] as DeadlineObligationItem[];
+    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+
+    const { data: memberRow, error: mErr } = await supabase
+      .from("organization_members")
+      .select("role")
+      .eq("organization_id", data.organizationId)
+      .eq("user_id", userId)
+      .eq("active", true)
+      .maybeSingle();
+    if (mErr) throw new Error(mErr.message);
+    const role = (memberRow as { role?: string } | null)?.role ?? "";
+    const isAdminRole =
+      role === "admin" || role === "program_manager" || role === "manager" || role === "super_admin";
+
+    const { visibleObligations, instancesByObligation } =
+      await bootstrapVisibleObligationInstancesInternal(supabase, data.organizationId);
+
+    let allowedInstanceIds: Set<string> | null = null;
+    if (!isAdminRole) {
+      const { data: assigneeRows, error: aErr } = await supabase
+        .from("company_obligation_instance_assignees")
+        .select("instance_id")
+        .eq("organization_id", data.organizationId)
+        .eq("staff_id", userId);
+      if (aErr) throw new Error(aErr.message);
+      allowedInstanceIds = new Set(
+        (assigneeRows ?? []).map((r: { instance_id: string }) => r.instance_id),
+      );
+      if (allowedInstanceIds.size === 0) return [];
+    }
+
+    const horizon = Date.now() + DEADLINE_OBLIGATION_HORIZON_DAYS * 86_400_000;
+    const staffIds = new Set<string>();
+    const pending: Array<{
+      ob: CompanyObligationRow;
+      inst: ObligationInstanceRow;
+    }> = [];
+
+    for (const ob of visibleObligations) {
+      if (!ob.active) continue;
+      for (const inst of instancesByObligation.get(ob.id) ?? []) {
+        if (inst.status !== "pending" && inst.status !== "overdue") continue;
+        if (allowedInstanceIds && !allowedInstanceIds.has(inst.id)) continue;
+        const dueMs = inst.due_at ? new Date(inst.due_at).getTime() : NaN;
+        if (Number.isFinite(dueMs) && dueMs > horizon) continue;
+        if (inst.assignee_staff_id) staffIds.add(inst.assignee_staff_id);
+        pending.push({ ob, inst });
+      }
+    }
+
+    const nameById = new Map<string, string>();
+    const ids = Array.from(staffIds);
+    if (ids.length) {
+      const { data: dirRows, error: dErr } = await supabase
+        .from("org_member_directory")
+        .select("id, full_name")
+        .in("id", ids);
+      if (dErr) throw new Error(dErr.message);
+      for (const r of (dirRows ?? []) as Array<{ id: string; full_name: string | null }>) {
+        if (r.full_name) nameById.set(r.id, r.full_name);
+      }
+    }
+
+    return pending.map(({ ob, inst }): DeadlineObligationItem => {
+      const title =
+        ob.scope === "staff_per_client" && inst.client_name
+          ? ob.title.replace("[Client Name]", inst.client_name)
+          : ob.title;
+      return {
+        instance_id: inst.id,
+        obligation_id: ob.id,
+        title,
+        catalog_title: ob.title,
+        period_key: inst.period_key,
+        due_at: inst.due_at ?? null,
+        status: inst.status === "overdue" ? "overdue" : "pending",
+        source: ob.source === "sow" ? "sow" : "provider",
+        cadence: ob.cadence,
+        due_day_config: ob.due_day_config,
+        source_policy_section: ob.source_policy_section,
+        evidence_type: ob.evidence_type,
+        linked_form_id: ob.linked_form_id,
+        scope: ob.scope,
+        assignee_staff_id: inst.assignee_staff_id,
+        assignee_staff_name: inst.assignee_staff_id
+          ? (nameById.get(inst.assignee_staff_id) ?? null)
+          : null,
+        client_id: inst.client_id,
+        client_name: inst.client_name,
       };
     });
   });

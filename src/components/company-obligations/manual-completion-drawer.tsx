@@ -205,6 +205,7 @@ export function ManualCompletionDrawer({
       toast.success(`Manual completion recorded for ${ok} staff member${ok === 1 ? "" : "s"}`);
       onOpenChange(false);
       qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
+      qc.invalidateQueries({ queryKey: ["deadlines"] });
       qc.invalidateQueries({ queryKey: ["obligation-instance-detail"] });
       qc.invalidateQueries({ queryKey: ["obligation-outstanding-roster"] });
       qc.invalidateQueries({ queryKey: ["obligation-per-client-detail"] });

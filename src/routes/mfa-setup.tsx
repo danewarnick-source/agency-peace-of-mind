@@ -2,6 +2,10 @@
  * MFA enrollment / verification for every signed-in user. Anyone who can
  * open HIVE can see PHI. Uses Supabase Auth TOTP (authenticator apps).
  * SMS is not offered.
+ *
+ * Login flow:
+ *  - First time: enroll (scan QR) once, then enter the 6-digit code.
+ *  - Every later login: password → enter 6-digit code only (verify). Never re-enroll.
  */
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -17,7 +21,14 @@ export const Route = createFileRoute("/mfa-setup")({
   component: MfaSetupPage,
 });
 
-type Factor = { id: string; status: string; factor_type: string };
+type Factor = {
+  id: string;
+  status: string;
+  factor_type: string;
+  friendly_name?: string;
+};
+
+const FRIENDLY_NAME = "HIVE authenticator";
 
 /** Supabase returns a data: URI, a raw SVG, or (rarely) a PNG URL. */
 export function QrCodeVisual({ qr }: { qr: string }) {
@@ -35,6 +46,31 @@ export function QrCodeVisual({ qr }: { qr: string }) {
     );
   }
   return <img src={value} alt="Authenticator QR code" className="h-48 w-48" />;
+}
+
+/** Unverified leftovers live in `all`; verified TOTP also appears in `totp`. */
+function collectTotpFactors(list: {
+  totp?: Factor[];
+  all?: Factor[];
+} | null): { verified: Factor[]; unverified: Factor[] } {
+  const byId = new Map<string, Factor>();
+  for (const f of list?.all ?? []) {
+    if (f.factor_type === "totp") byId.set(f.id, f);
+  }
+  for (const f of list?.totp ?? []) {
+    byId.set(f.id, f);
+  }
+  const all = [...byId.values()];
+  return {
+    verified: all.filter((f) => f.status === "verified"),
+    unverified: all.filter((f) => f.status !== "verified"),
+  };
+}
+
+async function unenrollFactors(factors: Factor[]) {
+  for (const f of factors) {
+    await supabase.auth.mfa.unenroll({ factorId: f.id });
+  }
 }
 
 function MfaSetupPage() {
@@ -58,17 +94,27 @@ function MfaSetupPage() {
         return;
       }
       const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      const { data: list } = await supabase.auth.mfa.listFactors();
-      const totp = (list?.totp ?? []) as Factor[];
-      const verified = totp.filter((f) => f.status === "verified");
       if (aal?.currentLevel === "aal2") {
         void navigate({ to: "/dashboard" });
         return;
       }
+
+      const { data: list } = await supabase.auth.mfa.listFactors();
+      const { verified, unverified } = collectTotpFactors(list);
+
+      // Incomplete prior setup leaves unverified factors that block re-enroll
+      // ("friendly name already exists"). Clear them before showing Start setup.
+      if (verified.length === 0 && unverified.length > 0) {
+        await unenrollFactors(unverified);
+      }
+
       if (verified.length > 0) {
+        // Already enrolled — each login only needs the 6-digit code.
         setMode("verify");
         setFactorId(verified[0].id);
-        const { data: ch, error } = await supabase.auth.mfa.challenge({ factorId: verified[0].id });
+        const { data: ch, error } = await supabase.auth.mfa.challenge({
+          factorId: verified[0].id,
+        });
         if (error) toast.error(error.message);
         else setChallengeId(ch.id);
       } else {
@@ -85,17 +131,50 @@ function MfaSetupPage() {
   async function startEnroll() {
     setBusy(true);
     const { data: list } = await supabase.auth.mfa.listFactors();
-    const leftover = ((list?.totp ?? []) as Factor[]).filter((f) => f.status !== "verified");
-    for (const f of leftover) {
-      await supabase.auth.mfa.unenroll({ factorId: f.id });
+    const { verified, unverified } = collectTotpFactors(list);
+
+    // If they somehow already finished enroll, switch to verify instead of
+    // creating a second factor with the same friendly name.
+    if (verified.length > 0) {
+      setMode("verify");
+      setQr(null);
+      setSecret(null);
+      setFactorId(verified[0].id);
+      const { data: ch, error } = await supabase.auth.mfa.challenge({
+        factorId: verified[0].id,
+      });
+      setBusy(false);
+      if (error) toast.error(error.message);
+      else setChallengeId(ch.id);
+      return;
     }
+
+    await unenrollFactors(unverified);
+
     const { data, error } = await supabase.auth.mfa.enroll({
       factorType: "totp",
-      friendlyName: "HIVE authenticator",
+      friendlyName: FRIENDLY_NAME,
     });
     if (error) {
+      // Last resort: name conflict from a factor we couldn't list — try a unique name.
+      const { data: retry, error: retryErr } = await supabase.auth.mfa.enroll({
+        factorType: "totp",
+        friendlyName: `${FRIENDLY_NAME} ${Date.now()}`,
+      });
+      if (retryErr || !retry) {
+        setBusy(false);
+        toast.error(error.message);
+        return;
+      }
+      setFactorId(retry.id);
+      setQr(retry.totp.qr_code);
+      setSecret(retry.totp.secret);
+      const { data: ch, error: chErr } = await supabase.auth.mfa.challenge({
+        factorId: retry.id,
+      });
       setBusy(false);
-      toast.error(error.message);
+      if (chErr) toast.error(chErr.message);
+      else setChallengeId(ch.id);
       return;
     }
     setFactorId(data.id);
@@ -122,10 +201,15 @@ function MfaSetupPage() {
     if (error) {
       toast.error(error.message);
       setCode("");
+      // Refresh challenge so the next code attempt is valid.
+      const { data: ch } = await supabase.auth.mfa.challenge({ factorId });
+      if (ch) setChallengeId(ch.id);
       codeRef.current?.focus();
       return;
     }
-    toast.success("Two-factor authentication enabled.");
+    toast.success(
+      mode === "verify" ? "Signed in." : "Two-factor authentication enabled.",
+    );
     void navigate({ to: "/dashboard" });
   }
 
@@ -167,8 +251,9 @@ function MfaSetupPage() {
               {mode === "verify" ? "Enter your two-factor code" : "Set up two-factor authentication"}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Everyone who signs in to HIVE needs an authenticator app before opening client
-              records — DSPs included. A texted code is not enough.
+              {mode === "verify"
+                ? "Open your authenticator app and type the 6-digit code. You do this each time you sign in."
+                : "One-time setup: scan a QR with Google Authenticator, 1Password, or Authy. After that you only enter a code at login."}
             </p>
           </div>
         </div>

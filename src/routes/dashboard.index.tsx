@@ -1,16 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useTodayShift } from "@/hooks/use-today-shift";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { usePortalView } from "@/hooks/use-portal-view";
-import { useDeadlines } from "@/hooks/use-deadlines";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Clock, FileText, ArrowRight, Users, CheckCircle2, ShieldAlert, FileSignature } from "lucide-react";
+import { AlertTriangle, Clock, FileText, ArrowRight, Users, FileSignature } from "lucide-react";
 import { listMyPendingPolicies } from "@/lib/policy-signatures.functions";
+import { getAgencyHealthSnapshot, type HealthMetric } from "@/lib/agency-health.functions";
 
 import { StaffClientGrid } from "@/components/staff-client-grid";
 import { CompanyOverview } from "@/components/company-overview";
@@ -19,7 +18,6 @@ import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { TodayHero } from "@/components/staff-mobile/today-hero";
 import { AttentionStrip } from "@/components/staff-mobile/attention-strip";
 import { NectarOnboardingPanel } from "@/components/onboarding/nectar-onboarding-panel";
-import { PersonAvatar } from "@/components/person/person-avatar";
 import { MyObligationsWidget } from "@/components/company-obligations/my-obligations-widget";
 
 export const Route = createFileRoute("/dashboard/")({
@@ -146,292 +144,140 @@ function ComplianceInbox() {
 
 // ─── Admin Compliance Status Section ─────────────────────────────────────────
 
-type StaffAttentionRow = {
-  staff_id: string;
-  full_name: string;
-  overdueCount: number;
-  expiringCount: number;
-  pendingCount: number;
-};
+function scoreTone(score: number) {
+  if (score >= 90) return { text: "text-emerald-600", ring: "stroke-emerald-500", bg: "bg-emerald-50/60 dark:bg-emerald-950/20", border: "border-emerald-300/60 dark:border-emerald-800/60", dot: "bg-emerald-500" };
+  if (score >= 75) return { text: "text-amber-600", ring: "stroke-amber-500", bg: "bg-amber-50/50 dark:bg-amber-950/20", border: "border-amber-300/70 dark:border-amber-800/60", dot: "bg-amber-500" };
+  return { text: "text-rose-600", ring: "stroke-rose-500", bg: "bg-rose-50/60 dark:bg-rose-950/20", border: "border-rose-300 dark:border-rose-800/60", dot: "bg-rose-500" };
+}
 
-type ObligationAttentionInstance = { id: string; status: "pending" | "overdue"; due_at: string };
-type ObligationAssigneeRow = { instance_id: string; staff_id: string; staff_name: string };
+function parseMetricLink(link: string): { to: string; search?: Record<string, string> } {
+  const [path, qs] = link.split("?");
+  if (!qs) return { to: path };
+  const search: Record<string, string> = {};
+  for (const part of qs.split("&")) {
+    const [k, v] = part.split("=");
+    if (k) search[decodeURIComponent(k)] = decodeURIComponent(v ?? "");
+  }
+  return { to: path, search };
+}
+
+function AuditReadinessRing({ score }: { score: number }) {
+  const t = scoreTone(score);
+  const r = 54;
+  const c = 2 * Math.PI * r;
+  const offset = c - (Math.min(100, Math.max(0, score)) / 100) * c;
+  return (
+    <div className="relative grid h-36 w-36 place-items-center">
+      <svg viewBox="0 0 140 140" className="h-36 w-36 -rotate-90" aria-hidden>
+        <circle cx="70" cy="70" r={r} className="fill-none stroke-border" strokeWidth="8" />
+        <circle
+          cx="70"
+          cy="70"
+          r={r}
+          className={`fill-none ${t.ring} transition-all duration-700`}
+          strokeWidth="8"
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+        />
+      </svg>
+      <div className="absolute inset-0 grid place-items-center">
+        <div className="text-center">
+          <div className={`text-3xl font-semibold tabular-nums ${t.text}`}>{score}%</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MetricStatusDot({ score }: { score: number }) {
+  const t = scoreTone(score);
+  return <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${t.dot}`} aria-hidden />;
+}
 
 function AdminComplianceStatus() {
   const { data: org } = useCurrentOrg();
-  const navigate = useNavigate();
+  const orgId = org?.organization_id;
+  const fetchHealth = useServerFn(getAgencyHealthSnapshot);
 
-  const obligationInstancesQ = useQuery({
-    enabled: !!org,
-    queryKey: ["home-obligations-summary", org?.organization_id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("company_obligation_instances")
-        .select("id, status, due_at")
-        .eq("organization_id", org!.organization_id)
-        .in("status", ["pending", "overdue"]);
-      if (error) throw new Error(error.message);
-      return (data ?? []) as ObligationAttentionInstance[];
-    },
+  const { data, isLoading } = useQuery({
+    enabled: !!orgId,
+    queryKey: ["agency-health", orgId],
+    queryFn: () => fetchHealth({ data: { organizationId: orgId! } }),
   });
 
-  const attentionInstanceIds = useMemo(
-    () => (obligationInstancesQ.data ?? []).map((i) => i.id),
-    [obligationInstancesQ.data],
-  );
-
-  const obligationAssigneesQ = useQuery({
-    enabled: !!org && attentionInstanceIds.length > 0,
-    queryKey: ["home-obligation-instance-assignees", org?.organization_id, attentionInstanceIds],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("company_obligation_instance_assignees")
-        .select("instance_id, staff_id, staff_name")
-        .in("instance_id", attentionInstanceIds);
-      if (error) throw new Error(error.message);
-      return (data ?? []) as ObligationAssigneeRow[];
-    },
-  });
-
-  const clientsQ = useQuery({
-    enabled: !!org,
-    queryKey: ["clients-intake-status", org?.organization_id],
-    queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (supabase as any)
-        .from("clients")
-        .select("id, intake_status")
-        .eq("organization_id", org!.organization_id)
-        .neq("account_status", "archived");
-      return (data ?? []) as Array<{ id: string; intake_status: string | null }>;
-    },
-  });
-
-  const { overdue: overdueDeadlines, isLoading: deadlinesLoading } = useDeadlines();
-
-  const staffMetrics = useMemo(() => {
-    if (!obligationInstancesQ.data) return null;
-    const statusByInstance = new Map(obligationInstancesQ.data.map((i) => [i.id, i.status]));
-    const perStaff = new Map<string, { full_name: string; overdueCount: number; pendingCount: number }>();
-
-    for (const a of obligationAssigneesQ.data ?? []) {
-      const status = statusByInstance.get(a.instance_id);
-      if (!status) continue;
-      const row = perStaff.get(a.staff_id) ?? { full_name: a.staff_name, overdueCount: 0, pendingCount: 0 };
-      if (status === "overdue") row.overdueCount++; else row.pendingCount++;
-      perStaff.set(a.staff_id, row);
-    }
-
-    const attentionRows: StaffAttentionRow[] = Array.from(perStaff.entries()).map(([staff_id, r]) => ({
-      staff_id,
-      full_name: r.full_name,
-      overdueCount: r.overdueCount,
-      expiringCount: 0,
-      pendingCount: r.pendingCount,
-    }));
-
-    // Sort: most severe first
-    attentionRows.sort((a, b) => (b.overdueCount - a.overdueCount) || (b.pendingCount - a.pendingCount));
-
-    return {
-      staffWithOverdue: attentionRows.filter((r) => r.overdueCount > 0).length,
-      staffWithPending: attentionRows.length,
-      attentionRows: attentionRows.slice(0, 5),
-      allAttentionRows: attentionRows,
-    };
-  }, [obligationInstancesQ.data, obligationAssigneesQ.data]);
-
-  const incompleteClientCount = useMemo(() => {
-    return (clientsQ.data ?? []).filter(
-      (c) => c.intake_status !== "complete",
-    ).length;
-  }, [clientsQ.data]);
-
-  // useDeadlines already includes source: "compliance_instance" rows (open UPI
-  // submissions etc.) with status "overdue" in its `overdue` bucket — no filter
-  // excludes them, so no extra wiring is needed here.
-  const overdueDeadlineCount = overdueDeadlines.length;
-
-  const isLoading = obligationInstancesQ.isLoading || clientsQ.isLoading || deadlinesLoading;
-
-  if (isLoading) {
+  if (isLoading || !data) {
     return (
       <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-        <div className="text-sm text-muted-foreground">Loading compliance status…</div>
+        <div className="text-sm text-muted-foreground">Loading audit readiness…</div>
       </div>
     );
   }
 
-  const allClear =
-    (staffMetrics?.staffWithPending ?? 0) === 0 &&
-    incompleteClientCount === 0 &&
-    overdueDeadlineCount === 0;
-
-  if (allClear) {
-    return (
-      <div className="flex items-center gap-3 rounded-2xl border border-emerald-300/60 bg-emerald-50/60 px-5 py-4 shadow-[var(--shadow-card)] dark:border-emerald-800/60 dark:bg-emerald-950/20">
-        <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
-        <span className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
-          All compliance items current — audit ready
-        </span>
-      </div>
-    );
-  }
-
-  const staffOverdueCount = staffMetrics?.staffWithOverdue ?? 0;
-  const staffPendingCount = staffMetrics?.staffWithPending ?? 0;
+  const visible = data.metrics.filter((m: HealthMetric) => m.applicable);
+  const tone = scoreTone(data.overall);
+  const overdueStaff = data.staffWithOverdueObligations;
 
   return (
-    <div className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-      <h2 className="flex items-center gap-2 text-sm font-semibold">
-        <ShieldAlert className="h-4 w-4 text-[#137182]" />
-        Compliance Status
-      </h2>
-
-      {/* Three tiles */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {/* Tile 1 — Staff */}
-        <Link
-          to="/dashboard/hub/employees"
-          className={
-            "group flex flex-col gap-1 rounded-xl border p-4 transition hover:shadow-sm " +
-            (staffOverdueCount > 0
-              ? "border-rose-300 bg-rose-50/60 dark:border-rose-800/60 dark:bg-rose-950/20"
-              : staffPendingCount > 0
-                ? "border-amber-300/70 bg-amber-50/40 dark:border-amber-800/60 dark:bg-amber-950/10"
-                : "border-emerald-300/60 bg-emerald-50/40 dark:border-emerald-800/60 dark:bg-emerald-950/10")
-          }
-        >
-          <div
-            className={
-              "text-2xl font-bold " +
-              (staffOverdueCount > 0
-                ? "text-rose-600"
-                : staffPendingCount > 0
-                  ? "text-amber-600"
-                  : "text-emerald-600")
-            }
-          >
-            {staffPendingCount}
-          </div>
-          <div className="text-xs font-medium leading-tight text-foreground">
-            Staff with incomplete required records
-          </div>
-          {staffOverdueCount > 0 && (
-            <div className="text-[11px] text-rose-600">{staffOverdueCount} overdue</div>
-          )}
-        </Link>
-
-        {/* Tile 2 — Clients */}
-        <Link
-          to="/dashboard/hub/clients"
-          className={
-            "group flex flex-col gap-1 rounded-xl border p-4 transition hover:shadow-sm " +
-            (incompleteClientCount > 0
-              ? "border-amber-300/70 bg-amber-50/40 dark:border-amber-800/60 dark:bg-amber-950/10"
-              : "border-emerald-300/60 bg-emerald-50/40 dark:border-emerald-800/60 dark:bg-emerald-950/10")
-          }
-        >
-          <div
-            className={
-              "text-2xl font-bold " +
-              (incompleteClientCount > 0 ? "text-amber-600" : "text-emerald-600")
-            }
-          >
-            {incompleteClientCount}
-          </div>
-          <div className="text-xs font-medium leading-tight text-foreground">
-            Clients with incomplete intake
-          </div>
-        </Link>
-
-        {/* Tile 3 — Overdue deadlines */}
-        <Link
-          to="/dashboard/deadlines"
-          title="Includes open UPI submissions, renewal deadlines, and other tracked obligations"
-          className={
-            "group flex flex-col gap-1 rounded-xl border p-4 transition hover:shadow-sm " +
-            (overdueDeadlineCount > 0
-              ? "border-rose-300 bg-rose-50/60 dark:border-rose-800/60 dark:bg-rose-950/20"
-              : "border-emerald-300/60 bg-emerald-50/40 dark:border-emerald-800/60 dark:bg-emerald-950/10")
-          }
-        >
-          <div
-            className={
-              "text-2xl font-bold " +
-              (overdueDeadlineCount > 0 ? "text-rose-600" : "text-emerald-600")
-            }
-          >
-            {overdueDeadlineCount}
-          </div>
-          <div className="text-xs font-medium leading-tight text-foreground">
-            Overdue deadlines
-          </div>
-          <div className="text-[10px] leading-tight text-muted-foreground">
-            Includes open UPI submissions, renewal deadlines, and other tracked obligations
-          </div>
-        </Link>
+    <div className={`space-y-5 rounded-2xl border ${tone.border} ${tone.bg} p-5 md:p-6 shadow-[var(--shadow-card)]`}>
+      <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-6">
+        <AuditReadinessRing score={data.overall} />
+        <div className="min-w-0 text-center sm:text-left">
+          <h2 className="text-lg font-semibold tracking-tight text-foreground">Audit Readiness Score</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Weighted across {visible.length} DSPD documentation area{visible.length === 1 ? "" : "s"} that apply to this organization.
+          </p>
+        </div>
       </div>
 
-      {/* Staff needing attention list */}
-      {(staffMetrics?.attentionRows.length ?? 0) > 0 && (
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Staff needing attention
-            </div>
-            {(staffMetrics?.allAttentionRows.length ?? 0) > 5 && (
-              <Link
-                to="/dashboard/hub/employees"
-                className="text-xs text-[#137182] hover:underline"
-              >
-                View all →
-              </Link>
-            )}
-          </div>
-          <ul className="divide-y divide-border rounded-xl border border-border">
-            {staffMetrics!.attentionRows.map((row) => (
-              <li
-                key={row.staff_id}
-                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:flex-nowrap sm:gap-3"
-              >
-                <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <PersonAvatar
-                    bucket="staff-photos"
-                    path={null}
-                    name={row.full_name}
-                    className="h-7 w-7 shrink-0 text-[10px]"
-                  />
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{row.full_name}</div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {row.overdueCount > 0 && (
-                        <span className="text-rose-600">{row.overdueCount} overdue</span>
-                      )}
-                      {row.overdueCount > 0 && row.expiringCount > 0 && " · "}
-                      {row.expiringCount > 0 && (
-                        <span className="text-amber-600">{row.expiringCount} expiring</span>
-                      )}
-                      {(row.overdueCount > 0 || row.expiringCount > 0) && row.pendingCount > 0 && " · "}
-                      {row.pendingCount > 0 && `${row.pendingCount} pending`}
+      <div className="max-h-[28rem] overflow-y-auto rounded-xl border border-border bg-card/80">
+        <ul className="divide-y divide-border">
+          {visible.map((m: HealthMetric) => {
+            const { to, search } = parseMetricLink(m.link);
+            return (
+              <li key={m.key}>
+                <Link
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  to={to as any}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  search={search as any}
+                  className="flex items-start gap-3 px-3 py-3 transition hover:bg-muted/40 sm:items-center"
+                >
+                  <MetricStatusDot score={m.score} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                      <span className="text-sm font-medium text-foreground">{m.label}</span>
+                      <span className={`text-sm font-semibold tabular-nums ${scoreTone(m.score).text}`}>
+                        {m.score}%
+                      </span>
+                    </div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">
+                      {m.total === 0 && m.score === 100
+                        ? "No active items — compliant"
+                        : `${m.passing} of ${m.total} passing`}
                     </div>
                   </div>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 shrink-0 text-xs"
-                  onClick={() =>
-                    navigate({ to: "/dashboard/employees/$staffId", params: { staffId: row.staff_id } })
-                  }
-                >
-                  View profile
-                </Button>
+                  <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground sm:mt-0" />
+                </Link>
               </li>
-            ))}
-          </ul>
-        </div>
-      )}
+            );
+          })}
+        </ul>
+      </div>
+
+      <div className="text-sm text-muted-foreground">
+        {overdueStaff > 0 ? (
+          <Link
+            to="/dashboard/company-obligations"
+            className="inline-flex items-center gap-1 font-medium text-rose-700 hover:underline dark:text-rose-300"
+          >
+            {overdueStaff} staff with overdue obligations
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        ) : (
+          <span>No staff with overdue obligations</span>
+        )}
+      </div>
     </div>
   );
 }

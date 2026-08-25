@@ -13,6 +13,8 @@
 //  - Upserts client_billing_codes by (org, client, service_code).
 // =============================================================
 
+import { enrichNamesFromFull, firstNameWithMiddle } from "@/lib/person-name";
+
 export interface ExtractedField {
   field_key: string;
   field_group?: string | null;
@@ -325,6 +327,31 @@ export async function applyExtractedFieldsToClient(
 
   setScalarText("first_name", "first_name");
   setScalarText("last_name", "last_name");
+  // If full_name carries a middle initial the model dropped from first/last,
+  // fold it into first_name (clients has no middle_name column).
+  {
+    const fullF = byKey.get("full_name");
+    const midF = byKey.get("middle_name");
+    const fullText = fullF ? fieldText(fullF) : null;
+    const midText = midF ? fieldText(midF) : null;
+    if (fullText || midText) {
+      const curFirst = (update.first_name as string | undefined) ?? (client.first_name as string | null);
+      const curLast = (update.last_name as string | undefined) ?? (client.last_name as string | null);
+      const enriched = enrichNamesFromFull(
+        midText ? firstNameWithMiddle(curFirst ?? "", midText) : curFirst,
+        curLast,
+        fullText,
+      );
+      if (enriched.first_name && enriched.first_name !== client.first_name) {
+        update.first_name = enriched.first_name;
+        if (!autofilled.includes("first_name")) autofilled.push("first_name");
+      }
+      if (enriched.last_name && !client.last_name && !update.last_name) {
+        update.last_name = enriched.last_name;
+        autofilled.push("last_name");
+      }
+    }
+  }
   setScalarDate("date_of_birth", "dob");
   setScalarDate("date_of_birth", "date_of_birth");
   setScalarText("medicaid_id", "medicaid_id");

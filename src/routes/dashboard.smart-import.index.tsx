@@ -113,6 +113,7 @@ async function readDocText(file: File): Promise<string> {
 // Order matters: check more-specific keywords before generic ones.
 const DOC_TYPE_PATTERNS: Array<{ label: string; re: RegExp }> = [
   { label: "PCSP", re: /\bpcsp\b/i },
+  { label: "Face Sheet", re: /face[\s_-]*sheet|client[\s_-]*info|facesheet/i },
   { label: "Person-Centered Profile", re: /person[\s_-]*centered|\bpcp\b/i },
   { label: "ISP", re: /\bisp\b/i },
   { label: "IEP", re: /\biep\b/i },

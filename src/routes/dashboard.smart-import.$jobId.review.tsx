@@ -25,6 +25,7 @@ import {
   saveBillingCodeRow, saveManualReviewRow, removeExtractedField, restoreExtractedField,
   getJobAssigner, upsertManualAssignment, removeAssignmentMapRow,
   listPendingClientSubjects,
+  ISSUE_KEY_TO_TARGET,
 } from "@/lib/smart-import-review.functions";
 
 import { resolveMergeFlag, overrideValidationIssue } from "@/lib/import-checklist.functions";
@@ -284,7 +285,14 @@ function useCompleteSetup({
         setPartial([]);
         toast.success(`${mode === "client" ? "Client" : "Staff"} setup complete — ${committedRows.length === 1 ? "added to directory" : `${committedRows.length} added`}.`);
         if (committedRows.length === 1 && mode === "client" && committedRows[0].record_id) {
-          navigate({ to: "/dashboard/clients/$clientId", params: { clientId: committedRows[0].record_id! } }).catch(() => navigate({ to: "/dashboard/clients" }));
+          navigate({
+            to: "/dashboard/client-intake/$clientId",
+            params: { clientId: committedRows[0].record_id! },
+          }).catch(() =>
+            navigate({ to: "/dashboard/clients/$clientId", params: { clientId: committedRows[0].record_id! } }).catch(() =>
+              navigate({ to: "/dashboard/clients" }),
+            ),
+          );
         } else if (mode === "client") {
           navigate({ to: "/dashboard/clients" });
         } else {
@@ -849,7 +857,22 @@ function SubjectHeader({ subject, onChanged, canMarkReady = true }: { subject: S
   const setReady = useServerFn(setSubjectReady);
   const m = useMutation({
     mutationFn: (ready: boolean) => setReady({ data: { subjectId: subject.id, ready } }),
-    onSuccess: () => { toast.success("Updated"); onChanged(); },
+    onSuccess: (res) => {
+      if (res && "ok" in res && res.ok === false) {
+        const blocking = "blocking" in res && Array.isArray((res as { blocking?: Array<{ message: string }> }).blocking)
+          ? (res as { blocking: Array<{ message: string }> }).blocking
+          : [];
+        toast.error(
+          blocking.length
+            ? `Cannot mark ready: ${blocking.map((b) => b.message).join(" · ")}`
+            : "Cannot mark ready — resolve validation issues first.",
+        );
+        onChanged();
+        return;
+      }
+      toast.success("Updated");
+      onChanged();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const isReady = subject.review_status === "ready";
@@ -916,6 +939,7 @@ function labelForField(key: string): string {
   return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 function fieldKeyFromIssue(key: string): string | null {
+  if (ISSUE_KEY_TO_TARGET[key]) return ISSUE_KEY_TO_TARGET[key];
   const m = key.match(/^client\.(?:missing|address)\.(.+)$/);
   return m ? m[1] : null;
 }

@@ -7,7 +7,7 @@
 // =============================================================
 
 import { z } from "zod";
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { gatewayFetch, friendlyAiErrorMessage } from "@/lib/ai-bedrock.server";
 
 export const FieldOut = z.object({
   field_key: z.string().min(1).max(80),
@@ -40,7 +40,7 @@ export type ParseOutT = z.infer<typeof ParseOut>;
 // attribute. Keep in lockstep with client-import-schema.ts.
 export const CORE_CLIENT_FIELD_KEYS = new Set<string>([
   // Person
-  "first_name", "last_name", "full_name", "dob", "medicaid_id", "phone", "plan_year",
+  "first_name", "last_name", "full_name", "middle_name", "dob", "medicaid_id", "phone", "plan_year",
   "disability_category", "admission_date", "discharge_date", "pcsp_expiration_date",
   // Address
   "physical_address",
@@ -109,7 +109,9 @@ OUTPUT CONTRACT — Return STRICT JSON only, using exactly this envelope:
   "title": "Person-Centered Support Plan",
   "fields": [
     { "field_key": "first_name", "field_group": "person", "value_text": "Marcus", "confidence": 0.95 },
+    { "field_key": "middle_name", "field_group": "person", "value_text": "T.", "confidence": 0.9 },
     { "field_key": "last_name",  "field_group": "person", "value_text": "Rivera", "confidence": 0.95 },
+    { "field_key": "full_name",  "field_group": "person", "value_text": "Marcus T. Rivera", "confidence": 0.95 },
     { "field_key": "medicaid_id","field_group": "person", "value_text": "1029384756", "confidence": 0.95 },
     { "field_key": "billing_code_row", "field_group": "billing_code",
       "value_json": { "service_code": "SLH", "unit_type": "15 min", "max_units": 5000 }, "confidence": 0.9 }
@@ -133,7 +135,10 @@ Each extracted field has: field_key, field_group, optional value_text / value_nu
 - Structured rows (per-code billing authorizations) in value_json.
 
 Common field_key values to extract when present (use field_group to bucket related fields):
-  Person (group "person"): first_name, last_name, dob (value_date), medicaid_id, phone, plan_year,
+  Person (group "person"): first_name, last_name, middle_name (value_text — middle name or
+    initial such as "T" or "T."; omit if absent), full_name (value_text — COMPLETE legal name
+    including middle initial when present, e.g. "Marcus T. Rivera"; never drop the middle),
+    dob (value_date), medicaid_id, phone, plan_year,
     disability_category (value_text: exactly "ID-RC" or "ABI" — read from the population/diagnosis
     section of the PCSP; ID-RC = Intellectual Disability / Related Condition, ABI = Acquired Brain
     Injury; omit this field entirely if the document does not state the population),
@@ -338,14 +343,13 @@ export async function parseDocumentWithAI(
     // surfacing to users as "AI returned malformed JSON". Give real headroom.
     max_tokens: 16000,
   });
-  if (res.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
+  if (res.status === 429) throw new Error(friendlyAiErrorMessage(429, "Throttled"));
   if (res.status === 401)
-    throw new Error(
-      "AWS Bedrock credentials are not configured (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / BEDROCK_MODEL_ID).",
-    );
+    throw new Error(friendlyAiErrorMessage(401, "AWS Bedrock credentials are not configured"));
   if (!res.ok) {
     const t = await res.text().catch(() => "");
-    throw new Error(`AI gateway error ${res.status}: ${t.slice(0, 200)}`);
+    console.error(`[document-extraction] AI gateway ${res.status}: ${t.slice(0, 600)}`);
+    throw new Error(friendlyAiErrorMessage(res.status, t));
   }
   const body = (await res.json()) as {
     choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
@@ -435,10 +439,11 @@ export async function extractGoalsOnly(documentText: string): Promise<ParseOutT>
     response_format: { type: "json_object" },
     max_tokens: 12000,
   });
-  if (res.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
+  if (res.status === 429) throw new Error(friendlyAiErrorMessage(429, "Throttled"));
   if (!res.ok) {
     const t = await res.text().catch(() => "");
-    throw new Error(`AI gateway error ${res.status}: ${t.slice(0, 200)}`);
+    console.error(`[document-extraction] goals AI gateway ${res.status}: ${t.slice(0, 600)}`);
+    throw new Error(friendlyAiErrorMessage(res.status, t));
   }
   const body = (await res.json()) as {
     choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;

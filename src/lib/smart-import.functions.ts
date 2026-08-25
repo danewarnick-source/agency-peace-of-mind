@@ -9,8 +9,137 @@ import { z } from "zod";
 import { Buffer } from "node:buffer";
 
 
-import { gatewayFetch } from "@/lib/ai-bedrock.server";
+import { gatewayFetch, assertBedrockConfigured, friendlyAiErrorMessage } from "@/lib/ai-bedrock.server";
 import { parseDocumentWithAI, extractGoalsOnly, documentLikelyHasGoals, CORE_CLIENT_FIELD_KEYS } from "@/lib/document-extraction";
+import { enrichNamesFromFull, firstNameWithMiddle, formatPersonName } from "@/lib/person-name";
+
+function digitsOnly(v: string | null | undefined): string {
+  return (v ?? "").replace(/\D/g, "");
+}
+
+function normName(v: string | null | undefined): string {
+  return (v ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Collapse in-job duplicate people (e.g. PCSP + facesheet that filename-keyed
+ * differently). Prefer medicaid_id; else first+last(+dob). Keep the subject
+ * with more extracted fields and move the rest onto it.
+ */
+async function mergeInJobDuplicateClientSubjects(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  jobId: string,
+  orgId: string,
+  subjects: Array<{ id: string; display_name: string }>,
+): Promise<Array<{ id: string; display_name: string }>> {
+  if (subjects.length < 2) return subjects;
+
+  type FieldRow = { id: string; target_field: string; value: string | null };
+  const bySubject = new Map<string, FieldRow[]>();
+  for (const s of subjects) {
+    const { data: fields } = await sb
+      .from("extracted_fields")
+      .select("id, target_field, value")
+      .eq("import_subject_id", s.id);
+    bySubject.set(s.id, (fields ?? []) as FieldRow[]);
+  }
+
+  const identityOf = (sid: string): { medicaid: string; nameKey: string } => {
+    const fields = bySubject.get(sid) ?? [];
+    const map = new Map(fields.map((f) => [f.target_field, f.value ?? ""]));
+    const medicaid = digitsOnly(map.get("medicaid_id"));
+    let first = normName(map.get("first_name"));
+    let last = normName(map.get("last_name"));
+    const full = normName(map.get("full_name"));
+    if ((!first || !last) && full) {
+      const parts = full.split(" ").filter(Boolean);
+      if (parts.length >= 2) {
+        first = first || parts[0];
+        last = last || parts.slice(1).join(" ");
+      }
+    }
+    const dob = (map.get("date_of_birth") ?? "").trim();
+    const nameKey = first && last ? `${first}|${last}|${dob}` : "";
+    return { medicaid, nameKey };
+  };
+
+  const clusters: string[][] = [];
+  const used = new Set<string>();
+  for (const s of subjects) {
+    if (used.has(s.id)) continue;
+    const a = identityOf(s.id);
+    const group = [s.id];
+    used.add(s.id);
+    for (const other of subjects) {
+      if (used.has(other.id)) continue;
+      const b = identityOf(other.id);
+      const sameMedicaid = a.medicaid.length >= 8 && a.medicaid === b.medicaid;
+      const sameName = !!a.nameKey && a.nameKey === b.nameKey;
+      if (sameMedicaid || sameName) {
+        group.push(other.id);
+        used.add(other.id);
+      }
+    }
+    clusters.push(group);
+  }
+
+  const kept: Array<{ id: string; display_name: string }> = [];
+  for (const group of clusters) {
+    if (group.length === 1) {
+      const one = subjects.find((s) => s.id === group[0])!;
+      kept.push(one);
+      continue;
+    }
+    // Prefer the subject with the most fields (usually the PCSP).
+    group.sort((a, b) => (bySubject.get(b)?.length ?? 0) - (bySubject.get(a)?.length ?? 0));
+    const keeperId = group[0];
+    const keeper = subjects.find((s) => s.id === keeperId)!;
+    const keeperFields = bySubject.get(keeperId) ?? [];
+    const have = new Set(keeperFields.map((f) => f.target_field));
+
+    for (const dupId of group.slice(1)) {
+      const dupFields = bySubject.get(dupId) ?? [];
+      for (const f of dupFields) {
+        if (have.has(f.target_field)) continue;
+        await sb
+          .from("extracted_fields")
+          .update({ import_subject_id: keeperId })
+          .eq("id", f.id);
+        have.add(f.target_field);
+      }
+      await sb
+        .from("unfiled_items")
+        .update({ import_subject_id: keeperId })
+        .eq("import_subject_id", dupId);
+      // Drop leftover field rows still on the duplicate, then the subject.
+      await sb.from("extracted_fields").delete().eq("import_subject_id", dupId);
+      await sb.from("unfiled_items").delete().eq("import_subject_id", dupId);
+      await sb.from("import_subjects").delete().eq("id", dupId);
+    }
+
+    const mergedName =
+      keeper.display_name && keeper.display_name !== "Unnamed"
+        ? keeper.display_name
+        : subjects.find((s) => group.includes(s.id) && s.display_name !== "Unnamed")?.display_name ||
+          keeper.display_name;
+    if (mergedName !== keeper.display_name) {
+      await sb.from("import_subjects").update({ display_name: mergedName }).eq("id", keeperId);
+    }
+    kept.push({ id: keeperId, display_name: mergedName });
+
+    await sb.from("import_audit").insert({
+      import_job_id: jobId,
+      org_id: orgId,
+      item: `Merged ${group.length} duplicate subjects into one person (${mergedName})`,
+      traces_to: "rule",
+      actor: null,
+      action: "merge_duplicate_subjects",
+    });
+  }
+
+  return kept;
+}
 
 // ----- Input schemas -----
 const ModeEnum = z.enum(["employee", "client"]);
@@ -284,7 +413,13 @@ export const runSmartExtraction = createServerFn({ method: "POST" })
     await sb.from("import_jobs").update({ status: "extracting" }).eq("id", data.jobId);
 
     try {
-      const allSubjects: Array<{ id: string; display_name: string }> = [];
+      try {
+        assertBedrockConfigured();
+      } catch (e) {
+        throw new Error(friendlyAiErrorMessage(401, (e as Error).message));
+      }
+
+      let allSubjects: Array<{ id: string; display_name: string }> = [];
 
       // ---- Roster batches: one subject per row ----
       for (const batch of data.rosterBatches) {
@@ -528,6 +663,15 @@ export const runSmartExtraction = createServerFn({ method: "POST" })
         );
       }
 
+      // Collapse facesheet+PCSP (etc.) that landed as separate people in this job.
+      if (mode === "client") {
+        allSubjects = await mergeInJobDuplicateClientSubjects(
+          sb,
+          data.jobId,
+          data.organizationId,
+          allSubjects,
+        );
+      }
 
       // ---- Dedup / match (read-only against real tables) ----
       let matchedCount = 0;
@@ -855,12 +999,71 @@ async function aiExtractFieldsFromText(
     });
   }
 
-  // Derive a display name from extracted person fields.
+  // Derive a display name from extracted person fields — keep middle initials.
   const get = (k: string) => out.find((r) => r.target_field === k)?.value;
   const full = get("full_name");
   const fn = get("first_name");
+  const mn = get("middle_name");
   const ln = get("last_name");
-  const display = (full || `${fn ?? ""} ${ln ?? ""}`.trim() || "Imported client").trim();
+
+  const enriched = enrichNamesFromFull(
+    mn ? firstNameWithMiddle(fn ?? "", mn) : fn,
+    ln,
+    full,
+  );
+
+  // Ensure first_name on the client row keeps the middle initial (no middle_name column).
+  const firstIdx = out.findIndex((r) => r.target_field === "first_name");
+  if (enriched.first_name) {
+    if (firstIdx >= 0) out[firstIdx] = { ...out[firstIdx], value: enriched.first_name };
+    else {
+      out.push({
+        target_field: "first_name",
+        value: enriched.first_name,
+        status: "placed",
+        confidence: 0.9,
+        snippet: enriched.display_name,
+        provenance: "inferred",
+        is_custom: false,
+      });
+    }
+  }
+  if (enriched.last_name) {
+    const lastIdx = out.findIndex((r) => r.target_field === "last_name");
+    if (lastIdx >= 0 && !out[lastIdx].value) out[lastIdx] = { ...out[lastIdx], value: enriched.last_name };
+    else if (lastIdx < 0) {
+      out.push({
+        target_field: "last_name",
+        value: enriched.last_name,
+        status: "placed",
+        confidence: 0.9,
+        snippet: enriched.display_name,
+        provenance: "inferred",
+        is_custom: false,
+      });
+    }
+  }
+  // Always keep a full_name field for review / intake prefill.
+  const fullIdx = out.findIndex((r) => r.target_field === "full_name");
+  if (enriched.display_name) {
+    if (fullIdx >= 0) out[fullIdx] = { ...out[fullIdx], value: enriched.display_name };
+    else {
+      out.push({
+        target_field: "full_name",
+        value: enriched.display_name,
+        status: "placed",
+        confidence: 0.9,
+        snippet: enriched.display_name,
+        provenance: "inferred",
+        is_custom: false,
+      });
+    }
+  }
+
+  const display =
+    enriched.display_name ||
+    formatPersonName(fn ?? "", mn ?? "", ln ?? "") ||
+    "Imported client";
 
   return { display_name: display, fields: out, unfiled };
 }

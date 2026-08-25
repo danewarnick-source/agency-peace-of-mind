@@ -105,7 +105,7 @@ function fmtMonth(yyyyMm: string): string {
 export function useDeadlines() {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id ?? null;
-  const isAdminRole = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
+  const isAdminRole = org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
   const { user } = useAuth();
   const currentUserId = user?.id ?? null;
   const ensureFn = useServerFn(ensureCurrentSummaryPeriods);

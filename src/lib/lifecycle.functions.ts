@@ -13,7 +13,7 @@ async function assertManager(actorId: string, orgId: string) {
     .eq("organization_id", orgId)
     .eq("active", true)
     .maybeSingle();
-  if (!data || !["admin", "manager", "super_admin"].includes(data.role)) {
+  if (!data || !["admin", "program_manager", "manager"].includes(data.role)) {
     throw new Error("Forbidden: only managers or admins may archive or delete profiles");
   }
 }

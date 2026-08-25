@@ -24,7 +24,7 @@ const METHOD_LABEL: Record<string, string> = {
 
 function RoleAuditPage() {
   const { data: org } = useCurrentOrg();
-  const canView = org?.role === "admin" || org?.role === "super_admin";
+  const canView = org?.role === "admin";
   const [page, setPage] = useState(0);
   const listFn = useServerFn(listRoleChangeAuditLog);
 

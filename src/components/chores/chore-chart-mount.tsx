@@ -29,7 +29,7 @@ const TYPES = [
 
 function useCanEdit() {
   const { data: org } = useCurrentOrg();
-  return org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
+  return org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
 }
 
 /** Chore chart tied to a home (teams row). */

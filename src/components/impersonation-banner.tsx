@@ -10,8 +10,8 @@ export function ImpersonationBanner() {
 
   const exit = () => {
     stop();
-    toast.success("Restored Super-Admin credentials");
-    navigate({ to: "/dashboard/super-admin" });
+    toast.success("Restored Hive Executive credentials");
+    navigate({ to: "/dashboard/hive-exec" });
   };
 
   return (
@@ -27,7 +27,7 @@ export function ImpersonationBanner() {
             {" "}(<span className="font-bold">{session.tenant_name}</span>)
           </>
         )}
-        . All modifications are monitored and tracked under Super-Admin Auditing rules.
+        . All modifications are monitored.
       </div>
       <button
         onClick={exit}

@@ -97,7 +97,7 @@ export const parseAndProduceAuditPacket = createServerFn({ method: "POST" })
       .eq("organization_id", data.organization_id)
       .eq("user_id", userId)
       .maybeSingle();
-    if (!membership?.active || !["admin", "manager", "super_admin"].includes(membership.role)) {
+    if (!membership?.active || !["admin", "program_manager", "manager"].includes(membership.role)) {
       throw new Error("Only admins or managers can produce an audit packet.");
     }
 

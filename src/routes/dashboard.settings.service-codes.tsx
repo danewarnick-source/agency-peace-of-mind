@@ -16,7 +16,7 @@ export const Route = createFileRoute("/dashboard/settings/service-codes")({
   head: () => ({ meta: [{ title: "Service Codes — Settings" }] }),
   validateSearch: (s) => search.parse(s),
   component: () => (
-    <RequireRole roles={["admin", "manager", "super_admin"]}>
+    <RequireRole roles={["admin", "program_manager", "manager"]}>
       <ServiceCodesPage />
     </RequireRole>
   ),
@@ -26,7 +26,7 @@ function ServiceCodesPage() {
   const { view } = Route.useSearch();
   const { data: org } = useCurrentOrg();
   const activeView = view ?? "reference";
-  const canConfig = org?.role === "admin" || org?.role === "super_admin";
+  const canConfig = org?.role === "admin";
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">

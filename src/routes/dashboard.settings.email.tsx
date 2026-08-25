@@ -28,7 +28,7 @@ function EmailSettingsPage() {
   const [sending, setSending] = useState(false);
 
   const canEdit =
-    org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
+    org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
 
   useEffect(() => {
     if (!org) return;

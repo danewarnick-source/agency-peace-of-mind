@@ -24,7 +24,7 @@ export const Route = createFileRoute("/dashboard/nectar-company-profile")({
     return out;
   },
   component: () => (
-    <RequireRole roles={["admin", "manager", "super_admin"]}>
+    <RequireRole roles={["admin", "program_manager", "manager"]}>
       <NectarCompanyProfilePage />
     </RequireRole>
   ),

@@ -41,7 +41,7 @@ async function getMembership(
 
 
 function isManager(role: string | undefined) {
-  return !!role && ["admin", "manager", "super_admin"].includes(role);
+  return !!role && ["admin", "program_manager", "manager"].includes(role);
 }
 
 const createInput = z.object({

@@ -373,7 +373,7 @@ function TransfersCard({ meds, clientId }: { meds: Med[]; clientId: string }) {
 export function EmarOpsPanel({ clientId }: { clientId: string }) {
   const { data: org } = useCurrentOrg();
   const { role } = usePermissions();
-  const isAdmin = role === "admin" || role === "manager" || role === "super_admin";
+  const isAdmin = role === "admin" || role === "program_manager" || role === "manager";
   const { data: meds = [], isLoading } = useQuery({
     enabled: !!org && !!clientId,
     queryKey: ["mar-meds-ops", clientId, org?.organization_id],

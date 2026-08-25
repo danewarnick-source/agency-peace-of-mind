@@ -12,7 +12,7 @@ import { assertBedrockConfigured, gatewayFetch } from "@/lib/ai-bedrock.server";
 type AnySupabase = any;
 
 function adminGuard(role: string | undefined) {
-  if (!role || !["admin", "manager", "super_admin"].includes(role)) {
+  if (!role || !["admin", "program_manager", "manager"].includes(role)) {
     throw new Error("Forbidden: admin access required.");
   }
 }
@@ -1069,7 +1069,7 @@ export const recordStaffMandateOverride = createServerFn({ method: "POST" })
     if (isBlockOverride) {
       // Stricter gate: only admin/super_admin (not manager) may override
       // a hard-block mandate, and a typed reason is required.
-      if (!["admin", "super_admin"].includes(m.role)) {
+      if (!["admin"].includes(m.role)) {
         throw new Error("Only admins or owners may override a blocking staff mandate.");
       }
       if (!data.overrideReason || !data.overrideReason.trim()) {

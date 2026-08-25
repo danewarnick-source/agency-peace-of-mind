@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ROLE_LABEL, type Role } from "@/lib/rbac";
+import { PROVIDER_ROLES, ROLE_LABEL, isHiveInternalRole, type ProviderRole, type Role } from "@/lib/rbac";
 import { ShieldCheck, Search } from "lucide-react";
 import { toast } from "sonner";
 
@@ -25,9 +25,9 @@ export const Route = createFileRoute("/dashboard/roles")({
   ),
 });
 
-const ROLE_BADGE: Record<Role, string> = {
-  super_admin: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
+const ROLE_BADGE: Record<ProviderRole, string> = {
   admin: "bg-primary/15 text-primary",
+  program_manager: "bg-teal-500/15 text-teal-700 dark:text-teal-300",
   manager: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
   employee: "bg-secondary text-secondary-foreground",
   committee_member: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
@@ -38,8 +38,6 @@ function RolesPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
   const [q, setQ] = useState("");
-
-  const isSuperAdmin = org?.role === "super_admin";
 
   const { data: members, isLoading } = useQuery({
     enabled: !!org,
@@ -52,18 +50,22 @@ function RolesPage() {
         .eq("active", true);
       if (error) throw error;
       const ids = (data ?? []).map((m) => m.user_id);
-      const { data: profs } = await supabase
-        .from("org_member_directory")
-        .select("id, full_name, email")
-        .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
+      const [{ data: profs }, { data: hiveExecs }] = await Promise.all([
+        supabase
+          .from("org_member_directory")
+          .select("id, full_name, email")
+          .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]),
+        supabase.from("hive_executives").select("user_id, active").in("user_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]),
+      ]);
       const map = new Map((profs ?? []).map((p) => [p.id, p]));
-      return (data ?? []).map((m) => ({ ...m, profile: map.get(m.user_id) }));
+      const hiveSet = new Set((hiveExecs ?? []).filter((h) => h.active).map((h) => h.user_id));
+      return (data ?? []).map((m) => ({ ...m, profile: map.get(m.user_id), isHiveExec: hiveSet.has(m.user_id) }));
     },
   });
 
   const setGrantsFn = useServerFn(setMemberGrants);
   const updateRole = useMutation({
-    mutationFn: async ({ memberId, userId, role }: { memberId: string; userId: string; role: Role }) => {
+    mutationFn: async ({ memberId, userId, role }: { memberId: string; userId: string; role: ProviderRole }) => {
       await setGrantsFn({
         data: {
           organization_id: org!.organization_id,
@@ -98,8 +100,12 @@ function RolesPage() {
   });
 
   const counts = (members ?? []).reduce(
-    (acc, m) => ({ ...acc, [m.role]: (acc[m.role as Role] ?? 0) + 1 }),
-    {} as Record<Role, number>,
+    (acc, m) => {
+      if (isHiveInternalRole(m.role)) return acc;
+      const key = m.role as ProviderRole;
+      return { ...acc, [key]: (acc[key] ?? 0) + 1 };
+    },
+    {} as Record<ProviderRole, number>,
   );
 
   return (
@@ -116,8 +122,8 @@ function RolesPage() {
             </p>
           </div>
         </div>
-        <div className="mt-6 grid gap-3 sm:grid-cols-4">
-          {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
+        <div className="mt-6 grid gap-3 sm:grid-cols-5">
+          {PROVIDER_ROLES.map((r) => (
             <div key={r} className="rounded-xl border border-border bg-background p-4">
               <div className="text-xs uppercase tracking-wide text-muted-foreground">{ROLE_LABEL[r]}</div>
               <div className="mt-1 text-2xl font-semibold">{counts[r] ?? 0}</div>
@@ -158,12 +164,17 @@ function RolesPage() {
             )}
             {filtered.map((m) => {
               const isSelf = m.user_id === user?.id;
-              const isTargetSuperAdmin = m.role === "super_admin";
-              // Admins cannot demote a super admin or promote anyone to super admin.
-              // Admins cannot change their own role (avoid orphaned org).
-              const disabled =
-                isSelf || (!isSuperAdmin && isTargetSuperAdmin) || updateRole.isPending;
+              const lockedInternal = isHiveInternalRole(m.role);
+              const disabled = isSelf || lockedInternal || updateRole.isPending;
               const role = m.role as Role;
+              const label =
+                m.isHiveExec && isHiveInternalRole(role)
+                  ? ROLE_LABEL.super_admin
+                  : ROLE_LABEL[role] ?? role;
+              const badgeClass =
+                isHiveInternalRole(role)
+                  ? "bg-purple-500/15 text-purple-700 dark:text-purple-300"
+                  : ROLE_BADGE[role as ProviderRole] ?? "bg-secondary text-secondary-foreground";
               return (
                 <TableRow key={m.id}>
                   <TableCell>
@@ -172,17 +183,20 @@ function RolesPage() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{m.profile?.email ?? "—"}</TableCell>
                   <TableCell>
-                    <Badge className={`${ROLE_BADGE[role]} border-0`} variant="secondary">
-                      {ROLE_LABEL[role]}
+                    <Badge className={`${badgeClass} border-0`} variant="secondary">
+                      {label}
                     </Badge>
                     {isSelf && <span className="ml-2 text-xs text-muted-foreground">(you)</span>}
                   </TableCell>
                   <TableCell>
+                    {lockedInternal ? (
+                      <span className="text-xs text-muted-foreground">Managed by HIVE</span>
+                    ) : (
                     <Select
-                      value={role === "super_admin" ? "admin" : role}
+                      value={isHiveInternalRole(role) ? "admin" : role}
                       disabled={disabled}
                       onValueChange={(val) => {
-                        const next = val as Role;
+                        const next = val as ProviderRole;
                         if (next === role) return;
                         if (confirm(`Change ${m.profile?.full_name ?? "this user"}'s role to ${ROLE_LABEL[next]}?`)) {
                           updateRole.mutate({ memberId: m.id, userId: m.user_id, role: next });
@@ -191,12 +205,12 @@ function RolesPage() {
                     >
                       <SelectTrigger className="w-full sm:w-auto"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="employee">Employee</SelectItem>
-                        <SelectItem value="manager">Manager</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
+                        {PROVIDER_ROLES.map((r) => (
+                          <SelectItem key={r} value={r}>{ROLE_LABEL[r]}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
-
+                    )}
                   </TableCell>
                 </TableRow>
               );
@@ -208,9 +222,11 @@ function RolesPage() {
       <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground shadow-[var(--shadow-card)]">
         <h3 className="mb-2 text-sm font-semibold text-foreground">Role guide</h3>
         <ul className="space-y-1">
-          <li><strong className="text-foreground">Admin</strong> — Manages employees, courses, billing, and roles in this organization.</li>
-          <li><strong className="text-foreground">Manager</strong> — Assigns training and views team reports.</li>
-          <li><strong className="text-foreground">Employee</strong> — Completes assigned courses and earns certifications.</li>
+          <li><strong className="text-foreground">Owner</strong> — Full access including billing, org settings, and permissions.</li>
+          <li><strong className="text-foreground">Program Manager</strong> — Scheduling, timesheets, compliance, and client records within assigned scope. No billing management or org settings.</li>
+          <li><strong className="text-foreground">Supervisor</strong> — Team operations, training, and day-to-day documentation.</li>
+          <li><strong className="text-foreground">Staff</strong> — Own caseload, logs, trainings, and assigned obligations.</li>
+          <li><strong className="text-foreground">Committee Member</strong> — Human Rights Committee only.</li>
         </ul>
       </div>
 

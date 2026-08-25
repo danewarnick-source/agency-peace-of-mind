@@ -334,7 +334,7 @@ function Overview() {
   const { view, subView, hasStoredView } = usePortalView();
   const { welcome } = Route.useSearch();
 
-  const isManager = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
+  const isManager = org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
   const effectiveView = hasStoredView ? view : isManager ? "admin" : "staff";
   const isStatePreviewAdmin = effectiveView === "state_preview" && subView === "admin";
   const showAdmin = (isManager && effectiveView === "admin") || isStatePreviewAdmin;

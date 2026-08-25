@@ -434,8 +434,8 @@ export async function resolveGroupMembersInternal(
   for (const staffId of staffIds) {
     const role = roleById.get(staffId);
     if (!role) continue; // not an active org member — drop
-    if (assigneeRole === "managers_only" && !["manager", "super_admin"].includes(role)) continue;
-    if (assigneeRole === "admin_only" && !["admin", "super_admin"].includes(role)) continue;
+    if (assigneeRole === "managers_only" && !["manager", "program_manager", "admin"].includes(role)) continue;
+    if (assigneeRole === "admin_only" && !["admin"].includes(role)) continue;
     out.push({ staff_id: staffId, staff_name: nameById.get(staffId) ?? "Unknown", staff_role: role });
   }
   return out;

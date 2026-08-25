@@ -31,10 +31,10 @@ async function ensureOverrideRole(supabase: any, userId: string, orgId: string) 
     .maybeSingle();
   if (error) throw new Error(error.message);
   const role = data?.role;
-  if (role !== "admin" && role !== "manager" && role !== "super_admin") {
-    throw new Error("Forbidden — admin, manager, or super_admin required to resolve held timesheets");
+  if (role !== "admin" && role !== "program_manager" && role !== "manager") {
+    throw new Error("Forbidden — admin, program manager, or supervisor required to resolve held timesheets");
   }
-  return role as "admin" | "manager" | "super_admin";
+  return role as "admin" | "program_manager" | "manager";
 }
 
 export type HeldTimesheetFlag = {

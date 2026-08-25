@@ -4,11 +4,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useIsHiveExecutive } from "@/hooks/use-hive-executive";
+import { ROLE_LABEL, type ProviderRole } from "@/lib/rbac";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Lock, Mail, ShieldCheck, History } from "lucide-react";
 import { toast } from "sonner";
@@ -47,7 +49,7 @@ function TeamAccessPage() {
   const inviteFn = useServerFn(inviteTeamMember);
 
   const canManage =
-    org?.role === "admin" || org?.role === "super_admin" || isHiveExec;
+    org?.role === "admin" || isHiveExec;
 
   const { data: members = [], isLoading } = useQuery({
     enabled: !!org && canManage,
@@ -78,26 +80,26 @@ function TeamAccessPage() {
   });
 
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteAdmin, setInviteAdmin] = useState(false);
+  const [inviteRole, setInviteRole] = useState<ProviderRole>("employee");
   const invite = useMutation({
     mutationFn: () =>
       inviteFn({
         data: {
           organization_id: org!.organization_id,
           email: inviteEmail,
-          grant_admin: inviteAdmin,
+          role: inviteRole === "committee_member" ? "employee" : inviteRole,
         },
       }),
     onSuccess: () => {
       toast.success("Invitation sent");
       setInviteEmail("");
-      setInviteAdmin(false);
+      setInviteRole("employee");
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const canManageGroups =
-    org?.role === "admin" || org?.role === "super_admin" || isHiveExec;
+    org?.role === "admin" || isHiveExec;
 
   if (!canManage) {
     return (
@@ -162,7 +164,7 @@ function TeamAccessPage() {
           <Mail className="h-4 w-4 text-muted-foreground" />
           <h3 className="text-sm font-semibold">Invite by email</h3>
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_14rem_auto]">
           <div className="grid gap-1">
             <Label htmlFor="invite-email" className="sr-only">Email</Label>
             <Input
@@ -174,19 +176,23 @@ function TeamAccessPage() {
               required
             />
           </div>
-          <label className="inline-flex items-center gap-2 px-2 text-sm">
-            <Checkbox
-              checked={inviteAdmin}
-              onCheckedChange={(v) => setInviteAdmin(v === true)}
-            />
-            Grant Admin
-          </label>
+          <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as ProviderRole)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="employee">{ROLE_LABEL.employee}</SelectItem>
+              <SelectItem value="manager">{ROLE_LABEL.manager}</SelectItem>
+              <SelectItem value="program_manager">{ROLE_LABEL.program_manager}</SelectItem>
+              <SelectItem value="admin">{ROLE_LABEL.admin}</SelectItem>
+            </SelectContent>
+          </Select>
           <Button type="submit" disabled={invite.isPending || !inviteEmail}>
             Send invite
           </Button>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Company Executive and HIVE Executive can be granted after the invite is accepted.
+          Committee Member is assigned after they join. Company Executive and HIVE Executive can be granted after the invite is accepted.
         </p>
       </form>
 

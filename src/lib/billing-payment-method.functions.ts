@@ -25,7 +25,7 @@ export const updatePaymentMethodFn = createServerFn({ method: "POST" })
     if (!context.supabase || !context.userId) {
       return { ok: false, was_past_due: false, card_expires_at: null as string | null };
     }
-    // Authorize: caller must be an active admin/super_admin of this org.
+    // Authorize: caller must be an active owner (admin) of this org.
     const { data: membership, error: mErr } = await context.supabase
       .from("organization_members")
       .select("role")
@@ -34,7 +34,7 @@ export const updatePaymentMethodFn = createServerFn({ method: "POST" })
       .eq("active", true)
       .maybeSingle();
     if (mErr) throw new Error(mErr.message);
-    if (!membership || (membership.role !== "admin" && membership.role !== "super_admin")) {
+    if (!membership || membership.role !== "admin") {
       throw new Error("Forbidden — admin role required to update payment method");
     }
 

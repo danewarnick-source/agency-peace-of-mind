@@ -877,7 +877,7 @@ export const generateRequirementsFromSource = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .eq("active", true)
       .maybeSingle();
-    const allowedRoles = new Set(["admin", "manager", "super_admin"]);
+    const allowedRoles = new Set(["admin", "program_manager", "manager"]);
     if (!membership || !allowedRoles.has(membership.role as string)) {
       throw new Error(
         "Drafting requirements is an Admin View action. Switch to this company's Admin View with an Admin, Manager, or Super Admin role to draft from authoritative sources.",

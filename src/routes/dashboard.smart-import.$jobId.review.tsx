@@ -233,7 +233,7 @@ function AttributionBar() {
     <div className="flex items-start gap-2 rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm">
       <ShieldCheck className="mt-0.5 h-4 w-4 text-primary" />
       <div>
-        Reviewing as <strong>{user?.email ?? "admin"}</strong> · {org?.role === "super_admin" ? "Super Admin" : "Company Admin"}.
+        Reviewing as <strong>{user?.email ?? "admin"}</strong> · Company Admin.
         Confirming approves this setup, including anything you changed or switched on; recorded with every item.
       </div>
     </div>

@@ -28,7 +28,7 @@ import {
 export const Route = createFileRoute("/dashboard/financial/nectar")({
   head: () => ({ meta: [{ title: "NECTAR Financial — HIVE" }] }),
   component: () => (
-    <RequireRole roles={["admin", "manager", "super_admin"]}>
+    <RequireRole roles={["admin", "program_manager", "manager"]}>
       <NectarFinancialPage />
     </RequireRole>
   ),

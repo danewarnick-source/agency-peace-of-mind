@@ -77,7 +77,7 @@ function fmt$(n: number): string {
 export function ClientBudgetPanel({ clientId }: { clientId: string }) {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
-  const canEdit = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
+  const canEdit = org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
   const qc = useQueryClient();
 
   const [monthInput, setMonthInput] = useState<string>(currentMonthValue());

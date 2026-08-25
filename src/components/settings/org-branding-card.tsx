@@ -32,7 +32,7 @@ export function OrgBrandingCard() {
   }, [branding?.org_address, branding?.org_phone]);
 
   if (!orgId) return null;
-  const isAdmin = org?.role === "admin" || org?.role === "super_admin" || org?.role === "manager";
+  const isAdmin = org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
   if (!isAdmin) return null;
 
   const save = async (patch: Record<string, unknown>) => {

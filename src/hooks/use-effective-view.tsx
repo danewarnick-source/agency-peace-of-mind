@@ -8,7 +8,7 @@ export function useEffectiveView() {
   const { data: org } = useCurrentOrg();
   const { view, subView } = usePortalView();
   const role = org?.role ?? "employee";
-  const isAdminCapable = role === "admin" || role === "manager" || role === "super_admin";
+  const isAdminCapable = role === "admin" || role === "program_manager" || role === "manager";
   const isStatePreview = view === "state_preview";
   const previewIsAdmin = isStatePreview && subView === "admin";
   const effective: "admin" | "staff" =

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
-import type { Role } from "@/lib/rbac";
+import { ROLE_RANK, type Role } from "@/lib/rbac";
 
 export type { Role };
 
@@ -46,10 +46,9 @@ async function fetchMemberships(userId: string): Promise<CurrentMembership[]> {
     .eq("user_id", userId)
     .eq("active", true);
   if (error || !data?.length) return [];
-  const rank: Record<Role, number> = { super_admin: 0, admin: 1, manager: 2, employee: 3, committee_member: 4 };
   type OrgRow = { name: string; is_demo: boolean; legal_name: string | null; dba_name: string | null; display_acronym: string | null } | null;
   return [...data]
-    .sort((a, b) => rank[a.role as Role] - rank[b.role as Role])
+    .sort((a, b) => ROLE_RANK[b.role as Role] - ROLE_RANK[a.role as Role])
     .map((m) => {
       const o = m.organizations as OrgRow;
       return {
@@ -111,10 +110,9 @@ export function useMyMemberships() {
  */
 function pickDefaultMembership(memberships: CurrentMembership[]): CurrentMembership | null {
   if (!memberships.length) return null;
-  const rank: Record<Role, number> = { super_admin: 0, admin: 1, manager: 2, employee: 3, committee_member: 4 };
   const sorted = [...memberships].sort((a, b) => {
     if (a.is_demo !== b.is_demo) return a.is_demo ? 1 : -1; // non-demo first
-    const r = rank[a.role] - rank[b.role];
+    const r = ROLE_RANK[b.role] - ROLE_RANK[a.role];
     if (r !== 0) return r;
     return a.organization_id.localeCompare(b.organization_id);
   });

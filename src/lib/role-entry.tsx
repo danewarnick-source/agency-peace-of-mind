@@ -27,10 +27,9 @@ function makeRoleEntry(allowed: Role[]) {
   };
 }
 
-export const AdminEntry = makeRoleEntry(["admin", "super_admin"]);
-export const ManagerEntry = makeRoleEntry(["manager", "admin", "super_admin"]);
-export const EmployeeEntry = makeRoleEntry(["employee", "manager", "admin", "super_admin"]);
-export const SuperAdminEntry = makeRoleEntry(["super_admin"]);
+export const AdminEntry = makeRoleEntry(["admin"]);
+export const ManagerEntry = makeRoleEntry(["manager", "program_manager", "admin"]);
+export const EmployeeEntry = makeRoleEntry(["employee", "manager", "program_manager", "admin"]);
 
 // Re-export createFileRoute for the route files to use.
 export { createFileRoute };

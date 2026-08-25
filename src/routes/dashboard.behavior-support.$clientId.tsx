@@ -54,7 +54,7 @@ function BehaviorSupportClientPage() {
     );
   }
 
-  const isAdmin = orgRole === "admin" || orgRole === "super_admin";
+  const isAdmin = orgRole === "admin";
   const isBehaviorist = !isAdmin && data.bsc.assigned_behaviorist_user_id === user?.id;
 
   // Staff should not reach this surface — send them to the client workspace

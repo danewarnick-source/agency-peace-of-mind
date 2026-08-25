@@ -105,7 +105,7 @@ export function ChoreChartPanel({
   const { data: org } = useCurrentOrg();
   const canEdit =
     !forcedReadOnly &&
-    (org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin");
+    (org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager");
   const qc = useQueryClient();
 
   const spaceQ = useQuery({

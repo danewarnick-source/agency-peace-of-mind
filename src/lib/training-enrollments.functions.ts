@@ -105,7 +105,7 @@ async function notifyOrgAdminsInternal(
     .select("user_id")
     .eq("organization_id", organizationId)
     .eq("active", true)
-    .in("role", ["admin", "super_admin"]);
+    .in("role", ["admin"]);
   if (error) throw new Error(error.message);
   const rows = ((admins ?? []) as Array<{ user_id: string }>).map((a) => ({
     organization_id: organizationId,

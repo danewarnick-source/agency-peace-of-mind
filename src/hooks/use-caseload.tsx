@@ -33,8 +33,8 @@ export function useCaseload() {
   const { data: org, isLoading: orgLoading } = useCurrentOrg();
   const { view } = usePortalView();
   const role = org?.role;
-  const isManagerial = role === "admin" || role === "manager" || role === "super_admin";
-  const shouldForceStaffCaseload = role === "super_admin";
+  const isManagerial = role === "admin" || role === "program_manager" || role === "manager";
+  const shouldForceStaffCaseload = false;
   const canSeeWholeOrgCaseload = isManagerial && view === "admin" && !shouldForceStaffCaseload;
 
   return useQuery({

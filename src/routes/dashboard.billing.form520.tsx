@@ -33,7 +33,7 @@ import { RequireRole } from "@/components/rbac-guard";
 export const Route = createFileRoute("/dashboard/billing/form520")({
   head: () => ({ meta: [{ title: "520 Billing — HIVE" }] }),
   component: () => (
-    <RequireRole roles={["admin", "manager", "super_admin"]}>
+    <RequireRole roles={["admin", "program_manager", "manager"]}>
       <Billing520Page />
     </RequireRole>
   ),

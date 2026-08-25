@@ -61,7 +61,7 @@ function BillingLockedPage() {
       }
       const m = ms.find((x) => x.organization_id === activeOrgId) ?? ms[0];
       const orgId = m.organization_id;
-      const isAdmin = m.role === "admin" || m.role === "super_admin";
+      const isAdmin = m.role === "admin";
 
       const { data: sub } = await supabase
         .from("org_subscriptions")

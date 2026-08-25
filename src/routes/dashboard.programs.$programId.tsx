@@ -52,7 +52,7 @@ function ProgramPlayer() {
   const router = useRouter();
   const [activeCourseId, setActiveCourseId] = useState<string | null>(null);
 
-  const isPrivilegedViewer = role === "admin" || role === "manager" || role === "super_admin" || can("manage_programs");
+  const isPrivilegedViewer = role === "admin" || role === "program_manager" || role === "manager" || can("manage_programs");
 
   useEffect(() => {
     console.info("[ProgramPlayer] route", {

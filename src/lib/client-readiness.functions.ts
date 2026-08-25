@@ -60,7 +60,7 @@ export const clientReadiness = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!membership) throw new Error("Forbidden");
     const role = String((membership as { role: string }).role ?? "").toLowerCase();
-    if (!["admin", "manager", "owner", "super_admin"].includes(role)) {
+    if (!["admin", "program_manager", "manager", "owner"].includes(role)) {
       throw new Error("Forbidden");
     }
 

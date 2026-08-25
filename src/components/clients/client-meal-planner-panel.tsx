@@ -177,7 +177,7 @@ export function ClientMealPlannerPanel({
   const orgId = org?.organization_id;
   const canEdit =
     !forcedReadOnly &&
-    (org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin");
+    (org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager");
   // Staff (any org member) may record daily actuals even in read-only-plan mode.
   const canRecordActuals = !!org?.role;
   const qc = useQueryClient();

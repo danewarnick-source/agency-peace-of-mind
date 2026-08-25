@@ -103,7 +103,7 @@ export function EvvArchivePage() {
   const navigate = useNavigate();
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
-  const isAdmin = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
+  const isAdmin = org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
 
   // Filter state — local only. We sync to URL when embedded as a standalone route,
   // but since this component is also rendered inside the Documentation hub

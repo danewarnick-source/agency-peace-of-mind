@@ -2,8 +2,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { ROLE_LABEL, type Role } from "@/lib/rbac";
 
-const RoleEnum = z.enum(["super_admin", "admin", "manager", "employee", "committee_member"]);
+const RoleEnum = z.enum(["admin", "program_manager", "manager", "employee", "committee_member"]);
+const InviteRoleEnum = z.enum(["admin", "program_manager", "manager", "employee"]);
 
 async function logRoleChange(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -41,6 +43,8 @@ export interface TeamMemberAccess {
   user_id: string;
   email: string;
   full_name: string | null;
+  role: string;
+  display_role_label: string;
   grants: {
     staff: boolean;
     admin: boolean;
@@ -110,16 +114,23 @@ export const listTeamAccess = createServerFn({ method: "GET" })
 
     return (members ?? []).map((m) => {
       const p = pMap.get(m.user_id);
+      const isHive = hSet.has(m.user_id);
+      const role = m.role as Role;
       return {
         membership_id: m.id,
         user_id: m.user_id,
         email: p?.email ?? "",
         full_name: p?.full_name ?? null,
+        role: m.role,
+        display_role_label:
+          isHive && role === "super_admin"
+            ? ROLE_LABEL.super_admin
+            : ROLE_LABEL[role] ?? m.role,
         grants: {
           staff: true,
-          admin: m.role === "admin" || m.role === "super_admin",
+          admin: m.role === "admin",
           company_executive: !!m.is_company_executive,
-          hive_executive: hSet.has(m.user_id),
+          hive_executive: isHive,
         },
       };
     });
@@ -158,13 +169,17 @@ export const setMemberGrants = createServerFn({ method: "POST" })
     if (e0) throw e0;
 
     let nextRole = cur.role;
+    // super_admin is never assignable here — Hive executives are managed
+    // via hive_executives, not organization_members.role.
     if (data.explicit_role) {
-      if (data.explicit_role === "super_admin" && !isHiveExec) {
-        throw new Error("Only HIVE executives can assign the super_admin role.");
+      if ((data.explicit_role as string) === "super_admin") {
+        throw new Error("super_admin is not assignable. Hive executives are granted through hive_executives.");
+      }
+      if (cur.role === "super_admin") {
+        return { ok: true };
       }
       nextRole = data.explicit_role;
     } else if (cur.role !== "super_admin") {
-      // Toggle Company Admin via role column (preserve super_admin if set).
       nextRole = data.grants!.admin ? "admin" : "employee";
     }
 
@@ -219,7 +234,8 @@ export const inviteTeamMember = createServerFn({ method: "POST" })
     z.object({
       organization_id: z.string().uuid(),
       email: z.string().trim().toLowerCase().email().max(255),
-      grant_admin: z.boolean(),
+      role: InviteRoleEnum.optional(),
+      grant_admin: z.boolean().optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -236,12 +252,9 @@ export const inviteTeamMember = createServerFn({ method: "POST" })
       .maybeSingle();
     if (existing) throw new Error("A pending invitation already exists for this email");
 
-    const inviteRole = data.grant_admin ? "admin" : "employee";
-    // Defense-in-depth — the DB also enforces this via invitations_role_check.
-    // No invitation can ever be issued for super_admin/manager/committee_member;
-    // elevation to those roles happens after the person joins, via setMemberGrants.
-    if (!["admin", "employee"].includes(inviteRole)) {
-      throw new Error("Invitations can only be issued for admin or employee roles.");
+    const inviteRole = data.role ?? (data.grant_admin ? "admin" : "employee");
+    if ((inviteRole as string) === "super_admin") {
+      throw new Error("Invitations cannot be issued for super_admin.");
     }
 
     const { error } = await supabase.from("invitations").insert({

@@ -2,13 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "./use-org";
 import { useAuth } from "./use-auth";
-import { ALL_PERMISSIONS, type Permission, type Role } from "@/lib/rbac";
+import { ALL_PERMISSIONS, PROVIDER_ROLES, type Permission, type ProviderRole, type Role } from "@/lib/rbac";
 
-export type PermissionMap = Record<Role, Record<Permission, boolean>>;
+export type PermissionMap = Record<ProviderRole, Record<Permission, boolean>>;
 
 function buildEmpty(): PermissionMap {
   const out = {} as PermissionMap;
-  (["super_admin", "admin", "manager", "employee", "committee_member"] as Role[]).forEach((r) => {
+  PROVIDER_ROLES.forEach((r) => {
     out[r] = {} as Record<Permission, boolean>;
     ALL_PERMISSIONS.forEach((p) => {
       out[r][p] = false;
@@ -35,9 +35,9 @@ export function useOrgPermissions() {
         .select("role, permission, enabled")
         .eq("organization_id", org!.organization_id);
       (data ?? []).forEach((row) => {
-        const r = row.role as Role;
+        const r = row.role as ProviderRole;
         const p = row.permission as Permission;
-        if (map[r] && p in map[r]) map[r][p] = !!row.enabled;
+        if (r in map && p in map[r]) map[r][p] = !!row.enabled;
       });
       return map;
     },
@@ -87,13 +87,7 @@ export function usePermissions() {
     const override = (overrides ?? []).find((o) => o.permission === perm);
     if (override !== undefined) return override.granted;
 
-    // Mirrors public.has_permission()'s super_admin shortcut: platform
-    // owners aren't in the editable role_permissions matrix
-    // (EDITABLE_ROLES in dashboard.permissions.tsx excludes super_admin),
-    // so they must never depend on a matrix row existing.
-    if (role === "super_admin") return true;
-
-    if (matrix) return !!matrix[role]?.[perm];
+    if (matrix && role !== "super_admin") return !!matrix[role as ProviderRole]?.[perm];
 
     return false;
   };

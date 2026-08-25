@@ -57,7 +57,7 @@ export function HeldTimesheetsBadge({ organizationId }: { organizationId: string
 
 export function HeldTimesheetsPanel({ organizationId }: { organizationId: string }) {
   const { role, isLoading: roleLoading } = usePermissions();
-  const canResolve = role === "admin" || role === "manager" || role === "super_admin";
+  const canResolve = role === "admin" || role === "program_manager" || role === "manager";
   const { data: rows, isLoading, error } = useHeldTimesheets(organizationId);
   const [reviewing, setReviewing] = useState<HeldTimesheetRow | null>(null);
 

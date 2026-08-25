@@ -17,7 +17,7 @@ import {
 import { ShieldCheck, ChevronDown, RotateCcw, AlertTriangle, Loader2 } from "lucide-react";
 import {
   ALL_PERMISSIONS, DEFAULT_MATRIX, PERMISSION_LABEL, PERMISSION_SECTIONS,
-  PERMISSION_SECTION_MAP, ROLE_LABEL, type Permission, type Role,
+  PERMISSION_SECTION_MAP, ROLE_LABEL, type Permission, type ProviderRole,
 } from "@/lib/rbac";
 import { setRolePermission, resetRoleToDefaults } from "@/lib/permissions.functions";
 import { toast } from "sonner";
@@ -31,7 +31,7 @@ export const Route = createFileRoute("/dashboard/permissions")({
   ),
 });
 
-const EDITABLE_ROLES: Role[] = ["admin", "manager", "employee", "committee_member"];
+const EDITABLE_ROLES: ProviderRole[] = ["admin", "program_manager", "manager", "employee", "committee_member"];
 
 function groupedPermissions(): Record<string, Permission[]> {
   const groups: Record<string, Permission[]> = {};
@@ -84,14 +84,14 @@ function RoleDefaultsTab() {
   const setPermFn = useServerFn(setRolePermission);
   const resetFn = useServerFn(resetRoleToDefaults);
   const [saving, setSaving] = useState<string | null>(null);
-  const [resetRole, setResetRole] = useState<Role | null>(null);
+  const [resetRole, setResetRole] = useState<ProviderRole | null>(null);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(
     Object.fromEntries(Object.keys(PERMISSION_SECTIONS).map((s) => [s, true])),
   );
 
   const groups = useMemo(groupedPermissions, []);
 
-  const toggle = async (role: Role, perm: Permission, value: boolean) => {
+  const toggle = async (role: ProviderRole, perm: Permission, value: boolean) => {
     if (!org) return;
     const key = `${role}:${perm}`;
     setSaving(key);
@@ -107,7 +107,7 @@ function RoleDefaultsTab() {
     }
   };
 
-  const doReset = async (role: Role) => {
+  const doReset = async (role: ProviderRole) => {
     if (!org) return;
     const permissions = ALL_PERMISSIONS.map((p) => ({
       permission: p,

@@ -160,7 +160,7 @@ export function RecordsTab() {
   const qc = useQueryClient();
   const adminName = (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Administrator";
   const orgId = org?.organization_id;
-  const isAdmin = org?.role === "admin" || org?.role === "manager" || org?.role === "super_admin";
+  const isAdmin = org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
 
   const [mode, setMode] = useState<Mode>("all");
   const [type, setType] = useState<RecordType>("all");

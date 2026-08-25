@@ -1307,7 +1307,7 @@ export function MarEmarTab({
   const qc = useQueryClient();
   const orgId = org?.organization_id;
   const { role } = usePermissions();
-  const canManageMeds = role === "admin" || role === "manager" || role === "super_admin";
+  const canManageMeds = role === "admin" || role === "program_manager" || role === "manager";
   const [safetyEditorOpen, setSafetyEditorOpen] = useState(false);
   const [disableConfirmOpen, setDisableConfirmOpen] = useState(false);
   const [disabling, setDisabling] = useState(false);

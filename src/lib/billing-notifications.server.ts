@@ -25,7 +25,7 @@ async function getOrgAdminEmails(orgId: string): Promise<string[]> {
     .select("user_id")
     .eq("organization_id", orgId)
     .eq("active", true)
-    .in("role", ["admin", "super_admin"]);
+    .in("role", ["admin"]);
   const ids = (members ?? []).map((m: { user_id: string }) => m.user_id);
   if (ids.length === 0) return [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

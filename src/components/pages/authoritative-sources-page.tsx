@@ -459,7 +459,7 @@ function SourceRow({
   onJumpToRequirements: (docId: string) => void;
   currentRole?: string | null;
 }) {
-  const canDraft = currentRole === "admin" || currentRole === "manager" || currentRole === "super_admin";
+  const canDraft = currentRole === "admin" || currentRole === "program_manager" || currentRole === "manager";
 
   const meta = (source.metadata ?? {}) as {
     ignored?: boolean;

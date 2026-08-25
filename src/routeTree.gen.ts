@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UnauthorizedRouteImport } from './routes/unauthorized'
 import { Route as TrainingRouteImport } from './routes/training'
-import { Route as SuperAdminRouteImport } from './routes/super-admin'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PricingRouteImport } from './routes/pricing'
@@ -36,7 +35,6 @@ import { Route as DashboardTracksRouteImport } from './routes/dashboard.tracks'
 import { Route as DashboardTimeclockRouteImport } from './routes/dashboard.timeclock'
 import { Route as DashboardTeamsRouteImport } from './routes/dashboard.teams'
 import { Route as DashboardTeamRouteImport } from './routes/dashboard.team'
-import { Route as DashboardSuperAdminRouteImport } from './routes/dashboard.super-admin'
 import { Route as DashboardSummariesRouteImport } from './routes/dashboard.summaries'
 import { Route as DashboardStateAuditRouteImport } from './routes/dashboard.state-audit'
 import { Route as DashboardSmartImportRouteImport } from './routes/dashboard.smart-import'
@@ -87,7 +85,6 @@ import { Route as DashboardClientsRouteImport } from './routes/dashboard.clients
 import { Route as DashboardClientLoansRouteImport } from './routes/dashboard.client-loans'
 import { Route as DashboardClientBillingCodesRouteImport } from './routes/dashboard.client-billing-codes'
 import { Route as DashboardCertificationsRouteImport } from './routes/dashboard.certifications'
-import { Route as DashboardBilling520RouteImport } from './routes/dashboard.billing-520'
 import { Route as DashboardBillingRouteImport } from './routes/dashboard.billing'
 import { Route as DashboardBehavioristRouteImport } from './routes/dashboard.behaviorist'
 import { Route as DashboardAuthoritativeSourcesRouteImport } from './routes/dashboard.authoritative-sources'
@@ -179,16 +176,10 @@ import { Route as DashboardClientsPendingRouteImport } from './routes/dashboard.
 import { Route as DashboardClientsClientIdRouteImport } from './routes/dashboard.clients.$clientId'
 import { Route as DashboardClientTrainingClientIdRouteImport } from './routes/dashboard.client-training.$clientId'
 import { Route as DashboardClientIntakeClientIdRouteImport } from './routes/dashboard.client-intake.$clientId'
-import { Route as DashboardBillingTotalsRouteImport } from './routes/dashboard.billing.totals'
 import { Route as DashboardBillingSubscriptionRouteImport } from './routes/dashboard.billing.subscription'
 import { Route as DashboardBillingNectarRouteImport } from './routes/dashboard.billing.nectar'
-import { Route as DashboardBillingMonthlyGridRouteImport } from './routes/dashboard.billing.monthly-grid'
 import { Route as DashboardBillingImportsRouteImport } from './routes/dashboard.billing.imports'
-import { Route as DashboardBillingHostHomeRouteImport } from './routes/dashboard.billing.host-home'
-import { Route as DashboardBillingGrossRouteImport } from './routes/dashboard.billing.gross'
 import { Route as DashboardBillingForm520RouteImport } from './routes/dashboard.billing.form520'
-import { Route as DashboardBillingDistributionsRouteImport } from './routes/dashboard.billing.distributions'
-import { Route as DashboardBillingContractorsRouteImport } from './routes/dashboard.billing.contractors'
 import { Route as DashboardBillingClientIdRouteImport } from './routes/dashboard.billing.$clientId'
 import { Route as DashboardBehaviorSupportClientIdRouteImport } from './routes/dashboard.behavior-support.$clientId'
 import { Route as DashboardAdminEmarAuditRouteImport } from './routes/dashboard.admin.emar-audit'
@@ -225,11 +216,6 @@ const UnauthorizedRoute = UnauthorizedRouteImport.update({
 const TrainingRoute = TrainingRouteImport.update({
   id: '/training',
   path: '/training',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SuperAdminRoute = SuperAdminRouteImport.update({
-  id: '/super-admin',
-  path: '/super-admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignupRoute = SignupRouteImport.update({
@@ -350,11 +336,6 @@ const DashboardTeamsRoute = DashboardTeamsRouteImport.update({
 const DashboardTeamRoute = DashboardTeamRouteImport.update({
   id: '/team',
   path: '/team',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardSuperAdminRoute = DashboardSuperAdminRouteImport.update({
-  id: '/super-admin',
-  path: '/super-admin',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardSummariesRoute = DashboardSummariesRouteImport.update({
@@ -618,11 +599,6 @@ const DashboardClientBillingCodesRoute =
 const DashboardCertificationsRoute = DashboardCertificationsRouteImport.update({
   id: '/certifications',
   path: '/certifications',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardBilling520Route = DashboardBilling520RouteImport.update({
-  id: '/billing-520',
-  path: '/billing-520',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardBillingRoute = DashboardBillingRouteImport.update({
@@ -1132,11 +1108,6 @@ const DashboardClientIntakeClientIdRoute =
     path: '/client-intake/$clientId',
     getParentRoute: () => DashboardRoute,
   } as any)
-const DashboardBillingTotalsRoute = DashboardBillingTotalsRouteImport.update({
-  id: '/totals',
-  path: '/totals',
-  getParentRoute: () => DashboardBillingRoute,
-} as any)
 const DashboardBillingSubscriptionRoute =
   DashboardBillingSubscriptionRouteImport.update({
     id: '/subscription',
@@ -1148,26 +1119,9 @@ const DashboardBillingNectarRoute = DashboardBillingNectarRouteImport.update({
   path: '/nectar',
   getParentRoute: () => DashboardBillingRoute,
 } as any)
-const DashboardBillingMonthlyGridRoute =
-  DashboardBillingMonthlyGridRouteImport.update({
-    id: '/monthly-grid',
-    path: '/monthly-grid',
-    getParentRoute: () => DashboardBillingRoute,
-  } as any)
 const DashboardBillingImportsRoute = DashboardBillingImportsRouteImport.update({
   id: '/imports',
   path: '/imports',
-  getParentRoute: () => DashboardBillingRoute,
-} as any)
-const DashboardBillingHostHomeRoute =
-  DashboardBillingHostHomeRouteImport.update({
-    id: '/host-home',
-    path: '/host-home',
-    getParentRoute: () => DashboardBillingRoute,
-  } as any)
-const DashboardBillingGrossRoute = DashboardBillingGrossRouteImport.update({
-  id: '/gross',
-  path: '/gross',
   getParentRoute: () => DashboardBillingRoute,
 } as any)
 const DashboardBillingForm520Route = DashboardBillingForm520RouteImport.update({
@@ -1175,18 +1129,6 @@ const DashboardBillingForm520Route = DashboardBillingForm520RouteImport.update({
   path: '/form520',
   getParentRoute: () => DashboardBillingRoute,
 } as any)
-const DashboardBillingDistributionsRoute =
-  DashboardBillingDistributionsRouteImport.update({
-    id: '/distributions',
-    path: '/distributions',
-    getParentRoute: () => DashboardBillingRoute,
-  } as any)
-const DashboardBillingContractorsRoute =
-  DashboardBillingContractorsRouteImport.update({
-    id: '/contractors',
-    path: '/contractors',
-    getParentRoute: () => DashboardBillingRoute,
-  } as any)
 const DashboardBillingClientIdRoute =
   DashboardBillingClientIdRouteImport.update({
     id: '/$clientId',
@@ -1363,7 +1305,6 @@ export interface FileRoutesByFullPath {
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
-  '/super-admin': typeof SuperAdminRoute
   '/training': typeof TrainingRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
@@ -1377,7 +1318,6 @@ export interface FileRoutesByFullPath {
   '/dashboard/authoritative-sources': typeof DashboardAuthoritativeSourcesRoute
   '/dashboard/behaviorist': typeof DashboardBehavioristRoute
   '/dashboard/billing': typeof DashboardBillingRouteWithChildren
-  '/dashboard/billing-520': typeof DashboardBilling520Route
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
   '/dashboard/client-loans': typeof DashboardClientLoansRoute
@@ -1428,7 +1368,6 @@ export interface FileRoutesByFullPath {
   '/dashboard/smart-import': typeof DashboardSmartImportRouteWithChildren
   '/dashboard/state-audit': typeof DashboardStateAuditRoute
   '/dashboard/summaries': typeof DashboardSummariesRoute
-  '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/teams': typeof DashboardTeamsRoute
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
@@ -1443,16 +1382,10 @@ export interface FileRoutesByFullPath {
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/behavior-support/$clientId': typeof DashboardBehaviorSupportClientIdRoute
   '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
-  '/dashboard/billing/contractors': typeof DashboardBillingContractorsRoute
-  '/dashboard/billing/distributions': typeof DashboardBillingDistributionsRoute
   '/dashboard/billing/form520': typeof DashboardBillingForm520Route
-  '/dashboard/billing/gross': typeof DashboardBillingGrossRoute
-  '/dashboard/billing/host-home': typeof DashboardBillingHostHomeRoute
   '/dashboard/billing/imports': typeof DashboardBillingImportsRoute
-  '/dashboard/billing/monthly-grid': typeof DashboardBillingMonthlyGridRoute
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/billing/subscription': typeof DashboardBillingSubscriptionRoute
-  '/dashboard/billing/totals': typeof DashboardBillingTotalsRoute
   '/dashboard/client-intake/$clientId': typeof DashboardClientIntakeClientIdRoute
   '/dashboard/client-training/$clientId': typeof DashboardClientTrainingClientIdRoute
   '/dashboard/clients/$clientId': typeof DashboardClientsClientIdRoute
@@ -1571,7 +1504,6 @@ export interface FileRoutesByTo {
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
-  '/super-admin': typeof SuperAdminRoute
   '/training': typeof TrainingRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
@@ -1584,7 +1516,6 @@ export interface FileRoutesByTo {
   '/dashboard/audit': typeof DashboardAuditRoute
   '/dashboard/authoritative-sources': typeof DashboardAuthoritativeSourcesRoute
   '/dashboard/behaviorist': typeof DashboardBehavioristRoute
-  '/dashboard/billing-520': typeof DashboardBilling520Route
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
   '/dashboard/client-loans': typeof DashboardClientLoansRoute
@@ -1630,7 +1561,6 @@ export interface FileRoutesByTo {
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
   '/dashboard/state-audit': typeof DashboardStateAuditRoute
   '/dashboard/summaries': typeof DashboardSummariesRoute
-  '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/teams': typeof DashboardTeamsRoute
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
@@ -1645,16 +1575,10 @@ export interface FileRoutesByTo {
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/behavior-support/$clientId': typeof DashboardBehaviorSupportClientIdRoute
   '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
-  '/dashboard/billing/contractors': typeof DashboardBillingContractorsRoute
-  '/dashboard/billing/distributions': typeof DashboardBillingDistributionsRoute
   '/dashboard/billing/form520': typeof DashboardBillingForm520Route
-  '/dashboard/billing/gross': typeof DashboardBillingGrossRoute
-  '/dashboard/billing/host-home': typeof DashboardBillingHostHomeRoute
   '/dashboard/billing/imports': typeof DashboardBillingImportsRoute
-  '/dashboard/billing/monthly-grid': typeof DashboardBillingMonthlyGridRoute
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/billing/subscription': typeof DashboardBillingSubscriptionRoute
-  '/dashboard/billing/totals': typeof DashboardBillingTotalsRoute
   '/dashboard/client-intake/$clientId': typeof DashboardClientIntakeClientIdRoute
   '/dashboard/client-training/$clientId': typeof DashboardClientTrainingClientIdRoute
   '/dashboard/clients/$clientId': typeof DashboardClientsClientIdRoute
@@ -1775,7 +1699,6 @@ export interface FileRoutesById {
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
-  '/super-admin': typeof SuperAdminRoute
   '/training': typeof TrainingRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
@@ -1789,7 +1712,6 @@ export interface FileRoutesById {
   '/dashboard/authoritative-sources': typeof DashboardAuthoritativeSourcesRoute
   '/dashboard/behaviorist': typeof DashboardBehavioristRoute
   '/dashboard/billing': typeof DashboardBillingRouteWithChildren
-  '/dashboard/billing-520': typeof DashboardBilling520Route
   '/dashboard/certifications': typeof DashboardCertificationsRoute
   '/dashboard/client-billing-codes': typeof DashboardClientBillingCodesRoute
   '/dashboard/client-loans': typeof DashboardClientLoansRoute
@@ -1840,7 +1762,6 @@ export interface FileRoutesById {
   '/dashboard/smart-import': typeof DashboardSmartImportRouteWithChildren
   '/dashboard/state-audit': typeof DashboardStateAuditRoute
   '/dashboard/summaries': typeof DashboardSummariesRoute
-  '/dashboard/super-admin': typeof DashboardSuperAdminRoute
   '/dashboard/team': typeof DashboardTeamRoute
   '/dashboard/teams': typeof DashboardTeamsRoute
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
@@ -1855,16 +1776,10 @@ export interface FileRoutesById {
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
   '/dashboard/behavior-support/$clientId': typeof DashboardBehaviorSupportClientIdRoute
   '/dashboard/billing/$clientId': typeof DashboardBillingClientIdRoute
-  '/dashboard/billing/contractors': typeof DashboardBillingContractorsRoute
-  '/dashboard/billing/distributions': typeof DashboardBillingDistributionsRoute
   '/dashboard/billing/form520': typeof DashboardBillingForm520Route
-  '/dashboard/billing/gross': typeof DashboardBillingGrossRoute
-  '/dashboard/billing/host-home': typeof DashboardBillingHostHomeRoute
   '/dashboard/billing/imports': typeof DashboardBillingImportsRoute
-  '/dashboard/billing/monthly-grid': typeof DashboardBillingMonthlyGridRoute
   '/dashboard/billing/nectar': typeof DashboardBillingNectarRoute
   '/dashboard/billing/subscription': typeof DashboardBillingSubscriptionRoute
-  '/dashboard/billing/totals': typeof DashboardBillingTotalsRoute
   '/dashboard/client-intake/$clientId': typeof DashboardClientIntakeClientIdRoute
   '/dashboard/client-training/$clientId': typeof DashboardClientTrainingClientIdRoute
   '/dashboard/clients/$clientId': typeof DashboardClientsClientIdRoute
@@ -1986,7 +1901,6 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/reset-password'
     | '/signup'
-    | '/super-admin'
     | '/training'
     | '/unauthorized'
     | '/.mcp/list-tools'
@@ -2000,7 +1914,6 @@ export interface FileRouteTypes {
     | '/dashboard/authoritative-sources'
     | '/dashboard/behaviorist'
     | '/dashboard/billing'
-    | '/dashboard/billing-520'
     | '/dashboard/certifications'
     | '/dashboard/client-billing-codes'
     | '/dashboard/client-loans'
@@ -2051,7 +1964,6 @@ export interface FileRouteTypes {
     | '/dashboard/smart-import'
     | '/dashboard/state-audit'
     | '/dashboard/summaries'
-    | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/teams'
     | '/dashboard/timeclock'
@@ -2066,16 +1978,10 @@ export interface FileRouteTypes {
     | '/dashboard/admin/emar-audit'
     | '/dashboard/behavior-support/$clientId'
     | '/dashboard/billing/$clientId'
-    | '/dashboard/billing/contractors'
-    | '/dashboard/billing/distributions'
     | '/dashboard/billing/form520'
-    | '/dashboard/billing/gross'
-    | '/dashboard/billing/host-home'
     | '/dashboard/billing/imports'
-    | '/dashboard/billing/monthly-grid'
     | '/dashboard/billing/nectar'
     | '/dashboard/billing/subscription'
-    | '/dashboard/billing/totals'
     | '/dashboard/client-intake/$clientId'
     | '/dashboard/client-training/$clientId'
     | '/dashboard/clients/$clientId'
@@ -2194,7 +2100,6 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/reset-password'
     | '/signup'
-    | '/super-admin'
     | '/training'
     | '/unauthorized'
     | '/.mcp/list-tools'
@@ -2207,7 +2112,6 @@ export interface FileRouteTypes {
     | '/dashboard/audit'
     | '/dashboard/authoritative-sources'
     | '/dashboard/behaviorist'
-    | '/dashboard/billing-520'
     | '/dashboard/certifications'
     | '/dashboard/client-billing-codes'
     | '/dashboard/client-loans'
@@ -2253,7 +2157,6 @@ export interface FileRouteTypes {
     | '/dashboard/settings'
     | '/dashboard/state-audit'
     | '/dashboard/summaries'
-    | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/teams'
     | '/dashboard/timeclock'
@@ -2268,16 +2171,10 @@ export interface FileRouteTypes {
     | '/dashboard/admin/emar-audit'
     | '/dashboard/behavior-support/$clientId'
     | '/dashboard/billing/$clientId'
-    | '/dashboard/billing/contractors'
-    | '/dashboard/billing/distributions'
     | '/dashboard/billing/form520'
-    | '/dashboard/billing/gross'
-    | '/dashboard/billing/host-home'
     | '/dashboard/billing/imports'
-    | '/dashboard/billing/monthly-grid'
     | '/dashboard/billing/nectar'
     | '/dashboard/billing/subscription'
-    | '/dashboard/billing/totals'
     | '/dashboard/client-intake/$clientId'
     | '/dashboard/client-training/$clientId'
     | '/dashboard/clients/$clientId'
@@ -2397,7 +2294,6 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/reset-password'
     | '/signup'
-    | '/super-admin'
     | '/training'
     | '/unauthorized'
     | '/.mcp/list-tools'
@@ -2411,7 +2307,6 @@ export interface FileRouteTypes {
     | '/dashboard/authoritative-sources'
     | '/dashboard/behaviorist'
     | '/dashboard/billing'
-    | '/dashboard/billing-520'
     | '/dashboard/certifications'
     | '/dashboard/client-billing-codes'
     | '/dashboard/client-loans'
@@ -2462,7 +2357,6 @@ export interface FileRouteTypes {
     | '/dashboard/smart-import'
     | '/dashboard/state-audit'
     | '/dashboard/summaries'
-    | '/dashboard/super-admin'
     | '/dashboard/team'
     | '/dashboard/teams'
     | '/dashboard/timeclock'
@@ -2477,16 +2371,10 @@ export interface FileRouteTypes {
     | '/dashboard/admin/emar-audit'
     | '/dashboard/behavior-support/$clientId'
     | '/dashboard/billing/$clientId'
-    | '/dashboard/billing/contractors'
-    | '/dashboard/billing/distributions'
     | '/dashboard/billing/form520'
-    | '/dashboard/billing/gross'
-    | '/dashboard/billing/host-home'
     | '/dashboard/billing/imports'
-    | '/dashboard/billing/monthly-grid'
     | '/dashboard/billing/nectar'
     | '/dashboard/billing/subscription'
-    | '/dashboard/billing/totals'
     | '/dashboard/client-intake/$clientId'
     | '/dashboard/client-training/$clientId'
     | '/dashboard/clients/$clientId'
@@ -2607,7 +2495,6 @@ export interface RootRouteChildren {
   PricingRoute: typeof PricingRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
-  SuperAdminRoute: typeof SuperAdminRoute
   TrainingRoute: typeof TrainingRoute
   UnauthorizedRoute: typeof UnauthorizedRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
@@ -2644,13 +2531,6 @@ declare module '@tanstack/react-router' {
       path: '/training'
       fullPath: '/training'
       preLoaderRoute: typeof TrainingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/super-admin': {
-      id: '/super-admin'
-      path: '/super-admin'
-      fullPath: '/super-admin'
-      preLoaderRoute: typeof SuperAdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/signup': {
@@ -2819,13 +2699,6 @@ declare module '@tanstack/react-router' {
       path: '/team'
       fullPath: '/dashboard/team'
       preLoaderRoute: typeof DashboardTeamRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/dashboard/super-admin': {
-      id: '/dashboard/super-admin'
-      path: '/super-admin'
-      fullPath: '/dashboard/super-admin'
-      preLoaderRoute: typeof DashboardSuperAdminRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/summaries': {
@@ -3176,13 +3049,6 @@ declare module '@tanstack/react-router' {
       path: '/certifications'
       fullPath: '/dashboard/certifications'
       preLoaderRoute: typeof DashboardCertificationsRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/dashboard/billing-520': {
-      id: '/dashboard/billing-520'
-      path: '/billing-520'
-      fullPath: '/dashboard/billing-520'
-      preLoaderRoute: typeof DashboardBilling520RouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/billing': {
@@ -3822,13 +3688,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardClientIntakeClientIdRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/billing/totals': {
-      id: '/dashboard/billing/totals'
-      path: '/totals'
-      fullPath: '/dashboard/billing/totals'
-      preLoaderRoute: typeof DashboardBillingTotalsRouteImport
-      parentRoute: typeof DashboardBillingRoute
-    }
     '/dashboard/billing/subscription': {
       id: '/dashboard/billing/subscription'
       path: '/subscription'
@@ -3843,13 +3702,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardBillingNectarRouteImport
       parentRoute: typeof DashboardBillingRoute
     }
-    '/dashboard/billing/monthly-grid': {
-      id: '/dashboard/billing/monthly-grid'
-      path: '/monthly-grid'
-      fullPath: '/dashboard/billing/monthly-grid'
-      preLoaderRoute: typeof DashboardBillingMonthlyGridRouteImport
-      parentRoute: typeof DashboardBillingRoute
-    }
     '/dashboard/billing/imports': {
       id: '/dashboard/billing/imports'
       path: '/imports'
@@ -3857,39 +3709,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardBillingImportsRouteImport
       parentRoute: typeof DashboardBillingRoute
     }
-    '/dashboard/billing/host-home': {
-      id: '/dashboard/billing/host-home'
-      path: '/host-home'
-      fullPath: '/dashboard/billing/host-home'
-      preLoaderRoute: typeof DashboardBillingHostHomeRouteImport
-      parentRoute: typeof DashboardBillingRoute
-    }
-    '/dashboard/billing/gross': {
-      id: '/dashboard/billing/gross'
-      path: '/gross'
-      fullPath: '/dashboard/billing/gross'
-      preLoaderRoute: typeof DashboardBillingGrossRouteImport
-      parentRoute: typeof DashboardBillingRoute
-    }
     '/dashboard/billing/form520': {
       id: '/dashboard/billing/form520'
       path: '/form520'
       fullPath: '/dashboard/billing/form520'
       preLoaderRoute: typeof DashboardBillingForm520RouteImport
-      parentRoute: typeof DashboardBillingRoute
-    }
-    '/dashboard/billing/distributions': {
-      id: '/dashboard/billing/distributions'
-      path: '/distributions'
-      fullPath: '/dashboard/billing/distributions'
-      preLoaderRoute: typeof DashboardBillingDistributionsRouteImport
-      parentRoute: typeof DashboardBillingRoute
-    }
-    '/dashboard/billing/contractors': {
-      id: '/dashboard/billing/contractors'
-      path: '/contractors'
-      fullPath: '/dashboard/billing/contractors'
-      preLoaderRoute: typeof DashboardBillingContractorsRouteImport
       parentRoute: typeof DashboardBillingRoute
     }
     '/dashboard/billing/$clientId': {
@@ -4086,31 +3910,19 @@ declare module '@tanstack/react-router' {
 
 interface DashboardBillingRouteChildren {
   DashboardBillingClientIdRoute: typeof DashboardBillingClientIdRoute
-  DashboardBillingContractorsRoute: typeof DashboardBillingContractorsRoute
-  DashboardBillingDistributionsRoute: typeof DashboardBillingDistributionsRoute
   DashboardBillingForm520Route: typeof DashboardBillingForm520Route
-  DashboardBillingGrossRoute: typeof DashboardBillingGrossRoute
-  DashboardBillingHostHomeRoute: typeof DashboardBillingHostHomeRoute
   DashboardBillingImportsRoute: typeof DashboardBillingImportsRoute
-  DashboardBillingMonthlyGridRoute: typeof DashboardBillingMonthlyGridRoute
   DashboardBillingNectarRoute: typeof DashboardBillingNectarRoute
   DashboardBillingSubscriptionRoute: typeof DashboardBillingSubscriptionRoute
-  DashboardBillingTotalsRoute: typeof DashboardBillingTotalsRoute
   DashboardBillingIndexRoute: typeof DashboardBillingIndexRoute
 }
 
 const DashboardBillingRouteChildren: DashboardBillingRouteChildren = {
   DashboardBillingClientIdRoute: DashboardBillingClientIdRoute,
-  DashboardBillingContractorsRoute: DashboardBillingContractorsRoute,
-  DashboardBillingDistributionsRoute: DashboardBillingDistributionsRoute,
   DashboardBillingForm520Route: DashboardBillingForm520Route,
-  DashboardBillingGrossRoute: DashboardBillingGrossRoute,
-  DashboardBillingHostHomeRoute: DashboardBillingHostHomeRoute,
   DashboardBillingImportsRoute: DashboardBillingImportsRoute,
-  DashboardBillingMonthlyGridRoute: DashboardBillingMonthlyGridRoute,
   DashboardBillingNectarRoute: DashboardBillingNectarRoute,
   DashboardBillingSubscriptionRoute: DashboardBillingSubscriptionRoute,
-  DashboardBillingTotalsRoute: DashboardBillingTotalsRoute,
   DashboardBillingIndexRoute: DashboardBillingIndexRoute,
 }
 
@@ -4400,7 +4212,6 @@ interface DashboardRouteChildren {
   DashboardAuthoritativeSourcesRoute: typeof DashboardAuthoritativeSourcesRoute
   DashboardBehavioristRoute: typeof DashboardBehavioristRoute
   DashboardBillingRoute: typeof DashboardBillingRouteWithChildren
-  DashboardBilling520Route: typeof DashboardBilling520Route
   DashboardCertificationsRoute: typeof DashboardCertificationsRoute
   DashboardClientBillingCodesRoute: typeof DashboardClientBillingCodesRoute
   DashboardClientLoansRoute: typeof DashboardClientLoansRoute
@@ -4451,7 +4262,6 @@ interface DashboardRouteChildren {
   DashboardSmartImportRoute: typeof DashboardSmartImportRouteWithChildren
   DashboardStateAuditRoute: typeof DashboardStateAuditRoute
   DashboardSummariesRoute: typeof DashboardSummariesRoute
-  DashboardSuperAdminRoute: typeof DashboardSuperAdminRoute
   DashboardTeamRoute: typeof DashboardTeamRoute
   DashboardTeamsRoute: typeof DashboardTeamsRoute
   DashboardTimeclockRoute: typeof DashboardTimeclockRoute
@@ -4497,7 +4307,6 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAuthoritativeSourcesRoute: DashboardAuthoritativeSourcesRoute,
   DashboardBehavioristRoute: DashboardBehavioristRoute,
   DashboardBillingRoute: DashboardBillingRouteWithChildren,
-  DashboardBilling520Route: DashboardBilling520Route,
   DashboardCertificationsRoute: DashboardCertificationsRoute,
   DashboardClientBillingCodesRoute: DashboardClientBillingCodesRoute,
   DashboardClientLoansRoute: DashboardClientLoansRoute,
@@ -4549,7 +4358,6 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardSmartImportRoute: DashboardSmartImportRouteWithChildren,
   DashboardStateAuditRoute: DashboardStateAuditRoute,
   DashboardSummariesRoute: DashboardSummariesRoute,
-  DashboardSuperAdminRoute: DashboardSuperAdminRoute,
   DashboardTeamRoute: DashboardTeamRoute,
   DashboardTeamsRoute: DashboardTeamsRoute,
   DashboardTimeclockRoute: DashboardTimeclockRoute,
@@ -4611,7 +4419,6 @@ const rootRouteChildren: RootRouteChildren = {
   PricingRoute: PricingRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
-  SuperAdminRoute: SuperAdminRoute,
   TrainingRoute: TrainingRoute,
   UnauthorizedRoute: UnauthorizedRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,

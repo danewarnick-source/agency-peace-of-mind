@@ -199,10 +199,10 @@ function AssignmentsPage() {
   const recordOverride = useServerFn(recordStaffMandateOverride);
 
   // Role of the current user in this org. Block-overrides are admin/owner
-  // only (super_admin/admin). Managers can still proceed past WARN mandates
+  // only (owner/admin). Managers can still proceed past WARN mandates
   // (their existing capability), but a hard BLOCK has no override for them.
   const myRole = org?.role as string | undefined;
-  const canOverrideBlock = myRole === "admin" || myRole === "super_admin";
+  const canOverrideBlock = myRole === "admin";
 
   type UnmetItem = { name: string; form_id: string; enforcement: "warn" | "block" };
   const [pendingWarning, setPendingWarning] = useState<
@@ -406,7 +406,7 @@ function AssignmentsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* BLOCK dialog — hard stop. Admin/super_admin may override with a typed reason. */}
+      {/* BLOCK dialog — hard stop. Owner may override with a typed reason. */}
       <AlertDialog
         open={!!pendingBlock}
         onOpenChange={(o) => { if (!o) { setPendingBlock(null); setOverrideReason(""); } }}

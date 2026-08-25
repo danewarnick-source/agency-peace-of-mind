@@ -87,22 +87,14 @@ const STATIC_ROUTES: string[] = [
   // Admin sub-routes
   "/dashboard/admin/ce-hours",
   "/dashboard/admin/emar-audit",
-  "/dashboard/super-admin",
   "/dashboard/behaviorist",
 
   // Billing
   "/dashboard/billing",
-  "/dashboard/billing-520",
-  "/dashboard/billing/contractors",
-  "/dashboard/billing/distributions",
   "/dashboard/billing/form520",
-  "/dashboard/billing/gross",
-  "/dashboard/billing/host-home",
   "/dashboard/billing/imports",
-  "/dashboard/billing/monthly-grid",
   "/dashboard/billing/nectar",
   "/dashboard/billing/subscription",
-  "/dashboard/billing/totals",
 
   // Clients
   "/dashboard/clients",

@@ -60,6 +60,7 @@ import { ManualCompletionDrawer } from "./manual-completion-drawer";
 import { ObligationCardActions } from "./obligation-card-actions";
 import { CatalogBadges, RollupStatus, catalogFor } from "./obligation-meta";
 import { ObligationCatalogNote } from "./obligation-catalog-note";
+import { cn } from "@/lib/utils";
 
 export type ObligationWithInstance = CompanyObligationRow & {
   current_instance: ObligationInstanceRow | null;
@@ -235,6 +236,7 @@ function ConfirmNectarOverrideButton({
       toast.success(`Confirmed ${staffName}'s upload`);
       qc.invalidateQueries({ queryKey: ["obligation-instance-detail", instanceId] });
       qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
+      qc.invalidateQueries({ queryKey: ["deadlines"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -591,6 +593,7 @@ function LogEventDialog({
       onOpenChange(false);
       setDescription("");
       qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
+      qc.invalidateQueries({ queryKey: ["deadlines"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -673,6 +676,7 @@ export function ObligationCard({
   userNamesById,
   publishedFormIds,
   onEdit,
+  highlighted = false,
 }: {
   orgId: string;
   obligation: ObligationWithInstance;
@@ -680,6 +684,7 @@ export function ObligationCard({
   userNamesById: Map<string, string>;
   publishedFormIds: Set<string>;
   onEdit: (ob: ObligationWithInstance) => void;
+  highlighted?: boolean;
 }) {
   const qc = useQueryClient();
   const toggleFn = useServerFn(toggleObligationActive);
@@ -698,6 +703,7 @@ export function ObligationCard({
     onSuccess: () => {
       toast.success(obligation.active ? "Obligation paused" : "Obligation resumed");
       qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
+      qc.invalidateQueries({ queryKey: ["deadlines"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -708,6 +714,7 @@ export function ObligationCard({
       toast.success("Obligation deleted");
       setConfirmDelete(false);
       qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
+      qc.invalidateQueries({ queryKey: ["deadlines"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -718,7 +725,13 @@ export function ObligationCard({
       : false;
 
   return (
-    <div className="w-full rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+    <div
+      id={highlighted ? undefined : `obligation-${obligation.id}`}
+      className={cn(
+        "w-full rounded-xl border bg-card p-4 shadow-[var(--shadow-card)]",
+        highlighted ? "border-primary ring-2 ring-primary/30" : "border-border",
+      )}
+    >
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-3">
         <div className="min-w-0 flex-1">
           <h4 className="font-semibold">{obligation.title}</h4>

@@ -45,6 +45,7 @@ import { listStaffGroups, type StaffGroupRow } from "@/lib/staff-groups.function
 type Cadence = CompanyObligationRow["cadence"];
 type EvidenceType = CompanyObligationRow["evidence_type"];
 type AssigneeRole = CompanyObligationRow["assignee_role"];
+type Scope = CompanyObligationRow["scope"];
 
 interface FormState {
   title: string;
@@ -60,6 +61,7 @@ interface FormState {
   assignedToGroups: string[];
   assignedToUsers: string[];
   assigneeRole: AssigneeRole;
+  scope: Scope;
   notifyManagerOnComplete: boolean;
   notifyManagerOnOverdue: boolean;
   active: boolean;
@@ -81,6 +83,7 @@ const DEFAULT_STATE: FormState = {
   assignedToGroups: [],
   assignedToUsers: [],
   assigneeRole: "any_assigned",
+  scope: "org",
   notifyManagerOnComplete: true,
   notifyManagerOnOverdue: true,
   active: true,
@@ -103,6 +106,7 @@ function fromObligation(ob: CompanyObligationRow): FormState {
     assignedToGroups: ob.assigned_to_groups ?? [],
     assignedToUsers: ob.assigned_to_users ?? [],
     assigneeRole: ob.assignee_role,
+    scope: ob.scope ?? "org",
     notifyManagerOnComplete: ob.notify_manager_on_complete,
     notifyManagerOnOverdue: ob.notify_manager_on_overdue,
     active: ob.active,
@@ -405,6 +409,7 @@ export function ObligationDrawer({
         assignedToGroups: state.assignedToGroups,
         assignedToUsers: state.assignedToUsers,
         assigneeRole: state.assigneeRole,
+        scope: state.scope,
         notifyManagerOnComplete: state.notifyManagerOnComplete,
         notifyManagerOnOverdue: state.notifyManagerOnOverdue,
         nectarCertTypeLabel:
@@ -429,6 +434,7 @@ export function ObligationDrawer({
       toast.success(isEdit ? "Obligation updated" : "Obligation created");
       onOpenChange(false);
       qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
+      qc.invalidateQueries({ queryKey: ["deadlines"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -447,13 +453,25 @@ export function ObligationDrawer({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-[480px]">
         <SheetHeader>
-          <SheetTitle>{isEdit ? "Edit obligation" : "New obligation"}</SheetTitle>
+          <SheetTitle>{isEdit ? "Edit obligation" : "New company policy"}</SheetTitle>
           <SheetDescription>
-            A recurring or per-event compliance duty, tracked to completion.
+            {isEdit
+              ? "A recurring or per-event compliance duty, tracked to completion."
+              : "Track an internal P&P requirement on Deadlines — weekly house meeting, weekly form, monthly checklist, and so on. State-contract duties already live on this register and cannot be added here."}
           </SheetDescription>
         </SheetHeader>
 
         <div className="mt-4 space-y-5 pb-4">
+          {!isEdit && !isLocked && (
+            <div className="rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+              <p className="font-medium text-foreground">How this shows on Deadlines</p>
+              <ul className="mt-1.5 list-disc space-y-1 pl-4">
+                <li>Weekly meeting — cadence Weekly, evidence Attestation.</li>
+                <li>Weekly form — cadence Weekly, evidence Form, pick a published HIVE form.</li>
+                <li>Cite the P&amp;P section so staff know which policy this came from.</li>
+              </ul>
+            </div>
+          )}
           {isLocked && (
             <div className="flex items-start gap-2 rounded-md border border-blue-300 bg-blue-50 p-3 text-sm text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200">
               <Lock className="mt-0.5 h-4 w-4 shrink-0" />
@@ -475,7 +493,7 @@ export function ObligationDrawer({
             <Input
               value={state.sourcePolicySection}
               onChange={(e) => setState({ ...state, sourcePolicySection: e.target.value })}
-              placeholder="e.g. § 3.2 — TNS Operating P&P v2.1"
+              placeholder="e.g. TNS Operating P&P §4.2 — Weekly house meeting"
               disabled={isLocked}
             />
           </div>
@@ -737,7 +755,43 @@ export function ObligationDrawer({
 
           {/* 11. Assigned to */}
           <div className="grid gap-2">
-            <Label>Groups</Label>
+            <Label>Who this is due for</Label>
+            <RadioGroup
+              value={state.scope}
+              onValueChange={(v) => setState({ ...state, scope: v as Scope })}
+              className="grid gap-2"
+              disabled={isLocked}
+            >
+              <label className="flex items-start gap-2 text-sm">
+                <RadioGroupItem value="org" className="mt-0.5" />
+                <span>
+                  <span className="font-medium">Whole agency</span>
+                  <span className="block text-xs text-muted-foreground">
+                    One clock — weekly all-staff meeting, posting a poster, a manager checklist.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2 text-sm">
+                <RadioGroupItem value="staff" className="mt-0.5" />
+                <span>
+                  <span className="font-medium">Each staff member</span>
+                  <span className="block text-xs text-muted-foreground">
+                    One clock per person — weekly timesheet attestation, annual disclosure.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2 text-sm">
+                <RadioGroupItem value="staff_per_client" className="mt-0.5" />
+                <span>
+                  <span className="font-medium">Each staff + client assignment</span>
+                  <span className="block text-xs text-muted-foreground">
+                    One clock per pairing — a form that must be done for every person on a caseload.
+                  </span>
+                </span>
+              </label>
+            </RadioGroup>
+
+            <Label className="mt-2">Groups</Label>
             <div className="grid gap-1.5 rounded-md border border-border p-2">
               {groups.length === 0 && (
                 <p className="px-1 py-1 text-sm text-muted-foreground">No groups yet — create one in Settings → Team Access → Groups.</p>

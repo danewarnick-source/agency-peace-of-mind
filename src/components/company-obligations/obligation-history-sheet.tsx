@@ -88,6 +88,7 @@ function InstanceRow({
       setWaiveOpen(false);
       qc.invalidateQueries({ queryKey: ["obligation-history", instance.obligation_id] });
       qc.invalidateQueries({ queryKey: ["company-obligations", orgId] });
+      qc.invalidateQueries({ queryKey: ["deadlines"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

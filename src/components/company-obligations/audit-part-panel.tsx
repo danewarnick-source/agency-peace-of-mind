@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -74,6 +74,7 @@ export function AuditPartPanel({
   evidence = EMPTY_AUDIT_EVIDENCE,
   selectedPersonId = null,
   onSelectPerson,
+  highlightObligationId = null,
 }: {
   part: AuditPart;
   footprint: OrgFootprint;
@@ -88,6 +89,7 @@ export function AuditPartPanel({
   evidence?: AuditEvidenceSnapshot;
   selectedPersonId?: string | null;
   onSelectPerson?: (id: string | null) => void;
+  highlightObligationId?: string | null;
 }) {
   const person = useMemo(
     () => evidence.people.find((p) => p.client_id === selectedPersonId) ?? null,
@@ -155,6 +157,7 @@ export function AuditPartPanel({
                 userNamesById={userNamesById}
                 publishedFormIds={publishedFormIds}
                 onEdit={onEdit}
+                highlightObligationId={highlightObligationId}
                 footprint={
                   person
                     ? { codes: person.service_codes, hasAbiClients: person.has_abi }
@@ -227,6 +230,7 @@ function AuditItemRow({
   onEdit,
   footprint,
   homes,
+  highlightObligationId = null,
 }: {
   item: AuditItem;
   applies: boolean;
@@ -239,8 +243,13 @@ function AuditItemRow({
   onEdit: (ob: ObligationWithInstance) => void;
   footprint: OrgFootprint;
   homes: AuditEvidenceSnapshot["homes"];
+  highlightObligationId?: string | null;
 }) {
-  const [open, setOpen] = useState(false);
+  const containsHighlight = !!highlightObligationId && linked.some((o) => o.id === highlightObligationId);
+  const [open, setOpen] = useState(containsHighlight);
+  useEffect(() => {
+    if (containsHighlight) setOpen(true);
+  }, [containsHighlight]);
   const status = itemStatus(item, applies, linked, live);
   const Icon =
     status.tone === "overdue"
@@ -329,6 +338,7 @@ function AuditItemRow({
                   userNamesById={userNamesById}
                   publishedFormIds={publishedFormIds}
                   onEdit={onEdit}
+                  highlighted={o.id === highlightObligationId}
                 />
               ))}
             </div>
@@ -346,6 +356,7 @@ export function UnmappedDuties({
   userNamesById,
   publishedFormIds,
   onEdit,
+  highlightObligationId = null,
 }: {
   obligations: ObligationListItem[];
   orgId: string;
@@ -353,6 +364,7 @@ export function UnmappedDuties({
   userNamesById: Map<string, string>;
   publishedFormIds: Set<string>;
   onEdit: (ob: ObligationWithInstance) => void;
+  highlightObligationId?: string | null;
 }) {
   const extra = obligations.filter(
     (o) =>
@@ -387,6 +399,7 @@ export function UnmappedDuties({
             userNamesById={userNamesById}
             publishedFormIds={publishedFormIds}
             onEdit={onEdit}
+            highlighted={o.id === highlightObligationId}
           />
         ))}
       </div>

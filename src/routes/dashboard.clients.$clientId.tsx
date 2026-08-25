@@ -1984,7 +1984,7 @@ function SummariesPanel({
               header: "",
               cell: (r) => (
                 <Button asChild size="sm" variant="outline">
-                  <Link to="/dashboard/summaries" search={{ open: r.id }}>
+                  <Link to="/dashboard/summaries" search={{ client: clientId, open: r.id }}>
                     {r.status === "finalized" ? "View" : "Open editor"}
                   </Link>
                 </Button>
@@ -2068,6 +2068,45 @@ function NewSummaryDialog({
     setSaving(true);
     try {
       const p = computePeriod();
+
+      // Enforce the same summaryPeriodFloor as ensureCurrentSummaryPeriods.
+      const [{ data: orgRow }, { data: clientRow }] = await Promise.all([
+        supabase
+          .from("organizations")
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .select("go_live_date, created_at" as any)
+          .eq("id", orgId)
+          .maybeSingle(),
+        supabase
+          .from("clients")
+          .select("created_at")
+          .eq("id", clientId)
+          .maybeSingle(),
+      ]);
+      const org = orgRow as unknown as { go_live_date: string | null; created_at: string } | null;
+      let hiveStart: string | null = null;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: hs } = await (supabase as any)
+          .from("clients")
+          .select("hive_start_date")
+          .eq("id", clientId)
+          .maybeSingle();
+        hiveStart = (hs?.hive_start_date as string | null) ?? null;
+      } catch { /* column may not exist yet */ }
+      const { summaryPeriodFloor } = await import("@/lib/progress-summaries");
+      const floor = summaryPeriodFloor({
+        orgGoLiveDate: org?.go_live_date ?? org?.created_at,
+        clientHiveStartDate: hiveStart,
+        clientCreatedAt: clientRow?.created_at,
+      });
+      if (floor && p.period_end < floor) {
+        toast.error(
+          `Cannot create a summary for a period that ended before this client's HIVE start (${floor}).`,
+        );
+        return;
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
         .from("client_progress_summaries")

@@ -74,8 +74,9 @@ export function OrgBrandingCard() {
         <h2 className="text-base font-semibold">Organization branding</h2>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        Logo and header contact info shown on the Client Face Sheet and other branded surfaces.
-        If no logo is uploaded, your organization name is rendered in its place — never a broken image.
+        Logo and header contact info shown on the Client Face Sheet, progress-summary packets,
+        and other branded surfaces. If no logo is uploaded, your organization name is rendered
+        in its place — never a broken image, and never an AI-invented mark.
       </p>
 
       <div className="mt-4 grid gap-6 md:grid-cols-2">

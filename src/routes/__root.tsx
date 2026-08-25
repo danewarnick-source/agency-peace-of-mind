@@ -104,17 +104,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       throw redirect({ to: "/reset-password" });
     }
 
-    // MFA required for admin / manager / super_admin before accessing the app.
-    // Only enforce when Supabase MFA APIs are available; if the call fails,
-    // do not lock the org out of care delivery.
-    const elevated = (memberships ?? []).some((m) =>
-      ["admin", "manager", "super_admin"].includes((m as { role?: string }).role ?? ""),
-    );
-    if (elevated) {
-      const { data: aal, error: aalErr } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (!aalErr && aal && aal.currentLevel !== "aal2") {
-        throw redirect({ to: "/mfa-setup" });
-      }
+    // Every signed-in user can see PHI (caseload, notes, EVV). Require TOTP
+    // (AAL2) before the app. If the MFA API is unavailable, fail open so
+    // care delivery is not locked.
+    const { data: aal, error: aalErr } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (!aalErr && aal && aal.currentLevel !== "aal2") {
+      throw redirect({ to: "/mfa-setup" });
     }
 
     // Gate app access on unsigned required provider policies. Exempted from

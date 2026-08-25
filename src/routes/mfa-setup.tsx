@@ -1,7 +1,7 @@
 /**
- * MFA enrollment / verification for admin, manager, and super_admin roles.
- * Uses Supabase Auth TOTP (authenticator apps). SMS is not offered — PHI
- * accounts need an authenticator, not a text message.
+ * MFA enrollment / verification for every signed-in user. Anyone who can
+ * open HIVE can see PHI. Uses Supabase Auth TOTP (authenticator apps).
+ * SMS is not offered.
  */
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -167,8 +167,8 @@ function MfaSetupPage() {
               {mode === "verify" ? "Enter your two-factor code" : "Set up two-factor authentication"}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Admin and manager accounts need an authenticator app before opening PHI. Staff DSP
-              logins are not required to do this.
+              Everyone who signs in to HIVE needs an authenticator app before opening client
+              records — DSPs included. A texted code is not enough.
             </p>
           </div>
         </div>

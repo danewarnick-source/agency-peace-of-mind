@@ -2,7 +2,7 @@ export type Role = "super_admin" | "admin" | "program_manager" | "manager" | "em
 export type ProviderRole = Exclude<Role, "super_admin">;
 
 export const ROLE_LABEL: Record<Role, string> = {
-  super_admin: "Platform Admin", // Hive-internal only — never assignable in provider UI
+  super_admin: "Platform Admin", // leftover enum; platform access is hive_executives / is_hive_executive()
   admin: "Owner",
   program_manager: "Program Manager",
   manager: "Supervisor",
@@ -260,7 +260,7 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
 };
 
 /** Default permission matrix used to seed org-specific role_permissions rows.
- *  super_admin is Hive-internal (is_hive_executive) and has no matrix entry. */
+ *  super_admin has no matrix entry. Platform bypass is is_hive_executive(). */
 export const DEFAULT_MATRIX: Record<ProviderRole, Permission[]> = {
   admin: [...ALL_PERMISSIONS], // owner starts with everything on
 

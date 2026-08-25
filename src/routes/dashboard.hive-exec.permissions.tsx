@@ -18,7 +18,7 @@ export const Route = createFileRoute("/dashboard/hive-exec/permissions")({
   component: PermissionsPage,
 });
 
-const ROLE_OPTIONS = ["employee", "manager", "program_manager", "admin", "super_admin"] as const;
+const ROLE_OPTIONS = ["employee", "manager", "program_manager", "admin"] as const;
 
 function PermissionsPage() {
   return (

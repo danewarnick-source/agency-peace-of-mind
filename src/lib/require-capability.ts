@@ -7,7 +7,7 @@
  *
  * Fail-closed: any error from the DB resolver, missing membership, or
  * unknown capability collapses to "forbidden". Deny overrides always win,
- * even for super_admin (see `public.has_capability`).
+ * even for hive executives (see `public.has_capability`).
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";

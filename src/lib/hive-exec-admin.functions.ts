@@ -39,7 +39,7 @@ export interface AuditEntry {
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const ALLOWED_ROLES = ["employee", "manager", "program_manager", "admin", "super_admin"] as const;
+const ALLOWED_ROLES = ["employee", "manager", "program_manager", "admin"] as const;
 type AllowedRole = (typeof ALLOWED_ROLES)[number];
 
 // ───── Helpers ───────────────────────────────────────────────────────────────

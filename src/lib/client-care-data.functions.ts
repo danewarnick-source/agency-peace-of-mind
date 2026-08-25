@@ -25,7 +25,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
-import { logPhiAccess } from "@/lib/phi-access-audit.functions";
+import { logPhiAccess } from "@/lib/phi-access-audit.server";
 import { queryOptions } from "@tanstack/react-query";
 import type { CSTGoal } from "./client-specific-training.functions";
 import {

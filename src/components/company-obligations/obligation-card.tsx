@@ -108,7 +108,7 @@ export function cadenceLabel(ob: CompanyObligationRow): string {
         const months = Number(cfg.every_n_months);
         const from = cfg.from === "cert_expiration" ? "cert expiration" : "completion";
         const renewalPart = months === 24 ? "2 years" : `${months} months`;
-        return `Due ${days} days after hire · renews every ${renewalPart} from ${from}`;
+        return `Due ${days} days after compliance start · renews every ${renewalPart} from ${from}`;
       }
       if (cfg.every_n_months !== undefined) {
         const n = Number(cfg.every_n_months);
@@ -120,7 +120,7 @@ export function cadenceLabel(ob: CompanyObligationRow): string {
             : `Every ${n} months · from ${from}`;
       }
       if (cfg.anniversary_based === true) {
-        return "Annually · from hire date";
+        return "Annually · from compliance start";
       }
       const m = Number(cfg.month);
       const d = cfg.day_of_month;
@@ -133,7 +133,7 @@ export function cadenceLabel(ob: CompanyObligationRow): string {
         return `Due ${Number(cfg.days_after_assignment)} days after client assignment`;
       }
       if (cfg.days_after_hire !== undefined) {
-        return `One-time · due ${Number(cfg.days_after_hire)} days after hire`;
+        return `One-time · due ${Number(cfg.days_after_hire)} days after compliance start`;
       }
       const dateStr = typeof cfg.date === "string" ? cfg.date : "";
       return `One-time · ${dateStr ? formatDate(`${dateStr}T00:00:00Z`) : "date TBD"}`;
@@ -659,8 +659,8 @@ function HireDateWarning({
       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
       <span>
         {data.missing} staff member{data.missing === 1 ? "" : "s"}{" "}
-        {data.missing === 1 ? "has" : "have"} no hire date — due dates cannot be calculated for{" "}
-        {data.missing === 1 ? "them" : "them"}.{" "}
+        {data.missing === 1 ? "has" : "have"} no hire date on file. Compliance
+        clocks use the day they were added to HIVE until a hire date is set.{" "}
         <a href="/dashboard/employees/hire-dates" className="underline underline-offset-2">
           Set hire dates →
         </a>

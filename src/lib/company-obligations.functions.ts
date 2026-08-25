@@ -19,6 +19,7 @@ import {
   addMonthsUTC,
   addYearsUTC,
   computePeriod,
+  effectiveComplianceStartDate,
   endOfDayUTC,
   formatShort,
   isCalendarDueRule,
@@ -495,7 +496,13 @@ async function fetchAssigneeHireDates(
     start_date: string | null;
     created_at: string | null;
   }>) {
-    map.set(p.id, { basis_date: p.hire_date ?? p.start_date ?? p.created_at ?? null });
+    map.set(p.id, {
+      basis_date: effectiveComplianceStartDate({
+        hire_date: p.hire_date,
+        start_date: p.start_date,
+        platform_created_at: p.created_at,
+      }),
+    });
   }
   return map;
 }
@@ -553,11 +560,11 @@ async function resolveAllAssigneesInternal(
 }
 
 /**
- * days_after_hire: due_at = hire_date + N days (fallback to created_at).
- * anniversary_based: due_at = the next hire anniversary on/after today that
- * is >= due_day_config.start_year (default 1) — i.e. only the CURRENT due
- * instance, not every future year at once. One instance per assignee;
- * skips assignees who already have an open (pending/overdue) instance.
+ * Per-assignee clocks (onboarding / anniversary / cert windows).
+ * Basis date = later of hire/start and profile.created_at (HIVE add date) so
+ * imported staff with ancient hire dates are not immediately years-overdue.
+ * days_after_hire: due_at = basis + N days, with a further 30-day grace from
+ * obligation.created_at when that would still land before the duty existed.
  */
 async function generatePerPersonInstancesInternal(
   supabase: AnySupabase,
@@ -582,7 +589,7 @@ async function generatePerPersonInstancesInternal(
   for (const a of assignees) {
     try {
       const basisStr = hireDates.get(a.staff_id)?.basis_date;
-      if (!basisStr) continue; // no hire_date/start_date/created_at on file — can't compute a due date
+      if (!basisStr) continue; // no hire/start/platform date — can't compute a due date
       const basisDate = new Date(`${basisStr.slice(0, 10)}T00:00:00Z`);
 
       let due: Date;
@@ -591,21 +598,23 @@ async function generatePerPersonInstancesInternal(
         if (!Number.isFinite(days)) continue;
         due = addDaysUTC(basisDate, days);
 
-        // Grace period: if the obligation was added to the platform after this
-        // staff member's hire date, don't mark them immediately overdue — give
-        // them 30 days from the obligation's creation to comply instead.
+        // Grace: if the duty was added to HIVE after this clock would already
+        // have expired, give 30 days from obligation creation instead.
         const obCreatedAt = new Date(ob.created_at ?? todayUTC.toISOString());
         if (due.getTime() < obCreatedAt.getTime()) {
           due = addDaysUTC(obCreatedAt, 30);
         }
       } else if (cfg.every_n_months !== undefined) {
-        // First instance for a not-yet-certified assignee: give them a
-        // reasonable window from hire before any cert exists. Later renewals
-        // are scheduled directly off the cert's expiration date in
-        // recordCompletion, not by this per-assignee generator.
+        // First instance for a not-yet-certified assignee: window from
+        // compliance start. Later renewals schedule off cert expiration in
+        // recordCompletion.
         const months = Number(cfg.every_n_months);
         if (!Number.isFinite(months)) continue;
         due = addMonthsUTC(basisDate, months);
+        const obCreatedAt = new Date(ob.created_at ?? todayUTC.toISOString());
+        if (due.getTime() < obCreatedAt.getTime()) {
+          due = addDaysUTC(obCreatedAt, 30);
+        }
       } else {
         const startYear = Math.max(1, Number(cfg.start_year ?? 1));
         let n = startYear;
@@ -1697,6 +1706,12 @@ async function bootstrapVisibleObligationInstancesInternal(
     if (!o.active) return false;
     const rows = instancesByObligation.get(o.id) ?? [];
     if (o.scope === "org") return true;
+    // Per-person generators skip assignees who already have an open instance,
+    // so always attempt — otherwise a new hire never gets a clock while an
+    // older teammate still has an open row (and stale rows can't be replaced
+    // after a due-date formula change).
+    if (isPerPersonObligation(o)) return true;
+    if (o.scope === "staff_per_client") return true;
     const hasOpen = rows.some((r) => r.status === "pending" || r.status === "overdue");
     return !hasOpen;
   });

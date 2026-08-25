@@ -3684,3 +3684,127 @@ You should see `can_access_client_phi=1`, `client_photos_public=false`, `inciden
 4. **AWS ALB:** Vault has `ALB_ORIGIN_VERIFY_SECRET`; set the same on ECS + CloudFront `x-origin-verify` before PHI on AWS (see `docs/AWS_DEPLOY.md`). Skip on Vercel-only.
 5. **Bedrock only for PHI AI:** Ensure `AWS_REGION`, `BEDROCK_MODEL_ID`, and credentials are set. `LOVABLE_API_KEY` is no longer accepted as the PHI AI path.
 
+
+---
+
+## ACTION — PHI audit + encryption sure-up (2026-08-25)
+
+**What this is for:** Post-HIPAA-hardening follow-up — confirm PHI storage buckets stay private, fix `phi_access_audit_log` SELECT so hive executives can read break-glass audit rows, add a retention purge helper (6-year HIPAA floor), and re-confirm table + RLS.
+
+**Encryption posture (ops — not SQL):** HIVE does **not** add application-level / field-level encryption. PHI protection is **TLS in transit**, **Supabase/AWS disk encryption at rest**, **private org-scoped storage buckets with short-lived signed URLs**, **RLS**, and **BAA-covered vendors** (Supabase, AWS). Do not market or document column-level crypto unless we explicitly add it later.
+
+### 1. Confirm PHI buckets are private
+
+**Clear the editor, paste, run:**
+
+```sql
+SELECT string_agg(
+  id || '=' || coalesce(public::text, 'missing'),
+  E'\n' ORDER BY id
+) AS phi_bucket_privacy
+FROM storage.buckets
+WHERE id IN (
+  'client-photos',
+  'incident-photos',
+  'client-documents',
+  'nectar-documents',
+  'obligation-evidence',
+  'hrc-documents'
+);
+```
+
+You should see six rows, each ending `=false`. Any `=true` or `missing` needs the bucket set private before PHI traffic.
+
+### 2. Fix `phi_access_audit_log` SELECT (hive executive break-glass)
+
+The original hardening policy used `is_super_admin` only for platform reads. Live DB should also allow `is_hive_executive` (and keep `is_super_admin` while that alias still exists).
+
+**Clear the editor, paste, run:**
+
+```sql
+DROP POLICY IF EXISTS "admins read phi access audit" ON public.phi_access_audit_log;
+
+CREATE POLICY "admins read phi access audit"
+  ON public.phi_access_audit_log FOR SELECT TO authenticated
+  USING (
+    public.is_org_admin_or_manager(organization_id, auth.uid())
+    OR public.is_hive_executive(auth.uid())
+    OR public.is_super_admin(auth.uid())
+  );
+```
+
+**What you'll see:** `Success. No rows returned` (policy drop + create).
+
+### 3. PHI access audit retention purge (6 years)
+
+Append-only log; purge rows older than six years (HIPAA minimum retention floor — adjust only with counsel).
+
+**Clear the editor, paste, run:**
+
+```sql
+CREATE OR REPLACE FUNCTION public.purge_phi_access_audit_log(
+  retention interval DEFAULT interval '6 years'
+)
+RETURNS bigint
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  WITH deleted AS (
+    DELETE FROM public.phi_access_audit_log
+    WHERE created_at < now() - retention
+    RETURNING 1
+  )
+  SELECT count(*)::bigint FROM deleted;
+$$;
+
+REVOKE ALL ON FUNCTION public.purge_phi_access_audit_log(interval) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.purge_phi_access_audit_log(interval) TO service_role;
+
+-- One-off manual purge (optional — returns deleted row count):
+-- SELECT public.purge_phi_access_audit_log();
+
+-- Optional pg_cron schedule (human must enable pg_cron extension in Supabase first):
+-- SELECT cron.schedule(
+--   'purge-phi-access-audit-log',
+--   '0 3 1 * *',
+--   $$SELECT public.purge_phi_access_audit_log();$$
+-- );
+```
+
+**What you'll see:** function created/replaced; grants applied. Uncomment and run the `cron.schedule` block only after `pg_cron` is enabled for the project.
+
+### 4. Confirm table + RLS + SELECT policy
+
+**Clear the editor, paste, run:**
+
+```sql
+SELECT string_agg(x, E'\n' ORDER BY x) AS checks
+FROM (
+  SELECT 'phi_access_audit_log_table=' ||
+    (SELECT count(*)::text FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'phi_access_audit_log') AS x
+  UNION ALL
+  SELECT 'phi_access_audit_log_rls=' ||
+    (SELECT relrowsecurity::text FROM pg_class
+      WHERE relname = 'phi_access_audit_log' AND relnamespace = 'public'::regnamespace) AS x
+  UNION ALL
+  SELECT 'phi_access_audit_select_policies=' ||
+    coalesce((SELECT string_agg(policyname, ', ' ORDER BY policyname)
+       FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = 'phi_access_audit_log' AND cmd = 'SELECT'),
+      'none') AS x
+  UNION ALL
+  SELECT 'client_documents_public=' ||
+    coalesce((SELECT public::text FROM storage.buckets WHERE id = 'client-documents'), 'missing')
+  UNION ALL
+  SELECT 'nectar_documents_public=' ||
+    coalesce((SELECT public::text FROM storage.buckets WHERE id = 'nectar-documents'), 'missing')
+  UNION ALL
+  SELECT 'obligation_evidence_public=' ||
+    coalesce((SELECT public::text FROM storage.buckets WHERE id = 'obligation-evidence'), 'missing')
+) s;
+```
+
+You should see `phi_access_audit_log_table=1`, `phi_access_audit_log_rls=true`, `phi_access_audit_select_policies=admins read phi access audit`, and all three document buckets `public=false`.
+

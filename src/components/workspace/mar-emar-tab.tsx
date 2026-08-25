@@ -40,6 +40,7 @@ import { MedicationsManager } from "@/components/medications-manager";
 import { usePermissions } from "@/hooks/use-permissions";
 import { logMedicationPass, addEmarAddendum } from "@/lib/emar-pass.functions";
 import { type EmarStatus, normalizeEmarStatus, EMAR_STATUS_LABELS } from "@/lib/emar-status";
+import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
 
 
 
@@ -1306,6 +1307,8 @@ export function MarEmarTab({
   const { data: clientSafety, isLoading: safetyLoading } = useClientSafety(clientId);
   const qc = useQueryClient();
   const orgId = org?.organization_id;
+  const recordAccessFn = useServerFn(recordPhiAccess);
+  const emarAuditLogged = useRef(false);
   const { role } = usePermissions();
   const canManageMeds = role === "admin" || role === "program_manager" || role === "manager";
   const [safetyEditorOpen, setSafetyEditorOpen] = useState(false);
@@ -1394,6 +1397,21 @@ export function MarEmarTab({
       return (data ?? []) as Medication[];
     },
   });
+
+  useEffect(() => {
+    if (!orgId || emarAuditLogged.current || medsLoading) return;
+    emarAuditLogged.current = true;
+    void recordAccessFn({
+      data: {
+        organizationId: orgId,
+        resourceType: "emar",
+        clientId,
+        action: "view",
+        detail: "mar-emar-tab",
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+      },
+    });
+  }, [orgId, clientId, medsLoading, recordAccessFn]);
 
   // ── Today's logs query ───────────────────────────────────────────────────────
 

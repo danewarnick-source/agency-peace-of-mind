@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -29,6 +30,7 @@ import { fmtHours, computeEntryUnits } from "@/lib/billing-units";
 import { isDailyServiceCode } from "@/lib/service-billing";
 import { aggregateHourlyUnits, aggregateDailyDays } from "@/lib/accrual";
 import { RequireRole } from "@/components/rbac-guard";
+import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
 
 export const Route = createFileRoute("/dashboard/billing/form520")({
   head: () => ({ meta: [{ title: "520 Billing — HIVE" }] }),
@@ -112,6 +114,20 @@ function Billing520Page() {
     (user?.user_metadata?.name as string | undefined) ||
     user?.email ||
     "Unknown user";
+  const recordAccessFn = useServerFn(recordPhiAccess);
+
+  const log520Export = (format: string) => {
+    if (!org?.organization_id) return;
+    void recordAccessFn({
+      data: {
+        organizationId: org.organization_id,
+        resourceType: "other",
+        action: "export",
+        detail: `form520-${format}`,
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+      },
+    });
+  };
 
   // ─── Data feeds for the 520 grid ──────────────────────────────────────────
   const tsQ = useQuery({
@@ -658,6 +674,7 @@ function Billing520Page() {
   };
 
   const exportXlsx = () => {
+    log520Export("xlsx");
     const exportRows = visibleRows.map(({ _key: _k, _client_id: _c, ...r }) => r);
     const ws = XLSX.utils.json_to_sheet(exportRows, { header: HEADERS as unknown as string[] });
     const wb = XLSX.utils.book_new();
@@ -666,6 +683,7 @@ function Billing520Page() {
   };
 
   const exportCsv = () => {
+    log520Export("csv");
     const esc = (v: unknown) => {
       const s = String(v ?? "");
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -687,6 +705,7 @@ function Billing520Page() {
   };
 
   const exportPdf = () => {
+    log520Export("pdf");
     const rangeLabel = `${rangeStartStr} to ${rangeEndStr}`;
     const win = window.open("", "_blank");
     if (!win) return toast.error("Pop-up blocked — allow pop-ups to export PDF.");

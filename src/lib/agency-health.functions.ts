@@ -70,7 +70,7 @@ const LINKS: Record<HealthMetricKey, string> = {
   daily_progress_notes: "/dashboard/hub/documentation",
   medication_records: "/dashboard/hub/documentation?tab=medications",
   incident_documentation: "/dashboard/hub/documentation?tab=incidents",
-  upi_attestations: "/dashboard/deadlines",
+  upi_attestations: "/dashboard/company-obligations?tab=action-required",
   hrc_documentation: "/dashboard/hub/documentation?tab=hrc",
   behavior_support: "/dashboard/hub/documentation?tab=behavior",
   client_record_completeness: "/dashboard/hub/clients",

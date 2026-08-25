@@ -247,7 +247,7 @@ export function NotificationBell() {
         urgency: (i.status === "overdue" ? "critical" : "urgent") as Urgency,
         title: i.title,
         body: `${i.subject} · due ${i.dueAt.toLocaleDateString()}`,
-        link_to: i.href ?? "/dashboard/deadlines",
+        link_to: i.href ?? "/dashboard/company-obligations?tab=action-required",
         related_id: null,
         related_type: null,
         read_at: null,

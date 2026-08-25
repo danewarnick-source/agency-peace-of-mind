@@ -31,6 +31,8 @@ export type DeadlineItem = {
   source: DeadlineSource;
   lane: DeadlineLane;
   title: string;
+  /** Duty name without person/period — used to group Johnny + Maria under CPR. */
+  dutyTitle?: string;
   subject: string;
   subjectKind: "client" | "staff" | "agency";
   dueAt: Date;
@@ -41,6 +43,8 @@ export type DeadlineItem = {
   clientId?: string;
   staffId?: string;
   instanceId?: string;
+  /** company_obligations.id — admin click target on the register. */
+  obligationId?: string;
   /** 1st/5th/10th-of-month reminder cadence — notification bell only. */
   cadenceReminder?: boolean;
   /** company_obligation: SOW vs provider/internal policy. */
@@ -66,13 +70,15 @@ function fmtMonth(yyyyMm: string): string {
   return new Date(y, m - 1, 1).toLocaleString(undefined, { month: "long", year: "numeric" });
 }
 
-function obligationHref(row: DeadlineObligationItem, isAdminRole: boolean): string {
+/** Admin always lands on the register card. Staff go fill a form or My Compliance. */
+export function obligationHref(row: DeadlineObligationItem, isAdminRole: boolean): string {
+  if (isAdminRole) {
+    return `/dashboard/company-obligations?obligation=${row.obligation_id}`;
+  }
   if (row.evidence_type === "form" && row.linked_form_id) {
     return `/dashboard/forms/${row.linked_form_id}/fill?obligation_instance=${row.instance_id}`;
   }
-  if (row.assignee_staff_id) return `/dashboard/employees/${row.assignee_staff_id}`;
-  if (row.client_id) return `/dashboard/clients/${row.client_id}`;
-  return isAdminRole ? "/dashboard/company-obligations" : "/dashboard/my-obligations";
+  return "/dashboard/my-obligations";
 }
 
 function obligationSubject(row: DeadlineObligationItem): {
@@ -196,6 +202,7 @@ export function useDeadlines() {
         source: "company_obligation",
         lane: row.source === "sow" ? "sow" : "provider",
         title: row.period_key ? `${row.title} — ${row.period_key}` : row.title,
+        dutyTitle: row.catalog_title || row.title,
         subject,
         subjectKind,
         dueAt: due,
@@ -206,6 +213,7 @@ export function useDeadlines() {
             : bucketStatus(due, now),
         href: obligationHref(row, isAdminRole),
         instanceId: row.instance_id,
+        obligationId: row.obligation_id,
         clientId: row.client_id ?? undefined,
         staffId: row.assignee_staff_id ?? undefined,
         obligationSource: row.source,

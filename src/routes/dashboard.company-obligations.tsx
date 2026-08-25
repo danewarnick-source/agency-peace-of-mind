@@ -20,6 +20,7 @@ import {
   FolderOpen,
   Layers,
   FileWarning,
+  X,
 } from "lucide-react";
 import {
   listCompanyObligations,
@@ -42,16 +43,27 @@ import {
   DSPD_AUDIT_ITEMS,
   footprintIsKnown,
   itemApplies,
+  obligationTitleMatches,
   type AuditPart,
 } from "@/lib/dspd-audit-tool";
 import { UTAH_DSPD_PACK } from "@/lib/utah-dspd-pack";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type CompanyObligationsSearch = { new?: boolean; obligation?: string };
+
+function parseCompanyObligationsSearch(s: Record<string, unknown>): CompanyObligationsSearch {
+  const openNew = s.new === "1" || s.new === 1 || s.new === true || s.new === "true";
+  const obligation = typeof s.obligation === "string" && UUID_RE.test(s.obligation) ? s.obligation : undefined;
+  return {
+    ...(openNew ? { new: true as const } : {}),
+    ...(obligation ? { obligation } : {}),
+  };
+}
+
 export const Route = createFileRoute("/dashboard/company-obligations")({
   head: () => ({ meta: [{ title: "Compliance register — HIVE" }] }),
-  validateSearch: (s: Record<string, unknown>): { new?: boolean } => {
-    const on = s.new === "1" || s.new === 1 || s.new === true;
-    return on ? { new: true } : {};
-  },
+  validateSearch: parseCompanyObligationsSearch,
   component: CompanyObligationsPage,
 });
 
@@ -88,6 +100,16 @@ function StatCard({
   );
 }
 
+function livingRegisterTab(o: ObligationListItem): "queue" | AuditPart | "external" | "other" {
+  const mapped = DSPD_AUDIT_ITEMS.find((i) =>
+    i.obligation_titles.some((t) => obligationTitleMatches(o.title, t)),
+  );
+  if (mapped) return mapped.part;
+  const ch = catalogFor(o)?.fulfillment;
+  if (ch === "external" || ch === "hybrid") return "external";
+  return "other";
+}
+
 function ObligationList({
   orgId,
   items,
@@ -96,6 +118,7 @@ function ObligationList({
   publishedFormIds,
   onEdit,
   empty,
+  highlightObligationId = null,
 }: {
   orgId: string;
   items: ObligationListItem[];
@@ -104,6 +127,7 @@ function ObligationList({
   publishedFormIds: Set<string>;
   onEdit: (ob: ObligationWithInstance) => void;
   empty: ReactNode;
+  highlightObligationId?: string | null;
 }) {
   if (items.length === 0) return <>{empty}</>;
   return (
@@ -117,13 +141,22 @@ function ObligationList({
           userNamesById={userNamesById}
           publishedFormIds={publishedFormIds}
           onEdit={onEdit}
+          highlighted={o.id === highlightObligationId}
         />
       ))}
     </div>
   );
 }
 
-function ObligationsTab({ orgId, openNew }: { orgId: string; openNew?: boolean }) {
+function ObligationsTab({
+  orgId,
+  openNew,
+  focusObligationId,
+}: {
+  orgId: string;
+  openNew?: boolean;
+  focusObligationId?: string;
+}) {
   const listFn = useServerFn(listCompanyObligations);
   const listGroupsFn = useServerFn(listStaffGroups);
   const footprintFn = useServerFn(getOrgServiceFootprint);
@@ -203,13 +236,43 @@ function ObligationsTab({ orgId, openNew }: { orgId: string; openNew?: boolean }
   const [personId, setPersonId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingObligation, setEditingObligation] = useState<ObligationWithInstance | null>(null);
+  const [registerTab, setRegisterTab] = useState<string>(focusObligationId ? "queue" : "queue");
   const navigate = useNavigate();
+
+  const focusObligation = useMemo(
+    () => (focusObligationId ? obligations.find((o) => o.id === focusObligationId) ?? null : null),
+    [obligations, focusObligationId],
+  );
 
   useEffect(() => {
     if (!openNew) return;
     setEditingObligation(null);
     setDrawerOpen(true);
   }, [openNew]);
+
+  useEffect(() => {
+    if (!focusObligation) return;
+    setSearch("");
+    setScopeFilter("all");
+    setPersonId(null);
+    setFilter(focusObligation.active ? "active" : "all");
+    const mapped = DSPD_AUDIT_ITEMS.find((i) =>
+      i.obligation_titles.some((t) => obligationTitleMatches(focusObligation.title, t)),
+    );
+    if (mapped && !itemApplies(mapped, footprint)) setShowNa(true);
+    setRegisterTab(livingRegisterTab(focusObligation));
+    // footprint is read once the row is known; don't re-pin when the object identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusObligation?.id]);
+
+  useEffect(() => {
+    if (!focusObligationId || isLoading) return;
+    const id = `obligation-${focusObligationId}`;
+    const t = window.setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [focusObligationId, isLoading, registerTab, showNa, filter, focusObligation?.id]);
 
   const stats = useMemo(() => {
     let overdueItems = 0;
@@ -310,10 +373,51 @@ function ObligationsTab({ orgId, openNew }: { orgId: string; openNew?: boolean }
     userNamesById,
     publishedFormIds,
     onEdit: openEdit,
+    highlightObligationId: focusObligationId ?? null,
+  };
+
+  const dismissFocus = () => {
+    navigate({
+      to: "/dashboard/company-obligations",
+      search: openNew ? { new: true } : {},
+    });
   };
 
   return (
     <div className="space-y-6">
+      {focusObligationId && (
+        <div
+          id={`obligation-${focusObligationId}`}
+          className="space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-3"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium">Opened from Deadlines</p>
+            <Button type="button" variant="ghost" size="sm" onClick={dismissFocus}>
+              <X className="mr-1 h-3.5 w-3.5" />
+              Dismiss
+            </Button>
+          </div>
+          {focusObligation ? (
+            <ObligationCard
+              orgId={orgId}
+              obligation={focusObligation}
+              groupNamesById={groupNamesById}
+              userNamesById={userNamesById}
+              publishedFormIds={publishedFormIds}
+              onEdit={openEdit}
+              highlighted
+            />
+          ) : isLoading ? (
+            <p className="text-sm text-muted-foreground">Finding that duty…</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              That duty is not in this register (it may have been paused, filtered as N/A, or
+              removed).
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-2xl text-sm text-muted-foreground">
           Laid out like the DSPD In-depth Review Tool (DHHS91172). Rows for services this program
@@ -412,7 +516,7 @@ function ObligationsTab({ orgId, openNew }: { orgId: string; openNew?: boolean }
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading obligations…</p>
       ) : (
-        <Tabs defaultValue="queue">
+        <Tabs value={registerTab} onValueChange={setRegisterTab}>
           <TabsList className="flex h-auto flex-wrap">
             <TabsTrigger value="queue">Work queue ({workQueue.length})</TabsTrigger>
             <TabsTrigger value="I">{AUDIT_PART_LABEL.I}</TabsTrigger>
@@ -573,7 +677,12 @@ function ObligationsTab({ orgId, openNew }: { orgId: string; openNew?: boolean }
         open={drawerOpen}
         onOpenChange={(open) => {
           setDrawerOpen(open);
-          if (!open && openNew) navigate({ to: "/dashboard/company-obligations", search: {} });
+          if (!open && openNew) {
+            navigate({
+              to: "/dashboard/company-obligations",
+              search: focusObligationId ? { obligation: focusObligationId } : {},
+            });
+          }
         }}
         orgId={orgId}
         obligation={editingObligation}
@@ -602,7 +711,7 @@ function PolicyLibraryTab() {
 
 function CompanyObligationsPage() {
   const { data: org, isLoading } = useCurrentOrg();
-  const { new: openNew } = Route.useSearch();
+  const { new: openNew, obligation: focusObligationId } = Route.useSearch();
   const canAccess = org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
 
   if (isLoading) {
@@ -636,7 +745,11 @@ function CompanyObligationsPage() {
           <TabsTrigger value="policy-library">Authoritative Sources</TabsTrigger>
         </TabsList>
         <TabsContent value="obligations">
-          <ObligationsTab orgId={org.organization_id} openNew={openNew} />
+          <ObligationsTab
+            orgId={org.organization_id}
+            openNew={openNew}
+            focusObligationId={focusObligationId}
+          />
         </TabsContent>
         <TabsContent value="utah-pack">
           <UtahPackPanel />

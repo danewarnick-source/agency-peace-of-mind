@@ -3808,3 +3808,105 @@ FROM (
 
 You should see `phi_access_audit_log_table=1`, `phi_access_audit_log_rls=true`, `phi_access_audit_select_policies=admins read phi access audit`, and all three document buckets `public=false`.
 
+
+---
+
+## ACTION — Summaries redesign: date floor + SC/AI attestation columns (2026-08-26)
+
+**What this is for:** Progress Summaries redesign.
+1. `clients.hive_start_date` — per-client HIVE start for `summaryPeriodFloor` (falls back to `created_at`).
+2. `client_progress_summaries.sc_sent_at/by` — attest PDF sent to Support Coordinator (non-UPI).
+3. `client_progress_summaries.ai_review_attested_at/by` — attest Nectar draft reviewed at finalize.
+4. Backfill so already-completed summaries do not reopen on Deadlines.
+
+Matches migration `supabase/migrations/20260826010000_summaries_redesign_floor_attest.sql`.
+
+```sql
+ALTER TABLE public.clients
+  ADD COLUMN IF NOT EXISTS hive_start_date date;
+
+COMMENT ON COLUMN public.clients.hive_start_date IS
+  'When this client started on HIVE for summary/obligation date floors. Defaults to created_at when null.';
+
+ALTER TABLE public.client_progress_summaries
+  ADD COLUMN IF NOT EXISTS sc_sent_at timestamptz,
+  ADD COLUMN IF NOT EXISTS sc_sent_by uuid,
+  ADD COLUMN IF NOT EXISTS ai_review_attested_at timestamptz,
+  ADD COLUMN IF NOT EXISTS ai_review_attested_by uuid;
+
+UPDATE public.client_progress_summaries
+SET sc_sent_at = completed_at,
+    sc_sent_by = completed_by
+WHERE completed_at IS NOT NULL
+  AND requires_upi_attestation = false
+  AND sc_sent_at IS NULL;
+
+UPDATE public.client_progress_summaries
+SET ai_review_attested_at = COALESCE(ai_review_attested_at, finalized_at),
+    ai_review_attested_by = COALESCE(ai_review_attested_by, finalized_by)
+WHERE finalized_at IS NOT NULL
+  AND ai_review_attested_at IS NULL;
+```
+
+**What you'll see:** two `ALTER TABLE`s, two `UPDATE`s (row counts vary).
+
+**Confirm:**
+
+```sql
+SELECT string_agg(x, E'\n' ORDER BY x) AS checks
+FROM (
+  SELECT 'clients.hive_start_date=' ||
+    (SELECT count(*)::text FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='clients' AND column_name='hive_start_date') AS x
+  UNION ALL
+  SELECT 'cps.sc_sent_at=' ||
+    (SELECT count(*)::text FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='client_progress_summaries' AND column_name='sc_sent_at')
+  UNION ALL
+  SELECT 'cps.ai_review_attested_at=' ||
+    (SELECT count(*)::text FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='client_progress_summaries' AND column_name='ai_review_attested_at')
+) s;
+```
+
+You should see all three `=1`.
+
+**Optional cleanup** — drop summary rows whose period ended before the client's HIVE floor (org go-live + client hive_start/created_at). Review before delete:
+
+```sql
+WITH floors AS (
+  SELECT c.id AS client_id,
+         GREATEST(
+           COALESCE(o.go_live_date, o.created_at::date),
+           COALESCE(c.hive_start_date, c.created_at::date)
+         ) AS floor_date
+  FROM public.clients c
+  JOIN public.organizations o ON o.id = c.organization_id
+)
+SELECT string_agg(s.id::text, E'\n' ORDER BY s.period_end, s.id) AS stale_summary_ids
+FROM public.client_progress_summaries s
+JOIN floors f ON f.client_id = s.client_id
+WHERE s.period_end < f.floor_date
+  AND s.finalized_at IS NULL
+  AND s.completed_at IS NULL;
+```
+
+If the list looks right, delete those pending-only rows (do **not** delete finalized packets without an explicit human decision):
+
+```sql
+WITH floors AS (
+  SELECT c.id AS client_id,
+         GREATEST(
+           COALESCE(o.go_live_date, o.created_at::date),
+           COALESCE(c.hive_start_date, c.created_at::date)
+         ) AS floor_date
+  FROM public.clients c
+  JOIN public.organizations o ON o.id = c.organization_id
+)
+DELETE FROM public.client_progress_summaries s
+USING floors f
+WHERE s.client_id = f.client_id
+  AND s.period_end < f.floor_date
+  AND s.finalized_at IS NULL
+  AND s.completed_at IS NULL;
+```

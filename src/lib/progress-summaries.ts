@@ -127,3 +127,67 @@ export function bucketCodes(codes: string[]): SummaryBuckets {
   }
   return b;
 }
+
+/** Codes typed into the state UPI portal (admin attestation after finalize). */
+export const UPI_FILING_CODES = new Set(["SEI", "SJD"]);
+
+/** True when this period's services require UPI entry (not SC email). */
+export function requiresUpiFiling(serviceCodes: string[]): boolean {
+  return serviceCodes.some((c) => UPI_FILING_CODES.has(c.toUpperCase()));
+}
+
+/**
+ * Filing destination for a narrative summary after finalize.
+ * SEI/SJD → UPI portal; everything else narrative → Support Coordinator.
+ */
+export type SummaryFilingDestination = "upi" | "support_coordinator" | "none";
+
+export function summaryFilingDestination(
+  summaryKind: string,
+  serviceCodes: string[],
+): SummaryFilingDestination {
+  if (summaryKind === "financial_statement") return "support_coordinator";
+  if (summaryKind !== "narrative") return "none";
+  if (requiresUpiFiling(serviceCodes)) return "upi";
+  return "support_coordinator";
+}
+
+export function summaryCadenceLabel(periodKind: string, serviceCodes: string[]): string {
+  if (periodKind === "quarterly") {
+    return "Quarterly · due 15 days after quarter end · to Support Coordinator";
+  }
+  if (requiresUpiFiling(serviceCodes)) {
+    return "Monthly · due 15th of following month · enter in UPI";
+  }
+  return "Monthly · due 15th of following month · to Support Coordinator";
+}
+
+/**
+ * Single source of truth for "when does this client's HIVE summary clock start."
+ * Later of org go-live and client HIVE start (hive_start_date → created_at).
+ * Callers still apply per-code service_start_date on top.
+ * Periods whose period_end is strictly before this floor must never be generated.
+ */
+export function summaryPeriodFloor(opts: {
+  orgGoLiveDate: string | null | undefined;
+  clientHiveStartDate: string | null | undefined;
+  clientCreatedAt: string | null | undefined;
+}): string | null {
+  const org = (opts.orgGoLiveDate ?? "").slice(0, 10) || null;
+  const clientStart =
+    (opts.clientHiveStartDate ?? "").slice(0, 10) ||
+    (opts.clientCreatedAt ?? "").slice(0, 10) ||
+    null;
+  const parts = [org, clientStart].filter((d): d is string => !!d && /^\d{4}-\d{2}-\d{2}/.test(d));
+  if (parts.length === 0) return null;
+  return parts.sort()[parts.length - 1];
+}
+
+/** Drop periods that closed before the floor (period_end < floor). */
+export function filterPeriodsByFloor<T extends { period_end: string }>(
+  periods: T[],
+  floor: string | null,
+): T[] {
+  if (!floor) return periods;
+  return periods.filter((p) => p.period_end >= floor);
+}

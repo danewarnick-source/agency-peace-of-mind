@@ -228,12 +228,21 @@ export function useDeadlines() {
         const due = new Date(`${s.due_date}T23:59:59`);
         const clientName = nameOf(s.client_id);
         const isSei = s.period_kind === "monthly" && s.service_codes?.includes("SEI");
+        const isSjd = s.period_kind === "monthly" && s.service_codes?.includes("SJD");
         const isCmpCms =
           s.period_kind === "monthly" && s.service_codes?.some((c) => c === "CMP" || c === "CMS");
-        const finalizedUnattested = isSei && !!s.finalized_at && !s.upi_entered_at;
+        const finalizedUnattestedUpi =
+          (isSei || isSjd) && !!s.finalized_at && !s.upi_entered_at;
+        const finalizedUnattestedSc =
+          !s.requires_upi_attestation &&
+          !!s.finalized_at &&
+          !s.sc_sent_at &&
+          !s.completed_at;
         let title: string;
-        if (finalizedUnattested) {
-          title = `SEI monthly summary for ${fmtMonth(s.period_label)} — mark as entered in UPI.`;
+        if (finalizedUnattestedUpi) {
+          title = `${isSjd && !isSei ? "SJD" : "SEI"} monthly summary for ${fmtMonth(s.period_label)} — mark as entered in UPI.`;
+        } else if (finalizedUnattestedSc) {
+          title = `${s.period_kind === "quarterly" ? s.period_label + " quarterly" : fmtMonth(s.period_label) + " monthly"} summary — mark sent to Support Coordinator.`;
         } else if (isCmpCms) {
           title = `CMP/CMS monthly summary for ${fmtMonth(s.period_label)} — ${clientName} is due.`;
         } else if (s.period_kind === "quarterly") {
@@ -250,10 +259,10 @@ export function useDeadlines() {
           subjectKind: "client",
           dueAt: due,
           status: bucketStatus(due, now),
-          href: `/dashboard/summaries?open=${s.id}`,
+          href: `/dashboard/summaries?client=${s.client_id}&open=${s.id}`,
           summary: s,
           clientId: s.client_id,
-          cadenceReminder: finalizedUnattested || (isCmpCms && !s.completed_at),
+          cadenceReminder: finalizedUnattestedUpi || finalizedUnattestedSc || (isCmpCms && !s.completed_at),
         });
       }
 

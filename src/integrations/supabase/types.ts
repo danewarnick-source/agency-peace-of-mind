@@ -3597,6 +3597,10 @@ export type Database = {
           period_label: string
           period_start: string
           requires_upi_attestation: boolean
+          sc_sent_at: string | null
+          sc_sent_by: string | null
+          ai_review_attested_at: string | null
+          ai_review_attested_by: string | null
           service_codes: string[]
           status: string
           summary_kind: string
@@ -3626,6 +3630,10 @@ export type Database = {
           period_label: string
           period_start: string
           requires_upi_attestation?: boolean
+          sc_sent_at?: string | null
+          sc_sent_by?: string | null
+          ai_review_attested_at?: string | null
+          ai_review_attested_by?: string | null
           service_codes?: string[]
           status?: string
           summary_kind?: string
@@ -3655,6 +3663,10 @@ export type Database = {
           period_label?: string
           period_start?: string
           requires_upi_attestation?: boolean
+          sc_sent_at?: string | null
+          sc_sent_by?: string | null
+          ai_review_attested_at?: string | null
+          ai_review_attested_by?: string | null
           service_codes?: string[]
           status?: string
           summary_kind?: string
@@ -4182,6 +4194,7 @@ export type Database = {
           home_longitude: number | null
           hospice_status: string | null
           housing_voucher: string | null
+          hive_start_date: string | null
           hr_applicable: boolean
           id: string
           identifying_marks: string | null
@@ -4315,6 +4328,7 @@ export type Database = {
           home_longitude?: number | null
           hospice_status?: string | null
           housing_voucher?: string | null
+          hive_start_date?: string | null
           hr_applicable?: boolean
           id?: string
           identifying_marks?: string | null
@@ -4448,6 +4462,7 @@ export type Database = {
           home_longitude?: number | null
           hospice_status?: string | null
           housing_voucher?: string | null
+          hive_start_date?: string | null
           hr_applicable?: boolean
           id?: string
           identifying_marks?: string | null

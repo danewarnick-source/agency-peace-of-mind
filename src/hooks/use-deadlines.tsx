@@ -50,6 +50,13 @@ export type DeadlineItem = {
   /** company_obligation: P&P citation the admin typed (provider) or SOW section. */
   policySection?: string | null;
   dueAtMissing?: boolean;
+  /** Catalog title without period suffix — used when grouping person-level rows. */
+  obligationTitle?: string;
+  /** Set on grouped staff / staff+client register rows. */
+  groupedCount?: number;
+  obligationId?: string;
+  clientIds?: string[];
+  staffIds?: string[];
 };
 
 const DAY = 86_400_000;
@@ -84,6 +91,66 @@ function obligationSubject(row: DeadlineObligationItem): {
     return { subject: row.assignee_staff_name || "Staff member", subjectKind: "staff" };
   }
   return { subject: "Agency", subjectKind: "agency" };
+}
+
+function peopleLabel(n: number, kind: "staff" | "client"): string {
+  if (kind === "client") return n === 1 ? "1 person" : `${n} people`;
+  return n === 1 ? "1 staff" : `${n} staff`;
+}
+
+/**
+ * Staff-scoped register duties stay as one calendar row (the duty), not
+ * one row per person. Johnny's CPR still lives on the CPR obligation card;
+ * Deadlines only shows that CPR is due / overdue and how many people.
+ * Org-scoped duties and live clocks (summaries, incidents, HRC) stay as
+ * individual rows.
+ */
+export function groupRegisterDutyRows(items: DeadlineItem[]): DeadlineItem[] {
+  const standalone: DeadlineItem[] = [];
+  const groups = new Map<string, DeadlineItem[]>();
+
+  for (const item of items) {
+    if (item.source !== "company_obligation" || !item.obligationId) {
+      standalone.push(item);
+      continue;
+    }
+    if (item.subjectKind === "agency") {
+      standalone.push(item);
+      continue;
+    }
+    const key = `${item.obligationId}:${item.status}`;
+    const list = groups.get(key) ?? [];
+    list.push(item);
+    groups.set(key, list);
+  }
+
+  const grouped: DeadlineItem[] = [];
+  for (const [key, rows] of groups) {
+    const first = rows[0];
+    if (!first) continue;
+    const earliest = [...rows].sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime())[0] ?? first;
+    const staffIds = Array.from(new Set(rows.map((r) => r.staffId).filter((id): id is string => !!id)));
+    const clientIds = Array.from(new Set(rows.map((r) => r.clientId).filter((id): id is string => !!id)));
+    const kind: "staff" | "client" = first.subjectKind === "client" ? "client" : "staff";
+    const count =
+      kind === "client" ? Math.max(clientIds.length, rows.length) : Math.max(staffIds.length, rows.length);
+    grouped.push({
+      ...earliest,
+      key: `company_obligation_group_${key}`,
+      title: first.obligationTitle ?? earliest.title,
+      subject: peopleLabel(count, kind),
+      subjectKind: kind === "client" ? "client" : "staff",
+      href: "/dashboard/company-obligations",
+      instanceId: undefined,
+      clientId: undefined,
+      staffId: undefined,
+      groupedCount: count,
+      clientIds,
+      staffIds,
+    });
+  }
+
+  return [...standalone, ...grouped].sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
 }
 
 export function useDeadlines() {
@@ -210,6 +277,8 @@ export function useDeadlines() {
         cadenceLabel,
         policySection: row.source_policy_section,
         dueAtMissing,
+        obligationId: row.obligation_id,
+        obligationTitle: row.catalog_title,
       });
     }
 
@@ -295,11 +364,13 @@ export function useDeadlines() {
     hrcRestrictionsQ.data,
   ]);
 
+  const calendar = useMemo(() => groupRegisterDutyRows(items), [items]);
+
   return {
     items,
-    overdue: items.filter((i) => i.status === "overdue"),
-    dueSoon: items.filter((i) => i.status === "due_soon"),
-    upcoming: items.filter((i) => i.status === "upcoming"),
+    overdue: calendar.filter((i) => i.status === "overdue"),
+    dueSoon: calendar.filter((i) => i.status === "due_soon"),
+    upcoming: calendar.filter((i) => i.status === "upcoming"),
     isLoading:
       obligationsQ.isLoading ||
       (isAdminRole &&

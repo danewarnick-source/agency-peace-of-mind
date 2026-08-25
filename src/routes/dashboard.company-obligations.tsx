@@ -38,6 +38,8 @@ import { ObligationDrawer } from "@/components/company-obligations/obligation-dr
 import { catalogFor } from "@/components/company-obligations/obligation-meta";
 import { AuditPartPanel, UnmappedDuties } from "@/components/company-obligations/audit-part-panel";
 import { UtahPackPanel } from "@/components/company-obligations/utah-pack-panel";
+import { ActionRequiredPanel } from "@/components/company-obligations/action-required-panel";
+import { useActionRequiredQueue } from "@/hooks/use-action-required-queue";
 import {
   AUDIT_PART_LABEL,
   DSPD_AUDIT_ITEMS,
@@ -50,12 +52,23 @@ import { UTAH_DSPD_PACK } from "@/lib/utah-dspd-pack";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type CompanyObligationsSearch = { new?: boolean; obligation?: string };
+type CompanyObligationsTab = "overview" | "action-required";
+
+type CompanyObligationsSearch = {
+  tab?: CompanyObligationsTab;
+  new?: boolean;
+  obligation?: string;
+};
 
 function parseCompanyObligationsSearch(s: Record<string, unknown>): CompanyObligationsSearch {
   const openNew = s.new === "1" || s.new === 1 || s.new === true || s.new === "true";
-  const obligation = typeof s.obligation === "string" && UUID_RE.test(s.obligation) ? s.obligation : undefined;
+  const obligation =
+    typeof s.obligation === "string" && UUID_RE.test(s.obligation) ? s.obligation : undefined;
+  const tabRaw = typeof s.tab === "string" ? s.tab : undefined;
+  const tab: CompanyObligationsTab | undefined =
+    tabRaw === "action-required" ? "action-required" : tabRaw === "overview" ? "overview" : undefined;
   return {
+    ...(tab ? { tab } : {}),
     ...(openNew ? { new: true as const } : {}),
     ...(obligation ? { obligation } : {}),
   };
@@ -709,10 +722,49 @@ function PolicyLibraryTab() {
   );
 }
 
+function OverviewPanel({
+  orgId,
+  openNew,
+  focusObligationId,
+}: {
+  orgId: string;
+  openNew?: boolean;
+  focusObligationId?: string;
+}) {
+  return (
+    <Tabs defaultValue="obligations">
+      <TabsList>
+        <TabsTrigger value="obligations">Obligations</TabsTrigger>
+        <TabsTrigger value="utah-pack">Utah pack</TabsTrigger>
+        <TabsTrigger value="policy-library">Authoritative Sources</TabsTrigger>
+      </TabsList>
+      <TabsContent value="obligations">
+        <ObligationsTab
+          orgId={orgId}
+          openNew={openNew}
+          focusObligationId={focusObligationId}
+        />
+      </TabsContent>
+      <TabsContent value="utah-pack">
+        <UtahPackPanel />
+      </TabsContent>
+      <TabsContent value="policy-library">
+        <PolicyLibraryTab />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
 function CompanyObligationsPage() {
+  const navigate = useNavigate({ from: "/dashboard/company-obligations" });
   const { data: org, isLoading } = useCurrentOrg();
-  const { new: openNew, obligation: focusObligationId } = Route.useSearch();
-  const canAccess = org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
+  const { tab, new: openNew, obligation: focusObligationId } = Route.useSearch();
+  const canAccess =
+    org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
+  const { totalCount: actionCount } = useActionRequiredQueue(
+    canAccess ? org?.organization_id : null,
+  );
+  const activeTab: CompanyObligationsTab = tab === "action-required" ? "action-required" : "overview";
 
   if (isLoading) {
     return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
@@ -738,24 +790,51 @@ function CompanyObligationsPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="obligations">
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => {
+          const next = v === "action-required" ? "action-required" : "overview";
+          navigate({
+            search: (prev) => ({
+              ...prev,
+              tab: next === "overview" ? undefined : next,
+            }),
+          });
+        }}
+      >
         <TabsList>
-          <TabsTrigger value="obligations">Obligations</TabsTrigger>
-          <TabsTrigger value="utah-pack">Utah pack</TabsTrigger>
-          <TabsTrigger value="policy-library">Authoritative Sources</TabsTrigger>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="action-required" className="gap-1.5">
+            {actionCount > 0 ? (
+              <>
+                Action Required
+                <Badge
+                  variant="secondary"
+                  className="ml-0.5 border-transparent bg-destructive text-destructive-foreground"
+                >
+                  {actionCount}
+                </Badge>
+              </>
+            ) : (
+              <>
+                Action Required
+                <span
+                  aria-label="No urgent items"
+                  className="inline-block h-2 w-2 rounded-full bg-success"
+                />
+              </>
+            )}
+          </TabsTrigger>
         </TabsList>
-        <TabsContent value="obligations">
-          <ObligationsTab
+        <TabsContent value="overview" className="mt-4">
+          <OverviewPanel
             orgId={org.organization_id}
             openNew={openNew}
             focusObligationId={focusObligationId}
           />
         </TabsContent>
-        <TabsContent value="utah-pack">
-          <UtahPackPanel />
-        </TabsContent>
-        <TabsContent value="policy-library">
-          <PolicyLibraryTab />
+        <TabsContent value="action-required" className="mt-4">
+          <ActionRequiredPanel orgId={org.organization_id} />
         </TabsContent>
       </Tabs>
     </div>

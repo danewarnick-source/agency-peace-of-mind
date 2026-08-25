@@ -12,7 +12,7 @@ import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
   LayoutDashboard, GraduationCap, Settings, Hexagon,
 
-  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink, Sparkles, MapPin, TrendingUp, HandCoins, Scale, FileText, Inbox, Search, AlarmClock, Archive, ClipboardList,
+  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink, Sparkles, MapPin, TrendingUp, HandCoins, Scale, FileText, Inbox, Search, Archive, ClipboardList,
 } from "lucide-react";
 import { useIsHiveExecutive } from "@/hooks/use-hive-executive";
 import { EXEC_NAV, EXEC_DOMAINS, COMMAND_CENTER_ITEM } from "@/lib/exec-nav";
@@ -28,6 +28,7 @@ import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";
 import { NectarSearchBar } from "@/components/nectar/nectar-search-bar";
 import { ListChecks, Clock } from "lucide-react";
 import { FeatureLockedRoute, UpgradeGate } from "@/components/upgrade-gate";
+import { useActionRequiredQueue } from "@/hooks/use-action-required-queue";
 import { OrgSwitcher, DemoBadge, DemoOrgBanner } from "@/components/org-switcher";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -154,7 +155,6 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/hub/clients", label: "Clients", icon: Contact2, feature: "client_intake" },
   { to: "/dashboard/scheduler", label: "Scheduler", icon: CalendarDays, feature: "evv_timesheets" },
   { to: "/dashboard/hub/documentation", label: "Documentation", icon: ClipboardCheck, feature: "pcsp" },
-  { to: "/dashboard/deadlines", label: "Deadlines", icon: AlarmClock },
   { to: "/dashboard/company-obligations", label: "Compliance", icon: ClipboardList },
   { to: "/dashboard/summaries", label: "Summaries", icon: FileText },
   { to: "/dashboard/hub/finances", label: "Finances", icon: Receipt, perm: "view_billing", feature: "pba_ledgers" },
@@ -199,6 +199,7 @@ type SidebarBodyProps = {
   signOut: () => Promise<void>;
   onNavigate?: () => void;
   inboxUnread: number;
+  complianceActionCount: number;
 };
 
 
@@ -379,6 +380,9 @@ function DashboardLayout() {
     allNav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ?? "Dashboard";
   const isStaffView = effectiveView === "staff";
   const inboxUnread = unreadQ.data?.count ?? 0;
+  const { totalCount: complianceActionCount } = useActionRequiredQueue(
+    isAdminCapable ? org?.organization_id : null,
+  );
 
   const sidebarProps: Omit<SidebarBodyProps, "onNavigate"> = {
     user,
@@ -401,6 +405,7 @@ function DashboardLayout() {
     pathname,
     signOut,
     inboxUnread,
+    complianceActionCount,
   };
 
 
@@ -653,6 +658,7 @@ function SidebarBody({
   signOut,
   onNavigate,
   inboxUnread,
+  complianceActionCount,
 }: SidebarBodyProps) {
   const [upgradeFeatureKey, setUpgradeFeatureKey] = useState<string | null>(null);
   // Domain sections in the Executive Command Center sidebar are collapsed by
@@ -935,6 +941,14 @@ function SidebarBody({
             >
               <Icon className={`h-4 w-4 ${active ? (isNectar ? "text-white" : "") : isNectar ? "text-[#f4a93a]" : ""}`} />
               <span className="flex-1">{item.label}</span>
+              {item.to === "/dashboard/company-obligations" && complianceActionCount > 0 && (
+                <span
+                  aria-label={`${complianceActionCount} action required`}
+                  className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-destructive-foreground"
+                >
+                  {complianceActionCount > 99 ? "99+" : complianceActionCount}
+                </span>
+              )}
               {item.to === "/dashboard/inbox" && inboxUnread > 0 && (
                 <span
                   aria-label={`${inboxUnread} unread`}

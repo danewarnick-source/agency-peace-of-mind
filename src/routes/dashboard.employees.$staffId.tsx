@@ -839,7 +839,13 @@ function StaffDeadlinesList({ staffId }: { staffId: string }) {
           </div>
         )}
         <div className="pt-1">
-          <Link to="/dashboard/deadlines" className="text-sm underline">View all deadlines →</Link>
+          <Link
+            to="/dashboard/company-obligations"
+            search={{ tab: "action-required" }}
+            className="text-sm underline"
+          >
+            View all action required →
+          </Link>
         </div>
       </CardContent>
     </Card>

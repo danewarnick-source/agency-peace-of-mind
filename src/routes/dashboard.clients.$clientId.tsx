@@ -2292,13 +2292,16 @@ function DeadlinesPanel({ clientId }: { clientId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Deadlines</CardTitle>
+        <CardTitle className="text-base">Action required</CardTitle>
       </CardHeader>
       <CardContent className="text-sm text-muted-foreground">
-        Client-scoped deadlines are tracked centrally. Open the deadlines desk and filter by this
-        client.{" "}
-        <Link className="underline" to="/dashboard/deadlines" search={{ client: clientId }}>
-          Open deadlines →
+        Urgent compliance items for this client are tracked on Compliance → Action Required.{" "}
+        <Link
+          className="underline"
+          to="/dashboard/company-obligations"
+          search={{ tab: "action-required" }}
+        >
+          Open Action Required →
         </Link>
       </CardContent>
     </Card>

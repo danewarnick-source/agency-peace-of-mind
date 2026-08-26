@@ -115,6 +115,11 @@ export function isGuardianValueEmpty(v: unknown): boolean {
 
 // One canonical normalizer used by review, applyFields, and commit. Mutates
 // the draft in place AND returns it for chaining. Idempotent.
+//
+// Does NOT invent is_own_guardian=true from empty guardian fields — that would
+// hide the required "own vs separate guardian" confirmation and let commit
+// disagree with what the admin saw on review. Empty placeholders are cleared;
+// explicit true clears guardian contact fields; explicit false leaves contacts.
 export function normalizeGuardianFields<T extends ClientDraft & {
   guardian_phone?: string | null;
   guardian_relationship?: string | null;
@@ -124,7 +129,6 @@ export function normalizeGuardianFields<T extends ClientDraft & {
   const phoneEmpty = isGuardianValueEmpty(d.guardian_phone);
   const relEmpty = isGuardianValueEmpty(d.guardian_relationship);
   const emailEmpty = isGuardianValueEmpty(d.guardian_email);
-  const noRealGuardian = nameEmpty && phoneEmpty && relEmpty && emailEmpty;
 
   // Strip self-referential / placeholder strings out of the actual fields
   // so commit + validation see clean nulls.
@@ -133,18 +137,41 @@ export function normalizeGuardianFields<T extends ClientDraft & {
   if (relEmpty) d.guardian_relationship = null;
   if (emailEmpty) d.guardian_email = null;
 
-  if (d.is_own_guardian === true || noRealGuardian) {
-    d.is_own_guardian = true;
+  if (d.is_own_guardian === true) {
     d.guardian_name = null;
     d.guardian_phone = null;
     d.guardian_relationship = null;
     d.guardian_email = null;
-  } else if (d.is_own_guardian === false && !nameEmpty) {
-    // keep guardian fields as-is
   }
-  // If is_own_guardian is null/undefined and a real guardian name exists,
-  // leave is_own_guardian alone — the commit layer defaults appropriately.
+  // is_own_guardian null/undefined stays unset so validateClientDraft can
+  // emit guardian.unknown_status when no real guardian contacts exist.
   return d;
+}
+
+/** Coerce extracted-field strings into a real boolean (or null if unknown). */
+export function parseOwnGuardianValue(v: string | null | undefined): boolean | null {
+  if (v == null) return null;
+  const raw = v.trim();
+  if (!raw) return null;
+  try {
+    const j = JSON.parse(raw) as { bool?: boolean };
+    if (typeof j?.bool === "boolean") return j.bool;
+  } catch {
+    /* plain string */
+  }
+  const lower = raw.toLowerCase();
+  if (lower === "true" || lower === "yes" || lower === "own" || lower === "self") return true;
+  if (
+    lower === "false" ||
+    lower === "no" ||
+    lower === "separate" ||
+    lower.startsWith("has a") ||
+    lower.includes("separate guardian")
+  ) {
+    return false;
+  }
+  if (SELF_GUARDIAN_PHRASE.test(raw)) return true;
+  return null;
 }
 
 export function findClientContradictions(d: ClientDraft): ValidationIssue[] {

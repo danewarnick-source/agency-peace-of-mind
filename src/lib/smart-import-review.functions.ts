@@ -10,6 +10,7 @@ import {
   filterBlocking,
   findClientContradictions,
   normalizeGuardianFields,
+  parseOwnGuardianValue,
   type ClientDraft,
   type ValidationIssue,
 } from "@/lib/import-validation";
@@ -274,8 +275,7 @@ function buildDraftFromExtractedFields(
       case "discharge_date": d.discharge_date = v; break;
       case "form_1056_approved_date": d.form_1056_approved_date = v; break;
       case "is_own_guardian":
-        try { d.is_own_guardian = !!(JSON.parse(v) as { bool?: boolean }).bool; }
-        catch { d.is_own_guardian = v === "true"; }
+        d.is_own_guardian = parseOwnGuardianValue(v);
         break;
       case "guardian_name": d.guardian_name = v; break;
       case "guardian_phone": d.guardian_phone = v; break;

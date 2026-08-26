@@ -64,18 +64,28 @@ export type SummaryPeriod = {
 const pad = (n: number) => String(n).padStart(2, "0");
 const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-/** All closed quarterly periods in the last `limit` quarters (most recent first). */
+/**
+ * The current (still in-progress) quarter plus the last `limit` CLOSED
+ * quarters, most recent first. The in-progress quarter is included so a
+ * summary can be typed or Nectar-drafted any time before it closes — its
+ * due_date is real (quarter end + 15 days) but still in the future, so
+ * callers must not treat it as due/overdue just because a row exists.
+ */
 export function recentQuarterlyPeriods(now: Date, limit = 4): SummaryPeriod[] {
   const out: SummaryPeriod[] = [];
   let y = now.getFullYear();
   let q = Math.floor(now.getMonth() / 3) + 1;
-  for (let i = 0; i < limit; i++) {
-    q -= 1;
-    if (q < 1) { q = 4; y -= 1; }
+  for (let i = 0; i < limit + 1; i++) {
+    if (i > 0) {
+      q -= 1;
+      if (q < 1) { q = 4; y -= 1; }
+    }
     const startMonth = (q - 1) * 3;
     const start = new Date(y, startMonth, 1);
     const end = new Date(y, startMonth + 3, 0);
-    if (end >= now) continue;
+    // Only the current (i === 0) period may still be open; every prior one
+    // must already be closed.
+    if (i > 0 && end >= now) continue;
     const due = new Date(end.getTime() + 15 * 86_400_000);
     out.push({
       period_kind: "quarterly",
@@ -88,17 +98,23 @@ export function recentQuarterlyPeriods(now: Date, limit = 4): SummaryPeriod[] {
   return out;
 }
 
-/** All closed monthly periods in the last `limit` months (most recent first). */
+/**
+ * The current (still in-progress) month plus the last `limit` CLOSED
+ * months, most recent first. Same in-progress-first shape as
+ * recentQuarterlyPeriods — see its doc comment.
+ */
 export function recentMonthlyPeriods(now: Date, limit = 6): SummaryPeriod[] {
   const out: SummaryPeriod[] = [];
   let y = now.getFullYear();
   let m = now.getMonth();
-  for (let i = 0; i < limit; i++) {
-    m -= 1;
-    if (m < 0) { m = 11; y -= 1; }
+  for (let i = 0; i < limit + 1; i++) {
+    if (i > 0) {
+      m -= 1;
+      if (m < 0) { m = 11; y -= 1; }
+    }
     const start = new Date(y, m, 1);
     const end = new Date(y, m + 1, 0);
-    if (end >= now) continue;
+    if (i > 0 && end >= now) continue;
     const due = new Date(y, m + 1, 15);
     out.push({
       period_kind: "monthly",
@@ -109,6 +125,12 @@ export function recentMonthlyPeriods(now: Date, limit = 6): SummaryPeriod[] {
     });
   }
   return out;
+}
+
+/** True when a period's own window hasn't closed yet — the row exists so
+ *  drafting can start early, but it is not "owed" until this flips false. */
+export function isPeriodInProgress(periodEnd: string, now: Date = new Date()): boolean {
+  return new Date(`${periodEnd}T23:59:59`).getTime() >= now.getTime();
 }
 
 export type SummaryBuckets = {

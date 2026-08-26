@@ -33,6 +33,7 @@ import { draftProgressSummary } from "@/lib/progress-summary-draft.functions";
 import { renderSummaryPdf } from "@/lib/progress-summary-pdf";
 import {
   formatPeriodMonthYear,
+  isPeriodInProgress,
   summaryCadenceLabel,
   summaryFilingDestination,
 } from "@/lib/progress-summaries";
@@ -139,13 +140,17 @@ function SummariesPage() {
       .map((id) => {
         const rows = byClient.get(id) ?? [];
         const open = rows.filter((r) => !r.completed_at);
-        const overdue = open.filter((r) => r.due_date < today && r.status !== "finalized");
+        // A row exists for the current, still-in-progress period too (so it
+        // can be typed/drafted early) — that one isn't actually "owed" yet,
+        // so it shouldn't count toward the open/overdue badge.
+        const due = open.filter((r) => !isPeriodInProgress(r.period_end));
+        const overdue = due.filter((r) => r.due_date < today && r.status !== "finalized");
         const next = [...open].sort((a, b) => a.due_date.localeCompare(b.due_date))[0] ?? null;
         const c = (clientsQ.data ?? []).find((x) => x.id === id);
         return {
           id,
           name: c ? `${c.first_name} ${c.last_name}` : nameOf(id),
-          openCount: open.length,
+          openCount: due.length,
           overdueCount: overdue.length,
           nextDue: next?.due_date ?? null,
           hasSei: rows.some((r) => r.service_codes?.includes("SEI") || r.service_codes?.includes("SJD")),
@@ -264,7 +269,7 @@ function ClientList({
   if (cards.length === 0) {
     return (
       <div className="py-16 text-center text-muted-foreground rounded-xl border bg-card">
-        No summary periods yet. Clients with active HHS/RHS/DSI/SLH/SLN/SEI (and related) codes appear here after periods close.
+        No summary periods yet. Clients with active HHS/RHS/DSI/SLH/SLN/SEI (and related) codes appear here once their first period starts.
       </div>
     );
   }
@@ -290,8 +295,10 @@ function ClientList({
               <Badge className="bg-red-100 text-red-800">{c.overdueCount} overdue</Badge>
             ) : c.openCount > 0 ? (
               <Badge className="bg-amber-100 text-amber-900">{c.openCount} open</Badge>
+            ) : c.nextDue ? (
+              <Badge className="bg-green-100 text-green-800">On track</Badge>
             ) : (
-              <Badge className="bg-green-100 text-green-800">Caught up</Badge>
+              <Badge variant="outline" className="text-muted-foreground">No active codes</Badge>
             )}
             <ChevronRight className="size-4 text-muted-foreground" />
           </div>
@@ -404,6 +411,11 @@ function PeriodSection({
                     r.period_label
                   )}
                   {statusBadge(r.status)}
+                  {isPeriodInProgress(r.period_end) && (
+                    <Badge variant="outline" className="text-muted-foreground">
+                      Not yet due — draft anytime
+                    </Badge>
+                  )}
                   {tone === "overdue" && <Badge className="bg-red-100 text-red-800">Overdue</Badge>}
                   {r.status === "finalized" && filing === "upi" && !r.upi_entered_at && (
                     <Badge className="bg-amber-100 text-amber-900">Awaiting UPI</Badge>

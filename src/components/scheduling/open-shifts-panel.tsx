@@ -75,7 +75,7 @@ export function OpenShiftsPanel({
       </div>
       <ul className="space-y-1.5">
         {rows.map((s) => {
-          const pending = s.status === "pending" && !!s.claim_requested_by;
+          const pending = !!s.claim_requested_by;
           return (
             <li
               key={s.id}
@@ -120,7 +120,7 @@ export function OpenShiftsPanel({
                     </Button>
                   </>
                 )}
-                {mode === "staff" && s.status === "open" && (
+                {mode === "staff" && s.status === "open" && !pending && (
                   <>
                     <Button
                       size="sm"

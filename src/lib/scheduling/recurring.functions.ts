@@ -241,7 +241,7 @@ export const materializeWeek = createServerFn({ method: "POST" })
           status: staffId ? "draft" : "open",
           published: false,
           created_by: context.userId,
-          created_from: "recurring",
+          created_from: "template",
           notes: p.notes ?? null,
         });
         existingKey.add(key);

@@ -6,9 +6,11 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
  * Open shifts = scheduled_shifts where staff_id IS NULL and status='open'.
  * Lifecycle:
  *   admin posts → status='open'
- *   staff claims → status='pending', claim_requested_by = userId (staff_id still NULL)
+ *   staff claims → status stays 'open', claim_requested_by = userId (staff_id still NULL)
  *   admin approves → status='accepted', staff_id = claim_requested_by, claim_requested_by NULL
  *   admin denies → status='open', claim_requested_by NULL
+ *
+ * Note: status 'pending' is NOT allowed by scheduled_shifts_status_check.
  */
 
 export const listOpenShifts = createServerFn({ method: "POST" })
@@ -28,7 +30,7 @@ export const listOpenShifts = createServerFn({ method: "POST" })
       .from("scheduled_shifts")
       .select("id, organization_id, client_id, service_code, starts_at, ends_at, location_id, notes, status, claim_requested_by")
       .eq("organization_id", data.organizationId)
-      .in("status", ["open", "pending"])
+      .eq("status", "open")
       .is("staff_id", null)
       .gte("starts_at", data.startIso)
       .lt("starts_at", data.endIso)
@@ -101,7 +103,8 @@ export const claimOpenShift = createServerFn({ method: "POST" })
 
     const { error: uErr } = await supabase
       .from("scheduled_shifts")
-      .update({ status: "pending", claim_requested_by: userId })
+      // Keep status "open" while claim is pending approval — "pending" is not a valid status.
+      .update({ claim_requested_by: userId })
       .eq("id", data.shiftId);
     if (uErr) throw uErr;
 

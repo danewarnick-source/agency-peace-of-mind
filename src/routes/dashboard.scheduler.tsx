@@ -26,7 +26,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useCurrentOrg } from "@/hooks/use-org";
-import { getMissingThirtyDayStaffIds } from "@/lib/sow-perimeters.functions";
+import { getMissingAbiStaffIds, getMissingThirtyDayStaffIds } from "@/lib/sow-perimeters.functions";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
   useSchedulerData, startOfWeek, startOfDay, startOfMonth,
@@ -864,15 +864,26 @@ function AddShiftDialog({
   const save = useServerFn(saveShift);
   const recur = useServerFn(createRecurringShifts);
   const missingThirtyDayFn = useServerFn(getMissingThirtyDayStaffIds);
+  const missingAbiFn = useServerFn(getMissingAbiStaffIds);
   const { data: missingData } = useQuery({
     enabled: !!org?.organization_id,
     queryKey: ["sow-r3", org?.organization_id],
     queryFn: () => missingThirtyDayFn({ data: { organizationId: org!.organization_id } }),
     staleTime: 5 * 60_000,
   });
+  const { data: missingAbiData } = useQuery({
+    enabled: !!org?.organization_id,
+    queryKey: ["sow-r1-abi", org?.organization_id],
+    queryFn: () => missingAbiFn({ data: { organizationId: org!.organization_id } }),
+    staleTime: 5 * 60_000,
+  });
   const missingThirtyDay = useMemo(
     () => new Set(missingData?.missingIds ?? []),
     [missingData],
+  );
+  const missingAbi = useMemo(
+    () => new Set(missingAbiData?.missingIds ?? []),
+    [missingAbiData],
   );
   const [clientId, setClientId] = useState<string>(prefill?.clientId ?? "");
   const [code, setCode] = useState<string>(prefill?.code ?? "");
@@ -887,7 +898,7 @@ function AddShiftDialog({
   const [freq, setFreq] = useState<"daily" | "weekly" | "monthly">("weekly");
   const [weekdays, setWeekdays] = useState<number[]>([]); // 0=Sun..6=Sat
   const [dayOfMonth, setDayOfMonth] = useState<number>(new Date(dInit).getDate());
-  const [endMode, setEndMode] = useState<"count" | "until">("count");
+  const [endMode, setEndMode] = useState<"count" | "until" | "indefinite">("count");
   const [count, setCount] = useState<number>(4);
   const [until, setUntil] = useState<string>("");
 
@@ -920,6 +931,16 @@ function AddShiftDialog({
     return c ? `${c.first_name} ${c.last_name}`.trim() : "this client";
   }, [sched.clients, clientId]);
 
+  const clientHasAbi = useMemo(
+    () => !!sched.clients.find((x) => x.id === clientId)?.has_abi,
+    [sched.clients, clientId],
+  );
+
+  const selectedStaffMissingAbi =
+    clientHasAbi && staffId !== "__open__" && missingAbi.has(staffId);
+  const selectedStaffMissing30Day =
+    staffId !== "__open__" && missingThirtyDay.has(staffId);
+
   const toggleWeekday = (n: number) =>
     setWeekdays((prev) => prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n].sort());
 
@@ -931,16 +952,18 @@ function AddShiftDialog({
       if (!canManageSchedule) throw new Error("You don't have permission to create or edit shifts.");
       const starts = new Date(`${date}T${start}:00`).toISOString();
       const ends = new Date(`${date}T${end}:00`).toISOString();
+      const assignedStaff = staffId === "__open__" ? null : staffId;
       const res = await save({
         data: {
           organization_id: org!.organization_id,
           client_id: clientId,
           job_code: code,
-          staff_id: staffId === "__open__" ? null : staffId,
+          staff_id: assignedStaff,
           starts_at: starts,
           ends_at: ends,
           shift_type: "hourly",
-          status: "pending",
+          // Valid statuses: draft|published|accepted|declined|open|cancelled (not "pending")
+          status: assignedStaff ? "draft" : "open",
           published: false,
         },
       });
@@ -954,6 +977,7 @@ function AddShiftDialog({
             day_of_month: freq === "monthly" ? dayOfMonth : undefined,
             count: endMode === "count" ? count : undefined,
             until_date: endMode === "until" && until ? until : null,
+            indefinite: endMode === "indefinite",
           },
         });
       }
@@ -1014,14 +1038,20 @@ function AddShiftDialog({
                   const notActive = !s.is_active;
                   const reason = isOff ? "Off this day" : notActive ? "Onboarding incomplete" : null;
                   const needs30Day = missingThirtyDay.has(s.id);
+                  const needsAbi = clientHasAbi && missingAbi.has(s.id);
                   return (
                     <SelectItem key={s.id} value={s.id} disabled={!!reason}>
                       <span className="flex items-center gap-1">
+                        {needsAbi && (
+                          <AlertTriangle
+                            className="inline h-3 w-3 shrink-0 text-amber-600"
+                            aria-label="Missing ABI training (reminder only)"
+                          />
+                        )}
                         {needs30Day && (
                           <AlertTriangle
-                            className="inline h-3 w-3 shrink-0 text-red-600"
-                           
-                            aria-label="30-day training incomplete"
+                            className="inline h-3 w-3 shrink-0 text-amber-600"
+                            aria-label="30-day training incomplete (reminder only)"
                           />
                         )}
                         {s.name}{reason ? ` — ${reason}` : ""}
@@ -1032,6 +1062,22 @@ function AddShiftDialog({
               </SelectContent>
             </Select>
             {clientId && <p className="text-[11px] text-muted-foreground mt-1">Only staff on {clientName}'s team are listed.</p>}
+            {selectedStaffMissingAbi && (
+              <p className="text-[11px] text-amber-800 mt-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
+                Reminder: {clientName} has an ABI designation and this staff member has no ABI training on file.
+                You can still schedule — complete training when you can.
+              </p>
+            )}
+            {selectedStaffMissing30Day && !selectedStaffMissingAbi && (
+              <p className="text-[11px] text-amber-800 mt-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
+                Reminder: 30-day orientation training is incomplete. Scheduling is still allowed.
+              </p>
+            )}
+            {selectedStaffMissing30Day && selectedStaffMissingAbi && (
+              <p className="text-[11px] text-amber-800 mt-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
+                Reminder: 30-day orientation training is also incomplete. Scheduling is still allowed.
+              </p>
+            )}
           </Field>
 
           <div className="grid grid-cols-3 gap-2">
@@ -1104,11 +1150,12 @@ function AddShiftDialog({
 
                 <div className="grid grid-cols-2 gap-2">
                   <Field label="ENDS">
-                    <Select value={endMode} onValueChange={(v) => setEndMode(v as "count" | "until")}>
+                    <Select value={endMode} onValueChange={(v) => setEndMode(v as "count" | "until" | "indefinite")}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="count">After N occurrences</SelectItem>
                         <SelectItem value="until">On a date</SelectItem>
+                        <SelectItem value="indefinite">Indefinite (no end)</SelectItem>
                       </SelectContent>
                     </Select>
                   </Field>
@@ -1120,12 +1167,23 @@ function AddShiftDialog({
                         onChange={(e) => setCount(Math.max(1, Math.min(200, Number(e.target.value) || 1)))}
                       />
                     </Field>
-                  ) : (
+                  ) : endMode === "until" ? (
                     <Field label="UNTIL DATE">
                       <Input type="date" value={until} onChange={(e) => setUntil(e.target.value)} />
                     </Field>
+                  ) : (
+                    <div className="flex items-end">
+                      <p className="text-[11px] text-muted-foreground pb-2">
+                        Creates up to 200 future shifts (about 2 years).
+                      </p>
+                    </div>
                   )}
                 </div>
+                {endMode === "indefinite" && (
+                  <p className="text-[11px] text-muted-foreground">
+                    No end date or occurrence count required. HIVE generates the next stretch of the series now; extend later as needed.
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -1134,7 +1192,13 @@ function AddShiftDialog({
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button
             onClick={() => saveMut.mutate()}
-            disabled={!clientId || !code || saveMut.isPending || !canManageSchedule}
+            disabled={
+              !clientId ||
+              !code ||
+              saveMut.isPending ||
+              !canManageSchedule ||
+              (repeatOn && endMode === "until" && !until)
+            }
             
             style={{ background: GOLD, color: NAVY }}
           >
@@ -1235,7 +1299,7 @@ function ShiftDetailPanel({
           starts_at: shift.starts_at,
           ends_at: shift.ends_at,
           shift_type: "hourly",
-          status: "pending",
+          status: shift.staff_id ? "draft" : "open",
           published: false,
         },
       });

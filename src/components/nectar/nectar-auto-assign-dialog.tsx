@@ -224,7 +224,7 @@ export function NectarAutoAssignDialog({
           is_recurring: false,
           recurrence_rule: null,
           recurrence_end_date: null,
-          status: "pending",
+          status: "draft",
           published: false,
           created_by: userId,
         }));

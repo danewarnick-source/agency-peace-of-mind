@@ -1057,7 +1057,7 @@ function IdentityCard({ clientId, client }: { clientId: string; client: ClientRo
             <Row label="Discharge date">{client.discharge_date ? fmtDate(client.discharge_date as string) : <span className="text-muted-foreground italic font-normal">— active —</span>}</Row>
 
             <GroupHeader>Flags</GroupHeader>
-            <Row label="Acquired brain injury (ABI)">{client.has_abi ? "Yes — staff need ABI training" : "No"}</Row>
+            <Row label="Acquired brain injury (ABI)">{client.has_abi ? "Yes — staff should have ABI training (reminder on schedule)" : "No"}</Row>
             <Row label="Human Rights documentation">{client.hr_applicable ? "Applicable" : "Not applicable"}</Row>
             <Row label="DNR order">{client.dnr_applicable ? "On — document required" : "Off"}</Row>
           </>
@@ -1108,7 +1108,7 @@ function IdentityCard({ clientId, client }: { clientId: string; client: ClientRo
                   <Switch id="has-abi" checked={draft.has_abi} onCheckedChange={(v) => set("has_abi", v)} />
                   <Label htmlFor="has-abi" className="text-sm leading-tight">
                     Acquired brain injury (ABI)
-                    <div className="text-xs text-muted-foreground font-normal">When on, staff need ABI training before being assigned.</div>
+                    <div className="text-xs text-muted-foreground font-normal">When on, staff should have ABI training — HIVE reminds admins on the scheduler but does not block scheduling.</div>
                   </Label>
                 </div>
                 <div className="flex items-start gap-3">

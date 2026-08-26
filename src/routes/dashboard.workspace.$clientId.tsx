@@ -60,7 +60,14 @@ function ActiveShiftReimbursementSlot({ clientId }: { clientId: string }) {
   );
 }
 
-const workspaceSearch = z.object({ tab: z.string().optional(), code: z.string().optional(), verify: z.string().optional() });
+const workspaceSearch = z.object({
+  tab: z.string().optional(),
+  code: z.string().optional(),
+  verify: z.string().optional(),
+  // Pending narrative handed off from the Compass voice agent's "expand_note"
+  // intent — pre-fills the clock-out compliance modal's note field.
+  note: z.string().max(5000).optional(),
+});
 export const Route = createFileRoute("/dashboard/workspace/$clientId")({
   head: () => ({ meta: [{ title: "Client Workspace — HIVE" }] }),
   validateSearch: workspaceSearch,
@@ -72,7 +79,7 @@ function ClientWorkspace() {
   const { data: caseload, isLoading } = useCaseload();
   const { data: assignments } = useMyAssignments();
   const navigate = useNavigate();
-  const { tab: tabParam, code: presetCode, verify } = Route.useSearch();
+  const { tab: tabParam, code: presetCode, verify, note: voiceNarrative } = Route.useSearch();
 
   const client = useMemo(() => {
     return (caseload ?? []).find((c) => c.id === clientId) ?? null;
@@ -361,7 +368,7 @@ function ClientWorkspace() {
               presetServiceCode={effectivePresetCode}
               lockServiceCode={!!effectivePresetCode}
               autoOpenCompliance={verify === "1"}
-
+              initialNarrative={voiceNarrative}
             />
             <ActiveShiftReimbursementSlot clientId={client.id} />
           </TabsContent>

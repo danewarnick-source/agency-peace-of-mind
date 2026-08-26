@@ -991,13 +991,25 @@ function AddShiftDialog({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const trainingReminder = (() => {
+    if (!selectedStaffMissingAbi && !selectedStaffMissing30Day) return null;
+    const parts: string[] = [];
+    if (selectedStaffMissingAbi) {
+      parts.push(`${clientName} is ABI — this staff has no ABI training on file`);
+    }
+    if (selectedStaffMissing30Day) {
+      parts.push("30-day orientation incomplete");
+    }
+    return `${parts.join("; ")}. Reminder only — you can still schedule.`;
+  })();
+
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent className="max-w-lg max-h-[90dvh] max-md:max-h-[92dvh] flex flex-col gap-0 overflow-hidden p-0 max-md:overflow-hidden">
+        <DialogHeader className="shrink-0 px-6 pt-6 pb-3 pr-12">
           <DialogTitle className="flex items-center gap-2"><Plus className="h-4 w-4" /> Add shift</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 space-y-3">
           <Field label="CLIENT">
             <Select value={clientId} onValueChange={(v) => { setClientId(v); setCode(""); setStaffId("__open__"); }}>
               <SelectTrigger><SelectValue placeholder="Choose client" /></SelectTrigger>
@@ -1062,20 +1074,9 @@ function AddShiftDialog({
               </SelectContent>
             </Select>
             {clientId && <p className="text-[11px] text-muted-foreground mt-1">Only staff on {clientName}'s team are listed.</p>}
-            {selectedStaffMissingAbi && (
+            {trainingReminder && (
               <p className="text-[11px] text-amber-800 mt-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
-                Reminder: {clientName} has an ABI designation and this staff member has no ABI training on file.
-                You can still schedule — complete training when you can.
-              </p>
-            )}
-            {selectedStaffMissing30Day && !selectedStaffMissingAbi && (
-              <p className="text-[11px] text-amber-800 mt-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
-                Reminder: 30-day orientation training is incomplete. Scheduling is still allowed.
-              </p>
-            )}
-            {selectedStaffMissing30Day && selectedStaffMissingAbi && (
-              <p className="text-[11px] text-amber-800 mt-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
-                Reminder: 30-day orientation training is also incomplete. Scheduling is still allowed.
+                {trainingReminder}
               </p>
             )}
           </Field>
@@ -1174,21 +1175,19 @@ function AddShiftDialog({
                   ) : (
                     <div className="flex items-end">
                       <p className="text-[11px] text-muted-foreground pb-2">
-                        Creates up to 200 future shifts (about 2 years).
+                        Up to 200 shifts (~2 years); extend later as needed.
                       </p>
                     </div>
                   )}
                 </div>
-                {endMode === "indefinite" && (
-                  <p className="text-[11px] text-muted-foreground">
-                    No end date or occurrence count required. HIVE generates the next stretch of the series now; extend later as needed.
-                  </p>
-                )}
               </div>
             )}
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter
+          className="shrink-0 border-t bg-background px-6 py-4 max-md:pb-[max(1rem,env(safe-area-inset-bottom))]"
+          style={{ borderColor: LINE }}
+        >
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button
             onClick={() => saveMut.mutate()}
@@ -1199,7 +1198,6 @@ function AddShiftDialog({
               !canManageSchedule ||
               (repeatOn && endMode === "until" && !until)
             }
-            
             style={{ background: GOLD, color: NAVY }}
           >
             {saveMut.isPending ? "Saving…" : "Add shift"}

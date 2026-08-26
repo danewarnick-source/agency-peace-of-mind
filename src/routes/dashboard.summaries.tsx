@@ -93,7 +93,15 @@ function SummariesPage() {
     enabled: !!orgId && isAdmin,
     queryKey: ["summaries", orgId],
     queryFn: async () => {
-      await ensureFn({ data: { organizationId: orgId! } });
+      // Generating this period's rows is best-effort — if it fails for any
+      // reason, still show whatever summaries already exist instead of
+      // silently rendering an empty list (which looked identical to "no
+      // clients have active codes" and hid a real error).
+      try {
+        await ensureFn({ data: { organizationId: orgId! } });
+      } catch (e) {
+        console.error("[summaries] ensureCurrentSummaryPeriods failed:", e);
+      }
       return listFn({ data: { organizationId: orgId! } });
     },
   });
@@ -199,6 +207,15 @@ function SummariesPage() {
           {summariesQ.isFetching ? <Loader2 className="size-4 animate-spin" /> : "Refresh"}
         </Button>
       </div>
+
+      {summariesQ.isError && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive flex items-start gap-2">
+          <AlertTriangle className="size-4 mt-0.5 shrink-0" />
+          <span>
+            Could not load summaries: {summariesQ.error instanceof Error ? summariesQ.error.message : "Unknown error"}
+          </span>
+        </div>
+      )}
 
       {!selectedClientId ? (
         <ClientList

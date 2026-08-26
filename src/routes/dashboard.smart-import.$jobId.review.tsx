@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -25,10 +25,12 @@ import {
   saveBillingCodeRow, saveManualReviewRow, removeExtractedField, restoreExtractedField,
   getJobAssigner, upsertManualAssignment, removeAssignmentMapRow,
   listPendingClientSubjects,
+  applyMissingClientFields,
   ISSUE_KEY_TO_TARGET,
 } from "@/lib/smart-import-review.functions";
 
 import { resolveMergeFlag, overrideValidationIssue } from "@/lib/import-checklist.functions";
+import { parseOwnGuardianValue } from "@/lib/import-validation";
 import { type TenantIdentity, normalizeOrgName } from "@/lib/service-classification";
 import { EVV_SERVICE_CODES } from "@/lib/evv-codes";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,8 +40,33 @@ import { Trash2, Plus, X, RotateCcw, Tag, UserPlus } from "lucide-react";
 
 import { providerSignoff } from "@/lib/hive-migration.functions";
 import { DiscardImportDialog } from "@/components/smart-import/discard-import-dialog";
+import { GuardianConfirmCard } from "@/components/smart-import/guardian-confirm-card";
 import { ApprovalDialog } from "@/components/billing/ApprovalDialog";
 import { lookupApprovalRequestsForFields, type ApprovalRequestRow } from "@/lib/billing-approvals.functions";
+
+/** Dirty-field flush registry — saves in-progress editors before step changes. */
+type FlushFn = () => Promise<unknown>;
+const dirtyFlushRegistry = new Map<string, FlushFn>();
+
+function useRegisterDirtyFlush(id: string, flush: FlushFn | null) {
+  useEffect(() => {
+    if (flush) dirtyFlushRegistry.set(id, flush);
+    else dirtyFlushRegistry.delete(id);
+    return () => {
+      dirtyFlushRegistry.delete(id);
+    };
+  }, [id, flush]);
+}
+
+async function flushAllDirtyEditors() {
+  const fns = [...dirtyFlushRegistry.values()];
+  if (!fns.length) return;
+  await Promise.allSettled(fns.map((fn) => fn()));
+}
+
+function stepStorageKey(jobId: string, subjectId: string) {
+  return `smart-import-step:${jobId}:${subjectId}`;
+}
 
 export const Route = createFileRoute("/dashboard/smart-import/$jobId/review")({
   head: () => ({ meta: [{ title: "Smart Import Review — NECTAR" }] }),
@@ -537,7 +564,60 @@ function SubjectReview({
   const q = useQuery({ queryKey: ["smart-import-subject", subjectId], queryFn: () => getSubj({ data: { subjectId } }) });
   // Lift wizard step up so we can render the rail directly under the name header.
   // Must be declared before any early returns to keep hook order stable.
-  const [step, setStep] = useState<WizardStepId>("person");
+  const [step, setStepState] = useState<WizardStepId>(() => {
+    try {
+      const stored = sessionStorage.getItem(stepStorageKey(jobId, subjectId));
+      if (
+        stored === "person" ||
+        stored === "health" ||
+        stored === "medications" ||
+        stored === "goals" ||
+        stored === "services" ||
+        stored === "plan" ||
+        stored === "staff" ||
+        stored === "review"
+      ) {
+        return stored;
+      }
+    } catch {
+      /* private mode */
+    }
+    return "person";
+  });
+
+  // Reset / restore step when switching subjects.
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem(stepStorageKey(jobId, subjectId));
+      if (
+        stored === "person" ||
+        stored === "health" ||
+        stored === "medications" ||
+        stored === "goals" ||
+        stored === "services" ||
+        stored === "plan" ||
+        stored === "staff" ||
+        stored === "review"
+      ) {
+        setStepState(stored);
+        return;
+      }
+    } catch {
+      /* private mode */
+    }
+    setStepState("person");
+  }, [jobId, subjectId]);
+
+  const setStep = useCallback(async (next: WizardStepId) => {
+    await flushAllDirtyEditors();
+    setStepState(next);
+    try {
+      sessionStorage.setItem(stepStorageKey(jobId, subjectId), next);
+    } catch {
+      /* private mode */
+    }
+  }, [jobId, subjectId]);
+
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["smart-import-subject", subjectId] });
     onChanged();
@@ -583,7 +663,13 @@ function SubjectReview({
   return (
     <div className="space-y-4">
       <SubjectHeader subject={subject} onChanged={refresh} canMarkReady={canMarkReady} />
-      <StepRail steps={steps} activeIdx={activeIdx} onJump={(i) => setStep(steps[i].id)} />
+      <StepRail
+        steps={steps}
+        activeIdx={activeIdx}
+        onJump={(i) => {
+          void setStep(steps[i].id);
+        }}
+      />
       <DedupBanner subject={subject} matched={matched} onChanged={refresh} />
 
       {validation && visibleIssues.length > 0 && (
@@ -673,7 +759,7 @@ function SubjectWizard({
   subjects: SubjectRow[];
   assignments: Array<{ id: string; relation_type: string; staff_subject_id: string | null; client_subject_id: string | null; status: string; inference_reason: string | null }>;
   step: WizardStepId;
-  setStep: (s: WizardStepId) => void;
+  setStep: (s: WizardStepId) => void | Promise<void>;
   steps: Array<{ id: WizardStepId; label: string; badge?: number }>;
   onChanged: () => void;
   commit: () => void;
@@ -696,11 +782,20 @@ function SubjectWizard({
   return (
     <div className="space-y-4">
       {step === "person" && (
-        <PlacementLineup
-          fields={personFieldsAll.filter((f) => f.target_field !== "billing_code_row")}
-          targetFields={targetFields} matched={matched} decision={decision}
-          subjectId={subjectId} tenant={tenant} onChanged={onChanged}
-        />
+        <div className="space-y-3">
+          {jobMode === "client" && (
+            <GuardianConfirmCard
+              subjectId={subjectId}
+              fields={fields}
+              onChanged={onChanged}
+            />
+          )}
+          <PlacementLineup
+            fields={personFieldsAll.filter((f) => f.target_field !== "billing_code_row")}
+            targetFields={targetFields} matched={matched} decision={decision}
+            subjectId={subjectId} tenant={tenant} onChanged={onChanged}
+          />
+        </div>
       )}
       {step === "services" && (
         <PlacementLineup
@@ -788,17 +883,33 @@ function SubjectWizard({
       )}
 
       <div className="flex items-center justify-between gap-2 pt-2">
-        <Button variant="outline" size="sm" onClick={() => setStep(steps[Math.max(0, idx - 1)].id)} disabled={idx === 0}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void setStep(steps[Math.max(0, idx - 1)].id)}
+          disabled={idx === 0}
+        >
           <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Back
         </Button>
         <div className="text-xs text-muted-foreground">Step {idx + 1} of {steps.length}</div>
         {idx === steps.length - 1 ? (
-          <Button size="sm" onClick={commit} disabled={commitDisabled} title={commitReason}>
+          <Button
+            size="sm"
+            onClick={async () => {
+              await flushAllDirtyEditors();
+              commit();
+            }}
+            disabled={commitDisabled}
+            title={commitReason}
+          >
             {commitPending && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
             <Send className="mr-1 h-3.5 w-3.5" /> Complete {jobMode === "client" ? "client" : "staff"} setup
           </Button>
         ) : (
-          <Button size="sm" onClick={() => setStep(steps[Math.min(steps.length - 1, idx + 1)].id)}>
+          <Button
+            size="sm"
+            onClick={() => void setStep(steps[Math.min(steps.length - 1, idx + 1)].id)}
+          >
             Next <ChevronRight className="ml-1 h-3.5 w-3.5" />
           </Button>
         )}
@@ -921,6 +1032,7 @@ const CLIENT_FIELD_LABELS: Record<string, string> = {
   city: "City",
   state: "State",
   postal_code: "ZIP code",
+  is_own_guardian: "Own guardian?",
   guardian_name: "Guardian name",
   guardian_phone: "Guardian phone",
   guardian_email: "Guardian email",
@@ -1001,10 +1113,11 @@ function ValidationPanel({
   subjectId: string;
   validation: { ok: boolean; issues: Array<{ key: string; severity: "error" | "warning"; field?: string; message: string }>; blocking: string[] };
   onChanged: () => void;
-  onNavigateStep?: (id: WizardStepId) => void;
+  onNavigateStep?: (id: WizardStepId) => void | Promise<void>;
 }) {
   const overrideFn = useServerFn(overrideValidationIssue);
   const saveManualFn = useServerFn(saveManualReviewRow);
+  const applyGuardianFn = useServerFn(applyMissingClientFields);
   const m = useMutation({
     mutationFn: (vars: { issueKey: string; overridden: boolean }) =>
       overrideFn({ data: { subjectId, issueKey: vars.issueKey, overridden: vars.overridden } }),
@@ -1015,6 +1128,15 @@ function ValidationPanel({
     mutationFn: (vars: { targetField: string; value: string }) =>
       saveManualFn({ data: { subjectId, targetField: vars.targetField, value: vars.value } }),
     onSuccess: () => { toast.success("Added"); onChanged(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const guardianM = useMutation({
+    mutationFn: (isOwn: boolean) =>
+      applyGuardianFn({ data: { subjectId, values: { is_own_guardian: isOwn } } }),
+    onSuccess: () => {
+      toast.success("Guardian status saved");
+      onChanged();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const [inlineValue, setInlineValue] = useState<Record<string, string>>({});
@@ -1049,6 +1171,8 @@ function ValidationPanel({
         {sortedIssues.map((i) => {
           const isBlocking = blockingSet.has(i.key);
           const codeMatch = i.key.match(/^code\.(confirm_owner|coordination|coordination_info)\.(.+)$/);
+          const isGuardianConfirm =
+            i.key === "guardian.unknown_status" || i.key === "contradiction.guardian_self_vs_named";
           const setCodeBucket = (code: string, bucket: "bill_as_ours" | "coordination" | "ignore") => {
             const all = ["bill_as_ours", "coordination", "ignore"] as const;
             all.forEach((b) => {
@@ -1059,7 +1183,7 @@ function ValidationPanel({
             m.mutate({ issueKey: i.key, overridden: true });
           };
           const help = getIssueHelp(i.key, onNavigateStep);
-          const missingField = fieldKeyFromIssue(i.key);
+          const missingField = isGuardianConfirm ? null : fieldKeyFromIssue(i.key);
           return (
             <li key={i.key} className="flex flex-col gap-2 rounded-md border border-border/70 bg-background/60 px-3 py-2">
               <div className="flex flex-wrap items-start justify-between gap-2">
@@ -1071,10 +1195,16 @@ function ValidationPanel({
                     {i.field && <span className="text-xs text-muted-foreground">{i.field}</span>}
                   </div>
                   <div className="mt-1">{i.message}</div>
-                  {!codeMatch && (
+                  {!codeMatch && !isGuardianConfirm && (
                     <div className="mt-1 text-xs text-muted-foreground">
                       <span className="font-medium text-foreground/80">What to do: </span>
                       {help.whatToDo}
+                    </div>
+                  )}
+                  {isGuardianConfirm && (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Choose whether this client is their own guardian. If they have a separate guardian,
+                      open Person &amp; contacts and enter name + phone.
                     </div>
                   )}
                 </div>
@@ -1085,10 +1215,32 @@ function ValidationPanel({
                         Bill this (ours)
                       </Button>
                       <Button size="sm" variant="outline" disabled={m.isPending} onClick={() => setCodeBucket(codeMatch[2], "coordination")}>
-                        Coordination only (won't bill)
+                        Coordination only (won&apos;t bill)
                       </Button>
                       <Button size="sm" variant="ghost" disabled={m.isPending} onClick={() => setCodeBucket(codeMatch[2], "ignore")}>
                         File as info / ignore
+                      </Button>
+                    </>
+                  ) : isGuardianConfirm ? (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        disabled={guardianM.isPending}
+                        onClick={() => guardianM.mutate(true)}
+                      >
+                        Their own guardian
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={guardianM.isPending}
+                        onClick={() => {
+                          void onNavigateStep?.("person");
+                          guardianM.mutate(false);
+                        }}
+                      >
+                        Separate guardian →
                       </Button>
                     </>
                   ) : (
@@ -1100,7 +1252,7 @@ function ValidationPanel({
                       )}
                       {!missingField && (isBlocking ? (
                         <Button size="sm" variant="default" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: true })}>
-                          Confirm — I've reviewed this
+                          Confirm — I&apos;ve reviewed this
                         </Button>
                       ) : (
                         <Button size="sm" variant="ghost" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: true })}>
@@ -1109,7 +1261,7 @@ function ValidationPanel({
                       ))}
                       {missingField && (
                         <Button size="sm" variant="ghost" disabled={m.isPending} onClick={() => m.mutate({ issueKey: i.key, overridden: true })}>
-                          Doesn't apply — dismiss
+                          Doesn&apos;t apply — dismiss
                         </Button>
                       )}
                     </>
@@ -2430,12 +2582,38 @@ function FieldRowEditor({
   const [target, setTarget] = useState(field.target_field);
   const [dirty, setDirty] = useState(false);
   const dismissed = !!field.dismissed_at;
+  const valueRef = useRef(value);
+  const targetRef = useRef(target);
+  const dirtyRef = useRef(dirty);
+  valueRef.current = value;
+  targetRef.current = target;
+  dirtyRef.current = dirty;
+
+  useEffect(() => {
+    setValue(field.value ?? "");
+    setTarget(field.target_field);
+    setDirty(false);
+  }, [field.id, field.value, field.target_field]);
 
   const m = useMutation({
-    mutationFn: () => edit({ data: { fieldId: field.id, value, target_field: target } }),
+    mutationFn: () =>
+      edit({
+        data: {
+          fieldId: field.id,
+          value: valueRef.current,
+          target_field: targetRef.current,
+        },
+      }),
     onSuccess: () => { toast.success("Saved"); setDirty(false); onChanged(); },
     onError: (e: Error) => toast.error(e.message),
   });
+  const saveIfDirty = useCallback(async () => {
+    if (!dirtyRef.current || dismissed) return;
+    await m.mutateAsync();
+  }, [dismissed, m]);
+
+  useRegisterDirtyFlush(dirty ? `field:${field.id}` : `field:${field.id}:clean`, dirty ? saveIfDirty : null);
+
   const dismissM = useMutation({
     mutationFn: () => dismiss({ data: { fieldId: field.id } }),
     onSuccess: () => { toast.success("Dismissed — will not commit"); onChanged(); },
@@ -2465,6 +2643,7 @@ function FieldRowEditor({
         className={`sm:max-w-xs ${dismissed ? "line-through text-muted-foreground" : ""}`}
         value={value}
         onChange={(e) => { setValue(e.target.value); setDirty(true); }}
+        onBlur={() => { void saveIfDirty(); }}
         disabled={dismissed}
       />
       <span className="text-xs text-muted-foreground">→</span>
@@ -2473,6 +2652,7 @@ function FieldRowEditor({
           className={`sm:max-w-[200px] ${dismissed ? "line-through text-muted-foreground" : ""}`}
           value={target}
           onChange={(e) => { setTarget(e.target.value); setDirty(true); }}
+          onBlur={() => { void saveIfDirty(); }}
           disabled={dismissed}
         />
       ) : (
@@ -2636,11 +2816,28 @@ function QuestionsPanel({
 function QuestionItem({ q, onChanged }: { q: { id: string; question: string; context: string | null; answer: string | null }; onChanged: () => void }) {
   const answer = useServerFn(answerNectarQuestion);
   const [text, setText] = useState(q.answer ?? "");
+  const [dirty, setDirty] = useState(false);
+  const textRef = useRef(text);
+  const dirtyRef = useRef(dirty);
+  textRef.current = text;
+  dirtyRef.current = dirty;
+
+  useEffect(() => {
+    setText(q.answer ?? "");
+    setDirty(false);
+  }, [q.id, q.answer]);
+
   const m = useMutation({
-    mutationFn: () => answer({ data: { questionId: q.id, answer: text } }),
-    onSuccess: () => { toast.success("Answer saved"); onChanged(); },
+    mutationFn: () => answer({ data: { questionId: q.id, answer: textRef.current } }),
+    onSuccess: () => { toast.success("Answer saved"); setDirty(false); onChanged(); },
     onError: (e: Error) => toast.error(e.message),
   });
+  const saveIfDirty = useCallback(async () => {
+    if (!dirtyRef.current || !textRef.current.trim()) return;
+    await m.mutateAsync();
+  }, [m]);
+  useRegisterDirtyFlush(dirty ? `q:${q.id}` : `q:${q.id}:clean`, dirty ? saveIfDirty : null);
+
   return (
     <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="flex items-start gap-2">
@@ -2648,9 +2845,19 @@ function QuestionItem({ q, onChanged }: { q: { id: string; question: string; con
         <div className="flex-1">
           <div className="text-sm font-medium">{q.question}</div>
           {q.context && <div className="mt-0.5 text-xs text-muted-foreground">{q.context}</div>}
-          <Textarea className="mt-2" rows={2} value={text} onChange={(e) => setText(e.target.value)} placeholder="Your answer" />
+          <Textarea
+            className="mt-2"
+            rows={2}
+            value={text}
+            onChange={(e) => { setText(e.target.value); setDirty(true); }}
+            onBlur={() => { void saveIfDirty(); }}
+            placeholder="Your answer"
+          />
           <div className="mt-2 flex justify-end">
-            <Button size="sm" onClick={() => m.mutate()} disabled={m.isPending || !text.trim()}>{m.isPending && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}Save answer</Button>
+            <Button size="sm" onClick={() => m.mutate()} disabled={m.isPending || !text.trim()}>
+              {m.isPending && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+              Save answer
+            </Button>
           </div>
         </div>
       </div>

@@ -12,6 +12,7 @@ import {
   validateClientDraft,
   filterBlocking,
   normalizeGuardianFields,
+  parseOwnGuardianValue,
   type ClientDraft,
 } from "@/lib/import-validation";
 import { fetchTenantIdentity, type TenantIdentity } from "@/lib/service-classification";
@@ -1015,14 +1016,19 @@ function buildClientDraftFromFields(
         d.form_1056_approved_date = v;
         break;
       case "is_own_guardian":
-        try {
-          d.is_own_guardian = !!(JSON.parse(v) as { bool?: boolean }).bool;
-        } catch {
-          d.is_own_guardian = v === "true";
-        }
+        d.is_own_guardian = parseOwnGuardianValue(v);
         break;
       case "guardian_name":
         d.guardian_name = v;
+        break;
+      case "guardian_phone":
+        d.guardian_phone = v;
+        break;
+      case "guardian_relationship":
+        d.guardian_relationship = v;
+        break;
+      case "guardian_email":
+        d.guardian_email = v;
         break;
       case "billing_code_row":
         try {
@@ -1046,6 +1052,8 @@ function buildClientDraftFromFields(
     }
   }
   if (codes.length) d.billing_codes = codes;
+  // Same normalizer as review — strip placeholders but do not invent self-guardian.
+  normalizeGuardianFields(d);
   return d;
 }
 

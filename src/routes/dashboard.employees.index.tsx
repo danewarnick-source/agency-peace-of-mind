@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -27,10 +27,7 @@ import { OnboardingGuidanceBanner } from "@/components/onboarding/onboarding-gui
 
 import { RequirePermission } from "@/components/rbac-guard";
 // Smart Import replaces the legacy NECTAR Bulk Importer dialog.
-import { getRosterTrainingStatus } from "@/lib/hive-training-roster.functions";
 import { PersonAvatar } from "@/components/person/person-avatar";
-import { useEntitlements } from "@/hooks/use-entitlements";
-import { StaffTrainingStrip, type StaffTrainingStatus } from "@/components/training/staff-training-strip";
 import { TrainingRequirementField } from "@/components/hr/training-requirement-field";
 import type { Position } from "@/lib/employee-positions";
 import {
@@ -175,22 +172,6 @@ export function EmployeesPage() {
         .filter((m) => (m.profile?.account_status ?? "active") !== "archived");
     },
   });
-  const fetchTrainingStatus = useServerFn(getRosterTrainingStatus);
-  const { hasAddon } = useEntitlements();
-  const hiveTrainingEnabled = hasAddon("hive_training");
-  const { data: trainingStatus } = useQuery({
-    enabled: !!org && hiveTrainingEnabled,
-    queryKey: ["roster-training-status", org?.organization_id],
-    queryFn: async () => await fetchTrainingStatus({ data: { organizationId: org!.organization_id } }),
-  });
-  const trainingByStaff = useMemo(() => {
-    const m = new Map<string, StaffTrainingStatus[]>();
-    for (const row of trainingStatus ?? []) m.set(row.userId, row.trainings);
-    return m;
-  }, [trainingStatus]);
-
-
-
   const { data: invites } = useQuery({
     enabled: !!org,
     queryKey: ["invites", org?.organization_id],
@@ -511,15 +492,14 @@ export function EmployeesPage() {
                 const openProfile = () => {
                   window.location.href = `/dashboard/employees/${m.user_id}`;
                 };
-                const trainings = trainingByStaff.get(m.user_id) ?? [];
                 const compliance = complianceByStaff.get(m.user_id);
                 const hasOverdue = (compliance?.overdue ?? 0) > 0;
                 const hasExpiring = (compliance?.expiring ?? 0) > 0;
                 const hasPending = (compliance?.pending ?? 0) > 0;
                 const needsAction = hasOverdue || hasExpiring || hasPending;
                 return (
-                  <React.Fragment key={m.id}>
                   <tr
+                    key={m.id}
                     className="cursor-pointer h-12 border-b border-border/50 hover:bg-muted/50 transition-colors"
                     onClick={openProfile}
                   >
@@ -640,15 +620,6 @@ export function EmployeesPage() {
                       </div>
                     </td>
                   </tr>
-                  {trainings.length > 0 && (
-                    <tr className="border-b border-border last:border-0 bg-muted/20">
-                      <td colSpan={6} className="px-4 pb-2">
-                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">DSPD required trainings</div>
-                        <StaffTrainingStrip trainings={trainings} hiveTrainingEnabled={hiveTrainingEnabled} />
-                      </td>
-                    </tr>
-                  )}
-                  </React.Fragment>
                 );
               })}
             </tbody>

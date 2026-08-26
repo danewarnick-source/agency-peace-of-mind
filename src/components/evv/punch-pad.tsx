@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Play, Square, MapPin, Lock, Loader2, AlertTriangle, CheckCircle2, Clock, Wifi,
-  Hexagon, Mic, MicOff, Sparkles, Pencil, ShieldCheck, ExternalLink,
+  Hexagon, Mic, MicOff, Sparkles, Pencil, ShieldCheck, ExternalLink, Compass,
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -24,6 +24,7 @@ import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { computeEntryUnits } from "@/lib/billing-units";
 import { EvvConsentGate } from "@/components/evv/consent-gate";
 import { evaluateShiftNote, type CoachResult } from "@/lib/ai-coach.functions";
+import { expandShiftNote } from "@/lib/voice-documentation.server";
 import { draftVarianceJustification, answerProceduralQuestion, type ProceduralResult } from "@/lib/ai-coach.functions";
 import { NectarInfusionLock } from "@/components/nectar/nectar-infusion-lock";
 import { useNectarInfusion } from "@/hooks/use-nectar-infusion";
@@ -314,6 +315,10 @@ export function PunchPad({
   const [aiIterations, setAiIterations]   = useState(0);
   const [aiFlagCount, setAiFlagCount]     = useState(0);
   const [allowException, setAllowException] = useState(false);
+
+  // ── Compass note expansion (Phase 1 voice documentation) ────────────────────
+  const [expandBusy, setExpandBusy]       = useState(false);
+  const [noteExpanded, setNoteExpanded]   = useState(false);
 
   // ── Voice dictation for the narrative textarea ──────────────────────────────
   const { enabled: nectarInfusionEnabled } = useNectarInfusion();
@@ -977,6 +982,8 @@ export function PunchPad({
     setAiIterations(0);
     setAiFlagCount(0);
     setAllowException(false);
+    setExpandBusy(false);
+    setNoteExpanded(false);
     setAttestationChecked(false);
     setAttestationTimestamp(null);
     setCompletenessRan(false);
@@ -1302,6 +1309,36 @@ export function PunchPad({
       toast.error((e as Error).message || "NECTAR coach unavailable — please try again.");
     } finally {
       setAiBusy(false);
+    }
+  }
+
+  // Expand a short spoken/typed shift note into a complete, SOW-compliant
+  // draft. Staff still edits and attests before submitting — see the amber
+  // "review carefully" notice rendered below the narrative textarea.
+  async function handleExpandWithCompass() {
+    if (!active) return;
+    setExpandBusy(true);
+    try {
+      const clientFirst =
+        lockedClient?.name?.split(" ")?.[0] ??
+        caseload.find((c) => c.id === active.client_id)?.first_name ??
+        "the client";
+
+      const expanded = await expandShiftNote({
+        data: {
+          narrative: narrative.trim(),
+          goals: activeClientGoals,
+          serviceCode: active.service_type_code,
+          clientFirstName: clientFirst,
+        },
+      });
+      setNarrative(expanded);
+      setNoteExpanded(true);
+      if (aiCoach) setAiCoach(null);
+    } catch (e) {
+      toast.error((e as Error).message || "Compass couldn't expand this note — please try again.");
+    } finally {
+      setExpandBusy(false);
     }
   }
 
@@ -2854,18 +2891,39 @@ export function PunchPad({
                       to satisfy state Medicaid auditing and DSPD billing validation criteria.
                     </div>
                   )}
-                  {wordCount >= 20 && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={reviewWithNectar}
-                      disabled={aiBusy}
-                      className="w-fit border-[color:var(--amber-600)]/60 text-[color:var(--amber-700)] hover:bg-[color:var(--amber-50)]"
-                    >
-                      {aiBusy ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-2 h-3.5 w-3.5" />}
-                      Review with NECTAR
-                    </Button>
+                  <div className="flex flex-wrap gap-2">
+                    {wordCount >= 20 && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={reviewWithNectar}
+                        disabled={aiBusy}
+                        className="w-fit border-[color:var(--amber-600)]/60 text-[color:var(--amber-700)] hover:bg-[color:var(--amber-50)]"
+                      >
+                        {aiBusy ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-2 h-3.5 w-3.5" />}
+                        Review with NECTAR
+                      </Button>
+                    )}
+                    {narrative.trim().split(/\s+/).length >= 5 && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleExpandWithCompass}
+                        disabled={expandBusy}
+                        className="w-fit border-[color:var(--amber-600)]/60 text-[color:var(--amber-700)] hover:bg-[color:var(--amber-50)]"
+                      >
+                        {expandBusy ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Compass className="mr-2 h-3.5 w-3.5" />}
+                        Expand with Compass
+                      </Button>
+                    )}
+                  </div>
+                  {noteExpanded && (
+                    <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
+                      ✨ Expanded by Compass — review carefully before attesting. Your attestation confirms this
+                      accurately reflects your shift.
+                    </div>
                   )}
                 </div>
 

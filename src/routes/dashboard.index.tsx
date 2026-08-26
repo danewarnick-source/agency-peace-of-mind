@@ -18,7 +18,7 @@ import { TodayHero } from "@/components/staff-mobile/today-hero";
 import { AttentionStrip } from "@/components/staff-mobile/attention-strip";
 import { NectarOnboardingPanel } from "@/components/onboarding/nectar-onboarding-panel";
 import { MyObligationsWidget } from "@/components/company-obligations/my-obligations-widget";
-import { AdminHome } from "@/components/admin-home/admin-home";
+import { AdminHomeDashboard } from "@/components/admin-home/admin-home-dashboard";
 
 export const Route = createFileRoute("/dashboard/")({
   component: Overview,
@@ -197,7 +197,7 @@ function Overview() {
       {showAdmin && (
         <>
           <NectarOnboardingPanel welcomeFlag={!!welcome} />
-          <AdminHome />
+          <AdminHomeDashboard />
         </>
       )}
 

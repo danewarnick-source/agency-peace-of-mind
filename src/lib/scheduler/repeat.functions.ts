@@ -10,6 +10,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { newShiftStatus } from "@/lib/scheduling/shift-status";
 
 type ShiftRow = {
   id: string;
@@ -202,10 +203,11 @@ export const applyRepeat = createServerFn({ method: "POST" })
         ends_at: p.target_ends_at,
         is_awake_overnight: p.is_awake_overnight,
         notes: p.notes,
-        status: data.keep_staff && p.staff_id ? "pending" : "open",
+        status: newShiftStatus(data.keep_staff ? p.staff_id : null),
         published: data.publish_now === true,
         created_by: userId,
-        created_from: "copy",
+        // CHECK allowlist: manual|template|nectar|import|rotation (not "copy")
+        created_from: "manual",
       });
     }
     if (rows.length > 0) {
@@ -236,6 +238,7 @@ export const createRecurringShifts = createServerFn({ method: "POST" })
     day_of_month?: number;         // monthly only (1..31; clamped to last day if short)
     count?: number;                // occurrences after the seed
     until_date?: string | null;    // ISO date
+    indefinite?: boolean;          // no end — expand to hard cap / 2yr horizon
   }) =>
     z.object({
       organization_id: z.string().uuid(),
@@ -245,6 +248,7 @@ export const createRecurringShifts = createServerFn({ method: "POST" })
       day_of_month: z.number().min(1).max(31).optional(),
       count: z.number().min(1).max(200).optional(),
       until_date: z.string().nullable().optional(),
+      indefinite: z.boolean().optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -264,8 +268,11 @@ export const createRecurringShifts = createServerFn({ method: "POST" })
     const seedStart = new Date(seed.starts_at);
     const seedEnd = new Date(seed.ends_at);
     const durationMs = seedEnd.getTime() - seedStart.getTime();
-    const cap = Math.min(data.count ?? 200, 200);
-    const until = data.until_date ? startOfDay(data.until_date) : null;
+    // Indefinite = open-ended series: fill to the hard cap (200) / 2yr scan.
+    const cap = data.indefinite ? 200 : Math.min(data.count ?? 200, 200);
+    const until = data.indefinite
+      ? null
+      : (data.until_date ? startOfDay(data.until_date) : null);
 
     const dates: Date[] = [];
     if (data.freq === "daily") {
@@ -323,10 +330,11 @@ export const createRecurringShifts = createServerFn({ method: "POST" })
         ends_at: ends.toISOString(),
         is_awake_overnight: seed.is_awake_overnight,
         notes: seed.notes,
-        status: seed.staff_id ? "pending" : "open",
+        status: newShiftStatus(seed.staff_id),
         published: false,
         created_by: userId,
-        created_from: "recurring",
+        // CHECK allowlist: manual|template|nectar|import|rotation (not "recurring")
+        created_from: "manual",
       };
     });
     const { gateScheduledShiftInsert } = await import("@/lib/scheduling/shift-commit");

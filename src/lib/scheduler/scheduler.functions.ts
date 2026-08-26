@@ -5,6 +5,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { coerceScheduledShiftStatus } from "@/lib/scheduling/shift-status";
 
 const ShiftInput = z.object({
   id: z.string().uuid().optional(),
@@ -15,7 +16,7 @@ const ShiftInput = z.object({
   starts_at: z.string().min(1),
   ends_at: z.string().min(1),
   shift_type: z.string().default("hourly"),
-  status: z.string().default("pending"),
+  status: z.string().default("draft"),
   published: z.boolean().default(false),
   notes: z.string().nullable().optional(),
 });
@@ -152,7 +153,8 @@ export const saveShift = createServerFn({ method: "POST" })
       shift_type: data.shift_type,
       starts_at: data.starts_at,
       ends_at: data.ends_at,
-      status: data.status,
+      // Never write legacy "pending" — CHECK constraint rejects it.
+      status: coerceScheduledShiftStatus(data.status, data.staff_id),
       published: data.published,
       notes: data.notes?.trim() || null,
       created_by: userId,

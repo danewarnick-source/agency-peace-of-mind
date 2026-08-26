@@ -8,6 +8,8 @@ export type SchedClient = {
   last_name: string;
   team_id: string | null;
   admin_hours_per_week: number | null;
+  /** When true, staff ideally have ABI training — reminder only, never blocks schedule. */
+  has_abi: boolean;
 };
 export type SchedTeam = { id: string; team_name: string; setting: string | null };
 export type SchedStaff = {
@@ -54,7 +56,7 @@ export function useSchedulerData(weekStart: Date) {
           supabase
             .from("clients")
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .select("id, first_name, last_name, team_id, admin_hours_per_week" as any)
+            .select("id, first_name, last_name, team_id, admin_hours_per_week, has_abi" as any)
             .eq("organization_id", orgId!),
           supabase
             .from("teams")
@@ -91,7 +93,10 @@ export function useSchedulerData(weekStart: Date) {
             .gte("end_date", weekStart.toISOString().slice(0, 10)),
         ]);
       if (shiftsRes.error) throw shiftsRes.error;
-      const clients = (clientsRes.data ?? []) as unknown as SchedClient[];
+      const clients = ((clientsRes.data ?? []) as unknown as Array<SchedClient & { has_abi?: boolean | null }>).map((c) => ({
+        ...c,
+        has_abi: !!c.has_abi,
+      }));
       const teams = (teamsRes.data ?? []) as SchedTeam[];
       const memberIds = Array.from(
         new Set(

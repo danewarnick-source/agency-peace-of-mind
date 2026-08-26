@@ -173,7 +173,7 @@ export function NectarCommandBar({
                 starts_at: a.starts_at,
                 ends_at: a.ends_at,
                 notes: a.reason || null,
-                status: "pending",
+                status: "draft",
                 published: false,
               },
             });
@@ -191,7 +191,7 @@ export function NectarCommandBar({
                 starts_at: cur.starts_at,
                 ends_at: cur.ends_at,
                 notes: null,
-                status: cur.status ?? "pending",
+                status: cur.status === "pending" ? "draft" : (cur.status ?? "draft"),
                 published: !!cur.published,
               },
             });

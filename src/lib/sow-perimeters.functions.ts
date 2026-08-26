@@ -288,3 +288,61 @@ export const getMissingThirtyDayStaffIds = createServerFn({ method: "POST" })
 
     return { missingIds };
   });
+
+/**
+ * Staff missing current ABI training. Scheduler shows this as an admin
+ * reminder when the client has_abi — never blocks scheduling.
+ */
+export const getMissingAbiStaffIds = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ organizationId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) return { missingIds: [] as string[] };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = context.supabase as any;
+    const orgId = data.organizationId;
+    const today = new Date().toISOString().slice(0, 10);
+
+    const { data: memberRows } = await sb
+      .from("organization_members")
+      .select("user_id")
+      .eq("organization_id", orgId);
+    const memberIds: string[] = (memberRows ?? [])
+      .map((m: { user_id: string | null }) => m.user_id)
+      .filter((x: string | null): x is string => !!x);
+
+    if (memberIds.length === 0) return { missingIds: [] as string[] };
+
+    const [profilesRes, trainingsRes] = await Promise.all([
+      sb.from("profiles")
+        .select("id, is_active")
+        .in("id", memberIds),
+      sb.from("staff_baseline_training_completions")
+        .select("staff_id, completed_date, expires_at")
+        .eq("organization_id", orgId)
+        .eq("training_key", SOW_TRAINING_KEYS.ABI),
+    ]);
+
+    const activeIds = ((profilesRes.data ?? []) as Array<{ id: string; is_active: boolean }>)
+      .filter((p) => p.is_active)
+      .map((p) => p.id);
+
+    const trainings = (trainingsRes.data ?? []) as Array<{
+      staff_id: string;
+      completed_date: string | null;
+      expires_at: string | null;
+    }>;
+
+    const missingIds = activeIds.filter(
+      (id) => !isTrainingCurrent(
+        trainings.map((t) => ({ ...t, training_key: SOW_TRAINING_KEYS.ABI })),
+        id,
+        SOW_TRAINING_KEYS.ABI,
+        today,
+      ),
+    );
+
+    return { missingIds };
+  });

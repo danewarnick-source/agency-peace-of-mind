@@ -681,7 +681,7 @@ export const applyDrafts = createServerFn({ method: "POST" })
         if (!d.staff_id) continue;
         const { error } = await supabase
           .from("scheduled_shifts")
-          .update({ staff_id: d.staff_id, status: "pending" })
+          .update({ staff_id: d.staff_id, status: "draft" })
           .eq("id", d.assign_to_shift_id)
           .eq("organization_id", data.organization_id);
         if (error) throw error;
@@ -697,7 +697,7 @@ export const applyDrafts = createServerFn({ method: "POST" })
           job_code: code,
           starts_at: d.starts_at,
           ends_at: d.ends_at,
-          status: d.staff_id ? "pending" : "open",
+          status: d.staff_id ? "draft" : "open",
           published: false,
           shift_type: "hourly",
           notes: d.notes ?? null,

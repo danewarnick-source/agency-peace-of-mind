@@ -18,7 +18,11 @@ const SHIFT_PATCH_ALLOWLIST = new Set([
   "notes", "override_reason", "callout_reason", "shift_type",
 ]);
 
-async function assertActiveBillingCode(
+// Exported so other write paths that create a shift/clock-in outside this
+// file (e.g. the Compass voice agent's thin EVV clock-in) enforce the exact
+// same billing-authorization and Launchpad gates createShift does, instead
+// of duplicating — or worse, drifting from — this logic.
+export async function assertActiveBillingCode(
   supabase: SupabaseClient<Database>,
   organizationId: string,
   clientId: string,
@@ -45,7 +49,7 @@ async function assertActiveBillingCode(
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function assertLaunchpadPassed(supabase: any, staffId: string): Promise<void> {
+export async function assertLaunchpadPassed(supabase: any, staffId: string): Promise<void> {
   const { data, error } = await supabase
     .from("profiles")
     .select("has_passed_launchpad")

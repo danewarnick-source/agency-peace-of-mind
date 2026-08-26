@@ -143,6 +143,13 @@ export interface PunchPadProps {
    * once an active shift for this pad is detected (fires once per mount).
    */
   autoOpenCompliance?: boolean;
+  /**
+   * Pending narrative text handed off from the Compass voice agent's
+   * "expand_note" intent (see compass-voice-button.tsx). Consumed once, the
+   * next time the compliance modal opens, instead of the normal blank note —
+   * everything else about openCompliance()'s reset is unchanged.
+   */
+  initialNarrative?: string;
 }
 
 
@@ -155,11 +162,21 @@ export function PunchPad({
   presetServiceCode,
   lockServiceCode = false,
   autoOpenCompliance = false,
+  initialNarrative,
 }: PunchPadProps) {
 
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
+
+  // Voice-agent handoff — see initialNarrative doc comment above. Ref so a
+  // late-arriving prop (navigation already landed on this component) is
+  // still there the next time openCompliance() runs, without re-triggering
+  // on every render.
+  const pendingVoiceNarrativeRef = useRef<string | null>(initialNarrative ?? null);
+  useEffect(() => {
+    if (initialNarrative) pendingVoiceNarrativeRef.current = initialNarrative;
+  }, [initialNarrative]);
 
   // ── GPS state ───────────────────────────────────────────────────────────────
   // Single watchPosition — no redundant getCurrentPosition call.
@@ -976,14 +993,15 @@ export function PunchPad({
     if (!active) return;
     setCheckedGoals({});
     setBaselineChecked(false);
-    setNarrative("");
+    setNarrative(pendingVoiceNarrativeRef.current ?? "");
+    setNoteExpanded(!!pendingVoiceNarrativeRef.current);
+    pendingVoiceNarrativeRef.current = null;
     setShowNarrativeError(false);
     setAiCoach(null);
     setAiIterations(0);
     setAiFlagCount(0);
     setAllowException(false);
     setExpandBusy(false);
-    setNoteExpanded(false);
     setAttestationChecked(false);
     setAttestationTimestamp(null);
     setCompletenessRan(false);

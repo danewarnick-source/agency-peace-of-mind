@@ -1,24 +1,24 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useTodayShift } from "@/hooks/use-today-shift";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { usePortalView } from "@/hooks/use-portal-view";
+import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Clock, FileText, ArrowRight, Users, FileSignature } from "lucide-react";
 import { listMyPendingPolicies } from "@/lib/policy-signatures.functions";
-import { getAgencyHealthSnapshot, type HealthMetric } from "@/lib/agency-health.functions";
 
 import { StaffClientGrid } from "@/components/staff-client-grid";
-import { CompanyOverview } from "@/components/company-overview";
-import { DeadlinesHomeCard } from "./dashboard.deadlines";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { TodayHero } from "@/components/staff-mobile/today-hero";
 import { AttentionStrip } from "@/components/staff-mobile/attention-strip";
 import { NectarOnboardingPanel } from "@/components/onboarding/nectar-onboarding-panel";
 import { MyObligationsWidget } from "@/components/company-obligations/my-obligations-widget";
+import { AdminHome } from "@/components/admin-home/admin-home";
 
 export const Route = createFileRoute("/dashboard/")({
   component: Overview,
@@ -27,8 +27,6 @@ export const Route = createFileRoute("/dashboard/")({
     return on ? { welcome: true } : {};
   },
 });
-
-
 
 function ComplianceInbox() {
   const { user } = useAuth();
@@ -76,8 +74,6 @@ function ComplianceInbox() {
     },
   });
 
-  // Exclude the currently-active shift — TodayHero already surfaces it
-  // (and promotes itself to a clock-out prompt past 12h).
   const orphanOpenShifts = openShifts.filter((s) => s.id !== active?.id);
   const totalItems = rejectedLogs.length + orphanOpenShifts.length;
   if (totalItems === 0) return null;
@@ -112,7 +108,6 @@ function ComplianceInbox() {
               })}>
               Fix Now <ArrowRight />
             </Button>
-
           </li>
         ))}
         {rejectedLogs.map((l) => (
@@ -141,148 +136,6 @@ function ComplianceInbox() {
     </div>
   );
 }
-
-// ─── Admin Compliance Status Section ─────────────────────────────────────────
-
-function scoreTone(score: number) {
-  if (score >= 90) return { text: "text-emerald-600", ring: "stroke-emerald-500", bg: "bg-emerald-50/60 dark:bg-emerald-950/20", border: "border-emerald-300/60 dark:border-emerald-800/60", dot: "bg-emerald-500" };
-  if (score >= 75) return { text: "text-amber-600", ring: "stroke-amber-500", bg: "bg-amber-50/50 dark:bg-amber-950/20", border: "border-amber-300/70 dark:border-amber-800/60", dot: "bg-amber-500" };
-  return { text: "text-rose-600", ring: "stroke-rose-500", bg: "bg-rose-50/60 dark:bg-rose-950/20", border: "border-rose-300 dark:border-rose-800/60", dot: "bg-rose-500" };
-}
-
-function parseMetricLink(link: string): { to: string; search?: Record<string, string> } {
-  const [path, qs] = link.split("?");
-  if (!qs) return { to: path };
-  const search: Record<string, string> = {};
-  for (const part of qs.split("&")) {
-    const [k, v] = part.split("=");
-    if (k) search[decodeURIComponent(k)] = decodeURIComponent(v ?? "");
-  }
-  return { to: path, search };
-}
-
-function AuditReadinessRing({ score }: { score: number }) {
-  const t = scoreTone(score);
-  const r = 54;
-  const c = 2 * Math.PI * r;
-  const offset = c - (Math.min(100, Math.max(0, score)) / 100) * c;
-  return (
-    <div className="relative grid h-36 w-36 place-items-center">
-      <svg viewBox="0 0 140 140" className="h-36 w-36 -rotate-90" aria-hidden>
-        <circle cx="70" cy="70" r={r} className="fill-none stroke-border" strokeWidth="8" />
-        <circle
-          cx="70"
-          cy="70"
-          r={r}
-          className={`fill-none ${t.ring} transition-all duration-700`}
-          strokeWidth="8"
-          strokeLinecap="round"
-          strokeDasharray={c}
-          strokeDashoffset={offset}
-        />
-      </svg>
-      <div className="absolute inset-0 grid place-items-center">
-        <div className="text-center">
-          <div className={`text-3xl font-semibold tabular-nums ${t.text}`}>{score}%</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MetricStatusDot({ score }: { score: number }) {
-  const t = scoreTone(score);
-  return <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${t.dot}`} aria-hidden />;
-}
-
-function AdminComplianceStatus() {
-  const { data: org } = useCurrentOrg();
-  const orgId = org?.organization_id;
-  const fetchHealth = useServerFn(getAgencyHealthSnapshot);
-
-  const { data, isLoading } = useQuery({
-    enabled: !!orgId,
-    queryKey: ["agency-health", orgId],
-    queryFn: () => fetchHealth({ data: { organizationId: orgId! } }),
-  });
-
-  if (isLoading || !data) {
-    return (
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-        <div className="text-sm text-muted-foreground">Loading audit readiness…</div>
-      </div>
-    );
-  }
-
-  const visible = data.metrics.filter((m: HealthMetric) => m.applicable);
-  const tone = scoreTone(data.overall);
-  const overdueStaff = data.staffWithOverdueObligations;
-
-  return (
-    <div className={`space-y-5 rounded-2xl border ${tone.border} ${tone.bg} p-5 md:p-6 shadow-[var(--shadow-card)]`}>
-      <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-6">
-        <AuditReadinessRing score={data.overall} />
-        <div className="min-w-0 text-center sm:text-left">
-          <h2 className="text-lg font-semibold tracking-tight text-foreground">Audit Readiness Score</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Weighted across {visible.length} DSPD documentation area{visible.length === 1 ? "" : "s"} that apply to this organization.
-          </p>
-        </div>
-      </div>
-
-      <div className="max-h-[28rem] overflow-y-auto rounded-xl border border-border bg-card/80">
-        <ul className="divide-y divide-border">
-          {visible.map((m: HealthMetric) => {
-            const { to, search } = parseMetricLink(m.link);
-            return (
-              <li key={m.key}>
-                <Link
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  to={to as any}
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  search={search as any}
-                  className="flex items-start gap-3 px-3 py-3 transition hover:bg-muted/40 sm:items-center"
-                >
-                  <MetricStatusDot score={m.score} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                      <span className="text-sm font-medium text-foreground">{m.label}</span>
-                      <span className={`text-sm font-semibold tabular-nums ${scoreTone(m.score).text}`}>
-                        {m.score}%
-                      </span>
-                    </div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">
-                      {m.total === 0 && m.score === 100
-                        ? "No active items — compliant"
-                        : `${m.passing} of ${m.total} passing`}
-                    </div>
-                  </div>
-                  <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground sm:mt-0" />
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-
-      <div className="text-sm text-muted-foreground">
-        {overdueStaff > 0 ? (
-          <Link
-            to="/dashboard/company-obligations"
-            className="inline-flex items-center gap-1 font-medium text-rose-700 hover:underline dark:text-rose-300"
-          >
-            {overdueStaff} staff with overdue obligations
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        ) : (
-          <span>No staff with overdue obligations</span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Staff: Policies to acknowledge ──────────────────────────────────────────
 
 function PoliciesToAcknowledgeCard() {
   const { user } = useAuth();
@@ -339,18 +192,14 @@ function Overview() {
   const isStatePreviewAdmin = effectiveView === "state_preview" && subView === "admin";
   const showAdmin = (isManager && effectiveView === "admin") || isStatePreviewAdmin;
 
-
   return (
     <div className="space-y-8">
       {showAdmin && (
         <>
           <NectarOnboardingPanel welcomeFlag={!!welcome} />
-          <AdminComplianceStatus />
-          <DeadlinesHomeCard />
-          <CompanyOverview />
+          <AdminHome />
         </>
       )}
-
 
       {!showAdmin && (
         <div className="space-y-5">
@@ -366,7 +215,6 @@ function Overview() {
           <PoliciesToAcknowledgeCard />
           <ComplianceInbox />
           <StaffClientGrid />
-
         </div>
       )}
     </div>

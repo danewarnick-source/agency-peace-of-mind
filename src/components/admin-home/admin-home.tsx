@@ -2,6 +2,10 @@
  * Admin Home — "the quiet command."
  * Brand-forward hero + readiness, human-only decisions, plain-language picture,
  * Nectar as quiet watcher — styled with platform HIVE tokens (navy / gold / card).
+ *
+ * "What needs you" uses the same Action Required queue as Compliance (sidebar
+ * badge + Action Required tab) so the home count matches that surface.
+ * The readiness ring is an audit % score — never an item count.
  */
 import { useMemo, useRef, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
@@ -10,11 +14,18 @@ import { useServerFn } from "@tanstack/react-start";
 import { ArrowRight, Hexagon, Loader2, Sparkles } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
-import { useDeadlines, type DeadlineItem } from "@/hooks/use-deadlines";
+import { useDeadlines } from "@/hooks/use-deadlines";
+import {
+  useActionRequiredQueue,
+  type ActionRequiredItem,
+} from "@/hooks/use-action-required-queue";
 import { supabase } from "@/integrations/supabase/client";
 import { getAgencyHealthSnapshot } from "@/lib/agency-health.functions";
 import { getCompanyOverview } from "@/lib/company-overview.functions";
 import { cn } from "@/lib/utils";
+
+/** Preview length on Home; lede / CTA use the full Action Required total. */
+const NEEDS_YOU_PREVIEW = 8;
 
 function timeGreeting(): string {
   const h = new Date().getHours();
@@ -29,20 +40,47 @@ function scoreTone(score: number): "ok" | "warn" | "bad" {
   return "bad";
 }
 
-function whenLabel(item: DeadlineItem): { text: string; tone: "overdue" | "today" | "soon" } {
-  if (item.status === "overdue") return { text: "Overdue", tone: "overdue" };
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-  if (item.dueAt >= start && item.dueAt < end) return { text: "Today", tone: "today" };
+function whenLabel(item: ActionRequiredItem): { text: string; tone: "overdue" | "today" | "soon" } {
+  const label = item.dueLabel.toLowerCase();
+  if (
+    item.category === "overdue_obligations" ||
+    item.tone === "red" ||
+    label.includes("overdue")
+  ) {
+    return { text: "Overdue", tone: "overdue" };
+  }
+  if (label.includes("today") || /due in \d+h/.test(label)) {
+    return { text: "Today", tone: "today" };
+  }
   return { text: "This week", tone: "soon" };
+}
+
+function actionRequiredHref(item: ActionRequiredItem): string {
+  const a = item.action;
+  switch (a.kind) {
+    case "obligation":
+      return `/dashboard/company-obligations?tab=action-required&obligation=${a.obligationId}`;
+    case "incident":
+      return a.clientId
+        ? `/dashboard/hub/documentation?tab=incidents&client=${a.clientId}`
+        : "/dashboard/hub/documentation?tab=incidents";
+    case "review_timesheet":
+    case "notify_attest":
+      return `/dashboard/compliance-desk?focus=${a.timesheetId}`;
+    case "hrc":
+      return "/dashboard/hrc";
+    case "hire_dates":
+      return "/dashboard/employees/hire-dates";
+    default:
+      return "/dashboard/company-obligations?tab=action-required";
+  }
 }
 
 function ReadinessRing({ score, tone }: { score: number; tone: "ok" | "warn" | "bad" }) {
   const r = 54;
   const c = 2 * Math.PI * r;
   const clamped = Math.min(100, Math.max(0, score));
+  const rounded = Math.round(clamped);
   const offset = c - (clamped / 100) * c;
   const stroke =
     tone === "ok" ? "var(--success)" : tone === "warn" ? "var(--nectar-gold-500)" : "var(--destructive)";
@@ -54,7 +92,11 @@ function ReadinessRing({ score, tone }: { score: number; tone: "ok" | "warn" | "
         : "text-destructive";
 
   return (
-    <div className="relative grid h-[168px] w-[168px] place-items-center sm:h-[184px] sm:w-[184px]">
+    <div
+      className="relative grid h-[168px] w-[168px] place-items-center sm:h-[184px] sm:w-[184px]"
+      role="img"
+      aria-label={`Audit readiness score ${rounded} percent`}
+    >
       <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90" aria-hidden>
         <circle cx="60" cy="60" r={r} fill="none" className="stroke-border" strokeWidth="9" />
         <circle
@@ -72,11 +114,17 @@ function ReadinessRing({ score, tone }: { score: number; tone: "ok" | "warn" | "
       </svg>
       <div className="absolute inset-0 grid place-items-center text-center">
         <div>
-          <div className={cn("font-display text-4xl font-extrabold tabular-nums tracking-tight sm:text-5xl", text)}>
-            {Math.round(score)}
+          <div
+            className={cn(
+              "font-display text-4xl font-extrabold tabular-nums tracking-tight sm:text-5xl",
+              text,
+            )}
+          >
+            {rounded}
+            <span className="text-[0.55em] font-bold tracking-normal">%</span>
           </div>
           <div className="mt-1 text-[0.65rem] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-            Ready
+            Audit score
           </div>
         </div>
       </div>
@@ -182,18 +230,21 @@ export function AdminHome() {
     },
   });
 
-  const { overdue, dueSoon, upcoming, isLoading: deadlinesLoading } = useDeadlines();
+  const { overdue, dueSoon, upcoming } = useDeadlines();
+  const {
+    items: actionItems,
+    totalCount: needsCount,
+    isLoading: actionLoading,
+  } = useActionRequiredQueue(orgId);
 
-  const needsYou = useMemo(() => {
-    return [...overdue, ...dueSoon]
-      .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime())
-      .slice(0, 8);
-  }, [overdue, dueSoon]);
+  const needsYou = useMemo(
+    () => actionItems.slice(0, NEEDS_YOU_PREVIEW),
+    [actionItems],
+  );
 
   const firstName = profileQ.data || "there";
   const score = healthQ.data?.overall ?? null;
   const tone = score == null ? "ok" : scoreTone(score);
-  const needsCount = needsYou.length;
   const overdueStaff = healthQ.data?.staffWithOverdueObligations ?? 0;
 
   const displayHeadline = useMemo(() => {
@@ -343,22 +394,22 @@ export function AdminHome() {
           id="needs"
           eyebrow="Decisions"
           title="What needs you"
-          lede="Not a feed. Not forty widgets. Only decisions that cannot wait for automation."
+          lede="Same queue as Compliance → Action Required. Only decisions that cannot wait for automation."
           delayClass="[animation-delay:80ms] [animation-fill-mode:both]"
         >
           <div className="divide-y divide-border rounded-xl border border-border bg-background/60">
-            {deadlinesLoading ? (
+            {actionLoading ? (
               <div className="flex items-center gap-2 px-4 py-10 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" /> Loading…
               </div>
-            ) : needsYou.length === 0 ? (
+            ) : needsCount === 0 ? (
               <div className="px-4 py-10 text-sm text-muted-foreground">
                 Nothing in the queue. A good moment to get ahead — or ask Nectar.
               </div>
             ) : (
               needsYou.map((item) => {
                 const when = whenLabel(item);
-                const href = item.href ?? "/dashboard/company-obligations";
+                const href = actionRequiredHref(item);
                 return (
                   <NeedsLink
                     key={item.key}
@@ -380,13 +431,10 @@ export function AdminHome() {
                         {item.title}
                       </h3>
                       <p className="mt-0.5 max-w-[52ch] text-xs text-muted-foreground sm:text-sm">
-                        {item.cadenceLabel || item.dutyTitle || "Open to review and complete."}
+                        {item.subject}
                       </p>
                       <span className="mt-1.5 inline-block text-xs font-medium text-foreground/80">
-                        {item.subject}
-                        {item.dueAtMissing
-                          ? ""
-                          : ` · ${item.dueAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`}
+                        {item.dueLabel}
                       </span>
                     </div>
                     <span className="col-start-2 inline-flex items-center gap-1 self-center text-xs font-semibold text-hive-navy-500 opacity-80 transition group-hover:opacity-100 sm:col-start-auto">
@@ -398,14 +446,17 @@ export function AdminHome() {
             )}
           </div>
 
-          {(overdue.length > 0 || dueSoon.length > 0) && (
+          {needsCount > 0 && (
             <div className="mt-4">
               <Link
                 to="/dashboard/company-obligations"
                 search={{ tab: "action-required" }}
                 className="inline-flex items-center gap-1 text-sm font-semibold text-hive-navy-500 underline-offset-2 transition hover:text-hive-navy-700 hover:underline"
               >
-                See all action required <ArrowRight className="h-3.5 w-3.5" />
+                {needsCount > NEEDS_YOU_PREVIEW
+                  ? `See all ${needsCount} action required`
+                  : "Open Action Required"}{" "}
+                <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </div>
           )}

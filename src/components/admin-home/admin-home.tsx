@@ -1,13 +1,13 @@
 /**
  * Admin Home — "the quiet command."
- * Matches the approved demo: brand-forward hero, readiness signal,
- * only-human-decisions list, plain-language picture, Nectar as quiet watcher.
+ * Brand-forward hero + readiness, human-only decisions, plain-language picture,
+ * Nectar as quiet watcher — styled with platform HIVE tokens (navy / gold / card).
  */
 import { useMemo, useRef, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Hexagon, Loader2, Sparkles } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useDeadlines, type DeadlineItem } from "@/hooks/use-deadlines";
@@ -23,10 +23,10 @@ function timeGreeting(): string {
   return "Good evening";
 }
 
-function scoreTone(score: number): "sage" | "honey" | "rose" {
-  if (score >= 90) return "sage";
-  if (score >= 75) return "honey";
-  return "rose";
+function scoreTone(score: number): "ok" | "warn" | "bad" {
+  if (score >= 90) return "ok";
+  if (score >= 75) return "warn";
+  return "bad";
 }
 
 function whenLabel(item: DeadlineItem): { text: string; tone: "overdue" | "today" | "soon" } {
@@ -39,20 +39,24 @@ function whenLabel(item: DeadlineItem): { text: string; tone: "overdue" | "today
   return { text: "This week", tone: "soon" };
 }
 
-function ReadinessRing({ score, tone }: { score: number; tone: "sage" | "honey" | "rose" }) {
+function ReadinessRing({ score, tone }: { score: number; tone: "ok" | "warn" | "bad" }) {
   const r = 54;
   const c = 2 * Math.PI * r;
   const clamped = Math.min(100, Math.max(0, score));
   const offset = c - (clamped / 100) * c;
   const stroke =
-    tone === "sage" ? "#2f6b4f" : tone === "honey" ? "#d4922a" : "#9b2c2c";
+    tone === "ok" ? "var(--success)" : tone === "warn" ? "var(--nectar-gold-500)" : "var(--destructive)";
   const text =
-    tone === "sage" ? "text-[#2f6b4f]" : tone === "honey" ? "text-[#a86d12]" : "text-[#9b2c2c]";
+    tone === "ok"
+      ? "text-success"
+      : tone === "warn"
+        ? "text-nectar-gold-700"
+        : "text-destructive";
 
   return (
-    <div className="relative grid h-[200px] w-[200px] place-items-center">
-      <svg viewBox="0 0 120 120" className="h-[200px] w-[200px] -rotate-90" aria-hidden>
-        <circle cx="60" cy="60" r={r} fill="none" stroke="rgba(16,19,31,0.08)" strokeWidth="9" />
+    <div className="relative grid h-[168px] w-[168px] place-items-center sm:h-[184px] sm:w-[184px]">
+      <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90" aria-hidden>
+        <circle cx="60" cy="60" r={r} fill="none" className="stroke-border" strokeWidth="9" />
         <circle
           cx="60"
           cy="60"
@@ -68,10 +72,10 @@ function ReadinessRing({ score, tone }: { score: number; tone: "sage" | "honey" 
       </svg>
       <div className="absolute inset-0 grid place-items-center text-center">
         <div>
-          <div className={cn("font-display text-5xl font-extrabold tabular-nums tracking-tight", text)}>
+          <div className={cn("font-display text-4xl font-extrabold tabular-nums tracking-tight sm:text-5xl", text)}>
             {Math.round(score)}
           </div>
-          <div className="mt-1 text-[0.7rem] font-bold uppercase tracking-[0.1em] text-[#5e667c]">
+          <div className="mt-1 text-[0.65rem] font-bold uppercase tracking-[0.12em] text-muted-foreground">
             Ready
           </div>
         </div>
@@ -80,12 +84,53 @@ function ReadinessRing({ score, tone }: { score: number; tone: "sage" | "honey" 
   );
 }
 
+function SectionBlock({
+  id,
+  eyebrow,
+  title,
+  lede,
+  children,
+  className,
+  delayClass,
+}: {
+  id?: string;
+  eyebrow: string;
+  title: string;
+  lede: string;
+  children: ReactNode;
+  className?: string;
+  delayClass?: string;
+}) {
+  return (
+    <section
+      id={id}
+      className={cn(
+        "scroll-mt-6 animate-fade-in rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)] sm:p-6",
+        delayClass,
+        className,
+      )}
+    >
+      <div className="mb-5 border-b border-border pb-4">
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-accent">
+          <Hexagon className="h-3.5 w-3.5" strokeWidth={2.5} />
+          {eyebrow}
+        </div>
+        <h2 className="font-display mt-2 text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+          {title}
+        </h2>
+        <p className="mt-1.5 max-w-[52ch] text-sm leading-relaxed text-muted-foreground">{lede}</p>
+      </div>
+      {children}
+    </section>
+  );
+}
+
 export function AdminHome() {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id ?? null;
   const orgName = org?.organization_name ?? "Your agency";
-  const needsRef = useRef<HTMLElement | null>(null);
+  const needsRef = useRef<HTMLDivElement | null>(null);
 
   const fetchHealth = useServerFn(getAgencyHealthSnapshot);
   const fetchOverview = useServerFn(getCompanyOverview);
@@ -147,7 +192,7 @@ export function AdminHome() {
 
   const firstName = profileQ.data || "there";
   const score = healthQ.data?.overall ?? null;
-  const tone = score == null ? "sage" : scoreTone(score);
+  const tone = score == null ? "ok" : scoreTone(score);
   const needsCount = needsYou.length;
   const overdueStaff = healthQ.data?.staffWithOverdueObligations ?? 0;
 
@@ -170,9 +215,9 @@ export function AdminHome() {
     return `Readiness dipped. ${needsCount || "A few"} decision${needsCount === 1 ? "" : "s"} ${needsCount === 1 ? "is" : "are"} waiting — none of them are mysteries.`;
   }, [score, needsCount]);
 
-  const readyKicker = tone === "sage" ? "Audit readiness" : "Attention required";
+  const readyKicker = tone === "ok" ? "Audit readiness" : "Attention required";
   const readyLine =
-    tone === "sage"
+    tone === "ok"
       ? `Weighted across the DSPD areas that apply to ${orgName} — documentation, EVV, credentials, obligations.`
       : "Still defensible — but open items are pulling the score down until humans finish them.";
   const readySub =
@@ -203,152 +248,150 @@ export function AdminHome() {
   };
 
   return (
-    <div
-      className="relative -mx-4 -mt-6 min-h-[70vh] overflow-hidden px-4 pb-16 md:-mx-8 md:px-8"
-      style={{
-        background:
-          "radial-gradient(900px 520px at 12% -8%, rgba(212,146,42,0.14), transparent 55%), radial-gradient(700px 480px at 100% 8%, rgba(47,107,79,0.09), transparent 50%), linear-gradient(180deg, #f8f5ef 0%, #f6f4ef 38%, #efebe3 100%)",
-      }}
-    >
-      {/* Honeycomb atmosphere */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.35]"
-        style={{
-          backgroundImage:
-            "url(\"data:image/svg+xml,%3Csvg width='56' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M28 0l28 16v32L28 64 0 48V16z' fill='none' stroke='%2310131f' stroke-opacity='0.05' stroke-width='1'/%3E%3C/svg%3E\")",
-          backgroundSize: "56px 64px",
-          maskImage: "linear-gradient(180deg, #000 0%, transparent 70%)",
-        }}
-        aria-hidden
-      />
-
-      <div className="relative mx-auto max-w-[1120px]">
-        {/* ── Hero ── */}
-        <header className="grid grid-cols-1 items-end gap-9 pb-3 pt-8 md:grid-cols-[1.15fr_0.85fr] md:gap-12 md:pt-10 lg:min-h-[min(72vh,720px)]">
-          <div>
-            <div className="mb-4 flex flex-wrap items-baseline gap-3.5">
-              <div className="font-display text-[clamp(3rem,8vw,4.75rem)] font-extrabold leading-[0.9] tracking-[-0.045em] text-[#10131f]">
-                HIVE
-              </div>
-              <div className="pb-1 text-[0.95rem] font-semibold text-[#5e667c]">{orgName}</div>
+    <div className="mx-auto max-w-[1120px] space-y-5 sm:space-y-6">
+      {/* ── Hero block ── */}
+      <section
+        className="animate-fade-in overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]"
+        style={{ animationDuration: "0.45s" }}
+      >
+        <div
+          className="border-b border-border px-5 py-4 sm:px-6"
+          style={{ background: "var(--gradient-soft)" }}
+        >
+          <div className="flex flex-wrap items-baseline gap-3">
+            <div className="font-display text-3xl font-extrabold tracking-tight text-hive-navy-900 sm:text-4xl">
+              HIVE
             </div>
+            <div className="text-sm font-semibold text-muted-foreground">{orgName}</div>
+          </div>
+        </div>
 
-            <h1 className="font-display mb-3.5 max-w-[18ch] text-[clamp(1.55rem,3.2vw,2.35rem)] font-bold leading-[1.15] tracking-[-0.03em] text-[#2a3148]">
+        <div className="grid grid-cols-1 gap-8 p-5 sm:p-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center lg:gap-10">
+          <div>
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-accent">
+              <Hexagon className="h-3.5 w-3.5" strokeWidth={2.5} />
+              Home · Admin
+            </div>
+            <h1 className="font-display mt-2 max-w-[18ch] text-[clamp(1.5rem,3vw,2.15rem)] font-bold leading-tight tracking-tight text-foreground">
               {displayHeadline}
             </h1>
-            <p className="mb-7 max-w-[38ch] text-[1.08rem] text-[#5e667c]">{lede}</p>
+            <p className="mt-3 max-w-[40ch] text-sm leading-relaxed text-muted-foreground sm:text-[0.95rem]">
+              {lede}
+            </p>
 
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="mt-6 flex flex-wrap items-center gap-2.5">
               <button
                 type="button"
                 onClick={scrollToNeeds}
-                className="rounded-[10px] bg-[#10131f] px-[18px] py-3 text-[0.92rem] font-semibold text-[#fffcf7] transition hover:bg-[#1c2438] active:scale-[0.98]"
+                className="inline-flex items-center gap-2 rounded-lg bg-hive-navy-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-hive-navy-600 active:scale-[0.98]"
               >
                 Review what needs you
+                <ArrowRight className="h-4 w-4" />
               </button>
               <Link
                 to="/dashboard/ask-nectar"
-                className="rounded-[10px] border border-[rgba(16,19,31,0.08)] bg-transparent px-[18px] py-3 text-[0.92rem] font-semibold text-[#2a3148] transition hover:bg-[rgba(16,19,31,0.04)]"
+                className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-accent/40 hover:bg-accent/5"
               >
+                <Sparkles className="h-4 w-4 text-accent" />
                 Ask Nectar
               </Link>
             </div>
           </div>
 
-          <div className="justify-self-start md:justify-self-end">
-            <div className="flex w-full max-w-[320px] flex-col items-center gap-4 rounded-[20px] border border-[rgba(16,19,31,0.06)] bg-[rgba(255,252,247,0.72)] px-[22px] py-7 text-center backdrop-blur-[8px]">
-              {score == null ? (
-                <div className="grid h-[200px] w-[200px] place-items-center text-[#5e667c]">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                </div>
-              ) : (
-                <ReadinessRing score={score} tone={tone} />
-              )}
-              <div>
-                <div
-                  className={cn(
-                    "mb-1.5 text-[0.72rem] font-bold uppercase tracking-[0.1em]",
-                    tone === "sage" ? "text-[#2f6b4f]" : tone === "honey" ? "text-[#a86d12]" : "text-[#9b2c2c]",
-                  )}
-                >
-                  {readyKicker}
-                </div>
-                <p className="mx-auto max-w-[28ch] text-[0.95rem] text-[#2a3148]">{readyLine}</p>
-                <p className="mt-2.5 text-[0.8rem] text-[#5e667c]">{readySub}</p>
-                <Link
-                  to="/dashboard/company-obligations"
-                  className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[#10131f] underline-offset-2 hover:underline"
-                >
-                  Open full metrics <ArrowRight className="h-3 w-3" />
-                </Link>
+          <div
+            className={cn(
+              "flex flex-col items-center gap-3 rounded-xl border p-5 text-center transition-colors",
+              tone === "ok" && "border-success/25 bg-success/5",
+              tone === "warn" && "border-nectar-gold-300/60 bg-nectar-gold-50/80",
+              tone === "bad" && "border-destructive/25 bg-destructive/5",
+            )}
+          >
+            {score == null ? (
+              <div className="grid h-[168px] w-[168px] place-items-center text-muted-foreground">
+                <Loader2 className="h-6 w-6 animate-spin" />
               </div>
+            ) : (
+              <ReadinessRing score={score} tone={tone} />
+            )}
+            <div>
+              <div
+                className={cn(
+                  "text-[0.7rem] font-bold uppercase tracking-[0.12em]",
+                  tone === "ok" && "text-success",
+                  tone === "warn" && "text-nectar-gold-700",
+                  tone === "bad" && "text-destructive",
+                )}
+              >
+                {readyKicker}
+              </div>
+              <p className="mx-auto mt-1.5 max-w-[28ch] text-sm text-foreground/80">{readyLine}</p>
+              <p className="mt-2 text-xs text-muted-foreground">{readySub}</p>
+              <Link
+                to="/dashboard/company-obligations"
+                className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-hive-navy-500 underline-offset-2 transition hover:text-hive-navy-700 hover:underline"
+              >
+                Open full metrics <ArrowRight className="h-3 w-3" />
+              </Link>
             </div>
           </div>
+        </div>
+      </section>
 
-          <div className="col-span-full mt-2 inline-flex items-center gap-2 text-[0.78rem] font-semibold uppercase tracking-[0.06em] text-[#5e667c]">
-            <span className="inline-block h-px w-[18px] bg-[#5e667c]" aria-hidden />
-            What needs you
-          </div>
-        </header>
-
-        {/* ── Needs you ── */}
-        <section ref={needsRef} id="needs" className="mt-10 scroll-mt-6">
-          <h2 className="font-display text-[clamp(1.35rem,2.4vw,1.75rem)] tracking-[-0.025em] text-[#10131f]">
-            What needs you
-          </h2>
-          <p className="mb-5 mt-1.5 max-w-[48ch] text-[0.98rem] text-[#5e667c]">
-            Not a feed. Not forty widgets. Only decisions that cannot wait for automation.
-          </p>
-
-          <div className="border-t border-[rgba(16,19,31,0.08)]">
+      {/* ── What needs you ── */}
+      <div ref={needsRef}>
+        <SectionBlock
+          id="needs"
+          eyebrow="Decisions"
+          title="What needs you"
+          lede="Not a feed. Not forty widgets. Only decisions that cannot wait for automation."
+          delayClass="[animation-delay:80ms] [animation-fill-mode:both]"
+        >
+          <div className="divide-y divide-border rounded-xl border border-border bg-background/60">
             {deadlinesLoading ? (
-              <div className="flex items-center gap-2 py-10 text-sm text-[#5e667c]">
+              <div className="flex items-center gap-2 px-4 py-10 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" /> Loading…
               </div>
             ) : needsYou.length === 0 ? (
-              <div className="py-10 text-[0.98rem] text-[#5e667c]">
+              <div className="px-4 py-10 text-sm text-muted-foreground">
                 Nothing in the queue. A good moment to get ahead — or ask Nectar.
               </div>
             ) : (
               needsYou.map((item) => {
                 const when = whenLabel(item);
                 const href = item.href ?? "/dashboard/company-obligations";
-                const body = (
-                  <>
+                return (
+                  <NeedsLink
+                    key={item.key}
+                    href={href}
+                    className="group grid grid-cols-[4.5rem_1fr] gap-3 px-4 py-3.5 text-inherit no-underline transition hover:bg-muted/40 sm:grid-cols-[5rem_1fr_auto] sm:items-center sm:gap-4"
+                  >
                     <div
                       className={cn(
-                        "pt-1 text-[0.72rem] font-bold uppercase tracking-[0.04em]",
-                        when.tone === "overdue" && "text-[#9b2c2c]",
-                        when.tone === "today" && "text-[#a86d12]",
-                        when.tone === "soon" && "text-[#1f4f6e]",
+                        "pt-0.5 text-[0.7rem] font-bold uppercase tracking-[0.06em]",
+                        when.tone === "overdue" && "text-destructive",
+                        when.tone === "today" && "text-nectar-gold-700",
+                        when.tone === "soon" && "text-hive-teal-700",
                       )}
                     >
                       {when.text}
                     </div>
                     <div className="min-w-0">
-                      <h3 className="mb-1 text-[1.02rem] font-semibold tracking-[-0.01em] text-[#10131f]">
+                      <h3 className="text-sm font-semibold tracking-tight text-foreground sm:text-[0.95rem]">
                         {item.title}
                       </h3>
-                      <p className="max-w-[52ch] text-[0.9rem] text-[#5e667c]">
+                      <p className="mt-0.5 max-w-[52ch] text-xs text-muted-foreground sm:text-sm">
                         {item.cadenceLabel || item.dutyTitle || "Open to review and complete."}
                       </p>
-                      <span className="mt-2 inline-block text-[0.8rem] font-semibold text-[#2a3148]">
+                      <span className="mt-1.5 inline-block text-xs font-medium text-foreground/80">
                         {item.subject}
                         {item.dueAtMissing
                           ? ""
                           : ` · ${item.dueAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`}
                       </span>
                     </div>
-                    <span className="col-start-2 self-center whitespace-nowrap text-[0.85rem] font-semibold text-[#10131f] group-hover:underline sm:col-start-auto">
-                      Open →
+                    <span className="col-start-2 inline-flex items-center gap-1 self-center text-xs font-semibold text-hive-navy-500 opacity-80 transition group-hover:opacity-100 sm:col-start-auto">
+                      Open <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
                     </span>
-                  </>
-                );
-                const rowClass =
-                  "group grid grid-cols-[56px_1fr] gap-4 border-b border-[rgba(16,19,31,0.08)] py-[18px] text-inherit no-underline transition hover:bg-[rgba(16,19,31,0.02)] sm:grid-cols-[72px_1fr_auto] sm:items-start";
-                return (
-                  <NeedsLink key={item.key} href={href} className={rowClass}>
-                    {body}
                   </NeedsLink>
                 );
               })
@@ -360,159 +403,162 @@ export function AdminHome() {
               <Link
                 to="/dashboard/company-obligations"
                 search={{ tab: "action-required" }}
-                className="inline-flex items-center gap-1 text-sm font-semibold text-[#10131f] underline-offset-2 hover:underline"
+                className="inline-flex items-center gap-1 text-sm font-semibold text-hive-navy-500 underline-offset-2 transition hover:text-hive-navy-700 hover:underline"
               >
                 See all action required <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </div>
           )}
-        </section>
+        </SectionBlock>
+      </div>
 
-        {/* ── Today's picture ── */}
-        <section className="mt-14">
-          <h2 className="font-display text-[clamp(1.35rem,2.4vw,1.75rem)] tracking-[-0.025em] text-[#10131f]">
-            Today&apos;s picture
-          </h2>
-          <p className="mb-5 mt-1.5 max-w-[48ch] text-[0.98rem] text-[#5e667c]">
-            One honest glance at how the agency is moving — no vanity metrics.
-          </p>
+      {/* ── Today's picture ── */}
+      <SectionBlock
+        eyebrow="Transparency"
+        title="Today's picture"
+        lede="One honest glance at how the agency is moving — no vanity metrics."
+        delayClass="[animation-delay:140ms] [animation-fill-mode:both]"
+      >
+        <div className="grid gap-2 sm:grid-cols-2">
+          <PictureTile
+            label="Coverage"
+            value={
+              att && att.unacceptedShifts > 0 ? (
+                <>
+                  <span className="font-semibold text-nectar-gold-700">{att.unacceptedShifts}</span> open
+                  shift{att.unacceptedShifts === 1 ? "" : "s"} still unaccepted
+                </>
+              ) : (
+                <>
+                  <span className="font-semibold text-foreground">Shifts clear</span>
+                  {" · "}no unaccepted coverage gaps
+                </>
+              )
+            }
+          />
+          <PictureTile
+            label="EVV"
+            value={
+              evv ? (
+                <>
+                  <span className={evv.score >= 90 ? "font-semibold text-success" : "font-semibold text-nectar-gold-700"}>
+                    {evv.passing} / {evv.total}
+                  </span>{" "}
+                  documentation passing
+                  {evv.total - evv.passing > 0
+                    ? ` · ${evv.total - evv.passing} need review`
+                    : " · no open exceptions"}
+                </>
+              ) : (
+                "Loading EVV…"
+              )
+            }
+          />
+          <PictureTile
+            label="Documentation"
+            value={
+              docs ? (
+                <>
+                  <span className={docs.score >= 90 ? "font-semibold text-success" : "font-semibold text-foreground"}>
+                    {docs.passing} / {docs.total}
+                  </span>{" "}
+                  daily notes on track
+                  {att && (att.unsignedNotes > 0 || att.missingDailyLogs > 0) ? (
+                    <>
+                      {" · "}
+                      <span className="font-semibold text-foreground">
+                        {att.unsignedNotes + att.missingDailyLogs}
+                      </span>{" "}
+                      need admin attention
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                "Loading documentation…"
+              )
+            }
+          />
+          <PictureTile
+            label="People"
+            value={
+              peopleQ.data ? (
+                <>
+                  {peopleQ.data.clients} clients · {peopleQ.data.staff} staff
+                  {att && att.expiringCredentials > 0 ? (
+                    <>
+                      {" · "}
+                      <span className="font-semibold text-nectar-gold-700">{att.expiringCredentials}</span> cert
+                      {att.expiringCredentials === 1 ? "" : "s"} expiring
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                "Loading people…"
+              )
+            }
+          />
+          <PictureTile
+            className="sm:col-span-2"
+            label="Billing pulse"
+            value={
+              billing ? (
+                <>
+                  {billing.periodLabel}:{" "}
+                  <span className="font-semibold text-foreground">
+                    {new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: "USD",
+                      maximumFractionDigits: 0,
+                    }).format(billing.claimsReadyAmount)}
+                  </span>{" "}
+                  claims-ready
+                  {billingMetric && billingMetric.total - billingMetric.passing > 0 ? (
+                    <>
+                      {" · "}
+                      <span className="font-semibold text-nectar-gold-700">
+                        {billingMetric.total - billingMetric.passing}
+                      </span>{" "}
+                      accuracy flags
+                    </>
+                  ) : (
+                    " · scrubber quiet"
+                  )}
+                </>
+              ) : billingMetric ? (
+                <>
+                  Billing accuracy{" "}
+                  <span className="font-semibold text-foreground">{billingMetric.score}%</span>
+                  {billingMetric.total - billingMetric.passing > 0
+                    ? ` · ${billingMetric.total - billingMetric.passing} flags`
+                    : " · on track"}
+                </>
+              ) : (
+                "Billing snapshot unavailable for this role"
+              )
+            }
+          />
+        </div>
+      </SectionBlock>
 
-          <div className="border-t border-[rgba(16,19,31,0.08)]">
-            <PictureLane
-              label="Coverage"
-              value={
-                att && att.unacceptedShifts > 0 ? (
-                  <>
-                    <span className="font-bold text-[#a86d12]">{att.unacceptedShifts}</span> open
-                    shift{att.unacceptedShifts === 1 ? "" : "s"} still unaccepted
-                  </>
-                ) : (
-                  <>
-                    <em className="font-bold not-italic text-[#10131f]">Shifts clear</em>
-                    {" · "}
-                    no unaccepted coverage gaps in the queue
-                  </>
-                )
-              }
-            />
-            <PictureLane
-              label="EVV"
-              value={
-                evv ? (
-                  <>
-                    <span className={evv.score >= 90 ? "font-bold text-[#2f6b4f]" : "font-bold text-[#a86d12]"}>
-                      {evv.passing} / {evv.total}
-                    </span>{" "}
-                    documentation passing
-                    {evv.total - evv.passing > 0
-                      ? ` · ${evv.total - evv.passing} need review`
-                      : " · no open exceptions"}
-                  </>
-                ) : (
-                  "Loading EVV…"
-                )
-              }
-            />
-            <PictureLane
-              label="Documentation"
-              value={
-                docs ? (
-                  <>
-                    <span className={docs.score >= 90 ? "font-bold text-[#2f6b4f]" : "font-bold text-[#10131f]"}>
-                      {docs.passing} / {docs.total}
-                    </span>{" "}
-                    daily notes on track
-                    {att && (att.unsignedNotes > 0 || att.missingDailyLogs > 0) ? (
-                      <>
-                        {" · "}
-                        <em className="font-bold not-italic text-[#10131f]">
-                          {att.unsignedNotes + att.missingDailyLogs}
-                        </em>{" "}
-                        need admin attention
-                      </>
-                    ) : null}
-                  </>
-                ) : (
-                  "Loading documentation…"
-                )
-              }
-            />
-            <PictureLane
-              label="People"
-              value={
-                peopleQ.data ? (
-                  <>
-                    {peopleQ.data.clients} active clients · {peopleQ.data.staff} staff on roster
-                    {att && att.expiringCredentials > 0 ? (
-                      <>
-                        {" · "}
-                        <span className="font-bold text-[#a86d12]">{att.expiringCredentials}</span> cert
-                        {att.expiringCredentials === 1 ? "" : "s"} expiring soon
-                      </>
-                    ) : null}
-                  </>
-                ) : (
-                  "Loading people…"
-                )
-              }
-            />
-            <PictureLane
-              label="Billing pulse"
-              value={
-                billing ? (
-                  <>
-                    {billing.periodLabel}:{" "}
-                    <em className="font-bold not-italic text-[#10131f]">
-                      {new Intl.NumberFormat("en-US", {
-                        style: "currency",
-                        currency: "USD",
-                        maximumFractionDigits: 0,
-                      }).format(billing.claimsReadyAmount)}
-                    </em>{" "}
-                    claims-ready
-                    {billingMetric && billingMetric.total - billingMetric.passing > 0 ? (
-                      <>
-                        {" · "}
-                        <span className="font-bold text-[#a86d12]">
-                          {billingMetric.total - billingMetric.passing}
-                        </span>{" "}
-                        accuracy flags
-                      </>
-                    ) : (
-                      " · scrubber quiet"
-                    )}
-                  </>
-                ) : billingMetric ? (
-                  <>
-                    Billing accuracy{" "}
-                    <span className="font-bold text-[#10131f]">{billingMetric.score}%</span>
-                    {billingMetric.total - billingMetric.passing > 0
-                      ? ` · ${billingMetric.total - billingMetric.passing} flags`
-                      : " · on track"}
-                  </>
-                ) : (
-                  "Billing snapshot unavailable for this role"
-                )
-              }
-            />
-          </div>
-        </section>
-
-        {/* ── Nectar strip ── */}
-        <div className="mt-12 grid grid-cols-1 items-end gap-5 border-t-2 border-[#10131f] pt-7 md:grid-cols-[1fr_auto]">
+      {/* ── Nectar ── */}
+      <section
+        className="animate-fade-in overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] [animation-delay:200ms] [animation-fill-mode:both]"
+      >
+        <div className="grid grid-cols-1 gap-6 border-l-4 border-l-accent p-5 sm:p-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
           <div>
-            <div className="mb-2 text-[0.72rem] font-bold uppercase tracking-[0.1em] text-[#a86d12]">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-accent">
+              <Sparkles className="h-3.5 w-3.5" strokeWidth={2.5} />
               Nectar · always advisory
             </div>
-            <h2 className="font-display mb-2 max-w-[18ch] text-[clamp(1.4rem,2.6vw,1.9rem)] tracking-[-0.03em] text-[#10131f]">
+            <h2 className="font-display mt-2 max-w-[18ch] text-xl font-bold tracking-tight text-foreground sm:text-2xl">
               Watching so you don&apos;t have to hover.
             </h2>
-            <p className="max-w-[42ch] text-[0.95rem] text-[#5e667c]">
+            <p className="mt-2 max-w-[42ch] text-sm leading-relaxed text-muted-foreground">
               Nectar drafts, flags, and reminds. It never invents documentation and never publishes
               unreviewed. You stay in control — HIVE just makes the control feel quiet.
             </p>
           </div>
-          <div className="flex min-w-[200px] flex-col gap-2">
+          <div className="flex flex-col gap-2">
             <WatchRow
               name="Scrubber"
               detail={
@@ -534,25 +580,40 @@ export function AdminHome() {
             />
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
 
-function PictureLane({ label, value }: { label: string; value: ReactNode }) {
+function PictureTile({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="grid grid-cols-1 items-baseline gap-1 border-b border-[rgba(16,19,31,0.08)] py-4 sm:grid-cols-[140px_1fr] sm:gap-4">
-      <div className="text-[0.72rem] font-bold uppercase tracking-[0.08em] text-[#5e667c]">{label}</div>
-      <div className="text-[1rem] font-medium text-[#2a3148]">{value}</div>
+    <div
+      className={cn(
+        "rounded-xl border border-border bg-muted/30 px-4 py-3.5 transition hover:bg-muted/50",
+        className,
+      )}
+    >
+      <div className="text-[0.7rem] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+        {label}
+      </div>
+      <div className="mt-1.5 text-sm leading-snug text-foreground/90">{value}</div>
     </div>
   );
 }
 
 function WatchRow({ name, detail, ok }: { name: string; detail: string; ok: boolean }) {
   return (
-    <div className="rounded-lg border border-[rgba(16,19,31,0.08)] bg-[#fffcf7] px-3 py-2.5 text-[0.85rem] text-[#2a3148]">
-      <b className={ok ? "text-[#2f6b4f]" : "text-[#a86d12]"}>{name}</b>
-      <span className="text-[#5e667c]"> · {detail}</span>
+    <div className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground/90 transition hover:border-accent/30">
+      <b className={ok ? "text-success" : "text-nectar-gold-700"}>{name}</b>
+      <span className="text-muted-foreground"> · {detail}</span>
     </div>
   );
 }

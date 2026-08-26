@@ -298,7 +298,7 @@ function AdminHomeDashboardInner() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("company_obligation_instances")
-        .select("id, status, assignee_staff_id, obligation_id, due_on")
+        .select("id, status, assignee_staff_id, obligation_id, due_at")
         .eq("organization_id", orgId!);
       if (error) throw error;
       return (data ?? []) as Array<{
@@ -306,7 +306,7 @@ function AdminHomeDashboardInner() {
         status: string;
         assignee_staff_id: string | null;
         obligation_id: string;
-        due_on: string | null;
+        due_at: string | null;
       }>;
     },
     staleTime: 30_000,

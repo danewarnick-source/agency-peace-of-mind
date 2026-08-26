@@ -26,13 +26,14 @@ import {
 import {
   ClipboardCheck, User, Eraser, Loader2, CheckCircle2,
   FileSignature, CalendarDays, AlertTriangle, CalendarClock,
-  Pen, ShieldAlert,
+  Pen, ShieldAlert, Mic, MicOff, Compass,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   evaluateShiftNote, scanNoteForTriggers,
   type CoachResult, type ScanResult,
 } from "@/lib/ai-coach.functions";
+import { expandShiftNote } from "@/lib/voice-documentation.server";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
 import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
@@ -387,6 +388,16 @@ function DailyLogDialog({
   const [allowException, setAllowException] = useState(false);
   const [showNarrativeError, setShowNarrativeError] = useState(false);
 
+  // ── Voice dictation for the narrative textarea (same pattern as punch-pad.tsx) ──
+  const [isRecording, setIsRecording] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
+
+  // ── Compass note expansion (Phase 1 voice documentation) ────────────────────
+  const [expandBusy, setExpandBusy] = useState(false);
+  const [noteExpanded, setNoteExpanded] = useState(false);
+
   // Incident trigger state
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [showIncidentModal, setShowIncidentModal] = useState(false);
@@ -410,6 +421,7 @@ function DailyLogDialog({
   const journalTitle = program === "RP5" ? "RP5 Daily Summary Note" : "Host Home Daily Compliance Journal";
 
   useEffect(() => {
+    stopRecording();
     if (client) {
       setGoals([]);
       setNarrative("");
@@ -423,11 +435,22 @@ function DailyLogDialog({
       setIncidentDeferred(false);
       setDeferUsed(false);
       setSuccess(null);
+      setExpandBusy(false);
+      setNoteExpanded(false);
       hasSigRef.current = false;
       setTimeout(() => clearCanvas(), 0);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client?.id, date]);
+
+  // Same Web Speech API detection as punch-pad.tsx.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
+    setSpeechSupported(!!SR);
+  }, []);
 
   const words = wordCount(narrative);
   const narrativeOk = words >= MIN_WORDS;
@@ -437,6 +460,77 @@ function DailyLogDialog({
   function toggleGoal(g: string) {
     setGoals((p) => p.includes(g) ? p.filter((x) => x !== g) : [...p, g]);
     if (aiCoach) setAiCoach(null);
+  }
+
+  // ── Voice dictation — continuous mode, interim results off (final-only
+  //    transcripts appended to the narrative, same append pattern as
+  //    punch-pad.tsx's startRecording/stopRecording). ────────────────────────
+  function stopRecording() {
+    try { recognitionRef.current?.stop?.(); } catch { /* ignore */ }
+    recognitionRef.current = null;
+    setIsRecording(false);
+  }
+
+  function startRecording() {
+    if (typeof window === "undefined") return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!SR) {
+      toast.error("Voice input isn't supported on this browser.");
+      return;
+    }
+    try {
+      const rec = new SR();
+      rec.continuous = true;
+      rec.interimResults = false;
+      rec.lang = "en-US";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      rec.onresult = (e: any) => {
+        let finalText = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) finalText += e.results[i][0].transcript + " ";
+        }
+        if (finalText) {
+          setNarrative((prev) => (prev ? prev.trim() + " " : "") + finalText.trim());
+          if (showNarrativeError) setShowNarrativeError(false);
+          if (aiCoach) setAiCoach(null);
+          setScanResult(null);
+        }
+      };
+      rec.onerror = () => stopRecording();
+      rec.onend = () => setIsRecording(false);
+      recognitionRef.current = rec;
+      rec.start();
+      setIsRecording(true);
+    } catch {
+      toast.error("Couldn't start voice input — please type instead.");
+    }
+  }
+
+  // Expand a short spoken/typed daily note into a complete, SOW-compliant
+  // draft. Caregiver still edits and attests (signature) before submitting —
+  // see the amber "review carefully" notice rendered below the narrative.
+  async function handleExpandWithCompass() {
+    if (!client) return;
+    setExpandBusy(true);
+    try {
+      const expanded = await expandShiftNote({
+        data: {
+          narrative: narrative.trim(),
+          goals: client.pcsp_goals ?? [],
+          serviceCode: program,
+          clientFirstName: client.first_name,
+        },
+      });
+      setNarrative(expanded);
+      setNoteExpanded(true);
+      if (aiCoach) setAiCoach(null);
+    } catch (e) {
+      toast.error((e as Error).message || "Compass couldn't expand this note — please try again.");
+    } finally {
+      setExpandBusy(false);
+    }
   }
 
   // ── Signature canvas ─────────────────────────────────────────────────────────
@@ -714,15 +808,48 @@ function DailyLogDialog({
                   rows={6}
                   className="resize-none"
                 />
-                <div className="mt-1.5 flex items-center justify-between text-xs">
+                <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-xs">
                   <span className={narrativeOk ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}>
                     {narrativeOk ? "✓ Minimum met" : `${Math.max(0, MIN_WORDS - words)} more words required`}
                   </span>
-                  <span className="font-mono text-muted-foreground">{words} / {MIN_WORDS} words</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-muted-foreground">{words} / {MIN_WORDS} words</span>
+                    {speechSupported && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => (isRecording ? stopRecording() : startRecording())}
+                        className={`h-8 border ${isRecording ? "border-rose-500/60 text-rose-700" : ""}`}
+                      >
+                        {isRecording ? <MicOff className="mr-2 h-3.5 w-3.5" /> : <Mic className="mr-2 h-3.5 w-3.5" />}
+                        {isRecording ? "Stop voice" : "Dictate log"}
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 {showNarrativeError && !narrativeOk && (
                   <div className="mt-2 rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-300">
                     ⚠️ Your narrative must be at least {MIN_WORDS} words to satisfy DSPD Medicaid documentation requirements.
+                  </div>
+                )}
+                {narrative.trim().split(/\s+/).length >= 5 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleExpandWithCompass}
+                    disabled={expandBusy}
+                    className="mt-2 w-fit border-amber-600/60 text-amber-700 hover:bg-amber-50 dark:text-amber-300"
+                  >
+                    {expandBusy ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Compass className="mr-2 h-3.5 w-3.5" />}
+                    Expand with Compass
+                  </Button>
+                )}
+                {noteExpanded && (
+                  <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
+                    ✨ Expanded by Compass — review carefully before attesting. Your attestation confirms this
+                    accurately reflects your shift.
                   </div>
                 )}
               </div>

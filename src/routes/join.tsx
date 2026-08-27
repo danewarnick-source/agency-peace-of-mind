@@ -14,9 +14,11 @@ import {
   extractInviteToken,
   humanizeInviteError,
   inviteFailureMessage,
+  isValidExistingJoinPassword,
   isValidJoinPassword,
   isValidJoinUsername,
   joinHomeForRole,
+  joinSetsAuthPassword,
 } from "@/lib/join-invite";
 import {
   previewInvitation,
@@ -86,8 +88,12 @@ function JoinPage() {
         "Username must start with a letter and be 3–32 letters, numbers, or underscores.",
       );
     }
-    if (!isValidJoinPassword(password)) {
-      return toast.error("Password must be at least 8 characters and include a number.");
+    if (joinSetsAuthPassword(preview.account_exists)) {
+      if (!isValidJoinPassword(password)) {
+        return toast.error("Password must be at least 8 characters and include a number.");
+      }
+    } else if (!isValidExistingJoinPassword(password)) {
+      return toast.error("Enter the password you already use to sign in.");
     }
     if (password !== confirm) return toast.error("Passwords don't match.");
 
@@ -160,13 +166,20 @@ function JoinPage() {
   }
 
   const roleLabel = ROLE_LABEL[preview.role as Role] ?? preview.role;
+  const setsNewPassword = joinSetsAuthPassword(preview.account_exists);
   const matchOk = password.length > 0 && password === confirm;
-  const lenOk = isValidJoinPassword(password);
+  const lenOk = setsNewPassword
+    ? isValidJoinPassword(password)
+    : isValidExistingJoinPassword(password);
 
   return (
     <AuthShell
       title={`Join ${preview.org_name}`}
-      subtitle={`You've been invited as ${roleLabel}. Set how you'll sign in — this is not a new company.`}
+      subtitle={
+        setsNewPassword
+          ? `You've been invited as ${roleLabel}. Set how you'll sign in — this is not a new company.`
+          : `You've been invited as ${roleLabel}. Use the password you already sign in with — this is not a new company.`
+      }
     >
       <form onSubmit={onSubmit} className="grid gap-4" data-testid="join-form">
         <div className="grid gap-2">
@@ -213,18 +226,25 @@ function JoinPage() {
           </div>
         )}
         <div className="grid gap-2">
-          <Label htmlFor="join-password">Password</Label>
+          <Label htmlFor="join-password">
+            {setsNewPassword ? "Password" : "Password you already use"}
+          </Label>
           <PasswordInput
             id="join-password"
             name="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            autoComplete="new-password"
+            autoComplete={setsNewPassword ? "new-password" : "current-password"}
             className="bg-white/5 text-white"
           />
-          {!lenOk && password.length > 0 && (
+          {setsNewPassword && !lenOk && password.length > 0 && (
             <p className="text-xs text-amber-200/80">At least 8 characters and one number.</p>
+          )}
+          {!setsNewPassword && (
+            <p className="text-xs text-white/45">
+              This does not change your password. Use the same one you use on the sign-in page.
+            </p>
           )}
         </div>
         <div className="grid gap-2">
@@ -235,7 +255,7 @@ function JoinPage() {
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             required
-            autoComplete="new-password"
+            autoComplete={setsNewPassword ? "new-password" : "current-password"}
             className="bg-white/5 text-white"
           />
           {confirm.length > 0 && !matchOk && (

@@ -3,7 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 // ws is required for Supabase realtime in Node.js < 22 (no native WebSocket)
 import ws from 'ws';
-import { supabase as e2eSupabase } from "../../../e2e/mocks/supabase-client";
+// Do not import e2e/mocks here. Local Playwright swaps this module via the
+// vite plugin when VITE_E2E_HARNESS=1 — a static import would ship the stub
+// into production bundles.
 
 function getEnv() {
   const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -76,10 +78,6 @@ function getServerClient() {
 // import { supabase } from "@/integrations/supabase/client";
 export const supabase = new Proxy({} as unknown as ReturnType<typeof createClient<Database>> & object, {
   get(_, prop, receiver) {
-    if (import.meta.env.VITE_E2E_HARNESS === "1") {
-      const value = (e2eSupabase as Record<string | symbol, unknown>)[prop];
-      return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(e2eSupabase) : value;
-    }
     const client = hasBrowserStorage() ? getBrowserClient() : getServerClient();
     return Reflect.get(client, prop, receiver);
   },

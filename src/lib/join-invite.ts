@@ -103,6 +103,19 @@ export function isValidJoinPassword(password: string): boolean {
   return password.length >= 8 && /\d/.test(password);
 }
 
+/**
+ * New invitees set a password. Existing auth users must type the password they
+ * already use — join must never call admin.updateUserById({ password }).
+ */
+export function joinSetsAuthPassword(accountExists: boolean): boolean {
+  return !accountExists;
+}
+
+/** Existing accounts: any non-empty password is sent to Auth to verify. */
+export function isValidExistingJoinPassword(password: string): boolean {
+  return password.length > 0 && password.length <= 200;
+}
+
 export function isValidJoinUsername(username: string): boolean {
   return /^[a-zA-Z][a-zA-Z0-9_]{2,31}$/.test(username.trim());
 }

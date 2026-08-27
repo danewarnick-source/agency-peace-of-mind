@@ -25,6 +25,13 @@ import { computeEntryUnits } from "@/lib/billing-units";
 import { EvvConsentGate } from "@/components/evv/consent-gate";
 import { evaluateShiftNote, type CoachResult } from "@/lib/ai-coach.functions";
 import { expandShiftNote } from "@/lib/voice-documentation.server";
+import { freezeOriginalTranscript } from "@/lib/original-transcript";
+import {
+  accumulateSpeechResults,
+  beginContinuousRecognition,
+  type ContinuousSpeechSession,
+} from "@/lib/continuous-speech";
+import { OriginalSpeechAudit } from "@/components/staff-mobile/original-speech-audit";
 import { draftVarianceJustification, answerProceduralQuestion, type ProceduralResult } from "@/lib/ai-coach.functions";
 import { NectarInfusionLock } from "@/components/nectar/nectar-infusion-lock";
 import { useNectarInfusion } from "@/hooks/use-nectar-infusion";
@@ -150,6 +157,12 @@ export interface PunchPadProps {
    * everything else about openCompliance()'s reset is unchanged.
    */
   initialNarrative?: string;
+  /**
+   * Original spoken transcript from the same Compass turn. Shown read-only
+   * in the compliance modal and persisted as original_transcript on attest.
+   * Never written into shift_note_text.
+   */
+  initialOriginalTranscript?: string;
 }
 
 
@@ -163,6 +176,7 @@ export function PunchPad({
   lockServiceCode = false,
   autoOpenCompliance = false,
   initialNarrative,
+  initialOriginalTranscript,
 }: PunchPadProps) {
 
   const { user } = useAuth();
@@ -174,9 +188,17 @@ export function PunchPad({
   // still there the next time openCompliance() runs, without re-triggering
   // on every render.
   const pendingVoiceNarrativeRef = useRef<string | null>(initialNarrative ?? null);
+  const pendingOriginalTranscriptRef = useRef<string | null>(
+    initialOriginalTranscript ?? null,
+  );
   useEffect(() => {
     if (initialNarrative) pendingVoiceNarrativeRef.current = initialNarrative;
   }, [initialNarrative]);
+  useEffect(() => {
+    if (initialOriginalTranscript) {
+      pendingOriginalTranscriptRef.current = initialOriginalTranscript;
+    }
+  }, [initialOriginalTranscript]);
 
   // ── GPS state ───────────────────────────────────────────────────────────────
   // Single watchPosition — no redundant getCurrentPosition call.
@@ -336,13 +358,20 @@ export function PunchPad({
   // ── Compass note expansion (Phase 1 voice documentation) ────────────────────
   const [expandBusy, setExpandBusy]       = useState(false);
   const [noteExpanded, setNoteExpanded]   = useState(false);
+  const [originalTranscript, setOriginalTranscript] = useState("");
+  // First Compass expansion (before staff edits). Written to
+  // nectar_attestations.nectar_expanded_output; original speech stays separate.
+  const firstExpandedRef = useRef<string | null>(null);
 
   // ── Voice dictation for the narrative textarea ──────────────────────────────
   const { enabled: nectarInfusionEnabled } = useNectarInfusion();
   const [isRecording, setIsRecording]         = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognitionRef = useRef<any>(null);
+  const recognitionSessionRef = useRef<ContinuousSpeechSession | null>(null);
+  const recordingWantedRef = useRef(false);
+  const dictationBaseRef = useRef("");
+  const dictationPriorFinalsRef = useRef("");
+  const dictationLiveFinalsRef = useRef("");
 
   // ── Staff attestation (Medicaid fraud statement) ────────────────────────────
   const [attestationChecked, setAttestationChecked] = useState(false);
@@ -993,9 +1022,18 @@ export function PunchPad({
     if (!active) return;
     setCheckedGoals({});
     setBaselineChecked(false);
-    setNarrative(pendingVoiceNarrativeRef.current ?? "");
-    setNoteExpanded(!!pendingVoiceNarrativeRef.current);
+    const pendingNote = pendingVoiceNarrativeRef.current;
+    const pendingSpoken = pendingOriginalTranscriptRef.current;
+    setNarrative(pendingNote ?? "");
+    setNoteExpanded(!!pendingNote);
+    if (pendingNote) {
+      if (!firstExpandedRef.current) firstExpandedRef.current = pendingNote;
+    } else {
+      firstExpandedRef.current = null;
+    }
+    setOriginalTranscript(pendingSpoken ?? "");
     pendingVoiceNarrativeRef.current = null;
+    pendingOriginalTranscriptRef.current = null;
     setShowNarrativeError(false);
     setAiCoach(null);
     setAiIterations(0);
@@ -1190,43 +1228,51 @@ export function PunchPad({
 
 
   function stopRecording() {
-    try { recognitionRef.current?.stop?.(); } catch { /* ignore */ }
-    recognitionRef.current = null;
+    recordingWantedRef.current = false;
+    recognitionSessionRef.current?.stop();
+    recognitionSessionRef.current = null;
     setIsRecording(false);
   }
 
   function startRecording() {
     if (typeof window === "undefined") return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const w = window as any;
-    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if (!SR) {
+    stopRecording();
+    recordingWantedRef.current = true;
+    dictationBaseRef.current = narrative;
+    dictationPriorFinalsRef.current = "";
+    dictationLiveFinalsRef.current = "";
+    const session = beginContinuousRecognition({
+      interimResults: true,
+      shouldContinue: () => recordingWantedRef.current,
+      onResult: (e) => {
+        const { finals, display } = accumulateSpeechResults(
+          dictationPriorFinalsRef.current,
+          e.results,
+        );
+        dictationLiveFinalsRef.current = finals;
+        const base = dictationBaseRef.current.trim();
+        setNarrative(base && display ? `${base} ${display}` : display || base);
+        if (display.trim()) {
+          setShowNarrativeError(false);
+          setAiCoach(null);
+        }
+      },
+      onSessionEnd: () => {
+        dictationPriorFinalsRef.current = dictationLiveFinalsRef.current;
+      },
+      onFatalStop: () => {
+        recordingWantedRef.current = false;
+        recognitionSessionRef.current = null;
+        setIsRecording(false);
+      },
+    });
+    if (!session) {
+      recordingWantedRef.current = false;
       toast.error("Voice input isn't supported on this browser.");
       return;
     }
-    try {
-      const rec = new SR();
-      rec.continuous = true;
-      rec.interimResults = true;
-      rec.lang = "en-US";
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      rec.onresult = (e: any) => {
-        let finalText = "";
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          if (e.results[i].isFinal) finalText += e.results[i][0].transcript + " ";
-        }
-        if (finalText) {
-          setNarrative((prev) => (prev ? prev.trim() + " " : "") + finalText.trim());
-        }
-      };
-      rec.onerror = () => stopRecording();
-      rec.onend = () => setIsRecording(false);
-      recognitionRef.current = rec;
-      rec.start();
-      setIsRecording(true);
-    } catch {
-      toast.error("Couldn't start voice input — please type instead.");
-    }
+    recognitionSessionRef.current = session;
+    setIsRecording(true);
   }
 
   async function handleDraftVariance(phase: "clock_in" | "clock_out") {
@@ -1342,14 +1388,17 @@ export function PunchPad({
         caseload.find((c) => c.id === active.client_id)?.first_name ??
         "the client";
 
+      const source = narrative.trim();
       const expanded = await expandShiftNote({
         data: {
-          narrative: narrative.trim(),
+          narrative: source,
           goals: activeClientGoals,
           serviceCode: active.service_type_code,
           clientFirstName: clientFirst,
         },
       });
+      setOriginalTranscript((prev) => freezeOriginalTranscript(prev, source));
+      if (!firstExpandedRef.current) firstExpandedRef.current = expanded;
       setNarrative(expanded);
       setNoteExpanded(true);
       if (aiCoach) setAiCoach(null);
@@ -1548,6 +1597,11 @@ export function PunchPad({
     update.nectar_review_service_code = active.service_type_code;
     update.attested_accurate = true;
     update.attested_at = attestationTimestamp;
+    const frozenOriginal = freezeOriginalTranscript(originalTranscript, null);
+    if (frozenOriginal) {
+      // Frozen original speech — never replaced with the expanded/edited note.
+      update.original_transcript = frozenOriginal;
+    }
 
     // Permanent legal record of the staff attestation — written for every
     // submitted shift, not just ones NECTAR reviewed.
@@ -1567,6 +1621,8 @@ export function PunchPad({
           service_code: active.service_type_code,
           nectar_review_status: aiCoach?.status ?? "not_reviewed",
         },
+        original_staff_input: frozenOriginal || null,
+        nectar_expanded_output: firstExpandedRef.current || null,
         input_confirmed_at: attestationTimestamp,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any);
@@ -2873,6 +2929,7 @@ export function PunchPad({
                       {activeClientGoals.length > 3 && ` (+${activeClientGoals.length - 3} more)`}
                     </div>
                   )}
+                  <OriginalSpeechAudit transcript={originalTranscript} />
                   <Textarea
                     id="evv-narrative"
                     rows={7}
@@ -2940,7 +2997,7 @@ export function PunchPad({
                   {noteExpanded && (
                     <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
                       ✨ Expanded by Compass — review carefully before attesting. Your attestation confirms this
-                      accurately reflects your shift.
+                      accurately reflects your shift. Original speech is kept separately and is not overwritten.
                     </div>
                   )}
                 </div>

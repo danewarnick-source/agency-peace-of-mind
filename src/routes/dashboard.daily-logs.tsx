@@ -34,6 +34,13 @@ import {
   type CoachResult, type ScanResult,
 } from "@/lib/ai-coach.functions";
 import { expandShiftNote } from "@/lib/voice-documentation.server";
+import { freezeOriginalTranscript } from "@/lib/original-transcript";
+import {
+  accumulateSpeechResults,
+  beginContinuousRecognition,
+  type ContinuousSpeechSession,
+} from "@/lib/continuous-speech";
+import { OriginalSpeechAudit } from "@/components/staff-mobile/original-speech-audit";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
 import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
@@ -391,12 +398,16 @@ function DailyLogDialog({
   // ── Voice dictation for the narrative textarea (same pattern as punch-pad.tsx) ──
   const [isRecording, setIsRecording] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognitionRef = useRef<any>(null);
+  const recognitionSessionRef = useRef<ContinuousSpeechSession | null>(null);
+  const recordingWantedRef = useRef(false);
+  const dictationBaseRef = useRef("");
+  const dictationPriorFinalsRef = useRef("");
+  const dictationLiveFinalsRef = useRef("");
 
   // ── Compass note expansion (Phase 1 voice documentation) ────────────────────
   const [expandBusy, setExpandBusy] = useState(false);
   const [noteExpanded, setNoteExpanded] = useState(false);
+  const [originalTranscript, setOriginalTranscript] = useState("");
 
   // Incident trigger state
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
@@ -437,6 +448,7 @@ function DailyLogDialog({
       setSuccess(null);
       setExpandBusy(false);
       setNoteExpanded(false);
+      setOriginalTranscript("");
       hasSigRef.current = false;
       setTimeout(() => clearCanvas(), 0);
     }
@@ -462,50 +474,55 @@ function DailyLogDialog({
     if (aiCoach) setAiCoach(null);
   }
 
-  // ── Voice dictation — continuous mode, interim results off (final-only
-  //    transcripts appended to the narrative, same append pattern as
-  //    punch-pad.tsx's startRecording/stopRecording). ────────────────────────
+  // ── Voice dictation — continuous mode, keep the mic open across Chrome
+  //    onend / no-speech (same restart loop as punch-pad Dictate). ────────────
   function stopRecording() {
-    try { recognitionRef.current?.stop?.(); } catch { /* ignore */ }
-    recognitionRef.current = null;
+    recordingWantedRef.current = false;
+    recognitionSessionRef.current?.stop();
+    recognitionSessionRef.current = null;
     setIsRecording(false);
   }
 
   function startRecording() {
     if (typeof window === "undefined") return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const w = window as any;
-    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if (!SR) {
+    stopRecording();
+    recordingWantedRef.current = true;
+    dictationBaseRef.current = narrative;
+    dictationPriorFinalsRef.current = "";
+    dictationLiveFinalsRef.current = "";
+    const session = beginContinuousRecognition({
+      interimResults: true,
+      shouldContinue: () => recordingWantedRef.current,
+      onResult: (e) => {
+        const { finals, display } = accumulateSpeechResults(
+          dictationPriorFinalsRef.current,
+          e.results,
+        );
+        dictationLiveFinalsRef.current = finals;
+        const base = dictationBaseRef.current.trim();
+        setNarrative(base && display ? `${base} ${display}` : display || base);
+        if (display.trim()) {
+          setShowNarrativeError(false);
+          setAiCoach(null);
+          setScanResult(null);
+        }
+      },
+      onSessionEnd: () => {
+        dictationPriorFinalsRef.current = dictationLiveFinalsRef.current;
+      },
+      onFatalStop: () => {
+        recordingWantedRef.current = false;
+        recognitionSessionRef.current = null;
+        setIsRecording(false);
+      },
+    });
+    if (!session) {
+      recordingWantedRef.current = false;
       toast.error("Voice input isn't supported on this browser.");
       return;
     }
-    try {
-      const rec = new SR();
-      rec.continuous = true;
-      rec.interimResults = false;
-      rec.lang = "en-US";
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      rec.onresult = (e: any) => {
-        let finalText = "";
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          if (e.results[i].isFinal) finalText += e.results[i][0].transcript + " ";
-        }
-        if (finalText) {
-          setNarrative((prev) => (prev ? prev.trim() + " " : "") + finalText.trim());
-          if (showNarrativeError) setShowNarrativeError(false);
-          if (aiCoach) setAiCoach(null);
-          setScanResult(null);
-        }
-      };
-      rec.onerror = () => stopRecording();
-      rec.onend = () => setIsRecording(false);
-      recognitionRef.current = rec;
-      rec.start();
-      setIsRecording(true);
-    } catch {
-      toast.error("Couldn't start voice input — please type instead.");
-    }
+    recognitionSessionRef.current = session;
+    setIsRecording(true);
   }
 
   // Expand a short spoken/typed daily note into a complete, SOW-compliant
@@ -515,14 +532,16 @@ function DailyLogDialog({
     if (!client) return;
     setExpandBusy(true);
     try {
+      const source = narrative.trim();
       const expanded = await expandShiftNote({
         data: {
-          narrative: narrative.trim(),
+          narrative: source,
           goals: client.pcsp_goals ?? [],
           serviceCode: program,
           clientFirstName: client.first_name,
         },
       });
+      setOriginalTranscript((prev) => freezeOriginalTranscript(prev, source));
       setNarrative(expanded);
       setNoteExpanded(true);
       if (aiCoach) setAiCoach(null);
@@ -600,6 +619,11 @@ function DailyLogDialog({
       ],
       ai_trigger_reasons: opts.scanResult?.triggerTypes ?? [],
     };
+
+    const frozenOriginal = freezeOriginalTranscript(originalTranscript, null);
+    if (frozenOriginal) {
+      (payload as Record<string, unknown>).original_transcript = frozenOriginal;
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await supabase.from("daily_logs").insert(payload as any);
@@ -795,6 +819,7 @@ function DailyLogDialog({
                 <Label htmlFor="narrative" className="mb-2 block text-sm font-medium">
                   📝 Daily Summary Narrative
                 </Label>
+                <OriginalSpeechAudit transcript={originalTranscript} />
                 <Textarea
                   id="narrative"
                   value={narrative}
@@ -849,7 +874,7 @@ function DailyLogDialog({
                 {noteExpanded && (
                   <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
                     ✨ Expanded by Compass — review carefully before attesting. Your attestation confirms this
-                    accurately reflects your shift.
+                    accurately reflects your shift. Original speech is kept separately and is not overwritten.
                   </div>
                 )}
               </div>

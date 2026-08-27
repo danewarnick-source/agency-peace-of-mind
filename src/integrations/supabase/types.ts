@@ -5410,6 +5410,7 @@ export type Database = {
           log_date: string
           narrative: string
           organization_id: string
+          original_transcript: string | null
           original_due_date: string | null
           pcsp_goals_addressed: string[]
           requires_followup_form: boolean
@@ -5449,6 +5450,7 @@ export type Database = {
           log_date?: string
           narrative: string
           organization_id: string
+          original_transcript?: string | null
           original_due_date?: string | null
           pcsp_goals_addressed?: string[]
           requires_followup_form?: boolean
@@ -5488,6 +5490,7 @@ export type Database = {
           log_date?: string
           narrative?: string
           organization_id?: string
+          original_transcript?: string | null
           original_due_date?: string | null
           pcsp_goals_addressed?: string[]
           requires_followup_form?: boolean
@@ -6690,6 +6693,7 @@ export type Database = {
           service_type_code: string
           shift_entry_type: string
           shift_note_text: string | null
+          original_transcript: string | null
           staff_confirmed_at: string | null
           staff_confirmed_by: string | null
           staff_flag_reason: string | null
@@ -6775,6 +6779,7 @@ export type Database = {
           service_type_code: string
           shift_entry_type: string
           shift_note_text?: string | null
+          original_transcript?: string | null
           staff_confirmed_at?: string | null
           staff_confirmed_by?: string | null
           staff_flag_reason?: string | null
@@ -6860,6 +6865,7 @@ export type Database = {
           service_type_code?: string
           shift_entry_type?: string
           shift_note_text?: string | null
+          original_transcript?: string | null
           staff_confirmed_at?: string | null
           staff_confirmed_by?: string | null
           staff_flag_reason?: string | null

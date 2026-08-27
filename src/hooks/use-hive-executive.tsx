@@ -16,11 +16,13 @@ export function useIsHiveExecutive() {
   // the brief window after queryClient.clear() but before the refetch has
   // started, which would otherwise let downstream redirects fire with a
   // stale `isExecutive=false` and bounce the user off /dashboard/hive-exec.
+  // An error is not "still loading" — treat it as not-executive so the
+  // rest of the dashboard can render. Leaving q.data === undefined as
+  // loading forever stuck the shell on "Loading…" whenever the check
+  // failed (network, Unauthorized, etc.).
   const isLoading =
     authLoading ||
     !session?.user?.id ||
-    q.isLoading ||
-    q.isFetching ||
-    q.data === undefined;
+    ((q.isLoading || q.isFetching || q.data === undefined) && !q.isError);
   return { isExecutive: !!q.data?.isExecutive, isLoading };
 }

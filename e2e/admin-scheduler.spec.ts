@@ -80,6 +80,15 @@ async function expandCode(page: Page, code: string) {
   await header.click();
 }
 
+/** Staff-view preview picker — not the sidebar Portal View combobox. */
+async function openStaffPreviewPicker(page: Page) {
+  await page.getByRole("button", { name: /Staff view/i }).click();
+  await expect(page.getByText(/Staff portal preview/i)).toBeVisible({ timeout: 8_000 });
+  const trigger = page.getByText(/Staff portal preview/i).locator("xpath=..").getByRole("combobox");
+  await expect(trigger).toBeVisible();
+  await trigger.click();
+}
+
 test.describe("Admin scheduler — True North Sep 1", () => {
   test("1. admin can open /dashboard/scheduler without crash; calendar renders", async ({ page }) => {
     const mock = await openAdminScheduler(page);
@@ -152,13 +161,9 @@ test.describe("Admin scheduler — True North Sep 1", () => {
     await expect(page.getByText(/Jake Probert/i).first()).toBeVisible({ timeout: 8_000 });
     await saveShot(page, "03b-filter-sei-section");
 
-    // Staff selector lives on Staff view.
-    await page.getByRole("button", { name: /Staff view/i }).click();
-    await expect(page.getByText(/Staff portal preview/i)).toBeVisible({ timeout: 8_000 });
-    const staffTrigger = page.getByRole("combobox").first();
-    await expect(staffTrigger).toBeVisible();
-    await staffTrigger.click();
-    await expect(page.getByRole("option", { name: /Tommy Jones/i })).toBeVisible();
+    // Staff selector lives on Staff view (not the sidebar Portal View combobox).
+    await openStaffPreviewPicker(page);
+    await expect(page.getByRole("option", { name: /Tommy Jones/i })).toBeVisible({ timeout: 8_000 });
     await expect(page.getByRole("option", { name: /Riley NoShifts/i })).toBeVisible();
     await page.getByRole("option", { name: /Riley NoShifts/i }).click();
     await saveShot(page, "03c-staff-view-select");
@@ -179,9 +184,9 @@ test.describe("Admin scheduler — True North Sep 1", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible({ timeout: 8_000 });
     await expect(dialog.getByText(/Add shift/i).first()).toBeVisible();
-    await expect(dialog.getByText(/CLIENT/i)).toBeVisible();
-    await expect(dialog.getByText(/SERVICE CODE/i)).toBeVisible();
-    await expect(dialog.getByText(/STAFF/i)).toBeVisible();
+    await expect(dialog.getByText("CLIENT", { exact: true })).toBeVisible();
+    await expect(dialog.getByText(/SERVICE CODE \(AUTHORIZED ONLY\)/i)).toBeVisible();
+    await expect(dialog.getByText(/STAFF \(CLIENT'S AUTHORIZED TEAM\)/i)).toBeVisible();
     await expect(dialog.getByRole("button", { name: /^Cancel$/i })).toBeVisible();
     await saveShot(page, "04-add-shift-dialog");
 
@@ -217,8 +222,7 @@ test.describe("Admin scheduler — True North Sep 1", () => {
     await saveShot(page, "05b-unassigned-open");
 
     // Staff view empty state for Riley (no published shifts).
-    await page.getByRole("button", { name: /Staff view/i }).click();
-    await page.getByRole("combobox").first().click();
+    await openStaffPreviewPicker(page);
     await page.getByRole("option", { name: /Riley NoShifts/i }).click();
     await expect(page.getByText(/No shifts/i).first()).toBeVisible({ timeout: 8_000 });
     await expect(page.getByText(/Only published shifts appear here/i)).toBeVisible();
@@ -237,6 +241,10 @@ test.describe("Admin scheduler — True North Sep 1", () => {
     await saveShot(page, "06a-staff-nav");
 
     await page.goto("/dashboard/scheduler", { waitUntil: "domcontentloaded" });
+    // Wait for the dashboard shell to leave "Loading…" so we assert the real
+    // RBAC outcome, not the brief boot spinner (Publish count is 0 there too).
+    await expect(page.getByText(/^Loading…$/)).toHaveCount(0, { timeout: 25_000 });
+    await saveShot(page, "06b-staff-direct-scheduler-url");
     // Product rule: staff should not get Publish / Add-shift. If the URL still
     // mounts the admin chrome, this assertion fails and we report it as a bug.
     const publish = page.getByRole("button", { name: /Publish/ });
@@ -244,7 +252,6 @@ test.describe("Admin scheduler — True North Sep 1", () => {
       publish,
       "Staff visiting /dashboard/scheduler must not see the admin Publish control",
     ).toHaveCount(0);
-    await saveShot(page, "06b-staff-direct-scheduler-url");
   });
 
   test("7. America/Denver: evening shift stays on Sep 1 (not UTC Sep 2)", async ({ page }) => {

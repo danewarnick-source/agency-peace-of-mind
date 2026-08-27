@@ -37,3 +37,6 @@ dist-aws
 e2e/.auth.json
 test-results/
 playwright-report/
+blob-report/
+playwright/.cache/
+e2e/artifacts/

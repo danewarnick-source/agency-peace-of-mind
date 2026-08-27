@@ -6,6 +6,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { gatewayFetch, assertBedrockConfigured } from "@/lib/ai-bedrock.server";
 import { assertActiveBillingCode, assertLaunchpadPassed } from "@/lib/scheduling/shifts.functions";
 import { padMemberId } from "@/lib/evv-codes";
+import { isLikelyBadCoord } from "@/lib/geo";
+import { roundToQuarterHourISO } from "@/lib/time-rounding";
 
 // ─── Cedar voice agent — Bedrock intent routing (Phase 2) ───────────────────
 // processVoiceIntent classifies a spoken transcript into a structured action.
@@ -49,6 +51,24 @@ const FALLBACK_UNKNOWN = {
   intent: "unknown" as const,
   message: "Compass couldn't understand that — please try again.",
 };
+
+const COMPASS_BEDROCK_UNAVAILABLE =
+  "Compass isn't available right now — voice AI isn't configured on this deployment. An admin needs to set AWS Bedrock credentials.";
+
+function staffFacingCompassError(e: unknown, fallback: string): string {
+  const err = e as { name?: string; status?: number; message?: string } | null;
+  const msg = err?.message ?? "";
+  if (
+    err?.status === 401 ||
+    err?.name === "BedrockError" ||
+    /not configured|AWS_REGION|BEDROCK_MODEL_ID|AccessDenied|UnrecognizedClient|InvalidSignature/i.test(
+      msg,
+    )
+  ) {
+    return COMPASS_BEDROCK_UNAVAILABLE;
+  }
+  return msg || fallback;
+}
 
 function validateVoiceIntent(input: unknown): VoiceAgentInput {
   const i = (input ?? {}) as Record<string, unknown>;
@@ -142,7 +162,11 @@ export const processVoiceIntent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateVoiceIntent)
   .handler(async ({ data }): Promise<VoiceAgentResponse> => {
-    assertBedrockConfigured();
+    try {
+      assertBedrockConfigured();
+    } catch (e) {
+      throw new Error(staffFacingCompassError(e, COMPASS_BEDROCK_UNAVAILABLE));
+    }
 
     const system = `You are Compass, the AI voice agent inside Cedar — a DSPD Medicaid compliance platform for Utah disability service providers. Staff speak to you through a mic button and you figure out what they want to do and return a structured action.
 
@@ -198,7 +222,15 @@ Return JSON with one of these shapes:
     );
 
     if (res.status === 429) throw new Error("AI rate limit reached. Please retry in a moment.");
-    if (!res.ok) throw new Error(`AI error (${res.status}).`);
+    if (res.status === 401) throw new Error(COMPASS_BEDROCK_UNAVAILABLE);
+    if (!res.ok) {
+      throw new Error(
+        staffFacingCompassError(
+          new Error(`AI error (${res.status}).`),
+          "Compass couldn't process that — please try again.",
+        ),
+      );
+    }
 
     const json = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
@@ -224,18 +256,23 @@ Return JSON with one of these shapes:
     return normalizeVoiceAgentResponse(parsed);
   });
 
-// ─── createClockIn — thin EVV clock-in for the voice agent ──────────────────
-// Deliberately NOT a replica of the punch pad's full clock-in flow (no
-// geofence variance capture, no pending-tracking-forms gate, no staff
-// compliance-gate dialog) — this is the minimal EVV write path, gated by the
-// same billing-authorization and Launchpad checks createShift enforces.
-// GPS is honestly recorded as not captured rather than defaulting to
-// "validated" — see gps_in_bypassed below.
+// ─── createClockIn — Compass EVV clock-in ───────────────────────────────────
+// Same timesheet write shape as punch-pad.tsx writeShift for GPS + Utah
+// provider/member IDs + service code + shift entry type. GPS is required:
+// the UI must not call this without a browser geolocation fix, and this
+// handler refuses to insert a gps_in_bypassed stub. Geofence-variance and
+// pending-forms dialogs stay on the punch pad (Sep 1); honest GPS on the
+// row is the bar. State UEVV transmission is still the admin CSV export.
 
 const CreateClockInZ = z.object({
   organizationId: z.string().uuid(),
   clientId: z.string().uuid(),
   serviceCode: z.string().min(1).max(16),
+  gps: z.object({
+    latitude: z.number().finite(),
+    longitude: z.number().finite(),
+    accuracyMeters: z.number().finite(),
+  }),
 });
 
 export const createClockIn = createServerFn({ method: "POST" })
@@ -246,26 +283,44 @@ export const createClockIn = createServerFn({ method: "POST" })
       throw new Error("Not authenticated.");
     }
 
+    if (isLikelyBadCoord({ lat: data.gps.latitude, lng: data.gps.longitude })) {
+      throw new Error(
+        "Location isn't available for this clock-in. Open the punch pad to clock in instead.",
+      );
+    }
+
     // Same gates createShift enforces before writing — a voice clock-in must
     // not be able to bypass billing authorization or the Launchpad
     // training requirement. Errors here surface verbatim to the UI.
-    await assertActiveBillingCode(
-      context.supabase,
-      data.organizationId,
-      data.clientId,
-      data.serviceCode,
-    );
-    await assertLaunchpadPassed(context.supabase, context.userId);
+    const [clientRes, orgRes] = await Promise.all([
+      context.supabase
+        .from("clients")
+        .select("medicaid_id")
+        .eq("id", data.clientId)
+        .eq("organization_id", data.organizationId)
+        .maybeSingle(),
+      context.supabase
+        .from("organizations")
+        .select("dhhs_provider_id")
+        .eq("id", data.organizationId)
+        .maybeSingle(),
+      assertActiveBillingCode(
+        context.supabase,
+        data.organizationId,
+        data.clientId,
+        data.serviceCode,
+      ),
+      assertLaunchpadPassed(context.supabase, context.userId),
+    ]);
 
-    const { data: client, error: clientErr } = await context.supabase
-      .from("clients")
-      .select("medicaid_id")
-      .eq("id", data.clientId)
-      .eq("organization_id", data.organizationId)
-      .maybeSingle();
-    if (clientErr) throw new Error(clientErr.message);
+    if (clientRes.error) throw new Error(clientRes.error.message);
+    if (orgRes.error) throw new Error(orgRes.error.message);
+    if (!clientRes.data) {
+      throw new Error("Client not found in this organization.");
+    }
+
     const memberId = padMemberId(
-      (client as { medicaid_id: string | null } | null)?.medicaid_id ?? null,
+      (clientRes.data as { medicaid_id: string | null } | null)?.medicaid_id ?? null,
     );
     if (!memberId) {
       throw new Error(
@@ -273,7 +328,16 @@ export const createClockIn = createServerFn({ method: "POST" })
       );
     }
 
-    const providerId = (data.organizationId.replace(/\D/g, "") + "0000000").slice(0, 7);
+    const providerId = (
+      (orgRes.data as { dhhs_provider_id: string | null } | null)?.dhhs_provider_id ?? ""
+    ).trim();
+    if (!providerId) {
+      throw new Error(
+        "This agency is missing a DHHS Provider ID — an admin needs to set it in Settings before clocking in.",
+      );
+    }
+
+    const nowIso = new Date().toISOString();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: row, error } = await (context.supabase as any)
@@ -285,14 +349,22 @@ export const createClockIn = createServerFn({ method: "POST" })
         utah_medicaid_provider_id: providerId,
         utah_medicaid_member_id: memberId,
         service_type_code: data.serviceCode.toUpperCase(),
-        clock_in_timestamp: new Date().toISOString(),
-        shift_entry_type: "General_Sidebar_Unscheduled",
+        clock_in_timestamp: nowIso,
+        raw_clock_in: nowIso,
+        rounded_clock_in: roundToQuarterHourISO(nowIso),
+        // Workspace punch pad (the Compass fallback) uses Client_Profile_Pass.
+        shift_entry_type: "Client_Profile_Pass",
         status: "Active",
-        gps_in_coordinates: { latitude: null, longitude: null, accuracy_meters: null },
-        gps_validated: false,
-        gps_in_bypassed: true,
-        gps_in_bypass_reason:
-          "Clocked in via the Compass voice agent — GPS was not captured for this entry point.",
+        timezone_setting: "America/Denver",
+        gps_in_coordinates: {
+          latitude: data.gps.latitude,
+          longitude: data.gps.longitude,
+          accuracy_meters: data.gps.accuracyMeters,
+        },
+        gps_validated: true,
+        gps_in_bypassed: false,
+        gps_in_bypass_reason: null,
+        is_out_of_bounds: false,
         created_from: "voice_agent",
       })
       .select("id")

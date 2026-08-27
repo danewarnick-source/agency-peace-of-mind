@@ -23,10 +23,67 @@ import {
   type VoiceAgentResponse,
 } from "@/lib/cedar-voice-agent.server";
 import { expandShiftNote } from "@/lib/voice-documentation.server";
+import { isLikelyBadCoord } from "@/lib/geo";
 
 const CEDAR_TEAL = "#137182";
 const MAX_CLARIFY_ROUNDS = 2;
 const SILENCE_TIMEOUT_MS = 1500;
+const GPS_TIMEOUT_MS = 8_000;
+
+const COMPASS_BEDROCK_UNAVAILABLE =
+  "Compass isn't available right now — voice AI isn't configured on this deployment. An admin needs to set AWS Bedrock credentials.";
+
+type GpsFailKind = "denied" | "timeout" | "unavailable";
+
+function compassGpsFailMessage(kind: GpsFailKind): string {
+  if (kind === "denied") {
+    return "Location permission is needed to clock in with Compass. Opening the punch pad instead.";
+  }
+  if (kind === "timeout") {
+    return "Couldn't get your location in time. Opening the punch pad so you can clock in there.";
+  }
+  return "Location isn't available. Opening the punch pad so you can clock in there.";
+}
+
+function staffFacingCompassMessage(e: unknown): string {
+  const msg = e instanceof Error ? e.message : "";
+  if (
+    /not configured|AWS_REGION|BEDROCK_MODEL_ID|AccessDenied|UnrecognizedClient|InvalidSignature|voice AI isn't configured/i.test(
+      msg,
+    )
+  ) {
+    return COMPASS_BEDROCK_UNAVAILABLE;
+  }
+  return msg || "Compass couldn't process that — please try again.";
+}
+
+/** One-shot GPS on confirm tap. Fail closed — caller must send staff to punch pad. */
+function getCompassClockInPosition(): Promise<{ lat: number; lng: number; acc: number }> {
+  return new Promise((resolve, reject) => {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      reject(new Error("unavailable"));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const acc = pos.coords.accuracy;
+        if (isLikelyBadCoord({ lat, lng }) || !Number.isFinite(acc)) {
+          reject(new Error("unavailable"));
+          return;
+        }
+        resolve({ lat, lng, acc });
+      },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) reject(new Error("denied"));
+        else if (err.code === err.TIMEOUT) reject(new Error("timeout"));
+        else reject(new Error("unavailable"));
+      },
+      { enableHighAccuracy: true, timeout: GPS_TIMEOUT_MS, maximumAge: 10_000 },
+    );
+  });
+}
 
 type PendingClockIn = { clientId: string; clientName: string; serviceCode: string };
 
@@ -213,7 +270,7 @@ export function CompassVoiceButton() {
     } catch (e) {
       setResponse({
         intent: "unknown",
-        message: (e as Error).message || "Compass couldn't process that — please try again.",
+        message: staffFacingCompassMessage(e),
       });
     } finally {
       setProcessing(false);
@@ -264,15 +321,41 @@ export function CompassVoiceButton() {
     }
   }
 
+  function openPunchPadForClockIn(clientId: string, serviceCode: string) {
+    navigate({
+      to: "/dashboard/workspace/$clientId",
+      params: { clientId },
+      search: { tab: "clock-in", code: serviceCode },
+    });
+    closeSheet();
+  }
+
   async function handleStartShift() {
     if (!pendingClockIn || !org?.organization_id) return;
     setStartingShift(true);
     try {
+      let pos: { lat: number; lng: number; acc: number };
+      try {
+        pos = await getCompassClockInPosition();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "";
+        const kind: GpsFailKind =
+          msg === "denied" || msg === "timeout" ? msg : "unavailable";
+        toast.error(compassGpsFailMessage(kind));
+        openPunchPadForClockIn(pendingClockIn.clientId, pendingClockIn.serviceCode);
+        return;
+      }
+
       await clockInFn({
         data: {
           organizationId: org.organization_id,
           clientId: pendingClockIn.clientId,
           serviceCode: pendingClockIn.serviceCode,
+          gps: {
+            latitude: pos.lat,
+            longitude: pos.lng,
+            accuracyMeters: pos.acc,
+          },
         },
       });
       await qc.invalidateQueries({ queryKey: ["evv-active", user?.id] });
@@ -461,6 +544,9 @@ function CompassSheetBody({
         <div className="space-y-3 py-4 text-center">
           <p className="text-base font-medium">
             Clock in with {pendingClockIn.clientName} for {pendingClockIn.serviceCode}?
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Your location will be saved on this timesheet.
           </p>
           <div className="flex gap-2">
             <Button

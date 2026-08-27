@@ -92,7 +92,7 @@ function TeamAccessPage() {
       }),
     onSuccess: () => {
       toast.warning(
-        "Invitation row created, but this screen does not email the invitee. Add staff with Employees → Add manually (temp password), or create the invite on Employees → Invite by email and copy the join link. Email accept is not wired on /signup.",
+        "Invitation created — this screen does not send email. Copy the join link from Employees or Invitations (it now joins this organization). Or use Employees → Add manually and share the temp password.",
       );
       setInviteEmail("");
       setInviteRole("employee");
@@ -190,13 +190,14 @@ function TeamAccessPage() {
             </SelectContent>
           </Select>
           <Button type="submit" disabled={invite.isPending || !inviteEmail}>
-            Send invite
+            Create invitation
           </Button>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
           This form writes a pending invitation row only — it does not send email.
-          To put a tester on the roster today, use Employees → Add manually and share the
-          temporary password. Committee Member is assigned after they join.
+          Copy the join link from Employees or Invitations; that link now joins this
+          organization. Add manually still works if you would rather share a temp password.
+          Committee Member is assigned after they join.
         </p>
       </form>
 

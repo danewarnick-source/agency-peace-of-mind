@@ -10,13 +10,22 @@
  * or tick attestation / meds / GPS checkboxes.
  */
 
+import { clockInOrClarify, type VoiceCaseloadPerson } from "./cedar-voice-client-resolve.ts";
+
+export type { VoiceCaseloadPerson } from "./cedar-voice-client-resolve.ts";
+
 export type VoiceAgentResponse =
   | { intent: "expand_note"; narrative: string }
   | { intent: "expand_note_and_clock_out"; narrative: string }
   | { intent: "clock_in"; clientId: string; clientName: string; serviceCode: string }
   | { intent: "clock_out" }
   | { intent: "ask_compass"; question: string }
-  | { intent: "clarify"; question: string }
+  | {
+      intent: "clarify";
+      question: string;
+      candidates?: VoiceCaseloadPerson[];
+      serviceCode?: string;
+    }
   | { intent: "unknown"; message: string };
 
 export const FALLBACK_UNKNOWN: Extract<VoiceAgentResponse, { intent: "unknown" }> = {
@@ -90,12 +99,19 @@ export function normalizeVoiceAgentResponse(parsed: Record<string, unknown>): Vo
   }
 
   if (intent === "clock_in") {
-    const clientId = typeof parsed.clientId === "string" ? parsed.clientId : "";
+    const clientId = typeof parsed.clientId === "string" ? parsed.clientId.trim() : "";
     const serviceCode =
       typeof parsed.serviceCode === "string" ? parsed.serviceCode.toUpperCase() : "";
     const clientName = typeof parsed.clientName === "string" ? parsed.clientName.trim() : "";
-    if (clientId && serviceCode) {
-      return { intent: "clock_in", clientId, clientName: clientName || "this client", serviceCode };
+    // Accept a name even when Bedrock invented a non-uuid clientId — the
+    // caseload resolver maps it to a real id (or clarify) after this.
+    if (serviceCode && (clientId || clientName)) {
+      return {
+        intent: "clock_in",
+        clientId,
+        clientName: clientName || clientId || "this client",
+        serviceCode,
+      };
     }
   }
 
@@ -172,4 +188,17 @@ export function reconcileVoiceAgentResponse(
   }
 
   return normalized;
+}
+
+/**
+ * After reconcile, bind clock_in to a caseload uuid. Invented ids become
+ * the matching person or a "which client?" clarify — never a fake uuid.
+ */
+export function applyCaseloadClockInResolution(
+  response: VoiceAgentResponse,
+  caseload: VoiceCaseloadPerson[],
+  spokenText?: string,
+): VoiceAgentResponse {
+  if (response.intent !== "clock_in") return response;
+  return clockInOrClarify(response, caseload, spokenText);
 }

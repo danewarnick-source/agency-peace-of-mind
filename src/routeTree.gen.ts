@@ -31,6 +31,7 @@ import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as AuditPortalIndexRouteImport } from './routes/audit-portal.index'
 import { Route as VerifyCodeRouteImport } from './routes/verify.$code'
 import { Route as SignPolicyDocumentIdRouteImport } from './routes/sign-policy.$documentId'
+import { Route as E2eComplianceDeskRouteImport } from './routes/e2e.compliance-desk'
 import { Route as DashboardTracksRouteImport } from './routes/dashboard.tracks'
 import { Route as DashboardTimeclockRouteImport } from './routes/dashboard.timeclock'
 import { Route as DashboardTeamsRouteImport } from './routes/dashboard.teams'
@@ -317,6 +318,11 @@ const VerifyCodeRoute = VerifyCodeRouteImport.update({
 const SignPolicyDocumentIdRoute = SignPolicyDocumentIdRouteImport.update({
   id: '/sign-policy/$documentId',
   path: '/sign-policy/$documentId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const E2eComplianceDeskRoute = E2eComplianceDeskRouteImport.update({
+  id: '/e2e/compliance-desk',
+  path: '/e2e/compliance-desk',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardTracksRoute = DashboardTracksRouteImport.update({
@@ -1379,6 +1385,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/teams': typeof DashboardTeamsRoute
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
+  '/e2e/compliance-desk': typeof E2eComplianceDeskRoute
   '/sign-policy/$documentId': typeof SignPolicyDocumentIdRoute
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal/': typeof AuditPortalIndexRoute
@@ -1573,6 +1580,7 @@ export interface FileRoutesByTo {
   '/dashboard/teams': typeof DashboardTeamsRoute
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
+  '/e2e/compliance-desk': typeof E2eComplianceDeskRoute
   '/sign-policy/$documentId': typeof SignPolicyDocumentIdRoute
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal': typeof AuditPortalIndexRoute
@@ -1775,6 +1783,7 @@ export interface FileRoutesById {
   '/dashboard/teams': typeof DashboardTeamsRoute
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
+  '/e2e/compliance-desk': typeof E2eComplianceDeskRoute
   '/sign-policy/$documentId': typeof SignPolicyDocumentIdRoute
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal/': typeof AuditPortalIndexRoute
@@ -1978,6 +1987,7 @@ export interface FileRouteTypes {
     | '/dashboard/teams'
     | '/dashboard/timeclock'
     | '/dashboard/tracks'
+    | '/e2e/compliance-desk'
     | '/sign-policy/$documentId'
     | '/verify/$code'
     | '/audit-portal/'
@@ -2172,6 +2182,7 @@ export interface FileRouteTypes {
     | '/dashboard/teams'
     | '/dashboard/timeclock'
     | '/dashboard/tracks'
+    | '/e2e/compliance-desk'
     | '/sign-policy/$documentId'
     | '/verify/$code'
     | '/audit-portal'
@@ -2373,6 +2384,7 @@ export interface FileRouteTypes {
     | '/dashboard/teams'
     | '/dashboard/timeclock'
     | '/dashboard/tracks'
+    | '/e2e/compliance-desk'
     | '/sign-policy/$documentId'
     | '/verify/$code'
     | '/audit-portal/'
@@ -2515,6 +2527,7 @@ export interface RootRouteChildren {
   AuditPortalPackageIdRoute: typeof AuditPortalPackageIdRoute
   AuditPortalSetPasswordRoute: typeof AuditPortalSetPasswordRoute
   CertificateCodeRoute: typeof CertificateCodeRoute
+  E2eComplianceDeskRoute: typeof E2eComplianceDeskRoute
   SignPolicyDocumentIdRoute: typeof SignPolicyDocumentIdRoute
   VerifyCodeRoute: typeof VerifyCodeRoute
   AuditPortalIndexRoute: typeof AuditPortalIndexRoute
@@ -2684,6 +2697,13 @@ declare module '@tanstack/react-router' {
       path: '/sign-policy/$documentId'
       fullPath: '/sign-policy/$documentId'
       preLoaderRoute: typeof SignPolicyDocumentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/e2e/compliance-desk': {
+      id: '/e2e/compliance-desk'
+      path: '/e2e/compliance-desk'
+      fullPath: '/e2e/compliance-desk'
+      preLoaderRoute: typeof E2eComplianceDeskRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard/tracks': {
@@ -4449,6 +4469,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuditPortalPackageIdRoute: AuditPortalPackageIdRoute,
   AuditPortalSetPasswordRoute: AuditPortalSetPasswordRoute,
   CertificateCodeRoute: CertificateCodeRoute,
+  E2eComplianceDeskRoute: E2eComplianceDeskRoute,
   SignPolicyDocumentIdRoute: SignPolicyDocumentIdRoute,
   VerifyCodeRoute: VerifyCodeRoute,
   AuditPortalIndexRoute: AuditPortalIndexRoute,

@@ -26,7 +26,11 @@ import { EvvConsentGate } from "@/components/evv/consent-gate";
 import { evaluateShiftNote, type CoachResult } from "@/lib/ai-coach.functions";
 import { expandShiftNote } from "@/lib/voice-documentation.server";
 import { freezeOriginalTranscript } from "@/lib/original-transcript";
-import { beginContinuousRecognition, type ContinuousSpeechSession } from "@/lib/continuous-speech";
+import {
+  accumulateSpeechResults,
+  beginContinuousRecognition,
+  type ContinuousSpeechSession,
+} from "@/lib/continuous-speech";
 import { OriginalSpeechAudit } from "@/components/staff-mobile/original-speech-audit";
 import { draftVarianceJustification, answerProceduralQuestion, type ProceduralResult } from "@/lib/ai-coach.functions";
 import { NectarInfusionLock } from "@/components/nectar/nectar-infusion-lock";
@@ -365,6 +369,9 @@ export function PunchPad({
   const [speechSupported, setSpeechSupported] = useState(false);
   const recognitionSessionRef = useRef<ContinuousSpeechSession | null>(null);
   const recordingWantedRef = useRef(false);
+  const dictationBaseRef = useRef("");
+  const dictationPriorFinalsRef = useRef("");
+  const dictationLiveFinalsRef = useRef("");
 
   // ── Staff attestation (Medicaid fraud statement) ────────────────────────────
   const [attestationChecked, setAttestationChecked] = useState(false);
@@ -1229,21 +1236,29 @@ export function PunchPad({
 
   function startRecording() {
     if (typeof window === "undefined") return;
+    stopRecording();
     recordingWantedRef.current = true;
+    dictationBaseRef.current = narrative;
+    dictationPriorFinalsRef.current = "";
+    dictationLiveFinalsRef.current = "";
     const session = beginContinuousRecognition({
       interimResults: true,
       shouldContinue: () => recordingWantedRef.current,
       onResult: (e) => {
-        let finalText = "";
-        const start = typeof e.resultIndex === "number" ? e.resultIndex : 0;
-        for (let i = start; i < e.results.length; i++) {
-          if (e.results[i].isFinal) {
-            finalText += (e.results[i][0]?.transcript ?? "") + " ";
-          }
+        const { finals, display } = accumulateSpeechResults(
+          dictationPriorFinalsRef.current,
+          e.results,
+        );
+        dictationLiveFinalsRef.current = finals;
+        const base = dictationBaseRef.current.trim();
+        setNarrative(base && display ? `${base} ${display}` : display || base);
+        if (display.trim()) {
+          setShowNarrativeError(false);
+          setAiCoach(null);
         }
-        if (finalText.trim()) {
-          setNarrative((prev) => (prev ? prev.trim() + " " : "") + finalText.trim());
-        }
+      },
+      onSessionEnd: () => {
+        dictationPriorFinalsRef.current = dictationLiveFinalsRef.current;
       },
       onFatalStop: () => {
         recordingWantedRef.current = false;

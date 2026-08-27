@@ -35,7 +35,11 @@ import {
 } from "@/lib/ai-coach.functions";
 import { expandShiftNote } from "@/lib/voice-documentation.server";
 import { freezeOriginalTranscript } from "@/lib/original-transcript";
-import { beginContinuousRecognition, type ContinuousSpeechSession } from "@/lib/continuous-speech";
+import {
+  accumulateSpeechResults,
+  beginContinuousRecognition,
+  type ContinuousSpeechSession,
+} from "@/lib/continuous-speech";
 import { OriginalSpeechAudit } from "@/components/staff-mobile/original-speech-audit";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
@@ -396,6 +400,9 @@ function DailyLogDialog({
   const [speechSupported, setSpeechSupported] = useState(false);
   const recognitionSessionRef = useRef<ContinuousSpeechSession | null>(null);
   const recordingWantedRef = useRef(false);
+  const dictationBaseRef = useRef("");
+  const dictationPriorFinalsRef = useRef("");
+  const dictationLiveFinalsRef = useRef("");
 
   // ── Compass note expansion (Phase 1 voice documentation) ────────────────────
   const [expandBusy, setExpandBusy] = useState(false);
@@ -478,24 +485,30 @@ function DailyLogDialog({
 
   function startRecording() {
     if (typeof window === "undefined") return;
+    stopRecording();
     recordingWantedRef.current = true;
+    dictationBaseRef.current = narrative;
+    dictationPriorFinalsRef.current = "";
+    dictationLiveFinalsRef.current = "";
     const session = beginContinuousRecognition({
       interimResults: true,
       shouldContinue: () => recordingWantedRef.current,
       onResult: (e) => {
-        let finalText = "";
-        const start = typeof e.resultIndex === "number" ? e.resultIndex : 0;
-        for (let i = start; i < e.results.length; i++) {
-          if (e.results[i].isFinal) {
-            finalText += (e.results[i][0]?.transcript ?? "") + " ";
-          }
-        }
-        if (finalText.trim()) {
-          setNarrative((prev) => (prev ? prev.trim() + " " : "") + finalText.trim());
-          if (showNarrativeError) setShowNarrativeError(false);
-          if (aiCoach) setAiCoach(null);
+        const { finals, display } = accumulateSpeechResults(
+          dictationPriorFinalsRef.current,
+          e.results,
+        );
+        dictationLiveFinalsRef.current = finals;
+        const base = dictationBaseRef.current.trim();
+        setNarrative(base && display ? `${base} ${display}` : display || base);
+        if (display.trim()) {
+          setShowNarrativeError(false);
+          setAiCoach(null);
           setScanResult(null);
         }
+      },
+      onSessionEnd: () => {
+        dictationPriorFinalsRef.current = dictationLiveFinalsRef.current;
       },
       onFatalStop: () => {
         recordingWantedRef.current = false;

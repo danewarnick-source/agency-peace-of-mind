@@ -34,6 +34,8 @@ import {
   type CoachResult, type ScanResult,
 } from "@/lib/ai-coach.functions";
 import { expandShiftNote } from "@/lib/voice-documentation.server";
+import { freezeOriginalTranscript } from "@/lib/original-transcript";
+import { OriginalSpeechAudit } from "@/components/staff-mobile/original-speech-audit";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
 import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
@@ -397,6 +399,7 @@ function DailyLogDialog({
   // ── Compass note expansion (Phase 1 voice documentation) ────────────────────
   const [expandBusy, setExpandBusy] = useState(false);
   const [noteExpanded, setNoteExpanded] = useState(false);
+  const [originalTranscript, setOriginalTranscript] = useState("");
 
   // Incident trigger state
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
@@ -437,6 +440,7 @@ function DailyLogDialog({
       setSuccess(null);
       setExpandBusy(false);
       setNoteExpanded(false);
+      setOriginalTranscript("");
       hasSigRef.current = false;
       setTimeout(() => clearCanvas(), 0);
     }
@@ -515,14 +519,16 @@ function DailyLogDialog({
     if (!client) return;
     setExpandBusy(true);
     try {
+      const source = narrative.trim();
       const expanded = await expandShiftNote({
         data: {
-          narrative: narrative.trim(),
+          narrative: source,
           goals: client.pcsp_goals ?? [],
           serviceCode: program,
           clientFirstName: client.first_name,
         },
       });
+      setOriginalTranscript((prev) => freezeOriginalTranscript(prev, source));
       setNarrative(expanded);
       setNoteExpanded(true);
       if (aiCoach) setAiCoach(null);
@@ -600,6 +606,11 @@ function DailyLogDialog({
       ],
       ai_trigger_reasons: opts.scanResult?.triggerTypes ?? [],
     };
+
+    const frozenOriginal = freezeOriginalTranscript(originalTranscript, null);
+    if (frozenOriginal) {
+      (payload as Record<string, unknown>).original_transcript = frozenOriginal;
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await supabase.from("daily_logs").insert(payload as any);
@@ -795,6 +806,7 @@ function DailyLogDialog({
                 <Label htmlFor="narrative" className="mb-2 block text-sm font-medium">
                   📝 Daily Summary Narrative
                 </Label>
+                <OriginalSpeechAudit transcript={originalTranscript} />
                 <Textarea
                   id="narrative"
                   value={narrative}
@@ -849,7 +861,7 @@ function DailyLogDialog({
                 {noteExpanded && (
                   <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
                     ✨ Expanded by Compass — review carefully before attesting. Your attestation confirms this
-                    accurately reflects your shift.
+                    accurately reflects your shift. Original speech is kept separately and is not overwritten.
                   </div>
                 )}
               </div>

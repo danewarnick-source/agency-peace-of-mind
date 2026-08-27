@@ -23,6 +23,7 @@ import {
   type VoiceAgentResponse,
 } from "@/lib/cedar-voice-agent.server";
 import { expandShiftNote } from "@/lib/voice-documentation.server";
+import { freezeOriginalTranscript } from "@/lib/original-transcript";
 import { isLikelyBadCoord } from "@/lib/geo";
 
 const CEDAR_TEAL = "#137182";
@@ -300,6 +301,7 @@ export function CompassVoiceButton() {
     setProcessing(true);
     try {
       const clientFirst = activeShift.client_name.split(" ")[0] ?? activeShift.client_name;
+      const originalSpeech = freezeOriginalTranscript(baseTranscript, transcript);
       const expanded = await expandFn({
         data: {
           narrative,
@@ -311,7 +313,12 @@ export function CompassVoiceButton() {
       navigate({
         to: "/dashboard/workspace/$clientId",
         params: { clientId: activeShift.client_id },
-        search: { tab: "clock-in", verify: "1", note: expanded },
+        search: {
+          tab: "clock-in",
+          verify: "1",
+          note: expanded,
+          ...(originalSpeech ? { spoken: originalSpeech.slice(0, 2000) } : {}),
+        },
       });
       closeSheet();
     } catch (e) {

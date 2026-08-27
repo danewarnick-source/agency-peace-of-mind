@@ -67,6 +67,9 @@ const workspaceSearch = z.object({
   // Pending narrative handed off from the Compass voice agent's "expand_note"
   // intent — pre-fills the clock-out compliance modal's note field.
   note: z.string().max(5000).optional(),
+  // Original spoken transcript from the same Compass turn. Read-only on the
+  // punch pad; persisted as original_transcript on attest/submit.
+  spoken: z.string().max(2000).optional(),
 });
 export const Route = createFileRoute("/dashboard/workspace/$clientId")({
   head: () => ({ meta: [{ title: "Client Workspace — HIVE" }] }),
@@ -79,7 +82,13 @@ function ClientWorkspace() {
   const { data: caseload, isLoading } = useCaseload();
   const { data: assignments } = useMyAssignments();
   const navigate = useNavigate();
-  const { tab: tabParam, code: presetCode, verify, note: voiceNarrative } = Route.useSearch();
+  const {
+    tab: tabParam,
+    code: presetCode,
+    verify,
+    note: voiceNarrative,
+    spoken: voiceSpoken,
+  } = Route.useSearch();
 
   const client = useMemo(() => {
     return (caseload ?? []).find((c) => c.id === clientId) ?? null;
@@ -369,6 +378,7 @@ function ClientWorkspace() {
               lockServiceCode={!!effectivePresetCode}
               autoOpenCompliance={verify === "1"}
               initialNarrative={voiceNarrative}
+              initialOriginalTranscript={voiceSpoken}
             />
             <ActiveShiftReimbursementSlot clientId={client.id} />
           </TabsContent>

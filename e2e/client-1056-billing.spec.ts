@@ -14,13 +14,13 @@
 import { test, expect, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
-import { CLIENTS } from "./fixtures/tns-roster";
+import { CLIENTS } from "./fixtures/tns-1056";
 import {
   assertPageNotBlank,
   installHiveMocks,
   waitForDashboard,
   type HiveMockHandle,
-} from "./helpers/mock-hive";
+} from "./helpers/mock-hive-1056";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 

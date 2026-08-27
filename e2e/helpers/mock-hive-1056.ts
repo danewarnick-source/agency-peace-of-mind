@@ -1,10 +1,10 @@
 /**
- * Playwright network + session mocks so CLIENTS / STAFF e2e can run
+ * Playwright network + session mocks so CLIENTS / 1056 billing e2e can run
  * without live Supabase, live auth, or live PHI.
  *
  * Intercepts:
  *   - supabase.co REST / Auth / Storage / Realtime
- *   - TanStack Start server-fn POSTs (so invite submit never hits live)
+ *   - TanStack Start server-fn POSTs (so add/edit 1056 never hits live)
  */
 import { expect, type Page, type Route } from "@playwright/test";
 import { toCrossJSONAsync } from "seroval";
@@ -21,15 +21,17 @@ import {
   ADMIN_USER_ID,
   CLIENT_LIST,
   CLIENTS,
-  DAILY_LOGS,
   DSP_USER_ID,
   ORG_ID,
   ORG_NAME,
   PENDING_INVITE,
   STAFF,
+  STAFF_ASSIGNMENTS,
   STAFF_LIST,
   TEAMS,
-} from "../fixtures/tns-roster";
+  DAILY_CODES,
+  WORKSHEET_CODES,
+} from "../fixtures/tns-1056";
 
 export type MockPersona = "admin" | "dsp";
 
@@ -38,8 +40,13 @@ export type MockOptions = {
   emptyClients?: boolean;
   clientsError?: boolean;
   emptyStaff?: boolean;
-  emptyLogs?: boolean;
-  logsError?: boolean;
+  billingError?: boolean;
+  emptyBilling?: boolean;
+};
+
+export type HiveMockHandle = {
+  mutatingRest: Array<{ method: string; table: string }>;
+  mutatingServerFns: string[];
 };
 
 type Row = Record<string, unknown>;
@@ -164,10 +171,8 @@ function clientRow(c: (typeof CLIENT_LIST)[number]): Row {
     last_name: c.last_name,
     phone_number: null,
     physical_address: null,
-    pcsp_goals: [...c.pcsp_goals],
+    pcsp_goals: [],
     job_code: [...c.codes],
-    home_latitude: null,
-    home_longitude: null,
     authorized_dspd_codes: [...c.codes],
     medicaid_id: c.medicaid_id,
     account_status: "active",
@@ -217,13 +222,15 @@ function billingCodeRows(): Row[] {
   const out: Row[] = [];
   for (const c of CLIENT_LIST) {
     for (const code of c.codes) {
+      const worksheet = WORKSHEET_CODES.has(code);
       out.push({
         id: `bc-${c.id.slice(-4)}-${code}`,
         organization_id: ORG_ID,
         client_id: c.id,
         service_code: code,
-        unit_type: ["HHS", "RHS", "SLH"].includes(code) ? "daily" : "15min",
-        rate_per_unit: 12.5,
+        unit_type: DAILY_CODES.has(code) ? "day" : "Q",
+        // Worksheet (HHS/DSI/SEI) vs table (SLH/SLN) — display only; no live rates.
+        rate_per_unit: worksheet ? (code === "HHS" ? 185 : 12.5) : 6.48,
         annual_unit_authorization: 1000,
         monthly_max_units: null,
         weekly_cap_units: null,
@@ -231,6 +238,7 @@ function billingCodeRows(): Row[] {
         service_end_date: "2027-06-30",
         sce: null,
         provider_approver_email: null,
+        rate_source: worksheet ? "Manual override" : "Utah DSPD table",
       });
     }
   }
@@ -251,24 +259,6 @@ function rolePermissionRows(): Row[] {
     }
   }
   return rows;
-}
-
-function expandDailyLog(row: (typeof DAILY_LOGS)[number]): Row {
-  const staff = STAFF_LIST.find((s) => s.id === row.user_id);
-  const client = CLIENT_LIST.find((c) => c.id === row.client_id);
-  return {
-    ...row,
-    profiles: staff
-      ? { full_name: staff.name, email: staff.email, agency_name: ORG_NAME }
-      : null,
-    clients: client
-      ? {
-          first_name: client.first_name,
-          last_name: client.last_name,
-          medicaid_id: client.medicaid_id,
-        }
-      : null,
-  };
 }
 
 function parseFilters(url: URL): Array<{ col: string; op: string; val: string }> {
@@ -326,7 +316,10 @@ function tableRows(table: string, opts: MockOptions, personaId: string): Row[] {
     case "clients":
       return clients;
     case "client_billing_codes":
-      return opts.emptyClients ? [] : billingCodeRows();
+      if (opts.emptyClients || opts.emptyBilling) return [];
+      return billingCodeRows();
+    case "staff_assignments":
+      return opts.emptyClients ? [] : STAFF_ASSIGNMENTS.map((row) => ({ ...row }));
     case "client_external_services":
     case "client_medications":
     case "client_documents":
@@ -335,7 +328,6 @@ function tableRows(table: string, opts: MockOptions, personaId: string): Row[] {
     case "nectar_documents":
     case "policy_signatures":
     case "evv_timesheets":
-    case "staff_assignments":
     case "training_tracks":
     case "courses":
     case "course_assignments":
@@ -347,8 +339,6 @@ function tableRows(table: string, opts: MockOptions, personaId: string): Row[] {
     case "home_staff_designations":
     case "client_staffing_ratios":
       return [];
-    case "daily_logs":
-      return opts.emptyLogs ? [] : DAILY_LOGS.map((row) => expandDailyLog(row));
     case "role_permissions":
       return rolePermissionRows();
     case "invitations":
@@ -398,7 +388,13 @@ async function fulfillJson(route: Route, status: number, body: unknown, extra: R
   });
 }
 
-async function handleSupabase(route: Route, opts: MockOptions, personaId: string, session: ReturnType<typeof sessionBlob>) {
+async function handleSupabase(
+  route: Route,
+  opts: MockOptions,
+  personaId: string,
+  session: ReturnType<typeof sessionBlob>,
+  handle: HiveMockHandle,
+) {
   const req = route.request();
   const url = new URL(req.url());
   const method = req.method();
@@ -440,8 +436,13 @@ async function handleSupabase(route: Route, opts: MockOptions, personaId: string
   if (url.pathname.startsWith("/rest/v1/rpc/")) {
     const rpc = url.pathname.replace("/rest/v1/rpc/", "").split("/")[0];
     if (rpc === "clients_for_staff") {
-      const clients = opts.emptyClients ? [] : CLIENT_LIST.map(clientRow);
-      await fulfillJson(route, 200, clients);
+      const assignedIds = new Set(
+        STAFF_ASSIGNMENTS.filter((a) => a.staff_id === personaId).map((a) => a.client_id),
+      );
+      const rows = (opts.emptyClients ? [] : CLIENT_LIST)
+        .filter((c) => assignedIds.has(c.id))
+        .map(clientRow);
+      await fulfillJson(route, 200, rows);
       return;
     }
     await fulfillJson(route, 200, []);
@@ -465,9 +466,9 @@ async function handleSupabase(route: Route, opts: MockOptions, personaId: string
     return;
   }
 
-  if (table === "daily_logs" && opts.logsError && (method === "GET" || method === "HEAD")) {
+  if (table === "client_billing_codes" && opts.billingError && method === "GET") {
     await fulfillJson(route, 400, {
-      message: "Mocked daily_logs read failure",
+      message: "Mocked billing-codes read failure",
       code: "PGRST000",
       details: null,
       hint: null,
@@ -477,7 +478,19 @@ async function handleSupabase(route: Route, opts: MockOptions, personaId: string
 
   if (method !== "GET" && method !== "HEAD") {
     // Never write live data — swallow mutating REST as a successful no-op.
-    await fulfillJson(route, 201, []);
+    handle.mutatingRest.push({ method, table });
+    if (method === "POST") {
+      await fulfillJson(route, 201, []);
+      return;
+    }
+    await route.fulfill({
+      status: 204,
+      headers: {
+        "access-control-allow-origin": "*",
+        "access-control-expose-headers": "Content-Range, content-range",
+      },
+      body: "",
+    });
     return;
   }
 
@@ -595,6 +608,9 @@ function decodeServerFnExport(url: string): string {
 
 function serverFnPayload(url: string, body: string): unknown {
   const fn = decodeServerFnExport(url);
+  if (/addClientBillingCodes/i.test(fn)) {
+    return { ok: true, added: 0 };
+  }
   if (/createInvitation/i.test(fn)) {
     let email = "invited@example.test";
     const m = `${url}\n${body}`.match(/sep1\.tester@example\.test|[a-z0-9._%+-]+@example\.test/i);
@@ -642,26 +658,8 @@ function serverFnPayload(url: string, body: string): unknown {
   if (/getHrComplianceMatrix/i.test(fn)) return { requirements: [], staff: [] };
   if (/getStaffPii|getStaffTrainingRiskFlags/i.test(fn)) return null;
   if (/recordPhiAccess|dismissUiPref|requestPermission/i.test(fn)) return { ok: true };
-  if (/evaluateShiftNote/i.test(fn)) {
-    return { status: "Verified", feedback: "Mocked NECTAR coach — not a live review." };
-  }
-  if (/scanNoteForTriggers/i.test(fn)) {
-    return {
-      hasIncidentTrigger: false,
-      hasMedicalTrigger: false,
-      hasEmarTrigger: false,
-      triggerTypes: [],
-      triggerSummary: "",
-    };
-  }
-  if (/expandShiftNote|draftShiftNote/i.test(fn)) {
-    return "Mocked Compass expansion — not used in this suite.";
-  }
-  if (/processVoiceIntent|createClockIn|listClientTargetBehaviors/i.test(fn)) {
-    return { ok: true };
-  }
   if (/getClientCareData/i.test(fn)) {
-    const idMatch = `${url}\n${body}`.match(/00000000-0000-4000-a000-00000000010[1-4]/);
+    const idMatch = `${url}\n${body}`.match(/00000000-0000-4000-a000-00000000010[1-9]/);
     return emptyClientCareData(idMatch?.[0] ?? CLIENT_LIST[0].id);
   }
   if (/getClientSpecificTraining|getSupportStrategies|createPersonCentered/i.test(fn)) {
@@ -686,7 +684,7 @@ function serverFnPayload(url: string, body: string): unknown {
   return [];
 }
 
-async function handleServerFn(route: Route) {
+async function handleServerFn(route: Route, handle: HiveMockHandle) {
   const req = route.request();
   if (req.method() === "OPTIONS") {
     await route.fulfill({
@@ -699,6 +697,10 @@ async function handleServerFn(route: Route) {
     return;
   }
   const body = req.postData() ?? req.url();
+  const fnName = decodeServerFnExport(req.url()) || "unknown";
+  if (/create|update|delete|set|record|dismiss|request|revoke|resend|addClient|upsert|remove/i.test(fnName)) {
+    handle.mutatingServerFns.push(fnName);
+  }
   const payload = serverFnPayload(req.url(), body);
   const serialized = await toCrossJSONAsync({ result: payload });
   await route.fulfill({
@@ -721,15 +723,18 @@ function isServerFnUrl(url: URL): boolean {
   );
 }
 
-export async function installHiveMocks(page: Page, opts: MockOptions = {}): Promise<void> {
+export async function installHiveMocks(page: Page, opts: MockOptions = {}): Promise<HiveMockHandle> {
   const persona = opts.persona ?? "admin";
   const personaId = persona === "dsp" ? DSP_USER_ID : ADMIN_USER_ID;
   const personaStaff = persona === "dsp" ? STAFF.jake : STAFF.admin;
   const session = sessionBlob(personaId, personaStaff.email, personaStaff.name);
+  const handle: HiveMockHandle = { mutatingRest: [], mutatingServerFns: [] };
 
-  await page.route(/https?:\/\/[^/]*supabase\.co\/.*/, (route) => handleSupabase(route, opts, personaId, session));
+  await page.route(/https?:\/\/[^/]*supabase\.co\/.*/, (route) =>
+    handleSupabase(route, opts, personaId, session, handle),
+  );
 
-  await page.route((url) => isServerFnUrl(url), (route) => handleServerFn(route));
+  await page.route((url) => isServerFnUrl(url), (route) => handleServerFn(route, handle));
 
   // Catch same-origin POSTs that look like Start server functions even if
   // the path scheme changes between TanStack Start versions.
@@ -737,12 +742,12 @@ export async function installHiveMocks(page: Page, opts: MockOptions = {}): Prom
     const req = route.request();
     const headers = req.headers();
     if (headers["x-tsr-serverfn"] === "true" || headers["x-tsr-serverFn"] === "true") {
-      await handleServerFn(route);
+      await handleServerFn(route, handle);
       return;
     }
     const url = new URL(req.url());
     if (isServerFnUrl(url)) {
-      await handleServerFn(route);
+      await handleServerFn(route, handle);
       return;
     }
     await route.continue();
@@ -765,6 +770,8 @@ export async function installHiveMocks(page: Page, opts: MockOptions = {}): Prom
       persona,
     },
   );
+
+  return handle;
 }
 
 export async function assertPageNotBlank(page: Page, label: string): Promise<void> {
@@ -784,4 +791,4 @@ export async function waitForDashboard(page: Page): Promise<void> {
   await loading.waitFor({ state: "hidden", timeout: 25_000 }).catch(() => undefined);
 }
 
-export { ADMIN_EMAIL, ADMIN_NAME, ADMIN_USER_ID, CLIENTS, DAILY_LOGS, STAFF };
+export { ADMIN_EMAIL, ADMIN_NAME, ADMIN_USER_ID, CLIENTS, STAFF, DAILY_CODES, WORKSHEET_CODES };

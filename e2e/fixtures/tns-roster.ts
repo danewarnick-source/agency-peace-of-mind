@@ -1,9 +1,8 @@
 /**
- * Synthetic True North roster fixtures for Sep 1 CLIENTS / 1056 e2e.
+ * Synthetic True North roster fixtures for Sep 1 CLIENTS + STAFF e2e.
  *
- * Names match the known TNS roster the owner listed, plus one clearly fake
- * client (Avery Quinn) used only to exercise an empty Medicaid ID. IDs,
- * emails, and Medicaid values are fake — do not treat them as live PHI.
+ * Names match the known TNS roster the owner listed. IDs, emails, and
+ * Medicaid values are fake — do not treat them as live PHI.
  */
 export const ORG_ID = "00000000-0000-4000-a000-000000000001";
 export const ORG_NAME = "True North Supports";
@@ -61,11 +60,14 @@ export const STAFF = {
 
 export const DSP_USER_ID = STAFF.jake.id;
 
-/** Daily-rate codes (worksheet / attendance) — not SLH/SLN. */
-export const DAILY_CODES = new Set(["HHS", "RHS", "PPS", "DSG", "RL6", "RP4", "RP5", "SED", "MTP"]);
+const TOMMY_GOALS = [
+  "Community integration — join one community activity each week",
+  "Daily living — prepare a simple meal with staff support",
+] as const;
 
-/** Per-client worksheet rates (HHS/DSI/SEI). SLH/SLN use table rates. */
-export const WORKSHEET_CODES = new Set(["HHS", "RHS", "DSI", "SEI", "DSG", "DSP"]);
+const BLAKE_GOALS = [
+  "Health — complete daily hygiene routine independently",
+] as const;
 
 export const CLIENTS = {
   tommy: {
@@ -74,7 +76,8 @@ export const CLIENTS = {
     last_name: "Jones",
     codes: ["DSI", "HHS", "SEI", "SLH"],
     team_id: MAPLE_HOME_ID,
-    medicaid_id: "MOCK-TJ-001" as string | null,
+    medicaid_id: "MOCK-TJ-001",
+    pcsp_goals: [...TOMMY_GOALS],
   },
   blake: {
     id: "00000000-0000-4000-a000-000000000102",
@@ -82,15 +85,17 @@ export const CLIENTS = {
     last_name: "Stevens",
     codes: ["DSI", "HHS"],
     team_id: MAPLE_HOME_ID,
-    medicaid_id: "MOCK-BS-002" as string | null,
+    medicaid_id: "MOCK-BS-002",
+    pcsp_goals: [...BLAKE_GOALS],
   },
   stephen: {
     id: "00000000-0000-4000-a000-000000000103",
     first_name: "Stephen",
     last_name: "Prince",
-    codes: ["SLH", "SLN"],
+    codes: ["SLH"],
     team_id: OAK_SLH_ID,
-    medicaid_id: "MOCK-SP-003" as string | null,
+    medicaid_id: "MOCK-SP-003",
+    pcsp_goals: [] as string[],
   },
   marcus: {
     id: "00000000-0000-4000-a000-000000000104",
@@ -98,16 +103,8 @@ export const CLIENTS = {
     last_name: "Rivera",
     codes: [] as string[],
     team_id: null as string | null,
-    medicaid_id: "MOCK-MR-004" as string | null,
-  },
-  /** Fake client — empty Medicaid ID, active SLN auth. Not a live TNS person. */
-  avery: {
-    id: "00000000-0000-4000-a000-000000000105",
-    first_name: "Avery",
-    last_name: "Quinn",
-    codes: ["SLN"],
-    team_id: OAK_SLH_ID,
-    medicaid_id: null as string | null,
+    medicaid_id: "MOCK-MR-004",
+    pcsp_goals: [] as string[],
   },
 } as const;
 
@@ -142,19 +139,89 @@ export const PENDING_INVITE = {
 };
 
 export const STAFF_LIST = [STAFF.admin, STAFF.jake, STAFF.harvey, STAFF.tom, STAFF.dane];
-export const CLIENT_LIST = [
-  CLIENTS.tommy,
-  CLIENTS.blake,
-  CLIENTS.stephen,
-  CLIENTS.marcus,
-  CLIENTS.avery,
-];
+export const CLIENT_LIST = [CLIENTS.tommy, CLIENTS.blake, CLIENTS.stephen, CLIENTS.marcus];
 
-/** DSP Jake is assigned to every fixture client (all codes on the client). */
-export const STAFF_ASSIGNMENTS = CLIENT_LIST.map((c, i) => ({
-  id: `sa-jake-${String(i + 1).padStart(2, "0")}`,
-  organization_id: ORG_ID,
-  staff_id: STAFF.jake.id,
-  client_id: c.id,
-  service_codes: null as string[] | null,
-}));
+/** Fake daily_logs rows — IDs and narrative are synthetic, not live PHI. */
+export const PENDING_LOG_ID = "00000000-0000-4000-a000-000000000601";
+export const APPROVED_LOG_ID = "00000000-0000-4000-a000-000000000602";
+export const REJECTED_LOG_ID = "00000000-0000-4000-a000-000000000603";
+
+function isoDaysAgo(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+export const DAILY_LOGS = [
+  {
+    id: PENDING_LOG_ID,
+    organization_id: ORG_ID,
+    user_id: STAFF.jake.id,
+    client_id: CLIENTS.tommy.id,
+    service_code: "HHS",
+    log_date: isoDaysAgo(1),
+    pcsp_goals_addressed: [...TOMMY_GOALS],
+    narrative:
+      "Tommy joined a community outing to the library, chose two books, and practiced meal prep at dinner with staff support. Mood was calm all evening.",
+    signature_data_url: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwADhQGAWjR9awAAAABJRU5ErkJggg==",
+    submitted_at: `${isoDaysAgo(1)}T22:15:00.000Z`,
+    created_at: `${isoDaysAgo(1)}T22:15:00.000Z`,
+    status: "pending_approval",
+    approved_at: null as string | null,
+    approved_by: null as string | null,
+    denial_reason: null as string | null,
+    denied_at: null as string | null,
+    denied_by: null as string | null,
+    backdated: false,
+    submitted_late: false,
+    ai_compliance_status: "Verified",
+    word_count: 32,
+  },
+  {
+    id: APPROVED_LOG_ID,
+    organization_id: ORG_ID,
+    user_id: STAFF.jake.id,
+    client_id: CLIENTS.blake.id,
+    service_code: "HHS",
+    log_date: isoDaysAgo(2),
+    pcsp_goals_addressed: [...BLAKE_GOALS],
+    narrative:
+      "Blake completed his morning hygiene routine independently and attended a short walk. No incidents. Evening was quiet.",
+    signature_data_url: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwADhQGAWjR9awAAAABJRU5ErkJggg==",
+    submitted_at: `${isoDaysAgo(2)}T21:40:00.000Z`,
+    created_at: `${isoDaysAgo(2)}T21:40:00.000Z`,
+    status: "approved",
+    approved_at: `${isoDaysAgo(1)}T14:00:00.000Z`,
+    approved_by: ADMIN_USER_ID,
+    denial_reason: null as string | null,
+    denied_at: null as string | null,
+    denied_by: null as string | null,
+    backdated: false,
+    submitted_late: false,
+    ai_compliance_status: "Verified",
+    word_count: 22,
+  },
+  {
+    id: REJECTED_LOG_ID,
+    organization_id: ORG_ID,
+    user_id: STAFF.jake.id,
+    client_id: CLIENTS.tommy.id,
+    service_code: "HHS",
+    log_date: isoDaysAgo(3),
+    pcsp_goals_addressed: [...TOMMY_GOALS],
+    narrative: "Tommy had a good day.",
+    signature_data_url: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwADhQGAWjR9awAAAABJRU5ErkJggg==",
+    submitted_at: `${isoDaysAgo(3)}T20:05:00.000Z`,
+    created_at: `${isoDaysAgo(3)}T20:05:00.000Z`,
+    status: "rejected",
+    approved_at: null as string | null,
+    approved_by: null as string | null,
+    denial_reason: "Please add more detail about the community activity and meal prep.",
+    denied_at: `${isoDaysAgo(2)}T16:00:00.000Z`,
+    denied_by: ADMIN_USER_ID,
+    backdated: true,
+    submitted_late: true,
+    ai_compliance_status: "Exception",
+    word_count: 5,
+  },
+] as const;

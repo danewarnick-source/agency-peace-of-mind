@@ -833,9 +833,9 @@ export async function applyExtractedFieldsToClient(
       throw new Error("Client autofill update returned no rows");
   }
 
-  // ── EVV: geocode the home address when we just set/changed it and the
-  // client has no coordinates yet. Uses the SAME Nominatim helper the
-  // per-client "Auto-geocoded on save" form uses. Never throws.
+  // ── EVV: geocode the home address when we set/changed it. Replaces a
+  // stale pin (city centroid / old address). Never invents coordinates.
+  const addressChanged = typeof update.physical_address === "string";
   const addrForGeo =
     (update.physical_address as string | undefined) ??
     (client.physical_address as string | null) ??
@@ -847,34 +847,25 @@ export async function applyExtractedFieldsToClient(
       .eq("id", clientId)
       .eq("organization_id", organizationId)
       .maybeSingle();
-    const hasCoords =
-      geoRow &&
-      geoRow.home_latitude !== null &&
-      geoRow.home_latitude !== undefined;
-    if (!hasCoords) {
-      try {
-        const { geocodeAddress } = await import("@/lib/geocode");
-        const geo = await geocodeAddress(addrForGeo);
-        if (geo) {
-          const { error: gErr } = await supabase
-            .from("clients")
-            .update({ home_latitude: geo.lat, home_longitude: geo.lng })
-            .eq("id", clientId)
-            .eq("organization_id", organizationId);
-          if (gErr) {
-            suggested.push("Confirm home location for EVV");
-            await onError("geocode_update_error", gErr.message);
-          } else {
-            autofilled.push("home_latitude");
-            autofilled.push("home_longitude");
-          }
-        } else {
-          suggested.push("Confirm home location for EVV");
-        }
-      } catch (err) {
+    try {
+      const { syncHomePinFromAddress } = await import("@/lib/home-pin");
+      const pin = await syncHomePinFromAddress(supabase, {
+        clientId,
+        organizationId,
+        address: addrForGeo,
+        mode: addressChanged ? "on_address_save" : "backfill",
+        existingLat: geoRow?.home_latitude ?? null,
+        existingLng: geoRow?.home_longitude ?? null,
+      });
+      if (pin.updated) {
+        autofilled.push("home_latitude");
+        autofilled.push("home_longitude");
+      } else if (!pin.geocoded && (geoRow?.home_latitude == null)) {
         suggested.push("Confirm home location for EVV");
-        await onError("geocode_lookup_error", (err as Error).message);
       }
+    } catch (err) {
+      suggested.push("Confirm home location for EVV");
+      await onError("geocode_lookup_error", (err as Error).message);
     }
   }
 

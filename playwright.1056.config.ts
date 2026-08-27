@@ -9,7 +9,7 @@ const mockBase = `http://127.0.0.1:${mockPort}`;
  */
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: /client-1056-billing\.spec\.ts/,
+  testMatch: /(?:client-1056-billing|punch-pad-gps)\.spec\.ts/,
   retries: 0,
   timeout: 90_000,
   expect: { timeout: 15_000 },

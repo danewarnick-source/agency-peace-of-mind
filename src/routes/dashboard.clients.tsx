@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate, Link, Outlet } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { RequirePermission } from "@/components/rbac-guard";
@@ -35,6 +36,7 @@ import { isDailyServiceCode } from "@/lib/service-billing";
 import { useClientIntakeProgress } from "@/hooks/use-client-intake-progress";
 import { DeleteClientDialog } from "@/components/clients/delete-client-dialog";
 import { ClientCompliancePanel } from "@/components/clients/client-compliance-panel";
+import { backfillOrgHomePinsFromAddresses } from "@/lib/home-pin.functions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -234,6 +236,20 @@ export function ClientsPage() {
   });
 
   const navigate = useNavigate();
+  const backfillPinsFn = useServerFn(backfillOrgHomePinsFromAddresses);
+  const backfillPinsM = useMutation({
+    mutationFn: () => {
+      if (!org?.organization_id) throw new Error("No organization");
+      return backfillPinsFn({ data: { organizationId: org.organization_id, limit: 8 } });
+    },
+    onSuccess: (r) => {
+      toast.success(
+        `Home pin refresh: ${r.updated} updated, ${r.skipped} unchanged, ${r.scanned} scanned. Street-level geocode only — no invented pins.`,
+      );
+      qc.invalidateQueries({ queryKey: ["clients"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const addMutation = useMutation({
     mutationFn: async (input: ClientFormValues & { intake_mode: "intake" | "profile-only" }) => {
@@ -344,6 +360,19 @@ export function ClientsPage() {
             <Link to="/dashboard/smart-import" search={{ mode: "client" }}>
               <Sparkles className="mr-2 h-4 w-4" /> Smart Import
             </Link>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={backfillPinsM.isPending || !org?.organization_id}
+            onClick={() => backfillPinsM.mutate()}
+            title="Re-geocode addresses whose saved pin is missing or does not match. Does not invent coordinates."
+          >
+            {backfillPinsM.isPending
+              ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              : <MapPin className="mr-2 h-4 w-4" />}
+            Refresh home pins
           </Button>
 
           <Dialog open={addOpen} onOpenChange={setAddOpen}>

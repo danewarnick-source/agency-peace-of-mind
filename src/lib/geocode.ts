@@ -1,13 +1,101 @@
 // Shared OpenStreetMap (Nominatim) geocoder.
-// Originally lived inline in dashboard.clients.tsx ("Auto-geocoded on save"
-// flow). Extracted so per-client save AND Smart Import autofill use the
-// exact same lookup for EVV geofence coordinates.
+// Used by per-client save, Smart Import autofill, and home-pin refresh so
+// EVV geofence coordinates come from the same lookup.
+//
+// Never invent a pin: city / town / postcode centroids are rejected. If
+// Nominatim cannot resolve a street or road, callers keep the existing pin.
+
+export type GeocodeQuality = "street" | "road";
+
+export type GeocodeHit = {
+  lat: number;
+  lng: number;
+  quality: GeocodeQuality;
+};
+
+export type NominatimHit = {
+  lat: string;
+  lon: string;
+  class?: string;
+  type?: string;
+  addresstype?: string;
+  address?: {
+    house_number?: string;
+    road?: string;
+    residential?: string;
+    pedestrian?: string;
+    city?: string;
+    town?: string;
+    village?: string;
+    postcode?: string;
+  };
+};
+
+const LOCALITY_TYPES = new Set([
+  "city",
+  "town",
+  "village",
+  "municipality",
+  "county",
+  "state",
+  "postcode",
+  "postal_code",
+  "suburb",
+  "neighbourhood",
+  "neighborhood",
+  "hamlet",
+  "isolated_dwelling",
+  "administrative",
+  "continent",
+  "country",
+]);
+
+function classifyNominatimHit(hit: NominatimHit): GeocodeQuality | "locality" | null {
+  const addr = hit.address ?? {};
+  const type = String(hit.addresstype || hit.type || "").toLowerCase();
+  const klass = String(hit.class || "").toLowerCase();
+
+  if (addr.house_number && (addr.road || addr.residential || addr.pedestrian)) {
+    return "street";
+  }
+  if (["house", "building", "yes"].includes(type)) return "street";
+  if (klass === "building") return "street";
+  if (klass === "place" && type === "house") return "street";
+
+  if (LOCALITY_TYPES.has(type)) return "locality";
+  if (klass === "boundary" || klass === "place") return "locality";
+  if (klass === "place" && LOCALITY_TYPES.has(String(hit.type || "").toLowerCase())) {
+    return "locality";
+  }
+
+  if (addr.road || addr.residential || klass === "highway") return "road";
+  return "locality";
+}
+
+/** Pick the best street/road hit. City centroids return null (do not invent a pin). */
+export function pickStreetLevelGeocode(hits: NominatimHit[]): GeocodeHit | null {
+  if (!Array.isArray(hits) || hits.length === 0) return null;
+  let road: GeocodeHit | null = null;
+  for (const hit of hits) {
+    const lat = parseFloat(hit.lat);
+    const lng = parseFloat(hit.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    if (Math.abs(lat) < 1e-6 && Math.abs(lng) < 1e-6) continue;
+    const quality = classifyNominatimHit(hit);
+    if (quality === "street") return { lat, lng, quality };
+    if (quality === "road" && !road) road = { lat, lng, quality };
+  }
+  return road;
+}
 
 export async function geocodeAddress(
   address: string,
-): Promise<{ lat: number; lng: number } | null> {
+): Promise<GeocodeHit | null> {
+  const q = address.trim();
+  if (!q) return null;
   try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
+    const url =
+      `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=5&countrycodes=us&q=${encodeURIComponent(q)}`;
     const res = await fetch(url, {
       headers: {
         Accept: "application/json",
@@ -15,12 +103,8 @@ export async function geocodeAddress(
       },
     });
     if (!res.ok) return null;
-    const json = (await res.json()) as Array<{ lat: string; lon: string }>;
-    if (!Array.isArray(json) || !json.length) return null;
-    const lat = parseFloat(json[0].lat);
-    const lng = parseFloat(json[0].lon);
-    if (!isFinite(lat) || !isFinite(lng)) return null;
-    return { lat, lng };
+    const json = (await res.json()) as NominatimHit[];
+    return pickStreetLevelGeocode(json);
   } catch {
     return null;
   }

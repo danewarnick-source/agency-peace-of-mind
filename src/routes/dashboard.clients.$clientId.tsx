@@ -61,6 +61,7 @@ import {
   CareGroup,
 } from "@/components/clients/section-panel";
 import { ClientProfileTab } from "@/components/clients/profile-tab";
+import { HomePinCard } from "@/components/clients/home-pin-card";
 import { FaceSheetButton } from "@/components/clients/face-sheet-button";
 import {
   SectionsView,
@@ -275,7 +276,7 @@ function ClientProfileHub() {
         .from("clients")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .select(
-          "id, first_name, last_name, phone_number, physical_address, date_of_birth, medicaid_id, account_status, authorized_dspd_codes, pcsp_goals, job_code, special_directions, emergency_contact_name, emergency_contact_phone, emergency_contact_instructions, emergency_contact_2_name, emergency_contact_2_phone, emergency_contact_2_instructions, level_of_need, form_1056_number, form_1056_approved_date, grievance_acknowledged, grievance_signed_date, rights_restrictions, dnr_status, dnr_location, polst_status, palliative_care_status, hospice_status, team_id, admin_hours_per_week, feature_config, support_coordinator_name, support_coordinator_email, support_coordinator_phone, disability_category, bsp_status, diagnoses, advanced_directives, admission_date, discharge_date" as any,
+          "id, first_name, last_name, phone_number, physical_address, home_latitude, home_longitude, geofence_radius_feet, date_of_birth, medicaid_id, account_status, authorized_dspd_codes, pcsp_goals, job_code, special_directions, emergency_contact_name, emergency_contact_phone, emergency_contact_instructions, emergency_contact_2_name, emergency_contact_2_phone, emergency_contact_2_instructions, level_of_need, form_1056_number, form_1056_approved_date, grievance_acknowledged, grievance_signed_date, rights_restrictions, dnr_status, dnr_location, polst_status, palliative_care_status, hospice_status, team_id, admin_hours_per_week, feature_config, support_coordinator_name, support_coordinator_email, support_coordinator_phone, disability_category, bsp_status, diagnoses, advanced_directives, admission_date, discharge_date" as any,
         )
         .eq("id", clientId)
         .maybeSingle();
@@ -366,12 +367,20 @@ function ClientProfileHub() {
         {/* IDENTITY — sole home for name, DOB, Medicaid #, guardian,
             emergency contacts, support coordinator, admission date. */}
         <TabsContent value="identity" className="space-y-10">
-          <SectionGroup label="Identity" hint="Who this person is — the record of record">
-            <SectionPanel icon={FileUp} accent="amber">
-              <UpdateInfoFromDocumentCard clientId={clientId} orgId={orgId} />
+          <SectionGroup
+            label="Home location"
+            hint="Move the pin if this is the wrong house"
+          >
+            <SectionPanel icon={HomeIcon} accent="teal">
+              <HomePinCard clientId={clientId} />
             </SectionPanel>
+          </SectionGroup>
+          <SectionGroup label="Identity" hint="Who this person is — the record of record">
             <SectionPanel icon={UserCircle} accent="indigo">
               <ClientProfileTab clientId={clientId} onOpenFiles={() => setTab("files")} />
+            </SectionPanel>
+            <SectionPanel icon={FileUp} accent="amber">
+              <UpdateInfoFromDocumentCard clientId={clientId} orgId={orgId} />
             </SectionPanel>
           </SectionGroup>
           <CustomFieldsForSection clientId={clientId} section="identity" />

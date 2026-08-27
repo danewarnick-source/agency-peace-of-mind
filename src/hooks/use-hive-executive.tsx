@@ -6,23 +6,24 @@ import { useAuth } from "./use-auth";
 export function useIsHiveExecutive() {
   const { session, loading: authLoading } = useAuth();
   const check = useServerFn(checkHiveExecutive);
+  const enabled = !!session?.user?.id;
   const q = useQuery({
     queryKey: ["hive-executive", session?.user?.id ?? "none"],
-    enabled: !!session?.user?.id,
-    queryFn: () => check(),
+    enabled,
+    queryFn: async () => {
+      const result = await check();
+      return result ?? { isExecutive: false };
+    },
     staleTime: 60_000,
+    retry: 1,
   });
-  // Treat "no resolved data yet" as loading. q.isLoading flips to false in
-  // the brief window after queryClient.clear() but before the refetch has
-  // started, which would otherwise let downstream redirects fire with a
-  // stale `isExecutive=false` and bounce the user off /dashboard/hive-exec.
-  // An error is not "still loading" — treat it as not-executive so the
-  // rest of the dashboard can render. Leaving q.data === undefined as
-  // loading forever stuck the shell on "Loading…" whenever the check
-  // failed (network, Unauthorized, etc.).
+  // Fail closed (not executive) once the check errors. Do not freeze every
+  // /dashboard/* shell on a failed Hive Executive RPC — that used to leave
+  // Admin Home on "Loading…" forever because `q.data === undefined` after error.
+  // Still treat "no data yet" as loading so a queryClient.clear() cannot flash
+  // isExecutive=false and bounce someone off /dashboard/hive-exec.
   const isLoading =
     authLoading ||
-    !session?.user?.id ||
-    ((q.isLoading || q.isFetching || q.data === undefined) && !q.isError);
+    (enabled && q.data === undefined && !q.isError && (q.isPending || q.isFetching));
   return { isExecutive: !!q.data?.isExecutive, isLoading };
 }

@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test:e2e": "playwright test --config=playwright.local.config.ts && playwright test --config=playwright.scheduler.config.ts && playwright test --config=playwright.config.ts --project=mock"
+    "test:e2e": "playwright test --config=playwright.local.config.ts && playwright test --config=playwright.scheduler.config.ts && playwright test --config=playwright.admin-home.config.ts && playwright test --config=playwright.config.ts --project=mock"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1064.0",

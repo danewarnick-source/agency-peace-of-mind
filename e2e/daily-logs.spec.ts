@@ -53,6 +53,10 @@ async function gotoDailyLogs(page: Page) {
   await waitForDashboard(page);
 }
 
+function mainHeading(page: Page, name: RegExp) {
+  return page.getByRole("main").getByRole("heading", { name });
+}
+
 test.describe("Daily Logs — staff submit (mocked DSP)", () => {
   test.beforeEach(async ({ page }) => {
     await installHiveMocks(page, { persona: "dsp" });
@@ -62,13 +66,16 @@ test.describe("Daily Logs — staff submit (mocked DSP)", () => {
     const tracker = trackDailyLogWrites(page);
     await gotoDailyLogs(page);
 
-    await expect(page.getByRole("heading", { name: /^Daily Logs$/i })).toBeVisible({
-      timeout: 20_000,
-    });
-    await expect(page.getByText(/Select a client to submit/i)).toBeVisible();
-    await expect(page.getByText("Tommy Jones").first()).toBeVisible();
-    await expect(page.getByText("Blake Stevens").first()).toBeVisible();
-    await expect(page.getByText(/Open daily journal/i).first()).toBeVisible();
+    await expect(mainHeading(page, /^Daily Logs$/i)).toBeVisible({ timeout: 20_000 });
+    const main = page.getByRole("main");
+    await expect(main.getByText(/Select a client to submit/i)).toBeVisible();
+    await expect(main.getByRole("button", { name: /Resubmit Correction/i })).toBeVisible();
+    await expect(main.getByText(/community activity and meal prep/i)).toBeVisible();
+    await expect(main.getByText("Blake Stevens").first()).toBeVisible();
+    await expect(main.getByRole("button", { name: /Complete log/i }).first()).toBeVisible();
+    const todayCard = main.getByRole("button", { name: /Open daily journal/i }).first();
+    await todayCard.scrollIntoViewIfNeeded();
+    await expect(todayCard).toBeVisible();
 
     await assertPageNotBlank(page, "staff daily logs list");
     expect(tracker.writes, "staff list must not insert/update daily_logs").toEqual([]);
@@ -80,11 +87,9 @@ test.describe("Daily Logs — staff submit (mocked DSP)", () => {
     await installHiveMocks(page, { persona: "dsp", emptyClients: true });
     await gotoDailyLogs(page);
 
-    await expect(page.getByRole("heading", { name: /^Daily Logs$/i })).toBeVisible({
-      timeout: 20_000,
-    });
+    await expect(mainHeading(page, /^Daily Logs$/i)).toBeVisible({ timeout: 20_000 });
     await expect(
-      page.getByText(/No HHS or RP5 clients currently assigned/i),
+      page.getByRole("main").getByText(/No HHS or RP5 clients currently assigned/i),
     ).toBeVisible();
     await assertPageNotBlank(page, "staff empty caseload");
     await expect(
@@ -97,13 +102,10 @@ test.describe("Daily Logs — staff submit (mocked DSP)", () => {
     const tracker = trackDailyLogWrites(page);
     await gotoDailyLogs(page);
 
-    await expect(page.getByText("Tommy Jones").first()).toBeVisible({ timeout: 20_000 });
-    await page
-      .locator("button")
-      .filter({ hasText: /Tommy Jones/ })
-      .filter({ hasText: /Open daily journal/i })
-      .first()
-      .click();
+    await expect(page.getByRole("main").getByRole("button", { name: /Resubmit Correction/i })).toBeVisible({
+      timeout: 20_000,
+    });
+    await page.getByRole("main").getByRole("button", { name: /Resubmit Correction/i }).click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible({ timeout: 10_000 });
@@ -124,7 +126,7 @@ test.describe("Daily Logs — staff submit (mocked DSP)", () => {
 
     await dialog.getByRole("button", { name: /^Close$/i }).click();
     await expect(dialog).toHaveCount(0);
-    await expect(page.getByRole("heading", { name: /^Daily Logs$/i })).toBeVisible();
+    await expect(mainHeading(page, /^Daily Logs$/i)).toBeVisible();
     expect(tracker.writes, "Close/cancel must not persist a daily log").toEqual([]);
     tracker.stop();
   });
@@ -133,11 +135,9 @@ test.describe("Daily Logs — staff submit (mocked DSP)", () => {
     page,
   }) => {
     await gotoDailyLogs(page);
-    await expect(page.getByRole("heading", { name: /^Daily Logs$/i })).toBeVisible({
-      timeout: 20_000,
-    });
+    await expect(mainHeading(page, /^Daily Logs$/i)).toBeVisible({ timeout: 20_000 });
 
-    const completeLog = page.getByRole("button", { name: /Complete log/i }).first();
+    const completeLog = page.getByRole("main").getByRole("button", { name: /Complete log/i }).first();
     await expect(completeLog).toBeVisible();
     await completeLog.click();
 

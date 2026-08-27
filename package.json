@@ -10,7 +10,9 @@
     "build:aws": "NODE_OPTIONS=--max-old-space-size=8192 BUILD_TARGET=aws vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:unit": "node --test --experimental-strip-types src/lib/cedar-voice-intent.test.ts src/lib/compass-clock-out-interview.test.ts src/lib/launchpad-gate.test.ts src/lib/compass-go-live.contract.test.ts",
+    "test:e2e": "playwright test --project=staff-go-live"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1064.0",

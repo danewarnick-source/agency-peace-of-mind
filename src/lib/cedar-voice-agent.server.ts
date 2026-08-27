@@ -8,12 +8,22 @@ import { assertActiveBillingCode, assertLaunchpadPassed } from "@/lib/scheduling
 import { padMemberId } from "@/lib/evv-codes";
 import { isLikelyBadCoord } from "@/lib/geo";
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
+import {
+  FALLBACK_UNKNOWN,
+  applyCaseloadClockInResolution,
+  reconcileVoiceAgentResponse,
+  type VoiceAgentResponse,
+} from "@/lib/cedar-voice-intent";
+import { formatCaseloadForPrompt } from "@/lib/cedar-voice-client-resolve";
+
+export type { VoiceAgentResponse } from "@/lib/cedar-voice-intent";
 
 // ─── Cedar voice agent — Bedrock intent routing (Phase 2) ───────────────────
 // processVoiceIntent classifies a spoken transcript into a structured action.
-// Same gatewayFetch calling pattern as expandShiftNote in
-// voice-documentation.server.ts, but WITH response_format: json_object since
-// this call needs structured JSON back, not a plain draft.
+// Same gatewayFetch calling pattern as draftShiftNote in
+// ai-coach.functions.ts (JSON object back). A single utterance may be BOTH
+// a shift note AND a clock-out request; reconcileVoiceAgentResponse folds
+// that into expand_note_and_clock_out. Compass does not clock anyone out.
 
 export interface VoiceAgentActiveShift {
   id: string;
@@ -36,21 +46,6 @@ export interface VoiceAgentInput {
   orgId: string;
   staffId: string;
 }
-
-export type VoiceAgentResponse =
-  | { intent: "expand_note"; narrative: string }
-  | { intent: "clock_in"; clientId: string; clientName: string; serviceCode: string }
-  | { intent: "clock_out" }
-  | { intent: "ask_compass"; question: string }
-  | { intent: "clarify"; question: string }
-  | { intent: "unknown"; message: string };
-
-// Left untyped-as-the-union so callers can read .message directly — it's
-// still structurally a valid VoiceAgentResponse wherever it's returned.
-const FALLBACK_UNKNOWN = {
-  intent: "unknown" as const,
-  message: "Compass couldn't understand that — please try again.",
-};
 
 const COMPASS_BEDROCK_UNAVAILABLE =
   "Compass isn't available right now — voice AI isn't configured on this deployment. An admin needs to set AWS Bedrock credentials.";
@@ -113,51 +108,6 @@ function validateVoiceIntent(input: unknown): VoiceAgentInput {
   return { transcript, activeShift, caseload, orgId, staffId };
 }
 
-/**
- * Coerces Bedrock's parsed JSON into the strict VoiceAgentResponse union.
- * Any missing/malformed required field for the claimed intent falls back to
- * "unknown" rather than returning a half-formed action to the UI.
- */
-function normalizeVoiceAgentResponse(parsed: Record<string, unknown>): VoiceAgentResponse {
-  const intent = typeof parsed.intent === "string" ? parsed.intent : "";
-
-  if (intent === "expand_note") {
-    const narrative = typeof parsed.narrative === "string" ? parsed.narrative.trim() : "";
-    if (narrative) return { intent: "expand_note", narrative };
-  }
-
-  if (intent === "clock_in") {
-    const clientId = typeof parsed.clientId === "string" ? parsed.clientId : "";
-    const serviceCode =
-      typeof parsed.serviceCode === "string" ? parsed.serviceCode.toUpperCase() : "";
-    const clientName = typeof parsed.clientName === "string" ? parsed.clientName.trim() : "";
-    if (clientId && serviceCode) {
-      return { intent: "clock_in", clientId, clientName: clientName || "this client", serviceCode };
-    }
-  }
-
-  if (intent === "clock_out") {
-    return { intent: "clock_out" };
-  }
-
-  if (intent === "ask_compass") {
-    const question = typeof parsed.question === "string" ? parsed.question.trim() : "";
-    if (question) return { intent: "ask_compass", question };
-  }
-
-  if (intent === "clarify") {
-    const question = typeof parsed.question === "string" ? parsed.question.trim() : "";
-    if (question) return { intent: "clarify", question };
-  }
-
-  if (intent === "unknown") {
-    const message = typeof parsed.message === "string" ? parsed.message.trim() : "";
-    return { intent: "unknown", message: message || FALLBACK_UNKNOWN.message };
-  }
-
-  return FALLBACK_UNKNOWN;
-}
-
 export const processVoiceIntent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateVoiceIntent)
@@ -172,25 +122,24 @@ export const processVoiceIntent = createServerFn({ method: "POST" })
 
 Your job is to classify the staff member's intent from their spoken transcript and return a JSON response.
 
+You do NOT clock anyone out, tick attestation/meds/GPS checkboxes, or submit a timesheet. Clock-out writes happen on the punch pad after the staff member reviews. Your job is only to classify and extract.
+
 Rules:
 - Always return valid JSON matching one of the intent types
-- "expand_note" — staff want to add content to their open shift note. Extract the note content from their words. Only use this if there is an active shift.
+- Combined speech is allowed and required: if the transcript contains BOTH a shift note AND a request to clock out (example: "We went to the store, he was in a good mood. Clock me out."), return "expand_note_and_clock_out". Put only the note content in "narrative" — strip the clock-out request. Do not drop the note. Do not drop the clock-out.
+- "expand_note" — staff want to add content to their open shift note and did NOT ask to clock out. Extract the note content from their words. Only use this if there is an active shift.
+- "expand_note_and_clock_out" — staff dictated a shift note AND asked to clock out in the same utterance. Only use this if there is an active shift.
 - "clock_in" — staff want to start a shift. Identify the client by matching their spoken name against the caseload. Identify the service code from what they say or from the client's authorized codes if only one exists. If ambiguous return "clarify".
-- "clock_out" — staff want to end their current shift. Only valid if there is an active shift.
+- "clock_out" — staff asked to end their current shift and did NOT dictate a note. Only valid if there is an active shift. Do NOT invent a narrative.
 - "ask_compass" — staff are asking a compliance or policy question. Pass the question through.
 - "clarify" — you understood the general intent but need one specific piece of information. Ask exactly one short question.
 - "unknown" — you cannot determine intent. Return a helpful message.
 
-Client matching: match spoken first names case-insensitively. If there is only one client named "Justin" return that client. If there are multiple, return clarify asking which one.
+Client matching: copy the client's exact id UUID from the caseload list — never invent an id. Match spoken first names case-insensitively. If there is only one client named "Justin" return that client's id. If there are multiple, return clarify asking which one.
 
 Service code matching: if the staff says "SEI", "supported employment", "day supports", "HHS", "host home" etc — map to the appropriate DSPD service code. If unclear and the client has only one authorized code, use that. If still ambiguous, clarify.`;
 
-    const caseloadText = data.caseload
-      .map(
-        (c) =>
-          `${c.firstName} ${c.lastName} (authorized: ${c.authorizedCodes?.join(", ") ?? "unknown"})`,
-      )
-      .join("; ");
+    const caseloadText = formatCaseloadForPrompt(data.caseload);
     const activeShiftText = data.activeShift
       ? `Yes — ${data.activeShift.clientFirstName}, ${data.activeShift.serviceCode}`
       : "None";
@@ -203,7 +152,8 @@ Caseload: ${caseloadText || "(no clients on caseload)"}
 
 Return JSON with one of these shapes:
 { "intent": "expand_note", "narrative": "text to add to the note" }
-{ "intent": "clock_in", "clientId": "uuid", "clientName": "First Last", "serviceCode": "SEI" }
+{ "intent": "expand_note_and_clock_out", "narrative": "note content without the clock-out request" }
+{ "intent": "clock_in", "clientId": "<exact uuid from the caseload list>", "clientName": "First Last", "serviceCode": "SEI" }
 { "intent": "clock_out" }
 { "intent": "ask_compass", "question": "the question" }
 { "intent": "clarify", "question": "one short clarifying question" }
@@ -253,7 +203,11 @@ Return JSON with one of these shapes:
       }
     }
 
-    return normalizeVoiceAgentResponse(parsed);
+    return applyCaseloadClockInResolution(
+      reconcileVoiceAgentResponse(parsed, data.transcript),
+      data.caseload,
+      data.transcript,
+    );
   });
 
 // ─── createClockIn — Compass EVV clock-in ───────────────────────────────────

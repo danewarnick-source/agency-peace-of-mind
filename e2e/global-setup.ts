@@ -10,8 +10,9 @@ export default async function globalSetup() {
   const email = process.env.TEST_EMAIL;
   const password = process.env.TEST_PASSWORD;
 
-  // Mocked admin-scheduler tests (npm run test:e2e) do not need staging login.
-  if (!stagingUrl || !email || !password) return;
+  if (!stagingUrl) throw new Error("STAGING_URL env var is required");
+  if (!email) throw new Error("TEST_EMAIL env var is required");
+  if (!password) throw new Error("TEST_PASSWORD env var is required");
 
   const browser = await chromium.launch();
   const context = await browser.newContext();

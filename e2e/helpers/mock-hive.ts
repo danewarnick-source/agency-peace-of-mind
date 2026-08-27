@@ -479,7 +479,18 @@ async function handleSupabase(
   if (method !== "GET" && method !== "HEAD") {
     // Never write live data — swallow mutating REST as a successful no-op.
     handle.mutatingRest.push({ method, table });
-    await fulfillJson(route, 201, []);
+    if (method === "POST") {
+      await fulfillJson(route, 201, []);
+      return;
+    }
+    await route.fulfill({
+      status: 204,
+      headers: {
+        "access-control-allow-origin": "*",
+        "access-control-expose-headers": "Content-Range, content-range",
+      },
+      body: "",
+    });
     return;
   }
 

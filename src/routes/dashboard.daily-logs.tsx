@@ -35,6 +35,7 @@ import {
 } from "@/lib/ai-coach.functions";
 import { expandShiftNote } from "@/lib/voice-documentation.server";
 import { freezeOriginalTranscript } from "@/lib/original-transcript";
+import { beginContinuousRecognition, type ContinuousSpeechSession } from "@/lib/continuous-speech";
 import { OriginalSpeechAudit } from "@/components/staff-mobile/original-speech-audit";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
@@ -393,8 +394,8 @@ function DailyLogDialog({
   // ── Voice dictation for the narrative textarea (same pattern as punch-pad.tsx) ──
   const [isRecording, setIsRecording] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognitionRef = useRef<any>(null);
+  const recognitionSessionRef = useRef<ContinuousSpeechSession | null>(null);
+  const recordingWantedRef = useRef(false);
 
   // ── Compass note expansion (Phase 1 voice documentation) ────────────────────
   const [expandBusy, setExpandBusy] = useState(false);
@@ -466,50 +467,49 @@ function DailyLogDialog({
     if (aiCoach) setAiCoach(null);
   }
 
-  // ── Voice dictation — continuous mode, interim results off (final-only
-  //    transcripts appended to the narrative, same append pattern as
-  //    punch-pad.tsx's startRecording/stopRecording). ────────────────────────
+  // ── Voice dictation — continuous mode, keep the mic open across Chrome
+  //    onend / no-speech (same restart loop as punch-pad Dictate). ────────────
   function stopRecording() {
-    try { recognitionRef.current?.stop?.(); } catch { /* ignore */ }
-    recognitionRef.current = null;
+    recordingWantedRef.current = false;
+    recognitionSessionRef.current?.stop();
+    recognitionSessionRef.current = null;
     setIsRecording(false);
   }
 
   function startRecording() {
     if (typeof window === "undefined") return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const w = window as any;
-    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if (!SR) {
-      toast.error("Voice input isn't supported on this browser.");
-      return;
-    }
-    try {
-      const rec = new SR();
-      rec.continuous = true;
-      rec.interimResults = false;
-      rec.lang = "en-US";
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      rec.onresult = (e: any) => {
+    recordingWantedRef.current = true;
+    const session = beginContinuousRecognition({
+      interimResults: true,
+      shouldContinue: () => recordingWantedRef.current,
+      onResult: (e) => {
         let finalText = "";
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          if (e.results[i].isFinal) finalText += e.results[i][0].transcript + " ";
+        const start = typeof e.resultIndex === "number" ? e.resultIndex : 0;
+        for (let i = start; i < e.results.length; i++) {
+          if (e.results[i].isFinal) {
+            finalText += (e.results[i][0]?.transcript ?? "") + " ";
+          }
         }
-        if (finalText) {
+        if (finalText.trim()) {
           setNarrative((prev) => (prev ? prev.trim() + " " : "") + finalText.trim());
           if (showNarrativeError) setShowNarrativeError(false);
           if (aiCoach) setAiCoach(null);
           setScanResult(null);
         }
-      };
-      rec.onerror = () => stopRecording();
-      rec.onend = () => setIsRecording(false);
-      recognitionRef.current = rec;
-      rec.start();
-      setIsRecording(true);
-    } catch {
-      toast.error("Couldn't start voice input — please type instead.");
+      },
+      onFatalStop: () => {
+        recordingWantedRef.current = false;
+        recognitionSessionRef.current = null;
+        setIsRecording(false);
+      },
+    });
+    if (!session) {
+      recordingWantedRef.current = false;
+      toast.error("Voice input isn't supported on this browser.");
+      return;
     }
+    recognitionSessionRef.current = session;
+    setIsRecording(true);
   }
 
   // Expand a short spoken/typed daily note into a complete, SOW-compliant

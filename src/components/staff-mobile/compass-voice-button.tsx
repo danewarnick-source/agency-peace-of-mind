@@ -25,10 +25,16 @@ import {
 import { expandShiftNote } from "@/lib/voice-documentation.server";
 import { freezeOriginalTranscript } from "@/lib/original-transcript";
 import { isLikelyBadCoord } from "@/lib/geo";
+import {
+  accumulateSpeechResults,
+  beginContinuousRecognition,
+  canAutoSubmitTranscript,
+  COMPASS_SILENCE_TIMEOUT_MS,
+  type ContinuousSpeechSession,
+} from "@/lib/continuous-speech";
 
 const CEDAR_TEAL = "#137182";
 const MAX_CLARIFY_ROUNDS = 2;
-const SILENCE_TIMEOUT_MS = 1500;
 const GPS_TIMEOUT_MS = 8_000;
 
 const COMPASS_BEDROCK_UNAVAILABLE =
@@ -129,9 +135,21 @@ export function CompassVoiceButton() {
   const [clarifyRounds, setClarifyRounds] = useState(0);
   const [baseTranscript, setBaseTranscript] = useState("");
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognitionRef = useRef<any>(null);
+  const sessionRef = useRef<ContinuousSpeechSession | null>(null);
   const silenceTimerRef = useRef<number | null>(null);
+  const listeningWantedRef = useRef(false);
+  const committedRef = useRef(false);
+  const priorFinalsRef = useRef("");
+  const liveFinalsRef = useRef("");
+  const liveDisplayRef = useRef("");
+  const onFinalRef = useRef<(text: string) => void>(() => {});
+
+  useEffect(() => {
+    return () => {
+      listeningWantedRef.current = false;
+      sessionRef.current?.stop();
+    };
+  }, []);
 
   function clearSilenceTimer() {
     if (silenceTimerRef.current !== null) {
@@ -140,73 +158,85 @@ export function CompassVoiceButton() {
     }
   }
 
-  const stopListening = useCallback(() => {
+  const stopListening = useCallback((opts?: { submit?: boolean }) => {
+    listeningWantedRef.current = false;
     clearSilenceTimer();
-    try {
-      recognitionRef.current?.stop?.();
-    } catch {
-      /* ignore */
-    }
-    recognitionRef.current = null;
+    sessionRef.current?.stop();
+    sessionRef.current = null;
     setListening(false);
+    if (opts?.submit && !committedRef.current) {
+      const finalText = liveDisplayRef.current.trim();
+      if (finalText) {
+        committedRef.current = true;
+        onFinalRef.current(finalText);
+      }
+    }
   }, []);
 
-  // Starts a recording round. onFinal receives the final transcript once the
-  // staff stops talking (1.5s silence) or taps stop. Used for both the
-  // initial ask and each clarify-answer round.
+  // Starts a recording round. Mic stays open until staff taps Stop, or until
+  // a long pause AFTER they have actually spoken (not on rec.start()). Used
+  // for both the initial ask and each clarify-answer round.
   const startListening = useCallback(
     (onFinal: (text: string) => void) => {
       if (typeof window === "undefined") return;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const w = window as any;
-      const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
-      if (!SR) {
-        toast.error("Voice input isn't supported on this browser.");
+      sessionRef.current?.stop();
+      sessionRef.current = null;
+      clearSilenceTimer();
+      onFinalRef.current = onFinal;
+      committedRef.current = false;
+      listeningWantedRef.current = true;
+      priorFinalsRef.current = "";
+      liveFinalsRef.current = "";
+      liveDisplayRef.current = "";
+      setTranscript("");
+
+      const armSilenceTimer = () => {
+        clearSilenceTimer();
+        silenceTimerRef.current = window.setTimeout(() => {
+          const text = liveDisplayRef.current.trim();
+          // Chrome often finalizes 1–2 words mid-sentence. Keep listening.
+          if (!canAutoSubmitTranscript(text)) return;
+          stopListening({ submit: true });
+        }, COMPASS_SILENCE_TIMEOUT_MS);
+      };
+
+      const session = beginContinuousRecognition({
+        interimResults: true,
+        shouldContinue: () => listeningWantedRef.current && !committedRef.current,
+        onResult: (e) => {
+          const { finals, display } = accumulateSpeechResults(priorFinalsRef.current, e.results);
+          liveFinalsRef.current = finals;
+          liveDisplayRef.current = display;
+          setTranscript(display);
+          if (display.trim()) armSilenceTimer();
+        },
+        onSessionEnd: () => {
+          priorFinalsRef.current = liveFinalsRef.current;
+        },
+        onFatalStop: () => {
+          listeningWantedRef.current = false;
+          clearSilenceTimer();
+          sessionRef.current = null;
+          setListening(false);
+        },
+      });
+      if (!session) {
+        listeningWantedRef.current = false;
+        toast.error("Couldn't start voice input — please try again.");
         return;
       }
-      try {
-        const rec = new SR();
-        rec.continuous = true;
-        rec.interimResults = true;
-        rec.lang = "en-US";
-        let liveText = "";
-        const armSilenceTimer = () => {
-          clearSilenceTimer();
-          silenceTimerRef.current = window.setTimeout(() => {
-            stopListening();
-            const finalText = liveText.trim();
-            if (finalText) onFinal(finalText);
-          }, SILENCE_TIMEOUT_MS);
-        };
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        rec.onresult = (e: any) => {
-          let finalText = "";
-          let interim = "";
-          for (let i = e.resultIndex; i < e.results.length; i++) {
-            const chunk = e.results[i][0].transcript;
-            if (e.results[i].isFinal) finalText += chunk + " ";
-            else interim += chunk;
-          }
-          if (finalText) liveText = (liveText ? liveText.trim() + " " : "") + finalText.trim();
-          setTranscript((liveText ? liveText.trim() + " " : "") + interim);
-          armSilenceTimer();
-        };
-        rec.onerror = () => stopListening();
-        rec.onend = () => setListening(false);
-        recognitionRef.current = rec;
-        setTranscript("");
-        rec.start();
-        setListening(true);
-        armSilenceTimer();
-      } catch {
-        toast.error("Couldn't start voice input — please try again.");
-      }
+      sessionRef.current = session;
+      setListening(true);
     },
     [stopListening],
   );
 
   const resetSheet = useCallback(() => {
     stopListening();
+    committedRef.current = false;
+    priorFinalsRef.current = "";
+    liveFinalsRef.current = "";
+    liveDisplayRef.current = "";
     setTranscript("");
     setProcessing(false);
     setResponse(null);
@@ -436,7 +466,7 @@ export function CompassVoiceButton() {
             pendingClockIn={pendingClockIn}
             startingShift={startingShift}
             onFirstAsk={handleFirstAsk}
-            onStop={stopListening}
+            onStop={() => stopListening({ submit: true })}
             onClarifyAnswer={handleClarifyAnswer}
             onAddToShiftNote={handleAddToShiftNote}
             onStartShift={handleStartShift}
@@ -506,6 +536,7 @@ function CompassSheetBody({
         <p className="min-h-[3rem] max-w-sm px-4 text-sm text-muted-foreground">
           {transcript || "Go ahead…"}
         </p>
+        <p className="text-xs text-muted-foreground">Tap stop when you&apos;re done.</p>
       </div>
     );
   }

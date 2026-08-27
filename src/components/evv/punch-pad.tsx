@@ -26,6 +26,7 @@ import { EvvConsentGate } from "@/components/evv/consent-gate";
 import { evaluateShiftNote, type CoachResult } from "@/lib/ai-coach.functions";
 import { expandShiftNote } from "@/lib/voice-documentation.server";
 import { freezeOriginalTranscript } from "@/lib/original-transcript";
+import { beginContinuousRecognition, type ContinuousSpeechSession } from "@/lib/continuous-speech";
 import { OriginalSpeechAudit } from "@/components/staff-mobile/original-speech-audit";
 import { draftVarianceJustification, answerProceduralQuestion, type ProceduralResult } from "@/lib/ai-coach.functions";
 import { NectarInfusionLock } from "@/components/nectar/nectar-infusion-lock";
@@ -362,8 +363,8 @@ export function PunchPad({
   const { enabled: nectarInfusionEnabled } = useNectarInfusion();
   const [isRecording, setIsRecording]         = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognitionRef = useRef<any>(null);
+  const recognitionSessionRef = useRef<ContinuousSpeechSession | null>(null);
+  const recordingWantedRef = useRef(false);
 
   // ── Staff attestation (Medicaid fraud statement) ────────────────────────────
   const [attestationChecked, setAttestationChecked] = useState(false);
@@ -1220,43 +1221,43 @@ export function PunchPad({
 
 
   function stopRecording() {
-    try { recognitionRef.current?.stop?.(); } catch { /* ignore */ }
-    recognitionRef.current = null;
+    recordingWantedRef.current = false;
+    recognitionSessionRef.current?.stop();
+    recognitionSessionRef.current = null;
     setIsRecording(false);
   }
 
   function startRecording() {
     if (typeof window === "undefined") return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const w = window as any;
-    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if (!SR) {
+    recordingWantedRef.current = true;
+    const session = beginContinuousRecognition({
+      interimResults: true,
+      shouldContinue: () => recordingWantedRef.current,
+      onResult: (e) => {
+        let finalText = "";
+        const start = typeof e.resultIndex === "number" ? e.resultIndex : 0;
+        for (let i = start; i < e.results.length; i++) {
+          if (e.results[i].isFinal) {
+            finalText += (e.results[i][0]?.transcript ?? "") + " ";
+          }
+        }
+        if (finalText.trim()) {
+          setNarrative((prev) => (prev ? prev.trim() + " " : "") + finalText.trim());
+        }
+      },
+      onFatalStop: () => {
+        recordingWantedRef.current = false;
+        recognitionSessionRef.current = null;
+        setIsRecording(false);
+      },
+    });
+    if (!session) {
+      recordingWantedRef.current = false;
       toast.error("Voice input isn't supported on this browser.");
       return;
     }
-    try {
-      const rec = new SR();
-      rec.continuous = true;
-      rec.interimResults = true;
-      rec.lang = "en-US";
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      rec.onresult = (e: any) => {
-        let finalText = "";
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          if (e.results[i].isFinal) finalText += e.results[i][0].transcript + " ";
-        }
-        if (finalText) {
-          setNarrative((prev) => (prev ? prev.trim() + " " : "") + finalText.trim());
-        }
-      };
-      rec.onerror = () => stopRecording();
-      rec.onend = () => setIsRecording(false);
-      recognitionRef.current = rec;
-      rec.start();
-      setIsRecording(true);
-    } catch {
-      toast.error("Couldn't start voice input — please type instead.");
-    }
+    recognitionSessionRef.current = session;
+    setIsRecording(true);
   }
 
   async function handleDraftVariance(phase: "clock_in" | "clock_out") {

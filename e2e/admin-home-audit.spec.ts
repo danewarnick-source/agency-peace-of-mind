@@ -12,7 +12,7 @@ import {
   installHiveMocks,
   screenshotPath,
   TNS_ORG_ID,
-} from "./helpers/hive-mock";
+} from "./helpers/admin-home-mock";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 

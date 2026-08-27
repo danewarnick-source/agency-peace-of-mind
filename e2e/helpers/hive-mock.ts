@@ -1,126 +1,75 @@
 /**
- * Playwright mock layer for Admin Home / obligations E2E.
+ * Browser-side Supabase + TanStack server-fn mock for admin scheduler e2e.
  *
- * Injects a fake Supabase session for True North Supports and intercepts
- * browser traffic to Supabase + TanStack Start server functions so the
- * suite never reads or writes live obligation rows.
+ * Intercepts every call to the live project so these tests never read or
+ * write production calendar rows. Auth is a seeded localStorage session;
+ * REST and /_serverFn responses are fixtures shaped like True North's
+ * Sep 1 go-live week (Tommy/Jake SEI, Blake/Harvey HHS, Stephen/Tom SLH).
  */
-import type { Page, Route } from "@playwright/test";
-import { ALL_PERMISSIONS } from "../../src/lib/rbac";
+import fs from "node:fs";
+import path from "node:path";
+import type { Page, Request } from "@playwright/test";
+import { ALL_PERMISSIONS, DEFAULT_MATRIX } from "../../src/lib/rbac";
 
-export const TNS_ORG_ID = "7fabcf5d-f826-487f-8730-8b0c3f1969bb";
-export const ADMIN_USER_ID = "e2e00000-0000-4000-a000-000000000001";
-export const DSP_USER_ID = "e2e00000-0000-4000-a000-000000000002";
-export const STAFF_USER_ID = "e2e00000-0000-4000-a000-000000000003";
-export const CLIENT_ID = "e2e00000-0000-4000-a000-000000000010";
-
-export const OB_OVERDUE_ID = "e2e00000-0000-4000-a000-000000000021";
-export const OB_DUE_ID = "e2e00000-0000-4000-a000-000000000022";
-export const OB_DONE_ID = "e2e00000-0000-4000-a000-000000000023";
-export const OB_PAUSED_ID = "e2e00000-0000-4000-a000-000000000024";
-
-export const INST_OVERDUE_ID = "e2e00000-0000-4000-a000-000000000031";
-export const INST_DUE_ID = "e2e00000-0000-4000-a000-000000000032";
-export const INST_DONE_ID = "e2e00000-0000-4000-a000-000000000033";
+export const ORG_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1";
+export const ADMIN_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1";
+export const STAFF = {
+  tommy: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2",
+  blake: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb3",
+  stephen: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb4",
+  riley: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb5",
+} as const;
+export const CLIENT = {
+  jake: "cccccccc-cccc-cccc-cccc-ccccccccccc1",
+  harvey: "cccccccc-cccc-cccc-cccc-ccccccccccc2",
+  tom: "cccccccc-cccc-cccc-cccc-ccccccccccc3",
+} as const;
+export const SHIFT = {
+  seiPublished: "dddddddd-dddd-dddd-dddd-ddddddddddd1",
+  seiDraftOpen: "dddddddd-dddd-dddd-dddd-ddddddddddd2",
+  hhsPublished: "dddddddd-dddd-dddd-dddd-ddddddddddd3",
+  slhPublished: "dddddddd-dddd-dddd-dddd-ddddddddddd4",
+  seiEvening: "dddddddd-dddd-dddd-dddd-ddddddddddd5",
+} as const;
 
 const PROJECT_REF = "mmknqtdrefbzwfdtykza";
-const SUPABASE_HOST = `${PROJECT_REF}.supabase.co`;
 const AUTH_STORAGE_KEY = `sb-${PROJECT_REF}-auth-token`;
 
-export type MockPersona = "admin" | "employee";
-
-export type HiveMockOptions = {
-  role?: MockPersona;
-};
-
-const isoDaysFromNow = (days: number) =>
-  new Date(Date.now() + days * 86_400_000).toISOString();
-
-const ORG = {
-  name: "True North Supports",
-  is_demo: false,
-  legal_name: "True North Supports LLC",
-  dba_name: "True North Supports",
-  display_acronym: "TNS",
-  services_offered: ["HHS", "SLH", "SLN", "SEI", "DSI"],
-};
-
-const EMPTY_AUDIT_EVIDENCE = {
-  generated_at: new Date().toISOString(),
-  items: {},
-  people: [],
-  homes: [],
-};
-
-const EMPTY_AUDIT_SUMMARY = {
-  generatedAt: new Date().toISOString(),
-  scope: {},
-  totals: { critical: 0, attention: 0, minor: 0, total: 0 },
-  readinessScore: 92,
-  byArea: {
-    documentation: 0,
-    daily_logs: 0,
-    evv_timesheets: 0,
-    billing: 0,
-    staff_certifications: 0,
-    requirements_engine: 0,
-    external_attestations: 0,
-  },
-  findings: [],
-};
-
-const FEATURE_KEYS = [
-  "hive_training",
-  "nectar",
-  "state_audit",
-  "pba_ledgers",
-  "evv_timesheets",
-  "client_intake",
-  "pcsp",
-  "staff_onboarding",
-] as const;
-
-function b64url(obj: unknown): string {
-  return Buffer.from(JSON.stringify(obj))
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
+/** Sep 1 2026 is MDT (UTC-6). */
+function mt(date: string, time: string): string {
+  return new Date(`${date}T${time}:00-06:00`).toISOString();
 }
 
-function fakeJwt(userId: string, email: string): string {
-  const header = b64url({ alg: "none", typ: "JWT" });
-  const payload = b64url({
-    iss: `https://${SUPABASE_HOST}/auth/v1`,
-    sub: userId,
-    aud: "authenticated",
-    role: "authenticated",
-    email,
-    exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-    iat: Math.floor(Date.now() / 1000),
-  });
-  return `${header}.${payload}.e2e`;
+export type HiveRole = "admin" | "employee";
+
+export type WriteAttempt = {
+  method: string;
+  url: string;
+  table?: string;
+};
+
+export type HiveMock = {
+  writes: WriteAttempt[];
+};
+
+function fakeJwt(payload: Record<string, unknown>): string {
+  const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${header}.${body}.e2e`;
 }
 
-function userRecord(persona: MockPersona) {
-  const id = persona === "admin" ? ADMIN_USER_ID : DSP_USER_ID;
-  const email =
-    persona === "admin" ? "e2e.admin@truenorth.example" : "e2e.dsp@truenorth.example";
+function userFor(role: HiveRole) {
+  const id = role === "admin" ? ADMIN_ID : STAFF.riley;
+  const email = role === "admin" ? "tns-admin-e2e@example.com" : "riley-staff-e2e@example.com";
   const now = new Date().toISOString();
   return {
     id,
     aud: "authenticated",
     role: "authenticated",
     email,
-    email_confirmed_at: now,
     phone: "",
-    confirmed_at: now,
-    last_sign_in_at: now,
     app_metadata: { provider: "email", providers: ["email"] },
-    user_metadata: {
-      full_name: persona === "admin" ? "Dana Admin" : "Alex DSP",
-      first_name: persona === "admin" ? "Dana" : "Alex",
-    },
+    user_metadata: {},
     identities: [],
     created_at: now,
     updated_at: now,
@@ -128,922 +77,498 @@ function userRecord(persona: MockPersona) {
   };
 }
 
-function sessionRecord(persona: MockPersona) {
-  const user = userRecord(persona);
-  const access_token = fakeJwt(user.id, user.email);
+function sessionFor(role: HiveRole) {
+  const user = userFor(role);
+  const exp = Math.floor(Date.now() / 1000) + 60 * 60 * 12;
+  const access_token = fakeJwt({
+    aud: "authenticated",
+    sub: user.id,
+    email: user.email,
+    role: "authenticated",
+    exp,
+    iat: exp - 60 * 60,
+  });
   return {
     access_token,
+    refresh_token: "e2e-refresh",
     token_type: "bearer",
-    expires_in: 60 * 60 * 24,
-    expires_at: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-    refresh_token: "e2e-refresh-token",
+    expires_in: 60 * 60 * 12,
+    expires_at: exp,
     user,
   };
 }
 
-function corsHeaders(origin?: string | null) {
-  return {
-    "Access-Control-Allow-Origin": origin || "*",
-    "Access-Control-Allow-Headers":
-      "authorization, apikey, content-type, x-client-info, accept, prefer, x-supabase-api-version, range",
-    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD",
-    "Access-Control-Expose-Headers": "content-range, x-supabase-api-version, prefer",
-    "Access-Control-Max-Age": "86400",
-  };
-}
+const ORG = {
+  name: "True North Supports",
+  is_demo: false,
+  legal_name: "True North Supports LLC",
+  dba_name: "True North Supports",
+  display_acronym: "TNS",
+};
 
-function makeObligation(partial: Record<string, unknown>) {
-  const now = new Date().toISOString();
-  return {
-    organization_id: TNS_ORG_ID,
-    description: null,
-    source_policy_section: "DHHS91172",
-    cadence: "annually",
-    due_day_config: {},
-    reminder_days_before: [14, 7],
-    evidence_type: "upload",
-    linked_form_id: null,
-    attestation_text: null,
-    requires_individual_completion: false,
-    assigned_to_groups: [],
-    assigned_to_users: [],
-    assignee_role: "admin_only",
-    notify_manager_on_complete: true,
-    notify_manager_on_overdue: true,
+function members() {
+  const ids = [ADMIN_ID, STAFF.tommy, STAFF.blake, STAFF.stephen, STAFF.riley];
+  return ids.map((user_id, i) => ({
+    id: `eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee${i + 1}`,
+    user_id,
+    organization_id: ORG_ID,
+    role:
+      user_id === ADMIN_ID
+        ? "admin"
+        : "employee",
+    job_title: user_id === ADMIN_ID ? "Owner" : "DSP",
     active: true,
-    source: "sow",
-    is_locked: true,
-    scope: "org",
-    target_service_codes: [],
-    nectar_cert_type_label: null,
-    nectar_keyword_groups: null,
-    created_by: ADMIN_USER_ID,
-    created_at: now,
-    updated_at: now,
-    current_instance: null,
-    rollup: {
-      open_count: 0,
-      overdue_count: 0,
-      pending_count: 0,
-      next_due_at: null,
-      latest_completed_at: null,
-    },
-    ...partial,
-  };
+    organizations: ORG,
+  }));
 }
 
-function makeInstance(partial: Record<string, unknown>) {
-  const now = new Date().toISOString();
+function profiles() {
+  return [
+    { id: ADMIN_ID, first_name: "Dana", last_name: "Admin", full_name: "Dana Admin", is_active: true, start_date: "2024-01-01", must_change_password: false, staff_type_keys: ["admin"], bc_role: null },
+    { id: STAFF.tommy, first_name: "Tommy", last_name: "Jones", full_name: "Tommy Jones", is_active: true, start_date: "2024-01-01", must_change_password: false, staff_type_keys: ["dsp"], bc_role: null },
+    { id: STAFF.blake, first_name: "Blake", last_name: "Stevens", full_name: "Blake Stevens", is_active: true, start_date: "2024-01-01", must_change_password: false, staff_type_keys: ["dsp"], bc_role: null },
+    { id: STAFF.stephen, first_name: "Stephen", last_name: "Prince", full_name: "Stephen Prince", is_active: true, start_date: "2024-01-01", must_change_password: false, staff_type_keys: ["dsp"], bc_role: null },
+    { id: STAFF.riley, first_name: "Riley", last_name: "NoShifts", full_name: "Riley NoShifts", is_active: true, start_date: "2025-06-01", must_change_password: false, staff_type_keys: ["dsp"], bc_role: null },
+  ];
+}
+
+function clients() {
+  return [
+    { id: CLIENT.jake, first_name: "Jake", last_name: "Probert", team_id: null, admin_hours_per_week: null, has_abi: false, organization_id: ORG_ID },
+    { id: CLIENT.harvey, first_name: "Harvey", last_name: "Alisa", team_id: null, admin_hours_per_week: 4, has_abi: false, organization_id: ORG_ID },
+    { id: CLIENT.tom, first_name: "Tom", last_name: "Jones", team_id: null, admin_hours_per_week: null, has_abi: false, organization_id: ORG_ID },
+  ];
+}
+
+function shifts() {
+  return [
+    {
+      id: SHIFT.seiPublished,
+      staff_id: STAFF.tommy,
+      client_id: CLIENT.jake,
+      job_code: "SEI",
+      service_code: "SEI",
+      starts_at: mt("2026-09-01", "09:00"),
+      ends_at: mt("2026-09-01", "15:00"),
+      status: "published",
+      published: true,
+      parent_shift_id: null,
+      organization_id: ORG_ID,
+    },
+    {
+      id: SHIFT.seiDraftOpen,
+      staff_id: null,
+      client_id: CLIENT.jake,
+      job_code: "SEI",
+      service_code: "SEI",
+      starts_at: mt("2026-09-01", "15:30"),
+      ends_at: mt("2026-09-01", "16:30"),
+      status: "draft",
+      published: false,
+      parent_shift_id: null,
+      organization_id: ORG_ID,
+    },
+    {
+      id: SHIFT.hhsPublished,
+      staff_id: STAFF.blake,
+      client_id: CLIENT.harvey,
+      job_code: "HHS",
+      service_code: "HHS",
+      starts_at: mt("2026-09-01", "08:00"),
+      ends_at: mt("2026-09-01", "16:00"),
+      status: "published",
+      published: true,
+      parent_shift_id: null,
+      organization_id: ORG_ID,
+    },
+    {
+      id: SHIFT.slhPublished,
+      staff_id: STAFF.stephen,
+      client_id: CLIENT.tom,
+      job_code: "SLH",
+      service_code: "SLH",
+      starts_at: mt("2026-09-01", "10:00"),
+      ends_at: mt("2026-09-01", "14:00"),
+      status: "published",
+      published: true,
+      parent_shift_id: null,
+      organization_id: ORG_ID,
+    },
+    {
+      // 8pm–10pm MT on Sep 1 = 02:00–04:00 UTC Sep 2. Must still render on Sep 1 in Denver.
+      id: SHIFT.seiEvening,
+      staff_id: STAFF.tommy,
+      client_id: CLIENT.jake,
+      job_code: "SEI",
+      service_code: "SEI",
+      starts_at: mt("2026-09-01", "20:00"),
+      ends_at: mt("2026-09-01", "22:00"),
+      status: "published",
+      published: true,
+      parent_shift_id: null,
+      organization_id: ORG_ID,
+    },
+  ];
+}
+
+function auths() {
+  return [
+    { client_id: CLIENT.jake, service_code: "SEI", annual_unit_authorization: 4000, weekly_cap_units: 40, service_end_date: null, organization_id: ORG_ID },
+    { client_id: CLIENT.harvey, service_code: "HHS", annual_unit_authorization: 365, weekly_cap_units: null, service_end_date: null, organization_id: ORG_ID },
+    { client_id: CLIENT.tom, service_code: "SLH", annual_unit_authorization: 2000, weekly_cap_units: 40, service_end_date: null, organization_id: ORG_ID },
+  ];
+}
+
+function assigns() {
+  return [
+    { staff_id: STAFF.tommy, client_id: CLIENT.jake, organization_id: ORG_ID },
+    { staff_id: STAFF.blake, client_id: CLIENT.harvey, organization_id: ORG_ID },
+    { staff_id: STAFF.stephen, client_id: CLIENT.tom, organization_id: ORG_ID },
+  ];
+}
+
+function permissionsFor(role: HiveRole) {
+  const granted = role === "admin" ? ALL_PERMISSIONS : DEFAULT_MATRIX.employee;
+  const grantedSet = new Set(granted);
+  return ALL_PERMISSIONS.map((permission) => ({
+    organization_id: ORG_ID,
+    role: role === "admin" ? "admin" : "employee",
+    permission,
+    enabled: grantedSet.has(permission),
+  }));
+}
+
+function parseEq(search: URLSearchParams, key: string): string | null {
+  const raw = search.get(key);
+  if (!raw) return null;
+  if (raw.startsWith("eq.")) return raw.slice(3);
+  return null;
+}
+
+function parseIn(search: URLSearchParams, key: string): string[] | null {
+  const raw = search.get(key);
+  if (!raw) return null;
+  const m = raw.match(/^in\.\((.*)\)$/);
+  if (!m) return null;
+  return m[1].split(",").map((s) => s.trim()).filter(Boolean);
+}
+
+function wantsSingle(req: Request): boolean {
+  const accept = req.headers()["accept"] ?? "";
+  return accept.includes("vnd.pgrst.object+json");
+}
+
+function corsHeaders(extra: Record<string, string> = {}): Record<string, string> {
   return {
-    organization_id: TNS_ORG_ID,
-    period_key: "2026-Q3",
-    completed_at: null,
-    completed_by_id: null,
-    completed_by_name: null,
-    evidence_type_used: null,
-    upload_path: null,
-    upload_filename: null,
-    attestation_signed_at: null,
-    attestation_signed_by_id: null,
-    attestation_signed_by_name: null,
-    attestation_text_snapshot: null,
-    form_submission_id: null,
-    event_description: null,
-    waive_reason: null,
-    admin_notes: null,
-    assignee_staff_id: null,
-    client_id: null,
-    client_name: null,
-    created_at: now,
-    updated_at: now,
-    ...partial,
+    "access-control-allow-origin": "*",
+    "access-control-allow-headers": "*",
+    "access-control-allow-methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS,HEAD",
+    "access-control-expose-headers": "content-range,content-profile,preference-applied",
+    "content-type": "application/json; charset=utf-8",
+    ...extra,
   };
 }
 
-function fixtures() {
-  const overdueDue = isoDaysFromNow(-12);
-  const soonDue = isoDaysFromNow(5);
-  const doneAt = isoDaysFromNow(-20);
-
-  const instOverdue = makeInstance({
-    id: INST_OVERDUE_ID,
-    obligation_id: OB_OVERDUE_ID,
-    due_at: overdueDue,
-    status: "overdue",
-    period_key: "2026",
-  });
-  const instDue = makeInstance({
-    id: INST_DUE_ID,
-    obligation_id: OB_DUE_ID,
-    due_at: soonDue,
-    status: "pending",
-    period_key: "2026",
-    assignee_staff_id: STAFF_USER_ID,
-  });
-  const instDone = makeInstance({
-    id: INST_DONE_ID,
-    obligation_id: OB_DONE_ID,
-    due_at: isoDaysFromNow(-3),
-    status: "completed",
-    completed_at: doneAt,
-    completed_by_id: ADMIN_USER_ID,
-    completed_by_name: "Dana Admin",
-    period_key: "2026",
-  });
-
-  const overdue = makeObligation({
-    id: OB_OVERDUE_ID,
-    title: "Emergency Management and Business Continuity Plan",
-    cadence: "annually",
-    current_instance: instOverdue,
-    rollup: {
-      open_count: 1,
-      overdue_count: 1,
-      pending_count: 0,
-      next_due_at: overdueDue,
-      latest_completed_at: null,
-    },
-  });
-  const due = makeObligation({
-    id: OB_DUE_ID,
-    title: "CPR/First Aid Certification — Initial",
-    cadence: "one_time",
-    scope: "staff",
-    assignee_role: "any_assigned",
-    assigned_to_users: [STAFF_USER_ID],
-    current_instance: instDue,
-    rollup: {
-      open_count: 1,
-      overdue_count: 0,
-      pending_count: 1,
-      next_due_at: soonDue,
-      latest_completed_at: null,
-    },
-  });
-  const done = makeObligation({
-    id: OB_DONE_ID,
-    title: "Internal Quality Management Plan",
-    cadence: "annually",
-    current_instance: instDone,
-    rollup: {
-      open_count: 0,
-      overdue_count: 0,
-      pending_count: 0,
-      next_due_at: null,
-      latest_completed_at: doneAt,
-    },
-  });
-  const paused = makeObligation({
-    id: OB_PAUSED_ID,
-    title: "Staff handbook annual review",
-    source: "provider",
-    is_locked: false,
-    active: false,
-    source_policy_section: "Internal P&P",
-    current_instance: null,
-    rollup: {
-      open_count: 0,
-      overdue_count: 0,
-      pending_count: 0,
-      next_due_at: null,
-      latest_completed_at: null,
-    },
-  });
-
-  return {
-    obligations: [overdue, due, done, paused],
-    instances: [instOverdue, instDue, instDone],
-    overdue,
-    due,
-    done,
-    paused,
-    instOverdue,
-    instDue,
-    instDone,
-  };
+function filterRows(table: string, rows: Record<string, unknown>[], search: URLSearchParams): Record<string, unknown>[] {
+  let out = rows;
+  const userId = parseEq(search, "user_id");
+  if (userId) out = out.filter((r) => r.user_id === userId);
+  const idEq = parseEq(search, "id");
+  if (idEq) out = out.filter((r) => r.id === idEq);
+  const idIn = parseIn(search, "id");
+  if (idIn) out = out.filter((r) => idIn.includes(String(r.id)));
+  const orgEq = parseEq(search, "organization_id");
+  if (orgEq) out = out.filter((r) => !r.organization_id || r.organization_id === orgEq);
+  const clientEq = parseEq(search, "client_id");
+  if (clientEq) out = out.filter((r) => r.client_id === clientEq);
+  const staffEq = parseEq(search, "staff_id");
+  if (staffEq) out = out.filter((r) => r.staff_id === staffEq);
+  const activeEq = parseEq(search, "active");
+  if (activeEq === "true") out = out.filter((r) => r.active === true);
+  void table;
+  return out;
 }
+
+function tableRows(table: string, role: HiveRole): Record<string, unknown>[] {
+  switch (table) {
+    case "organization_members":
+      return members().map((m) =>
+        role === "employee" && m.user_id === STAFF.riley
+          ? { ...m, role: "employee" }
+          : m,
+      );
+    case "organizations":
+      return [{ id: ORG_ID, ...ORG }];
+    case "profiles":
+      return profiles();
+    case "clients":
+      return clients();
+    case "teams":
+      return [];
+    case "scheduled_shifts":
+      return shifts();
+    case "client_billing_codes":
+      return auths();
+    case "staff_assignments":
+      return assigns();
+    case "time_off_requests":
+      return [];
+    case "shift_swap_requests":
+      return [];
+    case "role_permissions":
+      return permissionsFor(role);
+    case "user_permission_overrides":
+      return [];
+    case "auditor_accounts":
+      return [];
+    case "org_subscriptions":
+      return [];
+    case "nectar_documents":
+      return [];
+    case "policy_signatures":
+      return [];
+    case "hive_executives":
+      return [];
+    case "feature_registry":
+      return featureRegistry();
+    case "organization_features":
+      return [];
+    default:
+      return [];
+  }
+}
+
+function restTable(pathname: string): string | null {
+  const m = pathname.match(/\/rest\/v1\/([^/?]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+function serverFnExport(url: string): string {
+  try {
+    const id = decodeURIComponent(new URL(url).pathname.split("/").pop() ?? "");
+    const parsed = JSON.parse(Buffer.from(id, "base64url").toString("utf8")) as { export?: string };
+    return parsed.export ?? "";
+  } catch {
+    return "";
+  }
+}
+
+const FEATURE_KEYS = [
+  "evv_timesheets",
+  "client_intake",
+  "pcsp",
+  "staff_onboarding",
+  "nectar",
+  "hive_training",
+  "state_audit",
+  "pba_ledgers",
+] as const;
 
 function featureRegistry() {
-  return FEATURE_KEYS.map((key, i) => ({
-    id: `e2e-feat-${i + 1}`,
-    feature_key: key,
-    label: key.replace(/_/g, " "),
+  return FEATURE_KEYS.map((feature_key, i) => ({
+    id: `ffffffff-ffff-ffff-ffff-fffffffffff${i + 1}`,
+    feature_key,
+    label: feature_key === "evv_timesheets" ? "Timesheets" : feature_key,
     description: null,
     parent_key: null,
-    category: "tab",
+    category: "tab" as const,
     default_enabled: true,
-    sort_order: i,
+    sort_order: i + 1,
     required_tier: null,
     upgrade_blurb: null,
   }));
 }
 
-function parsePostgrestFilters(url: URL): Array<{ col: string; op: string; value: string }> {
-  const out: Array<{ col: string; op: string; value: string }> = [];
-  for (const [key, raw] of url.searchParams.entries()) {
-    if (key === "select" || key === "order" || key === "limit" || key === "offset" || key === "or") {
-      continue;
-    }
-    const eq = raw.indexOf(".");
-    if (eq < 0) continue;
-    const op = raw.slice(0, eq);
-    const value = raw.slice(eq + 1);
-    out.push({ col: key, op, value });
+function serverFnResult(exportName: string): unknown {
+  if (/checkHiveExecutive/i.test(exportName)) return { isExecutive: false };
+  if (/getMyEntitlements/i.test(exportName)) {
+    return { organization_id: ORG_ID, addons: [], tier: "growth", status: "active" };
   }
-  return out;
-}
-
-function rowMatches(row: Record<string, unknown>, filters: ReturnType<typeof parsePostgrestFilters>) {
-  for (const f of filters) {
-    const cell = row[f.col];
-    if (f.op === "eq") {
-      if (String(cell) !== f.value) return false;
-    } else if (f.op === "neq") {
-      if (String(cell) === f.value) return false;
-    } else if (f.op === "in") {
-      const inner = f.value.replace(/^\(/, "").replace(/\)$/, "");
-      const vals = inner.split(",").map((s) => s.replace(/^"|"$/g, "").trim());
-      if (!vals.includes(String(cell))) return false;
-    } else if (f.op === "is") {
-      const wantNull = f.value === "null";
-      if (wantNull && cell != null) return false;
-      if (!wantNull && cell == null) return false;
-    }
+  if (/getMyOrgFeatures/i.test(exportName)) {
+    return {
+      organization_id: ORG_ID,
+      effective: Object.fromEntries(FEATURE_KEYS.map((k) => [k, true])),
+      registry: featureRegistry(),
+    };
   }
-  return true;
-}
-
-function tableRows(persona: MockPersona, fx: ReturnType<typeof fixtures>): Record<string, Record<string, unknown>[]> {
-  const user = userRecord(persona);
-  const role = persona === "admin" ? "admin" : "employee";
-  const first = persona === "admin" ? "Dana" : "Alex";
-  const full = persona === "admin" ? "Dana Admin" : "Alex DSP";
-
-  const members = [
-    {
-      id: `mem-${user.id}`,
-      user_id: user.id,
-      organization_id: TNS_ORG_ID,
-      role,
-      job_title: persona === "admin" ? "Owner" : "DSP",
-      active: true,
-      organizations: ORG,
-    },
-    {
-      id: `mem-${STAFF_USER_ID}`,
-      user_id: STAFF_USER_ID,
-      organization_id: TNS_ORG_ID,
-      role: "employee",
-      job_title: "DSP",
-      active: true,
-      organizations: ORG,
-    },
-  ];
-
-  const profiles = [
-    {
-      id: user.id,
-      first_name: first,
-      last_name: persona === "admin" ? "Admin" : "DSP",
-      full_name: full,
-      email: user.email,
-      must_change_password: false,
-      staff_type_keys: persona === "admin" ? ["admin"] : ["dsp"],
-      bc_role: null,
-    },
-    {
-      id: STAFF_USER_ID,
-      first_name: "Jordan",
-      last_name: "Lee",
-      full_name: "Jordan Lee",
-      email: "jordan.lee@truenorth.example",
-      must_change_password: false,
-      staff_type_keys: ["dsp"],
-      bc_role: null,
-    },
-  ];
-
-  const directory = profiles.map((p) => ({
-    id: p.id,
-    full_name: p.full_name,
-    email: p.email,
-    organization_id: TNS_ORG_ID,
-  }));
-
-  const rolePermissions =
-    persona === "admin"
-      ? ALL_PERMISSIONS.map((permission) => ({
-          organization_id: TNS_ORG_ID,
-          role: "admin",
-          permission,
-          enabled: true,
-        }))
-      : ALL_PERMISSIONS.map((permission) => ({
-          organization_id: TNS_ORG_ID,
-          role: "employee",
-          permission,
-          enabled: permission === "complete_obligations" || permission === "view_own_timesheets",
-        }));
-
-  const clients = [
-    {
-      id: CLIENT_ID,
-      organization_id: TNS_ORG_ID,
-      first_name: "Riley",
-      last_name: "Chen",
-      intake_status: "complete",
-      account_status: "active",
-      authorized_dspd_codes: ["HHS", "SLH", "DSI"],
-      disability_category: null,
-      has_abi: false,
-      home_latitude: null,
-      home_longitude: null,
-      pcsp_goals: [],
-      job_code: null,
-      medicaid_id: "000111222",
-      physical_address: "1 Hive Way, Salt Lake City, UT",
-      special_directions: null,
-      profile_photo_url: null,
-      feature_config: null,
-      emergency_contact_name: null,
-      emergency_contact_phone: null,
-      date_of_birth: "1999-04-12",
-    },
-  ];
-
-  const billing = [
-    {
-      client_id: CLIENT_ID,
-      organization_id: TNS_ORG_ID,
-      service_code: "SLH",
-      authorization_pending: false,
-      service_start_date: "2026-07-01",
-      service_end_date: null,
-    },
-    {
-      client_id: CLIENT_ID,
-      organization_id: TNS_ORG_ID,
-      service_code: "HHS",
-      authorization_pending: false,
-      service_start_date: "2026-07-01",
-      service_end_date: null,
-    },
-    {
-      client_id: CLIENT_ID,
-      organization_id: TNS_ORG_ID,
-      service_code: "DSI",
-      authorization_pending: false,
-      service_start_date: "2026-07-01",
-      service_end_date: null,
-    },
-  ];
-
-  const assignees = [
-    {
-      instance_id: INST_OVERDUE_ID,
-      staff_id: ADMIN_USER_ID,
-      staff_name: "Dana Admin",
-      organization_id: TNS_ORG_ID,
-    },
-    {
-      instance_id: INST_DUE_ID,
-      staff_id: STAFF_USER_ID,
-      staff_name: "Jordan Lee",
-      organization_id: TNS_ORG_ID,
-    },
-    {
-      instance_id: INST_DUE_ID,
-      staff_id: DSP_USER_ID,
-      staff_name: "Alex DSP",
-      organization_id: TNS_ORG_ID,
-    },
-  ];
-
-  const completions = [
-    {
-      id: "e2e00000-0000-4000-a000-000000000041",
-      instance_id: INST_DONE_ID,
-      staff_id: ADMIN_USER_ID,
-      staff_name: "Dana Admin",
-      completed_at: fx.instDone.completed_at,
-      evidence_type_used: "upload",
-      upload_path: null,
-      upload_filename: "qm-plan.pdf",
-      attestation_text_snapshot: null,
-      form_submission_id: null,
-      nectar_validation_status: "passed",
-      nectar_validation_reasons: null,
-      nectar_extracted_cert_type: null,
-      nectar_extracted_expires_date: null,
-    },
-  ];
-
-  return {
-    organization_members: members,
-    organizations: [{ id: TNS_ORG_ID, nectar_profile_saved_at: null, ...ORG }],
-    profiles,
-    org_member_directory: directory,
-    role_permissions: rolePermissions,
-    user_permission_overrides: [],
-    auditor_accounts: [],
-    org_subscriptions: [
-      {
-        organization_id: TNS_ORG_ID,
-        plan: "enterprise",
-        status: "active",
-        locked_at: null,
-        created_at: new Date().toISOString(),
-      },
-    ],
-    hive_executives: [],
-    nectar_documents: [],
-    policy_signatures: [],
-    company_obligations: fx.obligations,
-    company_obligation_instances: fx.instances,
-    company_obligation_instance_assignees: assignees,
-    company_obligation_completions: completions,
-    clients,
-    client_billing_codes: billing,
-    evv_timesheets: [],
-    daily_logs: [],
-    incident_reports: [],
-    forms: [],
-    staff_groups: [],
-    staff_group_members: [],
-    staff_assignments: [],
-    feature_registry: featureRegistry(),
-    organization_features: FEATURE_KEYS.map((feature_key) => ({
-      organization_id: TNS_ORG_ID,
-      feature_key,
-      enabled: true,
-      updated_by: null,
-      updated_at: null,
-    })),
-    hrc_restriction_records: [],
-    emar_records: [],
-    document_attestations: [],
-    upi_attestations: [],
-    nectar_draft_jobs: [],
-    platform_states: [],
-    provider_interest_outline: [
-      { organization_id: TNS_ORG_ID, codes_held: ["HHS", "SLH", "SLN", "SEI", "DSI"] },
-    ],
-  };
-}
-
-function jsonHeaders(origin?: string | null, extra?: Record<string, string>) {
-  return {
-    "content-type": "application/json; charset=utf-8",
-    ...corsHeaders(origin),
-    ...(extra ?? {}),
-  };
-}
-
-function fulfillJson(route: Route, body: unknown, status = 200, extraHeaders?: Record<string, string>) {
-  const origin = route.request().headers()["origin"];
-  const payload = body === undefined ? null : body;
-  return route.fulfill({
-    status,
-    headers: jsonHeaders(origin, extraHeaders),
-    body: JSON.stringify(payload),
-  });
-}
-
-function decodeDevServerFnExport(urlStr: string): string | null {
-  try {
-    const u = new URL(urlStr);
-    const marker = "/_serverFn/";
-    const idx = u.pathname.indexOf(marker);
-    if (idx < 0) return null;
-    let id = u.pathname.slice(idx + marker.length);
-    const q = id.indexOf("?");
-    if (q >= 0) id = id.slice(0, q);
-    id = decodeURIComponent(id).replace(/\/$/, "");
-    if (!id) return null;
-    const json = Buffer.from(id, "base64url").toString("utf8");
-    const parsed = JSON.parse(json) as { export?: unknown };
-    if (typeof parsed.export !== "string") return null;
-    return parsed.export.replace(/_createServerFn_handler$/, "");
-  } catch {
-    return null;
+  if (/getActiveDraftJobs/i.test(exportName)) return { jobs: [] };
+  if (/getOrgCeRoster/i.test(exportName)) {
+    return { organizationId: ORG_ID, goalHours: 12, rows: [], behindCount: 0 };
   }
-}
-
-function serverFnName(url: string, postText: string): string | null {
-  const fromId = decodeDevServerFnExport(url);
-  const blob = `${fromId ?? ""}\n${url}\n${postText}`;
-  const names = [
-    "listCompanyObligations",
-    "listDeadlineObligationInstances",
-    "listMyObligationInstances",
-    "getMyEntitlements",
-    "checkHiveExecutive",
-    "getMyOrgFeatures",
-    "getAuditEvidenceSnapshot",
-    "getOrgServiceFootprint",
-    "listStaffGroups",
-    "getInboxUnreadCount",
-    "getPendingUpgradeRequestCount",
-    "getActiveDraftJobs",
-    "listMyPendingPolicies",
-    "ensureCurrentSummaryPeriods",
-    "listOpenSummaries",
-    "checkAndMarkOverdue",
-    "countObligationAssigneesMissingHireDate",
-    "runInternalAudit",
-    "listAuditableStaff",
-    "listOrgAuditPackages",
-    "listOrgAuditors",
-    "listOrgSubjectCandidates",
-    "getCompanyObligation",
-    "getIncidentOpenClocks",
-    "waiveInstance",
-    "recordCompletion",
-    "toggleObligationActive",
-    "deleteCompanyObligation",
-    "createCompanyObligation",
-    "updateCompanyObligation",
-    "logObligationEvent",
-    "requestPermission",
-    "requestFeatureUpgrade",
-    "getPackageBuilderDetail",
-  ];
-  const hit = [...names].sort((a, b) => b.length - a.length).find((n) => blob.includes(n));
-  return hit ?? fromId;
-}
-
-function unwrapSeroval(parsed: unknown): Record<string, unknown> {
-  if (parsed == null) return {};
-  if (Array.isArray(parsed)) {
-    for (const item of parsed) {
-      const inner = unwrapSeroval(item);
-      if (Object.keys(inner).length) return inner;
-    }
-    return {};
+  if (/ensureCurrentSummaryPeriods/i.test(exportName)) return { ensured: 0 };
+  if (/getInboxUnreadCount|getPendingUpgradeRequestCount/i.test(exportName)) {
+    return { count: 0 };
   }
-  if (typeof parsed === "object") {
-    const rec = parsed as Record<string, unknown>;
-    if (rec.data && typeof rec.data === "object" && !Array.isArray(rec.data)) {
-      return rec.data as Record<string, unknown>;
-    }
-    return rec;
+  if (/getMissingThirtyDayStaffIds|getMissingAbiStaffIds/i.test(exportName)) {
+    return { missingIds: [] };
   }
+  if (/nectarDraftShifts|autoFillOpenShifts/i.test(exportName)) {
+    return { drafts: [], proposals: [] };
+  }
+  if (/nudgeDraftJob|processDraftChunk|finalizeRequirementsDraft/i.test(exportName)) {
+    return { ok: true };
+  }
+  // List-shaped server fns (obligations, open summaries, etc.)
+  if (/^list|^fetch/i.test(exportName)) return [];
   return {};
 }
 
-function parseBody(postText: string): Record<string, unknown> {
-  if (!postText) return {};
-  try {
-    return unwrapSeroval(JSON.parse(postText) as unknown);
-  } catch {
-    /* ignore */
-  }
-  const orgMatch = postText.match(/"organizationId"\s*:\s*"([0-9a-f-]+)"/i);
-  if (orgMatch) return { organizationId: orgMatch[1] };
-  return {};
-}
+const WRITE_TABLES = new Set([
+  "scheduled_shifts",
+  "time_off_requests",
+  "shift_swap_requests",
+  "staff_assignments",
+  "evv_timesheets",
+]);
 
-function entitlementsPayload() {
-  return {
-    organization_id: TNS_ORG_ID,
-    tier: "enterprise",
-    status: "active",
-    addons: [
-      "nectar_infusion",
-      "internal_audit",
-      "requirements_engine",
-      "priority_support",
-      "hive_training",
-    ],
-    isExecutive: false,
-  };
-}
+export async function installHiveMocks(page: Page, role: HiveRole = "admin"): Promise<HiveMock> {
+  const mock: HiveMock = { writes: [] };
+  const session = sessionFor(role);
 
-function orgFeaturesPayload() {
-  const registry = featureRegistry();
-  return {
-    organization_id: TNS_ORG_ID,
-    effective: Object.fromEntries(FEATURE_KEYS.map((k) => [k, true])),
-    registry,
-  };
-}
+  await page.route((url) => url.hostname.endsWith("supabase.co"), async (route) => {
+    const req = route.request();
+    const url = new URL(req.url());
+    const method = req.method().toUpperCase();
 
-function deadlineItems(fx: ReturnType<typeof fixtures>) {
-  return [
-    {
-      instance_id: INST_OVERDUE_ID,
-      obligation_id: OB_OVERDUE_ID,
-      title: fx.overdue.title,
-      catalog_title: fx.overdue.title,
-      period_key: "2026",
-      due_at: fx.instOverdue.due_at,
-      status: "overdue",
-      source: "sow",
-      cadence: "annually",
-      due_day_config: {},
-      source_policy_section: "DHHS91172",
-      evidence_type: "upload",
-      linked_form_id: null,
-      scope: "org",
-      assignee_staff_id: null,
-      assignee_staff_name: null,
-      client_id: null,
-      client_name: null,
-    },
-    {
-      instance_id: INST_DUE_ID,
-      obligation_id: OB_DUE_ID,
-      title: fx.due.title,
-      catalog_title: fx.due.title,
-      period_key: "2026",
-      due_at: fx.instDue.due_at,
-      status: "pending",
-      source: "sow",
-      cadence: "one_time",
-      due_day_config: {},
-      source_policy_section: "DHHS91172",
-      evidence_type: "upload",
-      linked_form_id: null,
-      scope: "staff",
-      assignee_staff_id: STAFF_USER_ID,
-      assignee_staff_name: "Jordan Lee",
-      client_id: null,
-      client_name: null,
-    },
-  ];
-}
-
-function myInstances(persona: MockPersona, fx: ReturnType<typeof fixtures>) {
-  const staffId = persona === "admin" ? ADMIN_USER_ID : DSP_USER_ID;
-  const mine = fx.instances.filter((i) => {
-    if (i.obligation_id === OB_DUE_ID) return true;
-    if (persona === "admin" && i.obligation_id === OB_OVERDUE_ID) return true;
-    return i.assignee_staff_id === staffId;
-  });
-  return mine.map((inst) => {
-    const ob = fx.obligations.find((o) => o.id === inst.obligation_id);
-    return { ...inst, obligation: ob };
-  });
-}
-
-function serverFnResult(
-  name: string | null,
-  body: Record<string, unknown>,
-  persona: MockPersona,
-  fx: ReturnType<typeof fixtures>,
-): unknown {
-  if (name && /hasPermission|checkPermission/i.test(name)) {
-    return { allowed: persona === "admin", reason: "" };
-  }
-  if (name && /nectar/i.test(name) && /invoke|chat|complete/i.test(name)) {
-    return { error: "Nectar is not configured in this test environment." };
-  }
-  switch (name) {
-    case "listCompanyObligations":
-      return fx.obligations;
-    case "listDeadlineObligationInstances":
-      return deadlineItems(fx);
-    case "listMyObligationInstances":
-      return myInstances(persona, fx);
-    case "getMyEntitlements":
-      return entitlementsPayload();
-    case "checkHiveExecutive":
-      return { isExecutive: false };
-    case "getMyOrgFeatures":
-      return orgFeaturesPayload();
-    case "getAuditEvidenceSnapshot":
-      return EMPTY_AUDIT_EVIDENCE;
-    case "getOrgServiceFootprint":
-      return { codes: ["DSI", "HHS", "SEI", "SLH", "SLN"], hasAbiClients: false };
-    case "listStaffGroups":
-      return [];
-    case "getInboxUnreadCount":
-    case "getPendingUpgradeRequestCount":
-      return { count: 0 };
-    case "getActiveDraftJobs":
-      return [];
-    case "listMyPendingPolicies":
-      return { pending: [], gating: [] };
-    case "ensureCurrentSummaryPeriods":
-      return { ok: true };
-    case "listOpenSummaries":
-      return [];
-    case "checkAndMarkOverdue":
-      return { updated: 0 };
-    case "countObligationAssigneesMissingHireDate":
-      return { count: 0 };
-    case "runInternalAudit":
-      return EMPTY_AUDIT_SUMMARY;
-    case "listAuditableStaff":
-      return [
-        {
-          user_id: STAFF_USER_ID,
-          full_name: "Jordan Lee",
-          email: "jordan.lee@truenorth.example",
-          job_title: "DSP",
-          role: "employee",
-        },
-      ];
-    case "listOrgAuditPackages":
-    case "listOrgAuditors":
-    case "listOrgSubjectCandidates":
-      return [];
-    case "getCompanyObligation": {
-      const id = String(body.obligationId ?? body.obligation_id ?? "");
-      return fx.obligations.find((o) => o.id === id) ?? null;
+    if (method === "OPTIONS") {
+      await route.fulfill({ status: 204, headers: corsHeaders(), body: "" });
+      return;
     }
-    case "getIncidentOpenClocks":
-      return [];
-    case "waiveInstance":
-    case "recordCompletion":
-    case "toggleObligationActive":
-    case "deleteCompanyObligation":
-    case "createCompanyObligation":
-    case "updateCompanyObligation":
-    case "logObligationEvent":
-    case "requestPermission":
-    case "requestFeatureUpgrade":
-      return { ok: true };
-    default:
-      break;
-  }
 
-  if ("activeOrganizationId" in body) return orgFeaturesPayload();
-  if ("organization_id" in body && !("organizationId" in body)) return { count: 0 };
-  if ("area" in body || "dateFrom" in body || "clientIds" in body) return EMPTY_AUDIT_SUMMARY;
-  if ("obligationId" in body) return { count: 0 };
-
-  // Unknown { organizationId } list-like calls: empty array is the safe default.
-  if ("organizationId" in body) return [];
-  // Empty-body GET-like calls: union of entitlements + executive check.
-  return entitlementsPayload();
-}
-
-async function handleSupabase(route: Route, persona: MockPersona, fx: ReturnType<typeof fixtures>) {
-  const req = route.request();
-  const method = req.method().toUpperCase();
-  const origin = req.headers()["origin"];
-  const url = new URL(req.url());
-
-  if (method === "OPTIONS") {
-    return route.fulfill({ status: 204, headers: corsHeaders(origin), body: "" });
-  }
-
-  if (url.pathname.startsWith("/auth/v1/")) {
-    const session = sessionRecord(persona);
-    if (url.pathname.endsWith("/user") || url.pathname.endsWith("/user/")) {
-      return fulfillJson(route, session.user);
-    }
-    if (url.pathname.includes("/token") || url.pathname.includes("/session")) {
-      return fulfillJson(route, session);
-    }
-    if (url.pathname.includes("/logout")) {
-      return route.fulfill({ status: 204, headers: corsHeaders(origin), body: "" });
-    }
-    return fulfillJson(route, session);
-  }
-
-  if (url.pathname.startsWith("/realtime/v1/") || url.pathname.startsWith("/storage/v1/")) {
-    return route.fulfill({ status: 200, headers: corsHeaders(origin), body: "" });
-  }
-
-  if (method !== "GET" && method !== "HEAD") {
-    // Never forward writes — the suite is read-only against live obligation rows.
-    return fulfillJson(route, [], 201);
-  }
-
-  if (!url.pathname.startsWith("/rest/v1/")) {
-    return fulfillJson(route, []);
-  }
-
-  if (url.pathname.startsWith("/rest/v1/rpc/")) {
-    return fulfillJson(route, []);
-  }
-
-  const table = decodeURIComponent(url.pathname.replace("/rest/v1/", "").split("/")[0] ?? "");
-  const rows = tableRows(persona, fx)[table] ?? [];
-  const filters = parsePostgrestFilters(url);
-  const matched = rows.filter((r) => rowMatches(r, filters));
-  const accept = (req.headers()["accept"] ?? "").toLowerCase();
-  const wantObject = accept.includes("vnd.pgrst.object");
-  const count = matched.length;
-
-  if (method === "HEAD") {
-    return route.fulfill({
-      status: 200,
-      headers: {
-        ...corsHeaders(origin),
-        "content-range": count ? `0-${count - 1}/${count}` : "*/0",
-        "content-type": "application/json; charset=utf-8",
-      },
-      body: "",
-    });
-  }
-
-  if (wantObject) {
-    if (!matched[0]) {
-      return route.fulfill({
-        status: 406,
-        headers: jsonHeaders(origin),
-        body: JSON.stringify({
-          code: "PGRST116",
-          details: "The result contains 0 rows",
-          hint: null,
-          message: "JSON object requested, multiple (or no) rows returned",
-        }),
+    if (url.pathname.startsWith("/auth/v1/user")) {
+      await route.fulfill({
+        status: 200,
+        headers: corsHeaders(),
+        body: JSON.stringify(session.user),
       });
+      return;
     }
-    return fulfillJson(route, matched[0], 200, {
-      "content-range": `0-0/${count}`,
+
+    if (url.pathname.startsWith("/auth/v1/token") || url.pathname.startsWith("/auth/v1/logout")) {
+      await route.fulfill({
+        status: 200,
+        headers: corsHeaders(),
+        body: JSON.stringify(session),
+      });
+      return;
+    }
+
+    if (url.pathname.startsWith("/rest/v1/rpc/")) {
+      await route.fulfill({ status: 200, headers: corsHeaders(), body: "[]" });
+      return;
+    }
+
+    const table = restTable(url.pathname);
+    if (table) {
+      if (method !== "GET" && method !== "HEAD") {
+        mock.writes.push({ method, url: req.url(), table });
+        if (WRITE_TABLES.has(table)) {
+          await route.fulfill({
+            status: 403,
+            headers: corsHeaders(),
+            body: JSON.stringify({
+              message: "E2E mock: refusing to mutate live calendar/shift tables",
+              code: "E2E_READONLY",
+            }),
+          });
+          return;
+        }
+        await route.fulfill({
+          status: 201,
+          headers: corsHeaders(),
+          body: JSON.stringify([]),
+        });
+        return;
+      }
+
+      const rows = filterRows(table, tableRows(table, role), url.searchParams);
+      const single = wantsSingle(req) || (req.headers()["accept"] ?? "").includes("vnd.pgrst.object+json");
+      if (single) {
+        if (rows.length === 0) {
+          await route.fulfill({
+            status: 406,
+            headers: corsHeaders({ "content-range": "*/0" }),
+            body: JSON.stringify({ code: "PGRST116", message: "Cannot coerce the result to a single JSON object" }),
+          });
+          return;
+        }
+        await route.fulfill({
+          status: 200,
+          headers: corsHeaders({ "content-range": "0-0/1" }),
+          body: JSON.stringify(rows[0]),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        headers: corsHeaders({
+          "content-range": rows.length ? `0-${rows.length - 1}/${rows.length}` : "*/0",
+        }),
+        body: JSON.stringify(rows),
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      headers: corsHeaders(),
+      body: JSON.stringify({}),
     });
-  }
-
-  return fulfillJson(route, matched, 200, {
-    "content-range": count ? `0-${count - 1}/${count}` : "*/0",
   });
-}
 
-async function handleServerFn(route: Route, persona: MockPersona, fx: ReturnType<typeof fixtures>) {
-  const req = route.request();
-  const method = req.method().toUpperCase();
-  if (method === "OPTIONS") {
-    return route.fulfill({ status: 204, headers: corsHeaders(req.headers()["origin"]), body: "" });
-  }
-  const postText = req.postData() ?? "";
-  let queryText = "";
-  try {
-    queryText = decodeURIComponent(new URL(req.url()).search);
-  } catch {
-    /* ignore */
-  }
-  const blob = `${postText}\n${queryText}`;
-  const name = serverFnName(req.url(), blob);
-  const body = { ...parseBody(queryText), ...parseBody(postText) };
-  const result = serverFnResult(name, body, persona, fx) ?? null;
-  if (!name) {
-    // eslint-disable-next-line no-console
-    console.log(`[hive-mock] unmatched server fn ${method} ${req.url()} body=${postText.slice(0, 180)}`);
-  }
-  // TanStack Start's client returns application/json payloads as-is when
-  // `x-tss-serialized` is absent (see serverFnFetcher getResponse).
-  return fulfillJson(route, result);
-}
-
-export async function installHiveMocks(page: Page, opts: HiveMockOptions = {}) {
-  const persona: MockPersona = opts.role ?? "admin";
-  const fx = fixtures();
-  const session = sessionRecord(persona);
+  // TanStack Start server functions. Per-fn shapes match production
+  // handlers (a generic [] crashed DraftJobsProvider via jobs.map).
+  // Calendar mutations are stubbed so Publish / Save never hit production.
+  await page.route(/_serverFn/, async (route) => {
+    const req = route.request();
+    const method = req.method().toUpperCase();
+    const url = req.url();
+    const name = serverFnExport(url);
+    const mutating = /saveShift|deleteShift|publishWeek|createRecurring|applyDrafts|autoFill|setAdminTimeOff/i.test(
+      name,
+    );
+    if (mutating) {
+      mock.writes.push({ method, url, table: "_serverFn" });
+    }
+    await route.fulfill({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ result: mutating ? { ok: false, message: "E2E mock: writes blocked" } : serverFnResult(name) }),
+    });
+  });
 
   await page.addInitScript(
-    ({ storageKey, sessionJson, orgId, view }) => {
-      try {
-        window.localStorage.setItem(storageKey, sessionJson);
-        window.localStorage.setItem("hive.activeOrgId", orgId);
-        window.localStorage.setItem("portal-view", view);
-      } catch {
-        /* ignore */
-      }
+    ({ storageKey, sessionJson, orgId, portalView }) => {
+      window.localStorage.setItem(storageKey, sessionJson);
+      window.localStorage.setItem("hive.activeOrgId", orgId);
+      window.localStorage.setItem("portal-view", portalView);
     },
     {
       storageKey: AUTH_STORAGE_KEY,
       sessionJson: JSON.stringify(session),
-      orgId: TNS_ORG_ID,
-      view: persona === "admin" ? "admin" : "staff",
+      orgId: ORG_ID,
+      portalView: role === "admin" ? "admin" : "staff",
     },
   );
 
-  page.on("pageerror", (err) => {
-    // eslint-disable-next-line no-console
-    console.log(`[hive-mock pageerror] ${err.message}`);
-  });
-
-  const interceptRpc = (route: Route) => {
-    const url = route.request().url();
-    const tsr = route.request().headers()["x-tsr-serverfn"];
-    if (url.includes("supabase.co") || url.includes(SUPABASE_HOST)) {
-      return handleSupabase(route, persona, fx);
-    }
-    if (tsr === "true" || url.includes("/_serverFn")) {
-      return handleServerFn(route, persona, fx);
-    }
-    return route.continue();
-  };
-
-  // Header match is required: GET server fns may not include `/_serverFn/` as
-  // a path segment, and page.route cannot see Node/SSR fetches. Never fulfill
-  // Vite JS modules — only RPCs with the Start header, or supabase.co.
-  await page.route(/supabase\.co/i, interceptRpc);
-  await page.route(/_serverFn/, interceptRpc);
-  await page.route("**/*", async (route) => {
-    const tsr = route.request().headers()["x-tsr-serverfn"];
-    const url = route.request().url();
-    if (tsr === "true" || url.includes("/_serverFn") || url.includes("supabase.co")) {
-      return interceptRpc(route);
-    }
-    return route.continue();
-  });
+  return mock;
 }
 
-export function screenshotPath(name: string): string {
-  return `/opt/cursor/artifacts/screenshots/${name}.png`;
+export async function saveShot(page: Page, name: string): Promise<string> {
+  const dirs = [
+    path.join(process.cwd(), "e2e/artifacts"),
+    "/opt/cursor/artifacts/screenshots",
+  ];
+  let last = "";
+  for (const dir of dirs) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      const file = path.join(dir, `${name}.png`);
+      await page.screenshot({ path: file, fullPage: true });
+      last = file;
+    } catch {
+      /* optional artifact mount may be missing */
+    }
+  }
+  return last;
 }

@@ -225,7 +225,9 @@ export function EmployeesPage() {
     },
     onSuccess: (res) => {
       if (res.email_sent) {
-        toast.success(`Invitation emailed to ${res.invitation.email}`);
+        toast.success(
+          `Invitation emailed to ${res.invitation.email}. The join link currently opens new-agency signup — for a tester, use Add manually instead.`,
+        );
       } else {
         toast.warning(
           `Invitation created, but the email couldn't be sent (${res.email_error ?? "unknown error"}). Share the join link from the pending list instead.`,
@@ -372,7 +374,9 @@ export function EmployeesPage() {
       {!!invites?.length && (
         <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
           <h3 className="text-sm font-semibold">Pending invitations</h3>
-          <p className="text-xs text-muted-foreground">An email was sent to each address below. If it didn't arrive, copy the link and share it manually.</p>
+          <p className="text-xs text-muted-foreground">
+            An email may have been sent. The join link currently opens new-agency signup and does not call <code>accept_invitation</code> — for the Sep 1 test, add staff with <strong>Add manually</strong> and share the temp password instead.
+          </p>
           <ul className="mt-3 divide-y divide-border">
             {invites.map((i) => {
               const link = `${typeof window !== "undefined" ? window.location.origin : ""}/signup?invite=${i.token}`;

@@ -91,7 +91,9 @@ function TeamAccessPage() {
         },
       }),
     onSuccess: () => {
-      toast.success("Invitation sent");
+      toast.warning(
+        "Invitation row created, but this screen does not email the invitee. Add staff with Employees → Add manually (temp password), or create the invite on Employees → Invite by email and copy the join link. Email accept is not wired on /signup.",
+      );
       setInviteEmail("");
       setInviteRole("employee");
     },
@@ -192,7 +194,9 @@ function TeamAccessPage() {
           </Button>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Committee Member is assigned after they join. Company Executive and HIVE Executive can be granted after the invite is accepted.
+          This form writes a pending invitation row only — it does not send email.
+          To put a tester on the roster today, use Employees → Add manually and share the
+          temporary password. Committee Member is assigned after they join.
         </p>
       </form>
 

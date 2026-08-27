@@ -17,7 +17,7 @@ import {
 import { ShieldCheck, ChevronDown, RotateCcw, AlertTriangle, Loader2 } from "lucide-react";
 import {
   ALL_PERMISSIONS, DEFAULT_MATRIX, PERMISSION_LABEL, PERMISSION_SECTIONS,
-  PERMISSION_SECTION_MAP, ROLE_LABEL, type Permission, type ProviderRole,
+  PERMISSION_SECTION_MAP, ROLE_LABEL, type Permission, type ProviderRole, type Role,
 } from "@/lib/rbac";
 import { setRolePermission, resetRoleToDefaults } from "@/lib/permissions.functions";
 import { toast } from "sonner";

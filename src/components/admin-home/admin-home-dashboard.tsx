@@ -504,7 +504,7 @@ function AdminHomeDashboardInner() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("daily_logs")
-        .select("id, status, log_date, updated_at, created_at")
+        .select("id, status, log_date, submitted_at, created_at")
         .eq("organization_id", orgId!)
         .gte("log_date", since30.slice(0, 10));
       if (error) throw error;
@@ -512,7 +512,7 @@ function AdminHomeDashboardInner() {
         id: string;
         status: string;
         log_date: string;
-        updated_at: string | null;
+        submitted_at: string | null;
         created_at: string;
       }>;
     },
@@ -1125,8 +1125,8 @@ function AdminHomeDashboardInner() {
     const recentLogs = [...(dailyLogsQ.data ?? [])]
       .sort(
         (a, b) =>
-          new Date(b.updated_at ?? b.created_at).getTime() -
-          new Date(a.updated_at ?? a.created_at).getTime(),
+          new Date(b.submitted_at ?? b.created_at).getTime() -
+          new Date(a.submitted_at ?? a.created_at).getTime(),
       )
       .slice(0, 3);
     for (const log of recentLogs) {
@@ -1140,7 +1140,7 @@ function AdminHomeDashboardInner() {
         key: `dl-${log.id}`,
         tone,
         text: `Daily log · ${log.status.replace(/_/g, " ")} · ${log.log_date}`,
-        at: new Date(log.updated_at ?? log.created_at),
+        at: new Date(log.submitted_at ?? log.created_at),
       });
     }
 

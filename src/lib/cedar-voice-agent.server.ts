@@ -10,9 +10,11 @@ import { isLikelyBadCoord } from "@/lib/geo";
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import {
   FALLBACK_UNKNOWN,
+  applyCaseloadClockInResolution,
   reconcileVoiceAgentResponse,
   type VoiceAgentResponse,
 } from "@/lib/cedar-voice-intent";
+import { formatCaseloadForPrompt } from "@/lib/cedar-voice-client-resolve";
 
 export type { VoiceAgentResponse } from "@/lib/cedar-voice-intent";
 
@@ -133,16 +135,11 @@ Rules:
 - "clarify" — you understood the general intent but need one specific piece of information. Ask exactly one short question.
 - "unknown" — you cannot determine intent. Return a helpful message.
 
-Client matching: match spoken first names case-insensitively. If there is only one client named "Justin" return that client. If there are multiple, return clarify asking which one.
+Client matching: copy the client's exact id UUID from the caseload list — never invent an id. Match spoken first names case-insensitively. If there is only one client named "Justin" return that client's id. If there are multiple, return clarify asking which one.
 
 Service code matching: if the staff says "SEI", "supported employment", "day supports", "HHS", "host home" etc — map to the appropriate DSPD service code. If unclear and the client has only one authorized code, use that. If still ambiguous, clarify.`;
 
-    const caseloadText = data.caseload
-      .map(
-        (c) =>
-          `${c.firstName} ${c.lastName} (authorized: ${c.authorizedCodes?.join(", ") ?? "unknown"})`,
-      )
-      .join("; ");
+    const caseloadText = formatCaseloadForPrompt(data.caseload);
     const activeShiftText = data.activeShift
       ? `Yes — ${data.activeShift.clientFirstName}, ${data.activeShift.serviceCode}`
       : "None";
@@ -156,7 +153,7 @@ Caseload: ${caseloadText || "(no clients on caseload)"}
 Return JSON with one of these shapes:
 { "intent": "expand_note", "narrative": "text to add to the note" }
 { "intent": "expand_note_and_clock_out", "narrative": "note content without the clock-out request" }
-{ "intent": "clock_in", "clientId": "uuid", "clientName": "First Last", "serviceCode": "SEI" }
+{ "intent": "clock_in", "clientId": "<exact uuid from the caseload list>", "clientName": "First Last", "serviceCode": "SEI" }
 { "intent": "clock_out" }
 { "intent": "ask_compass", "question": "the question" }
 { "intent": "clarify", "question": "one short clarifying question" }
@@ -206,7 +203,11 @@ Return JSON with one of these shapes:
       }
     }
 
-    return reconcileVoiceAgentResponse(parsed, data.transcript);
+    return applyCaseloadClockInResolution(
+      reconcileVoiceAgentResponse(parsed, data.transcript),
+      data.caseload,
+      data.transcript,
+    );
   });
 
 // ─── createClockIn — Compass EVV clock-in ───────────────────────────────────

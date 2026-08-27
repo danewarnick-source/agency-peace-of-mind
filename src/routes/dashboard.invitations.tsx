@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Mail, UserPlus, Copy, RefreshCcw, Ban, Send } from "lucide-react";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import { createInvitation, resendInvitation, revokeInvitation } from "@/lib/invitations.functions";
+import { inviteJoinUrl } from "@/lib/join-invite";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/invitations")({
@@ -185,7 +186,8 @@ function InvitationsPage() {
         <Send className="mt-0.5 h-4 w-4 shrink-0" />
         <div>
           <strong className="text-foreground">Email delivery:</strong> Invitations are emailed automatically when created or resent.
-          If a message doesn't arrive, copy the invite link below and send it manually — it's signed, expires in 14 days, and is locked to the invitee's email.
+          The link opens <code>/join</code> — they set a password and join this organization (not a new company).
+          If a message doesn't arrive, copy the invite link below and send it manually — it expires in 14 days and is locked to the invitee's email.
         </div>
       </div>
 
@@ -211,7 +213,7 @@ function InvitationsPage() {
             {invites?.map((inv) => {
               const expired = new Date(inv.expires_at) < new Date();
               const link = typeof window !== "undefined"
-                ? `${window.location.origin}/signup?invite=${inv.token}`
+                ? inviteJoinUrl(window.location.origin, inv.token)
                 : "";
               return (
                 <TableRow key={inv.id}>

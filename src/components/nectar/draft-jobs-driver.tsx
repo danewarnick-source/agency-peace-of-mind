@@ -354,7 +354,7 @@ export function DraftJobsProvider({ children }: { children: React.ReactNode }) {
       })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobsQuery.data?.jobs?.map((j) => j.jobId).join("|"), orgId]);
+  }, [(jobsQuery.data?.jobs ?? []).map((j) => j.jobId).join("|"), orgId]);
 
   // On tab hide / pagehide, POST the tick endpoint for each active job so
   // the server keeps chunking. Best-effort — the browser may cancel the

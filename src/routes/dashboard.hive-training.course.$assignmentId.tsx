@@ -152,7 +152,7 @@ function CoursePlayer() {
   if (!assignment) return <div className="p-6 text-center text-muted-foreground">Assignment not found.</div>;
 
   return (
-    <div className="mx-auto max-w-3xl p-4 md:p-6 space-y-4">
+    <div className="mx-auto max-w-3xl p-4 md:p-6 space-y-4" data-testid="hive-training-player">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/dashboard/hive-training" })}>
           <ArrowLeft className="h-4 w-4" />

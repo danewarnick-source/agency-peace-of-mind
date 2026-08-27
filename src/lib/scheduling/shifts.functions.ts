@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isDailyCode } from "./code-colors";
+import { launchpadBlockedMessage } from "@/lib/launchpad-gate";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -49,17 +50,20 @@ export async function assertActiveBillingCode(
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function assertLaunchpadPassed(supabase: any, staffId: string): Promise<void> {
+export async function assertLaunchpadPassed(
+  supabase: any,
+  staffId: string,
+  purpose: "clock_in" | "assign" = "assign",
+): Promise<void> {
   const { data, error } = await supabase
     .from("profiles")
     .select("has_passed_launchpad")
     .eq("id", staffId)
     .maybeSingle();
-  if (error) throw error;
-  if (!data?.has_passed_launchpad) {
-    throw new Error(
-      "This staff member has not completed Launchpad and cannot be assigned as a sole worker.",
-    );
+  // Never surface a raw PostgREST/UUID error to staff — the gate is a
+  // human-readable Launchpad block, fail-closed on lookup failure.
+  if (error || !data?.has_passed_launchpad) {
+    throw new Error(launchpadBlockedMessage(purpose));
   }
 }
 

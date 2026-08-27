@@ -540,7 +540,7 @@ function tableRows(persona: MockPersona, fx: ReturnType<typeof fixtures>): Recor
 
   return {
     organization_members: members,
-    organizations: [{ id: TNS_ORG_ID, ...ORG }],
+    organizations: [{ id: TNS_ORG_ID, nectar_profile_saved_at: null, ...ORG }],
     profiles,
     org_member_directory: directory,
     role_permissions: rolePermissions,
@@ -601,15 +601,37 @@ function jsonHeaders(origin?: string | null, extra?: Record<string, string>) {
 
 function fulfillJson(route: Route, body: unknown, status = 200, extraHeaders?: Record<string, string>) {
   const origin = route.request().headers()["origin"];
+  const payload = body === undefined ? null : body;
   return route.fulfill({
     status,
     headers: jsonHeaders(origin, extraHeaders),
-    body: JSON.stringify(body),
+    body: JSON.stringify(payload),
   });
 }
 
+function decodeDevServerFnExport(urlStr: string): string | null {
+  try {
+    const u = new URL(urlStr);
+    const marker = "/_serverFn/";
+    const idx = u.pathname.indexOf(marker);
+    if (idx < 0) return null;
+    let id = u.pathname.slice(idx + marker.length);
+    const q = id.indexOf("?");
+    if (q >= 0) id = id.slice(0, q);
+    id = decodeURIComponent(id).replace(/\/$/, "");
+    if (!id) return null;
+    const json = Buffer.from(id, "base64url").toString("utf8");
+    const parsed = JSON.parse(json) as { export?: unknown };
+    if (typeof parsed.export !== "string") return null;
+    return parsed.export.replace(/_createServerFn_handler$/, "");
+  } catch {
+    return null;
+  }
+}
+
 function serverFnName(url: string, postText: string): string | null {
-  const decoded = decodeURIComponent(url);
+  const fromId = decodeDevServerFnExport(url);
+  const blob = `${fromId ?? ""}\n${url}\n${postText}`;
   const names = [
     "listCompanyObligations",
     "listDeadlineObligationInstances",
@@ -646,23 +668,38 @@ function serverFnName(url: string, postText: string): string | null {
     "requestFeatureUpgrade",
     "getPackageBuilderDetail",
   ];
-  const hit = names.find((n) => decoded.includes(n) || postText.includes(n));
-  return hit ?? null;
+  const hit = [...names].sort((a, b) => b.length - a.length).find((n) => blob.includes(n));
+  return hit ?? fromId;
+}
+
+function unwrapSeroval(parsed: unknown): Record<string, unknown> {
+  if (parsed == null) return {};
+  if (Array.isArray(parsed)) {
+    for (const item of parsed) {
+      const inner = unwrapSeroval(item);
+      if (Object.keys(inner).length) return inner;
+    }
+    return {};
+  }
+  if (typeof parsed === "object") {
+    const rec = parsed as Record<string, unknown>;
+    if (rec.data && typeof rec.data === "object" && !Array.isArray(rec.data)) {
+      return rec.data as Record<string, unknown>;
+    }
+    return rec;
+  }
+  return {};
 }
 
 function parseBody(postText: string): Record<string, unknown> {
   if (!postText) return {};
   try {
-    const parsed = JSON.parse(postText) as unknown;
-    if (parsed && typeof parsed === "object" && "data" in (parsed as object)) {
-      const data = (parsed as { data: unknown }).data;
-      if (data && typeof data === "object") return data as Record<string, unknown>;
-      return {};
-    }
-    if (parsed && typeof parsed === "object") return parsed as Record<string, unknown>;
+    return unwrapSeroval(JSON.parse(postText) as unknown);
   } catch {
     /* ignore */
   }
+  const orgMatch = postText.match(/"organizationId"\s*:\s*"([0-9a-f-]+)"/i);
+  if (orgMatch) return { organizationId: orgMatch[1] };
   return {};
 }
 
@@ -755,6 +792,12 @@ function serverFnResult(
   persona: MockPersona,
   fx: ReturnType<typeof fixtures>,
 ): unknown {
+  if (name && /hasPermission|checkPermission/i.test(name)) {
+    return { allowed: persona === "admin", reason: "" };
+  }
+  if (name && /nectar/i.test(name) && /invoke|chat|complete/i.test(name)) {
+    return { error: "Nectar is not configured in this test environment." };
+  }
   switch (name) {
     case "listCompanyObligations":
       return fx.obligations;
@@ -780,7 +823,7 @@ function serverFnResult(
     case "getActiveDraftJobs":
       return [];
     case "listMyPendingPolicies":
-      return { pending: [] };
+      return { pending: [], gating: [] };
     case "ensureCurrentSummaryPeriods":
       return { ok: true };
     case "listOpenSummaries":
@@ -902,7 +945,12 @@ async function handleSupabase(route: Route, persona: MockPersona, fx: ReturnType
       return route.fulfill({
         status: 406,
         headers: jsonHeaders(origin),
-        body: JSON.stringify({ message: "JSON object requested, multiple (or no) rows returned" }),
+        body: JSON.stringify({
+          code: "PGRST116",
+          details: "The result contains 0 rows",
+          hint: null,
+          message: "JSON object requested, multiple (or no) rows returned",
+        }),
       });
     }
     return fulfillJson(route, matched[0], 200, {
@@ -922,26 +970,23 @@ async function handleServerFn(route: Route, persona: MockPersona, fx: ReturnType
     return route.fulfill({ status: 204, headers: corsHeaders(req.headers()["origin"]), body: "" });
   }
   const postText = req.postData() ?? "";
-  const name = serverFnName(req.url(), postText);
-  const body = parseBody(postText);
-  const result = serverFnResult(name, body, persona, fx);
+  let queryText = "";
+  try {
+    queryText = decodeURIComponent(new URL(req.url()).search);
+  } catch {
+    /* ignore */
+  }
+  const blob = `${postText}\n${queryText}`;
+  const name = serverFnName(req.url(), blob);
+  const body = { ...parseBody(queryText), ...parseBody(postText) };
+  const result = serverFnResult(name, body, persona, fx) ?? null;
   if (!name) {
-    // Keep a breadcrumb in the Playwright log so we can wire a new fn if UI regresses.
     // eslint-disable-next-line no-console
     console.log(`[hive-mock] unmatched server fn ${method} ${req.url()} body=${postText.slice(0, 180)}`);
   }
-  return fulfillJson(route, { result, data: result });
-}
-
-function isServerFnUrl(url: string): boolean {
-  const u = url.toLowerCase();
-  return (
-    u.includes("/_serverfn") ||
-    u.includes("/_server/") ||
-    u.includes("server-fn") ||
-    u.includes("serverfn") ||
-    u.includes("/_tanstack/server")
-  );
+  // TanStack Start's client returns application/json payloads as-is when
+  // `x-tss-serialized` is absent (see serverFnFetcher getResponse).
+  return fulfillJson(route, result);
 }
 
 export async function installHiveMocks(page: Page, opts: HiveMockOptions = {}) {
@@ -967,38 +1012,33 @@ export async function installHiveMocks(page: Page, opts: HiveMockOptions = {}) {
     },
   );
 
-  await page.route(`https://${SUPABASE_HOST}/**`, (route) => handleSupabase(route, persona, fx));
-  await page.route(`http://${SUPABASE_HOST}/**`, (route) => handleSupabase(route, persona, fx));
+  page.on("pageerror", (err) => {
+    // eslint-disable-next-line no-console
+    console.log(`[hive-mock pageerror] ${err.message}`);
+  });
 
-  await page.route("**/*", async (route) => {
+  const interceptRpc = (route: Route) => {
     const url = route.request().url();
-    if (url.includes(SUPABASE_HOST)) {
+    const tsr = route.request().headers()["x-tsr-serverfn"];
+    if (url.includes("supabase.co") || url.includes(SUPABASE_HOST)) {
       return handleSupabase(route, persona, fx);
     }
-    if (isServerFnUrl(url)) {
+    if (tsr === "true" || url.includes("/_serverFn")) {
       return handleServerFn(route, persona, fx);
     }
-    const method = route.request().method().toUpperCase();
-    const headers = route.request().headers();
-    const contentType = headers["content-type"] ?? "";
-    if (
-      (method === "POST" || method === "PUT") &&
-      contentType.includes("application/json") &&
-      !url.includes("/@") &&
-      !url.includes("vite") &&
-      !url.includes(".js") &&
-      !url.includes(".css") &&
-      !url.includes(".woff")
-    ) {
-      const post = route.request().postData() ?? "";
-      if (
-        post.includes("organizationId") ||
-        post.includes("organization_id") ||
-        post.includes("activeOrganizationId") ||
-        serverFnName(url, post)
-      ) {
-        return handleServerFn(route, persona, fx);
-      }
+    return route.continue();
+  };
+
+  // Header match is required: GET server fns may not include `/_serverFn/` as
+  // a path segment, and page.route cannot see Node/SSR fetches. Never fulfill
+  // Vite JS modules — only RPCs with the Start header, or supabase.co.
+  await page.route(/supabase\.co/i, interceptRpc);
+  await page.route(/_serverFn/, interceptRpc);
+  await page.route("**/*", async (route) => {
+    const tsr = route.request().headers()["x-tsr-serverfn"];
+    const url = route.request().url();
+    if (tsr === "true" || url.includes("/_serverFn") || url.includes("supabase.co")) {
+      return interceptRpc(route);
     }
     return route.continue();
   });

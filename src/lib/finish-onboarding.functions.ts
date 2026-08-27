@@ -8,7 +8,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { geocodeAddress } from "@/lib/geocode";
+import { syncHomePinFromAddress } from "@/lib/home-pin";
 import {
   CLIENT_PROFILE_FIELDS,
   PROFILE_CLIENT_COLUMNS,
@@ -206,7 +206,7 @@ export const saveProfileField = createServerFn({ method: "POST" })
 
     const { data: client } = await sb
       .from("clients")
-      .select("organization_id")
+      .select("organization_id, physical_address, home_latitude, home_longitude")
       .eq("id", data.clientId)
       .maybeSingle();
     if (!client) throw new Error("Client not found");
@@ -219,7 +219,20 @@ export const saveProfileField = createServerFn({ method: "POST" })
       field,
       data.value,
     );
-    return { ok: true, fieldKey: field.key };
+
+    let geocoded = false;
+    if (field.key === "physical_address" && typeof data.value === "string" && data.value.trim()) {
+      const pin = await syncHomePinFromAddress(sb, {
+        clientId: data.clientId,
+        organizationId: client.organization_id,
+        address: data.value,
+        mode: "on_address_save",
+        existingLat: client.home_latitude,
+        existingLng: client.home_longitude,
+      });
+      geocoded = pin.updated;
+    }
+    return { ok: true, fieldKey: field.key, geocoded };
   });
 
 
@@ -241,7 +254,7 @@ export const saveOnboardingClientPatch = createServerFn({ method: "POST" })
     const sb = context.supabase as any;
     const { data: client } = await sb
       .from("clients")
-      .select("id, organization_id, physical_address, home_latitude")
+      .select("id, organization_id, physical_address, home_latitude, home_longitude")
       .eq("id", data.clientId)
       .maybeSingle();
     if (!client) throw new Error("Client not found");
@@ -259,20 +272,24 @@ export const saveOnboardingClientPatch = createServerFn({ method: "POST" })
       .eq("id", data.clientId);
     if (uErr) throw new Error(uErr.message);
 
-    // Geocode when address was set / changed and we don't yet have coords.
+    // Geocode whenever the physical address is saved (not only when the pin
+    // is empty). A stale city-centroid pin is what caused false out-of-zone
+    // variances for staff standing at the house.
     let geocoded = false;
     const addrPatched =
       typeof safe.physical_address === "string" &&
+      safe.physical_address.trim() &&
       safe.physical_address !== client.physical_address;
-    if (addrPatched && client.home_latitude == null) {
-      const hit = await geocodeAddress(safe.physical_address as string);
-      if (hit) {
-        await sb
-          .from("clients")
-          .update({ home_latitude: hit.lat, home_longitude: hit.lng })
-          .eq("id", data.clientId);
-        geocoded = true;
-      }
+    if (addrPatched) {
+      const pin = await syncHomePinFromAddress(sb, {
+        clientId: data.clientId,
+        organizationId: client.organization_id,
+        address: safe.physical_address as string,
+        mode: "on_address_save",
+        existingLat: client.home_latitude,
+        existingLng: client.home_longitude,
+      });
+      geocoded = pin.updated;
     }
     return { ok: true, geocoded };
   });

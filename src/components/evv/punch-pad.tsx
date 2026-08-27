@@ -97,19 +97,16 @@ const TIMEZONES = [
   { v: "America/New_York",    l: "Eastern" },
 ];
 
-const MAX_GPS_ACCURACY_METERS = 100; // readings worse (larger) than this are too coarse to trust
-
-import { haversineFeet as _sharedHaversineFeet } from "@/lib/geo";
+import {
+  evaluateGeofence,
+  haversineFeet,
+  isGpsFixConfident,
+  pickBetterGpsFix,
+  MAX_GPS_ACCURACY_METERS,
+  type GpsFix,
+} from "@/lib/geo";
+import { gpsFixFromPosition, HIGH_ACCURACY_GPS_OPTIONS } from "@/lib/gps";
 import { selectedPill, unselectedPill } from "@/components/evv/toggle-styles";
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function haversineFeet(
-  a: { lat: number; lng: number },
-  b: { lat: number; lng: number },
-): number {
-  return _sharedHaversineFeet(a, b);
-}
 
 function fmtElapsed(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -171,15 +168,15 @@ export function PunchPad({
   const { passed: hasPassedLaunchpad, blocked: launchpadBlocked } = useHasPassedLaunchpad();
 
   // ── GPS state ───────────────────────────────────────────────────────────────
-  // Single watchPosition — no redundant getCurrentPosition call.
-  // Two-stage: high-accuracy watch, then low-accuracy fallback after 4 s.
-  const [livePos, setLivePos] = useState<{ lat: number; lng: number; acc: number } | null>(null);
-  const livePosRef = useRef<{ lat: number; lng: number; acc: number } | null>(null);
+  // High-accuracy watch only. A 4s low-accuracy fallback was accepting iPhone
+  // Safari coarse/Wi-Fi locations (~0.9 mi off) as a geofence decision.
+  const [livePos, setLivePos] = useState<GpsFix | null>(null);
+  const livePosRef = useRef<GpsFix | null>(null);
   const [hardwareDenied, setHardwareDenied] = useState(false);
   const [gpsAcquiring, setGpsAcquiring] = useState(true);
   const [awaitingGps, setAwaitingGps] = useState(false);
 
-  const gpsConfident = !!livePos && isFinite(livePos.acc) && livePos.acc <= MAX_GPS_ACCURACY_METERS;
+  const gpsConfident = isGpsFixConfident(livePos);
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
@@ -187,19 +184,15 @@ export function PunchPad({
       setGpsAcquiring(false);
       return;
     }
-    let watchHi: number | null = null;
-    let watchLo: number | null = null;
-    let gotFix = false;
     let cancelled = false;
 
     const onPos = (p: GeolocationPosition) => {
       if (cancelled) return;
-      gotFix = true;
       setHardwareDenied(false);
-      setGpsAcquiring(false);
-      const next = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy };
+      const next = pickBetterGpsFix(livePosRef.current, gpsFixFromPosition(p));
       livePosRef.current = next;
       setLivePos(next);
+      setGpsAcquiring(false);
     };
     const onErr = (err: GeolocationPositionError) => {
       if (cancelled) return;
@@ -209,26 +202,11 @@ export function PunchPad({
       }
     };
 
-    watchHi = navigator.geolocation.watchPosition(onPos, onErr, {
-      enableHighAccuracy: true,
-      maximumAge: 10_000,
-      timeout: 8_000,
-    });
-
-    const fallbackTimer = window.setTimeout(() => {
-      if (gotFix || cancelled) return;
-      watchLo = navigator.geolocation.watchPosition(onPos, onErr, {
-        enableHighAccuracy: false,
-        maximumAge: 30_000,
-        timeout: 8_000,
-      });
-    }, 4_000);
+    const watchId = navigator.geolocation.watchPosition(onPos, onErr, HIGH_ACCURACY_GPS_OPTIONS);
 
     return () => {
       cancelled = true;
-      window.clearTimeout(fallbackTimer);
-      if (watchHi !== null) navigator.geolocation.clearWatch(watchHi);
-      if (watchLo !== null) navigator.geolocation.clearWatch(watchLo);
+      navigator.geolocation.clearWatch(watchId);
     };
   }, []);
 
@@ -562,12 +540,14 @@ export function PunchPad({
       ? { lat: clientForPunch.homeLat as number, lng: clientForPunch.homeLng as number }
       : null;
 
-  const insideZone =
-    homeCoords && livePos && gpsConfident
-      ? haversineFeet(homeCoords, livePos) <= mapRadiusFeet
-      : homeCoords && livePos
-        ? false
-        : true;
+  const geofenceDecision = evaluateGeofence({
+    home: homeCoords,
+    live: livePos,
+    accuracyMeters: livePos?.acc ?? null,
+    radiusFeet: mapRadiusFeet,
+  });
+
+  const insideZone = geofenceDecision.kind === "inside";
 
   // ── Readiness guard ─────────────────────────────────────────────────────────
   const requireFacility = entryType === "General_Sidebar_Unscheduled";
@@ -580,21 +560,23 @@ export function PunchPad({
   // ── GPS status label ────────────────────────────────────────────────────────
   const gpsStatusLabel = (() => {
     if (hardwareDenied)
-      return { text: "⚠️ Location blocked — open device Settings to re-enable. You can still clock in with a written variance.", color: "amber" as const };
+      return { text: "⚠️ Location blocked — open device Settings and enable location for this site. Clock-in is held until GPS is available.", color: "amber" as const };
     if (gpsAcquiring || !livePos)
-      return { text: "📡 Acquiring GPS signal — you can tap to clock in. A variance note will be offered if needed.", color: "neutral" as const };
+      return { text: "📡 Acquiring high-accuracy GPS — wait for a live fix before clocking in.", color: "neutral" as const };
     if (!serviceCode)
       return { text: "📍 GPS confirmed. Select a service code above.", color: "neutral" as const };
     if (!isEvvLockedCode(serviceCode))
       return { text: `🛈 ${serviceCode} — GPS logged passively, geofence not enforced for this code.`, color: "neutral" as const };
     if (livePos && !gpsConfident)
-      return { text: `📡 GPS signal is too weak to confirm your location (±${Math.round(livePos.acc)} m). A written variance will be required when you clock in.`, color: "amber" as const };
+      return { text: `📡 GPS is too coarse to confirm you are at the saved home pin (±${Math.round(livePos.acc)} m). Wait for a better fix — this is not an out-of-zone reading.`, color: "amber" as const };
+    if (geofenceDecision.kind === "no_home_pin")
+      return { text: "📍 GPS live. No home pin is saved on this client — an administrator should set it. Geofence is not enforced until a pin exists.", color: "amber" as const };
     const matchedHere = livePos && gpsConfident ? matchApprovedLocation({ lat: livePos.lat, lng: livePos.lng }) : null;
     if (matchedHere)
       return { text: `🟢 GPS confirmed — inside approved location "${matchedHere.label}". No variance required.`, color: "green" as const };
     if (insideZone)
-      return { text: `🟢 GPS confirmed — you are within the ${mapRadiusFeet} ft compliance zone.`, color: "green" as const };
-    return { text: `🔴 Outside the ${mapRadiusFeet} ft zone — a written variance will be required when you clock in.`, color: "red" as const };
+      return { text: `🟢 GPS confirmed — you are within ${mapRadiusFeet} ft of the saved home pin.`, color: "green" as const };
+    return { text: `🔴 Outside the ${mapRadiusFeet} ft zone around the saved home pin — a written variance is required. This is not “GPS is off.”`, color: "red" as const };
   })();
 
   const gpsStripClass = {
@@ -797,36 +779,56 @@ export function PunchPad({
     }
     setBusy(true);
     try {
-      // No GPS fix yet or hardware denied → open variance modal so caregiver
-      // is never hard-blocked. Modal opens only on tap, never on mount.
-      if (hardwareDenied || !livePos) {
-        setVariance({ frameBlocked: true, pos: null });
-        setVarianceReason("");
+      if (hardwareDenied) {
+        toast.error("Location is blocked. Enable location for this site in device Settings, then retry. Clock-in is held until GPS is captured.");
         return;
       }
 
-      const pos = livePos;
+      let pos = livePosRef.current;
+      if (!isGpsFixConfident(pos)) {
+        setAwaitingGps(true);
+        try {
+          const deadline = Date.now() + 15_000;
+          while (Date.now() < deadline) {
+            await new Promise((r) => setTimeout(r, 250));
+            if (isGpsFixConfident(livePosRef.current)) break;
+          }
+        } finally {
+          setAwaitingGps(false);
+        }
+        pos = livePosRef.current;
+      }
+
+      if (!pos) {
+        toast.error("No GPS fix yet. Wait for high-accuracy GPS and retry — clock-in is held until a live location is captured.");
+        return;
+      }
+      if (!isGpsFixConfident(pos)) {
+        toast.error(
+          `GPS is too coarse (±${Math.round(pos.acc)} m) to confirm the saved home pin. Wait for a better fix and retry — this is not an out-of-zone variance.`,
+        );
+        return;
+      }
 
       // Hidden Gatekeeper: only EVV-locked codes enforce the geofence wall.
-      if (
-        isEvvLockedCode(serviceCode) &&
-        homeCoords &&
-        isFinite(homeCoords.lat) &&
-        isFinite(homeCoords.lng)
-      ) {
-        // Low-confidence fixes can't auto-pass the geofence or match approved locations.
-        if (!gpsConfident) {
-          setVariance({ distanceFeet: undefined, limitFeet: mapRadiusFeet, pos });
-          setVarianceReason("");
-          return;
-        }
-        // Approved locations skip the variance prompt — actual GPS still captured.
-        const matched = matchApprovedLocation({ lat: pos.lat, lng: pos.lng });
-        const dist = haversineFeet(homeCoords, { lat: pos.lat, lng: pos.lng });
-        if (!matched && dist > mapRadiusFeet) {
-          setVariance({ distanceFeet: Math.round(dist), limitFeet: mapRadiusFeet, pos });
-          setVarianceReason("");
-          return;
+      if (isEvvLockedCode(serviceCode)) {
+        const decision = evaluateGeofence({
+          home: homeCoords,
+          live: pos,
+          accuracyMeters: pos.acc,
+          radiusFeet: mapRadiusFeet,
+        });
+        if (decision.kind === "outside") {
+          const matched = matchApprovedLocation({ lat: pos.lat, lng: pos.lng });
+          if (!matched) {
+            setVariance({
+              distanceFeet: Math.round(decision.distanceFeet),
+              limitFeet: decision.limitFeet,
+              pos,
+            });
+            setVarianceReason("");
+            return;
+          }
         }
       }
 
@@ -1959,15 +1961,11 @@ export function PunchPad({
       const lng    = refClient?.homeLng;
       const radius = refClient?.geofenceRadiusFeet ?? 1000;
 
-      // Sequence GPS acquisition: never block a non-EVV clock-out on a fix.
-      // If GPS is truly unavailable (denied or no fix after waiting), staff
-      // is never hard-blocked — they proceed via the GPS-bypass dialog with a
-      // reason, and the EVV record falls back to the client's on-file address.
+      // Sequence GPS acquisition: fail-closed until a high-accuracy fix.
       let pos = livePosRef.current ?? livePos;
-      if (!pos && isEvv) {
+      if (!isGpsFixConfident(pos)) {
         if (hardwareDenied) {
-          setOutVariance({ frameBlocked: true, pos: null, limitFeet: radius });
-          setOutVarianceReason("");
+          toast.error("Location is blocked. Enable location for this site in device Settings, then retry. Clock-out is held until GPS is captured.");
           return;
         }
         setAwaitingGps(true);
@@ -1975,38 +1973,43 @@ export function PunchPad({
           const deadline = Date.now() + 15_000;
           while (Date.now() < deadline) {
             await new Promise((r) => setTimeout(r, 250));
-            if (livePosRef.current) { pos = livePosRef.current; break; }
+            if (isGpsFixConfident(livePosRef.current)) { pos = livePosRef.current; break; }
           }
         } finally {
           setAwaitingGps(false);
         }
+        pos = livePosRef.current ?? pos;
         if (!pos) {
-          setOutVariance({ frameBlocked: true, pos: null, limitFeet: radius });
-          setOutVarianceReason("");
+          toast.error("No GPS fix yet. Wait for high-accuracy GPS and retry — clock-out is held until a live location is captured.");
+          return;
+        }
+        if (!isGpsFixConfident(pos)) {
+          toast.error(
+            `GPS is too coarse (±${Math.round(pos.acc)} m) to confirm the saved home pin. Wait for a better fix and retry — this is not an out-of-zone variance.`,
+          );
           return;
         }
       }
 
       // Symmetric geofence check on clock-out — EVV-locked codes only.
-      if (
-        pos &&
-        isEvv &&
-        typeof lat === "number" && typeof lng === "number" &&
-        isFinite(lat) && isFinite(lng)
-      ) {
-        // Low-confidence fixes can't auto-pass the geofence or match approved locations.
-        if (!gpsConfident) {
-          setOutVariance({ distanceFeet: undefined, limitFeet: radius, pos });
-          setOutVarianceReason("");
-          return;
-        }
-        // Approved locations suppress the variance prompt on clock-out too.
-        const matchedOut = matchApprovedLocation({ lat: pos.lat, lng: pos.lng });
-        const dist = haversineFeet({ lat, lng }, { lat: pos.lat, lng: pos.lng });
-        if (!matchedOut && dist > radius) {
-          setOutVariance({ distanceFeet: Math.round(dist), limitFeet: radius, pos });
-          setOutVarianceReason("");
-          return;
+      if (pos && isEvv) {
+        const decision = evaluateGeofence({
+          home: typeof lat === "number" && typeof lng === "number" ? { lat, lng } : null,
+          live: pos,
+          accuracyMeters: pos.acc,
+          radiusFeet: radius,
+        });
+        if (decision.kind === "outside") {
+          const matchedOut = matchApprovedLocation({ lat: pos.lat, lng: pos.lng });
+          if (!matchedOut) {
+            setOutVariance({
+              distanceFeet: Math.round(decision.distanceFeet),
+              limitFeet: decision.limitFeet,
+              pos,
+            });
+            setOutVarianceReason("");
+            return;
+          }
         }
       }
 
@@ -2173,9 +2176,14 @@ export function PunchPad({
                 <Wifi className="h-3 w-3 animate-pulse" /> Acquiring GPS
               </Badge>
             )}
-            {isEvvLockedCode(serviceCode) && !gpsAcquiring && livePos && (
+            {isEvvLockedCode(serviceCode) && !gpsAcquiring && livePos && gpsConfident && (
               <Badge variant="outline" className="gap-1 text-[10px] text-emerald-600 border-emerald-400">
                 <MapPin className="h-3 w-3" /> GPS Live
+              </Badge>
+            )}
+            {isEvvLockedCode(serviceCode) && !hardwareDenied && livePos && !gpsConfident && (
+              <Badge variant="outline" className="gap-1 text-[10px] text-amber-600 border-amber-400">
+                <Wifi className="h-3 w-3" /> GPS coarse
               </Badge>
             )}
             {isEvvLockedCode(serviceCode) && hardwareDenied && (
@@ -2536,13 +2544,13 @@ export function PunchPad({
               </DialogTitle>
               <DialogDescription>
                 {variance?.frameBlocked
-                  ? "GPS could not be captured — location access is restricted or no signal is available. Confirm a reason to proceed; this shift's EVV record will use the client's on-file address for location evidence instead of GPS coordinates."
-                  : "Our system detects you are starting your shift outside the approved client home perimeter. Please provide a brief justification (e.g., Community outing, medical transit, network latency)."}
+                  ? "GPS could not be captured. Clock-in is held until a live location is available — enable location and retry."
+                  : "This check is against the home pin saved on the client record — not a sign that GPS is off. If you are standing at the house, ask an administrator to update that pin."}
               </DialogDescription>
             </DialogHeader>
             {variance && typeof variance.distanceFeet === "number" && typeof variance.limitFeet === "number" && (
               <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
-                Measured distance:{" "}
+                Distance from the saved home pin:{" "}
                 <span className="font-mono font-semibold">{variance.distanceFeet.toLocaleString()} ft</span>
                 {" "}· Allowed:{" "}
                 <span className="font-mono font-semibold">{variance.limitFeet.toLocaleString()} ft</span>
@@ -2560,7 +2568,7 @@ export function PunchPad({
                   rows={2}
                   value={varShorthand}
                   onChange={(e) => setVarShorthand(e.target.value)}
-                  placeholder='Shorthand — e.g. "GPS off on phone, at house" or "community outing, library"'
+                  placeholder='Shorthand — e.g. "community outing, library" or "medical transit"'
                   maxLength={400}
                   className="mt-2 text-sm"
                 />
@@ -2620,15 +2628,15 @@ export function PunchPad({
               </DialogTitle>
               <DialogDescription>
                 {outVariance?.frameBlocked
-                  ? "GPS could not be captured — location access is restricted or no signal is available. Confirm a reason to proceed; this shift's EVV record will use the client's on-file address for location evidence instead of GPS coordinates."
-                  : "You are located outside the authorized radius for this client. A written justification is required to submit this clock-out."}
+                  ? "GPS could not be captured. Clock-out is held until a live location is available — enable location and retry."
+                  : "This check is against the home pin saved on the client record — not a sign that GPS is off. If you are standing at the house, ask an administrator to update that pin."}
               </DialogDescription>
             </DialogHeader>
             {outVariance && !outVariance.frameBlocked && (
               <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
                 {typeof outVariance.distanceFeet === "number" ? (
                   <>
-                    Measured distance:{" "}
+                    Distance from the saved home pin:{" "}
                     <span className="font-mono font-semibold">{outVariance.distanceFeet.toLocaleString()} ft</span>
                     {" "}· Allowed:{" "}
                     <span className="font-mono font-semibold">{(outVariance.limitFeet ?? 0).toLocaleString()} ft</span>
@@ -3399,9 +3407,13 @@ export function PunchPad({
                     <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-muted-foreground">
                       <Loader2 className="h-3 w-3 animate-spin" /> Getting location…
                     </span>
-                  ) : livePos ? (
+                  ) : livePos && gpsConfident ? (
                     <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-emerald-800 dark:text-emerald-200">
                       📍 Location ready ✓
+                    </span>
+                  ) : livePos ? (
+                    <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-amber-800 dark:text-amber-200">
+                      📍 GPS too coarse — waiting
                     </span>
                   ) : (
                     <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-muted-foreground">

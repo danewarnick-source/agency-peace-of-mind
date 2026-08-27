@@ -42,7 +42,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (prevUserId !== undefined && prevUserId !== nextUserId) {
         queryClient.cancelQueries();
         queryClient.clear();
-        clearPortalRoutingState();
+        // Wipe Portal View on sign-out and account switch so a stale
+        // hive_exec from another person cannot trap the next session.
+        // Do NOT wipe on sign-in (null → user): honor a stored Admin/Staff
+        // choice. Login no longer overwrites those to hive_exec.
+        if (prevUserId !== null) {
+          clearPortalRoutingState();
+        }
         router.invalidate();
       }
       prevUserId = nextUserId;

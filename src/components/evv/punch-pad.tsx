@@ -2701,8 +2701,8 @@ export function PunchPad({
                   </p>
                   <p className={`text-xs ${clockInSuccess?.evvClean ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}`}>
                     {clockInSuccess?.evvClean
-                      ? "GPS verified · Location confirmed · EVV transmitted"
-                      : "Variance logged · Pending admin review · EVV transmitted"}
+                      ? "GPS verified · Location confirmed · Timesheet saved in HIVE"
+                      : "Variance logged · Pending admin review · Timesheet saved in HIVE"}
                   </p>
                 </div>
               </div>
@@ -2710,8 +2710,8 @@ export function PunchPad({
             <div className="space-y-4 px-6 py-4">
               <p className="text-sm text-muted-foreground">
                 {clockInSuccess?.evvClean
-                  ? `Your shift serving ${clockInSuccess.clientName} has started. GPS coordinates have been captured and transmitted to the EVV system. Your timesheet is now active.`
-                  : `Your shift serving ${clockInSuccess?.clientName} has started with a geofence variance on file. Your written justification has been recorded and an administrator will review the variance flag on this timesheet.`}
+                  ? `Your shift serving ${clockInSuccess.clientName} has started. GPS coordinates have been captured and your timesheet is now active. State EVV is an admin CSV export — this punch is not sent to DHHS automatically.`
+                  : `Your shift serving ${clockInSuccess?.clientName} has started with a geofence variance on file. Your written justification has been recorded and an administrator will review the variance flag on this timesheet. State EVV is an admin CSV export — this punch is not sent to DHHS automatically.`}
               </p>
               <div className="flex justify-end">
                 <Button

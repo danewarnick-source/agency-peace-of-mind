@@ -10,7 +10,8 @@
     "build:aws": "NODE_OPTIONS=--max-old-space-size=8192 BUILD_TARGET=aws vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:e2e": "E2E_MODE=mock npx playwright test e2e/client-1056-billing.spec.ts"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1064.0",

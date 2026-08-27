@@ -7,6 +7,7 @@ export default defineConfig({
   testDir: "./e2e",
   globalSetup: stagingReady ? "./e2e/global-setup.ts" : undefined,
   retries: 0,
+  workers: 1,
   reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]],
   timeout: 60_000,
   projects: [

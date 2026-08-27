@@ -330,7 +330,7 @@ function tableRows(table: string, role: HiveRole): Record<string, unknown>[] {
     case "hive_executives":
       return [];
     case "feature_registry":
-      return [];
+      return featureRegistry();
     case "organization_features":
       return [];
     default:
@@ -341,6 +341,76 @@ function tableRows(table: string, role: HiveRole): Record<string, unknown>[] {
 function restTable(pathname: string): string | null {
   const m = pathname.match(/\/rest\/v1\/([^/?]+)/);
   return m ? decodeURIComponent(m[1]) : null;
+}
+
+function serverFnExport(url: string): string {
+  try {
+    const id = decodeURIComponent(new URL(url).pathname.split("/").pop() ?? "");
+    const parsed = JSON.parse(Buffer.from(id, "base64url").toString("utf8")) as { export?: string };
+    return parsed.export ?? "";
+  } catch {
+    return "";
+  }
+}
+
+const FEATURE_KEYS = [
+  "evv_timesheets",
+  "client_intake",
+  "pcsp",
+  "staff_onboarding",
+  "nectar",
+  "hive_training",
+  "state_audit",
+  "pba_ledgers",
+] as const;
+
+function featureRegistry() {
+  return FEATURE_KEYS.map((feature_key, i) => ({
+    id: `ffffffff-ffff-ffff-ffff-fffffffffff${i + 1}`,
+    feature_key,
+    label: feature_key === "evv_timesheets" ? "Timesheets" : feature_key,
+    description: null,
+    parent_key: null,
+    category: "tab" as const,
+    default_enabled: true,
+    sort_order: i + 1,
+    required_tier: null,
+    upgrade_blurb: null,
+  }));
+}
+
+function serverFnResult(exportName: string): unknown {
+  if (/checkHiveExecutive/i.test(exportName)) return { isExecutive: false };
+  if (/getMyEntitlements/i.test(exportName)) {
+    return { organization_id: ORG_ID, addons: [], tier: "growth", status: "active" };
+  }
+  if (/getMyOrgFeatures/i.test(exportName)) {
+    return {
+      organization_id: ORG_ID,
+      effective: Object.fromEntries(FEATURE_KEYS.map((k) => [k, true])),
+      registry: featureRegistry(),
+    };
+  }
+  if (/getActiveDraftJobs/i.test(exportName)) return { jobs: [] };
+  if (/getOrgCeRoster/i.test(exportName)) {
+    return { organizationId: ORG_ID, goalHours: 12, rows: [], behindCount: 0 };
+  }
+  if (/ensureCurrentSummaryPeriods/i.test(exportName)) return { ensured: 0 };
+  if (/getInboxUnreadCount|getPendingUpgradeRequestCount/i.test(exportName)) {
+    return { count: 0 };
+  }
+  if (/getMissingThirtyDayStaffIds|getMissingAbiStaffIds/i.test(exportName)) {
+    return { missingIds: [] };
+  }
+  if (/nectarDraftShifts|autoFillOpenShifts/i.test(exportName)) {
+    return { drafts: [], proposals: [] };
+  }
+  if (/nudgeDraftJob|processDraftChunk|finalizeRequirementsDraft/i.test(exportName)) {
+    return { ok: true };
+  }
+  // List-shaped server fns (obligations, open summaries, etc.)
+  if (/^list|^fetch/i.test(exportName)) return [];
+  return {};
 }
 
 const WRITE_TABLES = new Set([
@@ -355,7 +425,7 @@ export async function installHiveMocks(page: Page, role: HiveRole = "admin"): Pr
   const mock: HiveMock = { writes: [] };
   const session = sessionFor(role);
 
-  await page.route("https://*.supabase.co/**", async (route) => {
+  await page.route((url) => url.hostname.endsWith("supabase.co"), async (route) => {
     const req = route.request();
     const url = new URL(req.url());
     const method = req.method().toUpperCase();
@@ -446,47 +516,24 @@ export async function installHiveMocks(page: Page, role: HiveRole = "admin"): Pr
     });
   });
 
-  // TanStack Start server functions — return a kitchen-sink success so
-  // checkHiveExecutive / getMyOrgFeatures / entitlements resolve. POST
-  // mutations are blocked so Publish / Save never hit production.
-  await page.route("**/_serverFn/**", async (route) => {
+  // TanStack Start server functions. Per-fn shapes match production
+  // handlers (a generic [] crashed DraftJobsProvider via jobs.map).
+  // Calendar mutations are stubbed so Publish / Save never hit production.
+  await page.route(/_serverFn/, async (route) => {
     const req = route.request();
     const method = req.method().toUpperCase();
-    if (method !== "GET" && method !== "HEAD") {
-      mock.writes.push({ method, url: req.url(), table: "_serverFn" });
-      await route.fulfill({
-        status: 200,
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          ok: false,
-          message: "E2E mock: server writes are blocked",
-        }),
-      });
-      return;
+    const url = req.url();
+    const name = serverFnExport(url);
+    const mutating = /saveShift|deleteShift|publishWeek|createRecurring|applyDrafts|autoFill|setAdminTimeOff/i.test(
+      name,
+    );
+    if (mutating) {
+      mock.writes.push({ method, url, table: "_serverFn" });
     }
     await route.fulfill({
       status: 200,
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        isExecutive: false,
-        organization_id: ORG_ID,
-        effective: {
-          evv_timesheets: true,
-          client_intake: true,
-          pcsp: true,
-          staff_onboarding: true,
-          nectar: true,
-          hive_training: true,
-          state_audit: true,
-          pba_ledgers: true,
-        },
-        registry: [],
-        addons: [],
-        tier: "growth",
-        status: "active",
-        count: 0,
-        missingIds: [],
-      }),
+      body: JSON.stringify({ result: mutating ? { ok: false, message: "E2E mock: writes blocked" } : serverFnResult(name) }),
     });
   });
 

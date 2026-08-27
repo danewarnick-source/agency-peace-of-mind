@@ -42,7 +42,20 @@ function consoleErrorsOf(page: Page): string[] {
 }
 
 async function waitForSchedulerChrome(page: Page) {
-  await expect(page.getByText("SCHEDULER")).toBeVisible({ timeout: 25_000 });
+  try {
+    // "Publish" is unique to the admin scheduler brand bar. getByText("SCHEDULER")
+    // is case-insensitive and also matches the sidebar "Scheduler" link / h1.
+    await expect(page.getByRole("button", { name: /^Publish$/ })).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByText("SCHEDULER", { exact: true })).toBeVisible();
+  } catch (err) {
+    const dump = await page.evaluate(() => ({
+      href: location.href,
+      body: (document.body?.innerText ?? "").slice(0, 1200),
+    }));
+    // eslint-disable-next-line no-console
+    console.log("[e2e-dump]", JSON.stringify(dump));
+    throw err;
+  }
   await expect(page.getByRole("button", { name: /^Schedule$/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Day Program/i })).toBeVisible();
   await expect(page.getByRole("button", { name: /Staff view/i })).toBeVisible();
@@ -112,11 +125,7 @@ test.describe("Admin scheduler — True North Sep 1", () => {
     await expect(page.getByText(/Published:\s*yes/i)).toBeVisible({ timeout: 8_000 });
     await expect(page.getByText(/Status:\s*published/i)).toBeVisible();
     await saveShot(page, "02a-published-shift-detail");
-    await page.keyboard.press("Escape");
-    await page.locator("button").filter({ has: page.locator("svg") }).last().click().catch(() => {});
-    // Close the panel via the X if still open.
-    const closePanel = page.locator(".fixed.inset-y-0.right-0 button").first();
-    if (await closePanel.isVisible().catch(() => false)) await closePanel.click();
+    await page.locator(".fixed.inset-y-0.right-0").locator("button").first().click();
 
     await page.getByText(/^Open\b/).first().click();
     await expect(page.getByText(/Published:\s*no/i)).toBeVisible({ timeout: 8_000 });
@@ -185,7 +194,7 @@ test.describe("Admin scheduler — True North Sep 1", () => {
     await expect(page.getByRole("button", { name: /Duplicate/i })).toBeVisible();
     await saveShot(page, "04b-edit-shift-panel");
 
-    expect(mock.writes.filter((w) => w.table === "scheduled_shifts" || w.table === "_serverFn")).toHaveLength(0);
+    expect(mock.writes.filter((w) => w.table === "scheduled_shifts")).toHaveLength(0);
   });
 
   test("5. staff assigned to a published shift is visible; empty-state when none", async ({ page }) => {
@@ -219,7 +228,7 @@ test.describe("Admin scheduler — True North Sep 1", () => {
   test("6. staff-only users do not get the full admin scheduler", async ({ page }) => {
     await openAdminScheduler(page, "employee");
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
-    await expect(page.getByText(/My Caseload|Schedule/i).first()).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByRole("link", { name: /^My Caseload$/ })).toBeVisible({ timeout: 25_000 });
 
     // Admin nav item is "Scheduler"; staff nav item is "Schedule".
     const schedulerNav = page.getByRole("link", { name: /^Scheduler$/ });

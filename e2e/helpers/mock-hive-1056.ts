@@ -146,6 +146,9 @@ function profileRow(staff: (typeof STAFF_LIST)[number]): Row {
     requires_abi: true,
     is_active: true,
     bc_role: null,
+    has_passed_launchpad: true,
+    evv_gps_consent_status: "Accepted",
+    evv_consent_timestamp: "2026-07-01T00:00:00.000Z",
   };
 }
 
@@ -170,7 +173,9 @@ function clientRow(c: (typeof CLIENT_LIST)[number]): Row {
     first_name: c.first_name,
     last_name: c.last_name,
     phone_number: null,
-    physical_address: null,
+    physical_address: "1 Hive Way, Salt Lake City, UT",
+    home_latitude: 40.7608,
+    home_longitude: -111.891,
     pcsp_goals: [],
     job_code: [...c.codes],
     authorized_dspd_codes: [...c.codes],

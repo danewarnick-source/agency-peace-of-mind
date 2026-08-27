@@ -44,6 +44,41 @@ const GpsPinInput = z.object({
   accuracyMeters: z.number().positive(),
 });
 
+/** Admin map drag / tap — writes the EVV geofence center. No GPS accuracy check. */
+export const saveClientHomePin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      clientId: z.string().uuid(),
+      latitude: z.number().gte(-90).lte(90),
+      longitude: z.number().gte(-180).lte(180),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    if (!context.supabase || !context.userId) {
+      throw new Error("Not signed in");
+    }
+    const sb = context.supabase as Sb;
+    const { organizationId } = await requireAdminForClient(sb, context.userId, data.clientId);
+    if (isLikelyBadCoord({ lat: data.latitude, lng: data.longitude })) {
+      throw new Error("That pin is not a valid location.");
+    }
+    const { error } = await sb
+      .from("clients")
+      .update({
+        home_latitude: data.latitude,
+        home_longitude: data.longitude,
+      })
+      .eq("id", data.clientId)
+      .eq("organization_id", organizationId);
+    if (error) throw new Error(error.message);
+    return {
+      ok: true as const,
+      latitude: data.latitude,
+      longitude: data.longitude,
+    };
+  });
+
 /** Owner standing at the house sets the EVV home pin from high-accuracy GPS. */
 export const saveClientHomePinFromGps = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

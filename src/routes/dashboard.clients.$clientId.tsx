@@ -367,15 +367,20 @@ function ClientProfileHub() {
         {/* IDENTITY — sole home for name, DOB, Medicaid #, guardian,
             emergency contacts, support coordinator, admission date. */}
         <TabsContent value="identity" className="space-y-10">
-          <SectionGroup label="Identity" hint="Who this person is — the record of record">
-            <SectionPanel icon={FileUp} accent="amber">
-              <UpdateInfoFromDocumentCard clientId={clientId} orgId={orgId} />
+          <SectionGroup
+            label="Home location"
+            hint="Move the pin if this is the wrong house"
+          >
+            <SectionPanel icon={HomeIcon} accent="teal">
+              <HomePinCard clientId={clientId} />
             </SectionPanel>
+          </SectionGroup>
+          <SectionGroup label="Identity" hint="Who this person is — the record of record">
             <SectionPanel icon={UserCircle} accent="indigo">
               <ClientProfileTab clientId={clientId} onOpenFiles={() => setTab("files")} />
             </SectionPanel>
-            <SectionPanel icon={HomeIcon} accent="teal">
-              <HomePinCard clientId={clientId} />
+            <SectionPanel icon={FileUp} accent="amber">
+              <UpdateInfoFromDocumentCard clientId={clientId} orgId={orgId} />
             </SectionPanel>
           </SectionGroup>
           <CustomFieldsForSection clientId={clientId} section="identity" />

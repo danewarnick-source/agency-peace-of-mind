@@ -88,7 +88,7 @@ export function ClientProfileTab({ clientId, onOpenFiles }: { clientId: string; 
         .from("clients")
         .select(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          "id, first_name, last_name, medicaid_id, date_of_birth, phone_number, is_own_guardian, guardian_name, guardian_phone, support_coordinator_name, support_coordinator_phone, support_coordinator_email, admission_date, discharge_date, diagnoses, primary_care_name, special_directions, dnr_status, account_status, pcsp_expiration_date, rights_restrictions, has_abi, hr_applicable, dnr_applicable, pcp_name, pcp_phone, specialist_name, specialist_phone, med_prescriber_name, med_prescriber_phone, medical_insurance, client_photo_url, profile_photo_url" as any,
+          "id, first_name, last_name, medicaid_id, date_of_birth, phone_number, physical_address, is_own_guardian, guardian_name, guardian_phone, support_coordinator_name, support_coordinator_phone, support_coordinator_email, admission_date, discharge_date, diagnoses, primary_care_name, special_directions, dnr_status, account_status, pcsp_expiration_date, rights_restrictions, has_abi, hr_applicable, dnr_applicable, pcp_name, pcp_phone, specialist_name, specialist_phone, med_prescriber_name, med_prescriber_phone, medical_insurance, client_photo_url, profile_photo_url" as any,
         )
         .eq("id", clientId)
         .maybeSingle();
@@ -1046,6 +1046,17 @@ function IdentityCard({ clientId, client }: { clientId: string; client: ClientRo
             <Row label="Guardian">{guardianValue}</Row>
             <Row label="Date of birth">{dobAge}</Row>
             <Row label="Phone">{(client.phone_number as string) || null}</Row>
+            <Row label="Home address">
+              <span className="block max-w-[18rem]">
+                {(client.physical_address as string) || "—"}
+                <a
+                  href="#home-location"
+                  className="mt-0.5 block text-xs font-normal text-primary underline-offset-2 hover:underline"
+                >
+                  Clock-in uses the pin on the Home location map above. Move that pin if this is the wrong house.
+                </a>
+              </span>
+            </Row>
 
             <GroupHeader>Support Coordinator</GroupHeader>
             <Row label="Name">{(client.support_coordinator_name as string) || null}</Row>

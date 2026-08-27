@@ -46,6 +46,16 @@ async function gotoAdmin(page: Page, url: string) {
   await waitForDashboard(page);
 }
 
+/** Staff punch pad is wrapped in a one-time Federal EVV GPS consent dialog. */
+async function acceptEvvConsentIfShown(page: Page, shotName: string) {
+  const dialog = page.getByRole("dialog").filter({ hasText: /Federal EVV Location/i });
+  const shown = await dialog.isVisible({ timeout: 8_000 }).catch(() => false);
+  if (!shown) return;
+  await shot(page, shotName);
+  await dialog.getByRole("button", { name: /I Consent/i }).click();
+  await expect(dialog).toHaveCount(0, { timeout: 10_000 });
+}
+
 function billingMutations(handle: HiveMockHandle) {
   return handle.mutatingRest.filter((c) => c.table === "client_billing_codes");
 }
@@ -258,13 +268,11 @@ test.describe("1056 → punch pad — mocked DSP", () => {
     await expect(page.getByRole("heading", { name: /Tommy Jones/i })).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByText(/Verified Medicaid ID/i).first()).toBeVisible();
-    await expect(page.getByText("MOCK-TJ-001").first()).toBeVisible();
-    await page.getByText(/Select Service Code/i).first().click().catch(async () => {
-      await page.getByRole("combobox").first().click();
-    });
+    await acceptEvvConsentIfShown(page, "14-evv-consent-before-punch");
+    await expect(page.getByText(/Verified Medicaid ID/i).filter({ visible: true })).toBeVisible();
+    await expect(page.getByText("MOCK-TJ-001").filter({ visible: true })).toBeVisible();
     await expect(
-      page.getByText(/Restricted to authorizations|Select authorized code|DSI|SEI|SLH/i).first(),
+      page.getByText(/Restricted to authorizations|Select authorized code|DSI|SEI|SLH/i).filter({ visible: true }),
     ).toBeVisible();
     await assertPageNotBlank(page, "Tommy punch pad");
     await shot(page, "14-tommy-punch-pad-codes");
@@ -286,17 +294,18 @@ test.describe("1056 → punch pad — mocked DSP", () => {
     await expect(page.getByRole("heading", { name: /Avery Quinn/i })).toBeVisible({
       timeout: 20_000,
     });
-    const medicaidLine = page.getByText(/Verified Medicaid ID/i).first();
+    await acceptEvvConsentIfShown(page, "16-evv-consent-avery");
+    const medicaidLine = page.getByText(/Verified Medicaid ID/i).filter({ visible: true });
     await expect(medicaidLine).toBeVisible();
     await expect(medicaidLine).toContainText("—");
     await expect(page.getByText(/No codes authorized/i)).toHaveCount(0);
 
-    const serviceTrigger = page.getByRole("combobox").first();
+    const serviceTrigger = page.getByRole("combobox").filter({ visible: true }).first();
     await serviceTrigger.click();
     await page.getByRole("option", { name: /SLN/i }).first().click();
     await shot(page, "16-avery-punch-pad-empty-medicaid");
 
-    await page.getByRole("button", { name: /Clock In|Start EVV Shift/i }).first().click();
+    await page.getByRole("button", { name: /Clock In|Start EVV Shift/i }).filter({ visible: true }).click();
     await expect(
       page.getByText(/Client is missing a Utah Medicaid Member ID/i).first(),
     ).toBeVisible({ timeout: 10_000 });

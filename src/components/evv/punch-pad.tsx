@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
+import { useHasPassedLaunchpad } from "@/hooks/use-launchpad-pass";
+import { LAUNCHPAD_CLOCK_IN_BLOCKED_MESSAGE } from "@/lib/launchpad-gate";
 import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -17,7 +19,7 @@ import {
   Play, Square, MapPin, Lock, Loader2, AlertTriangle, CheckCircle2, Clock, Wifi,
   Hexagon, Mic, MicOff, Sparkles, Pencil, ShieldCheck, ExternalLink, Compass,
 } from "lucide-react";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { EVV_SERVICE_CODES, evvServiceLabel, isEvvLockedCode, padMemberId } from "@/lib/evv-codes";
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
@@ -189,6 +191,7 @@ export function PunchPad({
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
+  const { passed: hasPassedLaunchpad, blocked: launchpadBlocked } = useHasPassedLaunchpad();
 
   // Voice-agent handoff — see initialNarrative doc comment above. Ref so a
   // late-arriving prop (navigation already landed on this component) is
@@ -692,6 +695,10 @@ export function PunchPad({
     gpsBypassReason?: string;
   }) {
     if (!user || !org || !clientForPunch) return;
+    if (!hasPassedLaunchpad) {
+      toast.error(LAUNCHPAD_CLOCK_IN_BLOCKED_MESSAGE);
+      return;
+    }
     const nowIso = new Date().toISOString();
     const isOutOfBounds = !!args.outsideReason;
     const isGpsBypass = !!args.gpsBypassReason;
@@ -833,6 +840,10 @@ export function PunchPad({
 
   async function handleClockIn() {
     if (!user || !org || !clientForPunch) return;
+    if (!hasPassedLaunchpad) {
+      toast.error(LAUNCHPAD_CLOCK_IN_BLOCKED_MESSAGE);
+      return;
+    }
     if (!clientForPunch.memberId) {
       toast.error("Client is missing a Utah Medicaid Member ID.");
       return;
@@ -2317,6 +2328,37 @@ export function PunchPad({
           </div>
         )}
 
+        {/* ── Launchpad clock-in gate (pre-clock-in only) ── */}
+        {!isRunning && launchpadBlocked && (
+          <div
+            data-testid="launchpad-gate-block"
+            className="mb-4 rounded-lg border border-amber-400/60 bg-amber-50 px-3 py-3"
+            role="alert"
+          >
+            <p className="flex items-center gap-2 text-sm font-semibold text-[#1A2B47]">
+              <Lock className="h-4 w-4 text-amber-700" />
+              Launchpad required before clock-in
+            </p>
+            <p className="mt-1 text-[12px] leading-snug text-[#1A2B47]/90">
+              {LAUNCHPAD_CLOCK_IN_BLOCKED_MESSAGE}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Link
+                to="/dashboard/hive-training"
+                className="inline-flex items-center rounded-md bg-[#1A2B47] px-2.5 py-1 text-xs font-semibold text-white hover:bg-[#1A2B47]/90"
+              >
+                Open Hive Training
+              </Link>
+              <Link
+                to="/dashboard/courses/core"
+                className="inline-flex items-center rounded-md border border-[#1A2B47]/30 px-2.5 py-1 text-xs font-semibold text-[#1A2B47] hover:bg-white"
+              >
+                Core Training
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* ── NECTAR Shift Pre-Flight (pre-clock-in only) ── */}
         {!isRunning && clientForPunch && serviceCode && (
           <NectarInfusionLock
@@ -2475,9 +2517,10 @@ export function PunchPad({
               <button
                 type="button"
                 onClick={handleClockIn}
-                disabled={busy || !inReady}
+                disabled={busy || !inReady || launchpadBlocked}
                 className="flex h-32 w-32 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 transition hover:scale-[1.02] hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                 aria-label={startIsEvv ? "Start EVV Shift" : "Clock In"}
+                data-testid="clock-in-button"
               >
                 {busy
                   ? <Loader2 className="h-10 w-10 animate-spin" />

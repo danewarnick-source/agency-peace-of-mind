@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test:unit": "node --test --experimental-strip-types src/lib/cedar-voice-intent.test.ts src/lib/compass-clock-out-interview.test.ts src/lib/launchpad-gate.test.ts src/lib/compass-go-live.contract.test.ts",
-    "test:e2e": "playwright test --config=playwright.local.config.ts && playwright test --config=playwright.scheduler.config.ts && playwright test --config=playwright.staff-go-live.config.ts"
+    "test:e2e": "playwright test --config=playwright.local.config.ts && playwright test --config=playwright.scheduler.config.ts && playwright test --config=playwright.admin-home.config.ts && playwright test --config=playwright.roster.config.ts && playwright test --config=playwright.staff-go-live.config.ts && playwright test --config=playwright.config.ts --project=mock"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1064.0",

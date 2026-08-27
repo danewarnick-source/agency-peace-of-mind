@@ -9,6 +9,7 @@ export function CompassClockOutInterview({
   phase,
   narrativePreview,
   goals,
+  goalsLoading,
   selectedGoals,
   baseline,
   onToggleGoal,
@@ -31,6 +32,7 @@ export function CompassClockOutInterview({
   phase: CompassInterviewPhase;
   narrativePreview: string | null;
   goals: string[];
+  goalsLoading?: boolean;
   selectedGoals: string[];
   baseline: boolean;
   onToggleGoal: (goal: string) => void;
@@ -86,7 +88,9 @@ export function CompassClockOutInterview({
       {phase === "goals" && (
         <div className="space-y-3">
           <h2 className="text-base font-medium">Which PCSP goals this shift?</h2>
-          {goals.length === 0 ? (
+          {goalsLoading ? (
+            <p className="text-sm text-muted-foreground">Loading this shift&apos;s PCSP goals…</p>
+          ) : goals.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No PCSP goals tagged for this service. Using baseline monitoring.
             </p>

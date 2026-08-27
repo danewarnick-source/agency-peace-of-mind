@@ -171,7 +171,7 @@ export function CompassVoiceButton() {
   const clockInFn = useServerFn(createClockIn);
   const draftFn = useServerFn(draftShiftNote);
   const listTargetBehaviorsFn = useServerFn(listClientTargetBehaviors);
-  const { data: targetBehaviorRows = [] } = useQuery({
+  const { data: targetBehaviorRows = [], isLoading: targetBehaviorsLoading } = useQuery({
     queryKey: ["client-target-behaviors", activeShift?.client_id],
     queryFn: () =>
       listTargetBehaviorsFn({
@@ -184,6 +184,10 @@ export function CompassVoiceButton() {
     staleTime: 5 * 60_000,
   });
   const targetBehaviorOptions = targetBehaviorRows.map((b) => b.behavior_name);
+  const careDataLoadingRef = useRef(true);
+  careDataLoadingRef.current = !!activeShift && careData.isLoading;
+  const targetBehaviorsLoadingRef = useRef(false);
+  targetBehaviorsLoadingRef.current = targetBehaviorsLoading;
 
   // ── Support detection — same pattern as punch-pad.tsx's speechSupported.
   const [speechSupported, setSpeechSupported] = useState(false);
@@ -364,6 +368,26 @@ export function CompassVoiceButton() {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
+
+    const waitWhile = (cond: () => boolean, ms: number) =>
+      new Promise<void>((resolve) => {
+        const started = Date.now();
+        const tick = () => {
+          if (gen !== interviewGenRef.current || !cond() || Date.now() - started >= ms) {
+            resolve();
+            return;
+          }
+          window.setTimeout(tick, 100);
+        };
+        tick();
+      });
+
+    if (phase === "goals") await waitWhile(() => careDataLoadingRef.current, 5000);
+    if (phase === "behaviors" || phase === "behavior-names") {
+      await waitWhile(() => targetBehaviorsLoadingRef.current, 4000);
+    }
+    if (gen !== interviewGenRef.current) return;
+
     const prompt = promptForInterviewPhase(phase);
     if (prompt) await speakCompassPrompt(prompt);
     if (gen !== interviewGenRef.current) return;
@@ -387,7 +411,7 @@ export function CompassVoiceButton() {
       phase: "goals",
       narrative,
       selectedGoals: [],
-      baseline: activeClientGoalsRef.current.length === 0,
+      baseline: false,
       incident: null,
       behaviorsObserved: null,
       targetBehaviors: [],
@@ -770,6 +794,7 @@ export function CompassVoiceButton() {
               phase={interview.phase}
               narrativePreview={interview.narrative}
               goals={activeClientGoals}
+              goalsLoading={!!activeShift && careData.isLoading}
               selectedGoals={interview.selectedGoals}
               baseline={interview.baseline}
               onToggleGoal={(goal) => {

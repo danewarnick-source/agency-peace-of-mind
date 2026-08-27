@@ -1,0 +1,43 @@
+@import "tailwindcss" source(none);
+@source ".";
+@source "../../src/components/staff-mobile";
+@source "../../src/components/ui";
+@source "../../src/components/evv/behavior-observations-block.tsx";
+@source "../../src/components/evv/toggle-styles.ts";
+
+:root {
+  --background: #fff;
+  --foreground: #111;
+  --muted: #f4f4f5;
+  --muted-foreground: #52525b;
+  --border: #e4e4e7;
+  --primary: #137182;
+  radius: 0.5rem;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: #fff;
+  color: #111;
+}
+
+button:disabled {
+  opacity: 0.5;
+}
+
+label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  margin: 0.35rem 0;
+}
+
+textarea {
+  width: 100%;
+}
+
+main,
+[data-e2e-scene] {
+  padding: 1rem;
+}

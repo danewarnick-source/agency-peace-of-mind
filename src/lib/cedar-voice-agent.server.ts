@@ -264,7 +264,7 @@ export const createClockIn = createServerFn({ method: "POST" })
         data.clientId,
         data.serviceCode,
       ),
-      assertLaunchpadPassed(context.supabase, context.userId),
+      assertLaunchpadPassed(context.supabase, context.userId, "clock_in"),
     ]);
 
     if (clientRes.error) throw new Error(clientRes.error.message);

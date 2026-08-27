@@ -35,3 +35,6 @@ dist-aws
 
 # Playwright auth state — never commit credentials
 e2e/.auth.json
+test-results/
+playwright-report/
+e2e/artifacts/

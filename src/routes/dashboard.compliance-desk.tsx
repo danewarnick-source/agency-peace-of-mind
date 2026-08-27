@@ -50,7 +50,7 @@ function GeofenceBadge({ row }: { row: Pick<Row, "outside_geofence_reason" | "ma
       <TooltipProvider delayDuration={150}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-success/12 px-2 py-0.5 text-[13px] font-medium leading-none text-success">
+            <span data-testid="geofence-badge" data-geofence="match" className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-success/12 px-2 py-0.5 text-[13px] font-medium leading-none text-success">
               <ShieldCheck className="h-3.5 w-3.5" /> MATCH
             </span>
           </TooltipTrigger>
@@ -61,7 +61,7 @@ function GeofenceBadge({ row }: { row: Pick<Row, "outside_geofence_reason" | "ma
   }
   if (!hasReason) {
     return (
-      <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-success/12 px-2 py-0.5 text-[13px] font-medium leading-none text-success">
+      <span data-testid="geofence-badge" data-geofence="match" className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-success/12 px-2 py-0.5 text-[13px] font-medium leading-none text-success">
         <ShieldCheck className="h-3.5 w-3.5" /> MATCH
       </span>
     );
@@ -72,7 +72,7 @@ function GeofenceBadge({ row }: { row: Pick<Row, "outside_geofence_reason" | "ma
       <TooltipProvider delayDuration={150}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-success/12 px-2 py-0.5 text-[13px] font-medium leading-none text-success">
+            <span data-testid="geofence-badge" data-geofence="reconciled" className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-success/12 px-2 py-0.5 text-[13px] font-medium leading-none text-success">
               <CheckCircle2 className="h-3.5 w-3.5" /> RECONCILED
             </span>
           </TooltipTrigger>
@@ -86,7 +86,7 @@ function GeofenceBadge({ row }: { row: Pick<Row, "outside_geofence_reason" | "ma
       <TooltipProvider delayDuration={150}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-[#137182]/12 px-2 py-0.5 text-[13px] font-medium leading-none text-[#137182]">
+            <span data-testid="geofence-badge" data-geofence="corrected" className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-[#137182]/12 px-2 py-0.5 text-[13px] font-medium leading-none text-[#137182]">
               <CheckCircle2 className="h-3.5 w-3.5" /> CORRECTED
             </span>
           </TooltipTrigger>
@@ -100,7 +100,7 @@ function GeofenceBadge({ row }: { row: Pick<Row, "outside_geofence_reason" | "ma
       <TooltipProvider delayDuration={150}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-destructive/12 px-2 py-0.5 text-[13px] font-medium leading-none text-destructive">
+            <span data-testid="geofence-badge" data-geofence="flagged" className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-destructive/12 px-2 py-0.5 text-[13px] font-medium leading-none text-destructive">
               <Flag className="h-3.5 w-3.5" /> FLAGGED
             </span>
           </TooltipTrigger>
@@ -114,9 +114,9 @@ function GeofenceBadge({ row }: { row: Pick<Row, "outside_geofence_reason" | "ma
     <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-warning/15 px-2 py-0.5 text-[13px] font-medium leading-none text-warning-foreground">
-            <AlertCircle className="h-3.5 w-3.5" /> NEEDS RECONCILIATION
-          </span>
+            <span data-testid="geofence-badge" data-geofence="needs-reconciliation" className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-warning/15 px-2 py-0.5 text-[13px] font-medium leading-none text-warning-foreground">
+              <AlertCircle className="h-3.5 w-3.5" /> NEEDS RECONCILIATION
+            </span>
         </TooltipTrigger>
         <TooltipContent className="max-w-xs text-xs">{reason}</TooltipContent>
       </Tooltip>
@@ -138,7 +138,7 @@ function GpsBypassBadge({ row }: { row: Pick<Row, "gps_in_bypassed" | "gps_in_by
     <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-[#137182]/12 px-2 py-0.5 text-[13px] font-medium leading-none text-[#137182]">
+          <span data-testid="gps-bypass-badge" className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-md bg-[#137182]/12 px-2 py-0.5 text-[13px] font-medium leading-none text-[#137182]">
             <Zap className="h-3.5 w-3.5" /> GPS BYPASSED — ADDRESS USED
           </span>
         </TooltipTrigger>
@@ -902,6 +902,7 @@ function ComplianceDeskPage() {
             <button
               key={id}
               type="button"
+              data-testid={`compliance-tab-${id}`}
               onClick={() => setSub(id)}
               className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition ${sub === id ? "bg-accent text-accent-foreground shadow-soft" : "text-muted-foreground hover:text-foreground"}`}
             >
@@ -2041,24 +2042,30 @@ function GpsMatchDialog({ row, onClose }: { row: Row | null; onClose: () => void
           <div className="space-y-3 text-sm">
             <div className="rounded-lg border border-border p-3">
               <div className="font-semibold text-emerald-600">Clock-In</div>
-              <div className="font-mono text-xs">
-                {row.gps_in_coordinates.latitude.toFixed(6)}, {row.gps_in_coordinates.longitude.toFixed(6)}
-                <span className="ml-2 text-muted-foreground">± {Math.round(row.gps_in_coordinates.accuracy_meters)}m</span>
-              </div>
-              <div className="text-[11px] text-muted-foreground">{new Date(row.clock_in_timestamp).toLocaleString()}</div>
-              {inLink && (
-                <a href={inLink} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-medium text-primary hover:underline">
-                  Open clock-in pin in OpenStreetMap
-                </a>
+              {row.gps_in_coordinates?.latitude != null && row.gps_in_coordinates?.longitude != null ? (
+                <>
+                  <div className="font-mono text-xs">
+                    {Number(row.gps_in_coordinates.latitude).toFixed(6)}, {Number(row.gps_in_coordinates.longitude).toFixed(6)}
+                    <span className="ml-2 text-muted-foreground">± {Math.round(row.gps_in_coordinates.accuracy_meters ?? 0)}m</span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">{new Date(row.clock_in_timestamp).toLocaleString()}</div>
+                  {inLink && (
+                    <a href={inLink} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-medium text-primary hover:underline">
+                      Open clock-in pin in OpenStreetMap
+                    </a>
+                  )}
+                </>
+              ) : (
+                <div className="text-xs text-muted-foreground">Not captured{row.gps_in_bypassed ? " (GPS bypassed — address used)" : ""}</div>
               )}
             </div>
             <div className="rounded-lg border border-border p-3">
               <div className="font-semibold text-rose-600">Clock-Out</div>
-              {row.gps_out_coordinates ? (
+              {row.gps_out_coordinates?.latitude != null && row.gps_out_coordinates?.longitude != null ? (
                 <>
                   <div className="font-mono text-xs">
-                    {row.gps_out_coordinates.latitude.toFixed(6)}, {row.gps_out_coordinates.longitude.toFixed(6)}
-                    <span className="ml-2 text-muted-foreground">± {Math.round(row.gps_out_coordinates.accuracy_meters)}m</span>
+                    {Number(row.gps_out_coordinates.latitude).toFixed(6)}, {Number(row.gps_out_coordinates.longitude).toFixed(6)}
+                    <span className="ml-2 text-muted-foreground">± {Math.round(row.gps_out_coordinates.accuracy_meters ?? 0)}m</span>
                   </div>
                   <div className="text-[11px] text-muted-foreground">{row.clock_out_timestamp ? new Date(row.clock_out_timestamp).toLocaleString() : ""}</div>
                   {outLink && (
@@ -2067,7 +2074,7 @@ function GpsMatchDialog({ row, onClose }: { row: Row | null; onClose: () => void
                     </a>
                   )}
                 </>
-              ) : <div className="text-xs text-muted-foreground">Not captured</div>}
+              ) : <div className="text-xs text-muted-foreground">Not captured{row.gps_out_bypassed ? " (GPS bypassed — address used)" : ""}</div>}
             </div>
           </div>
         )}

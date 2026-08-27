@@ -410,6 +410,8 @@ function tableRows(persona: MockPersona, fx: ReturnType<typeof fixtures>): Recor
       must_change_password: false,
       staff_type_keys: persona === "admin" ? ["admin"] : ["dsp"],
       bc_role: null,
+      // Launchpad (#179) is a clock-in gate, not an Admin Home wall.
+      has_passed_launchpad: true,
     },
     {
       id: STAFF_USER_ID,
@@ -420,6 +422,7 @@ function tableRows(persona: MockPersona, fx: ReturnType<typeof fixtures>): Recor
       must_change_password: false,
       staff_type_keys: ["dsp"],
       bc_role: null,
+      has_passed_launchpad: true,
     },
   ];
 

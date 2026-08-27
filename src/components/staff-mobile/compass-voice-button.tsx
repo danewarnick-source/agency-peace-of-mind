@@ -2,8 +2,10 @@
 // screen — mobile and desktop, never in admin view. Does NOT touch the
 // existing punch-pad/daily-log "Dictate note" / "Expand with Compass"
 // buttons or their voice-dictation state; this is an independent surface
-// that happens to share the same Web Speech API pattern and the same
-// expandShiftNote server function for the note-expansion intent.
+// that happens to share the same Web Speech API pattern. Note expansion
+// uses the NECTAR draft engine (draftShiftNote) — same prompt as
+// punch-pad / historical "Draft with NECTAR". Compass never auto-submits
+// clock-out or ticks attestation checkboxes.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -22,7 +24,7 @@ import {
   createClockIn,
   type VoiceAgentResponse,
 } from "@/lib/cedar-voice-agent.server";
-import { expandShiftNote } from "@/lib/voice-documentation.server";
+import { draftShiftNote } from "@/lib/ai-coach.functions";
 import { freezeOriginalTranscript } from "@/lib/original-transcript";
 import { isLikelyBadCoord } from "@/lib/geo";
 import {
@@ -113,7 +115,7 @@ export function CompassVoiceButton() {
 
   const processFn = useServerFn(processVoiceIntent);
   const clockInFn = useServerFn(createClockIn);
-  const expandFn = useServerFn(expandShiftNote);
+  const draftFn = useServerFn(draftShiftNote);
 
   // ── Support detection — same pattern as punch-pad.tsx's speechSupported.
   const [speechSupported, setSpeechSupported] = useState(false);
@@ -326,17 +328,19 @@ export function CompassVoiceButton() {
   }
 
   // ── Intent action handlers ──────────────────────────────────────────────
+  // Same punch-pad URL for expand_note and expand_note_and_clock_out:
+  // NECTAR-drafted note + original spoken transcript, verify=1. Staff still
+  // check boxes and attest on the punch pad. Compass does not clock out.
   async function handleAddToShiftNote(narrative: string) {
     if (!activeShift) return;
     setProcessing(true);
     try {
       const clientFirst = activeShift.client_name.split(" ")[0] ?? activeShift.client_name;
       const originalSpeech = freezeOriginalTranscript(baseTranscript, transcript);
-      const expanded = await expandFn({
+      const drafted = await draftFn({
         data: {
-          narrative,
+          shorthand: narrative,
           goals: activeClientGoals,
-          serviceCode: activeShift.service_type_code,
           clientFirstName: clientFirst,
         },
       });
@@ -346,13 +350,13 @@ export function CompassVoiceButton() {
         search: {
           tab: "clock-in",
           verify: "1",
-          note: expanded,
+          note: drafted.draft,
           ...(originalSpeech ? { spoken: originalSpeech.slice(0, 2000) } : {}),
         },
       });
       closeSheet();
     } catch (e) {
-      toast.error((e as Error).message || "Compass couldn't expand this note — please try again.");
+      toast.error((e as Error).message || "NECTAR couldn't draft this note — please try again.");
     } finally {
       setProcessing(false);
     }
@@ -562,7 +566,7 @@ function CompassSheetBody({
             {response.narrative}
           </div>
           <p className="text-xs text-muted-foreground">
-            Compass will expand this into a full note.
+            NECTAR will draft this into a full note. You still review and attest.
           </p>
           <Button
             className="w-full text-white"
@@ -570,6 +574,36 @@ function CompassSheetBody({
             onClick={() => onAddToShiftNote(response.narrative)}
           >
             Add to shift note
+          </Button>
+        </div>
+      );
+    }
+
+    if (response.intent === "expand_note_and_clock_out") {
+      return (
+        <div className="space-y-3 py-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Note + clock-out
+          </p>
+          <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
+            {response.narrative}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            NECTAR will draft this note and take you to clock-out with it filled in. You still check
+            the boxes and attest on the punch pad — Compass will not clock you out.
+          </p>
+          {!hasActiveShift && (
+            <p className="text-xs text-muted-foreground">
+              You don't have an active shift right now.
+            </p>
+          )}
+          <Button
+            className="w-full text-white"
+            style={{ backgroundColor: CEDAR_TEAL }}
+            onClick={() => onAddToShiftNote(response.narrative)}
+            disabled={!hasActiveShift}
+          >
+            Open clock-out with note
           </Button>
         </div>
       );
@@ -611,7 +645,11 @@ function CompassSheetBody({
     if (response.intent === "clock_out") {
       return (
         <div className="space-y-3 py-4 text-center">
-          <p className="text-base font-medium">Clock out of your current shift?</p>
+          <p className="text-base font-medium">Open the punch pad to clock out?</p>
+          <p className="text-xs text-muted-foreground">
+            You still need to review your note, check the boxes, and attest. Compass will not clock
+            you out from here.
+          </p>
           {!hasActiveShift && (
             <p className="text-xs text-muted-foreground">
               You don't have an active shift right now.
@@ -623,7 +661,7 @@ function CompassSheetBody({
             onClick={onClockOut}
             disabled={!hasActiveShift}
           >
-            Clock out
+            Open clock-out
           </Button>
         </div>
       );
@@ -678,8 +716,8 @@ function CompassSheetBody({
       </button>
       <div className="mt-2 space-y-1 text-xs text-muted-foreground">
         <p>"Add to my shift note…"</p>
+        <p>"We went to the store. Clock me out."</p>
         <p>"Clock me in with Justin for SEI"</p>
-        <p>"What obligations do I have due?"</p>
       </div>
     </div>
   );

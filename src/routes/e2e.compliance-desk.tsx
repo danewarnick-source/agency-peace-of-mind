@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ComplianceDeskWrapped } from "./dashboard.compliance-desk";
+import { ComplianceDeskPage } from "./dashboard.compliance-desk";
 
 /**
  * Local Playwright harness for EVV & Timesheet Control.
@@ -33,7 +33,10 @@ function E2eComplianceDeskHarness() {
         E2E harness · Admin View · permission approve_timesheets · Staff Compass is out of
         scope
       </p>
-      <ComplianceDeskWrapped />
+      {/* Inner page (not RequirePermission). The production route still
+          wraps this in perm="approve_timesheets"; the harness supplies an
+          admin session + fixture org so the desk itself can be exercised. */}
+      <ComplianceDeskPage />
     </div>
   );
 }

@@ -3,6 +3,7 @@
  * Selects return fixtures. Inserts/updates/deletes are rejected so tests
  * cannot write True North production timesheets.
  */
+import { ALL_PERMISSIONS } from "../../src/lib/rbac";
 import {
   ALL_TIMESHEETS,
   APPROVED_LOCATIONS,
@@ -77,13 +78,12 @@ function tableRows(table: string): Record<string, unknown>[] {
     case "profiles":
       return [PROFILE as unknown as Record<string, unknown>];
     case "role_permissions":
-      return [
-        { organization_id: ORG_ID, role: "admin", permission: "approve_timesheets", enabled: true },
-        { organization_id: ORG_ID, role: "admin", permission: "view_staff_records", enabled: true },
-        { organization_id: ORG_ID, role: "admin", permission: "view_all_timesheets", enabled: true },
-        { organization_id: ORG_ID, role: "admin", permission: "edit_timesheets", enabled: true },
-        { organization_id: ORG_ID, role: "admin", permission: "export_evv", enabled: true },
-      ];
+      return ALL_PERMISSIONS.map((permission) => ({
+        organization_id: ORG_ID,
+        role: "admin",
+        permission,
+        enabled: true,
+      }));
     case "user_permission_overrides":
       return [];
     case "evv_export_records":
@@ -250,7 +250,7 @@ export const supabase = {
     getUser: async () => ({ data: { user: FAKE_USER }, error: null }),
     onAuthStateChange: (cb: (event: string, session: typeof FAKE_SESSION | null) => void) => {
       listeners.add(cb);
-      queueMicrotask(() => cb("SIGNED_IN", FAKE_SESSION));
+      cb("SIGNED_IN", FAKE_SESSION);
       return {
         data: {
           subscription: {

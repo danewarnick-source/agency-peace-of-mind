@@ -41,10 +41,19 @@ async function openDesk(page: Page) {
   await expect(page.getByRole("heading", { name: "EVV & Timesheet Control" })).toBeVisible({
     timeout: 20_000,
   });
+  await expect(page.getByTestId("compliance-tab-pending")).toBeVisible({ timeout: 15_000 });
+  // Org membership has resolved when the Utah export CTA is enabled.
+  await expect(
+    page.getByRole("button", { name: /Export Utah DHHS EVV CSV/i }).first(),
+  ).toBeEnabled({ timeout: 20_000 });
 }
 
-async function openTab(page: Page, name: string) {
-  await page.getByRole("button", { name, exact: true }).click();
+async function openTab(page: Page, id: string) {
+  await page.keyboard.press("Escape").catch(() => {});
+  const tab = page.getByTestId(`compliance-tab-${id}`);
+  await expect(tab).toBeVisible();
+  await tab.click({ force: true });
+  await expect(tab).toHaveClass(/bg-accent/, { timeout: 10_000 });
 }
 
 test.describe("EVV & Timesheet Control — admin harness", () => {
@@ -120,21 +129,23 @@ test.describe("EVV & Timesheet Control — admin harness", () => {
     await page.getByRole("button", { name: /^View$/i }).first().click();
     const gpsDialog = page.getByRole("dialog").filter({ hasText: /GPS Map Match/i });
     await expect(gpsDialog).toBeVisible();
-    await expect(gpsDialog.getByText(/Clock-In/i)).toBeVisible();
-    await gpsDialog.getByRole("button", { name: /Close/i }).click();
+    await expect(gpsDialog.getByText("Clock-In", { exact: true })).toBeVisible();
+    await gpsDialog.getByRole("button", { name: "Close", exact: true }).first().click();
 
     // Geofence reason dialog
     await page.getByText("NEEDS RECONCILIATION").first().click();
     const reasonDialog = page.getByRole("dialog").filter({ hasText: /Geofence Variance Justification/i });
     await expect(reasonDialog).toBeVisible();
     await expect(reasonDialog.getByText(/library/i)).toBeVisible();
-    await reasonDialog.getByRole("button", { name: /Close/i }).click();
+    await reasonDialog.getByRole("button", { name: "Close", exact: true }).first().click();
+    await expect(reasonDialog).toHaveCount(0);
 
     // Approve is present — do not click (would write if this were live)
     await expect(page.getByRole("button", { name: "Approve" }).first()).toBeVisible();
 
     // Edit-shift dialog — open, do not save
-    await page.getByRole("button", { name: "Edit" }).first().click();
+    await page.keyboard.press("Escape").catch(() => {});
+    await page.locator("tr[role='button']").first().getByRole("button", { name: "Edit" }).click();
     const editDialog = page.getByRole("dialog").filter({ hasText: /Administrative Shift Override/i });
     await expect(editDialog).toBeVisible();
     await expect(editDialog.getByText(/immutable audit trail/i)).toBeVisible();
@@ -148,9 +159,10 @@ test.describe("EVV & Timesheet Control — admin harness", () => {
     page,
   }) => {
     await openDesk(page);
-    await openTab(page, "Needs Review");
+    await openTab(page, "needs-review");
 
     await expect(page.getByRole("heading", { name: "Needs Review" })).toBeVisible();
+    await expect(page.getByText(/Caregiver corrections/i)).toBeVisible();
     await expect(page.getByText("Correction submitted")).toBeVisible();
     await expect(page.getByText("Incident flagged")).toBeVisible();
     await expect(page.getByText(/Forgot to clock out/i)).toBeVisible();
@@ -172,7 +184,7 @@ test.describe("EVV & Timesheet Control — admin harness", () => {
     page,
   }) => {
     await openDesk(page);
-    await openTab(page, "EVV Reconciliation");
+    await openTab(page, "reconcile");
 
     await expect(page.getByText("EVV Reconciliation Queue")).toBeVisible();
     await shot(page, "06-reconciliation-pending");
@@ -180,8 +192,8 @@ test.describe("EVV & Timesheet Control — admin harness", () => {
     // Default filter is Pending
     await expect(page.getByRole("button", { name: /^Resolve$/i }).first()).toBeVisible();
 
-    await page.getByRole("combobox").first().click();
-    await page.getByRole("option", { name: "All" }).click();
+    await page.getByRole("combobox").filter({ hasText: /Pending/i }).click();
+    await page.getByRole("option", { name: "All", exact: true }).click();
     await expect(page.getByText("RECONCILED").first()).toBeVisible();
     await expect(page.getByText("CORRECTED").first()).toBeVisible();
     await expect(page.getByText("FLAGGED").first()).toBeVisible();
@@ -211,9 +223,8 @@ test.describe("EVV & Timesheet Control — admin harness", () => {
 
   test("Residential / Daily tab renders (empty-state or ledger)", async ({ page }) => {
     await openDesk(page);
-    await openTab(page, "Residential / Daily");
-    await expect(page.getByText(/Staff/i).first()).toBeVisible();
-    await expect(page.getByText(/Date range/i).first()).toBeVisible();
+    await openTab(page, "residential");
+    await expect(page.getByText("Date range", { exact: true })).toBeVisible();
     // Fixture has an HHS billing code, or the empty copy if client join fails.
     const empty = page.getByText(/No clients with an active HHS billing code/i);
     const loading = page.getByText(/Loading residential clients/i);
@@ -227,7 +238,7 @@ test.describe("EVV & Timesheet Control — admin harness", () => {
     page,
   }) => {
     await openDesk(page);
-    await openTab(page, "State EVV Archive");
+    await openTab(page, "evv-archive");
 
     await expect(page.getByRole("heading", { name: /State EVV Archive/i })).toBeVisible();
     await expect(page.getByPlaceholder(/Search staff, client, member ID/i)).toBeVisible();
@@ -257,7 +268,7 @@ test.describe("EVV & Timesheet Control — admin harness", () => {
 
   test("Internal / Non-EVV Archive: payroll CSV button and filters", async ({ page }) => {
     await openDesk(page);
-    await openTab(page, "Internal / Non-EVV Archive");
+    await openTab(page, "non-evv-archive");
 
     await expect(page.getByRole("heading", { name: /Internal \/ Non-EVV Archive/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /Export Payroll CSV/i })).toBeVisible();
@@ -279,7 +290,7 @@ test.describe("EVV & Timesheet Control — admin harness", () => {
 
     await search.fill("practiced money skills");
     // Keystrokes must not hide tabs / fire search
-    await expect(page.getByRole("button", { name: "Pending Review", exact: true })).toBeVisible();
+    await expect(page.getByTestId("compliance-tab-pending")).toBeVisible();
     await expect(page.getByText(/Showing cross-tab query results/i)).toHaveCount(0);
 
     await search.fill("");
@@ -292,7 +303,7 @@ test.describe("EVV & Timesheet Control — admin harness", () => {
     await shot(page, "11-ask-nectar-results");
 
     await page.getByRole("button", { name: "Clear search" }).click();
-    await expect(page.getByRole("button", { name: "Pending Review", exact: true })).toBeVisible();
+    await expect(page.getByTestId("compliance-tab-pending")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Pending EVV Shifts" })).toBeVisible();
   });
 
@@ -300,18 +311,14 @@ test.describe("EVV & Timesheet Control — admin harness", () => {
     await openDesk(page);
     await expect(page.getByText("MATCH").first()).toBeVisible();
     await expect(page.getByText("NEEDS RECONCILIATION").first()).toBeVisible();
-    await expect(page.getByText("GPS BYPASSED — ADDRESS USED")).toBeVisible();
+    const bypassCount = await page.getByText("GPS BYPASSED — ADDRESS USED").count();
+    expect(bypassCount).toBe(1);
 
-    await openTab(page, "EVV Reconciliation");
-    await page.getByRole("combobox").first().click();
-    await page.getByRole("option", { name: "All" }).click();
+    await openTab(page, "reconcile");
+    await page.getByRole("combobox").filter({ hasText: /Pending/i }).click();
+    await page.getByRole("option", { name: "All", exact: true }).click();
     await expect(page.getByText("RECONCILED").first()).toBeVisible();
     await expect(page.getByText("CORRECTED").first()).toBeVisible();
     await expect(page.getByText("FLAGGED").first()).toBeVisible();
-
-    // Bypass badge is only on the bypassed pending row, not on every row
-    await openTab(page, "Pending Review");
-    const bypassCount = await page.getByText("GPS BYPASSED — ADDRESS USED").count();
-    expect(bypassCount).toBe(1);
   });
 });

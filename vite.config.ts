@@ -16,9 +16,14 @@ function e2eSupabaseMockPlugin(): Plugin {
     name: "e2e-supabase-mock",
     enforce: "pre",
     resolveId(id) {
-      if (id === "@/integrations/supabase/client" || id.endsWith("/integrations/supabase/client")) {
-        return mock;
-      }
+      const normalized = id.replace(/\\/g, "/");
+      if (normalized.includes("e2e/mocks/supabase-client")) return null;
+      const isSupabaseClient =
+        normalized === "@/integrations/supabase/client" ||
+        normalized.endsWith("/integrations/supabase/client") ||
+        normalized.endsWith("/integrations/supabase/client.ts") ||
+        normalized.endsWith("/integrations/supabase/client.tsx");
+      if (isSupabaseClient) return mock;
       return null;
     },
   };

@@ -531,7 +531,7 @@ async function hydrateStaff(list: Row[]) {
 
 
 
-function ComplianceDeskPage() {
+export function ComplianceDeskPage() {
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
   const navigate = useNavigate();

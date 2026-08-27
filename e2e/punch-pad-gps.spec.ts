@@ -119,7 +119,7 @@ test.describe("Admin home pin", () => {
       timeout: 20_000,
     });
     await expect(page.getByTestId("home-location-section")).toBeVisible({ timeout: 15_000 });
-    const pinHeading = page.getByRole("heading", { name: /Home location/i });
+    const pinHeading = page.getByTestId("home-location-section").getByRole("heading", { name: /Home location/i });
     await expect(pinHeading).toBeVisible({ timeout: 15_000 });
     await pinHeading.scrollIntoViewIfNeeded();
     await expect(page.getByText(/Move the pin if this is the wrong house/i).first()).toBeVisible();
@@ -135,10 +135,12 @@ test.describe("Admin home pin", () => {
 
     // Tap the map → draft pin (main admin correction, not GPS-at-the-house).
     await page.locator(".leaflet-container").click({ position: { x: 220, y: 160 } });
+    const savePin = page.getByRole("button", { name: /Save this pin/i });
     await expect(page.getByText(/The pin moved\. Save it so clock-in uses this house/i)).toBeVisible({
       timeout: 8_000,
     });
-    await expect(page.getByRole("button", { name: /Save this pin/i })).toBeVisible();
+    await expect(savePin).toBeVisible();
+    await savePin.scrollIntoViewIfNeeded();
     await shot(page, "home_pin_map_after_tap");
   });
 });

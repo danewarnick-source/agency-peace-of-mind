@@ -158,7 +158,9 @@ function SchedulerPage() {
     return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
   }
   if (!canManageSchedule) {
-    return <Navigate to="/dashboard/schedule" replace />;
+    // Staff without create_shifts land on caseload / punch pad, not the
+    // admin scheduler (and not a deleted voice-clock screen).
+    return <Navigate to="/dashboard" replace />;
   }
 
   return (

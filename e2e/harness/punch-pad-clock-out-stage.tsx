@@ -6,36 +6,19 @@ import {
   validateBehaviorAnswers,
   type BehaviorAnswers,
 } from "@/components/evv/behavior-observations-block";
-import { searchToCompassHandoff } from "@/lib/compass-clock-out-interview";
 import { TOMMY_BEHAVIORS, TOMMY_GOALS } from "./fixtures";
 
 const FRAUD =
   "I attest that this shift note is accurate and truthful, that it reflects services I personally provided, and that I understand submitting false Medicaid documentation constitutes fraud.";
 
-export function PunchPadClockOutStage({ search }: { search: Record<string, string | undefined> }) {
-  const handoff = searchToCompassHandoff(search);
+const FIFTY_WORDS = Array.from({ length: 50 }, (_, i) => `word${i + 1}`).join(" ");
 
+export function PunchPadClockOutStage({ search }: { search: Record<string, string | undefined> }) {
   const [narrative, setNarrative] = useState(search.note ?? "");
-  const [checkedGoals, setCheckedGoals] = useState<Record<string, boolean>>(() => {
-    const map: Record<string, boolean> = {};
-    for (const g of handoff?.selectedGoals ?? []) map[g] = true;
-    return map;
-  });
-  const [baseline, setBaseline] = useState(!!handoff?.baseline);
-  const [incidentAnswer, setIncidentAnswer] = useState<"yes" | "no" | null>(
-    handoff?.incident ?? null,
-  );
-  const [behaviorAnswers, setBehaviorAnswers] = useState<BehaviorAnswers>(() => {
-    if (!handoff || handoff.behaviorsObserved === null) return emptyBehaviorAnswers;
-    if (handoff.behaviorsObserved === false) {
-      return { ...emptyBehaviorAnswers, behaviorsObserved: false };
-    }
-    return {
-      ...emptyBehaviorAnswers,
-      behaviorsObserved: true,
-      targetBehaviors: handoff.targetBehaviors,
-    };
-  });
+  const [checkedGoals, setCheckedGoals] = useState<Record<string, boolean>>({});
+  const [baseline, setBaseline] = useState(false);
+  const [incidentAnswer, setIncidentAnswer] = useState<"yes" | "no" | null>(null);
+  const [behaviorAnswers, setBehaviorAnswers] = useState<BehaviorAnswers>(emptyBehaviorAnswers);
   const [medsDue] = useState(true);
   const [medDosesResolved, setMedDosesResolved] = useState(false);
   const [attestationChecked, setAttestationChecked] = useState(false);
@@ -66,8 +49,11 @@ export function PunchPadClockOutStage({ search }: { search: Record<string, strin
         Timesheet writes: {window.__e2e.timesheetWrites}
       </p>
       <p data-e2e-attest-initial={attestationChecked ? "1" : "0"}>
-        Fraud attestation starts unchecked. Compass cannot skip this.
+        Fraud attestation starts unchecked.
       </p>
+      <button type="button" onClick={() => setNarrative(FIFTY_WORDS)}>
+        Fill 50-word note
+      </button>
 
       <OriginalSpeechAudit transcript={search.spoken ?? ""} />
 

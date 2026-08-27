@@ -654,10 +654,10 @@ function serverFnPayload(url: string, body: string): unknown {
       triggerSummary: "",
     };
   }
-  if (/expandShiftNote|draftShiftNote/i.test(fn)) {
-    return "Mocked Compass expansion — not used in this suite.";
+  if (/draftShiftNote/i.test(fn)) {
+    return "Mocked NECTAR draft — not used in this suite.";
   }
-  if (/processVoiceIntent|createClockIn|listClientTargetBehaviors/i.test(fn)) {
+  if (/listClientTargetBehaviors/i.test(fn)) {
     return { ok: true };
   }
   if (/getClientCareData/i.test(fn)) {

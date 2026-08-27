@@ -77,7 +77,7 @@ describe("humanizeInviteError", () => {
 });
 
 describe("joinHomeForRole", () => {
-  it("sends staff to the employee/Compass home and admins to Admin Home", () => {
+  it("sends staff to the employee home and admins to Admin Home", () => {
     assert.equal(joinHomeForRole("employee"), "/employee");
     assert.equal(joinHomeForRole("admin"), "/dashboard");
     assert.equal(joinHomeForRole("manager"), "/dashboard");

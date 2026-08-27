@@ -189,13 +189,9 @@ FROM (
 
 ## ACTION — Compass original speech transcript on shift notes + daily logs (2026-08-27)
 
-**What this is for:** Compass expands spoken shift notes into a SOW-compliant
-draft. Staff still review, edit, and attest — Cedar is the scribe, the staff
-member is the witness. Until this column exists, only the expanded text is
-saved (`evv_timesheets.shift_note_text` / `daily_logs.narrative`) and the
-original spoken words are discarded. This adds one nullable
-`original_transcript` column on each note table so the verbatim speech is
-queryable on the saved note and is never overwritten by the expanded text.
+**Status (2026-08-27):** Compass / Cedar voice was **removed from the product**. Keep these columns — they are harmless note fields used by punch-pad / daily-log dictation. Do **not** DROP `original_transcript`. Do **not** drop `evv_timesheets`. Historical `created_from` values (including voice/compass) stay on existing rows.
+
+**What this was for:** persist verbatim staff speech alongside the edited note. Until this column exists, only the submitted text is saved (`evv_timesheets.shift_note_text` / `daily_logs.narrative`). This adds one nullable `original_transcript` column on each note table.
 
 Live check 2026-08-27: neither table has an original-speech column.
 `nectar_raw_input` exists only on `general_shifts` (non-client Training/Admin
@@ -210,13 +206,13 @@ ALTER TABLE public.evv_timesheets
   ADD COLUMN IF NOT EXISTS original_transcript text;
 
 COMMENT ON COLUMN public.evv_timesheets.original_transcript IS
-  'Verbatim staff speech (or pre-expansion shorthand) captured by Compass. Never overwritten by shift_note_text.';
+  'Verbatim staff speech (or pre-edit shorthand). Never overwritten by shift_note_text.';
 
 ALTER TABLE public.daily_logs
   ADD COLUMN IF NOT EXISTS original_transcript text;
 
 COMMENT ON COLUMN public.daily_logs.original_transcript IS
-  'Verbatim staff speech (or pre-expansion shorthand) captured by Compass. Never overwritten by narrative.';
+  'Verbatim staff speech (or pre-edit shorthand). Never overwritten by narrative.';
 ```
 
 **What you'll see:** two `ALTER TABLE`s, two `COMMENT`s. No rows changed.

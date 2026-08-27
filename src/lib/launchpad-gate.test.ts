@@ -4,8 +4,8 @@ import { describe, it } from "node:test";
 /**
  * Mirror of assertLaunchpadPassed in src/lib/scheduling/shifts.functions.ts.
  * The live function lives next to createServerFn and cannot be imported from
- * node:test without TanStack Start. compass-go-live.contract.test.ts asserts
- * the production copy still uses has_passed_launchpad with no tester bypass.
+ * node:test without TanStack Start. The production copy still uses
+ * has_passed_launchpad with no tester bypass.
  */
 async function assertLaunchpadPassed(supabase: any, staffId: string): Promise<void> {
   void staffId;

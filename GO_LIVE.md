@@ -61,7 +61,7 @@ Portal view (`localStorage` `portal-view`) can switch admin-capable users betwee
 - My Trainings → `/dashboard/courses` (feature `staff_onboarding`)
 - HIVE Training → `/dashboard/hive-training` (feature + addon **default OFF**)
 
-**Staff (phone)** — `src/components/staff-mobile/staff-bottom-tabs.tsx`: Caseload, Schedule, Daily Logs, Ask NECTAR, Obligations, Trainings. Compass voice button is staff-only on every staff screen (`CompassVoiceButton`). General (non-client) time clock lives **under Schedule**, not its own tab.
+**Staff (phone)** — `src/components/staff-mobile/staff-bottom-tabs.tsx`: Caseload, Schedule, Daily Logs, Ask NECTAR, Obligations, Trainings. Clock-in/out is the punch pad on the client workspace. General (non-client) time clock lives **under Schedule**, not its own tab.
 
 **Admin** — `ADMIN_NAV`:
 
@@ -96,7 +96,7 @@ Deadlines (`/dashboard/deadlines`) **redirects** to Compliance → Action Requir
 | Caseload assign | Employees roster → caseload dialog | `staff_assignments` | Yes. Empty caseload = empty staff Home. |
 | Scheduler | `/dashboard/scheduler` | `scheduler.functions.ts` | Yes. Sole-worker assign requires `profiles.has_passed_launchpad`. |
 | Staff schedule | `/dashboard/schedule` | `respondToShift` | Yes (accept/decline exists now). |
-| EVV / payroll punch | Client card → workspace `/dashboard/workspace/$clientId` | `evv_timesheets.insert` in `punch-pad.tsx` | Yes. GPS + geofence for EVV codes (SLH/SLN). |
+| EVV / payroll punch | Client card → workspace `/dashboard/workspace/$clientId` | `evv_timesheets.insert` in `punch-pad.tsx` | Yes. GPS fail-closed. Only staff clock. No voice / Compass path. |
 | HHS daily note / attendance | `/dashboard/hhs-hub/$clientId` | `hhs.functions.ts` → `daily_logs` / `hhs_monthly_attendance` | Yes. Hosts do not clock. |
 | Daily logs (staff + admin review) | `/dashboard/daily-logs` | `daily_logs` insert/approve | Yes |
 | General time (training/admin/travel) | Schedule screen | `general_shifts` table | Yes (June localStorage finding is **fixed**) |
@@ -107,7 +107,6 @@ Deadlines (`/dashboard/deadlines`) **redirects** to Compliance → Action Requir
 | Utah EVV **CSV** export | Documentation → Records, or `/dashboard/compliance-desk` | `utah-export-dialog.tsx` / `utah-evv-export.ts` | Yes. Needs DHHS Provider ID in Settings. **Not a live UEVV API.** |
 | Form 520 | `/dashboard/billing/form520` | Writes `billing_submissions` drafts | **Submit button disabled** — see H-3. |
 | HIVE Training | `/dashboard/hive-training` | Catalog + Stripe checkout | Gated off by default; Stripe 501 if secrets missing |
-| Compass voice | Staff floating mic | Bedrock intent + thin `createClockIn` | Wired; GPS bypassed on voice clock-in — see H-2 |
 | MFA | `/mfa-setup` | Redirects to `/dashboard` | **Intentionally off** until PHI launch |
 
 ### 1.4 Feature flags a tester will hit
@@ -121,7 +120,7 @@ Seed defaults (`supabase/migrations/20260703173539_*.sql`):
 | `pcsp` | **on** | Documentation hub locks |
 | `staff_onboarding` | **on** | Employees hub + My Trainings lock |
 | `pba_ledgers` | **on** | Finances hub locks |
-| `nectar` | **off** | Ask NECTAR, Knowledge base lock. Compass button still renders; Bedrock still required for AI. |
+| `nectar` | **off** | Ask NECTAR, Knowledge base lock. Bedrock still required for AI. |
 | `hive_training` | **off** | HIVE Training nav hidden/locked (also needs subscription addon) |
 | `state_audit` | **off** | State Audit + Documentation Audit tab lock |
 
@@ -141,7 +140,7 @@ Project in repo: `mmknqtdrefbzwfdtykza` (`https://mmknqtdrefbzwfdtykza.supabase.
 | Var | Needed for |
 |-----|------------|
 | `SUPABASE_SERVICE_ROLE_KEY` | Login username lookup, create-employee, many server fns |
-| `AWS_REGION`, Bedrock model id, and AWS credentials **or** ECS task role | NECTAR, Smart Import extract, Compass expand, daily-log coach |
+| `AWS_REGION`, Bedrock model id, and AWS credentials **or** ECS task role | NECTAR, Smart Import extract, daily-log coach |
 | `RESEND_API_KEY` on `send-email` edge fn | Invite / notification email |
 | `STRIPE_SECRET_KEY` / training webhook secret | HIVE Training checkout |
 | `NECTAR_CRON_SECRET` / `CRON_SHARED_SECRET` | Scheduled NECTAR jobs |
@@ -213,16 +212,16 @@ June `LAUNCH_READINESS_AUDIT.md` is historical. Do not treat it as current.
 - **Fix in this PR:** select/sort `submitted_at`.
 - **Still true:** `utah-dspd-pack/coverage.ts` has many rows missing required `note` (tsc dirt, not runtime). `dashboard.permissions.tsx` was missing a `Role` import (fixed here). CI runs `npx tsc --noEmit || true` (`.github/workflows/typecheck-lint.yml`) so type errors never fail the build.
 
-#### H-2. Compass voice clock-in bypasses GPS
-- **Where:** `src/lib/cedar-voice-agent.server.ts` `createClockIn` — comment is explicit: not a replica of punch-pad gates; `gps_in_bypassed: true`. Also requires Launchpad + medicaid ID + active billing code.
-- **For Sep 1:** Use **punch pad / workspace** for SLH/SLN. Treat Compass as a demo of note expansion and navigation, not as the EVV path.
+#### H-2. Punch pad GPS is fail-closed
+- **Where:** `src/components/evv/punch-pad.tsx`. Clock-in requires a GPS fix. Staff without location cannot write a timesheet. There is no Compass / voice clock-in path.
+- **For Sep 1:** Use **punch pad / workspace** for SLH/SLN.
 
 #### H-3. Form 520 final submit is disabled
 - **Where:** `ATTESTATION_COPY_APPROVED = false` in `dashboard.billing.form520.tsx`. Button stays disabled until counsel-approved copy lands.
 - **Sep 1:** Review the 520 **draft/export**. Do not plan a live attestation.
 
-#### H-4. NECTAR / Smart Import / Compass AI need Bedrock in the deploy env
-- `src/lib/ai-bedrock.server.ts` `assertBedrockConfigured()`. Clock, logs, scheduler, compliance register work **without** AI. Extraction, Ask NECTAR, Compass expand, summary drafting fail loudly if Bedrock is missing.
+#### H-4. NECTAR / Smart Import AI need Bedrock in the deploy env
+- `src/lib/ai-bedrock.server.ts` `assertBedrockConfigured()`. Clock, logs, scheduler, compliance register work **without** AI. Extraction, Ask NECTAR, summary drafting fail loudly if Bedrock is missing.
 - `nectar` org feature defaults **OFF**. Even with Bedrock, Ask NECTAR nav is locked until Hive Exec enables it.
 
 #### H-5. Live DB vs `supabase/migrations/`
@@ -230,8 +229,8 @@ June `LAUNCH_READINESS_AUDIT.md` is historical. Do not treat it as current.
 - Must exist for this test: `hhs_daily_records_v`, `general_shifts`, `company_obligations` (+ instances), `client_billing_codes`, `evv_timesheets`, permission matrix for TNS, `feature_registry` / `organization_features`.
 
 #### H-6. Staff mobile is crowded, not broken
-- Six bottom tabs on a phone. Ask NECTAR often shows a **lock** (feature off). Compass floats on top. Usable; easy to miss Historical Records / Time Corrections (desktop staff nav only).
-- Compass / dictation need microphone permission (`vercel.json` Permissions-Policy allows `microphone=(self)` and `geolocation=(self)`).
+- Six bottom tabs on a phone. Ask NECTAR often shows a **lock** (feature off). Usable; easy to miss Historical Records / Time Corrections (desktop staff nav only).
+- Punch-pad dictation needs microphone permission (`vercel.json` Permissions-Policy allows `microphone=(self)` and `geolocation=(self)`).
 
 ### MEDIUM (skip or disclose)
 
@@ -273,7 +272,7 @@ Today is **Thursday Aug 27**. Test is **Tuesday Sep 1**.
 2. Confirm **admin and staff logins**. They are not in git. Do not hunt for `HIVE_DEMO_ADMIN_*`.
 3. In Supabase/Lovable: org not `locked_at`; `is_demo` badge expected or not; `nectar` / `hive_training` / `state_audit` on or off for TNS.
 4. Settings → DHHS Provider ID + EVV vendor name.
-5. Confirm Bedrock on the deploy that will be tested **if** Compass / Smart Import / Ask NECTAR are in scope. If not configured, **cut those from the Tuesday script** rather than debugging live.
+5. Confirm Bedrock on the deploy that will be tested **if** Smart Import / Ask NECTAR are in scope. If not configured, **cut those from the Tuesday script** rather than debugging live.
 6. Confirm `RESEND_API_KEY` only if you insist on invite email; **still use Add manually**.
 7. Do **not** turn on policy `gate_app_access` for all staff.
 
@@ -302,7 +301,7 @@ Second browser/phone. Run [Staff test script](#6-test-script--staff-path). Prove
 
 ### Monday 31 — Optional AI + freeze
 
-- If Bedrock + `nectar` are on: Smart Import one PCSP **or** Compass expand one note. Do not use Compass to clock EVV codes.
+- If Bedrock + `nectar` are on: Smart Import one PCSP. Clock EVV codes on the punch pad only.
 - Hive Training only if feature + addon + Stripe are on; otherwise skip.
 - Bug-bash anything that blocked Fri–Sun. Freeze new features Monday night.
 
@@ -351,13 +350,11 @@ Use the **Staff** account from step 4. Phone if possible; desktop Staff view is 
    - Allow location. If outside geofence, enter a variance reason (still a real timesheet).
    - Confirm success copy says the timesheet is **saved in HIVE**, not transmitted to the state.
    - Clock out with required paperwork.
-   - **Do not** use the Compass mic to start this shift.
 5. **HHS:** open Client Hub (`/dashboard/hhs-hub/$clientId`) from the client card or schedule. Write the **daily note**. Set attendance **Present** if you want a billable day (`hhs_daily_records_v.billable` needs Present **and** a note). Hosts do not appear on the punch pad.
 6. **SEI or DSI:** clock a timed shift. No geofence wall. DSI: do not exceed 6 hours in the test day if you will look at conflict warnings.
 7. **Daily Logs:** submit a log for a client (or HHS note if that is the HHS path you used).
 8. **Schedule:** see the published shift if admin published one; Accept/Decline if the card offers it.
 9. **My Compliance:** open one obligation if any instances exist; otherwise screenshot the empty state (seed gap, not a crash).
-10. **Compass (optional):** expand a note or ask to navigate. If Bedrock is down, skip. If it offers clock-in, cancel for EVV codes.
 
 ---
 
@@ -371,7 +368,7 @@ Use the **Staff** account from step 4. Phone if possible; desktop Staff view is 
 | Team Access invite toast + helper text tell the truth | Was “Invitation sent” with no email |
 | Employees pending-invite copy warns that `/signup?invite=` is new-agency signup | Stops testers from using a dead join link |
 
-**Not built (on purpose):** invite-accept UI, live UEVV, Form 520 legal copy, coverage.ts notes, CI tsc gate, Compass GPS, HRC un-scaffold.
+**Not built (on purpose):** invite-accept UI, live UEVV, Form 520 legal copy, coverage.ts notes, CI tsc gate, HRC un-scaffold. Compass (Cedar voice) was removed — punch pad is the only staff clock.
 
 ---
 

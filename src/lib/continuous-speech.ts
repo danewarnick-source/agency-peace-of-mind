@@ -1,17 +1,11 @@
 /**
- * Chrome Web Speech helpers for Compass + Dictate.
+ * Chrome Web Speech helpers for punch-pad / daily-log Dictate.
  *
  * Chrome marks short phrases `isFinal` after a brief pause even while the
- * person is still talking, then often fires `onend`. A 1.5s silence timer
- * armed on `rec.start()` used to submit that half-sentence. These helpers
+ * person is still talking, then often fires `onend`. These helpers
  * accumulate the whole utterance, ignore `no-speech`, and restart while
  * the UI still wants the mic open.
  */
-
-export const COMPASS_SILENCE_TIMEOUT_MS = 4_000;
-
-/** Don't auto-submit Chrome's early 1–2 word `isFinal` fragments. */
-export const AUTO_SUBMIT_MIN_WORDS = 3;
 
 const RESTART_DELAY_MS = 150;
 
@@ -39,10 +33,6 @@ export function joinTranscriptParts(...parts: Array<string | null | undefined>):
 
 export function countSpokenWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
-}
-
-export function canAutoSubmitTranscript(text: string): boolean {
-  return countSpokenWords(text) >= AUTO_SUBMIT_MIN_WORDS;
 }
 
 export type SpeechResultLike = {

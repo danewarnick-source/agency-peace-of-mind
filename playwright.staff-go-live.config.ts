@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Isolated Compass + punch pad staff go-live harness.
+ * Isolated punch pad staff go-live harness.
  * Uses e2e/harness/vite.config.ts (not the app's VITE_E2E_HARNESS).
  * Staging crawler remains playwright.config.ts (STAGING_URL + TEST_EMAIL).
  */

@@ -8,7 +8,6 @@ import { isClockableServiceCode } from "@/lib/service-billing";
 import { Badge } from "@/components/ui/badge";
 import { PunchPad } from "@/components/evv/punch-pad";
 import { padMemberId } from "@/lib/evv-codes";
-import { searchToCompassHandoff } from "@/lib/compass-clock-out-interview";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
@@ -59,18 +58,6 @@ const workspaceSearch = z.object({
   tab: z.string().optional(),
   code: z.string().optional(),
   verify: z.string().optional(),
-  // Pending narrative handed off from the Compass voice agent's "expand_note"
-  // intent — pre-fills the clock-out compliance modal's note field.
-  note: z.string().max(5000).optional(),
-  // Original spoken transcript from the same Compass turn. Read-only on the
-  // punch pad; persisted as original_transcript on attest/submit.
-  spoken: z.string().max(2000).optional(),
-  // Compass clock-out interview handoff (goals / incident / behaviors).
-  goals: z.string().max(4000).optional(),
-  baseline: z.enum(["0", "1"]).optional(),
-  incident: z.enum(["yes", "no"]).optional(),
-  behaviors: z.enum(["yes", "no"]).optional(),
-  targets: z.string().max(2000).optional(),
 });
 export const Route = createFileRoute("/dashboard/workspace/$clientId")({
   head: () => ({ meta: [{ title: "Client Workspace — HIVE" }] }),
@@ -87,23 +74,7 @@ function ClientWorkspace() {
     tab: tabParam,
     code: presetCode,
     verify,
-    note: voiceNarrative,
-    spoken: voiceSpoken,
-    goals: voiceGoals,
-    baseline: voiceBaseline,
-    incident: voiceIncident,
-    behaviors: voiceBehaviors,
-    targets: voiceTargets,
   } = Route.useSearch();
-  const clockOutHandoff = searchToCompassHandoff({
-    note: voiceNarrative,
-    spoken: voiceSpoken,
-    goals: voiceGoals,
-    baseline: voiceBaseline,
-    incident: voiceIncident,
-    behaviors: voiceBehaviors,
-    targets: voiceTargets,
-  });
 
   const client = useMemo(() => {
     return (caseload ?? []).find((c) => c.id === clientId) ?? null;
@@ -383,9 +354,6 @@ function ClientWorkspace() {
               presetServiceCode={effectivePresetCode}
               lockServiceCode={!!effectivePresetCode}
               autoOpenCompliance={verify === "1"}
-              initialNarrative={voiceNarrative}
-              initialOriginalTranscript={voiceSpoken}
-              clockOutHandoff={clockOutHandoff}
             />
             <ActiveShiftReimbursementSlot clientId={client.id} />
           </TabsContent>

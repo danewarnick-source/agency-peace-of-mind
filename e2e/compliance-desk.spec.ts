@@ -6,8 +6,8 @@
  * export confirm are asserted as present, not submitted.
  *
  * Real product gate: RequirePermission perm="approve_timesheets".
- * Admin vs staff: Portal View toggle (Admin View vs Staff View / Compass).
- * This spec renders as admin (approve_timesheets), not staff Compass.
+ * Admin vs staff: Portal View toggle (Admin View vs Staff View).
+ * This spec renders as admin (approve_timesheets), not staff punch pad.
  */
 import { test, expect, type Page } from "@playwright/test";
 import path from "path";
@@ -57,14 +57,14 @@ async function openTab(page: Page, id: string) {
 }
 
 test.describe("EVV & Timesheet Control — admin harness", () => {
-  test("renders as admin (not Staff Compass) with approve_timesheets context", async ({
+  test("renders as admin (not staff punch pad) with approve_timesheets context", async ({
     page,
   }) => {
     await openDesk(page);
     await expect(page.getByTestId("e2e-admin-context")).toContainText("Admin View");
     await expect(page.getByTestId("e2e-admin-context")).toContainText("approve_timesheets");
-    await expect(page.getByText("Staff Compass is out of scope")).toBeVisible();
-    // Staff Compass punch pad chrome is not on this admin page.
+    await expect(page.getByText("Staff punch pad is out of scope")).toBeVisible();
+    // Staff punch pad chrome is not on this admin page.
     await expect(page.getByText("My Caseload")).toHaveCount(0);
     await shot(page, "01-pending-review");
   });

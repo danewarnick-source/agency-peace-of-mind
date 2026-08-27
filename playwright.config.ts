@@ -3,6 +3,10 @@ import { defineConfig, devices } from "@playwright/test";
 const stagingUrl = process.env.STAGING_URL;
 const mockBase = process.env.E2E_BASE_URL ?? "http://127.0.0.1:4173";
 
+/** Mocked suites run via dedicated configs / the `mock` project — never against live staging. */
+const MOCK_SPECS =
+  /(?:hive-training-launchpad-gate|admin-home-audit|clients-staff-roster|staff-go-live|daily-logs|client-1056-billing|admin-scheduler|compliance-desk)\.spec\.ts/;
+
 export default defineConfig({
   testDir: "./e2e",
   retries: 0,
@@ -33,7 +37,7 @@ export default defineConfig({
       ? [
           {
             name: "chromium",
-            testIgnore: "**/hive-training-launchpad-gate.spec.ts",
+            testIgnore: MOCK_SPECS,
             use: {
               ...devices["Desktop Chrome"],
               baseURL: stagingUrl,

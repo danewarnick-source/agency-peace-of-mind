@@ -18,6 +18,7 @@ import { Route as MfaSetupRouteImport } from './routes/mfa-setup'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as ManagerRouteImport } from './routes/manager'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as JoinRouteImport } from './routes/join'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as EmployeeRouteImport } from './routes/employee'
 import { Route as DemoRouteImport } from './routes/demo'
@@ -253,6 +254,11 @@ const ManagerRoute = ManagerRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JoinRoute = JoinRouteImport.update({
+  id: '/join',
+  path: '/join',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
@@ -1311,6 +1317,7 @@ export interface FileRoutesByFullPath {
   '/demo': typeof DemoRoute
   '/employee': typeof EmployeeRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/join': typeof JoinRoute
   '/login': typeof LoginRoute
   '/manager': typeof ManagerRoute
   '/mcp': typeof McpRoute
@@ -1512,6 +1519,7 @@ export interface FileRoutesByTo {
   '/demo': typeof DemoRoute
   '/employee': typeof EmployeeRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/join': typeof JoinRoute
   '/login': typeof LoginRoute
   '/manager': typeof ManagerRoute
   '/mcp': typeof McpRoute
@@ -1709,6 +1717,7 @@ export interface FileRoutesById {
   '/demo': typeof DemoRoute
   '/employee': typeof EmployeeRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/join': typeof JoinRoute
   '/login': typeof LoginRoute
   '/manager': typeof ManagerRoute
   '/mcp': typeof McpRoute
@@ -1913,6 +1922,7 @@ export interface FileRouteTypes {
     | '/demo'
     | '/employee'
     | '/forgot-password'
+    | '/join'
     | '/login'
     | '/manager'
     | '/mcp'
@@ -2114,6 +2124,7 @@ export interface FileRouteTypes {
     | '/demo'
     | '/employee'
     | '/forgot-password'
+    | '/join'
     | '/login'
     | '/manager'
     | '/mcp'
@@ -2310,6 +2321,7 @@ export interface FileRouteTypes {
     | '/demo'
     | '/employee'
     | '/forgot-password'
+    | '/join'
     | '/login'
     | '/manager'
     | '/mcp'
@@ -2513,6 +2525,7 @@ export interface RootRouteChildren {
   DemoRoute: typeof DemoRoute
   EmployeeRoute: typeof EmployeeRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
+  JoinRoute: typeof JoinRoute
   LoginRoute: typeof LoginRoute
   ManagerRoute: typeof ManagerRoute
   McpRoute: typeof McpRoute
@@ -2606,6 +2619,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/join': {
+      id: '/join'
+      path: '/join'
+      fullPath: '/join'
+      preLoaderRoute: typeof JoinRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/forgot-password': {
@@ -4454,6 +4474,7 @@ const rootRouteChildren: RootRouteChildren = {
   DemoRoute: DemoRoute,
   EmployeeRoute: EmployeeRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
+  JoinRoute: JoinRoute,
   LoginRoute: LoginRoute,
   ManagerRoute: ManagerRoute,
   McpRoute: McpRoute,

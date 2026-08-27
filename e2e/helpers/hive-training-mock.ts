@@ -299,6 +299,28 @@ function serverFnPayload(world: HiveE2EWorld, req: Request): unknown {
     return [];
   }
 
+  if (
+    hay.includes("getorgceroster")
+  ) {
+    return { organizationId: IDS.org, goalHours: 12, rows: [], behindCount: 0 };
+  }
+
+  if (hay.includes("getactivedraftjobs")) {
+    return { jobs: [] };
+  }
+
+  if (
+    hay.includes("listdeadline") ||
+    hay.includes("listopensummaries") ||
+    hay.includes("searchactivestaff")
+  ) {
+    return [];
+  }
+
+  if (hay.includes("ensurecurrentsummary")) {
+    return { ensured: 0 };
+  }
+
   if (hay.includes("getpendingtrackingforms")) {
     return [];
   }
@@ -326,6 +348,11 @@ function serverFnPayload(world: HiveE2EWorld, req: Request): unknown {
     total: 0,
     completed: 0,
     count: 0,
+    jobs: [],
+    rows: [],
+    ensured: 0,
+    behindCount: 0,
+    goalHours: 12,
   };
 }
 
@@ -349,9 +376,10 @@ function paramIn(url: string, key: string): string[] | null {
 }
 
 function wrapServerFnResult(payload: unknown): unknown {
-  // Without x-tss-serialized, serverFnFetcher returns this JSON as the
-  // function's return value. Do not wrap in { result }.
-  return payload;
+  // createServerFn client middleware reads envelope.result.
+  // A bare payload makes every useQuery see `undefined` and the dashboard
+  // stays on "Loading…".
+  return { result: payload };
 }
 
 function restRows(world: HiveE2EWorld, table: string, url: string): unknown[] {
@@ -368,6 +396,7 @@ function restRows(world: HiveE2EWorld, table: string, url: string): unknown[] {
         staff_type_keys: [],
         bc_role: null,
         has_passed_launchpad: true,
+        evv_gps_consent_status: "Accepted",
       },
       {
         id: IDS.staff,
@@ -377,6 +406,7 @@ function restRows(world: HiveE2EWorld, table: string, url: string): unknown[] {
         staff_type_keys: [],
         bc_role: null,
         has_passed_launchpad: world.role === "employee" ? world.hasPassedLaunchpad : false,
+        evv_gps_consent_status: "Accepted",
       },
       {
         id: IDS.incompleteStaff,
@@ -386,6 +416,7 @@ function restRows(world: HiveE2EWorld, table: string, url: string): unknown[] {
         staff_type_keys: [],
         bc_role: null,
         has_passed_launchpad: false,
+        evv_gps_consent_status: "Accepted",
       },
     ];
     const idEq = paramEq(url, "id");
@@ -400,6 +431,7 @@ function restRows(world: HiveE2EWorld, table: string, url: string): unknown[] {
             staff_type_keys: [],
             bc_role: null,
             has_passed_launchpad: world.hasPassedLaunchpad,
+            evv_gps_consent_status: "Accepted",
           },
         ];
       }
@@ -856,9 +888,8 @@ export async function installHiveE2E(
       await fulfillJson(route, 200, wrapServerFnResult(payload));
     } catch (err) {
       const e = err as { status?: number; message?: string };
-      await fulfillJson(route, e.status ?? 400, {
-        error: true,
-        message: e.message ?? "blocked",
+      await fulfillJson(route, 200, {
+        error: e.message ?? "blocked",
       });
     }
   });

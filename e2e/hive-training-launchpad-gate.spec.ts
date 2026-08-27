@@ -42,6 +42,19 @@ async function waitSettled(page: Page) {
   await page.waitForTimeout(1_200);
 }
 
+/** Staff view mounts PunchPad / hub twice (mobile shell is md:hidden). */
+function visibleTestId(page: Page, testId: string) {
+  return page.getByTestId(testId).filter({ visible: true });
+}
+
+async function dismissEvvConsent(page: Page) {
+  const consent = page.getByRole("button", { name: /I Consent & Allow Tracking/i });
+  if (await consent.first().isVisible().catch(() => false)) {
+    await consent.first().click();
+    await page.waitForTimeout(400);
+  }
+}
+
 function completionWrites(writes: WriteAttempt[]): WriteAttempt[] {
   const blocked = new Set([
     "training_completions",
@@ -55,12 +68,10 @@ test("1. Admin can open Hive Training without crash", async ({ page }) => {
   const writes: WriteAttempt[] = [];
   await openAs(page, { role: "admin", hasPassedLaunchpad: true }, writes);
   await page.goto("/dashboard/hive-training", { waitUntil: "domcontentloaded" });
-  await waitSettled(page);
-  await shot(page, "01-hive-training-admin");
-
-  await expect(page.locator("body")).not.toContainText(/something went wrong/i);
   await expect(page.getByTestId("hive-training-hub")).toBeVisible({ timeout: 25_000 });
+  await expect(page.locator("body")).not.toContainText(/something went wrong/i);
   await expect(page.getByText(/HIVE Training/i).first()).toBeVisible();
+  await shot(page, "01-hive-training-admin");
   expect(completionWrites(writes), "must not write live completions").toHaveLength(0);
 });
 
@@ -71,25 +82,23 @@ test("2. Staff Hive Training list + assignment player render locked vs available
   await openAs(page, { role: "employee", hasPassedLaunchpad: false }, writes);
 
   await page.goto("/dashboard/hive-training", { waitUntil: "domcontentloaded" });
-  await waitSettled(page);
+  const hub = visibleTestId(page, "hive-training-hub");
+  await expect(hub).toBeVisible({ timeout: 20_000 });
+  await expect(hub.getByRole("heading", { name: /Assigned trainings/i })).toBeVisible();
+  await expect(hub.getByText(/DSPD Provider Orientation/i)).toBeVisible();
+  await expect(hub.getByText(/In progress/i).first()).toBeVisible();
+  await expect(hub.getByRole("button", { name: /Continue/i })).toBeVisible();
   await shot(page, "02-hive-training-staff-list");
-
-  await expect(page.getByTestId("hive-training-hub")).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText(/Assigned trainings/i).first()).toBeVisible();
-  await expect(page.getByText(/DSPD Provider Orientation/i).first()).toBeVisible();
-  await expect(page.getByText(/In progress/i).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: /Continue/i }).first()).toBeVisible();
 
   await page.goto(`/dashboard/hive-training/course/${IDS.assignment}`, {
     waitUntil: "domcontentloaded",
   });
-  await waitSettled(page);
+  const player = visibleTestId(page, "hive-training-player");
+  await expect(player).toBeVisible({ timeout: 20_000 });
+  await expect(player.getByText(/Welcome to Launchpad/i)).toBeVisible();
+  await expect(player.getByText(/Competency check/i)).toBeVisible();
+  await expect(player.getByRole("button", { name: /Mark complete/i }).first()).toBeVisible();
   await shot(page, "02b-hive-training-player");
-
-  await expect(page.getByTestId("hive-training-player")).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText(/Welcome to Launchpad/i).first()).toBeVisible();
-  await expect(page.getByText(/Competency check/i).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: /Mark complete/i }).first()).toBeVisible();
   // Do not click Mark complete — that would be a fake completion.
 
   expect(completionWrites(writes)).toHaveLength(0);
@@ -105,19 +114,17 @@ test("3. Incomplete staff cannot clock in — punch pad shows a clear block, not
     waitUntil: "domcontentloaded",
   });
   await waitSettled(page);
-  await page.waitForTimeout(1_500);
-  await shot(page, "03-clock-in-blocked");
-
-  const block = page.getByTestId("launchpad-gate-block");
+  await dismissEvvConsent(page);
+  const block = visibleTestId(page, "launchpad-gate-block");
   await expect(block).toBeVisible({ timeout: 20_000 });
   const blockText = (await block.innerText()).trim();
   expect(blockText, "block copy must mention Launchpad").toMatch(/Launchpad/i);
   expect(blockText, "block must not be a raw UUID error").not.toMatch(UUID_RE);
-
-  const clockIn = page.getByTestId("clock-in-button");
+  const clockIn = visibleTestId(page, "clock-in-button");
   if (await clockIn.isVisible().catch(() => false)) {
     await expect(clockIn).toBeDisabled();
   }
+  await shot(page, "03-clock-in-blocked");
 
   expect(
     writes.filter((w) => w.table === "evv_timesheets"),
@@ -136,12 +143,13 @@ test("4. Passed Launchpad allows clock-in UI to proceed (does not punch)", async
     waitUntil: "domcontentloaded",
   });
   await waitSettled(page);
-  await page.waitForTimeout(1_500);
-  await shot(page, "04-clock-in-allowed");
-
+  await dismissEvvConsent(page);
   await expect(page.getByTestId("launchpad-gate-block")).toHaveCount(0);
-  await expect(page.getByTestId("clock-in-button")).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText(/CLOCK IN|START EVV SHIFT/i).first()).toBeVisible();
+  const clockIn = visibleTestId(page, "clock-in-button");
+  await expect(clockIn).toBeVisible({ timeout: 20_000 });
+  await expect(clockIn).toBeEnabled();
+  await expect(page.getByText(/START EVV SHIFT|▶️ CLOCK IN/i).filter({ visible: true })).toBeVisible();
+  await shot(page, "04-clock-in-allowed");
   // Do not click — we never punch in e2e.
   expect(writes.filter((w) => w.table === "evv_timesheets")).toHaveLength(0);
 });
@@ -151,9 +159,6 @@ test("5. Admin roster shows who has / has not passed Launchpad", async ({ page }
   await openAs(page, { role: "admin", hasPassedLaunchpad: true }, writes);
 
   await page.goto("/dashboard/hive-training", { waitUntil: "domcontentloaded" });
-  await waitSettled(page);
-  await shot(page, "05-launchpad-roster");
-
   const roster = page.getByTestId("launchpad-roster");
   await expect(roster).toBeVisible({ timeout: 20_000 });
   await expect(roster).toContainText(/Launchpad clock-in gate/i);
@@ -161,6 +166,7 @@ test("5. Admin roster shows who has / has not passed Launchpad", async ({ page }
   await expect(roster).toContainText(/have not passed/i);
   await expect(roster).toContainText("E2E Admin");
   await expect(roster).toContainText("E2E Incomplete");
+  await shot(page, "05-launchpad-roster");
   expect(completionWrites(writes)).toHaveLength(0);
 });
 
@@ -171,36 +177,30 @@ test("6. Training catalog, courses, public /training, and core list do not crash
   await openAs(page, { role: "admin", hasPassedLaunchpad: true }, writes);
 
   await page.goto("/training", { waitUntil: "domcontentloaded" });
-  await waitSettled(page);
-  await shot(page, "06-public-training");
-  await expect(page.locator("body")).not.toContainText(/something went wrong/i);
   await expect(page.getByText(/HIVE Training|Certifications|Staff Training/i).first()).toBeVisible({
     timeout: 15_000,
   });
+  await expect(page.locator("body")).not.toContainText(/something went wrong/i);
+  await shot(page, "06-public-training");
 
   await page.goto("/dashboard/training", { waitUntil: "domcontentloaded" });
-  await waitSettled(page);
-  await shot(page, "06b-dashboard-training");
   await expect(page.locator("body")).not.toContainText(/something went wrong/i);
+  await shot(page, "06b-dashboard-training");
 
   await page.goto("/dashboard/training/catalog", { waitUntil: "domcontentloaded" });
-  await waitSettled(page);
-  await shot(page, "06c-training-catalog");
-  await expect(page.locator("body")).not.toContainText(/something went wrong/i);
   await expect(page.getByText(/Training Catalog|HIVE Training/i).first()).toBeVisible({
     timeout: 15_000,
   });
+  await expect(page.locator("body")).not.toContainText(/something went wrong/i);
+  await shot(page, "06c-training-catalog");
 
   await page.goto("/dashboard/courses", { waitUntil: "domcontentloaded" });
-  await waitSettled(page);
-  await shot(page, "06d-courses");
   await expect(page.getByText(/My Trainings|30 Day Core Training/i).first()).toBeVisible({
     timeout: 15_000,
   });
+  await shot(page, "06d-courses");
 
   await page.goto("/dashboard/courses/core", { waitUntil: "domcontentloaded" });
-  await waitSettled(page);
-  await shot(page, "06e-courses-core");
   await expect(page.getByTestId("core-training-list")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("core-topic-seizure_disorders")).toHaveAttribute(
     "data-status",
@@ -210,21 +210,20 @@ test("6. Training catalog, courses, public /training, and core list do not crash
     "data-status",
     "not_started",
   );
+  await shot(page, "06e-courses-core");
 
   await page.goto(`/dashboard/courses/topic/${IDS.topicReady}`, {
     waitUntil: "domcontentloaded",
   });
-  await waitSettled(page);
-  await shot(page, "06f-topic-player");
   await expect(page.locator("body")).not.toContainText(/something went wrong/i);
+  await shot(page, "06f-topic-player");
   // Review-only — do not click Sign & Complete.
 
   await page.goto(`/dashboard/training/${IDS.trainingModule}`, {
     waitUntil: "domcontentloaded",
   });
-  await waitSettled(page);
-  await shot(page, "06g-training-module");
   await expect(page.locator("body")).not.toContainText(/something went wrong/i);
+  await shot(page, "06g-training-module");
 
   expect(
     writes.filter((w) => w.table === "training_completions" || w.table === "hive_training_certificates"),

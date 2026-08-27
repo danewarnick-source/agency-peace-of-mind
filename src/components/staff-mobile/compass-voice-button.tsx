@@ -339,8 +339,7 @@ export function CompassVoiceButton() {
         pos = await getCompassClockInPosition();
       } catch (e) {
         const msg = e instanceof Error ? e.message : "";
-        const kind: GpsFailKind =
-          msg === "denied" || msg === "timeout" ? msg : "unavailable";
+        const kind: GpsFailKind = msg === "denied" || msg === "timeout" ? msg : "unavailable";
         toast.error(compassGpsFailMessage(kind));
         openPunchPadForClockIn(pendingClockIn.clientId, pendingClockIn.serviceCode);
         return;

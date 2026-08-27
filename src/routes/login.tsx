@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { signInWithUsername } from "@/lib/login.functions";
 import { checkHiveExecutive } from "@/lib/hive-exec.functions";
+import { completePasswordSignIn, GENERIC_LOGIN_ERROR } from "@/lib/login-auth";
 import { toast } from "sonner";
 
 function isSafeNext(v: unknown): v is string {
@@ -35,7 +36,13 @@ function HexPattern() {
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
-        <pattern id="hex" width="80" height="92" patternUnits="userSpaceOnUse" patternTransform="scale(1.4)">
+        <pattern
+          id="hex"
+          width="80"
+          height="92"
+          patternUnits="userSpaceOnUse"
+          patternTransform="scale(1.4)"
+        >
           <polygon
             points="40,2 78,24 78,68 40,90 2,68 2,24"
             fill="none"
@@ -51,7 +58,11 @@ function HexPattern() {
 
 function BrandLogo({ className = "" }: { className?: string }) {
   return (
-    <Link to="/" className={`flex items-center gap-2.5 font-semibold text-white ${className}`} style={{ fontFamily: JAKARTA }}>
+    <Link
+      to="/"
+      className={`flex items-center gap-2.5 font-semibold text-white ${className}`}
+      style={{ fontFamily: JAKARTA }}
+    >
       <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] backdrop-blur">
         <Hexagon className="h-4 w-4 text-[#f4a93a]" strokeWidth={2.5} />
       </span>
@@ -112,13 +123,19 @@ function LoginPage() {
           try {
             window.localStorage.setItem("portal-view", "hive_exec");
             window.dispatchEvent(new Event("portal-view-change"));
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
           target = "/dashboard/hive-exec";
         }
-      } catch { /* fall back to /dashboard */ }
+      } catch {
+        /* fall back to /dashboard */
+      }
       if (!cancelled) navigate({ to: target, replace: true });
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [loading, session, navigate, execCheck, nextPath]);
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -128,40 +145,36 @@ function LoginPage() {
     const password = String(fd.get("password"));
     setBusy(true);
 
-    try {
-      if (identifier.includes("@")) {
-        // Email path — normal client sign-in (preserves session persistence).
-        const { data: signInRes, error } = await supabase.auth.signInWithPassword({
-          email: identifier,
-          password,
-        });
-        if (error) { setBusy(false); return toast.error("Invalid username or password"); }
-        if (signInRes.user) {
-          const { data: prof } = await supabase
-            .from("profiles")
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .select("account_status" as any)
-            .eq("id", signInRes.user.id)
-            .maybeSingle();
+    const result = await completePasswordSignIn(identifier, password, {
+      signInWithEmail: async (email, pw) => {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password: pw });
+        return {
+          error: error ? { message: error.message } : null,
+          user: data.user ? { id: data.user.id } : null,
+        };
+      },
+      signInWithUsername: async (id, pw) => signIn({ data: { identifier: id, password: pw } }),
+      setSession: async (tokens) => {
+        const { error } = await supabase.auth.setSession(tokens);
+        return { error: error ? { message: error.message } : null };
+      },
+      getAccountStatus: async (userId) => {
+        const { data: prof } = await supabase
+          .from("profiles")
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          if ((prof as any)?.account_status === "archived") {
-            await supabase.auth.signOut();
-            setBusy(false);
-            return toast.error("Account suspended. Contact your administrator.");
-          }
-        }
-      } else {
-        // Username path — server resolves username + signs in; we never see the email.
-        const tokens = await signIn({ data: { identifier, password } });
-        const { error } = await supabase.auth.setSession({
-          access_token: tokens.access_token,
-          refresh_token: tokens.refresh_token,
-        });
-        if (error) { setBusy(false); return toast.error("Invalid username or password"); }
-      }
-    } catch (err) {
+          .select("account_status" as any)
+          .eq("id", userId)
+          .maybeSingle();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (prof as any)?.account_status as string | undefined;
+      },
+      signOut: async () => {
+        await supabase.auth.signOut();
+      },
+    });
+    if (!result.ok) {
       setBusy(false);
-      return toast.error((err as Error).message || "Invalid username or password");
+      return toast.error(result.message || GENERIC_LOGIN_ERROR);
     }
 
     setBusy(false);
@@ -169,7 +182,9 @@ function LoginPage() {
   };
 
   const google = async () => {
-    const r = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/dashboard" });
+    const r = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: window.location.origin + "/dashboard",
+    });
     if (r.error) toast.error("Google sign-in failed");
   };
 
@@ -236,9 +251,13 @@ function LoginPage() {
                 </p>
               </div>
 
-              <form onSubmit={onSubmit} className="grid gap-4">
+              <form onSubmit={onSubmit} className="grid gap-4" data-testid="login-form">
                 <div className="grid gap-2">
-                  <Label htmlFor="identifier" className="text-white/80" style={{ fontFamily: JAKARTA }}>
+                  <Label
+                    htmlFor="identifier"
+                    className="text-white/80"
+                    style={{ fontFamily: JAKARTA }}
+                  >
                     Email or username
                   </Label>
                   <input
@@ -256,10 +275,17 @@ function LoginPage() {
                 </div>
                 <div className="grid gap-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="password" className="text-white/80" style={{ fontFamily: JAKARTA }}>
+                    <Label
+                      htmlFor="password"
+                      className="text-white/80"
+                      style={{ fontFamily: JAKARTA }}
+                    >
                       Password
                     </Label>
-                    <Link to="/forgot-password" className="text-xs font-medium text-[#f4a93a] hover:text-[#f7c172] hover:underline">
+                    <Link
+                      to="/forgot-password"
+                      className="text-xs font-medium text-[#f4a93a] hover:text-[#f7c172] hover:underline"
+                    >
                       Forgot?
                     </Link>
                   </div>
@@ -295,7 +321,9 @@ function LoginPage() {
                     backgroundImage: "linear-gradient(135deg, #f4a93a 0%, #f59324 100%)",
                   }}
                 >
-                  {busy ? "Signing in…" : (
+                  {busy ? (
+                    "Signing in…"
+                  ) : (
                     <>
                       Sign in
                       <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
@@ -326,14 +354,20 @@ function LoginPage() {
 
               <p className="mt-6 text-center text-sm text-white/60" style={{ fontFamily: JAKARTA }}>
                 New here?{" "}
-                <Link to="/signup" className="font-semibold text-[#f4a93a] hover:text-[#f7c172] hover:underline">
+                <Link
+                  to="/signup"
+                  className="font-semibold text-[#f4a93a] hover:text-[#f7c172] hover:underline"
+                >
                   Start a free trial
                 </Link>
               </p>
             </div>
 
             <p className="mt-6 text-center text-xs text-white/40" style={{ fontFamily: JAKARTA }}>
-              <Link to="/" className="hover:text-white/70 hover:underline">← Back to site</Link> · {pathname}
+              <Link to="/" className="hover:text-white/70 hover:underline">
+                ← Back to site
+              </Link>{" "}
+              · {pathname}
             </p>
           </div>
         </div>
@@ -346,7 +380,15 @@ function LoginPage() {
  * Shared dark auth shell used by forgot-password / reset-password / signup.
  * Matches the new login page visual language.
  */
-export function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+export function AuthShell({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+}) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
     <div
@@ -372,10 +414,15 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
 
         <div className="flex items-center justify-center px-6 py-12">
           <div className="w-full max-w-sm">
-            <div className="mb-6 flex justify-center md:hidden"><BrandLogo /></div>
+            <div className="mb-6 flex justify-center md:hidden">
+              <BrandLogo />
+            </div>
             <div
               className="rounded-2xl p-7 shadow-2xl backdrop-blur-xl"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.11)" }}
+              style={{
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.11)",
+              }}
             >
               <div className="mb-7 text-center md:text-left">
                 <h1
@@ -389,7 +436,10 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
               {children}
             </div>
             <p className="mt-6 text-center text-xs text-white/40">
-              <Link to="/" className="hover:text-white/70 hover:underline">← Back to site</Link> · {pathname}
+              <Link to="/" className="hover:text-white/70 hover:underline">
+                ← Back to site
+              </Link>{" "}
+              · {pathname}
             </p>
           </div>
         </div>
@@ -397,4 +447,3 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
     </div>
   );
 }
-

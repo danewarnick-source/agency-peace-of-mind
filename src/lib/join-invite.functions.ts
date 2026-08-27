@@ -4,8 +4,10 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   ASK_ADMIN_MANUAL,
   inviteFailureMessage,
+  isValidExistingJoinPassword,
   isValidJoinPassword,
   isValidJoinUsername,
+  joinSetsAuthPassword,
   type InviteFailureReason,
 } from "@/lib/join-invite";
 
@@ -108,7 +110,7 @@ export const previewInvitation = createServerFn({ method: "POST" })
 
 const PrepareInput = z.object({
   token: z.string().trim().min(1).max(200),
-  password: z.string().min(8).max(128),
+  password: z.string().min(1).max(200),
   username: z.string().trim().max(32).optional().or(z.literal("")),
   full_name: z.string().trim().max(120).optional().or(z.literal("")),
 });
@@ -116,10 +118,6 @@ const PrepareInput = z.object({
 export const prepareInviteAccount = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => PrepareInput.parse(d))
   .handler(async ({ data }) => {
-    if (!isValidJoinPassword(data.password)) {
-      throw new Error("Password must be at least 8 characters and include a number.");
-    }
-
     const loaded = await loadInvite(data.token);
     if (!loaded.ok) {
       throw new Error(loaded.message);
@@ -127,6 +125,14 @@ export const prepareInviteAccount = createServerFn({ method: "POST" })
     const { invite, orgName } = loaded;
     const email = invite.email.trim().toLowerCase();
     const existing = await loadProfileByEmail(email);
+
+    if (joinSetsAuthPassword(!!existing)) {
+      if (!isValidJoinPassword(data.password)) {
+        throw new Error("Password must be at least 8 characters and include a number.");
+      }
+    } else if (!isValidExistingJoinPassword(data.password)) {
+      throw new Error("Enter the password you already use to sign in.");
+    }
 
     const usernameRaw = String(data.username || "").trim();
     const fullNameRaw = String(data.full_name || "").trim();
@@ -188,26 +194,37 @@ export const prepareInviteAccount = createServerFn({ method: "POST" })
         .eq("user_id", userId)
         .neq("organization_id", invite.organization_id);
     } else {
-      const { error: pwErr } = await supabaseAdmin.auth.admin.updateUserById(existing.id, {
+      // Existing login: verify the password they already use. Never overwrite it.
+      const { data: verified, error: pwErr } = await supabaseAdmin.auth.signInWithPassword({
+        email,
         password: data.password,
-        email_confirm: true,
       });
-      if (pwErr) throw new Error(pwErr.message);
+      if (pwErr || !verified?.user) {
+        throw new Error(
+          "That password doesn't match this account. Use the password you already sign in with, or tap Forgot on the login page.",
+        );
+      }
+      if (verified.session?.access_token) {
+        await supabaseAdmin.auth.admin.signOut(verified.session.access_token).catch(() => {});
+      }
     }
 
-    const { error: profErr } = await supabaseAdmin.from("profiles").upsert(
-      {
-        id: userId,
-        email,
-        full_name: fullName,
-        first_name: firstName,
-        last_name: lastName || null,
-        username: username || null,
-        must_change_password: false,
-        is_active: true,
-      } as never,
-      { onConflict: "id" },
-    );
+    const profilePatch: Record<string, unknown> = {
+      id: userId,
+      email,
+      full_name: fullName,
+      first_name: firstName,
+      last_name: lastName || null,
+      username: username || null,
+      is_active: true,
+    };
+    if (joinSetsAuthPassword(!!existing)) {
+      profilePatch.must_change_password = false;
+    }
+
+    const { error: profErr } = await supabaseAdmin
+      .from("profiles")
+      .upsert(profilePatch as never, { onConflict: "id" });
     if (profErr) throw new Error(profErr.message);
 
     return {

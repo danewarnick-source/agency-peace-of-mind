@@ -36,6 +36,21 @@ async function blockWrites(page: import("@playwright/test").Page) {
 }
 
 test.describe("invite join vs new-agency signup", () => {
+  test("/login with no invite token is still the sign-in form, not join", async ({ page }) => {
+    await blockWrites(page);
+    await page.goto("/login", { waitUntil: "domcontentloaded", timeout: 30_000 });
+    await expect(page).toHaveURL(/\/login/);
+    const body = await page.locator("body").innerText();
+    expect(body, "login must still say Welcome back").toMatch(/welcome back/i);
+    expect(body).toMatch(/email or username/i);
+    expect(body.toLowerCase()).not.toContain("ask your admin to add you manually");
+    expect(body.toLowerCase()).not.toContain("you've been invited");
+    await expect(page.getByTestId("join-form")).toHaveCount(0);
+    await expect(page.getByTestId("login-form")).toBeVisible();
+    await expect(page.locator("#identifier")).toBeVisible();
+    await expect(page.locator("#password")).toBeVisible();
+  });
+
   test("/signup with no invite token is still new-agency signup", async ({ page }) => {
     await blockWrites(page);
     await page.goto("/signup", { waitUntil: "domcontentloaded", timeout: 30_000 });

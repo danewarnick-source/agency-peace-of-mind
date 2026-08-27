@@ -11,6 +11,7 @@ import {
   isValidJoinPassword,
   isValidJoinUsername,
   joinHomeForRole,
+  joinSetsAuthPassword,
 } from "./join-invite.ts";
 
 describe("extractInviteToken", () => {
@@ -90,6 +91,10 @@ describe("join field rules", () => {
     assert.equal(isValidJoinPassword("short1"), false);
     assert.equal(isValidJoinPassword("longenough"), false);
     assert.equal(isValidJoinPassword("goodpass1"), true);
+  });
+  it("never overwrites an existing account's password", () => {
+    assert.equal(joinSetsAuthPassword(true), false);
+    assert.equal(joinSetsAuthPassword(false), true);
   });
   it("requires a letter-led username", () => {
     assert.equal(isValidJoinUsername("ab"), false);

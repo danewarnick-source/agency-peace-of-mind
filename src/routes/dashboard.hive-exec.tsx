@@ -1,12 +1,14 @@
 import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { Shield, ShieldAlert, HelpCircle } from "lucide-react";
+import { Shield, ShieldAlert, HelpCircle, Menu } from "lucide-react";
 import { RequireHiveExecutive } from "@/components/hive-executive-guard";
 import { EXEC_NAV } from "@/lib/exec-nav";
 import { useCapability } from "@/hooks/use-exec-capability";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SteveDockPanel } from "@/components/hive-exec/command/steve-panel";
+import { OpenCompanyViews } from "@/components/hive-exec/open-company-views";
+import { OPEN_DASHBOARD_MENU_EVENT } from "@/lib/portal-view-landing";
 
 export const Route = createFileRoute("/dashboard/hive-exec")({
   head: () => ({ meta: [{ title: "Executive Command Center — HIVE" }] }),
@@ -33,7 +35,15 @@ function ExecCommandCenterLayout() {
     <div className="space-y-4">
       <header className="rounded-xl border border-[#fed7aa] bg-gradient-to-r from-[#0f1b3d] to-[#1a2a5a] p-4 text-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-white/30 bg-white/10 text-white md:hidden"
+              aria-label="Open menu"
+              onClick={() => window.dispatchEvent(new Event(OPEN_DASHBOARD_MENU_EVENT))}
+            >
+              <Menu className="h-5 w-5" />
+            </button>
             <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#d97a1c] text-white">
               <Shield className="h-5 w-5" />
             </span>
@@ -60,6 +70,9 @@ function ExecCommandCenterLayout() {
               Account &amp; billing only — no client records or PHI
             </div>
           </div>
+        </div>
+        <div className="mt-3 text-white">
+          <OpenCompanyViews tone="dark" />
         </div>
       </header>
 

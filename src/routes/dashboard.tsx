@@ -40,6 +40,8 @@ import { BillingBanner } from "@/components/billing/billing-banner";
 import { DraftJobsProvider } from "@/components/nectar/draft-jobs-driver";
 import { DraftJobsHeaderPill } from "@/components/nectar/draft-jobs-header-pill";
 import { GuidedTourProvider } from "@/components/nectar/guided-tour-provider";
+import { OpenCompanyViews } from "@/components/hive-exec/open-company-views";
+import { OPEN_DASHBOARD_MENU_EVENT } from "@/lib/portal-view-landing";
 
 
 
@@ -216,6 +218,12 @@ function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [taskCenterOpen, setTaskCenterOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+
+  useEffect(() => {
+    const openMenu = () => setMobileOpen(true);
+    window.addEventListener(OPEN_DASHBOARD_MENU_EVENT, openMenu);
+    return () => window.removeEventListener(OPEN_DASHBOARD_MENU_EVENT, openMenu);
+  }, []);
 
 
 
@@ -445,9 +453,15 @@ function DashboardLayout() {
             }}
           >
             <div className="flex items-center gap-2 min-w-0">
+              {/* Always show on phones — including hive-exec. Portal View lives in this Sheet. */}
               <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open menu">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="md:hidden shrink-0 border border-border bg-background"
+                    aria-label="Open menu"
+                  >
                     <Menu className="h-5 w-5" />
                   </Button>
                 </SheetTrigger>
@@ -519,6 +533,11 @@ function DashboardLayout() {
               </Button>
             </div>
           </header>
+          {isHiveExecView && (
+            <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-background px-4 py-2 md:px-6">
+              <OpenCompanyViews />
+            </div>
+          )}
           {/* Collapsed-by-default NECTAR ask bar on phones — expands from the
               header icon; the desktop inline bar is unchanged. */}
           {mobileSearchOpen && !isHiveExecView && (

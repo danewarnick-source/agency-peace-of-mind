@@ -5,7 +5,7 @@ const mockBase = process.env.E2E_BASE_URL ?? "http://127.0.0.1:4173";
 
 /** Mocked suites run via dedicated configs / the `mock` project — never against live staging. */
 const MOCK_SPECS =
-  /(?:hive-training-launchpad-gate|admin-home-audit|clients-staff-roster|staff-go-live|daily-logs|client-1056-billing|admin-scheduler|compliance-desk)\.spec\.ts/;
+  /(?:hive-training-launchpad-gate|admin-home-audit|clients-staff-roster|staff-go-live|daily-logs|client-1056-billing|admin-scheduler|compliance-desk|hive-exec-phone-escape)\.spec\.ts/;
 
 export default defineConfig({
   testDir: "./e2e",

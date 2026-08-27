@@ -11,6 +11,12 @@ import { useServerFn } from "@tanstack/react-start";
 import { signInWithUsername } from "@/lib/login.functions";
 import { checkHiveExecutive } from "@/lib/hive-exec.functions";
 import { completePasswordSignIn, GENERIC_LOGIN_ERROR } from "@/lib/login-auth";
+import {
+  isCompanyAdminRole,
+  persistPortalView,
+  readStoredPortalView,
+  resolvePostLoginLanding,
+} from "@/lib/portal-view-landing";
 import { toast } from "sonner";
 
 function isSafeNext(v: unknown): v is string {
@@ -119,14 +125,31 @@ function LoginPage() {
       try {
         const r = await execCheck();
         if (r?.isExecutive) {
-          // Persist exec view so the dashboard shell doesn't re-route us.
-          try {
-            window.localStorage.setItem("portal-view", "hive_exec");
-            window.dispatchEvent(new Event("portal-view-change"));
-          } catch {
-            /* ignore */
+          // Honor last Admin/Staff choice. Only default to Command Center
+          // when there is no stored view AND the executive has no company
+          // admin membership. Never overwrite admin/staff/staff_mobile.
+          const storedView = readStoredPortalView();
+          let isCompanyAdmin = false;
+          if (!storedView || storedView === "hive_exec" || storedView === "state_preview") {
+            const { data: memberships, error } = await supabase
+              .from("organization_members")
+              .select("role")
+              .eq("user_id", session.user.id)
+              .eq("active", true);
+            if (error) {
+              // Fail toward the company dashboard so an owner-exec is not trapped.
+              isCompanyAdmin = true;
+            } else {
+              isCompanyAdmin = (memberships ?? []).some((m) => isCompanyAdminRole(m.role));
+            }
           }
-          target = "/dashboard/hive-exec";
+          const landing = resolvePostLoginLanding({
+            isExecutive: true,
+            storedView,
+            isCompanyAdmin,
+          });
+          if (landing.persistView) persistPortalView(landing.persistView);
+          target = landing.path;
         }
       } catch {
         /* fall back to /dashboard */

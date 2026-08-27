@@ -7,7 +7,7 @@
 // on-screen + voice interview (goals, incident, behaviors) then opens
 // punch pad pre-filled. Compass never auto-submits clock-out or ticks
 // attestation checkboxes.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -16,6 +16,7 @@ import { Mic, MicOff, Loader2 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { CompassClockOutInterview } from "@/components/staff-mobile/compass-clock-out-interview";
+import { unselectedPill } from "@/components/evv/toggle-styles";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useCaseload } from "@/hooks/use-caseload";
@@ -27,6 +28,13 @@ import {
   createClockIn,
   type VoiceAgentResponse,
 } from "@/lib/cedar-voice-agent.server";
+import { applyCaseloadClockInResolution } from "@/lib/cedar-voice-intent";
+import {
+  caseloadDisplayName,
+  clockInOrClarify,
+  suggestClarifyCandidates,
+  type VoiceCaseloadPerson,
+} from "@/lib/cedar-voice-client-resolve";
 import { draftShiftNote } from "@/lib/ai-coach.functions";
 import { listClientTargetBehaviors } from "@/lib/client-target-behaviors.functions";
 import { freezeOriginalTranscript } from "@/lib/original-transcript";
@@ -151,6 +159,15 @@ export function CompassVoiceButton() {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const { data: caseload = [] } = useCaseload();
+  const voiceCaseload: VoiceCaseloadPerson[] = useMemo(
+    () =>
+      caseload.map((c) => ({
+        id: c.id,
+        firstName: c.first_name,
+        lastName: c.last_name,
+      })),
+    [caseload],
+  );
   const { data: activeShift } = useActiveShift();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -205,6 +222,7 @@ export function CompassVoiceButton() {
   const [processing, setProcessing] = useState(false);
   const [response, setResponse] = useState<VoiceAgentResponse | null>(null);
   const [pendingClockIn, setPendingClockIn] = useState<PendingClockIn | null>(null);
+  const [clockInCandidates, setClockInCandidates] = useState<VoiceCaseloadPerson[]>([]);
   const [startingShift, setStartingShift] = useState(false);
   const [clarifyRounds, setClarifyRounds] = useState(0);
   const [baseTranscript, setBaseTranscript] = useState("");
@@ -335,6 +353,7 @@ export function CompassVoiceButton() {
     setProcessing(false);
     setResponse(null);
     setPendingClockIn(null);
+    setClockInCandidates([]);
     setClarifyRounds(0);
     setBaseTranscript("");
     setInterview(null);
@@ -599,7 +618,15 @@ export function CompassVoiceButton() {
         },
       });
 
-      if (res.intent === "clarify" && roundsSoFar >= MAX_CLARIFY_ROUNDS) {
+      const finalized =
+        res.intent === "clock_in" ? applyCaseloadClockInResolution(res, voiceCaseload, text) : res;
+
+      if (
+        finalized.intent === "clarify" &&
+        roundsSoFar >= MAX_CLARIFY_ROUNDS &&
+        !(finalized.candidates && finalized.candidates.length > 0) &&
+        suggestClarifyCandidates(voiceCaseload, text, finalized.question).length === 0
+      ) {
         setResponse({
           intent: "unknown",
           message: "I still couldn't quite catch that — please try again with a bit more detail.",
@@ -607,23 +634,38 @@ export function CompassVoiceButton() {
         return;
       }
 
-      setResponse(res);
-      if (res.intent === "clock_in") {
+      if (finalized.intent === "clock_in") {
+        setResponse(finalized);
+        setClockInCandidates([]);
         setPendingClockIn({
-          clientId: res.clientId,
-          clientName: res.clientName,
-          serviceCode: res.serviceCode,
+          clientId: finalized.clientId,
+          clientName: finalized.clientName,
+          serviceCode: finalized.serviceCode,
         });
+      } else if (finalized.intent === "clarify") {
+        const chips =
+          finalized.candidates && finalized.candidates.length > 0
+            ? finalized.candidates
+            : suggestClarifyCandidates(voiceCaseload, text, finalized.question);
+        setPendingClockIn(null);
+        setClockInCandidates(chips);
+        setResponse(finalized);
+      } else {
+        setResponse(finalized);
+        setClockInCandidates([]);
       }
-      if (res.intent === "ask_compass") {
-        navigate({ to: "/dashboard/ask-nectar", search: { q: res.question } });
+
+      if (finalized.intent === "ask_compass") {
+        navigate({ to: "/dashboard/ask-nectar", search: { q: finalized.question } });
         closeSheet();
       }
       if (
-        (res.intent === "clock_out" || res.intent === "expand_note_and_clock_out") &&
+        (finalized.intent === "clock_out" || finalized.intent === "expand_note_and_clock_out") &&
         activeShift
       ) {
-        startClockOutInterview(res.intent === "expand_note_and_clock_out" ? res.narrative : null);
+        startClockOutInterview(
+          finalized.intent === "expand_note_and_clock_out" ? finalized.narrative : null,
+        );
       }
     } catch (e) {
       setResponse({
@@ -687,6 +729,26 @@ export function CompassVoiceButton() {
     }
   }
 
+  function handlePickClockInClient(person: VoiceCaseloadPerson) {
+    const heldCode =
+      (response?.intent === "clarify" ? response.serviceCode : undefined) ||
+      pendingClockIn?.serviceCode ||
+      "";
+    const codes = (caseload.find((c) => c.id === person.id)?.authorized_dspd_codes ?? [])
+      .map((c) => (c ?? "").trim().toUpperCase())
+      .filter(Boolean);
+    const serviceCode = heldCode || (codes.length === 1 ? codes[0] : "");
+    if (!serviceCode) {
+      toast.error("Say which service code to use for this person.");
+      setBaseTranscript((t) => `${t} ${caseloadDisplayName(person)}`.trim());
+      return;
+    }
+    const name = caseloadDisplayName(person);
+    setClockInCandidates([]);
+    setPendingClockIn({ clientId: person.id, clientName: name, serviceCode });
+    setResponse({ intent: "clock_in", clientId: person.id, clientName: name, serviceCode });
+  }
+
   function openPunchPadForClockIn(clientId: string, serviceCode: string) {
     navigate({
       to: "/dashboard/workspace/$clientId",
@@ -698,6 +760,18 @@ export function CompassVoiceButton() {
 
   async function handleStartShift() {
     if (!pendingClockIn || !org?.organization_id) return;
+    const resolved = clockInOrClarify(pendingClockIn, voiceCaseload, baseTranscript);
+    if (resolved.intent !== "clock_in") {
+      const chips =
+        resolved.candidates.length > 0
+          ? resolved.candidates
+          : suggestClarifyCandidates(voiceCaseload, baseTranscript, resolved.question);
+      setPendingClockIn(null);
+      setClockInCandidates(chips);
+      setResponse(resolved);
+      return;
+    }
+
     setStartingShift(true);
     try {
       let pos: { lat: number; lng: number; acc: number };
@@ -707,15 +781,15 @@ export function CompassVoiceButton() {
         const msg = e instanceof Error ? e.message : "";
         const kind: GpsFailKind = msg === "denied" || msg === "timeout" ? msg : "unavailable";
         toast.error(compassGpsFailMessage(kind));
-        openPunchPadForClockIn(pendingClockIn.clientId, pendingClockIn.serviceCode);
+        openPunchPadForClockIn(resolved.clientId, resolved.serviceCode);
         return;
       }
 
       await clockInFn({
         data: {
           organizationId: org.organization_id,
-          clientId: pendingClockIn.clientId,
-          serviceCode: pendingClockIn.serviceCode,
+          clientId: resolved.clientId,
+          serviceCode: resolved.serviceCode,
           gps: {
             latitude: pos.lat,
             longitude: pos.lng,
@@ -725,7 +799,7 @@ export function CompassVoiceButton() {
       });
       await qc.invalidateQueries({ queryKey: ["evv-active", user?.id] });
       await qc.invalidateQueries({ queryKey: ["active-shift", user?.id] });
-      toast.success(`Clocked in with ${pendingClockIn.clientName}.`);
+      toast.success(`Clocked in with ${resolved.clientName}.`);
       closeSheet();
     } catch (e) {
       toast.error((e as Error).message || "Couldn't clock in — please try again.");
@@ -860,19 +934,25 @@ export function CompassVoiceButton() {
               processing={processing}
               response={response}
               pendingClockIn={pendingClockIn}
+              clockInCandidates={clockInCandidates}
               startingShift={startingShift}
               onFirstAsk={handleFirstAsk}
               onStop={() => stopListening({ submit: true })}
               onClarifyAnswer={handleClarifyAnswer}
+              onPickClockInClient={handlePickClockInClient}
               onAddToShiftNote={handleAddToShiftNote}
               onClockOutWithNote={startClockOutInterview}
               onStartShift={handleStartShift}
               onClockOut={handleClockOutNavigate}
-              onCancelClockIn={() => setPendingClockIn(null)}
+              onCancelClockIn={() => {
+                setPendingClockIn(null);
+                setClockInCandidates([]);
+              }}
               onTryAgain={() => {
                 setResponse(null);
                 setClarifyRounds(0);
                 setBaseTranscript("");
+                setClockInCandidates([]);
               }}
               hasActiveShift={!!activeShift}
             />
@@ -889,10 +969,12 @@ function CompassSheetBody({
   processing,
   response,
   pendingClockIn,
+  clockInCandidates,
   startingShift,
   onFirstAsk,
   onStop,
   onClarifyAnswer,
+  onPickClockInClient,
   onAddToShiftNote,
   onClockOutWithNote,
   onStartShift,
@@ -906,10 +988,12 @@ function CompassSheetBody({
   processing: boolean;
   response: VoiceAgentResponse | null;
   pendingClockIn: PendingClockIn | null;
+  clockInCandidates: VoiceCaseloadPerson[];
   startingShift: boolean;
   onFirstAsk: () => void;
   onStop: () => void;
   onClarifyAnswer: () => void;
+  onPickClockInClient: (person: VoiceCaseloadPerson) => void;
   onAddToShiftNote: (narrative: string) => void;
   onClockOutWithNote: (narrative: string | null) => void;
   onStartShift: () => void;
@@ -1070,6 +1154,20 @@ function CompassSheetBody({
           <div className="rounded-2xl rounded-bl-sm bg-muted px-4 py-3 text-sm">
             {response.question}
           </div>
+          {clockInCandidates.length > 0 ? (
+            <div className="flex flex-col gap-1.5">
+              {clockInCandidates.map((person) => (
+                <button
+                  key={person.id}
+                  type="button"
+                  onClick={() => onPickClockInClient(person)}
+                  className={`min-h-[44px] rounded-md border px-3 py-2 text-left text-sm ${unselectedPill}`}
+                >
+                  {caseloadDisplayName(person)}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <div className="flex flex-col items-center gap-2">
             <button
               type="button"
@@ -1079,7 +1177,9 @@ function CompassSheetBody({
             >
               <Mic className="h-5 w-5" />
             </button>
-            <p className="text-xs text-muted-foreground">Tap to answer</p>
+            <p className="text-xs text-muted-foreground">
+              {clockInCandidates.length > 0 ? "Tap a person, or answer by voice" : "Tap to answer"}
+            </p>
           </div>
         </div>
       );

@@ -270,7 +270,7 @@ test.describe("1056 → punch pad — mocked DSP", () => {
       timeout: 20_000,
     });
     await acceptEvvConsentIfShown(page, "14-evv-consent-before-punch");
-    const clock = page.getByRole("region", { name: "Time Clock" });
+    const clock = page.getByRole("region", { name: /Time Clock|EVV Shift Punch Pad/i });
     await expect(clock).toBeVisible({ timeout: 10_000 });
     await expect(clock.getByText(/Verified Medicaid ID/i)).toBeVisible();
     await expect(clock.getByText("MOCK-TJ-001")).toBeVisible();
@@ -301,7 +301,7 @@ test.describe("1056 → punch pad — mocked DSP", () => {
       timeout: 20_000,
     });
     await acceptEvvConsentIfShown(page, "16-evv-consent-avery");
-    const clock = page.getByRole("region", { name: "Time Clock" });
+    const clock = page.getByRole("region", { name: /Time Clock|EVV Shift Punch Pad/i });
     await expect(clock).toBeVisible({ timeout: 10_000 });
     await expect(clock.getByText(/Verified Medicaid ID/i)).toBeVisible();
     await expect(clock.getByText(/Verified Medicaid ID/i)).toContainText("—");

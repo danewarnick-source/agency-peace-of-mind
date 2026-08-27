@@ -4,8 +4,30 @@
 //     componentTagger (dev-only), VITE_* env injection, @ path alias, React/TanStack dedupe,
 //     error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... } }) if needed.
+import { fileURLToPath } from "node:url";
+import type { Plugin } from "vite";
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/tanstack/vite";
+
+/** Swap the live Supabase client for the in-memory e2e stub. Production builds never set this. */
+function e2eSupabaseMockPlugin(): Plugin {
+  const mock = fileURLToPath(new URL("./e2e/mocks/supabase-client.ts", import.meta.url));
+  return {
+    name: "e2e-supabase-mock",
+    enforce: "pre",
+    resolveId(id) {
+      const normalized = id.replace(/\\/g, "/");
+      if (normalized.includes("e2e/mocks/supabase-client")) return null;
+      const isSupabaseClient =
+        normalized === "@/integrations/supabase/client" ||
+        normalized.endsWith("/integrations/supabase/client") ||
+        normalized.endsWith("/integrations/supabase/client.ts") ||
+        normalized.endsWith("/integrations/supabase/client.tsx");
+      if (isSupabaseClient) return mock;
+      return null;
+    },
+  };
+}
 
 // AWS parallel-deploy target (see docs/AWS_DEPLOY.md). Lovable/Cloudflare never sets this
 // env var, so its build is completely unaffected — only `npm run build:aws` switches the
@@ -36,6 +58,9 @@ export default defineConfig({
       }
     : {}),
   vite: {
-    plugins: [mcpPlugin()],
+    plugins: [
+      ...(process.env.VITE_E2E_HARNESS === "1" ? [e2eSupabaseMockPlugin()] : []),
+      mcpPlugin(),
+    ],
   },
 });

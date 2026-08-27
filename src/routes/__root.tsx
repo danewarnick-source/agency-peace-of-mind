@@ -1,14 +1,19 @@
 import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
-  Outlet, createRootRouteWithContext, useRouter, redirect,
-  HeadContent, Scripts,
+  Outlet,
+  createRootRouteWithContext,
+  useRouter,
+  redirect,
+  HeadContent,
+  Scripts,
 } from "@tanstack/react-router";
 import appCss from "../styles.css?url";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthProvider } from "@/hooks/use-auth";
 import { Toaster } from "@/components/ui/sonner";
 import { isChunkLoadError, tryAutoReloadOnce, clearChunkReloadGuard } from "@/lib/chunk-reload";
+import { inviteTokenFromSearchStr } from "@/lib/join-invite";
 
 function NotFoundComponent() {
   return (
@@ -16,7 +21,12 @@ function NotFoundComponent() {
       <div className="max-w-md text-center">
         <h1 className="text-7xl font-bold">404</h1>
         <p className="mt-4 text-muted-foreground">This page doesn't exist.</p>
-        <a href="/" className="mt-6 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Go home</a>
+        <a
+          href="/"
+          className="mt-6 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+        >
+          Go home
+        </a>
       </div>
     </div>
   );
@@ -41,9 +51,14 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
             Please refresh to load the latest version of the app.
           </p>
           <button
-            onClick={() => { clearChunkReloadGuard(); window.location.reload(); }}
+            onClick={() => {
+              clearChunkReloadGuard();
+              window.location.reload();
+            }}
             className="mt-6 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-          >Refresh</button>
+          >
+            Refresh
+          </button>
         </div>
       </div>
     );
@@ -55,9 +70,14 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <h1 className="text-xl font-semibold">Something went wrong</h1>
         <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
         <button
-          onClick={() => { router.invalidate(); reset(); }}
+          onClick={() => {
+            router.invalidate();
+            reset();
+          }}
           className="mt-6 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-        >Try again</button>
+        >
+          Try again
+        </button>
       </div>
     </div>
   );
@@ -74,8 +94,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     if (location.pathname === "/mfa-setup") {
       throw redirect({ to: "/dashboard", replace: true });
     }
-    if (location.pathname === "/login" || location.pathname === "/signup") return;
-    const { data: { session } } = await supabase.auth.getSession();
+    // Old copied invite links pointed at /signup?invite= — that page is
+    // new-agency signup. Send them to /join so they join this provider.
+    if (location.pathname === "/signup") {
+      const inviteToken = inviteTokenFromSearchStr(location.searchStr);
+      if (inviteToken) {
+        throw redirect({ to: "/join", search: { invite: inviteToken }, replace: true });
+      }
+      return;
+    }
+    if (location.pathname === "/login" || location.pathname === "/join") return;
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session?.user?.id) return;
 
     // Reject sessions older than 24 hours as a defense-in-depth measure.
@@ -178,13 +209,33 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { name: "apple-mobile-web-app-title", content: "HIVE" },
       { title: "HIVE" },
-      { name: "description", content: "Modern employee training and certification platform for teams that take compliance seriously." },
+      {
+        name: "description",
+        content:
+          "Modern employee training and certification platform for teams that take compliance seriously.",
+      },
       { property: "og:title", content: "HIVE" },
       { name: "twitter:title", content: "HIVE" },
-      { property: "og:description", content: "Modern employee training and certification platform for teams that take compliance seriously." },
-      { name: "twitter:description", content: "Modern employee training and certification platform for teams that take compliance seriously." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/263ffe8b-ec5c-4e60-82b2-dbae54124a7e/id-preview-7c0aa2f3--4bb83c55-d88b-48a7-ba9c-cfb9436a8b52.lovable.app-1780466746098.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/263ffe8b-ec5c-4e60-82b2-dbae54124a7e/id-preview-7c0aa2f3--4bb83c55-d88b-48a7-ba9c-cfb9436a8b52.lovable.app-1780466746098.png" },
+      {
+        property: "og:description",
+        content:
+          "Modern employee training and certification platform for teams that take compliance seriously.",
+      },
+      {
+        name: "twitter:description",
+        content:
+          "Modern employee training and certification platform for teams that take compliance seriously.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/263ffe8b-ec5c-4e60-82b2-dbae54124a7e/id-preview-7c0aa2f3--4bb83c55-d88b-48a7-ba9c-cfb9436a8b52.lovable.app-1780466746098.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/263ffe8b-ec5c-4e60-82b2-dbae54124a7e/id-preview-7c0aa2f3--4bb83c55-d88b-48a7-ba9c-cfb9436a8b52.lovable.app-1780466746098.png",
+      },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],
@@ -210,8 +261,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <head><HeadContent /></head>
-      <body>{children}<Scripts /></body>
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        {children}
+        <Scripts />
+      </body>
     </html>
   );
 }
@@ -224,8 +280,12 @@ function RootComponent() {
   // reload — non-chunk errors are ignored and bubble up normally.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const onError = (e: ErrorEvent) => { tryAutoReloadOnce(e.error ?? e.message); };
-    const onRejection = (e: PromiseRejectionEvent) => { tryAutoReloadOnce(e.reason); };
+    const onError = (e: ErrorEvent) => {
+      tryAutoReloadOnce(e.error ?? e.message);
+    };
+    const onRejection = (e: PromiseRejectionEvent) => {
+      tryAutoReloadOnce(e.reason);
+    };
     window.addEventListener("error", onError);
     window.addEventListener("unhandledrejection", onRejection);
     return () => {
@@ -246,8 +306,11 @@ function RootComponent() {
     };
     // Defer until browser is idle to avoid blocking main thread during startup
     if ("requestIdleCallback" in window) {
-      (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => void })
-        .requestIdleCallback(registerSW, { timeout: 5000 });
+      (
+        window as Window & {
+          requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => void;
+        }
+      ).requestIdleCallback(registerSW, { timeout: 5000 });
     } else {
       setTimeout(registerSW, 2000);
     }

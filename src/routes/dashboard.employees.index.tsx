@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { createEmployeeManually, adminResetEmployeePassword } from "@/lib/employees.functions";
 import { createInvitation, revokeInvitation } from "@/lib/invitations.functions";
+import { inviteJoinUrl } from "@/lib/join-invite";
 import { getHrComplianceMatrix } from "@/lib/hr-staff.functions";
 import { StaffCompliancePanel } from "@/components/hr/staff-compliance-panel";
 
@@ -226,7 +227,7 @@ export function EmployeesPage() {
     onSuccess: (res) => {
       if (res.email_sent) {
         toast.success(
-          `Invitation emailed to ${res.invitation.email}. The join link currently opens new-agency signup — for a tester, use Add manually instead.`,
+          `Invitation emailed to ${res.invitation.email}. They can open the join link to set a password and join this organization.`,
         );
       } else {
         toast.warning(
@@ -375,11 +376,11 @@ export function EmployeesPage() {
         <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
           <h3 className="text-sm font-semibold">Pending invitations</h3>
           <p className="text-xs text-muted-foreground">
-            An email may have been sent. The join link currently opens new-agency signup and does not call <code>accept_invitation</code> — for the Sep 1 test, add staff with <strong>Add manually</strong> and share the temp password instead.
+            Pending people join <strong>this</strong> organization via the link (not new-agency signup). Add manually still works if you would rather share a temp password.
           </p>
           <ul className="mt-3 divide-y divide-border">
             {invites.map((i) => {
-              const link = `${typeof window !== "undefined" ? window.location.origin : ""}/signup?invite=${i.token}`;
+              const link = inviteJoinUrl(typeof window !== "undefined" ? window.location.origin : "", i.token);
               return (
                 <li key={i.id} className="flex items-center justify-between gap-3 py-3 text-sm">
                   <div className="flex items-center gap-2 truncate"><Mail className="h-4 w-4 shrink-0 text-muted-foreground" /> <span className="truncate">{i.email}</span> <span className="shrink-0 text-xs text-muted-foreground">· {i.role}</span></div>

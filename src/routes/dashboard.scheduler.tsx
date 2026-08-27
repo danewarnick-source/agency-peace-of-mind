@@ -9,7 +9,7 @@
 // day_program_sessions/_staff/_attendance. No sample/mock data.
 import { useMemo, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
@@ -113,6 +113,8 @@ function dayStr(d: Date) {
 function SchedulerPage() {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
+  const { can, isLoading: permLoading } = usePermissions();
+  const canManageSchedule = can("create_shifts");
   const [tab, setTab] = useState<Tab>("schedule");
   const [view, setView] = useState<ViewMode>("day");
   const [anchor, setAnchor] = useState<Date>(() => {
@@ -151,6 +153,13 @@ function SchedulerPage() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  if (permLoading) {
+    return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
+  }
+  if (!canManageSchedule) {
+    return <Navigate to="/dashboard/schedule" replace />;
+  }
 
   return (
     <div

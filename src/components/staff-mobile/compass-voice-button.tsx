@@ -3,9 +3,10 @@
 // existing punch-pad/daily-log "Dictate note" / "Expand with Compass"
 // buttons or their voice-dictation state; this is an independent surface
 // that happens to share the same Web Speech API pattern. Note expansion
-// uses the NECTAR draft engine (draftShiftNote) — same prompt as
-// punch-pad / historical "Draft with NECTAR". Compass never auto-submits
-// clock-out or ticks attestation checkboxes.
+// uses the NECTAR draft engine (draftShiftNote). Clock-out runs a short
+// on-screen + voice interview (goals, incident, behaviors) then opens
+// punch pad pre-filled. Compass never auto-submits clock-out or ticks
+// attestation checkboxes.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -14,17 +15,20 @@ import { toast } from "sonner";
 import { Mic, MicOff, Loader2 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { CompassClockOutInterview } from "@/components/staff-mobile/compass-clock-out-interview";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useCaseload } from "@/hooks/use-caseload";
 import { useActiveShift } from "@/hooks/use-active-shift";
 import { useClientCareData } from "@/hooks/use-client-care-data";
+import { useShiftBehaviorSetting } from "@/hooks/use-shift-behavior-setting";
 import {
   processVoiceIntent,
   createClockIn,
   type VoiceAgentResponse,
 } from "@/lib/cedar-voice-agent.server";
 import { draftShiftNote } from "@/lib/ai-coach.functions";
+import { listClientTargetBehaviors } from "@/lib/client-target-behaviors.functions";
 import { freezeOriginalTranscript } from "@/lib/original-transcript";
 import { isLikelyBadCoord } from "@/lib/geo";
 import {
@@ -34,6 +38,20 @@ import {
   COMPASS_SILENCE_TIMEOUT_MS,
   type ContinuousSpeechSession,
 } from "@/lib/continuous-speech";
+import {
+  applyBehaviorNameSpeech,
+  applyGoalSpeech,
+  buildBehaviorNamesPrompt,
+  buildBehaviorsPrompt,
+  buildGoalsPrompt,
+  buildIncidentPrompt,
+  canAutoSubmitInterviewReply,
+  compassHandoffToSearch,
+  parseYesNo,
+  speakPromptTimeoutMs,
+  type CompassClockOutHandoff,
+  type CompassInterviewPhase,
+} from "@/lib/compass-clock-out-interview";
 
 const CEDAR_TEAL = "#137182";
 const MAX_CLARIFY_ROUNDS = 2;
@@ -96,6 +114,39 @@ function getCompassClockInPosition(): Promise<{ lat: number; lng: number; acc: n
 
 type PendingClockIn = { clientId: string; clientName: string; serviceCode: string };
 
+type ClockOutInterview = {
+  phase: CompassInterviewPhase;
+  narrative: string | null;
+  selectedGoals: string[];
+  baseline: boolean;
+  incident: "yes" | "no" | null;
+  behaviorsObserved: boolean | null;
+  targetBehaviors: string[];
+};
+
+function speakCompassPrompt(text: string): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      resolve();
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "en-US";
+    u.rate = 1;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      resolve();
+    };
+    u.onend = finish;
+    u.onerror = finish;
+    window.setTimeout(finish, speakPromptTimeoutMs(text));
+    window.speechSynthesis.speak(u);
+  });
+}
+
 export function CompassVoiceButton() {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
@@ -113,9 +164,26 @@ export function CompassVoiceButton() {
   const activeClientGoals =
     careData.data?.visibility.goalsForStaff.map((g) => g.goal.trim()).filter(Boolean) ?? [];
 
+  const { data: behaviorSetting } = useShiftBehaviorSetting();
+  const behaviorEnabled = behaviorSetting?.enabled ?? true;
+
   const processFn = useServerFn(processVoiceIntent);
   const clockInFn = useServerFn(createClockIn);
   const draftFn = useServerFn(draftShiftNote);
+  const listTargetBehaviorsFn = useServerFn(listClientTargetBehaviors);
+  const { data: targetBehaviorRows = [] } = useQuery({
+    queryKey: ["client-target-behaviors", activeShift?.client_id],
+    queryFn: () =>
+      listTargetBehaviorsFn({
+        data: {
+          organization_id: org!.organization_id,
+          client_id: activeShift!.client_id,
+        },
+      }),
+    enabled: behaviorEnabled && !!activeShift?.client_id && !!org?.organization_id,
+    staleTime: 5 * 60_000,
+  });
+  const targetBehaviorOptions = targetBehaviorRows.map((b) => b.behavior_name);
 
   // ── Support detection — same pattern as punch-pad.tsx's speechSupported.
   const [speechSupported, setSpeechSupported] = useState(false);
@@ -136,6 +204,7 @@ export function CompassVoiceButton() {
   const [startingShift, setStartingShift] = useState(false);
   const [clarifyRounds, setClarifyRounds] = useState(0);
   const [baseTranscript, setBaseTranscript] = useState("");
+  const [interview, setInterview] = useState<ClockOutInterview | null>(null);
 
   const sessionRef = useRef<ContinuousSpeechSession | null>(null);
   const silenceTimerRef = useRef<number | null>(null);
@@ -145,11 +214,25 @@ export function CompassVoiceButton() {
   const liveFinalsRef = useRef("");
   const liveDisplayRef = useRef("");
   const onFinalRef = useRef<(text: string) => void>(() => {});
+  const readyToSubmitRef = useRef<(text: string) => boolean>(canAutoSubmitTranscript);
+  const interviewRef = useRef<ClockOutInterview | null>(null);
+  const interviewGenRef = useRef(0);
+  interviewRef.current = interview;
+  const activeClientGoalsRef = useRef(activeClientGoals);
+  activeClientGoalsRef.current = activeClientGoals;
+  const targetBehaviorOptionsRef = useRef(targetBehaviorOptions);
+  targetBehaviorOptionsRef.current = targetBehaviorOptions;
+  const behaviorEnabledRef = useRef(behaviorEnabled);
+  behaviorEnabledRef.current = behaviorEnabled;
 
   useEffect(() => {
     return () => {
       listeningWantedRef.current = false;
       sessionRef.current?.stop();
+      interviewGenRef.current += 1;
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
     };
   }, []);
 
@@ -179,12 +262,13 @@ export function CompassVoiceButton() {
   // a long pause AFTER they have actually spoken (not on rec.start()). Used
   // for both the initial ask and each clarify-answer round.
   const startListening = useCallback(
-    (onFinal: (text: string) => void) => {
+    (onFinal: (text: string) => void, opts?: { readyToSubmit?: (text: string) => boolean }) => {
       if (typeof window === "undefined") return;
       sessionRef.current?.stop();
       sessionRef.current = null;
       clearSilenceTimer();
       onFinalRef.current = onFinal;
+      readyToSubmitRef.current = opts?.readyToSubmit ?? canAutoSubmitTranscript;
       committedRef.current = false;
       listeningWantedRef.current = true;
       priorFinalsRef.current = "";
@@ -197,7 +281,7 @@ export function CompassVoiceButton() {
         silenceTimerRef.current = window.setTimeout(() => {
           const text = liveDisplayRef.current.trim();
           // Chrome often finalizes 1–2 words mid-sentence. Keep listening.
-          if (!canAutoSubmitTranscript(text)) return;
+          if (!readyToSubmitRef.current(text)) return;
           stopListening({ submit: true });
         }, COMPASS_SILENCE_TIMEOUT_MS);
       };
@@ -234,6 +318,10 @@ export function CompassVoiceButton() {
   );
 
   const resetSheet = useCallback(() => {
+    interviewGenRef.current += 1;
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
     stopListening();
     committedRef.current = false;
     priorFinalsRef.current = "";
@@ -245,11 +333,218 @@ export function CompassVoiceButton() {
     setPendingClockIn(null);
     setClarifyRounds(0);
     setBaseTranscript("");
+    setInterview(null);
   }, [stopListening]);
 
   function closeSheet() {
     setOpen(false);
     resetSheet();
+  }
+
+  function promptForInterviewPhase(phase: CompassInterviewPhase): string {
+    if (phase === "goals") return buildGoalsPrompt(activeClientGoalsRef.current);
+    if (phase === "incident") return buildIncidentPrompt();
+    if (phase === "behaviors") return buildBehaviorsPrompt();
+    if (phase === "behavior-names") {
+      return buildBehaviorNamesPrompt(targetBehaviorOptionsRef.current);
+    }
+    return "";
+  }
+
+  function listenForInterviewPhase(phase: CompassInterviewPhase) {
+    const kind = phase === "incident" || phase === "behaviors" ? "yesno" : "names";
+    startListening((text) => handleInterviewSpeech(phase, text), {
+      readyToSubmit: (t) => canAutoSubmitInterviewReply(t, kind),
+    });
+  }
+
+  async function speakThenListenInterview(phase: CompassInterviewPhase) {
+    const gen = ++interviewGenRef.current;
+    stopListening();
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    const prompt = promptForInterviewPhase(phase);
+    if (prompt) await speakCompassPrompt(prompt);
+    if (gen !== interviewGenRef.current) return;
+
+    if (phase === "goals" && activeClientGoalsRef.current.length === 0) {
+      setInterview((s) => (s ? { ...s, baseline: true, phase: "incident" } : s));
+      return;
+    }
+    if (phase === "behavior-names" && targetBehaviorOptionsRef.current.length === 0) {
+      const cur = interviewRef.current;
+      if (cur) void finishInterviewAndNavigate({ ...cur, phase: "finishing" });
+      return;
+    }
+    listenForInterviewPhase(phase);
+  }
+
+  function startClockOutInterview(narrative: string | null) {
+    if (!activeShift) return;
+    setResponse(null);
+    setInterview({
+      phase: "goals",
+      narrative,
+      selectedGoals: [],
+      baseline: activeClientGoalsRef.current.length === 0,
+      incident: null,
+      behaviorsObserved: null,
+      targetBehaviors: [],
+    });
+  }
+
+  async function finishInterviewAndNavigate(finalState: ClockOutInterview) {
+    if (!activeShift || finalState.incident === null) return;
+    const gen = interviewGenRef.current;
+    setInterview({ ...finalState, phase: "finishing" });
+    stopListening();
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+
+    const originalSpeech = freezeOriginalTranscript(baseTranscript, transcript);
+    let note: string | undefined;
+    const shorthand = (finalState.narrative ?? "").trim();
+    if (shorthand.length >= 3) {
+      try {
+        const drafted = await draftFn({
+          data: {
+            shorthand: shorthand.slice(0, 4000),
+            goals: finalState.selectedGoals.length > 0 ? finalState.selectedGoals : [],
+            clientFirstName: activeShift.client_name.split(" ")[0] ?? activeShift.client_name,
+          },
+        });
+        note = drafted.draft;
+      } catch (e) {
+        toast.error(
+          (e as Error).message || "NECTAR couldn't draft this note — using what you said.",
+        );
+        note = shorthand.slice(0, 5000);
+      }
+    }
+    if (gen !== interviewGenRef.current) return;
+
+    const handoff: CompassClockOutHandoff = {
+      note,
+      spoken: originalSpeech || undefined,
+      selectedGoals: finalState.selectedGoals,
+      baseline: finalState.baseline,
+      incident: finalState.incident,
+      behaviorsObserved: behaviorEnabledRef.current
+        ? (finalState.behaviorsObserved ?? false)
+        : null,
+      targetBehaviors: finalState.behaviorsObserved === true ? finalState.targetBehaviors : [],
+    };
+    navigate({
+      to: "/dashboard/workspace/$clientId",
+      params: { clientId: activeShift.client_id },
+      search: compassHandoffToSearch(handoff),
+    });
+    closeSheet();
+  }
+
+  function handleInterviewSpeech(phase: CompassInterviewPhase, text: string) {
+    const cur = interviewRef.current;
+    if (!cur) return;
+
+    if (phase === "goals") {
+      const res = applyGoalSpeech(text, activeClientGoalsRef.current, {
+        selectedGoals: cur.selectedGoals,
+        baseline: cur.baseline,
+      });
+      if (res.unclear) {
+        toast.error("Tap a goal on the list, or say its name.");
+        listenForInterviewPhase("goals");
+        return;
+      }
+      const next = { ...cur, selectedGoals: res.selectedGoals, baseline: res.baseline };
+      if (res.advance) {
+        setInterview({ ...next, phase: "incident" });
+      } else {
+        setInterview(next);
+        listenForInterviewPhase("goals");
+      }
+      return;
+    }
+
+    if (phase === "incident") {
+      const yn = parseYesNo(text);
+      if (!yn) {
+        toast.error("Please say yes or no, or tap a button.");
+        listenForInterviewPhase("incident");
+        return;
+      }
+      applyIncidentAnswer(yn);
+      return;
+    }
+
+    if (phase === "behaviors") {
+      const yn = parseYesNo(text);
+      if (!yn) {
+        toast.error("Please say yes or no, or tap a button.");
+        listenForInterviewPhase("behaviors");
+        return;
+      }
+      applyBehaviorsYesNo(yn === "yes");
+      return;
+    }
+
+    if (phase === "behavior-names") {
+      const res = applyBehaviorNameSpeech(
+        text,
+        targetBehaviorOptionsRef.current,
+        cur.targetBehaviors,
+      );
+      if (res.unclear) {
+        toast.error("Tap a behavior on the list, or say its name.");
+        listenForInterviewPhase("behavior-names");
+        return;
+      }
+      const next = { ...cur, targetBehaviors: res.targetBehaviors };
+      if (res.advance) {
+        void finishInterviewAndNavigate({ ...next, phase: "finishing" });
+      } else {
+        setInterview(next);
+        listenForInterviewPhase("behavior-names");
+      }
+    }
+  }
+
+  function applyIncidentAnswer(v: "yes" | "no") {
+    const cur = interviewRef.current;
+    if (!cur) return;
+    const next: ClockOutInterview = {
+      ...cur,
+      incident: v,
+      phase: behaviorEnabledRef.current ? "behaviors" : "finishing",
+    };
+    if (next.phase === "finishing") void finishInterviewAndNavigate(next);
+    else setInterview(next);
+  }
+
+  function applyBehaviorsYesNo(observed: boolean) {
+    const cur = interviewRef.current;
+    if (!cur) return;
+    if (!observed) {
+      void finishInterviewAndNavigate({
+        ...cur,
+        behaviorsObserved: false,
+        targetBehaviors: [],
+        phase: "finishing",
+      });
+      return;
+    }
+    if (targetBehaviorOptionsRef.current.length === 0) {
+      void finishInterviewAndNavigate({
+        ...cur,
+        behaviorsObserved: true,
+        targetBehaviors: [],
+        phase: "finishing",
+      });
+      return;
+    }
+    setInterview({ ...cur, behaviorsObserved: true, phase: "behavior-names" });
   }
 
   // ── Submit a transcript to the Bedrock router ──────────────────────────
@@ -299,6 +594,12 @@ export function CompassVoiceButton() {
       if (res.intent === "ask_compass") {
         navigate({ to: "/dashboard/ask-nectar", search: { q: res.question } });
         closeSheet();
+      }
+      if (
+        (res.intent === "clock_out" || res.intent === "expand_note_and_clock_out") &&
+        activeShift
+      ) {
+        startClockOutInterview(res.intent === "expand_note_and_clock_out" ? res.narrative : null);
       }
     } catch (e) {
       setResponse({
@@ -410,14 +711,16 @@ export function CompassVoiceButton() {
   }
 
   function handleClockOutNavigate() {
-    if (!activeShift) return;
-    navigate({
-      to: "/dashboard/workspace/$clientId",
-      params: { clientId: activeShift.client_id },
-      search: { tab: "clock-in", verify: "1" },
-    });
-    closeSheet();
+    startClockOutInterview(null);
   }
+
+  useEffect(() => {
+    if (!interview) return;
+    if (interview.phase === "finishing") return;
+    void speakThenListenInterview(interview.phase);
+    // Speak + listen once per interview step. Chip toggles must not re-prompt.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interview?.phase]);
 
   // Same detection as punch-pad.tsx — if the browser has no SpeechRecognition
   // support, render nothing rather than a broken button. (Text-input
@@ -462,27 +765,93 @@ export function CompassVoiceButton() {
           side="bottom"
           className="max-h-[80vh] overflow-y-auto rounded-t-2xl pb-8 md:mx-auto md:max-w-md md:rounded-2xl"
         >
-          <CompassSheetBody
-            listening={listening}
-            transcript={transcript}
-            processing={processing}
-            response={response}
-            pendingClockIn={pendingClockIn}
-            startingShift={startingShift}
-            onFirstAsk={handleFirstAsk}
-            onStop={() => stopListening({ submit: true })}
-            onClarifyAnswer={handleClarifyAnswer}
-            onAddToShiftNote={handleAddToShiftNote}
-            onStartShift={handleStartShift}
-            onClockOut={handleClockOutNavigate}
-            onCancelClockIn={() => setPendingClockIn(null)}
-            onTryAgain={() => {
-              setResponse(null);
-              setClarifyRounds(0);
-              setBaseTranscript("");
-            }}
-            hasActiveShift={!!activeShift}
-          />
+          {interview ? (
+            <CompassClockOutInterview
+              phase={interview.phase}
+              narrativePreview={interview.narrative}
+              goals={activeClientGoals}
+              selectedGoals={interview.selectedGoals}
+              baseline={interview.baseline}
+              onToggleGoal={(goal) => {
+                setInterview((s) => {
+                  if (!s) return s;
+                  const has = s.selectedGoals.includes(goal);
+                  return {
+                    ...s,
+                    selectedGoals: has
+                      ? s.selectedGoals.filter((g) => g !== goal)
+                      : [...s.selectedGoals, goal],
+                  };
+                });
+              }}
+              onToggleBaseline={() => {
+                setInterview((s) => (s ? { ...s, baseline: !s.baseline } : s));
+              }}
+              onGoalsContinue={() => {
+                const cur = interviewRef.current;
+                if (!cur) return;
+                if (!cur.baseline && cur.selectedGoals.length === 0) {
+                  toast.error("Select at least one goal, or baseline monitoring.");
+                  return;
+                }
+                setInterview({ ...cur, phase: "incident" });
+              }}
+              incident={interview.incident}
+              onIncident={applyIncidentAnswer}
+              targetOptions={targetBehaviorOptions}
+              selectedTargets={interview.targetBehaviors}
+              behaviorsObserved={interview.behaviorsObserved}
+              onBehaviorsYesNo={applyBehaviorsYesNo}
+              onToggleTarget={(name) => {
+                setInterview((s) => {
+                  if (!s) return s;
+                  const has = s.targetBehaviors.includes(name);
+                  return {
+                    ...s,
+                    targetBehaviors: has
+                      ? s.targetBehaviors.filter((n) => n !== name)
+                      : [...s.targetBehaviors, name],
+                  };
+                });
+              }}
+              onTargetsContinue={() => {
+                const cur = interviewRef.current;
+                if (!cur) return;
+                void finishInterviewAndNavigate({ ...cur, phase: "finishing" });
+              }}
+              listening={listening}
+              transcript={transcript}
+              onStopListen={() => stopListening({ submit: true })}
+              onStartListen={() => {
+                if (!interview) return;
+                listenForInterviewPhase(interview.phase);
+              }}
+              finishing={interview.phase === "finishing"}
+            />
+          ) : (
+            <CompassSheetBody
+              listening={listening}
+              transcript={transcript}
+              processing={processing}
+              response={response}
+              pendingClockIn={pendingClockIn}
+              startingShift={startingShift}
+              onFirstAsk={handleFirstAsk}
+              onStop={() => stopListening({ submit: true })}
+              onClarifyAnswer={handleClarifyAnswer}
+              onAddToShiftNote={handleAddToShiftNote}
+              onClockOutWithNote={startClockOutInterview}
+              onStartShift={handleStartShift}
+              onClockOut={handleClockOutNavigate}
+              onCancelClockIn={() => setPendingClockIn(null)}
+              onTryAgain={() => {
+                setResponse(null);
+                setClarifyRounds(0);
+                setBaseTranscript("");
+              }}
+              hasActiveShift={!!activeShift}
+            />
+          )}
         </SheetContent>
       </Sheet>
     </>
@@ -500,6 +869,7 @@ function CompassSheetBody({
   onStop,
   onClarifyAnswer,
   onAddToShiftNote,
+  onClockOutWithNote,
   onStartShift,
   onClockOut,
   onCancelClockIn,
@@ -516,6 +886,7 @@ function CompassSheetBody({
   onStop: () => void;
   onClarifyAnswer: () => void;
   onAddToShiftNote: (narrative: string) => void;
+  onClockOutWithNote: (narrative: string | null) => void;
   onStartShift: () => void;
   onClockOut: () => void;
   onCancelClockIn: () => void;
@@ -589,8 +960,9 @@ function CompassSheetBody({
             {response.narrative}
           </div>
           <p className="text-xs text-muted-foreground">
-            NECTAR will draft this note and take you to clock-out with it filled in. You still check
-            the boxes and attest on the punch pad — Compass will not clock you out.
+            A few clock-out questions first — goals, incident, and behaviors if your agency uses
+            them. Then the punch pad opens with your answers filled in. You still attest there.
+            Compass will not clock you out.
           </p>
           {!hasActiveShift && (
             <p className="text-xs text-muted-foreground">
@@ -600,10 +972,10 @@ function CompassSheetBody({
           <Button
             className="w-full text-white"
             style={{ backgroundColor: CEDAR_TEAL }}
-            onClick={() => onAddToShiftNote(response.narrative)}
+            onClick={() => onClockOutWithNote(response.narrative)}
             disabled={!hasActiveShift}
           >
-            Open clock-out with note
+            Continue to clock-out questions
           </Button>
         </div>
       );
@@ -645,10 +1017,10 @@ function CompassSheetBody({
     if (response.intent === "clock_out") {
       return (
         <div className="space-y-3 py-4 text-center">
-          <p className="text-base font-medium">Open the punch pad to clock out?</p>
+          <p className="text-base font-medium">A few questions, then the punch pad</p>
           <p className="text-xs text-muted-foreground">
-            You still need to review your note, check the boxes, and attest. Compass will not clock
-            you out from here.
+            Compass will ask about goals, incidents, and behaviors. It will not clock you out or
+            tick the attestation.
           </p>
           {!hasActiveShift && (
             <p className="text-xs text-muted-foreground">
@@ -661,7 +1033,7 @@ function CompassSheetBody({
             onClick={onClockOut}
             disabled={!hasActiveShift}
           >
-            Open clock-out
+            Continue to clock-out questions
           </Button>
         </div>
       );

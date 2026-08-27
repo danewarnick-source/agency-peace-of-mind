@@ -44,6 +44,7 @@ import {
 import { BehaviorObservationsBoundary } from "@/components/evv/behavior-observations-boundary";
 import { useShiftBehaviorSetting } from "@/hooks/use-shift-behavior-setting";
 import { listClientTargetBehaviors } from "@/lib/client-target-behaviors.functions";
+import { type CompassClockOutHandoff } from "@/lib/compass-clock-out-interview";
 import { getPendingTrackingForms } from "@/lib/forms.functions";
 import { PendingTrackingFormsDialog, type PendingForm } from "@/components/evv/pending-tracking-forms-dialog";
 import { NoteTriggerPrompt } from "@/components/residential/note-trigger-prompt";
@@ -153,8 +154,7 @@ export interface PunchPadProps {
   /**
    * Pending narrative text handed off from the Compass voice agent's
    * "expand_note" intent (see compass-voice-button.tsx). Consumed once, the
-   * next time the compliance modal opens, instead of the normal blank note —
-   * everything else about openCompliance()'s reset is unchanged.
+   * next time the compliance modal opens, instead of the normal blank note.
    */
   initialNarrative?: string;
   /**
@@ -163,6 +163,12 @@ export interface PunchPadProps {
    * Never written into shift_note_text.
    */
   initialOriginalTranscript?: string;
+  /**
+   * Clock-out interview answers from Compass. When present, openCompliance()
+   * keeps selected goals / baseline / incident / behavior toggles instead of
+   * wiping them. Attestation is still cleared — staff remain the witness.
+   */
+  clockOutHandoff?: CompassClockOutHandoff | null;
 }
 
 
@@ -177,6 +183,7 @@ export function PunchPad({
   autoOpenCompliance = false,
   initialNarrative,
   initialOriginalTranscript,
+  clockOutHandoff = null,
 }: PunchPadProps) {
 
   const { user } = useAuth();
@@ -191,6 +198,9 @@ export function PunchPad({
   const pendingOriginalTranscriptRef = useRef<string | null>(
     initialOriginalTranscript ?? null,
   );
+  const pendingClockOutHandoffRef = useRef<CompassClockOutHandoff | null>(
+    clockOutHandoff ?? null,
+  );
   useEffect(() => {
     if (initialNarrative) pendingVoiceNarrativeRef.current = initialNarrative;
   }, [initialNarrative]);
@@ -199,6 +209,9 @@ export function PunchPad({
       pendingOriginalTranscriptRef.current = initialOriginalTranscript;
     }
   }, [initialOriginalTranscript]);
+  useEffect(() => {
+    if (clockOutHandoff) pendingClockOutHandoffRef.current = clockOutHandoff;
+  }, [clockOutHandoff]);
 
   // ── GPS state ───────────────────────────────────────────────────────────────
   // Single watchPosition — no redundant getCurrentPosition call.
@@ -1020,10 +1033,10 @@ export function PunchPad({
 
   function openCompliance() {
     if (!active) return;
-    setCheckedGoals({});
-    setBaselineChecked(false);
     const pendingNote = pendingVoiceNarrativeRef.current;
     const pendingSpoken = pendingOriginalTranscriptRef.current;
+    const handoff = pendingClockOutHandoffRef.current;
+
     setNarrative(pendingNote ?? "");
     setNoteExpanded(!!pendingNote);
     if (pendingNote) {
@@ -1034,6 +1047,37 @@ export function PunchPad({
     setOriginalTranscript(pendingSpoken ?? "");
     pendingVoiceNarrativeRef.current = null;
     pendingOriginalTranscriptRef.current = null;
+
+    if (handoff) {
+      const goalMap: Record<string, boolean> = {};
+      for (const g of handoff.selectedGoals) {
+        if (g.trim()) goalMap[g] = true;
+      }
+      setCheckedGoals(goalMap);
+      setBaselineChecked(!!handoff.baseline);
+      setIncidentAnswer(handoff.incident);
+      setIncidentFlag(handoff.incident === "yes");
+      if (handoff.behaviorsObserved === null) {
+        setBehaviorAnswers(emptyBehaviorAnswers);
+      } else if (handoff.behaviorsObserved === false) {
+        setBehaviorAnswers({ ...emptyBehaviorAnswers, behaviorsObserved: false });
+      } else {
+        setBehaviorAnswers({
+          ...emptyBehaviorAnswers,
+          behaviorsObserved: true,
+          targetBehaviors: handoff.targetBehaviors,
+          // Do not invent counts or descriptions — staff complete those here.
+        });
+      }
+      pendingClockOutHandoffRef.current = null;
+    } else {
+      setCheckedGoals({});
+      setBaselineChecked(false);
+      setBehaviorAnswers(emptyBehaviorAnswers);
+      setIncidentFlag(false);
+      setIncidentAnswer(null);
+    }
+
     setShowNarrativeError(false);
     setAiCoach(null);
     setAiIterations(0);
@@ -1047,14 +1091,11 @@ export function PunchPad({
     setDismissals({});
     setDismissingKey(null);
     setDismissReasonDraft("");
-    setBehaviorAnswers(emptyBehaviorAnswers);
     setLongShiftAck(false);
     setTriggersResolved(true);
     setMedDosesResolved(true);
     setPendingMedDoses([]);
     setIncidentReportIds([]);
-    setIncidentFlag(false);
-    setIncidentAnswer(null);
     setCorrectionOpen(false);
     setCorrectionIn("");
     setCorrectionOut("");

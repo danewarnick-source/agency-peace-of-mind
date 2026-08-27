@@ -7,6 +7,7 @@
  *   - TanStack Start server-fn POSTs (so invite submit never hits live)
  */
 import { expect, type Page, type Route } from "@playwright/test";
+import { toCrossJSONAsync } from "seroval";
 import {
   ALL_PERMISSIONS,
   DEFAULT_MATRIX,
@@ -305,6 +306,11 @@ function tableRows(table: string, opts: MockOptions, personaId: string): Row[] {
       return opts.emptyClients ? [] : billingCodeRows();
     case "client_external_services":
     case "client_medications":
+    case "client_documents":
+    case "incident_reports":
+    case "hrc_restriction_records":
+    case "nectar_documents":
+    case "policy_signatures":
     case "evv_timesheets":
     case "staff_assignments":
     case "training_tracks":
@@ -469,15 +475,88 @@ async function handleSupabase(route: Route, opts: MockOptions, personaId: string
   await fulfillJson(route, 200, rows, extra);
 }
 
+function emptyClientCareData(clientId: string) {
+  const c = CLIENT_LIST.find((row) => row.id === clientId) ?? CLIENT_LIST[0];
+  const identity = {
+    id: c.id,
+    organization_id: ORG_ID,
+    first_name: c.first_name,
+    last_name: c.last_name,
+    preferred_name: null,
+    date_of_birth: null,
+    admission_date: "2025-07-01",
+    discharge_date: null,
+    medicaid_id: c.medicaid_id,
+    status: "active",
+    phone_number: null,
+    is_own_guardian: true,
+    guardian_name: null,
+    guardian_phone: null,
+    support_coordinator_name: null,
+    support_coordinator_phone: null,
+    support_coordinator_email: null,
+    has_abi: null,
+    hr_applicable: null,
+    dnr_applicable: null,
+    diagnoses: [] as string[],
+    primary_care_name: null,
+    pcsp_expiration_date: null,
+    special_directions: null,
+  };
+  const sections = {
+    identity: true,
+    care_plan: true,
+    billing: true,
+    files: true,
+    operations: true,
+    compliance: true,
+  };
+  return {
+    identity,
+    flags: { self_admin_med_support: false, self_admin_med_support_locked: false },
+    pcsp_training_id: null,
+    goals: [],
+    medications: [],
+    authorized_codes: [],
+    custom_fields: [],
+    target_behaviors: [],
+    emergency_contacts: [],
+    preferred_activities: [],
+    visibilityRow: { sections: {}, fields: {} },
+    visibility: {
+      goalsForStaff: [],
+      medicationsVisible: false,
+      shiftServiceCode: null,
+      sections,
+      staffCare: {
+        identity,
+        goals: [],
+        medications: [],
+        authorized_codes: [],
+        custom_fields: [],
+        target_behaviors: [],
+        emergency_contacts: [],
+        preferred_activities: [],
+      },
+    },
+  };
+}
+
+function decodeServerFnExport(url: string): string {
+  try {
+    const id = decodeURIComponent(url.split("/_serverFn/")[1]?.split("?")[0] ?? "");
+    const parsed = JSON.parse(Buffer.from(id, "base64url").toString("utf8")) as { export?: string };
+    return parsed.export ?? "";
+  } catch {
+    return "";
+  }
+}
+
 function serverFnPayload(url: string, body: string): unknown {
-  const blob = `${url}\n${body}`;
-  if (
-    /email/i.test(blob) &&
-    /invite|role/i.test(blob) &&
-    /organization/i.test(blob)
-  ) {
+  const fn = decodeServerFnExport(url);
+  if (/createInvitation/i.test(fn)) {
     let email = "invited@example.test";
-    const m = body.match(/sep1\.tester@example\.test|[a-z0-9._%+-]+@example\.test/i);
+    const m = `${url}\n${body}`.match(/sep1\.tester@example\.test|[a-z0-9._%+-]+@example\.test/i);
     if (m) email = m[0];
     return {
       invitation: {
@@ -490,35 +569,62 @@ function serverFnPayload(url: string, body: string): unknown {
       email_error: null,
     };
   }
-  // One payload covers every read-only server fn we hit on these surfaces.
-  // Callers only pick the fields they know.
-  return {
-    isExecutive: false,
-    organization_id: ORG_ID,
-    tier: "pro",
-    status: "active",
-    addons: ["hive_training", "nectar_infusion"],
-    registry: tableRows("feature_registry", {}, ADMIN_USER_ID),
-    overrides: [],
-    effective: {
-      client_intake: true,
-      staff_onboarding: true,
-      evv_timesheets: true,
-      nectar: true,
-      pcsp: true,
-      pba_ledgers: true,
-      hive_training: true,
-      state_audit: false,
-    },
-    requirements: [],
-    staff: [],
-    count: 0,
-    items: [],
-    jobs: {},
-    training: null,
-    flags: [],
-    ok: true,
-  };
+  if (/checkHiveExecutive/i.test(fn)) return { isExecutive: false };
+  if (/getMyEntitlements/i.test(fn)) {
+    return {
+      organization_id: ORG_ID,
+      tier: "pro",
+      status: "active",
+      addons: ["hive_training", "nectar_infusion"],
+    };
+  }
+  if (/getMyOrgFeatures/i.test(fn)) {
+    return {
+      organization_id: ORG_ID,
+      registry: tableRows("feature_registry", {}, ADMIN_USER_ID),
+      overrides: [],
+      effective: {
+        client_intake: true,
+        staff_onboarding: true,
+        evv_timesheets: true,
+        nectar: true,
+        pcsp: true,
+        pba_ledgers: true,
+        hive_training: true,
+        state_audit: false,
+      },
+    };
+  }
+  if (/getInboxUnreadCount|getPendingUpgradeRequestCount/i.test(fn)) return { count: 0 };
+  if (/getActiveDraftJobs/i.test(fn)) return { jobs: [] };
+  if (/listPendingClientSubjects/i.test(fn)) return { items: [], jobs: {} };
+  if (/getHrComplianceMatrix/i.test(fn)) return { requirements: [], staff: [] };
+  if (/getStaffPii|getStaffTrainingRiskFlags/i.test(fn)) return null;
+  if (/recordPhiAccess|dismissUiPref|requestPermission/i.test(fn)) return { ok: true };
+  if (/getClientCareData/i.test(fn)) {
+    const idMatch = `${url}\n${body}`.match(/00000000-0000-4000-a000-00000000010[1-4]/);
+    return emptyClientCareData(idMatch?.[0] ?? CLIENT_LIST[0].id);
+  }
+  if (/getClientSpecificTraining|getSupportStrategies|createPersonCentered/i.test(fn)) {
+    return { training: null };
+  }
+  if (/getClientIntakeChecklist|getUiDismissals/i.test(fn)) return [];
+  // Arrays: obligations, instances, lists. Safer default than an object
+  // so dashboard `.map()` / `for...of` calls don't crash the shell.
+  if (
+    /listCompanyObligations|listMyObligation|listDeadline|listRate|listClient|listUpi|listRhs/i.test(
+      fn,
+    )
+  ) {
+    return [];
+  }
+  if (/DraftJobs/i.test(fn)) return { jobs: [] };
+  if (/Count/i.test(fn)) return { count: 0 };
+  if (/list|Checklist|Dismissals|search/i.test(fn)) return [];
+  if (/create|update|delete|set|record|dismiss|request|revoke|resend/i.test(fn)) {
+    return { ok: true };
+  }
+  return [];
 }
 
 async function handleServerFn(route: Route) {
@@ -535,12 +641,14 @@ async function handleServerFn(route: Route) {
   }
   const body = req.postData() ?? req.url();
   const payload = serverFnPayload(req.url(), body);
-  // TanStack Start treats application/json (without x-tss-serialized) as the
-  // raw return value — do not wrap in { result }.
+  const serialized = await toCrossJSONAsync({ result: payload });
   await route.fulfill({
     status: 200,
-    contentType: "application/json",
-    body: JSON.stringify(payload),
+    headers: {
+      "content-type": "application/json",
+      "x-tss-serialized": "true",
+    },
+    body: JSON.stringify(serialized),
   });
 }
 
@@ -613,7 +721,8 @@ export async function assertPageNotBlank(page: Page, label: string): Promise<voi
 
 export async function waitForDashboard(page: Page): Promise<void> {
   await page.waitForLoadState("domcontentloaded");
-  await page.waitForTimeout(400);
+  const loading = page.getByText(/^Loading…$/);
+  await loading.waitFor({ state: "hidden", timeout: 25_000 }).catch(() => undefined);
 }
 
 export { ADMIN_EMAIL, ADMIN_NAME, ADMIN_USER_ID, CLIENTS, STAFF };

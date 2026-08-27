@@ -25,13 +25,18 @@ async function shot(page: Page, name: string) {
   fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
   await page.screenshot({
     path: path.join(ARTIFACT_DIR, `${name}.png`),
-    fullPage: true,
+    fullPage: false,
   });
 }
 
 async function gotoAdmin(page: Page, url: string) {
   await page.goto(url, { waitUntil: "domcontentloaded" });
   await waitForDashboard(page);
+}
+
+/** Names render in both the mobile card list (hidden on desktop) and the table. */
+function rosterName(page: Page, name: string) {
+  return page.locator("table").getByText(name, { exact: true });
 }
 
 test.describe("Clients + Staff roster — mocked admin", () => {
@@ -46,22 +51,22 @@ test.describe("Clients + Staff roster — mocked admin", () => {
     await expect(page.getByRole("heading", { name: /Client Directory/i })).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByText("Tommy Jones")).toBeVisible();
-    await expect(page.getByText("Blake Stevens")).toBeVisible();
-    await expect(page.getByText("Stephen Prince")).toBeVisible();
-    await expect(page.getByText("Marcus Rivera")).toBeVisible();
-    await expect(page.getByText("DSI").first()).toBeVisible();
+    await expect(rosterName(page, "Tommy Jones")).toBeVisible();
+    await expect(rosterName(page, "Blake Stevens")).toBeVisible();
+    await expect(rosterName(page, "Stephen Prince")).toBeVisible();
+    await expect(rosterName(page, "Marcus Rivera")).toBeVisible();
+    await expect(page.locator("table").getByText("DSI").first()).toBeVisible();
 
     const search = page.getByPlaceholder(/Search by name or Medicaid ID/i);
     await expect(search).toBeVisible();
     await search.fill("Jones");
-    await expect(page.getByText("Tommy Jones")).toBeVisible();
-    await expect(page.getByText("Blake Stevens")).toHaveCount(0);
+    await expect(rosterName(page, "Tommy Jones")).toBeVisible();
+    await expect(page.getByText("Blake Stevens", { exact: true })).toHaveCount(0);
 
     await search.fill("zzzz-no-match");
-    await expect(page.getByText(/No clients match your search/i)).toBeVisible();
+    await expect(page.getByText(/No clients match your search/i).first()).toBeVisible();
     await search.fill("");
-    await expect(page.getByText("Blake Stevens")).toBeVisible();
+    await expect(rosterName(page, "Blake Stevens")).toBeVisible();
 
     await page.getByRole("link", { name: /Tommy Jones/i }).first().click();
     await page.waitForURL(/\/dashboard\/clients\/00000000-0000-4000-a000-000000000101/);
@@ -98,11 +103,11 @@ test.describe("Clients + Staff roster — mocked admin", () => {
     await expect(page.getByRole("tab", { name: /Medications/i })).toBeVisible();
 
     await gotoAdmin(page, "/dashboard/homes");
-    await expect(page.getByRole("heading", { name: /Homes & Teams/i })).toBeVisible({
+    await expect(page.getByRole("heading", { name: /Homes & Teams/i }).first()).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByText("Maple House")).toBeVisible();
-    await expect(page.getByText("Oak SLH")).toBeVisible();
+    await expect(page.getByText("Maple House").first()).toBeVisible();
+    await expect(page.getByText("Oak SLH").first()).toBeVisible();
     await expect(page.getByText(/Tommy/i).first()).toBeVisible();
     await shot(page, "client_chart_codes_and_homes");
   });
@@ -112,7 +117,9 @@ test.describe("Clients + Staff roster — mocked admin", () => {
     await expect(page.getByRole("heading", { name: /Pending Clients/i })).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByText(/haven't joined your directory|All imported clients are finalized/i)).toBeVisible();
+    await expect(
+      page.getByText(/haven't joined your directory|All imported clients are finalized/i).first(),
+    ).toBeVisible();
     await assertPageNotBlank(page, "pending clients");
     await shot(page, "pending_clients");
   });
@@ -124,14 +131,14 @@ test.describe("Clients + Staff roster — mocked admin", () => {
     await expect(page.getByRole("heading", { name: /Team members/i })).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByText("Jake Probert")).toBeVisible();
-    await expect(page.getByText("Harvey Alisa")).toBeVisible();
-    await expect(page.getByText("Tom Jones")).toBeVisible();
-    await expect(page.getByText("Dane Warnick")).toBeVisible();
-    await expect(page.getByText(/^admin$/i).first()).toBeVisible();
-    await expect(page.getByText(/^employee$/i).first()).toBeVisible();
+    await expect(rosterName(page, "Jake Probert")).toBeVisible();
+    await expect(rosterName(page, "Harvey Alisa")).toBeVisible();
+    await expect(rosterName(page, "Tom Jones")).toBeVisible();
+    await expect(rosterName(page, "Dane Warnick")).toBeVisible();
+    await expect(page.locator("table").getByText(/^admin$/i).first()).toBeVisible();
+    await expect(page.locator("table").getByText(/^employee$/i).first()).toBeVisible();
 
-    await page.locator("a[href*='/dashboard/employees/']", { hasText: "View" }).first().click();
+    await page.locator("table a[href*='/dashboard/employees/']").first().click();
     await page.waitForURL(/\/dashboard\/employees\/00000000-0000-4000-a000-/);
     await expect(page.getByRole("tab", { name: /Staff record/i })).toBeVisible({
       timeout: 15_000,
@@ -157,21 +164,20 @@ test.describe("Clients + Staff roster — mocked admin", () => {
     await expect(page.getByRole("button", { name: /Add manually/i })).toBeVisible();
 
     // Pending-invite copy already tells testers the join link does not onboard.
-    await expect(
-      page.getByText(/does not call|add staff with|Add manually/i).first(),
-    ).toBeVisible();
+    await expect(page.getByText(/does not call/i)).toBeVisible();
+    await expect(page.getByText(/accept_invitation/i)).toBeVisible();
 
     await page.getByRole("button", { name: /Invite by email/i }).click();
     await expect(page.getByRole("heading", { name: /Invite an employee/i })).toBeVisible();
     await page.locator("#email").fill("sep1.tester@example.test");
     await page.getByRole("button", { name: /Create invitation/i }).click();
 
-    const toast = page.getByText(/Add manually|Invitation emailed|couldn't be sent|Unauthorized|does not/i).first();
-    await expect(toast).toBeVisible({ timeout: 10_000 });
-    const toastText = (await toast.innerText()) || "";
-    expect(
-      /silen|done(?![\s\S])/i.test(toastText) && !/manually|emailed|couldn't/i.test(toastText),
-    ).toBeFalsy();
+    const toast = page.locator("[data-sonner-toast]").filter({
+      hasText: /Invitation emailed|couldn't be sent|Add manually|Unauthorized|does not/i,
+    });
+    await expect(toast.first()).toBeVisible({ timeout: 10_000 });
+    const toastText = (await toast.first().innerText()) || "";
+    expect(toastText.length).toBeGreaterThan(8);
 
     await shot(page, "invite_staff_honest_copy");
 
@@ -188,18 +194,18 @@ test.describe("Clients + Staff roster — mocked admin", () => {
     await expect(page.getByRole("heading", { name: /Team progress/i })).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByText("Jake Probert")).toBeVisible();
+    await expect(rosterName(page, "Jake Probert")).toBeVisible();
     await assertPageNotBlank(page, "team progress");
 
     await gotoAdmin(page, "/dashboard/teams");
     await expect(page).toHaveURL(/\/dashboard\/homes/);
-    await expect(page.getByRole("heading", { name: /Homes & Teams/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Homes & Teams/i }).first()).toBeVisible();
 
     await gotoAdmin(page, "/dashboard/roles");
-    await expect(page.getByRole("heading", { name: /Roles/i }).or(page.getByText(/permissions/i).first())).toBeVisible({
+    await expect(page.getByRole("heading", { name: /Roles & permissions/i })).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByText("Dane Warnick")).toBeVisible();
+    await expect(rosterName(page, "Dane Warnick")).toBeVisible();
     await assertPageNotBlank(page, "roles");
     await shot(page, "staff_team_homes_roles");
   });
@@ -237,14 +243,11 @@ test.describe("RBAC — DSP / employee cannot open employee admin", () => {
 
   test("6. DSP is gated off the employees admin roster", async ({ page }) => {
     await gotoAdmin(page, "/dashboard/employees");
-    await page.waitForTimeout(1200);
-    const url = page.url();
-    const body = ((await page.locator("body").innerText().catch(() => "")) || "").toLowerCase();
-    const gated =
-      /\/unauthorized/.test(url) ||
-      /unauthorized|don't have permission|do not have permission|access request|loading…/i.test(body);
-    expect(gated, `DSP reached employee admin. url=${url}`).toBeTruthy();
+    await expect(page).toHaveURL(/\/unauthorized/, { timeout: 20_000 });
+    await expect(page.getByRole("heading", { name: /Access denied/i })).toBeVisible();
+    await expect(page.getByText(/View staff records/i)).toBeVisible();
     await expect(page.getByRole("button", { name: /Invite by email/i })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: /Team members/i })).toHaveCount(0);
     await shot(page, "dsp_rbac_employees_gated");
   });
 });

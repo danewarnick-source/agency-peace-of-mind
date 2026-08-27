@@ -18,6 +18,7 @@ import { Route as MfaSetupRouteImport } from './routes/mfa-setup'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as ManagerRouteImport } from './routes/manager'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as JoinRouteImport } from './routes/join'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as EmployeeRouteImport } from './routes/employee'
 import { Route as DemoRouteImport } from './routes/demo'
@@ -31,6 +32,7 @@ import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as AuditPortalIndexRouteImport } from './routes/audit-portal.index'
 import { Route as VerifyCodeRouteImport } from './routes/verify.$code'
 import { Route as SignPolicyDocumentIdRouteImport } from './routes/sign-policy.$documentId'
+import { Route as E2eComplianceDeskRouteImport } from './routes/e2e.compliance-desk'
 import { Route as DashboardTracksRouteImport } from './routes/dashboard.tracks'
 import { Route as DashboardTimeclockRouteImport } from './routes/dashboard.timeclock'
 import { Route as DashboardTeamsRouteImport } from './routes/dashboard.teams'
@@ -254,6 +256,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const JoinRoute = JoinRouteImport.update({
+  id: '/join',
+  path: '/join',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   id: '/forgot-password',
   path: '/forgot-password',
@@ -317,6 +324,11 @@ const VerifyCodeRoute = VerifyCodeRouteImport.update({
 const SignPolicyDocumentIdRoute = SignPolicyDocumentIdRouteImport.update({
   id: '/sign-policy/$documentId',
   path: '/sign-policy/$documentId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const E2eComplianceDeskRoute = E2eComplianceDeskRouteImport.update({
+  id: '/e2e/compliance-desk',
+  path: '/e2e/compliance-desk',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardTracksRoute = DashboardTracksRouteImport.update({
@@ -1305,6 +1317,7 @@ export interface FileRoutesByFullPath {
   '/demo': typeof DemoRoute
   '/employee': typeof EmployeeRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/join': typeof JoinRoute
   '/login': typeof LoginRoute
   '/manager': typeof ManagerRoute
   '/mcp': typeof McpRoute
@@ -1379,6 +1392,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/teams': typeof DashboardTeamsRoute
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
+  '/e2e/compliance-desk': typeof E2eComplianceDeskRoute
   '/sign-policy/$documentId': typeof SignPolicyDocumentIdRoute
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal/': typeof AuditPortalIndexRoute
@@ -1505,6 +1519,7 @@ export interface FileRoutesByTo {
   '/demo': typeof DemoRoute
   '/employee': typeof EmployeeRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/join': typeof JoinRoute
   '/login': typeof LoginRoute
   '/manager': typeof ManagerRoute
   '/mcp': typeof McpRoute
@@ -1573,6 +1588,7 @@ export interface FileRoutesByTo {
   '/dashboard/teams': typeof DashboardTeamsRoute
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
+  '/e2e/compliance-desk': typeof E2eComplianceDeskRoute
   '/sign-policy/$documentId': typeof SignPolicyDocumentIdRoute
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal': typeof AuditPortalIndexRoute
@@ -1701,6 +1717,7 @@ export interface FileRoutesById {
   '/demo': typeof DemoRoute
   '/employee': typeof EmployeeRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/join': typeof JoinRoute
   '/login': typeof LoginRoute
   '/manager': typeof ManagerRoute
   '/mcp': typeof McpRoute
@@ -1775,6 +1792,7 @@ export interface FileRoutesById {
   '/dashboard/teams': typeof DashboardTeamsRoute
   '/dashboard/timeclock': typeof DashboardTimeclockRoute
   '/dashboard/tracks': typeof DashboardTracksRouteWithChildren
+  '/e2e/compliance-desk': typeof E2eComplianceDeskRoute
   '/sign-policy/$documentId': typeof SignPolicyDocumentIdRoute
   '/verify/$code': typeof VerifyCodeRoute
   '/audit-portal/': typeof AuditPortalIndexRoute
@@ -1904,6 +1922,7 @@ export interface FileRouteTypes {
     | '/demo'
     | '/employee'
     | '/forgot-password'
+    | '/join'
     | '/login'
     | '/manager'
     | '/mcp'
@@ -1978,6 +1997,7 @@ export interface FileRouteTypes {
     | '/dashboard/teams'
     | '/dashboard/timeclock'
     | '/dashboard/tracks'
+    | '/e2e/compliance-desk'
     | '/sign-policy/$documentId'
     | '/verify/$code'
     | '/audit-portal/'
@@ -2104,6 +2124,7 @@ export interface FileRouteTypes {
     | '/demo'
     | '/employee'
     | '/forgot-password'
+    | '/join'
     | '/login'
     | '/manager'
     | '/mcp'
@@ -2172,6 +2193,7 @@ export interface FileRouteTypes {
     | '/dashboard/teams'
     | '/dashboard/timeclock'
     | '/dashboard/tracks'
+    | '/e2e/compliance-desk'
     | '/sign-policy/$documentId'
     | '/verify/$code'
     | '/audit-portal'
@@ -2299,6 +2321,7 @@ export interface FileRouteTypes {
     | '/demo'
     | '/employee'
     | '/forgot-password'
+    | '/join'
     | '/login'
     | '/manager'
     | '/mcp'
@@ -2373,6 +2396,7 @@ export interface FileRouteTypes {
     | '/dashboard/teams'
     | '/dashboard/timeclock'
     | '/dashboard/tracks'
+    | '/e2e/compliance-desk'
     | '/sign-policy/$documentId'
     | '/verify/$code'
     | '/audit-portal/'
@@ -2501,6 +2525,7 @@ export interface RootRouteChildren {
   DemoRoute: typeof DemoRoute
   EmployeeRoute: typeof EmployeeRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
+  JoinRoute: typeof JoinRoute
   LoginRoute: typeof LoginRoute
   ManagerRoute: typeof ManagerRoute
   McpRoute: typeof McpRoute
@@ -2515,6 +2540,7 @@ export interface RootRouteChildren {
   AuditPortalPackageIdRoute: typeof AuditPortalPackageIdRoute
   AuditPortalSetPasswordRoute: typeof AuditPortalSetPasswordRoute
   CertificateCodeRoute: typeof CertificateCodeRoute
+  E2eComplianceDeskRoute: typeof E2eComplianceDeskRoute
   SignPolicyDocumentIdRoute: typeof SignPolicyDocumentIdRoute
   VerifyCodeRoute: typeof VerifyCodeRoute
   AuditPortalIndexRoute: typeof AuditPortalIndexRoute
@@ -2593,6 +2619,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/join': {
+      id: '/join'
+      path: '/join'
+      fullPath: '/join'
+      preLoaderRoute: typeof JoinRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/forgot-password': {
@@ -2684,6 +2717,13 @@ declare module '@tanstack/react-router' {
       path: '/sign-policy/$documentId'
       fullPath: '/sign-policy/$documentId'
       preLoaderRoute: typeof SignPolicyDocumentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/e2e/compliance-desk': {
+      id: '/e2e/compliance-desk'
+      path: '/e2e/compliance-desk'
+      fullPath: '/e2e/compliance-desk'
+      preLoaderRoute: typeof E2eComplianceDeskRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard/tracks': {
@@ -4434,6 +4474,7 @@ const rootRouteChildren: RootRouteChildren = {
   DemoRoute: DemoRoute,
   EmployeeRoute: EmployeeRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
+  JoinRoute: JoinRoute,
   LoginRoute: LoginRoute,
   ManagerRoute: ManagerRoute,
   McpRoute: McpRoute,
@@ -4449,6 +4490,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuditPortalPackageIdRoute: AuditPortalPackageIdRoute,
   AuditPortalSetPasswordRoute: AuditPortalSetPasswordRoute,
   CertificateCodeRoute: CertificateCodeRoute,
+  E2eComplianceDeskRoute: E2eComplianceDeskRoute,
   SignPolicyDocumentIdRoute: SignPolicyDocumentIdRoute,
   VerifyCodeRoute: VerifyCodeRoute,
   AuditPortalIndexRoute: AuditPortalIndexRoute,

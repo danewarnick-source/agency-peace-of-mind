@@ -5,16 +5,11 @@ import { useCaseload } from "@/hooks/use-caseload";
 import { useMyAssignments, allowedCodesFor } from "@/hooks/use-my-assignments";
 import { isClockableServiceCode } from "@/lib/service-billing";
 
-
 import { Badge } from "@/components/ui/badge";
 import { PunchPad } from "@/components/evv/punch-pad";
 import { padMemberId } from "@/lib/evv-codes";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { searchToCompassHandoff } from "@/lib/compass-clock-out-interview";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
   Clock,
@@ -70,6 +65,12 @@ const workspaceSearch = z.object({
   // Original spoken transcript from the same Compass turn. Read-only on the
   // punch pad; persisted as original_transcript on attest/submit.
   spoken: z.string().max(2000).optional(),
+  // Compass clock-out interview handoff (goals / incident / behaviors).
+  goals: z.string().max(4000).optional(),
+  baseline: z.enum(["0", "1"]).optional(),
+  incident: z.enum(["yes", "no"]).optional(),
+  behaviors: z.enum(["yes", "no"]).optional(),
+  targets: z.string().max(2000).optional(),
 });
 export const Route = createFileRoute("/dashboard/workspace/$clientId")({
   head: () => ({ meta: [{ title: "Client Workspace — HIVE" }] }),
@@ -88,7 +89,21 @@ function ClientWorkspace() {
     verify,
     note: voiceNarrative,
     spoken: voiceSpoken,
+    goals: voiceGoals,
+    baseline: voiceBaseline,
+    incident: voiceIncident,
+    behaviors: voiceBehaviors,
+    targets: voiceTargets,
   } = Route.useSearch();
+  const clockOutHandoff = searchToCompassHandoff({
+    note: voiceNarrative,
+    spoken: voiceSpoken,
+    goals: voiceGoals,
+    baseline: voiceBaseline,
+    incident: voiceIncident,
+    behaviors: voiceBehaviors,
+    targets: voiceTargets,
+  });
 
   const client = useMemo(() => {
     return (caseload ?? []).find((c) => c.id === clientId) ?? null;
@@ -105,19 +120,14 @@ function ClientWorkspace() {
   // EVV workspace is the clock-in surface — needs at least one clockable
   // code (excludes only HHS host-home & PPS parent-paid codes; RHS and the
   // other daily-rate codes remain clock-inable for payroll capture).
-  const allowedHourly = useMemo(
-    () => allowedCodes.filter(isClockableServiceCode),
-    [allowedCodes],
-  );
+  const allowedHourly = useMemo(() => allowedCodes.filter(isClockableServiceCode), [allowedCodes]);
 
   // Auto-prefill the clock-in service code from today's scheduled shift for
   // this client, even when the user didn't arrive via the Today hero deep link.
   const { data: todayShifts } = useTodayShifts();
   const scheduledCode = useMemo(() => {
     if (presetCode) return undefined; // URL wins
-    const mine = (todayShifts ?? []).filter(
-      (s) => s.client_id === clientId && !!s.job_code,
-    );
+    const mine = (todayShifts ?? []).filter((s) => s.client_id === clientId && !!s.job_code);
     if (mine.length === 0) return undefined;
     const now = Date.now();
     const current = mine.find(
@@ -229,7 +239,6 @@ function ClientWorkspace() {
   });
   const hasChores = (choreSpaceIds?.length ?? 0) > 0;
 
-
   if (isLoading || !client) {
     return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
   }
@@ -253,7 +262,8 @@ function ClientWorkspace() {
               className="h-10 w-10 rounded-full object-cover border-2 border-border"
               fallback={
                 <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                  {client.first_name?.[0] ?? ""}{client.last_name?.[0] ?? ""}
+                  {client.first_name?.[0] ?? ""}
+                  {client.last_name?.[0] ?? ""}
                 </span>
               }
             />
@@ -282,18 +292,12 @@ function ClientWorkspace() {
               <div className="mt-1 flex flex-wrap gap-1.5">
                 {codes.length ? (
                   codes.map((code) => (
-                    <Badge
-                      key={code}
-                      variant="outline"
-                      className="font-mono text-[10px]"
-                    >
+                    <Badge key={code} variant="outline" className="font-mono text-[10px]">
                       {code}
                     </Badge>
                   ))
                 ) : (
-                  <span className="text-xs text-muted-foreground">
-                    No billing codes on file
-                  </span>
+                  <span className="text-xs text-muted-foreground">No billing codes on file</span>
                 )}
               </div>
             </div>
@@ -368,7 +372,9 @@ function ClientWorkspace() {
                 name: `${client.first_name} ${client.last_name}`.trim(),
                 memberId: padMemberId(client.medicaid_id),
                 facility: client.physical_address,
-                authorizedCodes: allowedHourly.length ? allowedHourly : (client.job_code ?? undefined),
+                authorizedCodes: allowedHourly.length
+                  ? allowedHourly
+                  : (client.job_code ?? undefined),
                 homeLat: client.home_latitude,
                 homeLng: client.home_longitude,
                 geofenceRadiusFeet: client.geofence_radius_feet ?? 1000,
@@ -379,6 +385,7 @@ function ClientWorkspace() {
               autoOpenCompliance={verify === "1"}
               initialNarrative={voiceNarrative}
               initialOriginalTranscript={voiceSpoken}
+              clockOutHandoff={clockOutHandoff}
             />
             <ActiveShiftReimbursementSlot clientId={client.id} />
           </TabsContent>
@@ -413,14 +420,10 @@ function ClientWorkspace() {
 
           {showBehaviorTab && bsTab?.organizationId && (
             <TabsContent value="behavior-data" className="mt-5">
-              <StaffBehaviorDataTab
-                clientId={client.id}
-                organizationId={bsTab.organizationId}
-              />
+              <StaffBehaviorDataTab clientId={client.id} organizationId={bsTab.organizationId} />
             </TabsContent>
           )}
         </Tabs>
-
       </div>
 
       {/* 3-minute shared-device idle lock — scoped to this route */}

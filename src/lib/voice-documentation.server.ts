@@ -1,13 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-import { gatewayFetch, assertBedrockConfigured } from "@/lib/ai-bedrock.server";
+import { draftShiftNote } from "@/lib/ai-coach.functions";
 
-// ─── Compass — voice/shorthand note expansion (Phase 1) ─────────────────────
-// Same Bedrock-via-gatewayFetch calling pattern as evaluateShiftNote in
-// ai-coach.functions.ts. Unlike that coach call, this one wants a plain
-// expanded note back — no JSON response_format, no JSON.parse.
+// ─── Compass / punch-pad note expansion ─────────────────────────────────────
+// Thin wrapper around draftShiftNote (NECTAR). Punch-pad "Expand with Compass"
+// and daily-log expand keep this function name so callers do not change;
+// there is one prompt, not two.
 
 interface ExpandInput {
   narrative: string;
@@ -35,54 +34,19 @@ export const expandShiftNote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateExpand)
   .handler(async ({ data }): Promise<string> => {
-    assertBedrockConfigured();
-
-    const system = `You are Compass, the documentation assistant inside Cedar — a DSPD Medicaid compliance platform for Utah disability service providers. Your job is to expand a direct support professional's brief shift note into a complete, SOW-compliant progress note.
-
-Rules:
-- Write in first person from the staff member's perspective
-- Minimum 60 words, maximum 250 words
-- Reference specific PCSP goals by name when provided
-- Include: what activities occurred, how the client responded, what staff support was provided, any notable behaviors or progress
-- Never fabricate specific details not implied by the input
-- Sound like a trained DSP wrote it — professional but not clinical
-- No em-dashes, no AI-sounding filler phrases like "In today's session" or "It was observed that"
-- Service code context: ${data.serviceCode} — structure the note appropriately for this service type
-- Return only the expanded note text, no preamble or explanation`;
-
-    const goalsText = data.goals.length > 0 ? data.goals.join("; ") : "not provided";
-    const user = `Staff input: ${data.narrative}
-Client first name: ${data.clientFirstName}
-PCSP goals: ${goalsText}
-Service code: ${data.serviceCode}
-
-Expand this into a complete, compliant shift note.`;
-
-    // Forward the incoming request's abort signal, same as callAI in
-    // ai-coach.functions.ts, so a client-side cancellation actually stops
-    // the Bedrock call.
-    const res = await gatewayFetch(
-      {
-        model: "bedrock",
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-      },
-      { signal: getRequest()?.signal },
-    );
-
-    if (res.status === 429) throw new Error("AI rate limit reached. Please retry in a moment.");
-    if (!res.ok) throw new Error(`AI error (${res.status}).`);
-
-    const json = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const expanded = (json.choices?.[0]?.message?.content ?? "").trim();
-    if (!expanded) {
-      throw new Error(
-        "Compass could not expand this note — please try again or write it manually.",
-      );
+    const shorthand = data.narrative.slice(0, 4000);
+    if (shorthand.length < 3) {
+      throw new Error("Shorthand must be 3–4000 characters.");
     }
-    return expanded;
+    // serviceCode is accepted for caller compatibility; NECTAR's draft prompt
+    // is service-agnostic (same engine as historical Draft with NECTAR).
+    void data.serviceCode;
+    const { draft } = await draftShiftNote({
+      data: {
+        shorthand,
+        goals: data.goals,
+        clientFirstName: data.clientFirstName,
+      },
+    });
+    return draft;
   });

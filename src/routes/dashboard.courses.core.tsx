@@ -67,7 +67,7 @@ function CoreTrainingList() {
   const done = (topics ?? []).filter((t) => progress?.get(t.id) === "completed").length;
 
   return (
-    <div className="space-y-4 pb-2">
+    <div className="space-y-4 pb-2" data-testid="core-training-list">
       <StaffPageHeader
         eyebrow="Utah DSPD · 30 Day Core Training"
         eyebrowIcon={ShieldCheck}
@@ -121,7 +121,7 @@ function CoreTrainingList() {
                 const isDone = status === "completed";
                 const isProg = status === "in_progress";
                 return (
-                  <li key={t.id}>
+                  <li key={t.id} data-status={status} data-testid={`core-topic-${t.code}`}>
                     <Link
                       to="/dashboard/courses/topic/$topicId"
                       params={{ topicId: t.id }}

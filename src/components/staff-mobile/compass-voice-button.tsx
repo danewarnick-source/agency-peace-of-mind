@@ -5,7 +5,7 @@
 // that happens to share the same Web Speech API pattern and the same
 // expandShiftNote server function for the note-expansion intent.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -17,6 +17,8 @@ import { useCurrentOrg } from "@/hooks/use-org";
 import { useCaseload } from "@/hooks/use-caseload";
 import { useActiveShift } from "@/hooks/use-active-shift";
 import { useClientCareData } from "@/hooks/use-client-care-data";
+import { useHasPassedLaunchpad } from "@/hooks/use-launchpad-pass";
+import { LAUNCHPAD_CLOCK_IN_BLOCKED_MESSAGE } from "@/lib/launchpad-gate";
 import {
   processVoiceIntent,
   createClockIn,
@@ -99,6 +101,7 @@ export function CompassVoiceButton() {
   const { data: org } = useCurrentOrg();
   const { data: caseload = [] } = useCaseload();
   const { data: activeShift } = useActiveShift();
+  const { passed: hasPassedLaunchpad, blocked: launchpadBlocked } = useHasPassedLaunchpad();
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -369,6 +372,10 @@ export function CompassVoiceButton() {
 
   async function handleStartShift() {
     if (!pendingClockIn || !org?.organization_id) return;
+    if (!hasPassedLaunchpad) {
+      toast.error(LAUNCHPAD_CLOCK_IN_BLOCKED_MESSAGE);
+      return;
+    }
     setStartingShift(true);
     try {
       let pos: { lat: number; lng: number; acc: number };
@@ -465,6 +472,7 @@ export function CompassVoiceButton() {
             response={response}
             pendingClockIn={pendingClockIn}
             startingShift={startingShift}
+            launchpadBlocked={launchpadBlocked}
             onFirstAsk={handleFirstAsk}
             onStop={() => stopListening({ submit: true })}
             onClarifyAnswer={handleClarifyAnswer}
@@ -492,6 +500,7 @@ function CompassSheetBody({
   response,
   pendingClockIn,
   startingShift,
+  launchpadBlocked,
   onFirstAsk,
   onStop,
   onClarifyAnswer,
@@ -508,6 +517,7 @@ function CompassSheetBody({
   response: VoiceAgentResponse | null;
   pendingClockIn: PendingClockIn | null;
   startingShift: boolean;
+  launchpadBlocked: boolean;
   onFirstAsk: () => void;
   onStop: () => void;
   onClarifyAnswer: () => void;
@@ -577,6 +587,23 @@ function CompassSheetBody({
 
     if (response.intent === "clock_in") {
       if (!pendingClockIn) return null;
+      if (launchpadBlocked) {
+        return (
+          <div
+            data-testid="launchpad-gate-block"
+            className="space-y-3 py-4 text-center"
+            role="alert"
+          >
+            <p className="text-base font-medium">Launchpad required before clock-in</p>
+            <p className="text-sm text-muted-foreground">
+              {LAUNCHPAD_CLOCK_IN_BLOCKED_MESSAGE}
+            </p>
+            <Button asChild className="w-full text-white" style={{ backgroundColor: CEDAR_TEAL }}>
+              <Link to="/dashboard/hive-training">Open Hive Training</Link>
+            </Button>
+          </div>
+        );
+      }
       return (
         <div className="space-y-3 py-4 text-center">
           <p className="text-base font-medium">

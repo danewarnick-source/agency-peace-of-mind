@@ -96,7 +96,7 @@ function HiveTrainingHub() {
   const isAdmin = realIsAdmin && view !== "staff" && view !== "staff_mobile";
 
   return (
-    <div className="mx-auto max-w-6xl p-4 md:p-6 space-y-6">
+    <div className="mx-auto max-w-6xl p-4 md:p-6 space-y-6" data-testid="hive-training-hub">
       <header className="flex items-center gap-3">
         <div className="rounded-lg p-2 bg-[#1A2B47] text-white">
           <GraduationCap className="h-6 w-6" />
@@ -355,11 +355,30 @@ function AdminView({ orgId }: { orgId: string }) {
     },
   });
 
+  const { data: launchpadFlags } = useQuery({
+    enabled: (members ?? []).length > 0,
+    queryKey: ["ht-launchpad-flags", orgId, (members ?? []).map((m) => m.id).join(",")],
+    queryFn: async () => {
+      const ids = (members ?? []).map((m) => m.id);
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, has_passed_launchpad")
+        .in("id", ids);
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; has_passed_launchpad: boolean | null }>;
+    },
+  });
+
   return (
     <div className="space-y-6">
       <ReadinessBanner
         members={members ?? []}
         assignments={assignments ?? []}
+      />
+
+      <LaunchpadRoster
+        members={members ?? []}
+        flags={launchpadFlags ?? []}
       />
 
       <AutoRenewCard orgId={orgId} catalog={catalog ?? []} />
@@ -456,6 +475,66 @@ function ReadinessBanner({
       </div>
       <div className="space-y-1.5">{items}</div>
     </div>
+  );
+}
+
+function LaunchpadRoster({
+  members,
+  flags,
+}: {
+  members: Member[];
+  flags: Array<{ id: string; has_passed_launchpad: boolean | null }>;
+}) {
+  const passedIds = new Set(flags.filter((f) => f.has_passed_launchpad).map((f) => f.id));
+  const passed = members.filter((m) => passedIds.has(m.id));
+  const notPassed = members.filter((m) => !passedIds.has(m.id));
+
+  return (
+    <section
+      data-testid="launchpad-roster"
+      className="rounded-xl border border-border bg-white p-4 md:p-5 space-y-3"
+    >
+      <div>
+        <h2 className="text-lg font-semibold text-[#1A2B47]">Launchpad clock-in gate</h2>
+        <p className="text-sm text-muted-foreground">
+          Staff must pass Hive Launchpad before Compass or the punch pad will clock them in.
+          This list reads the live pass flag — it is not a test override.
+        </p>
+      </div>
+      <p className="text-sm text-[#1A2B47]">
+        <b>{passed.length}</b> passed · <b>{notPassed.length}</b> have not passed
+      </p>
+      <div className="grid gap-3 md:grid-cols-2">
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+            Passed
+          </h3>
+          {passed.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No staff have passed Launchpad yet.</p>
+          ) : (
+            <ul className="text-sm space-y-0.5">
+              {passed.map((m) => (
+                <li key={m.id}>{m.label}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+            Not passed
+          </h3>
+          {notPassed.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Everyone on this roster has passed.</p>
+          ) : (
+            <ul className="text-sm space-y-0.5">
+              {notPassed.map((m) => (
+                <li key={m.id}>{m.label}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 

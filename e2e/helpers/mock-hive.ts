@@ -21,6 +21,7 @@ import {
   ADMIN_USER_ID,
   CLIENT_LIST,
   CLIENTS,
+  DAILY_LOGS,
   DSP_USER_ID,
   ORG_ID,
   ORG_NAME,
@@ -37,6 +38,8 @@ export type MockOptions = {
   emptyClients?: boolean;
   clientsError?: boolean;
   emptyStaff?: boolean;
+  emptyLogs?: boolean;
+  logsError?: boolean;
 };
 
 type Row = Record<string, unknown>;
@@ -161,8 +164,10 @@ function clientRow(c: (typeof CLIENT_LIST)[number]): Row {
     last_name: c.last_name,
     phone_number: null,
     physical_address: null,
-    pcsp_goals: [],
+    pcsp_goals: [...c.pcsp_goals],
     job_code: [...c.codes],
+    home_latitude: null,
+    home_longitude: null,
     authorized_dspd_codes: [...c.codes],
     medicaid_id: c.medicaid_id,
     account_status: "active",
@@ -248,6 +253,24 @@ function rolePermissionRows(): Row[] {
   return rows;
 }
 
+function expandDailyLog(row: (typeof DAILY_LOGS)[number]): Row {
+  const staff = STAFF_LIST.find((s) => s.id === row.user_id);
+  const client = CLIENT_LIST.find((c) => c.id === row.client_id);
+  return {
+    ...row,
+    profiles: staff
+      ? { full_name: staff.name, email: staff.email, agency_name: ORG_NAME }
+      : null,
+    clients: client
+      ? {
+          first_name: client.first_name,
+          last_name: client.last_name,
+          medicaid_id: client.medicaid_id,
+        }
+      : null,
+  };
+}
+
 function parseFilters(url: URL): Array<{ col: string; op: string; val: string }> {
   const out: Array<{ col: string; op: string; val: string }> = [];
   for (const [key, raw] of url.searchParams.entries()) {
@@ -324,6 +347,8 @@ function tableRows(table: string, opts: MockOptions, personaId: string): Row[] {
     case "home_staff_designations":
     case "client_staffing_ratios":
       return [];
+    case "daily_logs":
+      return opts.emptyLogs ? [] : DAILY_LOGS.map((row) => expandDailyLog(row));
     case "role_permissions":
       return rolePermissionRows();
     case "invitations":
@@ -413,6 +438,12 @@ async function handleSupabase(route: Route, opts: MockOptions, personaId: string
   }
 
   if (url.pathname.startsWith("/rest/v1/rpc/")) {
+    const rpc = url.pathname.replace("/rest/v1/rpc/", "").split("/")[0];
+    if (rpc === "clients_for_staff") {
+      const clients = opts.emptyClients ? [] : CLIENT_LIST.map(clientRow);
+      await fulfillJson(route, 200, clients);
+      return;
+    }
     await fulfillJson(route, 200, []);
     return;
   }
@@ -427,6 +458,16 @@ async function handleSupabase(route: Route, opts: MockOptions, personaId: string
   if (table === "clients" && opts.clientsError && method === "GET") {
     await fulfillJson(route, 400, {
       message: "Mocked clients read failure",
+      code: "PGRST000",
+      details: null,
+      hint: null,
+    });
+    return;
+  }
+
+  if (table === "daily_logs" && opts.logsError && (method === "GET" || method === "HEAD")) {
+    await fulfillJson(route, 400, {
+      message: "Mocked daily_logs read failure",
       code: "PGRST000",
       details: null,
       hint: null,
@@ -601,6 +642,24 @@ function serverFnPayload(url: string, body: string): unknown {
   if (/getHrComplianceMatrix/i.test(fn)) return { requirements: [], staff: [] };
   if (/getStaffPii|getStaffTrainingRiskFlags/i.test(fn)) return null;
   if (/recordPhiAccess|dismissUiPref|requestPermission/i.test(fn)) return { ok: true };
+  if (/evaluateShiftNote/i.test(fn)) {
+    return { status: "Verified", feedback: "Mocked NECTAR coach — not a live review." };
+  }
+  if (/scanNoteForTriggers/i.test(fn)) {
+    return {
+      hasIncidentTrigger: false,
+      hasMedicalTrigger: false,
+      hasEmarTrigger: false,
+      triggerTypes: [],
+      triggerSummary: "",
+    };
+  }
+  if (/expandShiftNote|draftShiftNote/i.test(fn)) {
+    return "Mocked Compass expansion — not used in this suite.";
+  }
+  if (/processVoiceIntent|createClockIn|listClientTargetBehaviors/i.test(fn)) {
+    return { ok: true };
+  }
   if (/getClientCareData/i.test(fn)) {
     const idMatch = `${url}\n${body}`.match(/00000000-0000-4000-a000-00000000010[1-4]/);
     return emptyClientCareData(idMatch?.[0] ?? CLIENT_LIST[0].id);
@@ -725,4 +784,4 @@ export async function waitForDashboard(page: Page): Promise<void> {
   await loading.waitFor({ state: "hidden", timeout: 25_000 }).catch(() => undefined);
 }
 
-export { ADMIN_EMAIL, ADMIN_NAME, ADMIN_USER_ID, CLIENTS, STAFF };
+export { ADMIN_EMAIL, ADMIN_NAME, ADMIN_USER_ID, CLIENTS, DAILY_LOGS, STAFF };

@@ -1,18 +1,12 @@
-import type { VoiceAgentResponse } from "@/lib/cedar-voice-intent";
-import { TOMMY_ACTIVE_SHIFT, TOMMY_BEHAVIORS, TOMMY_ID } from "./fixtures";
+import { TOMMY_BEHAVIORS, TOMMY_ID } from "./fixtures";
 
 export type GpsMode = "ok" | "denied" | "timeout" | "unavailable";
 
 export type E2EScenario =
-  | "open-compass"
-  | "clock-in-valid"
-  | "clock-in-name-id"
-  | "clock-in-unknown-uuid"
+  | "clock-in"
   | "gps-denied"
   | "gps-timeout"
-  | "spoken-note"
-  | "clock-out-combined"
-  | "clock-out-bare"
+  | "clock-out"
   | "launchpad-blocked"
   | "admin";
 
@@ -33,11 +27,8 @@ export type E2EBridge = {
   scenario: E2EScenario;
   gpsMode: GpsMode;
   hasPassedLaunchpad: boolean;
-  clockInResponse: Extract<VoiceAgentResponse, { intent: "clock_in" }> | null;
   navigations: NavCall[];
   clockInCalls: ClockInCall[];
-  draftCalls: Array<{ shorthand: string; goals: string[]; clientFirstName: string }>;
-  processCalls: Array<{ transcript: string }>;
   timesheetWrites: number;
   targetBehaviors: string[];
   hasActiveShift: boolean;
@@ -54,56 +45,16 @@ declare global {
 const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
 
 function scenarioFromQuery(): E2EScenario {
-  const raw = params.get("scenario") ?? "open-compass";
+  const raw = params.get("scenario") ?? "clock-in";
   const allowed: E2EScenario[] = [
-    "open-compass",
-    "clock-in-valid",
-    "clock-in-name-id",
-    "clock-in-unknown-uuid",
+    "clock-in",
     "gps-denied",
     "gps-timeout",
-    "spoken-note",
-    "clock-out-combined",
-    "clock-out-bare",
+    "clock-out",
     "launchpad-blocked",
     "admin",
   ];
-  return (allowed as string[]).includes(raw) ? (raw as E2EScenario) : "open-compass";
-}
-
-export function clockInResponseForScenario(
-  scenario: E2EScenario,
-): Extract<VoiceAgentResponse, { intent: "clock_in" }> | null {
-  if (scenario === "clock-in-name-id") {
-    return {
-      intent: "clock_in",
-      clientId: "Tommy Jones",
-      clientName: "Tommy Jones",
-      serviceCode: "SEI",
-    };
-  }
-  if (scenario === "clock-in-unknown-uuid") {
-    return {
-      intent: "clock_in",
-      clientId: "00000000-0000-4000-8000-000000000099",
-      clientName: "Tommy Jones",
-      serviceCode: "SEI",
-    };
-  }
-  if (
-    scenario === "clock-in-valid" ||
-    scenario === "gps-denied" ||
-    scenario === "gps-timeout" ||
-    scenario === "launchpad-blocked"
-  ) {
-    return {
-      intent: "clock_in",
-      clientId: TOMMY_ID,
-      clientName: "Tommy Jones",
-      serviceCode: "SEI",
-    };
-  }
-  return null;
+  return (allowed as string[]).includes(raw) ? (raw as E2EScenario) : "clock-in";
 }
 
 export function createBridge(): E2EBridge {
@@ -114,17 +65,11 @@ export function createBridge(): E2EBridge {
     scenario,
     gpsMode,
     hasPassedLaunchpad: scenario !== "launchpad-blocked",
-    clockInResponse: clockInResponseForScenario(scenario),
     navigations: [],
     clockInCalls: [],
-    draftCalls: [],
-    processCalls: [],
     timesheetWrites: 0,
     targetBehaviors: TOMMY_BEHAVIORS,
-    hasActiveShift:
-      scenario === "spoken-note" ||
-      scenario === "clock-out-combined" ||
-      scenario === "clock-out-bare",
+    hasActiveShift: scenario === "clock-out",
   };
 }
 
@@ -243,11 +188,16 @@ export function installSpeechAndGps(bridge: E2EBridge) {
     paused: false,
     pending: false,
     speaking: false,
+    addEventListener() {},
+    removeEventListener() {},
+    dispatchEvent() {
+      return true;
+    },
   };
   Object.defineProperty(window, "speechSynthesis", {
     configurable: true,
     value: synth,
   });
 
-  void TOMMY_ACTIVE_SHIFT;
+  void TOMMY_ID;
 }

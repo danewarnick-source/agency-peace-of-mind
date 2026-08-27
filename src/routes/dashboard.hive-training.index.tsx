@@ -497,7 +497,7 @@ function LaunchpadRoster({
       <div>
         <h2 className="text-lg font-semibold text-[#1A2B47]">Launchpad clock-in gate</h2>
         <p className="text-sm text-muted-foreground">
-          Staff must pass Hive Launchpad before Compass or the punch pad will clock them in.
+          Staff must pass Hive Launchpad before the punch pad will clock them in.
           This list reads the live pass flag — it is not a test override.
         </p>
       </div>

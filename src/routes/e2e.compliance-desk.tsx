@@ -30,7 +30,7 @@ function E2eComplianceDeskHarness() {
       data-testid="e2e-compliance-desk-harness"
     >
       <p className="mb-3 text-xs text-muted-foreground" data-testid="e2e-admin-context">
-        E2E harness · Admin View · permission approve_timesheets · Staff Compass is out of
+        E2E harness · Admin View · permission approve_timesheets · Staff punch pad is out of
         scope
       </p>
       {/* Inner page (not RequirePermission). The production route still

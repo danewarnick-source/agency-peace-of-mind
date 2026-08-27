@@ -26,14 +26,13 @@ import {
 import {
   ClipboardCheck, User, Eraser, Loader2, CheckCircle2,
   FileSignature, CalendarDays, AlertTriangle, CalendarClock,
-  Pen, ShieldAlert, Mic, MicOff, Compass,
+  Pen, ShieldAlert, Mic, MicOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   evaluateShiftNote, scanNoteForTriggers,
   type CoachResult, type ScanResult,
 } from "@/lib/ai-coach.functions";
-import { expandShiftNote } from "@/lib/voice-documentation.server";
 import { freezeOriginalTranscript } from "@/lib/original-transcript";
 import {
   accumulateSpeechResults,
@@ -403,10 +402,6 @@ function DailyLogDialog({
   const dictationBaseRef = useRef("");
   const dictationPriorFinalsRef = useRef("");
   const dictationLiveFinalsRef = useRef("");
-
-  // ── Compass note expansion (Phase 1 voice documentation) ────────────────────
-  const [expandBusy, setExpandBusy] = useState(false);
-  const [noteExpanded, setNoteExpanded] = useState(false);
   const [originalTranscript, setOriginalTranscript] = useState("");
 
   // Incident trigger state
@@ -446,8 +441,6 @@ function DailyLogDialog({
       setIncidentDeferred(false);
       setDeferUsed(false);
       setSuccess(null);
-      setExpandBusy(false);
-      setNoteExpanded(false);
       setOriginalTranscript("");
       hasSigRef.current = false;
       setTimeout(() => clearCanvas(), 0);
@@ -502,6 +495,7 @@ function DailyLogDialog({
         const base = dictationBaseRef.current.trim();
         setNarrative(base && display ? `${base} ${display}` : display || base);
         if (display.trim()) {
+          setOriginalTranscript((prev) => freezeOriginalTranscript(prev, display));
           setShowNarrativeError(false);
           setAiCoach(null);
           setScanResult(null);
@@ -523,33 +517,6 @@ function DailyLogDialog({
     }
     recognitionSessionRef.current = session;
     setIsRecording(true);
-  }
-
-  // Expand a short spoken/typed daily note into a complete, SOW-compliant
-  // draft. Caregiver still edits and attests (signature) before submitting —
-  // see the amber "review carefully" notice rendered below the narrative.
-  async function handleExpandWithCompass() {
-    if (!client) return;
-    setExpandBusy(true);
-    try {
-      const source = narrative.trim();
-      const expanded = await expandShiftNote({
-        data: {
-          narrative: source,
-          goals: client.pcsp_goals ?? [],
-          serviceCode: program,
-          clientFirstName: client.first_name,
-        },
-      });
-      setOriginalTranscript((prev) => freezeOriginalTranscript(prev, source));
-      setNarrative(expanded);
-      setNoteExpanded(true);
-      if (aiCoach) setAiCoach(null);
-    } catch (e) {
-      toast.error((e as Error).message || "Compass couldn't expand this note — please try again.");
-    } finally {
-      setExpandBusy(false);
-    }
   }
 
   // ── Signature canvas ─────────────────────────────────────────────────────────
@@ -856,25 +823,6 @@ function DailyLogDialog({
                 {showNarrativeError && !narrativeOk && (
                   <div className="mt-2 rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-300">
                     ⚠️ Your narrative must be at least {MIN_WORDS} words to satisfy DSPD Medicaid documentation requirements.
-                  </div>
-                )}
-                {narrative.trim().split(/\s+/).length >= 5 && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={handleExpandWithCompass}
-                    disabled={expandBusy}
-                    className="mt-2 w-fit border-amber-600/60 text-amber-700 hover:bg-amber-50 dark:text-amber-300"
-                  >
-                    {expandBusy ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Compass className="mr-2 h-3.5 w-3.5" />}
-                    Expand with Compass
-                  </Button>
-                )}
-                {noteExpanded && (
-                  <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
-                    ✨ Expanded by Compass — review carefully before attesting. Your attestation confirms this
-                    accurately reflects your shift. Original speech is kept separately and is not overwritten.
                   </div>
                 )}
               </div>

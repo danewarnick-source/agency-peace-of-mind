@@ -17,7 +17,7 @@
 
 The codebase is large because it accumulated **three generations of the same surfaces** (old scheduler UI, old Home, old training LMS) next to the live ones, plus a full Hive-exec platform console that TNS testers will not use. It is **not** a junk drawer of unmounted routes. Almost every `src/routes/*.tsx` file is in `routeTree.gen.ts`.
 
-Safe cleanup after Sep 1 is **small, file-level deletions of components nothing imports**, plus optional redirect-stub hygiene. It is not a merge of Deadlines into Compliance, Compass into NECTAR, or My Trainings into HIVE Training. Those pairs are either already consolidated at the route layer, or they are different products that both still run.
+Safe cleanup after Sep 1 is **small, file-level deletions of components nothing imports**, plus optional redirect-stub hygiene. It is not a merge of Deadlines into Compliance or My Trainings into HIVE Training. Those pairs are either already consolidated at the route layer, or they are different products that both still run.
 
 Do not delete anything in the “never-touch-before-Tuesday” list. Do not drop database tables based on this file (`CLAUDE.md`: all SQL goes through `docs/SQL_HANDOFF.md`).
 
@@ -40,20 +40,19 @@ This is **not** two competing pages anymore. Deleting `/dashboard/deadlines` wou
 
 `nectar_requirements` / `nectar_compliance_instances` are a **third** compliance store used by Knowledge base / authoritative sources (`src/lib/authoritative-sources.functions.ts`, ~2653 lines). Action Required does not use them. Do not “simplify” by deleting that table or those functions — Knowledge is gated off for TNS (`nectar` feature default OFF) but the code is wired.
 
-### 1.2 NECTAR vs Compass — different products, both wired
+### 1.2 NECTAR — advisory layer, not a clock
 
 | Surface | Path | What it is | Wired? |
 |---------|------|------------|--------|
-| Compass (staff voice agent) | `src/components/staff-mobile/compass-voice-button.tsx`, `src/lib/cedar-voice-agent.server.ts` | Floating mic on **staff** screens. Clock-in / note expand / intent routing. Mounted from `src/routes/dashboard.tsx`. | **Yes.** PR #167: GPS required on Compass clock-in; location failure opens punch pad. Does **not** transmit UEVV. |
-| Punch-pad Compass | `src/components/evv/punch-pad.tsx` (“Expand with Compass”, dictation) | In-shift note tools. Independent of the floating button (comment in `compass-voice-button.tsx`). | **Yes.** |
+| Punch pad | `src/components/evv/punch-pad.tsx` | **Only staff clock.** Geofence, 1056 gate, launchpad, 50-word note, PCSP/incident/behaviors/meds/attest. Optional Dictate + Review with NECTAR. | **Yes.** |
 | Ask NECTAR (staff) | `/dashboard/ask-nectar` → `ask-nectar-staff.tsx` | Chat. `STAFF_NAV` + mobile tab. Feature `nectar` **default OFF**. | Mounted; locked unless flag on. |
 | Ask NECTAR (admin) | `/dashboard/help` | Admin help + ticket escalation. `NECTAR_NAV`. | Mounted; same flag. |
 | NECTAR Knowledge | `/dashboard/hub/knowledge` + standalone `/dashboard/authoritative-sources`, `/dashboard/nectar-docs`, `/dashboard/external-compliance` | Sources / company docs / external compliance. | Mounted; flag off. |
 | NECTAR billing / tasks / tours | `src/components/nectar/*`, `draft-jobs-driver.tsx` | Shell chrome, not a second clock. | Mounted in dashboard layout. |
 
-Do **not** delete Compass to “leave NECTAR,” or vice versa. Compass is how staff start a shift by voice; NECTAR is the advisory/knowledge layer (`CLAUDE.md`: Gatekeeper / Scrubber / Sentinel / Auditor — never auto-publish). They share Bedrock (`src/lib/ai-bedrock.server.ts`) and that is the only real overlap.
+NECTAR is the advisory/knowledge layer (`CLAUDE.md`: Gatekeeper / Scrubber / Sentinel / Auditor — never auto-publish). Compass (Cedar voice) was **removed** — do not restore a floating mic or spoken clock-in.
 
-`GO_LIVE.md` §H-2 (Compass clock-in wrote `gps_in_bypassed`) is **stale as of PR #167**. Current Compass requires GPS or hands off to the punch pad.
+`GO_LIVE.md` §H-2 is punch-pad GPS fail-closed. There is no voice clock-in.
 
 ### 1.3 Old training vs HIVE Training — three live stacks, not two
 
@@ -89,7 +88,7 @@ There is nothing left to delete in TS for whiteboard. Do **not** `DROP` those ta
 | Staff My Schedule | `/dashboard/schedule` | **In `STAFF_NAV`.** Uses `GeneralTimeClock` inline (the old Time Clock tab was folded in). |
 | Old scheduling **components** | most of `src/components/scheduling/*` | **Unimported** except `open-shifts-panel`, `hhs-info-tooltip`, `hhs-explainer-banner`, `homes-teams-board`, `add-segment-dialog` (only from other unused files). See §2. |
 | Old schedule-preview leftovers | `nectar-command-bar.tsx`, `settings-drawer.tsx`, `shift-editor.tsx` | **Unimported.** `requests-panel.tsx` / time-off / swap dialogs **are** used by the live scheduler + staff schedule. |
-| `src/lib/scheduling/*` | shifts, locations, open-shifts, HHS labels, conflict math | **Load-bearing.** Compass clock-in, staff schedule, homes board, and the unused old UI all call this package. Do not delete the lib because the old UI is unused. |
+| `src/lib/scheduling/*` | shifts, locations, open-shifts, HHS labels, conflict math | **Load-bearing.** Punch pad, staff schedule, homes board, and the unused old UI all call this package. Do not delete the lib because the old UI is unused. |
 
 Homes & Teams: `/dashboard/homes` is the live board (`HomesTeamsBoard`). `/dashboard/teams` redirects there. **Quirk (do not “fix” before Tuesday):** Clients hub tab “Teams & homes” (`dashboard.hub.clients.tsx`) still renders `TeamsPage()`, which is now a `<Navigate to="/dashboard/homes">` — so that hub tab navigates **away** from the hub. Wired, not dead.
 
@@ -136,7 +135,7 @@ These are 5–15 line files. Deleting them is a 404 for bookmarks and for stale 
 | `/dashboard/employees/` | `dashboard.employees.index.tsx` | Admin Home “Employees” tile; staff profile back-link; hub roster **embeds** the same `EmployeesPage`. |
 | `/dashboard/homes` | `dashboard.homes.tsx` | Live Homes & Teams. |
 | `/dashboard/hhs-hub/$clientId` | `dashboard.hhs-hub.$clientId.tsx` | **HHS Sep 1 path** (daily note + attendance). Not punch pad. |
-| `/dashboard/workspace/$clientId` | `dashboard.workspace.$clientId.tsx` | Staff caseload → punch pad. Compass GPS fallback lands here. |
+| `/dashboard/workspace/$clientId` | `dashboard.workspace.$clientId.tsx` | Staff caseload → punch pad. |
 | `/dashboard/evv-archive` | `dashboard.evv-archive.tsx` | Timesheet import wizard `onArchive`. Also a **tab inside** compliance-desk. |
 | `/dashboard/nectar-company-profile` | `dashboard.nectar-company-profile.tsx` | Form 520 “provider approver” link. |
 | `/dashboard/host-home-control` | `dashboard.host-home-control.tsx` | Only `src/lib/dspd-audit-tool.ts` `hive_href`. Still mounted. |
@@ -264,7 +263,7 @@ These files look like “too much code.” They are the Sep 1 product. Do not sp
 |------|--------|----------------|
 | `src/integrations/supabase/types.ts` | 18k | Generated DB types. Edit only via regen. |
 | `src/components/pages/authoritative-sources-page.tsx` | 5069 | NECTAR SOW ingestion UI. Gated off; still the only sources UI. |
-| `src/components/evv/punch-pad.tsx` | 3496 | **Clock in/out.** Geofence, 1056 gate, launchpad, Compass expand, GPS. PR #166/#167 just touched copy + Compass handoff. |
+| `src/components/evv/punch-pad.tsx` | 3496 | **Clock in/out.** Geofence, 1056 gate, launchpad, GPS. Only staff clock. |
 | `src/lib/company-obligations.functions.ts` | 3221 | Compliance register + due-date engine. Home / Action Required / My Compliance all sit on this. |
 | `src/routes/dashboard.smart-import.$jobId.review.tsx` | 3702 | PCSP/1056 import review. |
 | `src/routes/dashboard.compliance-desk.tsx` | 2721 | EVV approve + Utah CSV. |
@@ -282,12 +281,11 @@ These files look like “too much code.” They are the Sep 1 product. Do not sp
 | `src/lib/smart-import-commit.functions.ts` | 1645 | Import commit. |
 | `src/lib/billing-units.ts` + `src/lib/evv-codes.ts` + `src/lib/service-billing.ts` | small | **Domain math.** `computeEntryUnits()` is the only legal unit path (`CLAUDE.md`). |
 | `src/lib/hhs.functions.ts` | — | HHS daily note / attendance writes. Readers must stay on `hhs_daily_records_v`. |
-| `src/lib/cedar-voice-agent.server.ts` | — | Compass intents; just changed in PR #167. |
 | `src/routes/__root.tsx` | — | `must_change_password` enforcement. |
 
-Three EVV/shift hooks look duplicate and are all live: `use-active-shift.tsx` (green bar / Compass / punch), `use-today-shift.tsx` (staff Home hero), `use-today-shifts.tsx` (caseload grid). Unifying them is a regression magnet — not a cleanup.
+Three EVV/shift hooks look duplicate and are all live: `use-active-shift.tsx` (green bar / punch pad), `use-today-shift.tsx` (staff Home hero), `use-today-shifts.tsx` (caseload grid). Unifying them is a regression magnet — not a cleanup.
 
-`src/lib/scheduling/*` vs `src/lib/scheduler/*` is two packages by accident of history. Both are called from the live scheduler and from Compass. Do not merge this week.
+`src/lib/scheduling/*` vs `src/lib/scheduler/*` is two packages by accident of history. Both are called from the live scheduler. Do not merge this week.
 
 ---
 
@@ -297,7 +295,7 @@ Three EVV/shift hooks look duplicate and are all live: `use-active-shift.tsx` (g
 
 Anything a tester will click, plus the last 48 hours of merges:
 
-- Punch pad, Compass button, Cedar voice agent, GPS fallback to workspace.
+- Punch pad (only staff clock), GPS fail-closed, workspace.
 - Scheduler + staff Schedule + `GeneralTimeClock` + `general_shifts`.
 - HHS hub, daily logs, `hhs.functions.ts`, `hhs_daily_records_v`.
 - Client 1056 / `client_billing_codes`, `computeEntryUnits`, `evv-codes.ts`.
@@ -329,7 +327,7 @@ Do these as **one cluster per PR**, grep for the symbol, `npm run build`, keep `
 **Not safe as a “cleanup” even after Sep 1 without a product decision:**
 
 - Deleting `/dashboard/command-center` or `/dashboard/compliance-desk` or `/dashboard/timeclock` or `/dashboard/training` or `/dashboard/programs` or `/dashboard/team` or `/dashboard/assignments` or `/dashboard/host-home-control` — all still **mounted**. First change remaining links/embeds to the hub, ship that, *then* consider a redirect stub, *then* maybe delete. Never skip to delete.
-- Merging Compass into NECTAR or My Trainings into HIVE Training.
+- Merging My Trainings into HIVE Training.
 - Dropping `hhs_daily_records`, `locations`, celebration/whiteboard tables, or `nectar_requirements`.
 - Rewriting punch-pad / scheduler / obligations / smart-import “to make them smaller.”
 
@@ -356,7 +354,7 @@ From `GO_LIVE.md`, still true after PRs 166–167: no live UEVV API, invite-acce
 | `STAFF_NAV` is Caseload / Schedule / Logs / Ask NECTAR / Trainings | Also My Compliance, Historical Records, Time Corrections, HIVE Training. |
 | `FEATURE_INVENTORY.md` `/dashboard/billing/subscription` missing | File exists. |
 | `ROUTE_MAP.md` `/fix-admin`, Records Desk as primary | Historical. |
-| `GO_LIVE.md` Compass GPS bypassed | **Superseded by PR #167.** |
+| `GO_LIVE.md` Compass GPS bypassed | **Obsolete.** Compass was removed; punch pad is the only staff clock. |
 
 `GO_LIVE.md` is the Sep 1 operations doc. This file is the cleanup map. June audits are fossils.
 
@@ -364,7 +362,7 @@ From `GO_LIVE.md`, still true after PRs 166–167: no live UEVV API, invite-acce
 
 ## 6. What this audit will not recommend
 
-- A new information architecture, a “one training system,” or a NECTAR/Compass merge.
+- A new information architecture or a “one training system.”
 - Deleting any file under `src/routes/` while it still appears in `src/routeTree.gen.ts`.
 - Database drops, RLS edits, or “while we’re here” scheduler/punch-pad refactors.
 - Removing redirect stubs so the route map looks smaller. 404s during the agency test are worse than extra files.

@@ -17,7 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Play, Square, MapPin, Lock, Loader2, AlertTriangle, CheckCircle2, Clock, Wifi,
-  Hexagon, Mic, MicOff, Sparkles, Pencil, ShieldCheck, ExternalLink, Compass,
+  Hexagon, Mic, MicOff, Sparkles, Pencil, ShieldCheck, ExternalLink,
 } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -26,7 +26,6 @@ import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { computeEntryUnits } from "@/lib/billing-units";
 import { EvvConsentGate } from "@/components/evv/consent-gate";
 import { evaluateShiftNote, type CoachResult } from "@/lib/ai-coach.functions";
-import { expandShiftNote } from "@/lib/voice-documentation.server";
 import { freezeOriginalTranscript } from "@/lib/original-transcript";
 import {
   accumulateSpeechResults,
@@ -46,7 +45,6 @@ import {
 import { BehaviorObservationsBoundary } from "@/components/evv/behavior-observations-boundary";
 import { useShiftBehaviorSetting } from "@/hooks/use-shift-behavior-setting";
 import { listClientTargetBehaviors } from "@/lib/client-target-behaviors.functions";
-import { type CompassClockOutHandoff } from "@/lib/compass-clock-out-interview";
 import { getPendingTrackingForms } from "@/lib/forms.functions";
 import { PendingTrackingFormsDialog, type PendingForm } from "@/components/evv/pending-tracking-forms-dialog";
 import { NoteTriggerPrompt } from "@/components/residential/note-trigger-prompt";
@@ -153,24 +151,6 @@ export interface PunchPadProps {
    * once an active shift for this pad is detected (fires once per mount).
    */
   autoOpenCompliance?: boolean;
-  /**
-   * Pending narrative text handed off from the Compass voice agent's
-   * "expand_note" intent (see compass-voice-button.tsx). Consumed once, the
-   * next time the compliance modal opens, instead of the normal blank note.
-   */
-  initialNarrative?: string;
-  /**
-   * Original spoken transcript from the same Compass turn. Shown read-only
-   * in the compliance modal and persisted as original_transcript on attest.
-   * Never written into shift_note_text.
-   */
-  initialOriginalTranscript?: string;
-  /**
-   * Clock-out interview answers from Compass. When present, openCompliance()
-   * keeps selected goals / baseline / incident / behavior toggles instead of
-   * wiping them. Attestation is still cleared — staff remain the witness.
-   */
-  clockOutHandoff?: CompassClockOutHandoff | null;
 }
 
 
@@ -183,38 +163,12 @@ export function PunchPad({
   presetServiceCode,
   lockServiceCode = false,
   autoOpenCompliance = false,
-  initialNarrative,
-  initialOriginalTranscript,
-  clockOutHandoff = null,
 }: PunchPadProps) {
 
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
   const { passed: hasPassedLaunchpad, blocked: launchpadBlocked } = useHasPassedLaunchpad();
-
-  // Voice-agent handoff — see initialNarrative doc comment above. Ref so a
-  // late-arriving prop (navigation already landed on this component) is
-  // still there the next time openCompliance() runs, without re-triggering
-  // on every render.
-  const pendingVoiceNarrativeRef = useRef<string | null>(initialNarrative ?? null);
-  const pendingOriginalTranscriptRef = useRef<string | null>(
-    initialOriginalTranscript ?? null,
-  );
-  const pendingClockOutHandoffRef = useRef<CompassClockOutHandoff | null>(
-    clockOutHandoff ?? null,
-  );
-  useEffect(() => {
-    if (initialNarrative) pendingVoiceNarrativeRef.current = initialNarrative;
-  }, [initialNarrative]);
-  useEffect(() => {
-    if (initialOriginalTranscript) {
-      pendingOriginalTranscriptRef.current = initialOriginalTranscript;
-    }
-  }, [initialOriginalTranscript]);
-  useEffect(() => {
-    if (clockOutHandoff) pendingClockOutHandoffRef.current = clockOutHandoff;
-  }, [clockOutHandoff]);
 
   // ── GPS state ───────────────────────────────────────────────────────────────
   // Single watchPosition — no redundant getCurrentPosition call.
@@ -371,14 +325,6 @@ export function PunchPad({
   const [aiFlagCount, setAiFlagCount]     = useState(0);
   const [allowException, setAllowException] = useState(false);
 
-  // ── Compass note expansion (Phase 1 voice documentation) ────────────────────
-  const [expandBusy, setExpandBusy]       = useState(false);
-  const [noteExpanded, setNoteExpanded]   = useState(false);
-  const [originalTranscript, setOriginalTranscript] = useState("");
-  // First Compass expansion (before staff edits). Written to
-  // nectar_attestations.nectar_expanded_output; original speech stays separate.
-  const firstExpandedRef = useRef<string | null>(null);
-
   // ── Voice dictation for the narrative textarea ──────────────────────────────
   const { enabled: nectarInfusionEnabled } = useNectarInfusion();
   const [isRecording, setIsRecording]         = useState(false);
@@ -388,6 +334,7 @@ export function PunchPad({
   const dictationBaseRef = useRef("");
   const dictationPriorFinalsRef = useRef("");
   const dictationLiveFinalsRef = useRef("");
+  const [originalTranscript, setOriginalTranscript] = useState("");
 
   // ── Staff attestation (Medicaid fraud statement) ────────────────────────────
   const [attestationChecked, setAttestationChecked] = useState(false);
@@ -1044,57 +991,19 @@ export function PunchPad({
 
   function openCompliance() {
     if (!active) return;
-    const pendingNote = pendingVoiceNarrativeRef.current;
-    const pendingSpoken = pendingOriginalTranscriptRef.current;
-    const handoff = pendingClockOutHandoffRef.current;
-
-    setNarrative(pendingNote ?? "");
-    setNoteExpanded(!!pendingNote);
-    if (pendingNote) {
-      if (!firstExpandedRef.current) firstExpandedRef.current = pendingNote;
-    } else {
-      firstExpandedRef.current = null;
-    }
-    setOriginalTranscript(pendingSpoken ?? "");
-    pendingVoiceNarrativeRef.current = null;
-    pendingOriginalTranscriptRef.current = null;
-
-    if (handoff) {
-      const goalMap: Record<string, boolean> = {};
-      for (const g of handoff.selectedGoals) {
-        if (g.trim()) goalMap[g] = true;
-      }
-      setCheckedGoals(goalMap);
-      setBaselineChecked(!!handoff.baseline);
-      setIncidentAnswer(handoff.incident);
-      setIncidentFlag(handoff.incident === "yes");
-      if (handoff.behaviorsObserved === null) {
-        setBehaviorAnswers(emptyBehaviorAnswers);
-      } else if (handoff.behaviorsObserved === false) {
-        setBehaviorAnswers({ ...emptyBehaviorAnswers, behaviorsObserved: false });
-      } else {
-        setBehaviorAnswers({
-          ...emptyBehaviorAnswers,
-          behaviorsObserved: true,
-          targetBehaviors: handoff.targetBehaviors,
-          // Do not invent counts or descriptions — staff complete those here.
-        });
-      }
-      pendingClockOutHandoffRef.current = null;
-    } else {
-      setCheckedGoals({});
-      setBaselineChecked(false);
-      setBehaviorAnswers(emptyBehaviorAnswers);
-      setIncidentFlag(false);
-      setIncidentAnswer(null);
-    }
+    setNarrative("");
+    setOriginalTranscript("");
+    setCheckedGoals({});
+    setBaselineChecked(false);
+    setBehaviorAnswers(emptyBehaviorAnswers);
+    setIncidentFlag(false);
+    setIncidentAnswer(null);
 
     setShowNarrativeError(false);
     setAiCoach(null);
     setAiIterations(0);
     setAiFlagCount(0);
     setAllowException(false);
-    setExpandBusy(false);
     setAttestationChecked(false);
     setAttestationTimestamp(null);
     setCompletenessRan(false);
@@ -1305,6 +1214,7 @@ export function PunchPad({
         const base = dictationBaseRef.current.trim();
         setNarrative(base && display ? `${base} ${display}` : display || base);
         if (display.trim()) {
+          setOriginalTranscript((prev) => freezeOriginalTranscript(prev, display));
           setShowNarrativeError(false);
           setAiCoach(null);
         }
@@ -1427,40 +1337,6 @@ export function PunchPad({
       setAiBusy(false);
     }
   }
-
-  // Expand a short spoken/typed shift note into a complete, SOW-compliant
-  // draft. Staff still edits and attests before submitting — see the amber
-  // "review carefully" notice rendered below the narrative textarea.
-  async function handleExpandWithCompass() {
-    if (!active) return;
-    setExpandBusy(true);
-    try {
-      const clientFirst =
-        lockedClient?.name?.split(" ")?.[0] ??
-        caseload.find((c) => c.id === active.client_id)?.first_name ??
-        "the client";
-
-      const source = narrative.trim();
-      const expanded = await expandShiftNote({
-        data: {
-          narrative: source,
-          goals: activeClientGoals,
-          serviceCode: active.service_type_code,
-          clientFirstName: clientFirst,
-        },
-      });
-      setOriginalTranscript((prev) => freezeOriginalTranscript(prev, source));
-      if (!firstExpandedRef.current) firstExpandedRef.current = expanded;
-      setNarrative(expanded);
-      setNoteExpanded(true);
-      if (aiCoach) setAiCoach(null);
-    } catch (e) {
-      toast.error((e as Error).message || "Compass couldn't expand this note — please try again.");
-    } finally {
-      setExpandBusy(false);
-    }
-  }
-
 
   // ── Compliance gate (billing_conflict detector) at clock-out ────────────
   // Growth-adaptive: one useComplianceGate call, its own buildInput/buildSubject,
@@ -1651,7 +1527,7 @@ export function PunchPad({
     update.attested_at = attestationTimestamp;
     const frozenOriginal = freezeOriginalTranscript(originalTranscript, null);
     if (frozenOriginal) {
-      // Frozen original speech — never replaced with the expanded/edited note.
+      // Frozen original speech — never replaced with later edits to the note.
       update.original_transcript = frozenOriginal;
     }
 
@@ -1674,7 +1550,7 @@ export function PunchPad({
           nectar_review_status: aiCoach?.status ?? "not_reviewed",
         },
         original_staff_input: frozenOriginal || null,
-        nectar_expanded_output: firstExpandedRef.current || null,
+        nectar_expanded_output: null,
         input_confirmed_at: attestationTimestamp,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any);
@@ -3064,26 +2940,7 @@ export function PunchPad({
                         Review with NECTAR
                       </Button>
                     )}
-                    {narrative.trim().split(/\s+/).length >= 5 && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={handleExpandWithCompass}
-                        disabled={expandBusy}
-                        className="w-fit border-[color:var(--amber-600)]/60 text-[color:var(--amber-700)] hover:bg-[color:var(--amber-50)]"
-                      >
-                        {expandBusy ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Compass className="mr-2 h-3.5 w-3.5" />}
-                        Expand with Compass
-                      </Button>
-                    )}
                   </div>
-                  {noteExpanded && (
-                    <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
-                      ✨ Expanded by Compass — review carefully before attesting. Your attestation confirms this
-                      accurately reflects your shift. Original speech is kept separately and is not overwritten.
-                    </div>
-                  )}
                 </div>
 
                 {/* Incident report: explicit Yes/No so staff cannot skip it. */}

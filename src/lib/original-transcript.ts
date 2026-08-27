@@ -1,9 +1,8 @@
 /**
- * Original staff speech / pre-expansion shorthand for Compass notes.
+ * Original staff speech / pre-edit shorthand for punch-pad and daily-log notes.
  *
- * Legal split: Cedar (Compass) is the scribe; the staff member is the witness.
- * The expanded note is editable; the original transcript is frozen at first
- * capture and must never be overwritten with the expanded text.
+ * The submitted note is editable; the original transcript is frozen at first
+ * capture and must never be overwritten with later edits.
  */
 export function freezeOriginalTranscript(
   existing: string | null | undefined,

@@ -1,22 +1,47 @@
 import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
-import { CompassVoiceButton } from "@/components/staff-mobile/compass-voice-button";
 import { setNavigateImpl } from "./mocks/tanstack-router";
 import { PunchPadClockInStage } from "./punch-pad-clock-in-stage";
 import { PunchPadClockOutStage } from "./punch-pad-clock-out-stage";
+import { TOMMY_ID } from "./fixtures";
 import type { NavCall } from "./e2e-bridge";
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
 type Scene = "staff-home" | "punch-pad-clock-in" | "punch-pad-clock-out";
 
+function sceneForScenario(scenario: string): Scene {
+  if (scenario === "admin") return "staff-home";
+  if (scenario === "clock-out") return "punch-pad-clock-out";
+  if (
+    scenario === "clock-in" ||
+    scenario === "gps-denied" ||
+    scenario === "gps-timeout" ||
+    scenario === "launchpad-blocked"
+  ) {
+    return "punch-pad-clock-in";
+  }
+  return "staff-home";
+}
+
 export function StaffGoLiveApp() {
-  const [scene, setScene] = useState<Scene>("staff-home");
+  const scenario = window.__e2e.scenario;
+  const [scene, setScene] = useState<Scene>(() => sceneForScenario(scenario));
   const [workspace, setWorkspace] = useState<{
     clientId: string;
     search: Record<string, string | undefined>;
-  } | null>(null);
+  } | null>(() =>
+    sceneForScenario(scenario) === "staff-home"
+      ? null
+      : {
+          clientId: TOMMY_ID,
+          search: {
+            code: "SEI",
+            verify: scenario === "clock-out" ? "1" : undefined,
+          },
+        },
+  );
 
   useEffect(() => {
     setNavigateImpl((args: NavCall) => {
@@ -29,7 +54,7 @@ export function StaffGoLiveApp() {
     });
   }, []);
 
-  const admin = window.__e2e.scenario === "admin";
+  const admin = scenario === "admin";
 
   return (
     <QueryClientProvider client={qc}>
@@ -37,7 +62,6 @@ export function StaffGoLiveApp() {
         {scene === "staff-home" && (
           <div data-e2e-scene="staff-home">
             <h1>{admin ? "Admin home" : "Staff home"}</h1>
-            {!admin && <CompassVoiceButton />}
           </div>
         )}
         {scene === "punch-pad-clock-in" && workspace && (

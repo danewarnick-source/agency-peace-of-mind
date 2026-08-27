@@ -20,9 +20,9 @@ const SHIFT_PATCH_ALLOWLIST = new Set([
 ]);
 
 // Exported so other write paths that create a shift/clock-in outside this
-// file (e.g. the Compass voice agent's thin EVV clock-in) enforce the exact
-// same billing-authorization and Launchpad gates createShift does, instead
-// of duplicating — or worse, drifting from — this logic.
+// file (e.g. the punch pad) enforce the exact same billing-authorization
+// and Launchpad gates createShift does, instead of duplicating — or worse,
+// drifting from — this logic.
 export async function assertActiveBillingCode(
   supabase: SupabaseClient<Database>,
   organizationId: string,

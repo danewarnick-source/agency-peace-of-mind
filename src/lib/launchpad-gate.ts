@@ -3,8 +3,8 @@
  *
  * `profiles.has_passed_launchpad` is the live product flag. A handful of
  * internal test accounts may have it flipped true in staging so QA can
- * exercise Compass — that is a TEST override, not real completion, and must
- * never be hardcoded as a product allow-list for client staff.
+ * exercise the punch pad — that is a TEST override, not real completion, and
+ * must never be hardcoded as a product allow-list for client staff.
  */
 
 export const LAUNCHPAD_CLOCK_IN_BLOCKED_MESSAGE =

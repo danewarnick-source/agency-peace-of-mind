@@ -28,10 +28,6 @@ export default defineConfig({
         replacement: path.join(here, "mocks/use-shift-behavior-setting.ts"),
       },
       {
-        find: "@/lib/cedar-voice-agent.server",
-        replacement: path.join(here, "mocks/cedar-voice-agent.server.ts"),
-      },
-      {
         find: "@/lib/ai-coach.functions",
         replacement: path.join(here, "mocks/ai-coach.functions.ts"),
       },

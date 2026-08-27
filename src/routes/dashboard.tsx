@@ -24,7 +24,6 @@ import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { NotificationBell } from "@/components/NotificationBell";
 import { StaffMobileShell } from "@/components/staff-mobile/staff-mobile-shell";
 import { StaffMobilePreviewFrame } from "@/components/staff-mobile/staff-mobile-preview-frame";
-import { CompassVoiceButton } from "@/components/staff-mobile/compass-voice-button";
 import { NectarTaskCenter } from "@/components/nectar/nectar-task-center";
 import { NectarSearchBar } from "@/components/nectar/nectar-search-bar";
 import { ListChecks, Clock } from "lucide-react";
@@ -419,12 +418,6 @@ function DashboardLayout() {
     <div className="flex h-screen h-[100dvh] flex-col overflow-hidden">
       <ImpersonationBanner />
 
-
-      {/* Compass voice agent — staff view only (mobile + desktop), never
-          admin, never the admin's "preview as staff" tool. Fixed-position,
-          so it renders once here regardless of which layout block below
-          (mobile shell vs. desktop grid) is actually active. */}
-      {isStaffView && !isMobilePreview && <CompassVoiceButton />}
 
       {/* Mobile shell — staff view only (below md) */}
       {isStaffView && !isMobilePreview && (

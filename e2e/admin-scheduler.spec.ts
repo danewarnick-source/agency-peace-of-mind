@@ -3,7 +3,7 @@
  *
  * Auth is mocked as Company Admin. Every Supabase REST write and every
  * mutating server function is intercepted — these tests never touch the
- * live calendar. Staff Compass (/dashboard/schedule) is not the target;
+ * live calendar. Staff schedule (`/dashboard/schedule`) is not the target;
  * admin nav points at /dashboard/scheduler (legacy /scheduling and
  * /schedule-preview redirect there).
  *
@@ -241,17 +241,16 @@ test.describe("Admin scheduler — True North Sep 1", () => {
     await saveShot(page, "06a-staff-nav");
 
     await page.goto("/dashboard/scheduler", { waitUntil: "domcontentloaded" });
-    // Wait for the dashboard shell to leave "Loading…" so we assert the real
-    // RBAC outcome, not the brief boot spinner (Publish count is 0 there too).
+    await page.waitForURL(/\/dashboard\/?$/, { timeout: 20_000 });
     await expect(page.getByText(/^Loading…$/)).toHaveCount(0, { timeout: 25_000 });
     await saveShot(page, "06b-staff-direct-scheduler-url");
-    // Product rule: staff should not get Publish / Add-shift. If the URL still
-    // mounts the admin chrome, this assertion fails and we report it as a bug.
+    // Product rule: staff without create_shifts land on caseload, not admin Publish.
     const publish = page.getByRole("button", { name: /Publish/ });
     await expect(
       publish,
       "Staff visiting /dashboard/scheduler must not see the admin Publish control",
     ).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /^My Caseload$/ })).toBeVisible();
   });
 
   test("7. America/Denver: evening shift stays on Sep 1 (not UTC Sep 2)", async ({ page }) => {

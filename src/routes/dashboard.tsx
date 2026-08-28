@@ -48,6 +48,8 @@ import { DraftJobsHeaderPill } from "@/components/nectar/draft-jobs-header-pill"
 import { GuidedTourProvider } from "@/components/nectar/guided-tour-provider";
 import { OPEN_DASHBOARD_MENU_EVENT } from "@/lib/portal-view-landing";
 import { isCognitoAuth } from "@/lib/aws/env";
+import { AWS_DB_ERROR_EVENT } from "@/lib/aws/exec-http";
+import { shouldLeaveCognitoLoadingOverlay } from "@/lib/cognito-login-gate";
 
 
 
@@ -404,7 +406,9 @@ function DashboardLayout() {
   };
 
   const [bootstrapStuck, setBootstrapStuck] = useState(false);
-  const bootstrapping = dashboardShellShowsLoading({
+  const [awsDbFailed, setAwsDbFailed] = useState(false);
+  const [awsDbErrorMessage, setAwsDbErrorMessage] = useState<string | null>(null);
+  const awaitingBootstrap = dashboardShellShowsLoading({
     sessionLoading: loading,
     hasSession: !!session,
     execLoading,
@@ -412,27 +416,35 @@ function DashboardLayout() {
     orgLoading,
     bootTimedOut,
   });
-
+  const cognitoLeaveLoading = shouldLeaveCognitoLoadingOverlay({
+    isCognito: isCognitoAuth(),
+    hasSession: Boolean(session) && !loading,
+    awsDb5xx: awsDbFailed,
+    orgError,
+    timedOut: bootstrapStuck,
+  });
+  const bootstrapping = awaitingBootstrap && !cognitoLeaveLoading;
 
   useEffect(() => {
     if (!isCognitoAuth()) return;
-    if (!bootstrapping) {
+    const onErr = (e: Event) => {
+      const detail = (e as CustomEvent<{ message?: string; status?: number }>).detail;
+      setAwsDbFailed(true);
+      if (detail?.message) setAwsDbErrorMessage(String(detail.message));
+    };
+    window.addEventListener(AWS_DB_ERROR_EVENT, onErr);
+    return () => window.removeEventListener(AWS_DB_ERROR_EVENT, onErr);
+  }, []);
+
+  useEffect(() => {
+    if (!isCognitoAuth()) return;
+    if (!awaitingBootstrap) {
       setBootstrapStuck(false);
       return;
     }
     const t = window.setTimeout(() => setBootstrapStuck(true), 8_000);
     return () => window.clearTimeout(t);
-  }, [bootstrapping]);
-
-  useEffect(() => {
-    if (!isCognitoAuth()) return;
-    if (loading || !session) return;
-    if (!orgError) return;
-    void (async () => {
-      await supabase.auth.signOut();
-      navigate({ to: "/login", replace: true });
-    })();
-  }, [orgError, loading, session, navigate]);
+  }, [awaitingBootstrap]);
 
   if (bootstrapping) {
     const cognitoEscape = isCognitoAuth() && (orgError || bootstrapStuck);
@@ -504,6 +516,16 @@ function DashboardLayout() {
     <DraftJobsProvider>
     <div className="flex h-screen h-[100dvh] flex-col overflow-hidden">
       <ImpersonationBanner />
+      {isCognitoAuth() && (orgError || awsDbFailed) && (
+        <div
+          data-testid="cognito-bootstrap-error"
+          className="shrink-0 border-b border-amber-300/60 bg-amber-50 px-4 py-2 text-center text-xs text-amber-950 md:px-6"
+        >
+          {awsDbErrorMessage ||
+            (orgQueryError instanceof Error ? orgQueryError.message : null) ||
+            "Some workspace data did not load. You can keep working with what is available, or sign out."}
+        </div>
+      )}
 
 
       {/* Mobile shell — staff view only (below md) */}

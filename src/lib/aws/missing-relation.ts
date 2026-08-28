@@ -37,3 +37,40 @@ export function emptySelectResult(plan: Pick<DbPlan, "want" | "head">): ExecResu
   }
   return { data: [], error: null, count: 0, status: 200, statusText: "OK" };
 }
+
+/** Optional home-bootstrap upsert: orphan client_id must not 500 the session. */
+export const OPTIONAL_CLIENT_FK_TABLES = new Set(["client_progress_summaries"]);
+
+export function isClientProgressClientFkError(err: unknown): boolean {
+  const code =
+    err &&
+    typeof err === "object" &&
+    "code" in err &&
+    typeof (err as { code: unknown }).code === "string"
+      ? (err as { code: string }).code
+      : "";
+  const constraint =
+    err &&
+    typeof err === "object" &&
+    "constraint" in err &&
+    typeof (err as { constraint: unknown }).constraint === "string"
+      ? (err as { constraint: string }).constraint
+      : "";
+  const message = err instanceof Error ? err.message : String(err ?? "");
+  const blob = `${constraint} ${message}`;
+  if (!/client_progress_summaries_client_id_fkey/i.test(blob)) return false;
+  return code === "23503" || /foreign key constraint/i.test(message);
+}
+
+export function shouldNoopOptionalUpsert(
+  plan: Pick<DbPlan, "op" | "table">,
+  err: unknown,
+): boolean {
+  if (!OPTIONAL_CLIENT_FK_TABLES.has(plan.table)) return false;
+  if (plan.op !== "upsert" && plan.op !== "insert" && plan.op !== "update") return false;
+  return isClientProgressClientFkError(err);
+}
+
+export function emptyMutationResult(): ExecResult {
+  return { data: [], error: null, count: 0, status: 200, statusText: "OK" };
+}

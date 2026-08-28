@@ -11,7 +11,14 @@ import {
   shouldProxyClientData,
 } from "./env.ts";
 import { createCognitoAuthAdapter } from "./auth-adapter.ts";
-import { quoteIdent, filterToSql, parseSelectList, orExprToSql } from "./query-builder.ts";
+import {
+  quoteIdent,
+  filterToSql,
+  parseSelectList,
+  orExprToSql,
+  selectColumnSql,
+  parseSelectAlias,
+} from "./query-builder.ts";
 
 const SAVED = { ...process.env };
 
@@ -145,6 +152,68 @@ describe("query builder SQL safety", () => {
     assert.match(sql, /ILIKE/);
     assert.equal(params.length, 2);
   });
+
+  it("treats PostgREST select aliases as renames, not invalid identifiers", () => {
+    const live = "upi_submitted_at:state_submitted_at";
+    assert.doesNotThrow(() => quoteIdent("state_submitted_at"));
+    assert.throws(() => quoteIdent(live));
+    const parsed = parseSelectAlias(live);
+    assert.deepEqual(parsed, { alias: "upi_submitted_at", column: "state_submitted_at" });
+    assert.equal(
+      selectColumnSql(
+        "id, report_number, client_id, discovered_at, upi_submitted_at:state_submitted_at, status",
+      ),
+      '"id", "report_number", "client_id", "discovered_at", "state_submitted_at" AS "upi_submitted_at", "status"',
+    );
+  });
+
+  it("parses every alias:column used by home/admin bootstrap", () => {
+    const aliases = [
+      "upi_submitted_at:state_submitted_at",
+      "record_date:log_date",
+      "uploaded_at:created_at",
+      "provider_id:user_id",
+    ];
+    for (const token of aliases) {
+      const renamed = parseSelectAlias(token);
+      assert.ok(renamed, `expected alias parse for ${token}`);
+      assert.equal(
+        selectColumnSql(token),
+        `${quoteIdent(renamed!.column)} AS ${quoteIdent(renamed!.alias)}`,
+      );
+    }
+    const deadlines = readFileSync(
+      new URL("../../hooks/use-deadlines.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(deadlines, /upi_submitted_at:state_submitted_at/);
+    const pay = readFileSync(
+      new URL("../../hooks/use-nectar-pay-period.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(pay, /record_date:log_date/);
+    const util = readFileSync(
+      new URL("../../hooks/use-client-utilization.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(util, /record_date:log_date/);
+    const docs = readFileSync(new URL("../nectar-documents.functions.ts", import.meta.url), "utf8");
+    assert.match(docs, /uploaded_at:created_at/);
+    const audit = readFileSync(new URL("../internal-audit.functions.ts", import.meta.url), "utf8");
+    assert.match(audit, /record_date:log_date/);
+    assert.match(audit, /provider_id:user_id/);
+  });
+
+  it("does not treat embed syntax as a column alias", () => {
+    const parsed = parseSelectList(
+      "id, clients:client_id(first_name, last_name), upi_submitted_at:state_submitted_at",
+    );
+    assert.equal(parsed.embeds.length, 1);
+    assert.equal(parsed.embeds[0].alias, "clients");
+    assert.ok(parsed.columns.includes("upi_submitted_at:state_submitted_at"));
+    assert.ok(parsed.columns.includes("id"));
+    assert.equal(parseSelectAlias("clients:client_id(first_name)"), null);
+  });
 });
 
 describe("RDS TLS for /api/aws/db", () => {
@@ -214,6 +283,62 @@ describe("missing org_member_directory does not 500", () => {
   });
 });
 
+describe("optional client_progress_summaries upsert", () => {
+  it("no-ops FK violations instead of 500", async () => {
+    const { shouldNoopOptionalUpsert, emptyMutationResult } = await import("./missing-relation.ts");
+    const err = Object.assign(
+      new Error(
+        'insert or update on table "client_progress_summaries" violates foreign key constraint "client_progress_summaries_client_id_fkey"',
+      ),
+      { code: "23503", constraint: "client_progress_summaries_client_id_fkey" },
+    );
+    assert.equal(
+      shouldNoopOptionalUpsert({ op: "upsert", table: "client_progress_summaries" }, err),
+      true,
+    );
+    assert.equal(
+      shouldNoopOptionalUpsert({ op: "select", table: "client_progress_summaries" }, err),
+      false,
+    );
+    assert.equal(shouldNoopOptionalUpsert({ op: "upsert", table: "profiles" }, err), false);
+    const empty = emptyMutationResult();
+    assert.deepEqual(empty.data, []);
+    assert.equal(empty.error, null);
+    assert.equal(empty.status, 200);
+  });
+
+  it("ensureCurrentSummaryPeriods skips unknown client_id and does not throw on FK", () => {
+    const src = readFileSync(
+      new URL("../progress-summaries.functions.ts", import.meta.url),
+      "utf8",
+    );
+    assert.match(src, /if \(!clientMeta\.has\(clientId\)\) continue/);
+    assert.match(src, /client_progress_summaries_client_id_fkey/);
+    assert.match(src, /toIsoDateDay/);
+  });
+});
+
+describe("/api/aws/db never emits HTTP 500", () => {
+  it("maps executePlan 500 to HTTP 200 with JSON error body", async () => {
+    const { httpStatusForAwsDbResult, awsDbUnhandledBody, isAwsDbLogical5xx } =
+      await import("./exec-http.ts");
+    assert.equal(httpStatusForAwsDbResult(500), 200);
+    assert.equal(httpStatusForAwsDbResult(400), 200);
+    assert.equal(httpStatusForAwsDbResult(401), 401);
+    assert.equal(httpStatusForAwsDbResult(200), 200);
+    const body = awsDbUnhandledBody("HTTPError");
+    assert.equal(body.status, 500);
+    assert.equal(body.error?.message, "HTTPError");
+    assert.equal(isAwsDbLogical5xx({ status: 500, error: { message: "x" } }), true);
+    assert.equal(isAwsDbLogical5xx({ unhandled: true, error: { message: "HTTPError" } }), true);
+    assert.equal(isAwsDbLogical5xx({ status: 200, error: null }), false);
+    const routeSrc = readFileSync(new URL("../../routes/api/aws/db.ts", import.meta.url), "utf8");
+    assert.match(routeSrc, /httpStatusForAwsDbResult/);
+    assert.match(routeSrc, /status: 200/);
+    assert.doesNotMatch(routeSrc, /result\.status >= 400 \? result\.status : 200/);
+  });
+});
+
 describe("Cognito login / dashboard hang guards", () => {
   it("login skips leftover-session auto-enter on Cognito", () => {
     const src = readFileSync(new URL("../../routes/login.tsx", import.meta.url), "utf8");
@@ -221,11 +346,64 @@ describe("Cognito login / dashboard hang guards", () => {
     assert.match(src, /justSignedIn/);
   });
 
-  it("dashboard spinner has Sign out and does not stay Loading forever on Cognito failure", () => {
+  it("leaves the Cognito Loading overlay on aws-db 5xx, org error, or timeout", async () => {
+    const { shouldLeaveCognitoLoadingOverlay } = await import("../cognito-login-gate.ts");
+    assert.equal(
+      shouldLeaveCognitoLoadingOverlay({
+        isCognito: true,
+        hasSession: true,
+        awsDb5xx: true,
+        orgError: false,
+        timedOut: false,
+      }),
+      true,
+    );
+    assert.equal(
+      shouldLeaveCognitoLoadingOverlay({
+        isCognito: true,
+        hasSession: true,
+        awsDb5xx: false,
+        orgError: true,
+        timedOut: false,
+      }),
+      true,
+    );
+    assert.equal(
+      shouldLeaveCognitoLoadingOverlay({
+        isCognito: true,
+        hasSession: true,
+        awsDb5xx: false,
+        orgError: false,
+        timedOut: true,
+      }),
+      true,
+    );
+    assert.equal(
+      shouldLeaveCognitoLoadingOverlay({
+        isCognito: true,
+        hasSession: true,
+        awsDb5xx: false,
+        orgError: false,
+        timedOut: false,
+      }),
+      false,
+    );
+    assert.equal(
+      shouldLeaveCognitoLoadingOverlay({
+        isCognito: false,
+        hasSession: true,
+        awsDb5xx: true,
+        orgError: true,
+        timedOut: true,
+      }),
+      false,
+    );
     const src = readFileSync(new URL("../../routes/dashboard.tsx", import.meta.url), "utf8");
     assert.match(src, /dashboard-spinner-sign-out/);
-    assert.match(src, /Couldn't finish signing you in/);
-    assert.match(src, /isCognitoAuth\(\)/);
+    assert.match(src, /shouldLeaveCognitoLoadingOverlay/);
+    assert.match(src, /hive:aws-db-error|AWS_DB_ERROR_EVENT/);
+    assert.match(src, /cognito-bootstrap-error/);
+    assert.doesNotMatch(src, /if \(!orgError\) return;[\s\S]*signOut\(\)/);
   });
 
   it("fetchOrgGoLiveDate never calls slice on raw pg values", () => {

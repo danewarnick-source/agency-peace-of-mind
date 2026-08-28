@@ -27,3 +27,20 @@ export function isAwsBootstrapFailure(result: {
     msg,
   );
 }
+
+/**
+ * Cognito Loading… overlay (the one with Sign out) must not wait forever.
+ * Session is valid; leave Loading on /api/aws/db 5xx, org/home bootstrap
+ * failure, or the 8s stuck timer — show the dashboard with what loaded.
+ */
+export function shouldLeaveCognitoLoadingOverlay(opts: {
+  isCognito: boolean;
+  hasSession: boolean;
+  awsDb5xx: boolean;
+  orgError: boolean;
+  timedOut: boolean;
+}): boolean {
+  if (!opts.isCognito) return false;
+  if (!opts.hasSession) return false;
+  return opts.awsDb5xx || opts.orgError || opts.timedOut;
+}

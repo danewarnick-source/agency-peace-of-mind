@@ -50,10 +50,20 @@ export type DbPlan = {
 };
 
 export const IDENT_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+const IDENT_BODY = "[A-Za-z_][A-Za-z0-9_]*";
+/** PostgREST `alias:column` (no parens) is a rename, not an invalid ident. */
+const SELECT_ALIAS_RE = new RegExp(`^(${IDENT_BODY}):(${IDENT_BODY})$`);
 
 export function quoteIdent(name: string): string {
   if (!IDENT_RE.test(name)) throw new Error(`Invalid identifier: ${name}`);
   return `"${name}"`;
+}
+
+/** Parse `upi_submitted_at:state_submitted_at` → column `state_submitted_at` AS `upi_submitted_at`. */
+export function parseSelectAlias(token: string): { alias: string; column: string } | null {
+  const m = SELECT_ALIAS_RE.exec(token.trim());
+  if (!m) return null;
+  return { alias: m[1], column: m[2] };
 }
 
 export function emptyPlan(table: string): DbPlan {
@@ -484,5 +494,12 @@ export function limitSql(plan: DbPlan, params: unknown[]): string {
 export function selectColumnSql(select: string | undefined): string {
   const { columns } = parseSelectList(select);
   if (columns.includes("*")) return "*";
-  return columns.map((c) => (c === "*" ? "*" : quoteIdent(c))).join(", ");
+  return columns
+    .map((c) => {
+      if (c === "*") return "*";
+      const renamed = parseSelectAlias(c);
+      if (renamed) return `${quoteIdent(renamed.column)} AS ${quoteIdent(renamed.alias)}`;
+      return quoteIdent(c);
+    })
+    .join(", ");
 }

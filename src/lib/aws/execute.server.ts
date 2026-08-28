@@ -4,7 +4,12 @@
  */
 
 import { pgQuery } from "./pg.server";
-import { emptySelectResult, shouldDegradeMissingSelect } from "./missing-relation";
+import {
+  emptyMutationResult,
+  emptySelectResult,
+  shouldDegradeMissingSelect,
+  shouldNoopOptionalUpsert,
+} from "./missing-relation";
 import {
   IDENT_RE,
   limitSql,
@@ -202,6 +207,12 @@ export async function executePlan(plan: DbPlan): Promise<ExecResult> {
       console.warn(`[aws-db] ${plan.table} is missing; returning empty (not 500)`);
       return emptySelectResult(plan);
     }
+    if (shouldNoopOptionalUpsert(plan, err)) {
+      console.warn(
+        `[aws-db] ${plan.table} client_id FK missing; skipping optional upsert (not 500)`,
+      );
+      return emptyMutationResult();
+    }
     const message = err instanceof Error ? err.message : String(err);
     console.error("[aws-db] executePlan", message);
     return fail(message, 500);
@@ -244,8 +255,31 @@ async function execSelect(plan: DbPlan): Promise<ExecResult> {
   return shape(plan, shaped, count);
 }
 
+async function existingClientIdSet(ids: unknown[]): Promise<Set<string>> {
+  const uniq = [
+    ...new Set(ids.filter((id): id is string => typeof id === "string" && id.length > 0)),
+  ];
+  if (uniq.length === 0) return new Set();
+  const { rows } = await pgQuery<{ id: string }>(
+    `SELECT id FROM ${quoteIdent("clients")} WHERE id = ANY($1)`,
+    [uniq],
+  );
+  return new Set(rows.map((r) => r.id));
+}
+
+/** Skip rows whose client_id is not in `clients` — do not 500 the session. */
+async function filterToExistingClients(
+  rows: Record<string, unknown>[],
+): Promise<Record<string, unknown>[]> {
+  const existing = await existingClientIdSet(rows.map((r) => r.client_id));
+  return rows.filter((r) => typeof r.client_id === "string" && existing.has(r.client_id));
+}
+
 async function execInsert(plan: DbPlan): Promise<ExecResult> {
-  const rows = asRows(plan.payload);
+  let rows = asRows(plan.payload);
+  if (plan.table === "client_progress_summaries") {
+    rows = await filterToExistingClients(rows);
+  }
   if (rows.length === 0) return ok([], 0);
   const keys = Object.keys(rows[0]).filter((k) => IDENT_RE.test(k));
   if (keys.length === 0) return fail("Insert payload has no columns");
@@ -288,7 +322,10 @@ async function execUpdate(plan: DbPlan): Promise<ExecResult> {
 }
 
 async function execUpsert(plan: DbPlan): Promise<ExecResult> {
-  const rows = asRows(plan.payload);
+  let rows = asRows(plan.payload);
+  if (plan.table === "client_progress_summaries") {
+    rows = await filterToExistingClients(rows);
+  }
   if (rows.length === 0) return ok([], 0);
   const keys = Object.keys(rows[0]).filter((k) => IDENT_RE.test(k));
   const conflict = (plan.onConflict || "id")

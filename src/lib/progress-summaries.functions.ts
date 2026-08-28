@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
+import { toIsoDateDay } from "@/lib/iso-date-day";
 import {
   clientNeedsGoalProgress,
   filterPeriodsByFloor,
@@ -139,8 +140,8 @@ export const ensureCurrentSummaryPeriods = createServerFn({ method: "POST" })
       .eq("id", data.organizationId)
       .maybeSingle();
     if (orgErr) throw new Error(orgErr.message);
-    const org = orgRow as unknown as { go_live_date: string | null; created_at: string } | null;
-    const orgGoLiveDate = (org?.go_live_date ?? org?.created_at ?? "").slice(0, 10) || null;
+    const org = orgRow as unknown as { go_live_date: string | Date | null; created_at: string | Date } | null;
+    const orgGoLiveDate = toIsoDateDay(org?.go_live_date) ?? toIsoDateDay(org?.created_at);
 
     const { data: codes, error: codesErr } = await supabase
       .from("client_billing_codes")

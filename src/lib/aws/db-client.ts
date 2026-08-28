@@ -11,7 +11,13 @@ import {
   type ExecResult,
   type PlanExecutor,
 } from "./query-builder";
+import { AWS_DB_ERROR_EVENT, isAwsDbLogical5xx } from "./exec-http";
 import { readBrowserSession } from "./session-store";
+
+function notifyAwsDbError(message: string, status: number) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(AWS_DB_ERROR_EVENT, { detail: { message, status } }));
+}
 
 async function clientExec(plan: DbPlan): Promise<ExecResult> {
   const session = readBrowserSession();
@@ -25,15 +31,25 @@ async function clientExec(plan: DbPlan): Promise<ExecResult> {
     credentials: "same-origin",
     body: JSON.stringify(plan),
   });
-  const json = (await res.json().catch(() => null)) as ExecResult | null;
+  const json = (await res.json().catch(() => null)) as
+    | (ExecResult & { unhandled?: boolean; message?: string })
+    | null;
   if (!json) {
-    return {
+    const fallback: ExecResult = {
       data: null,
       error: { message: `AWS data request failed (${res.status})` },
       count: null,
-      status: res.status,
+      status: res.status || 500,
       statusText: res.statusText,
     };
+    notifyAwsDbError(fallback.error!.message, fallback.status);
+    return fallback;
+  }
+  const status = json.status || res.status;
+  const message =
+    json.error?.message || json.message || res.statusText || "AWS data request failed";
+  if (isAwsDbLogical5xx({ ...json, status }) || res.status >= 500) {
+    notifyAwsDbError(message, status >= 500 ? status : 500);
   }
   return json;
 }

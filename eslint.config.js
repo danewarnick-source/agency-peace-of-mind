@@ -14,6 +14,8 @@ export default tseslint.config(
       "e2e/harness/**",
       "playwright-report/**",
       "test-results/**",
+      // Generated Amazon RDS CA PEM inline (prettier would choke on the string).
+      "src/lib/aws/rds-ca-bundle.ts",
     ],
   },
   {

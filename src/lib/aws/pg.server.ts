@@ -1,10 +1,14 @@
 /**
  * Pooler-safe Postgres access for the AWS dual-run path.
  * Transaction-mode PgBouncer / RDS Proxy: no session SET, no LISTEN.
+ *
+ * TLS: Amazon RDS CA bundle + rejectUnauthorized (see rds-ssl.ts). This
+ * module is only used when DATABASE_URL is set (ECS). Vercel is unchanged.
  */
 
 import pg from "pg";
 import { getDatabaseUrl } from "./env";
+import { pgPoolConnectionOptions } from "./rds-ssl.ts";
 
 let _pool: pg.Pool | null = null;
 
@@ -13,7 +17,7 @@ export function getPgPool(): pg.Pool {
   if (!url) throw new Error("DATABASE_URL is not set");
   if (!_pool) {
     _pool = new pg.Pool({
-      connectionString: url,
+      ...pgPoolConnectionOptions(url),
       max: 8,
       idleTimeoutMillis: 10_000,
       connectionTimeoutMillis: 15_000,

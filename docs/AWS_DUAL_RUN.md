@@ -47,8 +47,11 @@ The app **does not force-reset passwords** on login. `must_change_password` on t
 |---|---|---|
 | `DATABASE_URL` | yes, to use RDS | Postgres URL. Alias: `AWS_DATABASE_URL` |
 | | | Use a **pooler** (RDS Proxy or PgBouncer in transaction mode). The app opens a small pool (`max` 8) and does not use session `SET` / `LISTEN`. |
+| | | `sslmode=require` is fine. The Node `pg` pool **does not** use Node’s default CA store: it loads the Amazon RDS global bundle (`rds-ca-rsa2048-g1` and regional roots) and verifies the server cert (`rejectUnauthorized: true`). Do **not** set `NODE_TLS_REJECT_UNAUTHORIZED=0`. |
 
 When `DATABASE_URL` is set, server-side queries that used the Supabase **service role** go to this Postgres connection (trusted, same as service role). RLS on RDS is incomplete, so org checks in server functions still run in app code.
+
+Post-login `/api/aws/db` uses this pool. If ECS logs `self-signed certificate in certificate chain` against `*.rds.amazonaws.com`, the image is older than the bundled RDS CA — rebuild from this branch. The hang after Cognito login is that TLS failure (org lookup spinner), not cookie forwarding.
 
 When `AUTH_PROVIDER=cognito`, browser `supabase.from()` / `.rpc()` calls are sent to `/api/aws/db` (session required) so we do **not** rewrite every screen. That endpoint uses RDS if `DATABASE_URL` is set, otherwise the existing Supabase service role (hybrid).
 

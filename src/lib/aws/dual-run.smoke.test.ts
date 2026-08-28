@@ -147,6 +147,41 @@ describe("query builder SQL safety", () => {
   });
 });
 
+describe("RDS TLS for /api/aws/db", () => {
+  it("trusts the Amazon RDS CA and still verifies the server certificate", async () => {
+    const { pgPoolConnectionOptions, rdsTlsOptions } = await import("./rds-ssl.ts");
+    const ssl = rdsTlsOptions();
+    assert.equal(ssl.rejectUnauthorized, true);
+    assert.equal(typeof ssl.ca, "string");
+    const ca = String(ssl.ca);
+    assert.match(ca, /BEGIN CERTIFICATE/);
+    assert.ok((ca.match(/BEGIN CERTIFICATE/g) || []).length >= 50);
+    const firstPem = ca.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/);
+    assert.ok(firstPem);
+    const { X509Certificate } = await import("node:crypto");
+    const cert = new X509Certificate(firstPem[0]);
+    assert.match(cert.subject, /Amazon RDS/);
+
+    const url =
+      "postgres://hive:secret@hive-postgres.cw34wm80sxx7.us-east-1.rds.amazonaws.com:5432/postgres?sslmode=require";
+    const opts = pgPoolConnectionOptions(url);
+    assert.equal(opts.ssl.rejectUnauthorized, true);
+    assert.equal(opts.ssl.ca, ssl.ca);
+    assert.doesNotMatch(opts.connectionString, /sslmode/i);
+    assert.doesNotMatch(opts.connectionString, /sslrootcert/i);
+    assert.match(opts.connectionString, /hive-postgres\.cw34wm80sxx7/);
+  });
+
+  it("does not disable TLS verification in the Postgres client", () => {
+    const pgSrc = readFileSync(new URL("./pg.server.ts", import.meta.url), "utf8");
+    const sslSrc = readFileSync(new URL("./rds-ssl.ts", import.meta.url), "utf8");
+    for (const src of [pgSrc, sslSrc]) {
+      assert.doesNotMatch(src, /process\.env\.NODE_TLS_REJECT_UNAUTHORIZED/);
+      assert.doesNotMatch(src, /rejectUnauthorized:\s*false/);
+    }
+  });
+});
+
 describe("Nitro AWS entry plugin", () => {
   it("does not use defineNitroPlugin (auto-import is missing in node-server index.mjs)", () => {
     const src = readFileSync(

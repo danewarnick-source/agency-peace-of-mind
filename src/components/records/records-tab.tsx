@@ -29,7 +29,7 @@ import {
   saveRecordFields, saveManagerNote, toLocalInput, fromLocalInput, type AuditEntry,
 } from "@/lib/records-edit";
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
-import { recordDurationMin, staffDisplayName } from "@/lib/record-duration";
+import { formatPunchDateSpan, formatPunchRange, recordDurationMin, staffDisplayName } from "@/lib/record-duration";
 import { ResidentialDailyTab } from "@/components/residential/residential-daily-tab";
 import { TimeCorrectionReviewSection } from "@/components/records/time-correction-review-section";
 import { RecordDetailSheet } from "@/components/records/record-detail-sheet";
@@ -496,7 +496,7 @@ export function RecordsTab() {
       clientName: r.client_name,
       memberId: r.utah_medicaid_member_id ?? "",
       serviceCode: r.service_type_code,
-      date: fmtDate(r.clock_in_timestamp),
+      date: formatPunchDateSpan(r.corrected_clock_in ?? r.clock_in_timestamp, r.corrected_clock_out ?? r.clock_out_timestamp),
       clockIn: fmtTs(r.corrected_clock_in ?? r.clock_in_timestamp),
       clockOut: fmtTs(r.corrected_clock_out ?? r.clock_out_timestamp),
       durationMin: r.duration_min,
@@ -512,7 +512,7 @@ export function RecordsTab() {
       clientName: "",
       memberId: "",
       serviceCode: g.category,
-      date: fmtDate(g.clock_in_timestamp),
+      date: formatPunchDateSpan(g.clock_in_timestamp, g.clock_out_timestamp),
       clockIn: fmtTs(g.clock_in_timestamp),
       clockOut: fmtTs(g.clock_out_timestamp),
       durationMin: g.duration_min,
@@ -909,8 +909,8 @@ export function RecordsTab() {
                     <tr key={g.id} className="border-t border-border hover:bg-accent/40">
                       <td className="px-3 py-2">{g.staff_name}</td>
                       <td className="px-3 py-2 font-mono text-xs">{g.category}</td>
-                      <td className="px-3 py-2">{fmtDate(g.clock_in_timestamp)}</td>
-                      <td className="px-3 py-2">{fmtTs(g.clock_in_timestamp)} → {fmtTs(g.clock_out_timestamp)}</td>
+                      <td className="px-3 py-2">{formatPunchDateSpan(g.clock_in_timestamp, g.clock_out_timestamp)}</td>
+                      <td className="px-3 py-2">{formatPunchRange(g.clock_in_timestamp, g.clock_out_timestamp)}</td>
                       <td className="px-3 py-2 tabular-nums">{fmtDur(g.duration_min)}</td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{g.note || "—"}</td>
                     </tr>
@@ -962,7 +962,7 @@ export function RecordsTab() {
                           )}
                         </td>
                         <td className="px-3 py-2 font-mono text-xs">{r.service_type_code}</td>
-                        <td className="px-3 py-2">{fmtDate(r.clock_in_timestamp)}</td>
+                        <td className="px-3 py-2">{formatPunchDateSpan(r.corrected_clock_in ?? r.clock_in_timestamp, r.corrected_clock_out ?? r.clock_out_timestamp)}</td>
                         <InlineTimeCell row={r} adminName={adminName} userId={user?.id ?? null} qc={qc} />
                         <td className="px-3 py-2 tabular-nums">{fmtDur(r.duration_min)}</td>
                         <InlineManagerNoteCell row={r} adminName={adminName} userId={user?.id ?? null} qc={qc} />
@@ -1171,7 +1171,7 @@ function InlineTimeCell({
       }}
       title={isEvv ? "EVV record — click to edit (UEVV transmission won't be amended)" : "Click to edit clock in/out"}
     >
-      {fmtTs(inTs)} → {fmtTs(outTs)}
+      {formatPunchRange(inTs, outTs)}
       {isEvv && (
         <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-orange-600 dark:text-orange-400">evv</span>
       )}

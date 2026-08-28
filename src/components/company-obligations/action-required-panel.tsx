@@ -84,7 +84,7 @@ function QueueRow({
     if (a.kind === "incident") {
       navigate({
         to: "/dashboard/hub/documentation",
-        search: { tab: "incidents" },
+        search: { tab: "incidents", cc: "urgent" },
       });
       return;
     }

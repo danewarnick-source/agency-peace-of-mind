@@ -1076,7 +1076,7 @@ function AdminHomeDashboardInner() {
       text: string;
       at: Date;
       to?: "/dashboard/hub/documentation";
-      search?: { tab: "incidents" };
+      search?: { tab: "incidents"; cc: "urgent" };
     };
     const out: Act[] = [];
 
@@ -1122,7 +1122,7 @@ function AdminHomeDashboardInner() {
         text: `Incident ${ir.report_number ?? ""} · ${ir.status.replace(/_/g, " ")}`,
         at: new Date(ir.updated_at ?? ir.created_at),
         to: "/dashboard/hub/documentation",
-        search: { tab: "incidents" },
+        search: { tab: "incidents", cc: "urgent" },
       });
     }
 
@@ -1544,7 +1544,7 @@ function AdminHomeDashboardInner() {
             {areaRows.map((row) => {
               const incidentHref =
                 row.key === "incidents"
-                  ? ({ to: "/dashboard/hub/documentation", search: { tab: "incidents" } } as const)
+                  ? ({ to: "/dashboard/hub/documentation", search: { tab: "incidents", cc: "urgent" } } as const)
                   : null;
               if (row.kind === "message") {
                 const inner = (

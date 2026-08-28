@@ -48,7 +48,7 @@ export const Route = createFileRoute("/dashboard/records-desk")({
     const next = hubTabFromRecordsDesk(search);
     throw redirect({
       to: "/dashboard/hub/documentation",
-      search: { tab: next },
+      search: next === "incidents" ? { tab: "incidents", cc: "urgent" as const } : { tab: next },
       replace: true,
     });
   },

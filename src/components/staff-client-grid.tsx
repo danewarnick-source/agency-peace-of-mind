@@ -414,7 +414,7 @@ export function StaffClientGrid() {
             My caseload · {source.length} {source.length === 1 ? "person" : "people"}
           </h2>
           <p className="text-xs text-muted-foreground">
-            Tap a person to view services. Clock in on Punch pad. EVV is submitted by CSV.
+            Tap a person to view services. Hourly codes use Punch pad. Host home (HHS) is the daily note — hosts do not clock in. EVV is submitted by CSV.
           </p>
         </div>
       </div>

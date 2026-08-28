@@ -2,6 +2,9 @@ import { createMiddleware } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js'
 import type { Database } from './types'
+import { getDatabaseUrl, isCognitoAuth } from '@/lib/aws/env'
+import { resolveRequestUser } from '@/lib/aws/resolve-user.server'
+import { getAwsDataClient } from '@/lib/aws/db-client.server'
 
 type SupabaseAuthContext = {
   supabase: SupabaseClient<Database>
@@ -10,8 +13,45 @@ type SupabaseAuthContext = {
   isSSR: boolean
 }
 
+function trustedDataClient() {
+  if (getDatabaseUrl()) return getAwsDataClient() as unknown as SupabaseClient<Database>
+  return null
+}
+
 export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
   async ({ next }) => {
+
+    const request = getRequest();
+
+    if (isCognitoAuth()) {
+      const resolved = await resolveRequestUser(request);
+      if (!resolved) {
+        const authHeader = request?.headers?.get('authorization');
+        if (!authHeader?.startsWith('Bearer ')) {
+          return next({
+            context: {
+              supabase: null,
+              userId: null,
+              claims: null,
+              isSSR: true,
+            } as unknown as SupabaseAuthContext,
+          });
+        }
+        console.error('[requireSupabaseAuth] Cognito token rejected');
+        throw new Error('Unauthorized');
+      }
+      const dataClient =
+        trustedDataClient() ??
+        (await import('./client.server')).supabaseAdmin as unknown as SupabaseClient<Database>;
+      return next({
+        context: {
+          supabase: dataClient,
+          userId: resolved.userId,
+          claims: resolved.claims,
+          isSSR: false,
+        },
+      });
+    }
 
     const SUPABASE_URL = process.env.SUPABASE_URL;
     const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
@@ -20,7 +60,6 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
       throw new Error('Missing Supabase environment variables.');
     }
 
-    const request = getRequest();
     const authHeader = request?.headers?.get('authorization');
 
     // During SSR there is no auth header — return a safe empty context
@@ -57,9 +96,11 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
       throw new Error('Unauthorized');
     }
 
+    const dataClient = trustedDataClient() ?? supabase;
+
     return next({
       context: {
-        supabase,
+        supabase: dataClient,
         userId: data.user.id,
         claims: data.user,
         isSSR: false,
@@ -67,4 +108,3 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
     });
   },
 );
-

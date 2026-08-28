@@ -11,6 +11,10 @@ GitHub repo and main branch. Lovable's build, `wrangler.jsonc`, and
 `src/server.ts`'s Cloudflare entry are untouched — nothing here changes how
 Lovable deploys.
 
+For **Cognito + RDS + S3** (env-gated, default remains Supabase) see
+`docs/AWS_DUAL_RUN.md`. That path is off until you set those ECS variables.
+Do not delete the Supabase project.
+
 ## What changed in the repo
 
 - `vite.config.ts` — when `BUILD_TARGET=aws` is set, nitro's preset switches

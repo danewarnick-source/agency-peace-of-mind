@@ -5,6 +5,12 @@ import type { Database } from "./types";
 import { getDatabaseUrl, isCognitoAuth } from "@/lib/aws/env";
 import { resolveRequestUser } from "@/lib/aws/resolve-user.server";
 import { getAwsDataClient } from "@/lib/aws/db-client.server";
+import { readAwsSessionCookie } from "@/lib/aws/session-cookie.server";
+import {
+  cookieHeaderHasAwsSession,
+  emptySsrAuthContext,
+  logCognitoRequireAuth,
+} from "@/lib/cognito-require-auth";
 
 type SupabaseAuthContext = {
   supabase: SupabaseClient<Database>;
@@ -24,20 +30,21 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
 
     if (isCognitoAuth()) {
       const resolved = await resolveRequestUser(request);
+      const authHeader = request?.headers?.get("authorization");
+      const hasBearer = !!authHeader?.startsWith("Bearer ");
+      let hasCookie = cookieHeaderHasAwsSession(request?.headers?.get("cookie"));
+      try {
+        hasCookie = hasCookie || !!readAwsSessionCookie();
+      } catch {
+        /* getCookie can throw outside a Start request context */
+      }
+      logCognitoRequireAuth({ hasCookie, hasBearer, resolved: !!resolved });
       if (!resolved) {
-        const authHeader = request?.headers?.get("authorization");
-        if (!authHeader?.startsWith("Bearer ")) {
-          return next({
-            context: {
-              supabase: null,
-              userId: null,
-              claims: null,
-              isSSR: true,
-            } as unknown as SupabaseAuthContext,
-          });
-        }
-        console.error("[requireSupabaseAuth] Cognito token rejected");
-        throw new Error("Unauthorized");
+        // Do not throw Unauthorized — h3 turns that into a JSON 500 that
+        // server.ts used to HTML-rewrite, hanging Cognito Loading.
+        return next({
+          context: emptySsrAuthContext() as unknown as SupabaseAuthContext,
+        });
       }
       const dataClient =
         trustedDataClient() ??
@@ -66,12 +73,7 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
     // proper auth after hydration.
     if (!authHeader?.startsWith("Bearer ")) {
       return next({
-        context: {
-          supabase: null,
-          userId: null,
-          claims: null,
-          isSSR: true,
-        } as unknown as SupabaseAuthContext,
+        context: emptySsrAuthContext() as unknown as SupabaseAuthContext,
       });
     }
 

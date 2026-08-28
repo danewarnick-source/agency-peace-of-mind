@@ -49,7 +49,12 @@ import { GuidedTourProvider } from "@/components/nectar/guided-tour-provider";
 import { OPEN_DASHBOARD_MENU_EVENT } from "@/lib/portal-view-landing";
 import { isCognitoAuth } from "@/lib/aws/env";
 import { AWS_DB_ERROR_EVENT } from "@/lib/aws/exec-http";
-import { shouldLeaveCognitoLoadingOverlay } from "@/lib/cognito-login-gate";
+import {
+  HIVE_BOOTSTRAP_ERROR_EVENT,
+  installBootstrapFailureWatch,
+  shouldLeaveCognitoLoadingOverlay,
+  type BootstrapFailureKind,
+} from "@/lib/cognito-login-gate";
 
 
 
@@ -408,6 +413,7 @@ function DashboardLayout() {
   const [bootstrapStuck, setBootstrapStuck] = useState(false);
   const [awsDbFailed, setAwsDbFailed] = useState(false);
   const [awsDbErrorMessage, setAwsDbErrorMessage] = useState<string | null>(null);
+  const [failKind, setFailKind] = useState<BootstrapFailureKind | null>(null);
   const awaitingBootstrap = dashboardShellShowsLoading({
     sessionLoading: loading,
     hasSession: !!session,
@@ -419,21 +425,39 @@ function DashboardLayout() {
   const cognitoLeaveLoading = shouldLeaveCognitoLoadingOverlay({
     isCognito: isCognitoAuth(),
     hasSession: Boolean(session) && !loading,
-    awsDb5xx: awsDbFailed,
+    awsDb5xx: awsDbFailed || failKind === "http-5xx",
     orgError,
     timedOut: bootstrapStuck,
+    unhandledHttpError: failKind === "unhandled-httperror",
+    html5xx: failKind === "html-500",
   });
   const bootstrapping = awaitingBootstrap && !cognitoLeaveLoading;
 
   useEffect(() => {
     if (!isCognitoAuth()) return;
-    const onErr = (e: Event) => {
-      const detail = (e as CustomEvent<{ message?: string; status?: number }>).detail;
+    const onFail = (kind: BootstrapFailureKind, message?: string) => {
+      setFailKind(kind);
       setAwsDbFailed(true);
-      if (detail?.message) setAwsDbErrorMessage(String(detail.message));
+      if (message) setAwsDbErrorMessage(message);
     };
-    window.addEventListener(AWS_DB_ERROR_EVENT, onErr);
-    return () => window.removeEventListener(AWS_DB_ERROR_EVENT, onErr);
+    const onAwsDb = (e: Event) => {
+      const detail = (e as CustomEvent<{ message?: string; status?: number }>).detail;
+      onFail("http-5xx", detail?.message);
+    };
+    const onBootstrap = (e: Event) => {
+      const detail = (e as CustomEvent<{ kind?: BootstrapFailureKind; message?: string }>).detail;
+      onFail(detail?.kind ?? "http-5xx", detail?.message);
+    };
+    window.addEventListener(AWS_DB_ERROR_EVENT, onAwsDb);
+    window.addEventListener(HIVE_BOOTSTRAP_ERROR_EVENT, onBootstrap);
+    const stopWatch = installBootstrapFailureWatch((detail) => {
+      onFail(detail.kind, detail.message);
+    });
+    return () => {
+      window.removeEventListener(AWS_DB_ERROR_EVENT, onAwsDb);
+      window.removeEventListener(HIVE_BOOTSTRAP_ERROR_EVENT, onBootstrap);
+      stopWatch();
+    };
   }, []);
 
   useEffect(() => {

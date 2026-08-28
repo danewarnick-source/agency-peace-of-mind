@@ -347,7 +347,8 @@ describe("Cognito login / dashboard hang guards", () => {
   });
 
   it("leaves the Cognito Loading overlay on aws-db 5xx, org error, or timeout", async () => {
-    const { shouldLeaveCognitoLoadingOverlay } = await import("../cognito-login-gate.ts");
+    const { shouldLeaveCognitoLoadingOverlay, inspectBootstrapFailure } =
+      await import("../cognito-login-gate.ts");
     assert.equal(
       shouldLeaveCognitoLoadingOverlay({
         isCognito: true,
@@ -375,6 +376,28 @@ describe("Cognito login / dashboard hang guards", () => {
         awsDb5xx: false,
         orgError: false,
         timedOut: true,
+      }),
+      true,
+    );
+    assert.equal(
+      shouldLeaveCognitoLoadingOverlay({
+        isCognito: true,
+        hasSession: true,
+        awsDb5xx: false,
+        orgError: false,
+        timedOut: false,
+        unhandledHttpError: true,
+      }),
+      true,
+    );
+    assert.equal(
+      shouldLeaveCognitoLoadingOverlay({
+        isCognito: true,
+        hasSession: true,
+        awsDb5xx: false,
+        orgError: false,
+        timedOut: false,
+        html5xx: true,
       }),
       true,
     );
@@ -398,12 +421,29 @@ describe("Cognito login / dashboard hang guards", () => {
       }),
       false,
     );
+    const headers = { get: (n: string) => (n === "content-type" ? "application/json" : null) };
+    assert.equal(
+      inspectBootstrapFailure(
+        { status: 500, headers },
+        '{"status":500,"unhandled":true,"message":"HTTPError"}',
+      )?.kind,
+      "unhandled-httperror",
+    );
+    const htmlHeaders = { get: (n: string) => (n === "content-type" ? "text/html" : null) };
+    assert.equal(
+      inspectBootstrapFailure({ status: 500, headers: htmlHeaders }, "<html>")?.kind,
+      "html-500",
+    );
     const src = readFileSync(new URL("../../routes/dashboard.tsx", import.meta.url), "utf8");
     assert.match(src, /dashboard-spinner-sign-out/);
     assert.match(src, /shouldLeaveCognitoLoadingOverlay/);
     assert.match(src, /hive:aws-db-error|AWS_DB_ERROR_EVENT/);
+    assert.match(src, /installBootstrapFailureWatch/);
     assert.match(src, /cognito-bootstrap-error/);
     assert.doesNotMatch(src, /if \(!orgError\) return;[\s\S]*signOut\(\)/);
+    const serverSrc = readFileSync(new URL("../../server.ts", import.meta.url), "utf8");
+    assert.match(serverSrc, /shouldHtmlRewriteCatastrophic500/);
+    assert.match(serverSrc, /method=\$\{method\} url=\$\{url\} accept=\$\{accept\}/);
   });
 
   it("fetchOrgGoLiveDate never calls slice on raw pg values", () => {

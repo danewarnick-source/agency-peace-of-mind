@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ArrowRight, Eye, EyeOff, Hexagon, Sparkles } from "lucide-react";
@@ -18,6 +18,8 @@ import {
   resolvePostLoginLanding,
 } from "@/lib/portal-view-landing";
 import { toast } from "sonner";
+import { isCognitoAuth } from "@/lib/aws/env";
+import { shouldSkipLoginAutoRedirect } from "@/lib/cognito-login-gate";
 
 function isSafeNext(v: unknown): v is string {
   return typeof v === "string" && v.startsWith("/") && !v.startsWith("//");
@@ -106,12 +108,30 @@ function LoginPage() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const search = Route.useSearch();
   const nextPath = search.next;
+  const hadSessionOnArrival = useRef<boolean | null>(null);
+  const [justSignedIn, setJustSignedIn] = useState(false);
+
+  useEffect(() => {
+    if (loading) return;
+    if (hadSessionOnArrival.current === null) {
+      hadSessionOnArrival.current = !!session;
+    }
+  }, [loading, session]);
 
   // Resolve the correct landing route ONCE per authenticated session, then
   // navigate with `replace` so the dashboard shell isn't forced to reconcile
   // /dashboard ↔ /dashboard/hive-exec after auth state settles.
   useEffect(() => {
     if (loading || !session) return;
+    if (
+      shouldSkipLoginAutoRedirect({
+        isCognito: isCognitoAuth(),
+        hadSessionOnArrival: !!hadSessionOnArrival.current,
+        justSignedIn,
+      })
+    ) {
+      return;
+    }
     let cancelled = false;
     (async () => {
       // If a same-origin `next` path was preserved (e.g. MCP OAuth consent),
@@ -159,7 +179,7 @@ function LoginPage() {
     return () => {
       cancelled = true;
     };
-  }, [loading, session, navigate, execCheck, nextPath]);
+  }, [loading, session, navigate, execCheck, nextPath, justSignedIn]);
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -200,6 +220,7 @@ function LoginPage() {
       return toast.error(result.message || GENERIC_LOGIN_ERROR);
     }
 
+    setJustSignedIn(true);
     setBusy(false);
     toast.success("Signed in");
   };

@@ -47,6 +47,7 @@ import { DraftJobsProvider } from "@/components/nectar/draft-jobs-driver";
 import { DraftJobsHeaderPill } from "@/components/nectar/draft-jobs-header-pill";
 import { GuidedTourProvider } from "@/components/nectar/guided-tour-provider";
 import { OPEN_DASHBOARD_MENU_EVENT } from "@/lib/portal-view-landing";
+import { isCognitoAuth } from "@/lib/aws/env";
 
 
 
@@ -184,7 +185,7 @@ type SidebarBodyProps = {
 
 function DashboardLayout() {
   const { session, loading, user } = useAuth();
-  const { data: org, isLoading: orgLoading } = useCurrentOrg();
+  const { data: org, isLoading: orgLoading, isError: orgError, error: orgQueryError } = useCurrentOrg();
   const { can } = usePermissions();
   const { view, hasStoredView, setView, stateCode, setStateCode, subView, setSubView, hydrated: viewHydrated } = usePortalView();
   const [states, setStates] = useState<PlatformStateLite[]>([]);
@@ -396,28 +397,66 @@ function DashboardLayout() {
     : null;
   const isComingSoonPreview = isStatePreview && currentPreviewState?.status === "coming_soon";
 
-  if (
-    dashboardShellShowsLoading({
-      sessionLoading: loading,
-      hasSession: !!session,
-      execLoading,
-      hydrated: viewHydrated,
-      orgLoading,
-      bootTimedOut,
-    })
-  ) {
-    return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading…</div>;
-  }
-
-
-
-
-
-  const signOut = async () => {
+  const signOut = async (to: "/" | "/login" = "/") => {
     await supabase.auth.signOut();
     toast.success("Signed out");
-    navigate({ to: "/" });
+    navigate({ to, replace: true });
   };
+
+  const [bootstrapStuck, setBootstrapStuck] = useState(false);
+  const bootstrapping = dashboardShellShowsLoading({
+    sessionLoading: loading,
+    hasSession: !!session,
+    execLoading,
+    hydrated: viewHydrated,
+    orgLoading,
+    bootTimedOut,
+  });
+
+
+  useEffect(() => {
+    if (!isCognitoAuth()) return;
+    if (!bootstrapping) {
+      setBootstrapStuck(false);
+      return;
+    }
+    const t = window.setTimeout(() => setBootstrapStuck(true), 8_000);
+    return () => window.clearTimeout(t);
+  }, [bootstrapping]);
+
+  useEffect(() => {
+    if (!isCognitoAuth()) return;
+    if (loading || !session) return;
+    if (!orgError) return;
+    void (async () => {
+      await supabase.auth.signOut();
+      navigate({ to: "/login", replace: true });
+    })();
+  }, [orgError, loading, session, navigate]);
+
+  if (bootstrapping) {
+    const cognitoEscape = isCognitoAuth() && (orgError || bootstrapStuck);
+    return (
+      <div className="grid min-h-screen place-items-center gap-4 px-4 text-center text-sm text-muted-foreground">
+        <p>{cognitoEscape ? "Couldn't finish signing you in." : "Loading…"}</p>
+        {cognitoEscape && (
+          <p className="max-w-sm text-xs">
+            {orgQueryError instanceof Error
+              ? orgQueryError.message
+              : "The workspace did not load. Sign out and enter your email and password."}
+          </p>
+        )}
+        <Button
+          data-testid="dashboard-spinner-sign-out"
+          variant="outline"
+          onClick={() => void signOut("/login")}
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          Sign out
+        </Button>
+      </div>
+    );
+  }
 
 
   const nectarNavForView = effectiveView === "admin"

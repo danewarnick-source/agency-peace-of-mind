@@ -37,6 +37,7 @@ import {
   homePeriodKey,
   perHomeServiceCode,
 } from "./obligation-assignee-rules";
+import { toIsoDateDay } from "./iso-date-day";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -1004,16 +1005,24 @@ async function fetchOrgGoLiveDate(
   supabase: AnySupabase,
   organizationId: string,
 ): Promise<string | null> {
-  const { data, error } = await supabase
-    .from("organizations")
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .select("go_live_date, created_at" as any)
-    .eq("id", organizationId)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  const org = data as unknown as { go_live_date: string | null; created_at: string | null } | null;
-  const raw = org?.go_live_date ?? org?.created_at ?? null;
-  return raw ? raw.slice(0, 10) : null;
+  try {
+    const { data, error } = await supabase
+      .from("organizations")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .select("go_live_date, created_at" as any)
+      .eq("id", organizationId)
+      .maybeSingle();
+    if (error) {
+      console.warn("[bootstrap] go_live_date lookup failed:", error.message);
+      return null;
+    }
+    const org = data as unknown as { go_live_date: unknown; created_at: unknown } | null;
+    // RDS/pg returns Date; PostgREST returns a string. Never call .slice on raw.
+    return toIsoDateDay(org?.go_live_date) ?? toIsoDateDay(org?.created_at);
+  } catch (err) {
+    console.warn("[bootstrap] go_live_date failed:", err);
+    return null;
+  }
 }
 
 /**
@@ -1747,6 +1756,26 @@ async function bootstrapVisibleObligationInstancesInternal(
   visibleObligations: CompanyObligationRow[];
   instancesByObligation: Map<string, ObligationInstanceRow[]>;
 }> {
+  try {
+    return await bootstrapVisibleObligationInstancesInternalUnsafe(
+      supabase,
+      organizationId,
+      opts,
+    );
+  } catch (e) {
+    console.warn("[bootstrap] obligation bootstrap failed; continuing without clocks:", e);
+    return { visibleObligations: [], instancesByObligation: new Map() };
+  }
+}
+
+async function bootstrapVisibleObligationInstancesInternalUnsafe(
+  supabase: AnySupabase,
+  organizationId: string,
+  opts?: { generateMissing?: boolean; skipMutations?: boolean },
+): Promise<{
+  visibleObligations: CompanyObligationRow[];
+  instancesByObligation: Map<string, ObligationInstanceRow[]>;
+}> {
   if (!opts?.skipMutations) {
     await checkAndMarkOverdueInternal(supabase, organizationId);
     try {
@@ -1831,7 +1860,7 @@ export const listCompanyObligations = createServerFn({ method: "POST" })
         };
       });
     } catch (e) {
-      console.error("[listCompanyObligations] failed", e);
+      console.warn("[bootstrap] listCompanyObligations failed; returning empty:", e);
       return [] as ObligationListItem[];
     }
   });
@@ -1890,8 +1919,16 @@ export const listDeadlineObligationInstances = createServerFn({ method: "POST" }
       role === "manager" ||
       role === "super_admin";
 
-    const { visibleObligations, instancesByObligation } =
-      await bootstrapVisibleObligationInstancesInternal(supabase, data.organizationId);
+    let visibleObligations: CompanyObligationRow[] = [];
+    let instancesByObligation: Map<string, ObligationInstanceRow[]> = new Map();
+    try {
+      const boot = await bootstrapVisibleObligationInstancesInternal(supabase, data.organizationId);
+      visibleObligations = boot.visibleObligations;
+      instancesByObligation = boot.instancesByObligation;
+    } catch (e) {
+      console.warn("[bootstrap] listDeadlineObligationInstances failed; returning empty:", e);
+      return [] as DeadlineObligationItem[];
+    }
 
     let allowedInstanceIds: Set<string> | null = null;
     if (!isAdminRole) {

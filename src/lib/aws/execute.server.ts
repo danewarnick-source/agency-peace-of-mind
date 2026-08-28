@@ -4,6 +4,7 @@
  */
 
 import { pgQuery } from "./pg.server";
+import { emptySelectResult, shouldDegradeMissingSelect } from "./missing-relation";
 import {
   IDENT_RE,
   limitSql,
@@ -16,6 +17,24 @@ import {
   type EmbedSpec,
   type ExecResult,
 } from "./query-builder";
+
+/** node-pg returns Date objects; PostgREST returns ISO strings. Match PostgREST. */
+function jsonSafe(value: unknown): unknown {
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(jsonSafe);
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = jsonSafe(v);
+    }
+    return out;
+  }
+  return value;
+}
+
+function jsonSafeResult(result: ExecResult): ExecResult {
+  return { ...result, data: jsonSafe(result.data) };
+}
 
 type FkRow = {
   from_table: string;
@@ -166,15 +185,23 @@ async function fetchRelated(
 
 export async function executePlan(plan: DbPlan): Promise<ExecResult> {
   try {
-    if (plan.op === "rpc") return await execRpc(plan);
-    assertTable(plan.table);
-    if (plan.op === "select") return await execSelect(plan);
-    if (plan.op === "insert") return await execInsert(plan);
-    if (plan.op === "update") return await execUpdate(plan);
-    if (plan.op === "upsert") return await execUpsert(plan);
-    if (plan.op === "delete") return await execDelete(plan);
-    return fail(`Unsupported op: ${plan.op}`);
+    let result: ExecResult;
+    if (plan.op === "rpc") result = await execRpc(plan);
+    else {
+      assertTable(plan.table);
+      if (plan.op === "select") result = await execSelect(plan);
+      else if (plan.op === "insert") result = await execInsert(plan);
+      else if (plan.op === "update") result = await execUpdate(plan);
+      else if (plan.op === "upsert") result = await execUpsert(plan);
+      else if (plan.op === "delete") result = await execDelete(plan);
+      else return fail(`Unsupported op: ${plan.op}`);
+    }
+    return jsonSafeResult(result);
   } catch (err) {
+    if (shouldDegradeMissingSelect(plan, err)) {
+      console.warn(`[aws-db] ${plan.table} is missing; returning empty (not 500)`);
+      return emptySelectResult(plan);
+    }
     const message = err instanceof Error ? err.message : String(err);
     console.error("[aws-db] executePlan", message);
     return fail(message, 500);

@@ -194,6 +194,50 @@ describe("Nitro AWS entry plugin", () => {
   });
 });
 
+describe("missing org_member_directory does not 500", () => {
+  it("degrades SELECT to empty rows", async () => {
+    const { shouldDegradeMissingSelect, emptySelectResult, isUndefinedTableError } =
+      await import("./missing-relation.ts");
+    const err = Object.assign(new Error('relation "org_member_directory" does not exist'), {
+      code: "42P01",
+    });
+    assert.equal(isUndefinedTableError(err, "org_member_directory"), true);
+    assert.equal(
+      shouldDegradeMissingSelect({ op: "select", table: "org_member_directory" }, err),
+      true,
+    );
+    assert.equal(shouldDegradeMissingSelect({ op: "select", table: "profiles" }, err), false);
+    const empty = emptySelectResult({ want: "many", head: false });
+    assert.deepEqual(empty.data, []);
+    assert.equal(empty.error, null);
+    assert.equal(empty.status, 200);
+  });
+});
+
+describe("Cognito login / dashboard hang guards", () => {
+  it("login skips leftover-session auto-enter on Cognito", () => {
+    const src = readFileSync(new URL("../../routes/login.tsx", import.meta.url), "utf8");
+    assert.match(src, /shouldSkipLoginAutoRedirect/);
+    assert.match(src, /justSignedIn/);
+  });
+
+  it("dashboard spinner has Sign out and does not stay Loading forever on Cognito failure", () => {
+    const src = readFileSync(new URL("../../routes/dashboard.tsx", import.meta.url), "utf8");
+    assert.match(src, /dashboard-spinner-sign-out/);
+    assert.match(src, /Couldn't finish signing you in/);
+    assert.match(src, /isCognitoAuth\(\)/);
+  });
+
+  it("fetchOrgGoLiveDate never calls slice on raw pg values", () => {
+    const src = readFileSync(
+      new URL("../company-obligations.functions.ts", import.meta.url),
+      "utf8",
+    );
+    assert.match(src, /toIsoDateDay/);
+    assert.doesNotMatch(src, /raw\.slice/);
+  });
+});
+
 function fakeIdToken(supabaseId: string, email: string, sub = "cognito-sub"): string {
   const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
   const payload = Buffer.from(

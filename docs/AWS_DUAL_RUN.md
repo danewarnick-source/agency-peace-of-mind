@@ -85,6 +85,8 @@ Do **not** set `AUTH_PROVIDER=cognito`, `DATABASE_URL` / `AWS_DATABASE_URL`, `CO
 3. Cognito may invoke the User Migration Lambda on first sign-in (infra, not this repo).
 4. Hive stores a session cookie (`hive.aws_session`) and the browser session. Server functions still send `Authorization: Bearer …`.
 5. App user id = `custom:supabase_id` (else `profiles.email` lookup).
+6. Visiting `/login` with a leftover Cognito cookie **shows the email/password form** (no auto-enter). After an explicit Sign in, it continues to the dashboard. The dashboard Loading screen has **Sign out**; if org/bootstrap 500s, Cognito signs out to `/login` instead of spinning forever.
+7. `listCompanyObligations` bootstrap must not 500 the document. RDS `date`/`timestamptz` values are coerced with `toIsoDateDay` (never `.slice` on a Date).
 
 Forgot-password on Cognito emails a **code** (Cognito), not the old Supabase magic link. Users who are already signed in and must change password still use `/reset-password` (admin set-password on Cognito; original password is not overwritten at login).
 

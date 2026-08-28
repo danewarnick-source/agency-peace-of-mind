@@ -113,6 +113,33 @@ export function BillingCodesDetail({ clientId, clientName, medicaidId }: Props) 
     [budgets],
   );
 
+  // Read-only. Shows what is already on the 1056 row. Does not invent dates or rates.
+  const authWarnings = useMemo(() => {
+    const lines: string[] = [];
+    for (const b of budgets ?? []) {
+      const c = b.code as typeof b.code & { authorization_pending?: boolean };
+      const status = getAuthStatus(c.service_start_date, c.service_end_date);
+      const label = (c.service_code || "code").trim() || "code";
+      if (status === "expired" && c.service_end_date) {
+        lines.push(`${label} expired ${c.service_end_date}. Enter the real renewal 1056 — do not invent an end date.`);
+        continue;
+      }
+      if (c.service_end_date && status !== "expired") {
+        const end = new Date(`${c.service_end_date}T00:00:00`);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const days = Math.round((end.getTime() - today.getTime()) / 86_400_000);
+        if (Number.isFinite(days) && days >= 0 && days <= 14) {
+          lines.push(`${label} ends ${c.service_end_date}. Enter the real renewal when you have it.`);
+        }
+      }
+      if (c.authorization_pending || Number(c.rate_per_unit ?? 0) === 0) {
+        lines.push(`${label} is pending or $0. Enter the real rate and units from the 1056.`);
+      }
+    }
+    return lines;
+  }, [budgets]);
+
   const [bulkEdit, setBulkEdit] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [saving, setSaving] = useState(false);
@@ -254,6 +281,19 @@ export function BillingCodesDetail({ clientId, clientName, medicaidId }: Props) 
             </Field>
           </div>
         </div>
+
+        {authWarnings.length > 0 && (
+          <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
+            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide">
+              <AlertTriangle className="h-3.5 w-3.5" /> Authorization needs a real 1056
+            </p>
+            <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-xs">
+              {authWarnings.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {isLoading ? (
           <div className="space-y-2">

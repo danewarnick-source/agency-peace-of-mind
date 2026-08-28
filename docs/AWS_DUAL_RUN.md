@@ -95,3 +95,30 @@ Realtime (notification badge live updates) is a no-op on the AWS data path; the 
 4. Only then consider switching DNS. Keep Supabase until AWS has been stable.
 
 `GET /api/public/runtime-config` shows which gates are on (`authProvider`, `databaseUrlSet`, `s3BucketSet`) without exposing secrets.
+
+## Rebuild the ECS image (do not replace the live :15 task until it stays up)
+
+The container runs Nitro's `node-server` bundle: `CMD ["node", "index.mjs"]` from `dist-aws/server/` (see `deploy/aws/Dockerfile`). `AUTH_PROVIDER=cognito` is a **runtime** env on the task — it is not baked into the image. After this branch, rebuild and push a **new tag**, then start a **new task definition revision**. Keep `hive-app-server:15` as the service task until the new revision stays `RUNNING`.
+
+From this branch (repo root):
+
+```bash
+npm ci
+npm run build:aws
+
+ACCOUNT=684707794522
+REGION=us-east-1
+REPO=hive-app-server
+SHA=$(git rev-parse HEAD)
+IMAGE="$ACCOUNT.dkr.ecr.$REGION.amazonaws.com/$REPO"
+
+aws ecr get-login-password --region "$REGION" \
+  | docker login --username AWS --password-stdin "$ACCOUNT.dkr.ecr.$REGION.amazonaws.com"
+
+docker build -f deploy/aws/Dockerfile -t "$IMAGE:$SHA" .
+docker push "$IMAGE:$SHA"
+```
+
+Register a new task definition that is a copy of the Cognito revision (`hive-app-server:63` env), but with image `$IMAGE:$SHA`. Do **not** `update-service` onto the live `hive-app-server-service-o5c33ah8` until that revision's task stays running (CloudWatch `/ecs/hive-app-server` should show the Node process listening, not `defineNitroPlugin is not defined`).
+
+Alternatively: GitHub → Actions → **Deploy AWS (parallel target)** → **Run workflow** → this branch. That workflow builds, pushes `$GITHUB_SHA`, and **will update the live ECS service** if `AWS_ECS_CLUSTER` / `AWS_ECS_SERVICE` secrets are set — only use that when you are ready to point the live service at the new image.

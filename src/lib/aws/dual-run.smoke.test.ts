@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { afterEach, describe, it } from "node:test";
 import { createClient } from "@supabase/supabase-js";
 import {
@@ -143,6 +144,18 @@ describe("query builder SQL safety", () => {
     const sql = orExprToSql("first_name.ilike.%ann%,last_name.ilike.%ann%", params);
     assert.match(sql, /ILIKE/);
     assert.equal(params.length, 2);
+  });
+});
+
+describe("Nitro AWS entry plugin", () => {
+  it("does not use defineNitroPlugin (auto-import is missing in node-server index.mjs)", () => {
+    const src = readFileSync(
+      new URL("../../nitro-plugins/alb-origin-verify.ts", import.meta.url),
+      "utf8",
+    );
+    assert.match(src, /export default function/);
+    assert.doesNotMatch(src, /export default defineNitroPlugin/);
+    assert.doesNotMatch(src, /declare function defineNitroPlugin/);
   });
 });
 

@@ -139,15 +139,25 @@ export function formatPunchDateSpan(
   return `${formatDay(inIso, timeZone, false)} – ${formatDay(outIso, timeZone, true)}`;
 }
 
+const UUID_LIKE = /^[0-9a-f]{8}(-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?$/i;
+
+/** True when a punch spans 24h or more (forgotten clock-out). Display only. */
+export function isLongOpenPunch(durationMin: number): boolean {
+  return Number.isFinite(durationMin) && durationMin >= 24 * 60;
+}
+
 export function staffDisplayName(
   profile: {
     full_name?: string | null;
     first_name?: string | null;
     last_name?: string | null;
   } | null | undefined,
+  fallbackId?: string | null,
 ): string {
   const full = (profile?.full_name ?? "").trim();
-  if (full) return full;
+  if (full && !UUID_LIKE.test(full)) return full;
   const parts = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim();
-  return parts || "Staff";
+  if (parts && !UUID_LIKE.test(parts)) return parts;
+  if (fallbackId && UUID_LIKE.test(fallbackId.trim())) return "Staff";
+  return "Staff";
 }

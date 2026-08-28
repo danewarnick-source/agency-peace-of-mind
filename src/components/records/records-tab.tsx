@@ -29,7 +29,7 @@ import {
   saveRecordFields, saveManagerNote, toLocalInput, fromLocalInput, type AuditEntry,
 } from "@/lib/records-edit";
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
-import { formatPunchDateSpan, formatPunchRange, recordDurationMin, staffDisplayName } from "@/lib/record-duration";
+import { formatPunchDateSpan, formatPunchRange, isLongOpenPunch, recordDurationMin, staffDisplayName } from "@/lib/record-duration";
 import { ResidentialDailyTab } from "@/components/residential/residential-daily-tab";
 import { TimeCorrectionReviewSection } from "@/components/records/time-correction-review-section";
 import { RecordDetailSheet } from "@/components/records/record-detail-sheet";
@@ -392,7 +392,7 @@ export function RecordsTab() {
         const exc = awaiting ? [] : reviewExceptions(r);
         return {
           ...r,
-          staff_name: staffMap.get(r.staff_id) || staffDisplayName(null),
+          staff_name: staffMap.get(r.staff_id) || staffDisplayName(null, r.staff_id),
           client_name: r.clients
             ? `${r.clients.first_name ?? ""} ${r.clients.last_name ?? ""}`.trim()
             : r.client_id.slice(0, 8),
@@ -457,7 +457,7 @@ export function RecordsTab() {
       return ((data ?? []) as any[]).map((g): GeneralRow => ({
         id: g.id,
         staff_id: g.user_id,
-        staff_name: staffMap.get(g.user_id) || staffDisplayName(null),
+        staff_name: staffMap.get(g.user_id) || staffDisplayName(null, g.user_id),
         category: g.category ?? "general",
         note: g.note ?? "",
         clock_in_timestamp: g.clock_in_timestamp,
@@ -911,7 +911,12 @@ export function RecordsTab() {
                       <td className="px-3 py-2 font-mono text-xs">{g.category}</td>
                       <td className="px-3 py-2">{formatPunchDateSpan(g.clock_in_timestamp, g.clock_out_timestamp)}</td>
                       <td className="px-3 py-2">{formatPunchRange(g.clock_in_timestamp, g.clock_out_timestamp)}</td>
-                      <td className="px-3 py-2 tabular-nums">{fmtDur(g.duration_min)}</td>
+                      <td className={`px-3 py-2 tabular-nums ${isLongOpenPunch(g.duration_min) ? "font-semibold text-amber-800 dark:text-amber-300" : ""}`}>
+                        {fmtDur(g.duration_min)}
+                        {isLongOpenPunch(g.duration_min) && (
+                          <span className="ml-1 text-[10px] font-medium uppercase tracking-wider">open punch</span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{g.note || "—"}</td>
                     </tr>
                   ))}
@@ -964,7 +969,12 @@ export function RecordsTab() {
                         <td className="px-3 py-2 font-mono text-xs">{r.service_type_code}</td>
                         <td className="px-3 py-2">{formatPunchDateSpan(r.corrected_clock_in ?? r.clock_in_timestamp, r.corrected_clock_out ?? r.clock_out_timestamp)}</td>
                         <InlineTimeCell row={r} adminName={adminName} userId={user?.id ?? null} qc={qc} />
-                        <td className="px-3 py-2 tabular-nums">{fmtDur(r.duration_min)}</td>
+                        <td className={`px-3 py-2 tabular-nums ${isLongOpenPunch(r.duration_min) ? "font-semibold text-amber-800 dark:text-amber-300" : ""}`}>
+                          {fmtDur(r.duration_min)}
+                          {isLongOpenPunch(r.duration_min) && (
+                            <span className="ml-1 text-[10px] font-medium uppercase tracking-wider">open punch</span>
+                          )}
+                        </td>
                         <InlineManagerNoteCell row={r} adminName={adminName} userId={user?.id ?? null} qc={qc} />
                         <td className="px-3 py-2">
                           <div className="flex flex-wrap items-center gap-1">

@@ -37,6 +37,7 @@ import { useEntitlements } from "@/hooks/use-entitlements";
 import { useOrgFeatures } from "@/hooks/use-feature-enabled";
 
 import { BillingBanner } from "@/components/billing/billing-banner";
+import { orgAccessIsLocked } from "@/lib/billing-access";
 import { DraftJobsProvider } from "@/components/nectar/draft-jobs-driver";
 import { DraftJobsHeaderPill } from "@/components/nectar/draft-jobs-header-pill";
 import { GuidedTourProvider } from "@/components/nectar/guided-tour-provider";
@@ -108,16 +109,53 @@ export const Route = createFileRoute("/dashboard")({
 
       const { data: sub } = await supabase
         .from("org_subscriptions")
-        .select("locked_at")
+        .select("locked_at, status, stripe_subscription_id")
         .eq("organization_id", orgId)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (!sub?.locked_at) return;
+      let orgRow: {
+        name?: string;
+        legal_name?: string | null;
+        dba_name?: string | null;
+        billing_exempt?: boolean;
+      } | null = null;
+      const orgFull = await supabase
+        .from("organizations")
+        .select("name, legal_name, dba_name, billing_exempt")
+        .eq("id", orgId)
+        .maybeSingle();
+      if (orgFull.error) {
+        const retry = await supabase
+          .from("organizations")
+          .select("name, legal_name, dba_name")
+          .eq("id", orgId)
+          .maybeSingle();
+        orgRow = retry.data;
+      } else {
+        orgRow = orgFull.data;
+      }
+
+      const locked = orgAccessIsLocked({
+        billingExempt: orgRow?.billing_exempt === true,
+        orgName: orgRow?.name ?? null,
+        legalName: orgRow?.legal_name,
+        dbaName: orgRow?.dba_name,
+        subscription: sub
+          ? {
+              status: sub.status,
+              locked_at: sub.locked_at,
+              stripe_subscription_id: (sub as { stripe_subscription_id?: string | null }).stripe_subscription_id,
+            }
+          : null,
+      });
+      if (!locked) return;
 
       // Locked. Allow admins on the billing/subscription page so they can pay.
+      // Hive Exec can always reach the companies list to mark someone comped.
       const path = location.pathname;
+      if (path.startsWith("/dashboard/hive-exec")) return;
       const billingAllowlist = [
         "/dashboard/billing/subscription",
         "/dashboard/settings/subscription",

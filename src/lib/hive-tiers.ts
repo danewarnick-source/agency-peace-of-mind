@@ -1,12 +1,16 @@
 /**
  * HIVE subscription tier catalog.
  *
- * Single source of truth for tier → NECTAR Infusion / add-on entitlements.
- * Tier assignment is functional today; payment collection is skeletoned and
- * fills in later (see Plans & Billing).
+ * Single source of truth for tier → NECTAR Infusion / add-on entitlements
+ * and list prices. Public self-serve checkout offers Pro and Enterprise only.
+ * Starter is not a public plan — Hive Exec assigns it for billing-exempt /
+ * comped companies.
  */
 
 export type TierId = "starter" | "pro" | "enterprise" | "custom";
+
+/** Plans a new agency can pick and pay for at /signup. */
+export const PUBLIC_SELF_SERVE_TIERS: TierId[] = ["pro", "enterprise"];
 
 export type AddonId =
   | "nectar_infusion" // Guided Mode, plain-language answers, NECTAR-accelerated controls
@@ -99,12 +103,24 @@ export const TIER_CATALOG: TierDef[] = [
   },
 ];
 
+/** Older rows used hive_standard (per-staff). Treat that as Pro. */
+export function normalizeTierId(id: string | null | undefined): TierId {
+  if (id === "hive_standard") return "pro";
+  if (id === "starter" || id === "pro" || id === "enterprise" || id === "custom") return id;
+  return "starter";
+}
+
 export function getTier(id: string): TierDef {
-  return TIER_CATALOG.find((t) => t.id === id) ?? TIER_CATALOG[0];
+  const normalized = normalizeTierId(id);
+  return TIER_CATALOG.find((t) => t.id === normalized) ?? TIER_CATALOG[0];
 }
 
 export function addonsForTier(id: string): AddonId[] {
   return getTier(id).addons;
+}
+
+export function isPublicSelfServeTier(id: string | null | undefined): id is "pro" | "enterprise" {
+  return id === "pro" || id === "enterprise";
 }
 
 export function formatTierPrice(t: TierDef): string {

@@ -13131,6 +13131,7 @@ export type Database = {
           additional_state_codes: string[]
           aliases: string[]
           approx_client_count: number | null
+          billing_exempt: boolean
           billing_sms_phone: string | null
           created_at: string
           created_by: string | null
@@ -13160,6 +13161,7 @@ export type Database = {
           additional_state_codes?: string[]
           aliases?: string[]
           approx_client_count?: number | null
+          billing_exempt?: boolean
           billing_sms_phone?: string | null
           created_at?: string
           created_by?: string | null
@@ -13189,6 +13191,7 @@ export type Database = {
           additional_state_codes?: string[]
           aliases?: string[]
           approx_client_count?: number | null
+          billing_exempt?: boolean
           billing_sms_phone?: string | null
           created_at?: string
           created_by?: string | null

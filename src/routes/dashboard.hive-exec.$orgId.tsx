@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { ArrowLeft, Save, Users, Contact2, Clock, Activity, Pencil, AlertTriangle, ShieldCheck, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { getCompanyDetail, upsertSubscription, updateOrgNames, updateAccountContact } from "@/lib/hive-exec.functions";
+import { setOrgBillingExemptFn } from "@/lib/billing-exempt.functions";
 import { MasterController } from "@/components/hive-exec/master-controller";
 
 export const Route = createFileRoute("/dashboard/hive-exec/$orgId")({
@@ -25,6 +26,7 @@ function CompanyDetailPage() {
   const saveFn = useServerFn(upsertSubscription);
   const saveNamesFn = useServerFn(updateOrgNames);
   const saveContactFn = useServerFn(updateAccountContact);
+  const exemptFn = useServerFn(setOrgBillingExemptFn);
 
 
   const detailQ = useQuery({
@@ -400,8 +402,11 @@ function CompanyDetailPage() {
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Plan">
               <select value={plan} onChange={(e) => setPlan(e.target.value)} className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm">
-                <option value="hive_standard">HIVE Standard</option>
+                <option value="pro">Pro</option>
                 <option value="enterprise">Enterprise</option>
+                <option value="starter">Starter (comped / not self-serve)</option>
+                <option value="custom">Custom</option>
+                <option value="hive_standard">HIVE Standard (legacy)</option>
               </select>
             </Field>
             <Field label="Status">
@@ -452,6 +457,36 @@ function CompanyDetailPage() {
           ) : (
             <div className="mt-3 text-xs text-muted-foreground">No subscription on file yet.</div>
           )}
+
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={!!d?.billing_exempt}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  exemptFn({ data: { organizationId: orgId, billingExempt: next } })
+                    .then(() => {
+                      toast.success(
+                        next
+                          ? "Company is now billing-exempt (no Stripe charges)."
+                          : "Company will be charged like any other agency.",
+                      );
+                      qc.invalidateQueries({ queryKey: ["hive-exec-company", orgId] });
+                      qc.invalidateQueries({ queryKey: ["hive-exec-companies"] });
+                    })
+                    .catch((err) => toast.error(err instanceof Error ? err.message : "Could not update"));
+                }}
+              />
+              <span>
+                <strong>Billing-exempt (comped)</strong>
+                <span className="block text-xs text-muted-foreground">
+                  Skip Stripe Checkout, skip training charges, keep full access. True North Supports stays checked. Use this to comp another company without a code change.
+                </span>
+              </span>
+            </label>
+          </div>
 
           <div className="mt-3 flex items-center justify-end">
             <button

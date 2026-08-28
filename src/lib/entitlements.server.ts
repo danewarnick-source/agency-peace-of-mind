@@ -1,4 +1,5 @@
-import { addonsForTier, type AddonId, type TierId } from "@/lib/hive-tiers";
+import { entitlementsForOrg, isBillingExempt } from "@/lib/billing-access";
+import { type AddonId } from "@/lib/hive-tiers";
 import { requireOrgMembership } from "@/integrations/supabase/require-org";
 
 /**
@@ -29,8 +30,34 @@ export async function assertAddonForOrg(
     .eq("organization_id", organizationId)
     .maybeSingle();
 
-  const tier = ((sub?.plan as TierId) ?? "starter") as TierId;
-  const addons = addonsForTier(tier);
+  const orgRes = await supabase
+    .from("organizations")
+    .select("name, legal_name, dba_name, billing_exempt")
+    .eq("id", organizationId)
+    .maybeSingle();
+  let org = orgRes.data as
+    | { name: string; legal_name: string | null; dba_name: string | null; billing_exempt?: boolean }
+    | null;
+  if (orgRes.error && /billing_exempt/i.test(orgRes.error.message ?? "")) {
+    const retry = await supabase
+      .from("organizations")
+      .select("name, legal_name, dba_name")
+      .eq("id", organizationId)
+      .maybeSingle();
+    org = retry.data as typeof org;
+  }
+  const billingExempt = org
+    ? isBillingExempt({
+        billingExempt: org.billing_exempt === true,
+        orgName: org.name,
+        legalName: org.legal_name,
+        dbaName: org.dba_name,
+      })
+    : false;
+  const { addons } = entitlementsForOrg({
+    billingExempt,
+    plan: (sub?.plan as string | null) ?? null,
+  });
   if (!addons.includes(addon)) {
     throw new Error(
       `Forbidden: this capability requires the "${addon}" add-on. Upgrade your plan to enable it.`,

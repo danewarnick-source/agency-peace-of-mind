@@ -185,7 +185,36 @@ export async function recordPaymentSuccess(
 }
 
 // ───── lockAccount ───────────────────────────────────────────────────────
-export async function lockAccount(orgId: string, reason: string): Promise<{ ok: boolean }> {
+export async function lockAccount(orgId: string, reason: string): Promise<{ ok: boolean; skipped?: boolean }> {
+  const orgRes = await supabaseAdmin
+    .from("organizations")
+    .select("name, legal_name, dba_name, billing_exempt")
+    .eq("id", orgId)
+    .maybeSingle();
+  let org = orgRes.data as
+    | { name: string; legal_name: string | null; dba_name: string | null; billing_exempt?: boolean }
+    | null;
+  if (orgRes.error) {
+    const retry = await supabaseAdmin
+      .from("organizations")
+      .select("name, legal_name, dba_name")
+      .eq("id", orgId)
+      .maybeSingle();
+    org = retry.data as typeof org;
+  }
+  if (org) {
+    const { isBillingExempt } = await import("@/lib/billing-access");
+    if (
+      isBillingExempt({
+        billingExempt: org.billing_exempt === true,
+        orgName: org.name,
+        legalName: org.legal_name,
+        dbaName: org.dba_name,
+      })
+    ) {
+      return { ok: true, skipped: true };
+    }
+  }
   const sub = await getActiveSubscription(orgId);
   if (!sub) throw new Error("No subscription found for organization");
 
@@ -256,8 +285,8 @@ export async function checkAndLockPastDueAccounts(): Promise<{
 
     if (row.past_due_since < cutoff) {
       try {
-        await lockAccount(row.organization_id, "Payment past due > 30 days");
-        lockedIds.push(row.organization_id);
+        const lockRes = await lockAccount(row.organization_id, "Payment past due > 30 days");
+        if (!lockRes.skipped) lockedIds.push(row.organization_id);
       } catch (err) {
         // eslint-disable-next-line no-console
         console.error("[checkAndLockPastDueAccounts] failed to lock", row.organization_id, err);

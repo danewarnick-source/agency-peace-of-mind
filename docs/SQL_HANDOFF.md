@@ -6,6 +6,91 @@ it worked before moving on.
 
 ---
 
+## ACTION — Stripe billing: never charge True North (2026-08-28)
+
+**What this is for:** New agencies must pay in Stripe before they can use Hive.
+True North Supports LLC must never be charged. This adds a `billing_exempt`
+checkbox on the company. Hive Exec can turn it on for other agencies later
+without a code change.
+
+**Run this** before testing signup paywalls. Matches migration
+`supabase/migrations/20260828010000_org_billing_exempt.sql`.
+
+**What you'll see:** `billing_exempt` column on `organizations`. True North
+Supports rows show `t`. A trigger stops company admins from flipping the flag
+themselves.
+
+```sql
+ALTER TABLE public.organizations
+  ADD COLUMN IF NOT EXISTS billing_exempt boolean NOT NULL DEFAULT false;
+
+CREATE INDEX IF NOT EXISTS organizations_billing_exempt_idx
+  ON public.organizations (id)
+  WHERE billing_exempt = true;
+
+UPDATE public.organizations
+SET billing_exempt = true
+WHERE billing_exempt = false
+  AND (
+    name ILIKE '%true north supports%'
+    OR COALESCE(legal_name, '') ILIKE '%true north supports%'
+    OR COALESCE(dba_name, '') ILIKE '%true north supports%'
+  );
+
+UPDATE public.org_subscriptions s
+SET
+  locked_at = NULL,
+  lock_reason = NULL,
+  past_due_since = NULL,
+  status = CASE
+    WHEN s.status IN ('paused', 'trial', 'locked') THEN 'active'::public.sub_status
+    ELSE s.status
+  END
+FROM public.organizations o
+WHERE s.organization_id = o.id
+  AND o.billing_exempt = true
+  AND (s.locked_at IS NOT NULL OR s.status IN ('paused', 'trial', 'locked'));
+
+CREATE OR REPLACE FUNCTION public.protect_billing_exempt()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' AND NEW.billing_exempt IS DISTINCT FROM OLD.billing_exempt THEN
+    IF auth.uid() IS NULL THEN
+      RETURN NEW;
+    END IF;
+    IF NOT public.is_hive_executive(auth.uid()) THEN
+      RAISE EXCEPTION 'Only a Hive Executive can mark a company billing-exempt';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_protect_billing_exempt ON public.organizations;
+CREATE TRIGGER trg_protect_billing_exempt
+  BEFORE UPDATE ON public.organizations
+  FOR EACH ROW
+  EXECUTE FUNCTION public.protect_billing_exempt();
+
+DROP POLICY IF EXISTS "hive execs update organizations" ON public.organizations;
+CREATE POLICY "hive execs update organizations"
+  ON public.organizations
+  FOR UPDATE
+  TO authenticated
+  USING (public.is_hive_executive(auth.uid()))
+  WITH CHECK (public.is_hive_executive(auth.uid()));
+
+SELECT id, name, billing_exempt
+FROM public.organizations
+ORDER BY billing_exempt DESC, name;
+```
+
+---
+
 ## ACTION — Invite join: attach to this provider, don't start a new company (2026-08-27)
 
 **What this is for:** Invite emails and copied links used to open `/signup`, which

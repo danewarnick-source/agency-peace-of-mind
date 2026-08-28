@@ -3,16 +3,7 @@ import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import {
-  CreditCard,
-  CheckCircle2,
-  Sparkles,
-  Receipt,
-  TrendingUp,
-  Wrench,
-  Search,
-  Save,
-} from "lucide-react";
+import { CreditCard, CheckCircle2, Sparkles, Search, Save } from "lucide-react";
 import { RequireHiveExecutive } from "@/components/hive-executive-guard";
 import {
   listCompanies,
@@ -20,6 +11,7 @@ import {
   getExecKpis,
   type CompanyRow,
 } from "@/lib/hive-exec.functions";
+import { setOrgBillingExemptFn } from "@/lib/billing-exempt.functions";
 import {
   TIER_CATALOG,
   ADDON_CATALOG,
@@ -48,7 +40,7 @@ function PlansAndBilling() {
       <Header />
       <TierCatalogSection />
       <CompanyTierAssignmentSection />
-      <PaymentSkeletonSection />
+      <StripeStatusSection />
     </div>
   );
 }
@@ -63,8 +55,8 @@ function Header() {
         <div>
           <h2 className="font-display text-lg font-semibold">Plans &amp; Billing</h2>
           <p className="text-sm text-muted-foreground">
-            Define tiers, assign companies to a tier, and (later) collect payment. Tier
-            assignment drives NECTAR Infusion / add-on access across the platform.
+            Define tiers, assign companies, and mark a company billing-exempt (comped)
+            so they never hit Stripe. New agencies pay Pro or Enterprise at signup.
           </p>
         </div>
       </div>
@@ -141,6 +133,7 @@ function CompanyTierAssignmentSection() {
   const qc = useQueryClient();
   const listFn = useServerFn(listCompanies);
   const saveFn = useServerFn(upsertSubscription);
+  const exemptFn = useServerFn(setOrgBillingExemptFn);
   const listQ = useQuery({ queryKey: ["hive-exec-companies"], queryFn: () => listFn() });
 
   const [search, setSearch] = useState("");
@@ -196,6 +189,7 @@ function CompanyTierAssignmentSection() {
               <th className="px-3 py-2">Company</th>
               <th className="px-3 py-2">Current tier</th>
               <th className="px-3 py-2">Status</th>
+              <th className="px-3 py-2">Comped</th>
               <th className="px-3 py-2 text-right">MRR</th>
               <th className="px-3 py-2">Assign tier</th>
               <th className="px-3 py-2">Included add-ons</th>
@@ -205,13 +199,13 @@ function CompanyTierAssignmentSection() {
           <tbody>
             {listQ.isLoading ? (
               <tr>
-                <td colSpan={7} className="p-6 text-center text-muted-foreground">
+                <td colSpan={8} className="p-6 text-center text-muted-foreground">
                   Loading companies…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="p-6 text-center text-muted-foreground">
+                <td colSpan={8} className="p-6 text-center text-muted-foreground">
                   No companies found.
                 </td>
               </tr>
@@ -228,6 +222,34 @@ function CompanyTierAssignmentSection() {
                     <td className="px-3 py-2 font-medium text-[#0f1b3d]">{r.name}</td>
                     <td className="px-3 py-2 text-xs uppercase tracking-wide">{r.plan}</td>
                     <td className="px-3 py-2 text-xs">{r.status.replace("_", " ")}</td>
+                    <td className="px-3 py-2">
+                      <label className="inline-flex items-center gap-1.5 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={r.billing_exempt}
+                          onChange={(e) => {
+                            exemptFn({
+                              data: {
+                                organizationId: r.organization_id,
+                                billingExempt: e.target.checked,
+                              },
+                            })
+                              .then(() => {
+                                toast.success(
+                                  e.target.checked
+                                    ? `${r.name} is now billing-exempt.`
+                                    : `${r.name} will be charged.`,
+                                );
+                                qc.invalidateQueries({ queryKey: ["hive-exec-companies"] });
+                              })
+                              .catch((err) =>
+                                toast.error(err instanceof Error ? err.message : "Could not update"),
+                              );
+                          }}
+                        />
+                        Exempt
+                      </label>
+                    </td>
                     <td className="px-3 py-2 text-right tabular-nums">
                       {fmtMoney(r.mrr_cents)}
                     </td>
@@ -292,70 +314,25 @@ function CompanyTierAssignmentSection() {
 
 // ───── Payment skeleton ─────────────────────────────────────────────────────
 
-function PaymentSkeletonSection() {
+function StripeStatusSection() {
   const kpisFn = useServerFn(getExecKpis);
   const kpisQ = useQuery({ queryKey: ["hive-exec-kpis"], queryFn: () => kpisFn() });
   const mrr = kpisQ.data?.mrr_cents ?? 0;
 
   return (
-    <section className="rounded-xl border border-dashed border-[#fed7aa] bg-[#fffdf7] p-5 shadow-sm">
-      <div className="mb-3 flex items-center gap-2">
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-[#fed7aa] text-[#7a4a0a]">
-          <Wrench className="h-4 w-4" />
-        </span>
-        <div>
-          <h3 className="font-display text-base font-semibold">Payment processing — coming soon</h3>
-          <p className="text-xs text-muted-foreground">
-            Tier assignment is live today. Payment collection, invoices, and MRR roll-up
-            will plug in here without changing tier behavior.
-          </p>
+    <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+      <h3 className="font-display text-base font-semibold">Stripe (test mode)</h3>
+      <p className="mt-1 text-xs text-muted-foreground">
+        New agencies pay Pro ($499) or Enterprise ($1,299) at signup via Stripe Checkout.
+        Comped companies (True North, or anyone you mark exempt) never see a paywall.
+        Webhook URL: <span className="font-mono">/api/stripe/webhook</span>
+      </p>
+      <div className="mt-3 rounded-lg border border-border bg-background p-4">
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">MRR (paying companies)</div>
+        <div className="mt-1 font-display text-xl font-bold tabular-nums text-[#0f1b3d]">
+          {fmtMoney(mrr)}
         </div>
       </div>
-
-      <div className="grid gap-3 md:grid-cols-3">
-        <SkeletonCard
-          icon={TrendingUp}
-          title="MRR roll-up"
-          value={fmtMoney(mrr)}
-          note="Currently sums org_subscriptions.mrr_cents. Real billing will replace this with the payment provider total."
-        />
-        <SkeletonCard
-          icon={Receipt}
-          title="Invoices"
-          value="—"
-          note="Invoice ledger, line items, and PDF receipts."
-        />
-        <SkeletonCard
-          icon={CreditCard}
-          title="Payment methods"
-          value="—"
-          note="Card / ACH on file per company; dunning for past-due accounts."
-        />
-      </div>
     </section>
-  );
-}
-
-function SkeletonCard({
-  icon: Icon,
-  title,
-  value,
-  note,
-}: {
-  icon: typeof TrendingUp;
-  title: string;
-  value: string;
-  note: string;
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-white p-4">
-      <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
-        <Icon className="h-3.5 w-3.5" /> {title}
-      </div>
-      <div className="mt-1 font-display text-xl font-bold tabular-nums text-[#0f1b3d]">
-        {value}
-      </div>
-      <p className="mt-1 text-xs text-muted-foreground">{note}</p>
-    </div>
   );
 }

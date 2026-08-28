@@ -1,86 +1,100 @@
 /**
  * Server-only password session helpers. Used by login.functions.ts (existing
  * username RPC) and /api/aws/session. Do not import from the browser.
+ *
+ * Password Auth uses the publishable-key client (SUPABASE_URL +
+ * SUPABASE_PUBLISHABLE_KEY), not supabaseAdmin / service role.
  */
 
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { isCognitoAuth } from "@/lib/aws/env";
+import { createClient } from "@supabase/supabase-js";
 import { getRequest } from "@tanstack/react-start/server";
+import { isCognitoAuth } from "@/lib/aws/env";
+import {
+  GENERIC_PASSWORD_ERROR,
+  performPasswordSignInWithClient,
+  readPublishableAuthEnv,
+  type PasswordSession,
+  type PublishableAuthClient,
+} from "@/lib/login-password-signin";
 
-const GENERIC_ERROR = "Invalid username or password";
+export type { PasswordSession };
+export const GENERIC_ERROR = GENERIC_PASSWORD_ERROR;
 
-export type PasswordSession = {
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
-  user: { id: string; email: string };
-};
+function createPublishableAuthClient(): PublishableAuthClient {
+  const env = readPublishableAuthEnv();
+  if (!env) {
+    throw new Error(GENERIC_PASSWORD_ERROR);
+  }
+  return createClient(env.url, env.key, {
+    auth: {
+      storage: undefined,
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  }) as unknown as PublishableAuthClient;
+}
+
+async function lookupUsernameEmailWithServiceRole(username: string): Promise<string | null> {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return null;
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row } = await supabaseAdmin
+      .from("profiles")
+      .select("email")
+      .ilike("username", username)
+      .maybeSingle();
+    return (row as { email?: string } | null)?.email ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export async function performPasswordSignIn(
   identifier: string,
   password: string,
 ): Promise<PasswordSession> {
-  let email = identifier;
-
-  if (!email.includes("@")) {
-    const { data: row } = await supabaseAdmin
-      .from("profiles")
-      .select("email")
-      .ilike("username", identifier)
-      .maybeSingle();
-    if (!row?.email) throw new Error(GENERIC_ERROR);
-    email = row.email;
-  }
-
-  const { data: signIn, error } = await supabaseAdmin.auth.signInWithPassword({
-    email,
-    password,
+  const session = await performPasswordSignInWithClient(identifier, password, {
+    createPublishableClient: createPublishableAuthClient,
+    lookupUsernameEmailWithServiceRole,
   });
-  if (error || !signIn?.session) {
-    throw new Error(GENERIC_ERROR);
-  }
 
-  let appUserId = signIn.user?.id ?? "";
   if (isCognitoAuth()) {
-    const { resolveAppUserId } = await import("@/lib/aws/cognito.server");
-    appUserId = await resolveAppUserId({
-      supabaseId: appUserId || null,
-      email,
-      lookupEmail: async (em) => {
-        const { data: row } = await supabaseAdmin
-          .from("profiles")
-          .select("id")
-          .ilike("email", em)
-          .maybeSingle();
-        return (row as { id?: string } | null)?.id ?? null;
-      },
-    });
-    const { writeAwsSessionCookie } = await import("@/lib/aws/session-cookie.server");
-    writeAwsSessionCookie({
-      access_token: signIn.session.access_token,
-      refresh_token: signIn.session.refresh_token,
-      app_user_id: appUserId,
-      email,
-      expires_at: Math.floor(Date.now() / 1000) + (signIn.session.expires_in ?? 3600),
-    });
+    let appUserId = session.user.id;
+    try {
+      const { resolveAppUserId } = await import("@/lib/aws/cognito.server");
+      appUserId = await resolveAppUserId({
+        supabaseId: session.user.id || null,
+        email: session.user.email,
+        lookupEmail: async (em) => {
+          if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return null;
+          try {
+            const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+            const { data: row } = await supabaseAdmin
+              .from("profiles")
+              .select("id")
+              .ilike("email", em)
+              .maybeSingle();
+            return (row as { id?: string } | null)?.id ?? null;
+          } catch {
+            return null;
+          }
+        },
+      });
+      const { writeAwsSessionCookie } = await import("@/lib/aws/session-cookie.server");
+      writeAwsSessionCookie({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+        app_user_id: appUserId,
+        email: session.user.email,
+        expires_at: Math.floor(Date.now() / 1000) + session.expires_in,
+      });
+    } catch {
+      /* Cognito cookie is optional; publishable sign-in already succeeded */
+    }
+    return { ...session, user: { ...session.user, id: appUserId } };
   }
 
-  const { data: prof } = await supabaseAdmin
-    .from("profiles")
-    .select("account_status")
-    .eq("id", appUserId || signIn.user!.id)
-    .maybeSingle();
-  if ((prof as { account_status?: string } | null)?.account_status === "archived") {
-    await supabaseAdmin.auth.admin.signOut(signIn.session.access_token).catch(() => {});
-    throw new Error("Account suspended. Contact your administrator.");
-  }
-
-  return {
-    access_token: signIn.session.access_token,
-    refresh_token: signIn.session.refresh_token,
-    expires_in: signIn.session.expires_in ?? 3600,
-    user: { id: appUserId || signIn.user!.id, email },
-  };
+  return session;
 }
 
 export async function performAwsSignOut(): Promise<void> {
@@ -99,18 +113,25 @@ export async function performAwsRefresh(refreshToken: string): Promise<PasswordS
   if (!isCognitoAuth()) throw new Error("Not a Cognito session");
   const { cognitoRefresh, resolveAppUserId } = await import("@/lib/aws/cognito.server");
   const tokens = await cognitoRefresh(refreshToken);
-  const appUserId = await resolveAppUserId({
-    supabaseId: tokens.supabaseId,
-    email: tokens.email,
-    lookupEmail: async (em) => {
-      const { data: row } = await supabaseAdmin
-        .from("profiles")
-        .select("id")
-        .ilike("email", em)
-        .maybeSingle();
-      return (row as { id?: string } | null)?.id ?? null;
-    },
-  });
+  let appUserId = tokens.supabaseId || "";
+  try {
+    appUserId = await resolveAppUserId({
+      supabaseId: tokens.supabaseId,
+      email: tokens.email,
+      lookupEmail: async (em) => {
+        if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return null;
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { data: row } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .ilike("email", em)
+          .maybeSingle();
+        return (row as { id?: string } | null)?.id ?? null;
+      },
+    });
+  } catch {
+    if (!appUserId) throw new Error(GENERIC_PASSWORD_ERROR);
+  }
   const { writeAwsSessionCookie } = await import("@/lib/aws/session-cookie.server");
   writeAwsSessionCookie({
     access_token: tokens.idToken,

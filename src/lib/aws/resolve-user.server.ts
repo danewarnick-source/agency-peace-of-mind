@@ -24,7 +24,9 @@ async function lookupProfileIdByEmail(email: string): Promise<string | null> {
   }
 }
 
-export async function resolveSupabaseBearer(request: Request | null | undefined): Promise<ResolvedAwsUser | null> {
+export async function resolveSupabaseBearer(
+  request: Request | null | undefined,
+): Promise<ResolvedAwsUser | null> {
   const header = request?.headers?.get("authorization");
   const token = header?.startsWith("Bearer ") ? header.slice(7).trim() : "";
   if (!token) return null;
@@ -44,12 +46,16 @@ export async function resolveSupabaseBearer(request: Request | null | undefined)
   }
 }
 
-export async function resolveAnyRequestUser(request: Request | null | undefined): Promise<ResolvedAwsUser | null> {
+export async function resolveAnyRequestUser(
+  request: Request | null | undefined,
+): Promise<ResolvedAwsUser | null> {
   if (isCognitoAuth()) return resolveRequestUser(request);
   return resolveSupabaseBearer(request);
 }
 
-export async function resolveRequestUser(request: Request | null | undefined): Promise<ResolvedAwsUser | null> {
+export async function resolveRequestUser(
+  request: Request | null | undefined,
+): Promise<ResolvedAwsUser | null> {
   if (!isCognitoAuth()) return resolveSupabaseBearer(request);
   const header = request?.headers?.get("authorization");
   const bearer = header?.startsWith("Bearer ") ? header.slice(7).trim() : "";

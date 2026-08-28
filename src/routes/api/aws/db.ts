@@ -6,13 +6,22 @@ export const Route = createFileRoute("/api/aws/db")({
       POST: async ({ request }) => {
         const { isCognitoAuth, shouldProxyClientData } = await import("@/lib/aws/env");
         if (!shouldProxyClientData() && !isCognitoAuth()) {
-          return Response.json({ error: { message: "AWS data path is not enabled" } }, { status: 404 });
+          return Response.json(
+            { error: { message: "AWS data path is not enabled" } },
+            { status: 404 },
+          );
         }
         const { resolveAnyRequestUser } = await import("@/lib/aws/resolve-user.server");
         const user = await resolveAnyRequestUser(request);
         if (!user) {
           return Response.json(
-            { data: null, error: { message: "Unauthorized" }, count: null, status: 401, statusText: "Unauthorized" },
+            {
+              data: null,
+              error: { message: "Unauthorized" },
+              count: null,
+              status: 401,
+              statusText: "Unauthorized",
+            },
             { status: 401 },
           );
         }
@@ -21,13 +30,25 @@ export const Route = createFileRoute("/api/aws/db")({
           plan = await request.json();
         } catch {
           return Response.json(
-            { data: null, error: { message: "Invalid plan" }, count: null, status: 400, statusText: "Error" },
+            {
+              data: null,
+              error: { message: "Invalid plan" },
+              count: null,
+              status: 400,
+              statusText: "Error",
+            },
             { status: 400 },
           );
         }
         if (!plan || typeof plan !== "object" || !("op" in plan)) {
           return Response.json(
-            { data: null, error: { message: "Invalid plan" }, count: null, status: 400, statusText: "Error" },
+            {
+              data: null,
+              error: { message: "Invalid plan" },
+              count: null,
+              status: 400,
+              statusText: "Error",
+            },
             { status: 400 },
           );
         }

@@ -25,8 +25,11 @@ export const Route = createFileRoute("/api/aws/storage")({
         }
         if (action === "download") {
           const out = await s3.serverDownload(bucket, path);
-          if (out.error || !out.data) return new Response(out.error?.message || "Not found", { status: 404 });
-          return new Response(out.data, { headers: { "content-type": out.data.type || "application/octet-stream" } });
+          if (out.error || !out.data)
+            return new Response(out.error?.message || "Not found", { status: 404 });
+          return new Response(out.data, {
+            headers: { "content-type": out.data.type || "application/octet-stream" },
+          });
         }
         return s3.serverGetObjectResponse(bucket, path);
       },
@@ -49,7 +52,8 @@ export const Route = createFileRoute("/api/aws/storage")({
           if (out.error) return Response.json({ error: out.error.message }, { status: 400 });
           return Response.json(out.data);
         }
-        if (!bucket || !path) return Response.json({ error: "Missing bucket/path" }, { status: 400 });
+        if (!bucket || !path)
+          return Response.json({ error: "Missing bucket/path" }, { status: 400 });
         const buf = new Uint8Array(await request.arrayBuffer());
         const out = await s3.serverUpload(bucket, path, buf, {
           contentType: request.headers.get("content-type") || undefined,

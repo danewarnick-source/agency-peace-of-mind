@@ -98,7 +98,11 @@ describe("AWS dual-run Cognito adapter", () => {
     process.env.AUTH_PROVIDER = "cognito";
     const adapter = createCognitoAuthAdapter({
       cognitoSignIn: async () => ({
-        access_token: fakeIdToken("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "a@b.c", "cognito-sub-NOT-app-id"),
+        access_token: fakeIdToken(
+          "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          "a@b.c",
+          "cognito-sub-NOT-app-id",
+        ),
         refresh_token: "r",
         user: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", email: "a@b.c" },
       }),

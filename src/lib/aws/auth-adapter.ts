@@ -33,9 +33,7 @@ export type CognitoAuthDeps = {
     user: { id: string; email?: string };
   }>;
   cognitoSignOut?: () => Promise<void>;
-  cognitoRefresh?: (
-    refreshToken: string,
-  ) => Promise<{
+  cognitoRefresh?: (refreshToken: string) => Promise<{
     access_token: string;
     refresh_token: string;
     expires_in?: number;
@@ -44,16 +42,10 @@ export type CognitoAuthDeps = {
   cognitoResetPassword?: (email: string) => Promise<void>;
   cognitoUpdatePassword?: (password: string) => Promise<void>;
   /** Only used when AUTH_PROVIDER is supabase — tests prove it is skipped. */
-  supabaseSignIn?: (
-    email: string,
-    password: string,
-  ) => Promise<PasswordSignInResult>;
+  supabaseSignIn?: (email: string, password: string) => Promise<PasswordSignInResult>;
 };
 
-function userFromToken(
-  accessToken: string,
-  fallback: { id: string; email?: string },
-): User {
+function userFromToken(accessToken: string, fallback: { id: string; email?: string }): User {
   const claims = decodeJwtPayload(accessToken);
   return appUserFromClaims(claims, fallback.id);
 }
@@ -75,10 +67,16 @@ function toSession(tokens: {
 
 export function createCognitoAuthAdapter(deps: CognitoAuthDeps) {
   const adapter = {
-    async signInWithPassword(args: { email: string; password: string }): Promise<PasswordSignInResult> {
+    async signInWithPassword(args: {
+      email: string;
+      password: string;
+    }): Promise<PasswordSignInResult> {
       if (!isCognitoAuth()) {
         if (!deps.supabaseSignIn) {
-          return { data: { session: null, user: null }, error: { message: "Auth is not configured" } };
+          return {
+            data: { session: null, user: null },
+            error: { message: "Auth is not configured" },
+          };
         }
         return deps.supabaseSignIn(args.email, args.password);
       }
@@ -117,7 +115,10 @@ export function createCognitoAuthAdapter(deps: CognitoAuthDeps) {
       refresh_token: string;
       expires_in?: number;
       user?: { id: string; email?: string };
-    }): Promise<{ data: { session: Session | null; user: User | null }; error: { message: string } | null }> {
+    }): Promise<{
+      data: { session: Session | null; user: User | null };
+      error: { message: string } | null;
+    }> {
       try {
         const claims = decodeJwtPayload(tokens.access_token);
         const supabaseId =
@@ -148,7 +149,10 @@ export function createCognitoAuthAdapter(deps: CognitoAuthDeps) {
       }
     },
 
-    async refreshSession(): Promise<{ data: { session: Session | null; user: User | null }; error: { message: string } | null }> {
+    async refreshSession(): Promise<{
+      data: { session: Session | null; user: User | null };
+      error: { message: string } | null;
+    }> {
       const current = readBrowserSession();
       if (!current?.refresh_token || !deps.cognitoRefresh) {
         return { data: { session: current, user: current?.user ?? null }, error: null };
@@ -173,13 +177,19 @@ export function createCognitoAuthAdapter(deps: CognitoAuthDeps) {
 
     async resetPasswordForEmail(email: string, _opts?: { redirectTo?: string }) {
       if (!deps.cognitoResetPassword) {
-        return { data: {}, error: { message: "Password reset is not configured for Cognito yet." } };
+        return {
+          data: {},
+          error: { message: "Password reset is not configured for Cognito yet." },
+        };
       }
       try {
         await deps.cognitoResetPassword(email);
         return { data: {}, error: null };
       } catch (err) {
-        return { data: {}, error: { message: err instanceof Error ? err.message : "Reset failed" } };
+        return {
+          data: {},
+          error: { message: err instanceof Error ? err.message : "Reset failed" },
+        };
       }
     },
 
@@ -207,7 +217,9 @@ export function createCognitoAuthAdapter(deps: CognitoAuthDeps) {
     async exchangeCodeForSession(_code: string) {
       return {
         data: { session: null, user: null },
-        error: { message: "Magic-link recovery is a Supabase flow. Use Forgot password on Cognito." },
+        error: {
+          message: "Magic-link recovery is a Supabase flow. Use Forgot password on Cognito.",
+        },
       };
     },
 
@@ -219,7 +231,10 @@ export function createCognitoAuthAdapter(deps: CognitoAuthDeps) {
     },
 
     async verifyOtp() {
-      return { data: { session: null, user: null }, error: { message: "OTP is not used on the Cognito path." } };
+      return {
+        data: { session: null, user: null },
+        error: { message: "OTP is not used on the Cognito path." },
+      };
     },
 
     async resend() {
@@ -251,7 +266,8 @@ export function getBrowserCognitoAuth() {
         body: JSON.stringify({ action: "signin", email, password }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error((json as { error?: string }).error || "Invalid username or password");
+      if (!res.ok)
+        throw new Error((json as { error?: string }).error || "Invalid username or password");
       return json as {
         access_token: string;
         refresh_token: string;
@@ -313,7 +329,10 @@ function getServerCognitoAuth() {
   const empty = { data: { session: null as null, user: null as null }, error: null as null };
   return {
     async signInWithPassword() {
-      return { data: { session: null, user: null }, error: { message: "Use the browser login form." } };
+      return {
+        data: { session: null, user: null },
+        error: { message: "Use the browser login form." },
+      };
     },
     async signOut() {
       return { error: null };
@@ -340,13 +359,22 @@ function getServerCognitoAuth() {
       return { data: { user: null }, error: { message: "Not signed in" } };
     },
     async exchangeCodeForSession() {
-      return { data: { session: null, user: null }, error: { message: "Not supported on Cognito." } };
+      return {
+        data: { session: null, user: null },
+        error: { message: "Not supported on Cognito." },
+      };
     },
     async signUp() {
-      return { data: { session: null, user: null }, error: { message: "Not supported on Cognito." } };
+      return {
+        data: { session: null, user: null },
+        error: { message: "Not supported on Cognito." },
+      };
     },
     async verifyOtp() {
-      return { data: { session: null, user: null }, error: { message: "Not supported on Cognito." } };
+      return {
+        data: { session: null, user: null },
+        error: { message: "Not supported on Cognito." },
+      };
     },
     async resend() {
       return { data: {}, error: { message: "Not supported on Cognito." } };

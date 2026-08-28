@@ -94,8 +94,10 @@ function applyCommon(q: AnyQ, plan: DbPlan): AnyQ {
     }
   }
   for (const expr of plan.orExprs) next = next.or(expr);
-  for (const o of plan.order) next = next.order(o.column, { ascending: o.ascending, nullsFirst: o.nullsFirst });
-  if (plan.limit != null && plan.offset != null) next = next.range(plan.offset, plan.offset + plan.limit - 1);
+  for (const o of plan.order)
+    next = next.order(o.column, { ascending: o.ascending, nullsFirst: o.nullsFirst });
+  if (plan.limit != null && plan.offset != null)
+    next = next.range(plan.offset, plan.offset + plan.limit - 1);
   else if (plan.limit != null) next = next.limit(plan.limit);
   else if (plan.offset != null) next = next.range(plan.offset, plan.offset + 999);
   if (plan.want === "single") next = next.single();

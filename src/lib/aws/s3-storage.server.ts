@@ -59,11 +59,16 @@ export async function serverDownload(logicalBucket: string, path: string) {
         Key: s3ObjectKey(logicalBucket, path),
       }),
     );
-    const bytes = out.Body ? new Uint8Array(await out.Body.transformToByteArray()) : new Uint8Array();
+    const bytes = out.Body
+      ? new Uint8Array(await out.Body.transformToByteArray())
+      : new Uint8Array();
     const blob = new Blob([bytes], { type: out.ContentType || "application/octet-stream" });
     return { data: blob, error: null };
   } catch (err) {
-    return { data: null, error: { message: err instanceof Error ? err.message : "Download failed" } };
+    return {
+      data: null,
+      error: { message: err instanceof Error ? err.message : "Download failed" },
+    };
   }
 }
 
@@ -95,7 +100,10 @@ export async function serverSignedUrl(logicalBucket: string, path: string, expir
   }
 }
 
-export async function serverGetObjectResponse(logicalBucket: string, path: string): Promise<Response> {
+export async function serverGetObjectResponse(
+  logicalBucket: string,
+  path: string,
+): Promise<Response> {
   const bucket = getS3Bucket();
   if (!bucket) return new Response("S3_BUCKET is not set", { status: 500 });
   try {
@@ -127,7 +135,8 @@ export function getS3StorageAdapter() {
       ) => serverUpload(logicalBucket, path, file, opts),
       download: (path: string) => serverDownload(logicalBucket, path),
       remove: (paths: string[]) => serverRemove(logicalBucket, paths),
-      createSignedUrl: (path: string, expiresIn: number) => serverSignedUrl(logicalBucket, path, expiresIn),
+      createSignedUrl: (path: string, expiresIn: number) =>
+        serverSignedUrl(logicalBucket, path, expiresIn),
       getPublicUrl: (path: string) => {
         const bucket = getS3Bucket();
         const region = getS3Region();

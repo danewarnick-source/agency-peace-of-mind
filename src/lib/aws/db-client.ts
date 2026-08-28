@@ -4,7 +4,13 @@
  * never enter the browser bundle.
  */
 
-import { createQueryBuilder, createRpcBuilder, type DbPlan, type ExecResult, type PlanExecutor } from "./query-builder";
+import {
+  createQueryBuilder,
+  createRpcBuilder,
+  type DbPlan,
+  type ExecResult,
+  type PlanExecutor,
+} from "./query-builder";
 import { readBrowserSession } from "./session-store";
 
 async function clientExec(plan: DbPlan): Promise<ExecResult> {

@@ -89,12 +89,24 @@ class QueryBuilder implements PromiseLike<ExecResult> {
   }
 
   private fork(patch: Partial<DbPlan>): QueryBuilder {
-    return new QueryBuilder({ ...this.plan, ...patch, filters: [...this.plan.filters], orExprs: [...this.plan.orExprs], order: [...this.plan.order] }, this.exec);
+    return new QueryBuilder(
+      {
+        ...this.plan,
+        ...patch,
+        filters: [...this.plan.filters],
+        orExprs: [...this.plan.orExprs],
+        order: [...this.plan.order],
+      },
+      this.exec,
+    );
   }
 
   select(columns?: string, opts?: SelectOpts) {
     return this.fork({
-      op: this.plan.op === "insert" || this.plan.op === "update" || this.plan.op === "upsert" ? this.plan.op : "select",
+      op:
+        this.plan.op === "insert" || this.plan.op === "update" || this.plan.op === "upsert"
+          ? this.plan.op
+          : "select",
       select: columns ?? this.plan.select ?? "*",
       count: opts?.count === "exact" ? "exact" : this.plan.count,
       head: opts?.head ?? this.plan.head,
@@ -102,14 +114,21 @@ class QueryBuilder implements PromiseLike<ExecResult> {
   }
 
   insert(payload: unknown, opts?: { count?: "exact" }) {
-    return this.fork({ op: "insert", payload, count: opts?.count === "exact" ? "exact" : this.plan.count });
+    return this.fork({
+      op: "insert",
+      payload,
+      count: opts?.count === "exact" ? "exact" : this.plan.count,
+    });
   }
 
   update(payload: unknown) {
     return this.fork({ op: "update", payload });
   }
 
-  upsert(payload: unknown, opts?: { onConflict?: string; ignoreDuplicates?: boolean; count?: "exact" }) {
+  upsert(
+    payload: unknown,
+    opts?: { onConflict?: string; ignoreDuplicates?: boolean; count?: "exact" },
+  ) {
     return this.fork({
       op: "upsert",
       payload,
@@ -166,19 +185,27 @@ class QueryBuilder implements PromiseLike<ExecResult> {
     return this.addFilter({ op: op as FilterOp, column, value });
   }
   match(obj: Record<string, unknown>) {
-    let next: QueryBuilder = this;
-    for (const [column, value] of Object.entries(obj)) {
-      next = next.eq(column, value);
-    }
-    return next;
+    return Object.entries(obj).reduce(
+      (builder, [column, value]) => builder.eq(column, value),
+      this as QueryBuilder,
+    );
   }
   or(expr: string) {
     const orExprs = [...this.plan.orExprs, expr];
-    return new QueryBuilder({ ...this.plan, orExprs, filters: [...this.plan.filters], order: [...this.plan.order] }, this.exec);
+    return new QueryBuilder(
+      { ...this.plan, orExprs, filters: [...this.plan.filters], order: [...this.plan.order] },
+      this.exec,
+    );
   }
   order(column: string, opts?: { ascending?: boolean; nullsFirst?: boolean }) {
-    const order = [...this.plan.order, { column, ascending: opts?.ascending !== false, nullsFirst: opts?.nullsFirst }];
-    return new QueryBuilder({ ...this.plan, order, filters: [...this.plan.filters], orExprs: [...this.plan.orExprs] }, this.exec);
+    const order = [
+      ...this.plan.order,
+      { column, ascending: opts?.ascending !== false, nullsFirst: opts?.nullsFirst },
+    ];
+    return new QueryBuilder(
+      { ...this.plan, order, filters: [...this.plan.filters], orExprs: [...this.plan.orExprs] },
+      this.exec,
+    );
   }
   limit(n: number) {
     return this.fork({ limit: n });
@@ -208,7 +235,10 @@ class QueryBuilder implements PromiseLike<ExecResult> {
 
   private addFilter(f: Filter): QueryBuilder {
     const filters = [...this.plan.filters, f];
-    return new QueryBuilder({ ...this.plan, filters, orExprs: [...this.plan.orExprs], order: [...this.plan.order] }, this.exec);
+    return new QueryBuilder(
+      { ...this.plan, filters, orExprs: [...this.plan.orExprs], order: [...this.plan.order] },
+      this.exec,
+    );
   }
 }
 
@@ -216,7 +246,11 @@ export function createQueryBuilder(table: string, exec: PlanExecutor): QueryBuil
   return new QueryBuilder(emptyPlan(table), exec);
 }
 
-export function createRpcBuilder(fn: string, args: Record<string, unknown> | undefined, exec: PlanExecutor): QueryBuilder {
+export function createRpcBuilder(
+  fn: string,
+  args: Record<string, unknown> | undefined,
+  exec: PlanExecutor,
+): QueryBuilder {
   return new QueryBuilder({ ...emptyPlan(fn), op: "rpc", rpcFn: fn, rpcArgs: args ?? {} }, exec);
 }
 
@@ -227,7 +261,10 @@ export type EmbedSpec = {
   columns: string;
 };
 
-export function parseSelectList(select: string | undefined): { columns: string[]; embeds: EmbedSpec[] } {
+export function parseSelectList(select: string | undefined): {
+  columns: string[];
+  embeds: EmbedSpec[];
+} {
   if (!select || select.trim() === "*") return { columns: ["*"], embeds: [] };
   const parts = splitTop(select, ",");
   const columns: string[] = [];
@@ -254,7 +291,12 @@ export function parseSelectList(select: string | undefined): { columns: string[]
       alias = a;
       hint = h?.replace(/^!inner/, "") || null;
     }
-    embeds.push({ alias: alias.trim(), hint: hint?.trim() || null, inner: isInner, columns: inner || "*" });
+    embeds.push({
+      alias: alias.trim(),
+      hint: hint?.trim() || null,
+      inner: isInner,
+      columns: inner || "*",
+    });
   }
   if (columns.length === 0 && embeds.length > 0) columns.push("*");
   return { columns, embeds };
@@ -325,7 +367,10 @@ export function filterToSql(f: Filter, params: unknown[]): string {
       return `${col} && ${p(params)}`;
     case "not": {
       const innerOp = String(f.value ?? "eq") as FilterOp;
-      const inner = filterToSql({ op: innerOp === "not" ? "eq" : innerOp, column: f.column, value: f.extra }, params);
+      const inner = filterToSql(
+        { op: innerOp === "not" ? "eq" : innerOp, column: f.column, value: f.extra },
+        params,
+      );
       return `NOT (${inner})`;
     }
     default:
@@ -386,10 +431,17 @@ function parseAtom(atom: string, params: unknown[]): string {
   if (value === "null") value = null;
   else if (value === "true") value = true;
   else if (value === "false") value = false;
-  else if (op === "in" && typeof value === "string" && value.startsWith("(") && value.endsWith(")")) {
-    value = value.slice(1, -1).split(",").map((s) => s.trim()).filter(Boolean);
-  } else if (op === "contains" && typeof value === "string" && value.startsWith("{")) {
-    value = value;
+  else if (
+    op === "in" &&
+    typeof value === "string" &&
+    value.startsWith("(") &&
+    value.endsWith(")")
+  ) {
+    value = value
+      .slice(1, -1)
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
   const sql = filterToSql({ op, column, value }, params);
   return negated ? `NOT (${sql})` : sql;

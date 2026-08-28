@@ -85,7 +85,8 @@ export async function performPasswordSignIn(
 
 export async function performAwsSignOut(): Promise<void> {
   if (!isCognitoAuth()) return;
-  const { clearAwsSessionCookie, readAwsSessionCookie } = await import("@/lib/aws/session-cookie.server");
+  const { clearAwsSessionCookie, readAwsSessionCookie } =
+    await import("@/lib/aws/session-cookie.server");
   const { cognitoGlobalSignOut } = await import("@/lib/aws/cognito.server");
   const cookie = readAwsSessionCookie();
   const header = getRequest()?.headers?.get("authorization");

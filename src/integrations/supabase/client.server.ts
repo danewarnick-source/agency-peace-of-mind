@@ -4,12 +4,12 @@
  * that Postgres pool instead. When AUTH_PROVIDER=cognito, `.auth` uses Cognito.
  * When S3_BUCKET is set, `.storage` uses S3. Unset AWS vars keep today's client.
  */
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from './types';
-import { getDatabaseUrl, isCognitoAuth, isS3StorageEnabled } from '@/lib/aws/env';
-import { getAwsDataClient } from '@/lib/aws/db-client.server';
-import { getS3StorageAdapter } from '@/lib/aws/s3-storage.server';
-import { createAwsAuthAdmin } from '@/lib/aws/auth-admin.server';
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "./types";
+import { getDatabaseUrl, isCognitoAuth, isS3StorageEnabled } from "@/lib/aws/env";
+import { getAwsDataClient } from "@/lib/aws/db-client.server";
+import { getS3StorageAdapter } from "@/lib/aws/s3-storage.server";
+import { createAwsAuthAdmin } from "@/lib/aws/auth-admin.server";
 
 function createSupabaseAdminClient() {
   const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -17,10 +17,10 @@ function createSupabaseAdminClient() {
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     const missing = [
-      ...(!SUPABASE_URL ? ['SUPABASE_URL'] : []),
-      ...(!SUPABASE_SERVICE_ROLE_KEY ? ['SUPABASE_SERVICE_ROLE_KEY'] : []),
+      ...(!SUPABASE_URL ? ["SUPABASE_URL"] : []),
+      ...(!SUPABASE_SERVICE_ROLE_KEY ? ["SUPABASE_SERVICE_ROLE_KEY"] : []),
     ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Connect Supabase in Lovable Cloud.`;
+    const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Connect Supabase in Lovable Cloud.`;
     console.error(`[Supabase] ${message}`);
     throw new Error(message);
   }
@@ -30,7 +30,7 @@ function createSupabaseAdminClient() {
       storage: undefined,
       persistSession: false,
       autoRefreshToken: false,
-    }
+    },
   });
 }
 
@@ -55,7 +55,9 @@ function liveAdminOrNull(): AdminClient | null {
 function requireLive(): AdminClient {
   const live = liveAdminOrNull();
   if (!live) {
-    throw new Error('Missing Supabase environment variable(s): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Connect Supabase in Lovable Cloud.');
+    throw new Error(
+      "Missing Supabase environment variable(s): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Connect Supabase in Lovable Cloud.",
+    );
   }
   return live;
 }
@@ -67,15 +69,15 @@ let _awsAuth: unknown = null;
 // Import like: import { supabaseAdmin } from "@/integrations/supabase/client.server";
 export const supabaseAdmin = new Proxy({} as AdminClient, {
   get(_, prop, receiver) {
-    if (prop === 'from' || prop === 'rpc') {
+    if (prop === "from" || prop === "rpc") {
       if (getDatabaseUrl()) {
         return getAwsDataClient()[prop];
       }
     }
-    if (prop === 'storage' && isS3StorageEnabled()) {
+    if (prop === "storage" && isS3StorageEnabled()) {
       return getS3StorageAdapter();
     }
-    if (prop === 'auth' && isCognitoAuth()) {
+    if (prop === "auth" && isCognitoAuth()) {
       if (!_awsAuth) {
         const lookup = getDatabaseUrl() ? getAwsDataClient() : liveAdminOrNull();
         _awsAuth = createAwsAuthAdmin(lookup as never);

@@ -32,7 +32,9 @@ function readRawAuthProvider(): string {
     typeof process !== "undefined"
       ? process.env.AUTH_PROVIDER || process.env.VITE_AUTH_PROVIDER
       : undefined;
-  return String(fromWindow || fromProc || "supabase").trim().toLowerCase();
+  return String(fromWindow || fromProc || "supabase")
+    .trim()
+    .toLowerCase();
 }
 
 export function getAuthProvider(): AuthProvider {
@@ -146,15 +148,21 @@ export function getPublicRuntimeBlob(): HiveRuntimeBlob {
  * dummy pair so `createClient` still succeeds (auth/data/storage are
  * intercepted). Missing keys with AWS unset still throw — same as today.
  */
-export function resolveSupabaseClientEnv(): { SUPABASE_URL: string; SUPABASE_PUBLISHABLE_KEY: string } {
+export function resolveSupabaseClientEnv(): {
+  SUPABASE_URL: string;
+  SUPABASE_PUBLISHABLE_KEY: string;
+} {
   const url =
     (typeof import.meta !== "undefined" &&
       (import.meta as ImportMeta & { env?: Record<string, string> }).env?.VITE_SUPABASE_URL) ||
-    (typeof process !== "undefined" ? process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL : undefined) ||
+    (typeof process !== "undefined"
+      ? process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
+      : undefined) ||
     (typeof process !== "undefined" ? process.env.NEXT_PUBLIC_SUPABASE_URL : undefined);
   const key =
     (typeof import.meta !== "undefined" &&
-      (import.meta as ImportMeta & { env?: Record<string, string> }).env?.VITE_SUPABASE_PUBLISHABLE_KEY) ||
+      (import.meta as ImportMeta & { env?: Record<string, string> }).env
+        ?.VITE_SUPABASE_PUBLISHABLE_KEY) ||
     (typeof process !== "undefined"
       ? process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY
       : undefined) ||
@@ -169,7 +177,10 @@ export function resolveSupabaseClientEnv(): { SUPABASE_URL: string; SUPABASE_PUB
     };
   }
 
-  const missing = [...(!url ? ["SUPABASE_URL"] : []), ...(!key ? ["SUPABASE_PUBLISHABLE_KEY"] : [])];
+  const missing = [
+    ...(!url ? ["SUPABASE_URL"] : []),
+    ...(!key ? ["SUPABASE_PUBLISHABLE_KEY"] : []),
+  ];
   const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Connect Supabase in Lovable Cloud.`;
   console.error(`[Supabase] ${message}`);
   throw new Error(message);

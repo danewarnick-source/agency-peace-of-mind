@@ -17,7 +17,10 @@ import { isCognitoAuth } from "./env";
 type AdminClient = {
   from: (table: string) => {
     select: (cols: string) => {
-      eq: (c: string, v: unknown) => {
+      eq: (
+        c: string,
+        v: unknown,
+      ) => {
         maybeSingle: () => Promise<{ data: { id?: string; email?: string } | null }>;
       };
     };
@@ -51,7 +54,9 @@ export function createAwsAuthAdmin(liveAdmin: AdminClient | null) {
         const id = randomUUID();
         const password = opts.password || randomUUID().slice(0, 12) + "Aa1!";
         const fullName =
-          typeof opts.user_metadata?.full_name === "string" ? opts.user_metadata.full_name : undefined;
+          typeof opts.user_metadata?.full_name === "string"
+            ? opts.user_metadata.full_name
+            : undefined;
         await cognitoAdminCreateUser({
           email: opts.email,
           password,
@@ -98,10 +103,7 @@ async function emailForId(liveAdmin: AdminClient | null, id: string): Promise<st
   }
 }
 
-export function wrapAdminAuth(
-  liveAuth: unknown,
-  liveAdminForLookup: AdminClient | null,
-): unknown {
+export function wrapAdminAuth(liveAuth: unknown, liveAdminForLookup: AdminClient | null): unknown {
   if (!isCognitoAuth()) return liveAuth;
   return createAwsAuthAdmin(liveAdminForLookup);
 }

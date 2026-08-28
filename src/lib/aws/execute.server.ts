@@ -74,7 +74,8 @@ function shape(plan: DbPlan, rows: Record<string, unknown>[], count: number | nu
     return ok(rows[0] ?? null, count ?? rows.length);
   }
   if (plan.want === "single") {
-    if (rows.length !== 1) return fail("JSON object requested, multiple (or no) rows returned", 406);
+    if (rows.length !== 1)
+      return fail("JSON object requested, multiple (or no) rows returned", 406);
     return ok(rows[0], count ?? 1);
   }
   return ok(rows, count ?? rows.length);
@@ -92,10 +93,14 @@ async function applyEmbeds(
     if (!relatedTable) continue;
     const hint = embed.hint && IDENT_RE.test(embed.hint) ? embed.hint : null;
     const outgoing = fks.find(
-      (f) => f.from_table === table && f.to_table === relatedTable && (!hint || f.from_col === hint),
+      (f) =>
+        f.from_table === table && f.to_table === relatedTable && (!hint || f.from_col === hint),
     );
     const incoming = fks.find(
-      (f) => f.to_table === table && f.from_table === relatedTable && (!hint || f.from_col === hint || f.to_col === hint),
+      (f) =>
+        f.to_table === table &&
+        f.from_table === relatedTable &&
+        (!hint || f.from_col === hint || f.to_col === hint),
     );
 
     if (outgoing) {
@@ -104,7 +109,7 @@ async function applyEmbeds(
       const byId = new Map(related.map((r) => [String(r[outgoing.to_col]), r]));
       for (const row of rows) {
         const key = row[outgoing.from_col];
-        row[embed.alias] = key == null ? null : byId.get(String(key)) ?? null;
+        row[embed.alias] = key == null ? null : (byId.get(String(key)) ?? null);
       }
       if (embed.inner) {
         rows = rows.filter((r) => r[embed.alias] != null);
@@ -121,10 +126,12 @@ async function applyEmbeds(
       }
       for (const row of rows) {
         const key = row[incoming.to_col];
-        row[embed.alias] = key == null ? [] : grouped.get(String(key)) ?? [];
+        row[embed.alias] = key == null ? [] : (grouped.get(String(key)) ?? []);
       }
       if (embed.inner) {
-        rows = rows.filter((r) => Array.isArray(r[embed.alias]) && (r[embed.alias] as unknown[]).length > 0);
+        rows = rows.filter(
+          (r) => Array.isArray(r[embed.alias]) && (r[embed.alias] as unknown[]).length > 0,
+        );
       }
     } else if (hint) {
       // No catalog FK — treat hint as a column on this table pointing at related.id
@@ -133,7 +140,7 @@ async function applyEmbeds(
       const byId = new Map(related.map((r) => [String(r.id), r]));
       for (const row of rows) {
         const key = row[hint];
-        row[embed.alias] = key == null ? null : byId.get(String(key)) ?? null;
+        row[embed.alias] = key == null ? null : (byId.get(String(key)) ?? null);
       }
     }
   }

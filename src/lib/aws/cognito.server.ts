@@ -29,7 +29,8 @@ const jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 
 function client(): CognitoIdentityProviderClient {
   const cfg = getCognitoConfig();
-  if (!cfg) throw new Error("Cognito is not configured (COGNITO_USER_POOL_ID / COGNITO_CLIENT_ID).");
+  if (!cfg)
+    throw new Error("Cognito is not configured (COGNITO_USER_POOL_ID / COGNITO_CLIENT_ID).");
   if (!_client) {
     _client = new CognitoIdentityProviderClient({ region: cfg.region });
   }
@@ -91,7 +92,9 @@ function decodePayload(token: string): Record<string, unknown> {
   const parts = token.split(".");
   if (parts.length < 2) return {};
   try {
-    const json = Buffer.from(parts[1].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+    const json = Buffer.from(parts[1].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString(
+      "utf8",
+    );
     return JSON.parse(json) as Record<string, unknown>;
   } catch {
     return {};
@@ -121,7 +124,8 @@ export async function cognitoInitiatePasswordAuth(
     if (!out.AuthenticationResult) throw new Error(GENERIC);
     return tokensFromAuthResult(out.AuthenticationResult);
   } catch (err) {
-    const name = err && typeof err === "object" && "name" in err ? String((err as { name: string }).name) : "";
+    const name =
+      err && typeof err === "object" && "name" in err ? String((err as { name: string }).name) : "";
     if (
       name === "NotAuthorizedException" ||
       name === "UserNotFoundException" ||
@@ -136,7 +140,10 @@ export async function cognitoInitiatePasswordAuth(
   }
 }
 
-export async function cognitoRefresh(refreshToken: string, username?: string): Promise<CognitoTokens> {
+export async function cognitoRefresh(
+  refreshToken: string,
+  username?: string,
+): Promise<CognitoTokens> {
   const cfg = getCognitoConfig();
   if (!cfg) throw new Error("Cognito is not configured.");
   const extra: Record<string, string> = { REFRESH_TOKEN: refreshToken };
@@ -157,7 +164,9 @@ export async function cognitoGetUser(accessToken: string): Promise<{
   username: string;
 }> {
   const out = await client().send(new GetUserCommand({ AccessToken: accessToken }));
-  const attrs = Object.fromEntries((out.UserAttributes ?? []).map((a) => [a.Name ?? "", a.Value ?? ""]));
+  const attrs = Object.fromEntries(
+    (out.UserAttributes ?? []).map((a) => [a.Name ?? "", a.Value ?? ""]),
+  );
   return {
     email: attrs.email || "",
     supabaseId: attrs["custom:supabase_id"] || null,
@@ -233,7 +242,10 @@ export async function cognitoAdminDeleteUser(email: string): Promise<void> {
   );
 }
 
-export async function cognitoAdminUpdateSupabaseId(email: string, supabaseId: string): Promise<void> {
+export async function cognitoAdminUpdateSupabaseId(
+  email: string,
+  supabaseId: string,
+): Promise<void> {
   const cfg = getCognitoConfig();
   if (!cfg) throw new Error("Cognito is not configured.");
   await client().send(

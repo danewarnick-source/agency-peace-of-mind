@@ -1,33 +1,32 @@
-import { createMiddleware } from '@tanstack/react-start'
-import { getRequest } from '@tanstack/react-start/server'
-import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js'
-import type { Database } from './types'
-import { getDatabaseUrl, isCognitoAuth } from '@/lib/aws/env'
-import { resolveRequestUser } from '@/lib/aws/resolve-user.server'
-import { getAwsDataClient } from '@/lib/aws/db-client.server'
+import { createMiddleware } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
+import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
+import type { Database } from "./types";
+import { getDatabaseUrl, isCognitoAuth } from "@/lib/aws/env";
+import { resolveRequestUser } from "@/lib/aws/resolve-user.server";
+import { getAwsDataClient } from "@/lib/aws/db-client.server";
 
 type SupabaseAuthContext = {
-  supabase: SupabaseClient<Database>
-  userId: string
-  claims: User
-  isSSR: boolean
-}
+  supabase: SupabaseClient<Database>;
+  userId: string;
+  claims: User;
+  isSSR: boolean;
+};
 
 function trustedDataClient() {
-  if (getDatabaseUrl()) return getAwsDataClient() as unknown as SupabaseClient<Database>
-  return null
+  if (getDatabaseUrl()) return getAwsDataClient() as unknown as SupabaseClient<Database>;
+  return null;
 }
 
-export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
+export const requireSupabaseAuth = createMiddleware({ type: "function" }).server(
   async ({ next }) => {
-
     const request = getRequest();
 
     if (isCognitoAuth()) {
       const resolved = await resolveRequestUser(request);
       if (!resolved) {
-        const authHeader = request?.headers?.get('authorization');
-        if (!authHeader?.startsWith('Bearer ')) {
+        const authHeader = request?.headers?.get("authorization");
+        if (!authHeader?.startsWith("Bearer ")) {
           return next({
             context: {
               supabase: null,
@@ -37,12 +36,12 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
             } as unknown as SupabaseAuthContext,
           });
         }
-        console.error('[requireSupabaseAuth] Cognito token rejected');
-        throw new Error('Unauthorized');
+        console.error("[requireSupabaseAuth] Cognito token rejected");
+        throw new Error("Unauthorized");
       }
       const dataClient =
         trustedDataClient() ??
-        (await import('./client.server')).supabaseAdmin as unknown as SupabaseClient<Database>;
+        ((await import("./client.server")).supabaseAdmin as unknown as SupabaseClient<Database>);
       return next({
         context: {
           supabase: dataClient,
@@ -57,15 +56,15 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
     const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
 
     if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-      throw new Error('Missing Supabase environment variables.');
+      throw new Error("Missing Supabase environment variables.");
     }
 
-    const authHeader = request?.headers?.get('authorization');
+    const authHeader = request?.headers?.get("authorization");
 
     // During SSR there is no auth header — return a safe empty context
     // instead of throwing, so SSR completes and the client re-calls with
     // proper auth after hydration.
-    if (!authHeader?.startsWith('Bearer ')) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return next({
         context: {
           supabase: null,
@@ -76,8 +75,7 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
       });
     }
 
-
-    const token = authHeader.replace('Bearer ', '');
+    const token = authHeader.replace("Bearer ", "");
 
     const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
       global: { headers: { Authorization: `Bearer ${token}` } },
@@ -92,8 +90,8 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
       // real cause (expired token, Supabase reachability, wrong key, etc.)
       // will actually show up in CloudWatch. Remove once the real cause
       // here is found and fixed.
-      console.error('[requireSupabaseAuth] getUser failed:', error, 'hasUser:', !!data?.user);
-      throw new Error('Unauthorized');
+      console.error("[requireSupabaseAuth] getUser failed:", error, "hasUser:", !!data?.user);
+      throw new Error("Unauthorized");
     }
 
     const dataClient = trustedDataClient() ?? supabase;

@@ -16,10 +16,12 @@ import {
 } from "@/lib/billing-access";
 import {
   PAYMENTS_NOT_CONFIGURED,
+  TRAINING_EXTRA_PRICE_CENTS,
   mrrCentsForPlan,
   readStripeEnv,
   stripePaymentsConfigured,
   stripePriceIdForPlan,
+  stripePriceIdForTrainingExtra,
 } from "@/lib/stripe-config";
 import { appOriginFromRequest, getStripe } from "@/lib/stripe.server";
 import { activateSubscriptionFromCheckout } from "@/lib/stripe-webhook";
@@ -477,11 +479,16 @@ export const createTrainingCheckoutFn = createServerFn({ method: "POST" })
       billingExempt: exempt,
       plan: (sub?.plan as string | null) ?? null,
     });
+    const env = readStripeEnv();
+    const extraPriceId = stripePriceIdForTrainingExtra(sku.kind, sku.stripe_price_id, env);
+    const unitCents =
+      extraPriceId && sku.kind !== "full_program" ? TRAINING_EXTRA_PRICE_CENTS : sku.price_cents;
+
     const needsCharge = trainingRequiresCharge({
       billingExempt: exempt,
       hasHiveTrainingAddon: ents.addons.includes("hive_training"),
       catalogKind: sku.kind,
-      priceCents: sku.price_cents,
+      priceCents: unitCents,
     });
 
     const { data: order, error: orderErr } = await admin
@@ -490,7 +497,7 @@ export const createTrainingCheckoutFn = createServerFn({ method: "POST" })
         organization_id: data.organizationId,
         purchaser_user_id: context.userId,
         model: data.modeContext,
-        amount_cents: needsCharge ? sku.price_cents * data.quantity : 0,
+        amount_cents: needsCharge ? unitCents * data.quantity : 0,
         currency: sku.currency ?? "usd",
         status: needsCharge ? "pending" : "paid",
       })
@@ -504,7 +511,7 @@ export const createTrainingCheckoutFn = createServerFn({ method: "POST" })
       order_id: order.id,
       catalog_id: sku.id,
       quantity: data.quantity,
-      unit_price_cents: needsCharge ? sku.price_cents : 0,
+      unit_price_cents: needsCharge ? unitCents : 0,
     });
 
     if (!needsCharge) {
@@ -527,12 +534,7 @@ export const createTrainingCheckoutFn = createServerFn({ method: "POST" })
 
     const stripe = getStripe();
     const origin = appOriginFromRequest(getRequest());
-    const env = readStripeEnv();
-    const priceId =
-      (typeof sku.stripe_price_id === "string" && sku.stripe_price_id.startsWith("price_")
-        ? sku.stripe_price_id
-        : null) ||
-      (sku.kind === "full_program" ? env.priceTrainingFull : null);
+    const priceId = extraPriceId;
 
     const lineItems = priceId
       ? [{ price: priceId, quantity: data.quantity }]
@@ -541,7 +543,7 @@ export const createTrainingCheckoutFn = createServerFn({ method: "POST" })
             quantity: data.quantity,
             price_data: {
               currency: sku.currency ?? "usd",
-              unit_amount: sku.price_cents,
+              unit_amount: unitCents,
               product_data: { name: sku.name, metadata: { sku: sku.sku } },
             },
           },

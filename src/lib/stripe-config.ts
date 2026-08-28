@@ -1,10 +1,21 @@
 /**
- * Stripe env + price mapping. Test mode only for this release.
+ * Stripe env + price mapping. Test / sandbox only for this release.
  *
+ * Account: Hive sandbox / Hive (acct_1Ti6CMIQWmyptLnb)
+ * Dashboard: https://dashboard.stripe.com/acct_1Ti6CMIQWmyptLnb/test/dashboard
+ *
+ * Price IDs stay as env placeholders until Dane pastes the price_ values.
  * Never log secret values. Missing keys fail closed on Checkout, not on login.
+ * Live sk_live_ keys are rejected.
  */
 
 import { getTier, type TierId } from "./hive-tiers.ts";
+
+/** Hive sandbox (test mode). Not a secret. */
+export const STRIPE_TEST_ACCOUNT_ID = "acct_1Ti6CMIQWmyptLnb";
+
+/** Hive Training extra course — $49 one-time (STRIPE_PRICE_TRAINING). */
+export const TRAINING_EXTRA_PRICE_CENTS = 4900;
 
 export type StripePriceEnv = {
   secretKey: string | null;
@@ -12,7 +23,8 @@ export type StripePriceEnv = {
   webhookSecret: string | null;
   pricePro: string | null;
   priceEnterprise: string | null;
-  priceTrainingFull: string | null;
+  /** Extra / à-la-carte training. Env: STRIPE_PRICE_TRAINING. */
+  priceTraining: string | null;
 };
 
 export function readStripeEnv(env: NodeJS.Dict<string> = process.env): StripePriceEnv {
@@ -22,7 +34,9 @@ export function readStripeEnv(env: NodeJS.Dict<string> = process.env): StripePri
     webhookSecret: emptyToNull(env.STRIPE_WEBHOOK_SECRET),
     pricePro: emptyToNull(env.STRIPE_PRICE_PRO),
     priceEnterprise: emptyToNull(env.STRIPE_PRICE_ENTERPRISE),
-    priceTrainingFull: emptyToNull(env.STRIPE_PRICE_TRAINING_FULL),
+    // Prefer STRIPE_PRICE_TRAINING. Accept the older FULL name if that is all that is set.
+    priceTraining:
+      emptyToNull(env.STRIPE_PRICE_TRAINING) ?? emptyToNull(env.STRIPE_PRICE_TRAINING_FULL),
   };
 }
 
@@ -92,6 +106,17 @@ export function stripePriceIdForPlan(plan: TierId, env: StripePriceEnv = readStr
   if (plan === "pro") return env.pricePro;
   if (plan === "enterprise") return env.priceEnterprise;
   return null;
+}
+
+/** Saved Stripe price for extra training. Full-program SKUs stay included-on-plan / inline. */
+export function stripePriceIdForTrainingExtra(
+  catalogKind: string,
+  catalogPriceId?: string | null,
+  env: StripePriceEnv = readStripeEnv(),
+): string | null {
+  if (typeof catalogPriceId === "string" && catalogPriceId.startsWith("price_")) return catalogPriceId;
+  if (catalogKind === "full_program") return null;
+  return env.priceTraining;
 }
 
 export function mrrCentsForPlan(plan: string): number {

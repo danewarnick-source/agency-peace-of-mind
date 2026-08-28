@@ -14,6 +14,7 @@ import {
   stripePaymentsConfigured,
   stripeClientConfigured,
   stripePriceIdForPlan,
+  stripePriceIdForTrainingExtra,
   readStripeEnv,
 } from "./stripe-config.ts";
 
@@ -197,6 +198,20 @@ describe("stripe-config", () => {
     assert.equal(isStripeTestPublishableKey(env.publishableKey), true);
     assert.equal(stripePriceIdForPlan("pro", env), "price_pro");
     assert.equal(stripePriceIdForPlan("enterprise", env), "price_ent");
+  });
+
+  it("maps STRIPE_PRICE_TRAINING for extra courses and ignores full_program", () => {
+    const env = readStripeEnv({
+      STRIPE_SECRET_KEY: "sk_test_abc",
+      STRIPE_PRICE_TRAINING: "price_training_extra",
+    });
+    assert.equal(env.priceTraining, "price_training_extra");
+    assert.equal(stripePriceIdForTrainingExtra("ala_carte", null, env), "price_training_extra");
+    assert.equal(stripePriceIdForTrainingExtra("full_program", null, env), null);
+    assert.equal(
+      stripePriceIdForTrainingExtra("ala_carte", "price_from_catalog", env),
+      "price_from_catalog",
+    );
   });
 
   it("webhook/client can be configured without price ids", () => {

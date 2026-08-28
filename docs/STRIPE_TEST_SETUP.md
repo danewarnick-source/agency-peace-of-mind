@@ -1,45 +1,44 @@
 # Stripe test-mode setup (Dane)
 
-Hive charges companies in **Stripe test mode only** right now. No real cards are charged.
+Hive charges companies in **Stripe test / sandbox only**. No real cards are charged. Do not switch this to live keys.
 
-## 1. Open Stripe (test mode)
+## Linked account
 
-1. Go to [https://dashboard.stripe.com](https://dashboard.stripe.com) and sign in.
-2. Turn **Test mode** ON (switch in the top right). It must stay on.
+| | |
+|---|---|
+| Name | Hive sandbox / Hive |
+| Account id | `acct_1Ti6CMIQWmyptLnb` |
+| Dashboard | [Test dashboard](https://dashboard.stripe.com/acct_1Ti6CMIQWmyptLnb/test/dashboard) |
 
-## 2. Create two products
+Test mode must stay ON (switch in the top right of the Stripe Dashboard).
 
-In **Product catalog → Add product**:
+## Products (reuse if they already exist)
 
-| Product name | Price | Billing |
-|---|---|---|
-| Hive Pro | $499 USD | Recurring, monthly |
-| Hive Enterprise | $1,299 USD | Recurring, monthly |
+A separate pass is creating these in this sandbox. Copy each **Price ID** (`price_…`) when it exists. Until then Hive uses env placeholders — do not put fake IDs in git.
 
-After you save each price, copy the **Price ID** (starts with `price_`).
+| Product | Amount | Billing | Env var |
+|---|---|---|---|
+| Hive Pro | $499 | Recurring, monthly | `STRIPE_PRICE_PRO` |
+| Hive Enterprise | $1,299 | Recurring, monthly | `STRIPE_PRICE_ENTERPRISE` |
+| Hive Training extra course | $49 | One time | `STRIPE_PRICE_TRAINING` |
 
-Optional extra training product (only if you want a saved Stripe price for the full training program):
+- **Pro / Enterprise** are the public signup plans. Starter $0 is not self-serve.
+- **Hive Training extra course** is for à-la-carte catalog courses (CPR and similar) that are **not** included in the plan. Pro and Enterprise already include HIVE Training, so the full program is not charged. True North (billing-exempt) is never charged for training.
 
-| Product name | Price | Billing |
-|---|---|---|
-| Hive Training — Full program | $300 USD | One time |
+## Environment variables (Vercel / Lovable)
 
-À-la-carte courses (CPR, Mandt, DSPD) do not need saved prices. Hive sends the amount to Stripe at checkout.
+Never paste these into GitHub. Test keys only (`sk_test_` / `pk_test_`).
 
-## 3. Add keys to the host (Vercel / Lovable)
+- `STRIPE_SECRET_KEY` — `sk_test_…` (Developers → API keys)
+- `STRIPE_PUBLISHABLE_KEY` — `pk_test_…`
+- `STRIPE_WEBHOOK_SECRET` — `whsec_…` (from the webhook below)
+- `STRIPE_PRICE_PRO` — Price ID for Hive Pro (placeholder until you paste it)
+- `STRIPE_PRICE_ENTERPRISE` — Price ID for Hive Enterprise (placeholder until you paste it)
+- `STRIPE_PRICE_TRAINING` — Price ID for Hive Training extra course $49 (placeholder until you paste it)
 
-Never paste these into GitHub. Add them as environment variables:
+If keys are missing, True North can still log in. New agencies see a clear “payments are not set up” message instead of a crash.
 
-- `STRIPE_SECRET_KEY` — starts with `sk_test_` (Developers → API keys)
-- `STRIPE_PUBLISHABLE_KEY` — starts with `pk_test_`
-- `STRIPE_WEBHOOK_SECRET` — starts with `whsec_` (from the webhook below)
-- `STRIPE_PRICE_PRO` — Price ID for Hive Pro
-- `STRIPE_PRICE_ENTERPRISE` — Price ID for Hive Enterprise
-- `STRIPE_PRICE_TRAINING_FULL` — optional Price ID for the full training program
-
-If these are missing, True North can still log in. New agencies see a clear “payments are not set up” message instead of a crash.
-
-## 4. Webhook
+## Webhook
 
 In Stripe: **Developers → Webhooks → Add endpoint**
 
@@ -55,7 +54,7 @@ Copy the signing secret into `STRIPE_WEBHOOK_SECRET`.
 
 Also turn on **Customer portal** (Settings → Billing → Customer portal) so “Manage billing” works.
 
-## 5. Test card
+## Test card
 
 On any paywall that says **TEST MODE**:
 
@@ -64,10 +63,10 @@ On any paywall that says **TEST MODE**:
 - CVC: any 3 digits
 - ZIP: any ZIP
 
-## 6. True North is never charged
+## True North is never charged
 
 True North Supports LLC is marked **billing-exempt**. Hive Exec can check that same box on another company to comp them later — no code change.
 
-## 7. SQL you must run
+## SQL you must run
 
 Paste the **Stripe billing: never charge True North** block at the top of `docs/SQL_HANDOFF.md` into Lovable’s SQL editor (clear the editor first). Until that runs, the exempt checkbox has no database column.

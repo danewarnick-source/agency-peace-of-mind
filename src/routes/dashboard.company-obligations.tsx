@@ -184,11 +184,17 @@ function ObligationsTab({
   const footprintFn = useServerFn(getOrgServiceFootprint);
   const evidenceFn = useServerFn(getAuditEvidenceSnapshot);
 
-  const { data: obligations = [], isLoading } = useQuery<ObligationListItem[]>({
+  const {
+    data: obligations = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery<ObligationListItem[]>({
     queryKey: ["company-obligations", orgId],
     queryFn: () => listFn({ data: { organizationId: orgId } }),
     staleTime: 0,
     refetchInterval: 60_000,
+    retry: 1,
   });
 
   const { data: groups = [] } = useQuery<Array<StaffGroupRow & { member_count: number }>>({
@@ -536,7 +542,14 @@ function ObligationsTab({
         </div>
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">Could not load obligations.</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => void refetch()}>
+            Try again
+          </Button>
+        </div>
+      ) : isLoading ? (
         <p className="text-sm text-muted-foreground">Loading obligations…</p>
       ) : (
         <Tabs value={registerTab} onValueChange={setRegisterTab}>

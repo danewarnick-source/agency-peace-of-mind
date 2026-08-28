@@ -1,5 +1,6 @@
 // Write clients.home_latitude / home_longitude from a geocoded address.
-// Never invents coordinates: a failed or city-level geocode leaves the pin.
+// Never invents coordinates: a failed, city-level, or road-only geocode
+// leaves the pin. Dane can drag it on the map.
 
 import { geocodeAddress } from "@/lib/geocode";
 import { homePinMismatchesGeocode, isLikelyBadCoord } from "@/lib/geo";
@@ -14,7 +15,8 @@ export type SyncHomePinResult = {
 };
 
 /**
- * Geocode `address` and, when the hit is street/road quality, write the pin.
+ * Geocode `address` and, when the hit is house-level (house_number + road),
+ * write the pin. Road-only Nominatim hits are not persisted.
  * `mode: "on_address_save"` always replaces a previous pin (the address changed).
  * `mode: "backfill"` only writes when there is no pin or the pin mismatches.
  */
@@ -34,7 +36,7 @@ export async function syncHomePinFromAddress(
   if (!address) return none;
 
   const hit = await geocodeAddress(address);
-  if (!hit) return none;
+  if (!hit || hit.quality !== "street") return none;
 
   const existing = {
     lat: args.existingLat ?? null,

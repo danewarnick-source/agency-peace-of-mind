@@ -2,8 +2,9 @@
 // Used by per-client save, Smart Import autofill, and home-pin refresh so
 // EVV geofence coordinates come from the same lookup.
 //
-// Never invent a pin: city / town / postcode centroids are rejected. If
-// Nominatim cannot resolve a street or road, callers keep the existing pin.
+// Never invent a pin: city / town / postcode centroids AND road-only hits
+// are rejected. A home pin requires house_number + road. If Nominatim
+// cannot resolve that, callers keep the existing pin (Dane can drag it).
 
 export type GeocodeQuality = "street" | "road";
 
@@ -50,6 +51,35 @@ const LOCALITY_TYPES = new Set([
   "country",
 ]);
 
+/** Utah-style compass letters only — do not expand St (St. George). */
+const COMPASS: Record<string, string> = {
+  n: "North",
+  s: "South",
+  e: "East",
+  w: "West",
+  ne: "Northeast",
+  nw: "Northwest",
+  se: "Southeast",
+  sw: "Southwest",
+};
+
+/**
+ * Expand standalone compass abbreviations so Nominatim sees a house query
+ * (`7675 S 2450 W` → `7675 South 2450 West`) instead of a road named
+ * "7675 South".
+ */
+export function expandUsAddressForNominatim(address: string): string {
+  return address
+    .trim()
+    .split(/(\s+|,)/)
+    .map((tok) => {
+      if (!tok || /^\s+$/.test(tok) || tok === ",") return tok;
+      const key = tok.replace(/\.$/, "").toLowerCase();
+      return COMPASS[key] ?? tok;
+    })
+    .join("");
+}
+
 function classifyNominatimHit(hit: NominatimHit): GeocodeQuality | "locality" | null {
   const addr = hit.address ?? {};
   const type = String(hit.addresstype || hit.type || "").toLowerCase();
@@ -58,9 +88,6 @@ function classifyNominatimHit(hit: NominatimHit): GeocodeQuality | "locality" | 
   if (addr.house_number && (addr.road || addr.residential || addr.pedestrian)) {
     return "street";
   }
-  if (["house", "building", "yes"].includes(type)) return "street";
-  if (klass === "building") return "street";
-  if (klass === "place" && type === "house") return "street";
 
   if (LOCALITY_TYPES.has(type)) return "locality";
   if (klass === "boundary" || klass === "place") return "locality";
@@ -72,10 +99,12 @@ function classifyNominatimHit(hit: NominatimHit): GeocodeQuality | "locality" | 
   return "locality";
 }
 
-/** Pick the best street/road hit. City centroids return null (do not invent a pin). */
+/**
+ * Pick a house-level hit only (house_number + road).
+ * City centroids and road-only hits return null — do not invent a pin.
+ */
 export function pickStreetLevelGeocode(hits: NominatimHit[]): GeocodeHit | null {
   if (!Array.isArray(hits) || hits.length === 0) return null;
-  let road: GeocodeHit | null = null;
   for (const hit of hits) {
     const lat = parseFloat(hit.lat);
     const lng = parseFloat(hit.lon);
@@ -83,15 +112,14 @@ export function pickStreetLevelGeocode(hits: NominatimHit[]): GeocodeHit | null 
     if (Math.abs(lat) < 1e-6 && Math.abs(lng) < 1e-6) continue;
     const quality = classifyNominatimHit(hit);
     if (quality === "street") return { lat, lng, quality };
-    if (quality === "road" && !road) road = { lat, lng, quality };
   }
-  return road;
+  return null;
 }
 
 export async function geocodeAddress(
   address: string,
 ): Promise<GeocodeHit | null> {
-  const q = address.trim();
+  const q = expandUsAddressForNominatim(address);
   if (!q) return null;
   try {
     const url =

@@ -111,7 +111,7 @@ export const saveClientHomePinFromGps = createServerFn({ method: "POST" })
     };
   });
 
-/** Re-geocode the address on file. No-op if Nominatim cannot resolve a street/road. */
+/** Re-geocode the address on file. No-op if Nominatim cannot resolve house + road. */
 export const refreshClientHomePinFromAddress = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
@@ -159,7 +159,7 @@ export const refreshClientHomePinFromAddress = createServerFn({ method: "POST" }
 /**
  * Optional org backfill: re-geocode clients that have an address whose pin
  * is missing or does not match. Sequential (Nominatim 1 req/s). Does not
- * delete EVV rows. Does not write when geocode is not street/road quality.
+ * delete EVV rows. Does not write when geocode is not house-level (road-only rejected).
  */
 export const backfillOrgHomePinsFromAddresses = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

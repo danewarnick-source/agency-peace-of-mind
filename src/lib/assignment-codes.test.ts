@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { allowedCodesFor, clientAuthorizedCodes, type AssignmentMap } from "./assignment-codes.ts";
+import {
+  allowedCodesFor,
+  clientAuthorizedCodes,
+  defaultCaseloadCode,
+  type AssignmentMap,
+} from "./assignment-codes.ts";
 
 describe("clientAuthorizedCodes", () => {
   it("uses authorized_dspd_codes when job_code is empty (Stephen / SLH)", () => {
@@ -50,5 +55,20 @@ describe("allowedCodesFor — null service_codes means all client codes", () => 
       allowedCodesFor(map, "client-stephen", ["SLH", "DSI"]),
       ["DSI"],
     );
+  });
+});
+
+describe("defaultCaseloadCode — do not invent SEI", () => {
+  it("uses HHS when that is the authorized code", () => {
+    assert.equal(defaultCaseloadCode([], ["HHS"]), "HHS");
+  });
+
+  it("does not fall back to SEI when no codes are listed", () => {
+    assert.equal(defaultCaseloadCode([], []), "");
+    assert.notEqual(defaultCaseloadCode([], []), "SEI");
+  });
+
+  it("prefers the assignment list", () => {
+    assert.equal(defaultCaseloadCode(["HHS"], ["HHS", "DSI"]), "HHS");
   });
 });

@@ -41,3 +41,18 @@ export function allowedCodesFor(
   if (!allow) return clientCodes;
   return clientCodes.filter((c) => allow.has(c));
 }
+
+/**
+ * First assigned code, else first authorized code. Never invent SEI —
+ * that opened Punch pad for Host Home people with no listed codes.
+ */
+export function defaultCaseloadCode(
+  assigned: string[],
+  authorized: string[],
+): string {
+  for (const raw of [...assigned, ...authorized]) {
+    const code = String(raw ?? "").trim();
+    if (code) return code;
+  }
+  return "";
+}

@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -83,6 +83,21 @@ export function BillingCodesDetail({ clientId, clientName, medicaidId }: Props) 
   const { data: budgets, isLoading } = useClientBudget(clientId);
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
+  const medicaidQ = useQuery({
+    enabled: !!clientId && !medicaidId,
+    queryKey: ["billing-card-medicaid", clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("medicaid_id")
+        .eq("id", clientId)
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.medicaid_id as string | null) ?? null;
+    },
+    staleTime: 60_000,
+  });
+  const displayMedicaid = medicaidId || medicaidQ.data || null;
 
   const planYear = useMemo(() => {
     if (!budgets || budgets.length === 0) return { start: null as Date | null, end: null as Date | null };
@@ -272,7 +287,7 @@ export function BillingCodesDetail({ clientId, clientName, medicaidId }: Props) 
               <span className="font-semibold">{clientName}</span>
             </Field>
             <Field icon={<Receipt className="h-3.5 w-3.5" />} label="Individual Medicaid ID">
-              <span className="font-mono">{medicaidId || "—"}</span>
+              <span className="font-mono">{displayMedicaid || "—"}</span>
             </Field>
             <Field icon={<CalendarRange className="h-3.5 w-3.5" />} label="Plan Year Renewal">
               <span className="font-semibold text-amber-700 dark:text-amber-300">

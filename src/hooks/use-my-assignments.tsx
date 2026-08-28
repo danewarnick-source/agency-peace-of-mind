@@ -7,6 +7,7 @@ import type { AssignmentMap } from "@/lib/assignment-codes";
 export {
   allowedCodesFor,
   clientAuthorizedCodes,
+  defaultCaseloadCode,
   type AssignmentMap,
 } from "@/lib/assignment-codes";
 

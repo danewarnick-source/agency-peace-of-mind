@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useCaseload, type CaseloadClient } from "@/hooks/use-caseload";
 import { useActiveShift, type ActiveShift } from "@/hooks/use-active-shift";
 import { useNectarPayPeriod } from "@/hooks/use-nectar-pay-period";
-import { useMyAssignments, allowedCodesFor, clientAuthorizedCodes, type AssignmentMap } from "@/hooks/use-my-assignments";
+import { useMyAssignments, allowedCodesFor, clientAuthorizedCodes, defaultCaseloadCode, type AssignmentMap } from "@/hooks/use-my-assignments";
 import { useTodayShifts, type TodayShiftRow } from "@/hooks/use-today-shifts";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -71,7 +71,7 @@ function ClientDetail({
 
   const initial = isOnTheClock
     ? activeShift!.service_type_code
-    : codes[0] ?? allCodes[0] ?? "SEI";
+    : defaultCaseloadCode(codes, allCodes);
   const [selected, setSelected] = useState<string>(initial);
   useEffect(() => {
     if (isOnTheClock) setSelected(activeShift!.service_type_code);
@@ -80,8 +80,9 @@ function ClientDetail({
   }, [isOnTheClock, activeShift, codes.join("|")]);
 
   const fullName = `${c.first_name} ${c.last_name}`.trim();
-  const daily = isDaily(selected);
-  const pills = codes.length ? codes : [initial];
+  // Empty selected must not invent a clockable code (old SEI fallback).
+  const daily = !selected || isDaily(selected);
+  const pills = codes.length ? codes : initial ? [initial] : [];
 
   return (
     <div className="space-y-4 px-4 pb-4 pt-2">

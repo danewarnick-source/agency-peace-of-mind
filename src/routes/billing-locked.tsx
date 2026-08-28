@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { CreditCard, Hexagon, Loader2, Mail, ShieldCheck } from "lucide-react";
+import { CreditCard, Hexagon, Loader2, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +9,11 @@ import {
   createSubscriptionCheckoutFn,
   getBillingStatusFn,
 } from "@/lib/stripe-checkout.functions";
+import {
+  formatUsdFromCents,
+  quoteHiveSubscription,
+  type BillingInterval,
+} from "@/lib/hive-pricing";
 
 export const Route = createFileRoute("/billing-locked")({
   head: () => ({ meta: [{ title: "Account locked — HIVE" }] }),
@@ -21,7 +26,9 @@ function BillingLockedPage() {
   const checkoutFn = useServerFn(createSubscriptionCheckoutFn);
   const confirmFn = useServerFn(confirmCheckoutSessionFn);
   const [busy, setBusy] = useState(false);
-  const [plan, setPlan] = useState<"pro" | "enterprise">("pro");
+  const [staffCount, setStaffCount] = useState(4);
+  const [clientCount, setClientCount] = useState(10);
+  const [interval, setInterval] = useState<BillingInterval>("monthly");
   const [state, setState] = useState<{
     loading: boolean;
     authed: boolean;
@@ -32,6 +39,8 @@ function BillingLockedPage() {
     paymentsConfigured: boolean;
     paymentsMessage: string | null;
     lockReason: string | null;
+    pricingSchedule: "list" | "founding";
+    foundingEndsAt: string | null;
   }>({
     loading: true,
     authed: false,
@@ -42,6 +51,8 @@ function BillingLockedPage() {
     paymentsConfigured: false,
     paymentsMessage: null,
     lockReason: null,
+    pricingSchedule: "founding",
+    foundingEndsAt: null,
   });
 
   useEffect(() => {
@@ -103,6 +114,9 @@ function BillingLockedPage() {
       }
 
       if (cancelled) return;
+      setStaffCount(status.staffCount || 4);
+      setClientCount(status.clientCount || 0);
+      setInterval(status.interval === "annual" ? "annual" : "monthly");
       setState({
         loading: false,
         authed: true,
@@ -113,6 +127,8 @@ function BillingLockedPage() {
         paymentsConfigured: status.paymentsConfigured,
         paymentsMessage: status.paymentsMessage,
         lockReason: status.lockReason,
+        pricingSchedule: status.pricingSchedule === "list" ? "list" : "founding",
+        foundingEndsAt: status.foundingEndsAt,
       });
     })();
     return () => {
@@ -120,11 +136,30 @@ function BillingLockedPage() {
     };
   }, [navigate, statusFn, confirmFn]);
 
+  const quote = useMemo(
+    () =>
+      quoteHiveSubscription({
+        staffCount,
+        clientCount,
+        schedule: state.pricingSchedule,
+        interval,
+        foundingEndsAt: state.foundingEndsAt,
+      }),
+    [staffCount, clientCount, state.pricingSchedule, state.foundingEndsAt, interval],
+  );
+
   const pay = async () => {
     if (!state.orgId) return;
     setBusy(true);
     try {
-      const r = await checkoutFn({ data: { organizationId: state.orgId, plan } });
+      const r = await checkoutFn({
+        data: {
+          organizationId: state.orgId,
+          staffCount,
+          clientCount,
+          interval,
+        },
+      });
       if (r.exempt) {
         navigate({ to: "/dashboard" });
         return;
@@ -162,7 +197,7 @@ function BillingLockedPage() {
         </h1>
         <p className="mt-3 text-white/70">
           {unpaid
-            ? `${state.agencyName} needs an active Hive plan before anyone can use the dashboard.`
+            ? `${state.agencyName} needs an active Hive subscription before anyone can use the dashboard.`
             : `${state.agencyName}'s Hive account is locked until billing is current.`}
         </p>
 
@@ -177,35 +212,76 @@ function BillingLockedPage() {
         )}
 
         {state.isAdmin ? (
-          <div className="mt-8 w-full space-y-3">
+          <div className="mt-8 w-full space-y-3 text-left">
             {!state.paymentsConfigured && (
-              <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-3 text-left text-sm text-red-200">
+              <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
                 {state.paymentsMessage ??
                   "Payments are not set up yet. A Hive Executive needs to add the Stripe test keys."}
               </div>
             )}
+            <div
+              className="rounded-lg border border-white/10 bg-white/5 px-4 py-3"
+              data-testid="pricing-schedule"
+            >
+              <div className="text-xs uppercase tracking-wider text-[#F5A524]">
+                {quote.schedule === "founding" ? "Founding rate" : "List rate"}
+              </div>
+              <div className="mt-1 text-2xl font-bold">
+                {formatUsdFromCents(quote.perStaffCents)}
+                <span className="text-base font-normal text-white/60"> / staff / month</span>
+              </div>
+              <p className="mt-1 text-sm text-white/70">
+                {formatUsdFromCents(quote.monthlyCents)} / month
+                {quote.minimumApplied ? ` · ${formatUsdFromCents(quote.minimumCents)} minimum applied` : ""}
+                {interval === "annual"
+                  ? ` · annual ${formatUsdFromCents(quote.billedCents)} (20% off)`
+                  : ""}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-xs text-white/60">
+                Active staff
+                <input
+                  type="number"
+                  min={1}
+                  className="mt-1 w-full rounded-md border border-white/15 bg-white/5 px-2 py-2 text-sm text-white"
+                  value={staffCount}
+                  onChange={(e) => setStaffCount(Number(e.target.value) || 1)}
+                />
+              </label>
+              <label className="text-xs text-white/60">
+                Clients
+                <input
+                  type="number"
+                  min={0}
+                  className="mt-1 w-full rounded-md border border-white/15 bg-white/5 px-2 py-2 text-sm text-white"
+                  value={clientCount}
+                  onChange={(e) => setClientCount(Number(e.target.value) || 0)}
+                />
+              </label>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setPlan("pro")}
+                onClick={() => setInterval("monthly")}
                 className="rounded-lg border px-3 py-2 text-sm"
                 style={{
-                  borderColor: plan === "pro" ? "#F5A524" : "rgba(255,255,255,0.15)",
-                  background: plan === "pro" ? "rgba(245,165,36,0.12)" : "transparent",
+                  borderColor: interval === "monthly" ? "#F5A524" : "rgba(255,255,255,0.15)",
+                  background: interval === "monthly" ? "rgba(245,165,36,0.12)" : "transparent",
                 }}
               >
-                Pro · $499/mo
+                Monthly
               </button>
               <button
                 type="button"
-                onClick={() => setPlan("enterprise")}
+                onClick={() => setInterval("annual")}
                 className="rounded-lg border px-3 py-2 text-sm"
                 style={{
-                  borderColor: plan === "enterprise" ? "#F5A524" : "rgba(255,255,255,0.15)",
-                  background: plan === "enterprise" ? "rgba(245,165,36,0.12)" : "transparent",
+                  borderColor: interval === "annual" ? "#F5A524" : "rgba(255,255,255,0.15)",
+                  background: interval === "annual" ? "rgba(245,165,36,0.12)" : "transparent",
                 }}
               >
-                Enterprise · $1,299/mo
+                Annual · 20% off
               </button>
             </div>
             <Button

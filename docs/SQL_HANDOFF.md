@@ -6,6 +6,83 @@ it worked before moving on.
 
 ---
 
+## ACTION — Stripe billing: founding vs list (2026-08-28)
+
+**What this is for:** Dane's confirmed prices. New agencies pay **per active staff**
+(list or founding), not the old $499 / $1,299 flat plans.
+
+- List: $125 / staff (1–19 clients), $109 (20–49), $99 (50+), $500 / month minimum, 20% off annual.
+- Founding (first 5 paying companies, 12 months): $79 / staff, $299 / month minimum.
+- Hive Exec can mark a company founding or list. True North stays billing-exempt and is never charged.
+- Dane's `danewarnick@gmail` test companies are **not** auto-exempt — they pay unless he comps them.
+
+**Run this** after the billing-exempt block below (or together if that already ran).
+Matches migration `supabase/migrations/20260828020000_org_pricing_schedule.sql`.
+
+**What you'll see:** `pricing_schedule` and `founding_ends_at` on `organizations`.
+No error from the check constraint.
+
+```sql
+ALTER TABLE public.organizations
+  ADD COLUMN IF NOT EXISTS pricing_schedule text;
+
+ALTER TABLE public.organizations
+  ADD COLUMN IF NOT EXISTS founding_ends_at timestamptz;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'organizations_pricing_schedule_chk'
+  ) THEN
+    ALTER TABLE public.organizations
+      ADD CONSTRAINT organizations_pricing_schedule_chk
+      CHECK (pricing_schedule IS NULL OR pricing_schedule IN ('list', 'founding'));
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS organizations_pricing_schedule_idx
+  ON public.organizations (pricing_schedule)
+  WHERE pricing_schedule IS NOT NULL;
+
+CREATE OR REPLACE FUNCTION public.protect_billing_exempt()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' AND (
+    NEW.billing_exempt IS DISTINCT FROM OLD.billing_exempt
+    OR NEW.pricing_schedule IS DISTINCT FROM OLD.pricing_schedule
+    OR NEW.founding_ends_at IS DISTINCT FROM OLD.founding_ends_at
+  ) THEN
+    IF auth.uid() IS NULL THEN
+      RETURN NEW;
+    END IF;
+    IF NOT public.is_hive_executive(auth.uid()) THEN
+      RAISE EXCEPTION 'Only a Hive Executive can change billing-exempt or founding/list pricing';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_protect_billing_exempt ON public.organizations;
+CREATE TRIGGER trg_protect_billing_exempt
+  BEFORE UPDATE ON public.organizations
+  FOR EACH ROW
+  EXECUTE FUNCTION public.protect_billing_exempt();
+
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'organizations'
+  AND column_name IN ('billing_exempt', 'pricing_schedule', 'founding_ends_at')
+ORDER BY column_name;
+```
+
+---
+
 ## ACTION — Stripe billing: never charge True North (2026-08-28)
 
 **What this is for:** New agencies must pay in Stripe before they can use Hive.

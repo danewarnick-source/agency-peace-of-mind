@@ -1,7 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { mrrCentsForPlan } from "@/lib/stripe-config";
 import { isBillingExempt } from "@/lib/billing-access";
+import {
+  quoteHiveSubscription,
+  type PricingSchedule,
+} from "@/lib/hive-pricing";
 
 // ───── Public types ────────────────────────────────────────────────────────
 
@@ -18,6 +21,8 @@ export interface CompanyRow {
   open_tickets: number;
   health: "good" | "warn" | "risk";
   billing_exempt: boolean;
+  pricing_schedule: PricingSchedule;
+  founding_ends_at: string | null;
 }
 
 export interface ExecKpis {
@@ -37,6 +42,8 @@ export interface CompanyDetail {
   display_acronym: string | null;
   billing_sms_phone: string | null;
   billing_exempt: boolean;
+  pricing_schedule: PricingSchedule;
+  founding_ends_at: string | null;
 
   /** Provider-submitted fields captured during signup. Read-only in exec UI. */
   signup: {
@@ -98,8 +105,27 @@ export interface TicketRow {
 
 // ───── Helpers ─────────────────────────────────────────────────────────────
 
-function liveMonthlyCents(plan: string | null | undefined): number {
-  return mrrCentsForPlan(plan ?? "starter");
+function liveSeatMrr(opts: {
+  exempt: boolean;
+  plan: string | null | undefined;
+  staffCount: number;
+  clientCount: number;
+  schedule: PricingSchedule | null | undefined;
+  foundingEndsAt: string | null | undefined;
+  interval: string | null | undefined;
+  storedMrr: number;
+}): number {
+  if (opts.exempt) return 0;
+  const plan = (opts.plan ?? "").toLowerCase();
+  if (plan === "enterprise" || plan === "custom") return opts.storedMrr;
+  const quote = quoteHiveSubscription({
+    staffCount: Math.max(1, opts.staffCount),
+    clientCount: opts.clientCount,
+    schedule: opts.schedule ?? "list",
+    interval: opts.interval === "annual" ? "annual" : "monthly",
+    foundingEndsAt: opts.foundingEndsAt ?? null,
+  });
+  return quote.monthlyCents;
 }
 
 async function ensureExecutive(
@@ -192,16 +218,12 @@ export const getExecKpis = createServerFn({ method: "GET" })
       plan: string | null;
     }>;
 
-    // MRR is computed live from current staff_count + volume tier — falls
-    // back to the recorded mrr_cents only for Enterprise (operator-priced)
-    // or when staff_count is somehow missing on legacy rows.
+    // MRR uses the amount stamped at checkout (per-staff quote). Exempt
+    // companies should already be stored as 0. Enterprise/custom keep the
+    // operator override on the row.
     const mrr_cents = rows
       .filter((r) => r.status === "active" || r.status === "past_due")
-      .reduce((sum, r) => {
-        const live = liveMonthlyCents(r.plan);
-        const value = live > 0 ? live : (r.mrr_cents ?? 0);
-        return sum + value;
-      }, 0);
+      .reduce((sum, r) => sum + (r.mrr_cents ?? 0), 0);
 
     return {
       active_companies: rows.filter((r) => r.status === "active").length,
@@ -225,13 +247,19 @@ export const listCompanies = createServerFn({ method: "GET" })
 
     const full = await supabase
       .from("organizations")
-      .select("id, name, legal_name, dba_name, billing_exempt");
+      .select("id, name, legal_name, dba_name, billing_exempt, pricing_schedule, founding_ends_at");
     let orgs = full.data;
     if (full.error) {
-      if (!/billing_exempt/i.test(full.error.message ?? "")) throw full.error;
-      const fallback = await supabase.from("organizations").select("id, name, legal_name, dba_name");
-      if (fallback.error) throw fallback.error;
-      orgs = fallback.data;
+      const msg = full.error.message ?? "";
+      if (!/billing_exempt|pricing_schedule|founding_ends_at/i.test(msg)) throw full.error;
+      const fallback = await supabase.from("organizations").select("id, name, legal_name, dba_name, billing_exempt");
+      if (fallback.error) {
+        const basic = await supabase.from("organizations").select("id, name, legal_name, dba_name");
+        if (basic.error) throw basic.error;
+        orgs = basic.data;
+      } else {
+        orgs = fallback.data;
+      }
     }
 
     const { data: subs } = await supabase
@@ -277,6 +305,8 @@ export const listCompanies = createServerFn({ method: "GET" })
       billing_exempt?: boolean;
       legal_name?: string | null;
       dba_name?: string | null;
+      pricing_schedule?: string | null;
+      founding_ends_at?: string | null;
     }>).map((o) => {
       const sub = subByOrg.get(o.id);
       const c = countByOrg.get(o.id);
@@ -292,13 +322,22 @@ export const listCompanies = createServerFn({ method: "GET" })
         legalName: o.legal_name,
         dbaName: o.dba_name,
       });
-      const live = liveMonthlyCents(sub?.plan ?? null);
-      const mrr_cents = exempt ? 0 : sub == null ? 0 : live || (sub.mrr_cents ?? 0);
+      const schedule: PricingSchedule = o.pricing_schedule === "founding" ? "founding" : "list";
+      const mrr_cents = liveSeatMrr({
+        exempt,
+        plan: sub?.plan ?? null,
+        staffCount: c?.staff ?? (sub as { staff_count?: number | null } | undefined)?.staff_count ?? 1,
+        clientCount: c?.clients ?? 0,
+        schedule,
+        foundingEndsAt: o.founding_ends_at ?? null,
+        interval: (sub as { billing_interval?: string | null } | undefined)?.billing_interval ?? null,
+        storedMrr: sub?.mrr_cents ?? 0,
+      });
 
       return {
         organization_id: o.id,
         name: o.name,
-        plan: sub?.plan ?? "pro",
+        plan: sub?.plan ?? "hive_standard",
         status,
         mrr_cents,
         renewal_date: sub?.renewal_date ?? null,
@@ -308,6 +347,8 @@ export const listCompanies = createServerFn({ method: "GET" })
         open_tickets: tickets,
         health,
         billing_exempt: exempt,
+        pricing_schedule: schedule,
+        founding_ends_at: o.founding_ends_at ?? null,
       };
     });
   });
@@ -334,19 +375,29 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
 
     const orgFull = await supabase
       .from("organizations")
-      .select("id, name, legal_name, dba_name, display_acronym, billing_sms_phone, billing_exempt, account_contact_name, account_contact_email, created_by, created_at")
+      .select("id, name, legal_name, dba_name, display_acronym, billing_sms_phone, billing_exempt, pricing_schedule, founding_ends_at, account_contact_name, account_contact_email, created_by, created_at")
       .eq("id", data.organizationId)
       .maybeSingle();
     let org = orgFull.data;
     if (orgFull.error) {
-      if (!/billing_exempt/i.test(orgFull.error.message ?? "")) throw orgFull.error;
+      const msg = orgFull.error.message ?? "";
+      if (!/billing_exempt|pricing_schedule|founding_ends_at/i.test(msg)) throw orgFull.error;
       const retry = await supabase
         .from("organizations")
-        .select("id, name, legal_name, dba_name, display_acronym, billing_sms_phone, account_contact_name, account_contact_email, created_by, created_at")
+        .select("id, name, legal_name, dba_name, display_acronym, billing_sms_phone, billing_exempt, account_contact_name, account_contact_email, created_by, created_at")
         .eq("id", data.organizationId)
         .maybeSingle();
-      if (retry.error) throw retry.error;
-      org = retry.data;
+      if (retry.error) {
+        const basic = await supabase
+          .from("organizations")
+          .select("id, name, legal_name, dba_name, display_acronym, billing_sms_phone, account_contact_name, account_contact_email, created_by, created_at")
+          .eq("id", data.organizationId)
+          .maybeSingle();
+        if (basic.error) throw basic.error;
+        org = basic.data;
+      } else {
+        org = retry.data;
+      }
     }
     if (!org) throw new Error("Organization not found.");
 
@@ -447,8 +498,16 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
       legalName: (org as { legal_name?: string | null }).legal_name,
       dbaName: (org as { dba_name?: string | null }).dba_name,
     });
-    const live = liveMonthlyCents(subPlan);
-    const liveMrr = orgExempt ? 0 : live || (sub?.mrr_cents ?? 0);
+    const liveMrr = liveSeatMrr({
+      exempt: orgExempt,
+      plan: subPlan,
+      staffCount: staffRes.count || subStaff || 1,
+      clientCount: clientRes.count ?? 0,
+      schedule: (org as { pricing_schedule?: string | null }).pricing_schedule === "founding" ? "founding" : "list",
+      foundingEndsAt: (org as { founding_ends_at?: string | null }).founding_ends_at ?? null,
+      interval: (sub as { billing_interval: string | null } | null)?.billing_interval ?? null,
+      storedMrr: sub?.mrr_cents ?? 0,
+    });
 
     return {
       organization_id: org.id,
@@ -458,6 +517,9 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
       display_acronym: (org as { display_acronym: string | null }).display_acronym ?? null,
       billing_sms_phone: (org as { billing_sms_phone: string | null }).billing_sms_phone ?? null,
       billing_exempt: orgExempt,
+      pricing_schedule:
+        (org as { pricing_schedule?: string | null }).pricing_schedule === "founding" ? "founding" : "list",
+      founding_ends_at: (org as { founding_ends_at?: string | null }).founding_ends_at ?? null,
       signup: {
         contact_name: contactName,
         contact_email: contactEmail,

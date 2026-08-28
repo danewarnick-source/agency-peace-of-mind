@@ -12,6 +12,7 @@ import {
   type CompanyRow,
 } from "@/lib/hive-exec.functions";
 import { setOrgBillingExemptFn } from "@/lib/billing-exempt.functions";
+import { setOrgPricingScheduleFn } from "@/lib/hive-pricing.functions";
 import {
   TIER_CATALOG,
   ADDON_CATALOG,
@@ -55,8 +56,9 @@ function Header() {
         <div>
           <h2 className="font-display text-lg font-semibold">Plans &amp; Billing</h2>
           <p className="text-sm text-muted-foreground">
-            Define tiers, assign companies, and mark a company billing-exempt (comped)
-            so they never hit Stripe. New agencies pay Pro or Enterprise at signup.
+            Define entitlements, mark a company founding vs list, or billing-exempt
+            so they never hit Stripe. New agencies pay per staff (founding until 5
+            paying companies exist, then list). Enterprise is contact us.
           </p>
         </div>
       </div>
@@ -134,6 +136,7 @@ function CompanyTierAssignmentSection() {
   const listFn = useServerFn(listCompanies);
   const saveFn = useServerFn(upsertSubscription);
   const exemptFn = useServerFn(setOrgBillingExemptFn);
+  const scheduleFn = useServerFn(setOrgPricingScheduleFn);
   const listQ = useQuery({ queryKey: ["hive-exec-companies"], queryFn: () => listFn() });
 
   const [search, setSearch] = useState("");
@@ -190,6 +193,7 @@ function CompanyTierAssignmentSection() {
               <th className="px-3 py-2">Current tier</th>
               <th className="px-3 py-2">Status</th>
               <th className="px-3 py-2">Comped</th>
+              <th className="px-3 py-2">Rate</th>
               <th className="px-3 py-2 text-right">MRR</th>
               <th className="px-3 py-2">Assign tier</th>
               <th className="px-3 py-2">Included add-ons</th>
@@ -199,13 +203,13 @@ function CompanyTierAssignmentSection() {
           <tbody>
             {listQ.isLoading ? (
               <tr>
-                <td colSpan={8} className="p-6 text-center text-muted-foreground">
+                <td colSpan={9} className="p-6 text-center text-muted-foreground">
                   Loading companies…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={8} className="p-6 text-center text-muted-foreground">
+                <td colSpan={9} className="p-6 text-center text-muted-foreground">
                   No companies found.
                 </td>
               </tr>
@@ -249,6 +253,32 @@ function CompanyTierAssignmentSection() {
                         />
                         Exempt
                       </label>
+                    </td>
+                    <td className="px-3 py-2">
+                      <select
+                        value={r.pricing_schedule}
+                        onChange={(e) => {
+                          const schedule = e.target.value === "founding" ? "founding" : "list";
+                          scheduleFn({
+                            data: { organizationId: r.organization_id, schedule },
+                          })
+                            .then(() => {
+                              toast.success(
+                                schedule === "founding"
+                                  ? `${r.name} is on founding pricing.`
+                                  : `${r.name} is on list pricing.`,
+                              );
+                              qc.invalidateQueries({ queryKey: ["hive-exec-companies"] });
+                            })
+                            .catch((err) =>
+                              toast.error(err instanceof Error ? err.message : "Could not update"),
+                            );
+                        }}
+                        className="min-h-[36px] rounded-md border border-border bg-background px-2 text-sm"
+                      >
+                        <option value="founding">Founding</option>
+                        <option value="list">List</option>
+                      </select>
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums">
                       {fmtMoney(r.mrr_cents)}
@@ -323,9 +353,11 @@ function StripeStatusSection() {
     <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <h3 className="font-display text-base font-semibold">Stripe (test mode)</h3>
       <p className="mt-1 text-xs text-muted-foreground">
-        New agencies pay Pro ($499) or Enterprise ($1,299) at signup via Stripe Checkout.
-        Comped companies (True North, or anyone you mark exempt) never see a paywall.
-        Webhook URL: <span className="font-mono">/api/stripe/webhook</span>
+        New agencies pay per active staff: founding $79 / staff ($299 min) until 5
+        paying companies exist, then list $125 / $109 / $99 with a $500 minimum.
+        Annual is 20% off. Enterprise is contact us. Comped companies (True North,
+        or anyone you mark exempt) never see a paywall. Webhook URL:{" "}
+        <span className="font-mono">/api/stripe/webhook</span>
       </p>
       <div className="mt-3 rounded-lg border border-border bg-background p-4">
         <div className="text-xs uppercase tracking-wide text-muted-foreground">MRR (paying companies)</div>

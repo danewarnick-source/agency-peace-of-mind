@@ -66,10 +66,10 @@ export function entitlementsForOrg(opts: {
 }
 
 /**
- * Extra HIVE Training catalog purchases.
- * - Comped orgs never pay.
- * - Pro/Enterprise include hive_training, so the full-program SKU is not charged.
- * - À-la-carte catalog courses still check out individually (unless comped).
+ * Extra HIVE Training catalog purchases (one-time per staff).
+ * - Comped orgs (True North, or Hive Exec exempt) never pay seats or training.
+ * - Paying orgs are charged catalog amounts: full $300, CPR $75, Mandt $200, DSPD $100.
+ * - Training is not included in the per-staff subscription.
  */
 export function trainingRequiresCharge(opts: {
   billingExempt: boolean;
@@ -79,7 +79,8 @@ export function trainingRequiresCharge(opts: {
 }): boolean {
   if (opts.billingExempt) return false;
   if (opts.priceCents <= 0) return false;
-  if (opts.hasHiveTrainingAddon && opts.catalogKind === "full_program") return false;
+  void opts.hasHiveTrainingAddon;
+  void opts.catalogKind;
   return true;
 }
 

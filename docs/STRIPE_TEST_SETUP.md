@@ -12,18 +12,50 @@ Hive charges companies in **Stripe test / sandbox only**. No real cards are char
 
 Test mode must stay ON (switch in the top right of the Stripe Dashboard).
 
-## Products (reuse if they already exist)
+## Confirmed prices (do not use $499 / $1,299 or $49 training)
 
-A separate pass is creating these in this sandbox. Copy each **Price ID** (`price_…`) when it exists. Until then Hive uses env placeholders — do not put fake IDs in git.
+**List** (public at `/pricing`):
+
+- $125 per active staff / month (1–19 clients)
+- $109 / staff at 20–49 clients, $99 / staff at 50+
+- $500 / month minimum
+- Annual = 20% off
+- Enterprise = contact us (no dollar amount in Stripe)
+
+**Founding** (first 5 paying companies, 12 months, then list):
+
+- $79 per staff / month
+- $299 / month minimum
+- Hive Exec can mark a company founding vs list
+
+**Exempt:** True North Supports LLC is billing-exempt forever. Never charge seats or training. Hive Exec can toggle exempt on other companies. Dane’s `danewarnick@gmail` test companies are **not** auto-exempt — they pay unless he comps them.
+
+**Training** (one-time per staff; Mandt name stays):
+
+- Full program $300
+- CPR/First Aid $75, Mandt $200, DSPD required $100
+- TNS / exempt skip these
+
+Until you paste `price_` IDs, Checkout uses Stripe `price_data` at these amounts so you can still test.
+
+## Products (create in test mode, then paste Price IDs)
 
 | Product | Amount | Billing | Env var |
 |---|---|---|---|
-| Hive Pro | $499 | Recurring, monthly | `STRIPE_PRICE_PRO` |
-| Hive Enterprise | $1,299 | Recurring, monthly | `STRIPE_PRICE_ENTERPRISE` |
-| Hive Training extra course | $49 | One time | `STRIPE_PRICE_TRAINING` |
+| Hive list / staff (1–19) | $125 | Recurring, monthly | `STRIPE_PRICE_STAFF_LIST_MONTHLY` |
+| Hive list / staff annual | 20% off yearly | Recurring, yearly | `STRIPE_PRICE_STAFF_LIST_ANNUAL` |
+| Hive list / staff (20–49) | $109 | Recurring, monthly | `STRIPE_PRICE_STAFF_LIST_20_MONTHLY` |
+| Hive list / staff (50+) | $99 | Recurring, monthly | `STRIPE_PRICE_STAFF_LIST_50_MONTHLY` |
+| Hive founding / staff | $79 | Recurring, monthly | `STRIPE_PRICE_STAFF_FOUNDING_MONTHLY` |
+| Hive founding / staff annual | 20% off yearly | Recurring, yearly | `STRIPE_PRICE_STAFF_FOUNDING_ANNUAL` |
+| Founding coupon (instead of a founding price) | — | Coupon | `STRIPE_COUPON_FOUNDING` |
+| Annual 20% coupon (optional) | 20% off | Coupon | `STRIPE_COUPON_ANNUAL` |
+| Training full program | $300 | One time | `STRIPE_PRICE_TRAINING_FULL` |
+| Training CPR/First Aid | $75 | One time | `STRIPE_PRICE_TRAINING_CPR` |
+| Training Mandt | $200 | One time | `STRIPE_PRICE_TRAINING_MANDT` |
+| Training DSPD required | $100 | One time | `STRIPE_PRICE_TRAINING_DSPD` |
 
-- **Pro / Enterprise** are the public signup plans. Starter $0 is not self-serve.
-- **Hive Training extra course** is for à-la-carte catalog courses (CPR and similar) that are **not** included in the plan. Pro and Enterprise already include HIVE Training, so the full program is not charged. True North (billing-exempt) is never charged for training.
+Do **not** create or wire $499 Pro, $1,299 Enterprise, or $49 training extras.
 
 ## Environment variables (Vercel / Lovable)
 
@@ -32,11 +64,9 @@ Never paste these into GitHub. Test keys only (`sk_test_` / `pk_test_`).
 - `STRIPE_SECRET_KEY` — `sk_test_…` (Developers → API keys)
 - `STRIPE_PUBLISHABLE_KEY` — `pk_test_…`
 - `STRIPE_WEBHOOK_SECRET` — `whsec_…` (from the webhook below)
-- `STRIPE_PRICE_PRO` — Price ID for Hive Pro (placeholder until you paste it)
-- `STRIPE_PRICE_ENTERPRISE` — Price ID for Hive Enterprise (placeholder until you paste it)
-- `STRIPE_PRICE_TRAINING` — Price ID for Hive Training extra course $49 (placeholder until you paste it)
+- The `STRIPE_PRICE_*` and `STRIPE_COUPON_*` values above — placeholders until you paste them
 
-If keys are missing, True North can still log in. New agencies see a clear “payments are not set up” message instead of a crash.
+If the secret key is missing, True North can still log in. New agencies see a clear “payments are not set up” message instead of a crash.
 
 ## Webhook
 
@@ -65,8 +95,11 @@ On any paywall that says **TEST MODE**:
 
 ## True North is never charged
 
-True North Supports LLC is marked **billing-exempt**. Hive Exec can check that same box on another company to comp them later — no code change.
+True North Supports LLC is marked **billing-exempt**. Hive Exec can check that same box on another company to comp them later — no code change. Hive Exec can also mark founding vs list.
 
 ## SQL you must run
 
-Paste the **Stripe billing: never charge True North** block at the top of `docs/SQL_HANDOFF.md` into Lovable’s SQL editor (clear the editor first). Until that runs, the exempt checkbox has no database column.
+Paste these blocks from the top of `docs/SQL_HANDOFF.md` into Lovable’s SQL editor (clear the editor first, one block at a time):
+
+1. **Stripe billing: founding vs list**
+2. **Stripe billing: never charge True North** (if you have not already)

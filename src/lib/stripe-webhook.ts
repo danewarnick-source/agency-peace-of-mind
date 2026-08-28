@@ -98,11 +98,21 @@ export async function activateSubscriptionFromCheckout(opts: {
   amountCents: number;
   periodEndIso: string | null;
   eventId: string | null;
+  staffCount?: number | null;
+  billingInterval?: "monthly" | "annual" | null;
+  monthlyCents?: number | null;
 }): Promise<void> {
   const nowIso = new Date().toISOString();
-  const plan = normalizeTierId(opts.plan);
-  const mrr = mrrCentsForPlan(plan) || opts.amountCents;
-  const periodEnd = opts.periodEndIso ?? new Date(Date.now() + 30 * 86_400_000).toISOString();
+  const plan = opts.plan === "hive_standard" ? "hive_standard" : normalizeTierId(opts.plan);
+  const monthly =
+    opts.monthlyCents && opts.monthlyCents > 0
+      ? opts.monthlyCents
+      : opts.billingInterval === "annual" && opts.amountCents > 0
+        ? Math.round(opts.amountCents / 12)
+        : opts.amountCents || mrrCentsForPlan(plan);
+  const periodEnd =
+    opts.periodEndIso ??
+    new Date(Date.now() + (opts.billingInterval === "annual" ? 365 : 30) * 86_400_000).toISOString();
 
   const { data: existing } = await supabaseAdmin
     .from("org_subscriptions")
@@ -113,8 +123,9 @@ export async function activateSubscriptionFromCheckout(opts: {
   const patch = {
     plan,
     status: "active" as const,
-    mrr_cents: mrr,
-    billing_interval: "monthly",
+    mrr_cents: monthly,
+    billing_interval: opts.billingInterval ?? "monthly",
+    staff_count: opts.staffCount && opts.staffCount > 0 ? opts.staffCount : undefined,
     current_period_start: nowIso,
     current_period_end: periodEnd,
     renewal_date: periodEnd.slice(0, 10),
@@ -130,13 +141,15 @@ export async function activateSubscriptionFromCheckout(opts: {
     stripe_subscription_id: opts.subscriptionId,
   };
 
+  const cleanPatch = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
+
   if (existing) {
-    const { error } = await supabaseAdmin.from("org_subscriptions").update(patch).eq("id", existing.id);
+    const { error } = await supabaseAdmin.from("org_subscriptions").update(cleanPatch).eq("id", existing.id);
     if (error) throw new Error(error.message);
   } else {
     const { error } = await supabaseAdmin.from("org_subscriptions").insert({
       organization_id: opts.orgId,
-      ...patch,
+      ...cleanPatch,
     });
     if (error) throw new Error(error.message);
   }
@@ -189,13 +202,16 @@ export async function handleVerifiedStripeEvent(event: StripeLikeEvent): Promise
       const periodEndUnix = typeof obj.current_period_end === "number" ? obj.current_period_end : null;
       await activateSubscriptionFromCheckout({
         orgId,
-        plan: meta.plan || "pro",
+        plan: meta.plan || "hive_standard",
         customerId,
         subscriptionId: asString(obj.subscription),
         paymentIntentId: asString(obj.payment_intent),
-        amountCents: typeof obj.amount_total === "number" ? obj.amount_total : mrrCentsForPlan(meta.plan || "pro"),
+        amountCents: typeof obj.amount_total === "number" ? obj.amount_total : Number(meta.monthly_cents ?? 0),
         periodEndIso: periodEndUnix ? new Date(periodEndUnix * 1000).toISOString() : null,
         eventId,
+        staffCount: Number(meta.staff_count ?? 0) || null,
+        billingInterval: meta.interval === "annual" ? "annual" : "monthly",
+        monthlyCents: Number(meta.monthly_cents ?? 0) || null,
       });
       break;
     }

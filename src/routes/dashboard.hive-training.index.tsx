@@ -1056,7 +1056,7 @@ function FeaturedCard({ row, members, onPurchased }: { row: CatalogRow; members:
           <li className="flex gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-[#C8881E]" /> Typed-signature competency sign-off</li>
           <li className="flex gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-[#C8881E]" /> Verifiable certificate + expiration tracking</li>
         </ul>
-        <PurchaseDialog row={row} members={members} onPurchased={onPurchased} triggerLabel="Add included training" />
+        <PurchaseDialog row={row} members={members} onPurchased={onPurchased} triggerLabel="Buy" />
       </CardContent>
     </Card>
   );
@@ -1110,7 +1110,7 @@ function PurchaseDialog({
         },
       });
       if (r.granted) {
-        toast.success("Included in your plan — seats added, no charge.");
+        toast.success("This company is billing-exempt — seats added, no charge.");
         onPurchased();
         setOpen(false);
         setBusy(false);
@@ -1133,7 +1133,7 @@ function PurchaseDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-[#1A2B47] hover:bg-[#1A2B47]/90 text-white w-full" data-testid="training-pay-button">
+        <Button className="bg-[#1A2B47] hover:bg-[#1A2B47]/90 text-white w-full" data-testid={`training-buy-${row.sku}`}>
           <ShoppingCart className="h-4 w-4 mr-1" /> {triggerLabel}
         </Button>
       </DialogTrigger>

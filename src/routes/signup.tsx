@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft,
@@ -18,6 +18,12 @@ import { checkEmailExists } from "@/lib/signup-checks.functions";
 import { setBillingSmsPhoneAtSignup } from "@/lib/billing-sms.functions";
 import { isValidUSPhone, normalizeUSPhoneToE164 } from "@/lib/us-phone";
 import { createSubscriptionCheckoutFn } from "@/lib/stripe-checkout.functions";
+import { getSignupPricingFn } from "@/lib/hive-pricing.functions";
+import {
+  formatUsdFromCents,
+  quoteHiveSubscription,
+  type BillingInterval,
+} from "@/lib/hive-pricing";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/signup")({
@@ -48,7 +54,7 @@ const inputStyle: React.CSSProperties = {
 const STEPS = [
   "Account",
   "Your business",
-  "Choose plan",
+  "Staff & billing",
   "Payment",
 ] as const;
 
@@ -62,7 +68,9 @@ interface FormState {
   contactName: string;
   phone: string;
   providerNumber: string;
-  plan: "pro" | "enterprise";
+  staffCount: number;
+  clientCount: number;
+  interval: BillingInterval;
 }
 
 const initialForm: FormState = {
@@ -73,7 +81,9 @@ const initialForm: FormState = {
   contactName: "",
   phone: "",
   providerNumber: "",
-  plan: "pro",
+  staffCount: 8,
+  clientCount: 12,
+  interval: "monthly",
 };
 
 /* ──────────────────────────── shell ──────────────────────────── */
@@ -633,68 +643,111 @@ function Step4Pricing({
   onBack: () => void;
   onNext: () => void;
 }) {
+  const pricingFn = useServerFn(getSignupPricingFn);
+  const [schedule, setSchedule] = useState<"list" | "founding">("founding");
+  const [slots, setSlots] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    pricingFn()
+      .then((r) => {
+        if (cancelled) return;
+        setSchedule(r.schedule);
+        setSlots(r.foundingSlotsRemaining);
+      })
+      .catch(() => {
+        if (!cancelled) setSchedule("founding");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pricingFn]);
+
+  const quote = quoteHiveSubscription({
+    staffCount: form.staffCount,
+    clientCount: form.clientCount,
+    schedule,
+    interval: form.interval,
+  });
+
   return (
     <>
       <Header
-        title="Choose your Hive plan"
-        subtitle="Starter is not available for self-serve signup. True North Supports is billed separately and is never charged here."
+        title="Staff & billing"
+        subtitle="Hive is billed per active staff. True North Supports is never charged here. Enterprise custom work is contact-us — no public dollar amount."
       />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <PriceCard
-          active={form.plan === "pro"}
-          onClick={() => update("plan", "pro")}
-          label="Pro"
-          amount="$499/mo"
-          sub="NECTAR Infusion and HIVE Training included"
-        />
-        <PriceCard
-          active={form.plan === "enterprise"}
-          onClick={() => update("plan", "enterprise")}
-          label="Enterprise"
-          amount="$1,299/mo"
-          sub="Audit-prep, requirements engine, priority support, and HIVE Training"
-        />
+      {schedule === "founding" && (
+        <div
+          className="mb-4 rounded-lg border px-3 py-2 text-sm"
+          data-testid="founding-rate-note"
+          style={{
+            background: "rgba(244,169,58,0.10)",
+            borderColor: "rgba(244,169,58,0.35)",
+            color: "#f7c172",
+          }}
+        >
+          Founding rate for the first 5 paying agencies: $79 / staff, $299 / month minimum
+          {slots != null ? ` · ${slots} founding slot${slots === 1 ? "" : "s"} left` : ""}. After 12
+          months you step up to list.
+        </div>
+      )}
+      {schedule === "list" && (
+        <div className="mb-4 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70">
+          List rate: $125 / staff (1–19 clients), $109 at 20–49, $99 at 50+. $500 / month minimum.
+          Annual saves 20%.
+        </div>
+      )}
+      <div className="grid gap-4">
+        <Field label="How many active staff?">
+          <TextInput
+            type="number"
+            value={String(form.staffCount)}
+            onChange={(v) => update("staffCount", Math.max(1, Number(v) || 1))}
+          />
+        </Field>
+        <Field label="About how many clients?">
+          <TextInput
+            type="number"
+            value={String(form.clientCount)}
+            onChange={(v) => update("clientCount", Math.max(0, Number(v) || 0))}
+          />
+        </Field>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => update("interval", "monthly")}
+            className="rounded-xl p-3 text-left"
+            style={{
+              background: form.interval === "monthly" ? "rgba(244,169,58,0.10)" : "rgba(255,255,255,0.03)",
+              border: `1px solid ${form.interval === "monthly" ? "rgba(244,169,58,0.55)" : "rgba(255,255,255,0.10)"}`,
+            }}
+          >
+            <div className="text-xs uppercase tracking-wider text-white/55">Monthly</div>
+            <div className="mt-1 text-lg font-bold">{formatUsdFromCents(quote.monthlyCents)}</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => update("interval", "annual")}
+            className="rounded-xl p-3 text-left"
+            style={{
+              background: form.interval === "annual" ? "rgba(244,169,58,0.10)" : "rgba(255,255,255,0.03)",
+              border: `1px solid ${form.interval === "annual" ? "rgba(244,169,58,0.55)" : "rgba(255,255,255,0.10)"}`,
+            }}
+          >
+            <div className="text-xs uppercase tracking-wider text-white/55">Annual · 20% off</div>
+            <div className="mt-1 text-lg font-bold">{formatUsdFromCents(quote.billedCents)}</div>
+          </button>
+        </div>
+        <p className="text-xs text-white/55">
+          {formatUsdFromCents(quote.perStaffCents)} per staff
+          {quote.minimumApplied ? ` · ${formatUsdFromCents(quote.minimumCents)} minimum applied` : ""}.
+          Training is separate (full program $300 / staff; TNS skips it).
+        </p>
       </div>
-      <p className="mt-4 text-xs leading-relaxed text-white/55">
-        Extra catalog courses that are not part of the included training can be bought later
-        inside Hive. Launchpad (required staff onboarding) stays free.
-      </p>
       <NavButtons onBack={onBack} onNext={onNext} />
     </>
   );
 }
-
-function PriceCard({
-  active,
-  onClick,
-  label,
-  amount,
-  sub,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  amount: string;
-  sub: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="relative rounded-xl p-4 text-left transition"
-      style={{
-        background: active ? "rgba(244,169,58,0.10)" : "rgba(255,255,255,0.03)",
-        border: `1px solid ${active ? "rgba(244,169,58,0.55)" : "rgba(255,255,255,0.10)"}`,
-      }}
-    >
-      <div className="text-xs uppercase tracking-wider text-white/55">{label}</div>
-      <div className="mt-1 text-2xl font-bold text-white">{amount}</div>
-      <div className="mt-0.5 text-xs text-white/55">{sub}</div>
-    </button>
-  );
-}
-
-/* ──────────────────────────── STEP 6 ──────────────────────────── */
 
 function Step6Payment({
   form,
@@ -706,7 +759,22 @@ function Step6Payment({
   onComplete: () => Promise<void>;
 }) {
   const checkoutFn = useServerFn(createSubscriptionCheckoutFn);
+  const pricingFn = useServerFn(getSignupPricingFn);
   const [busy, setBusy] = useState(false);
+  const [schedule, setSchedule] = useState<"list" | "founding">("founding");
+
+  useEffect(() => {
+    pricingFn()
+      .then((r) => setSchedule(r.schedule))
+      .catch(() => setSchedule("founding"));
+  }, [pricingFn]);
+
+  const quote = quoteHiveSubscription({
+    staffCount: form.staffCount,
+    clientCount: form.clientCount,
+    schedule,
+    interval: form.interval,
+  });
 
   const submit = async () => {
     setBusy(true);
@@ -723,7 +791,14 @@ function Step6Payment({
       const orgId = orgs?.[0]?.id;
       if (!orgId) throw new Error("Your workspace wasn't ready — please refresh and try again.");
 
-      const r = await checkoutFn({ data: { organizationId: orgId, plan: form.plan } });
+      const r = await checkoutFn({
+        data: {
+          organizationId: orgId,
+          staffCount: form.staffCount,
+          clientCount: form.clientCount,
+          interval: form.interval,
+        },
+      });
       if (r.exempt) {
         toast.success("Welcome to Hive — this company is comped.");
         await onComplete();
@@ -764,13 +839,20 @@ function Step6Payment({
         </span>
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm">
+      <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm" data-testid="pricing-schedule">
         <div className="text-xs uppercase tracking-wider text-[#f7c172]">
-          {form.plan === "enterprise" ? "Enterprise" : "Pro"}
+          {quote.schedule === "founding" ? "Founding" : "List"} · {form.staffCount} staff
         </div>
-        <div className="mt-1 text-2xl font-bold">{form.plan === "enterprise" ? "$1,299" : "$499"}<span className="text-base font-normal text-white/60">/mo</span></div>
+        <div className="mt-1 text-2xl font-bold">
+          {formatUsdFromCents(form.interval === "annual" ? quote.billedCents : quote.monthlyCents)}
+          <span className="text-base font-normal text-white/60">
+            {form.interval === "annual" ? "/year" : "/mo"}
+          </span>
+        </div>
         <p className="mt-2 text-xs text-white/55">
-          HIVE Training is included. Extra à-la-carte courses can be bought later inside Hive if you need them.
+          {formatUsdFromCents(quote.perStaffCents)} per staff
+          {quote.minimumApplied ? ` · ${formatUsdFromCents(quote.minimumCents)} minimum` : ""}.
+          Training is one-time and separate. Enterprise is contact us.
         </p>
       </div>
 

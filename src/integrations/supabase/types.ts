@@ -13139,6 +13139,7 @@ export type Database = {
           dhhs_provider_id: string | null
           display_acronym: string | null
           evv_vendor_name: string
+          founding_ends_at: string | null
           go_live_date: string | null
           id: string
           incident_ai_review_enabled: boolean
@@ -13148,6 +13149,7 @@ export type Database = {
           name: string
           nectar_profile_saved_at: string | null
           predates_go_live_note: string | null
+          pricing_schedule: string | null
           services_offered: string[] | null
           slug: string
           specializations: string | null
@@ -13169,6 +13171,7 @@ export type Database = {
           dhhs_provider_id?: string | null
           display_acronym?: string | null
           evv_vendor_name?: string
+          founding_ends_at?: string | null
           go_live_date?: string | null
           id?: string
           incident_ai_review_enabled?: boolean
@@ -13178,6 +13181,7 @@ export type Database = {
           name: string
           nectar_profile_saved_at?: string | null
           predates_go_live_note?: string | null
+          pricing_schedule?: string | null
           services_offered?: string[] | null
           slug: string
           specializations?: string | null
@@ -13199,6 +13203,7 @@ export type Database = {
           dhhs_provider_id?: string | null
           display_acronym?: string | null
           evv_vendor_name?: string
+          founding_ends_at?: string | null
           go_live_date?: string | null
           id?: string
           incident_ai_review_enabled?: boolean
@@ -13208,6 +13213,7 @@ export type Database = {
           name?: string
           nectar_profile_saved_at?: string | null
           predates_go_live_note?: string | null
+          pricing_schedule?: string | null
           services_offered?: string[] | null
           slug?: string
           specializations?: string | null

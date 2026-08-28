@@ -1,10 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CreditCard, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { getTier, formatTierPrice, normalizeTierId } from "@/lib/hive-tiers";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  formatUsdFromCents,
+  quoteHiveSubscription,
+  type BillingInterval,
+} from "@/lib/hive-pricing";
 import {
   confirmCheckoutSessionFn,
   createPortalSessionFn,
@@ -13,7 +20,7 @@ import {
 } from "@/lib/stripe-checkout.functions";
 
 function fmtMoney(cents: number): string {
-  return `$${(cents / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  return formatUsdFromCents(cents);
 }
 
 export function HiveSubscriptionPanel() {
@@ -23,7 +30,9 @@ export function HiveSubscriptionPanel() {
   const portalFn = useServerFn(createPortalSessionFn);
   const confirmFn = useServerFn(confirmCheckoutSessionFn);
   const [busy, setBusy] = useState(false);
-  const [pickedPlan, setPickedPlan] = useState<"pro" | "enterprise">("pro");
+  const [staffCount, setStaffCount] = useState(4);
+  const [clientCount, setClientCount] = useState(10);
+  const [interval, setInterval] = useState<BillingInterval>("monthly");
 
   const q = useQuery({
     queryKey: ["hive-billing-status"],
@@ -65,13 +74,24 @@ export function HiveSubscriptionPanel() {
   }, [confirmFn, qc]);
 
   const d = q.data;
-  const planId = normalizeTierId(d?.plan);
-  const tier = getTier(planId);
-  const activePlan = planId === "enterprise" ? "enterprise" : "pro";
 
   useEffect(() => {
-    setPickedPlan(activePlan);
-  }, [activePlan]);
+    if (!d) return;
+    setStaffCount(d.staffCount || 4);
+    setClientCount(d.clientCount || 0);
+    setInterval(d.interval === "annual" ? "annual" : "monthly");
+  }, [d?.staffCount, d?.clientCount, d?.interval]);
+
+  const quote = useMemo(() => {
+    if (!d) return null;
+    return quoteHiveSubscription({
+      staffCount,
+      clientCount,
+      schedule: d.pricingSchedule,
+      interval,
+      foundingEndsAt: d.foundingEndsAt,
+    });
+  }, [d, staffCount, clientCount, interval]);
 
   if (q.isLoading || !d) {
     return (
@@ -81,11 +101,18 @@ export function HiveSubscriptionPanel() {
     );
   }
 
-  const pay = async (plan: "pro" | "enterprise") => {
+  const pay = async () => {
     if (!d.organizationId) return;
     setBusy(true);
     try {
-      const r = await checkoutFn({ data: { organizationId: d.organizationId, plan } });
+      const r = await checkoutFn({
+        data: {
+          organizationId: d.organizationId,
+          staffCount,
+          clientCount,
+          interval,
+        },
+      });
       if (r.exempt) {
         toast.success("This company is comped. No payment needed.");
         await qc.invalidateQueries({ queryKey: ["hive-billing-status"] });
@@ -122,17 +149,24 @@ export function HiveSubscriptionPanel() {
   };
 
   const statusLabel = d.billingExempt
-    ? "Comped"
+    ? "Exempt — never charged"
     : d.lockedAt
       ? "Payment needed"
       : (d.status ?? "unknown").replace("_", " ");
+
+  const rateKind = d.billingExempt
+    ? "Exempt"
+    : quote?.schedule === "founding"
+      ? "Founding"
+      : "List";
 
   return (
     <div className="mx-auto max-w-2xl space-y-4" data-testid="hive-subscription-page">
       <header>
         <h2 className="font-display text-xl font-semibold">HIVE Subscription</h2>
         <p className="text-sm text-muted-foreground">
-          Your company plan. Pay here to unlock Hive, or manage the card on file.
+          Per active staff. List rates drop as client count grows. Enterprise is contact-us — no
+          public dollar amount.
         </p>
       </header>
 
@@ -154,8 +188,9 @@ export function HiveSubscriptionPanel() {
           className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950"
           data-testid="comped-note"
         >
-          {d.orgName ?? "This company"} is comped (billing-exempt). Hive stays fully available and
-          training extras are not charged. True North Supports is set this way on purpose.
+          {d.orgName ?? "This company"} is billing-exempt. Hive never charges seats or training.
+          True North Supports is set this way on purpose. Dane can toggle this in Hive Exec for
+          other companies — test orgs are not auto-exempt.
         </div>
       )}
 
@@ -166,13 +201,38 @@ export function HiveSubscriptionPanel() {
       )}
 
       <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">Current plan</div>
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">Current rate</div>
         <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
-          <div className="font-display text-2xl font-semibold text-[#0f1b3d]">{tier.name}</div>
+          <div className="font-display text-2xl font-semibold text-[#0f1b3d]" data-testid="pricing-schedule">
+            {rateKind}
+          </div>
           <div className="text-lg font-medium text-[#7a4a0a]">
-            {d.billingExempt ? "No charge" : d.mrrCents ? fmtMoney(d.mrrCents) + "/mo" : formatTierPrice(tier)}
+            {d.billingExempt
+              ? "No charge"
+              : quote
+                ? `${fmtMoney(quote.perStaffCents)} / staff`
+                : "Per staff"}
           </div>
         </div>
+        {!d.billingExempt && quote && (
+          <div className="mt-2 space-y-1 text-sm">
+            <div>
+              Monthly: <span className="font-medium">{fmtMoney(quote.monthlyCents)}</span>
+              {quote.minimumApplied ? ` (${fmtMoney(quote.minimumCents)} minimum applied)` : ""}
+            </div>
+            {quote.interval === "annual" && (
+              <div className="text-muted-foreground">
+                Billed annually (20% off): {fmtMoney(quote.billedCents)} / year
+              </div>
+            )}
+            <div className="text-xs text-muted-foreground">{quote.label}</div>
+            {d.foundingEndsAt && quote.schedule === "founding" && (
+              <div className="text-xs text-muted-foreground">
+                Founding rate through {new Date(d.foundingEndsAt).toLocaleDateString()}, then list.
+              </div>
+            )}
+          </div>
+        )}
         <div className="mt-2 text-sm">
           Status: <span className="font-medium capitalize">{statusLabel}</span>
         </div>
@@ -185,32 +245,63 @@ export function HiveSubscriptionPanel() {
 
       {!d.billingExempt && (
         <div className="rounded-xl border border-border bg-card p-5 shadow-sm space-y-3">
-          <div className="text-sm font-medium">Choose a plan</div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <PlanPick
-              active={pickedPlan === "pro"}
-              title="Pro"
-              price="$499/mo"
-              blurb="NECTAR Infusion and HIVE Training included."
-              onClick={() => setPickedPlan("pro")}
-            />
-            <PlanPick
-              active={pickedPlan === "enterprise"}
-              title="Enterprise"
-              price="$1,299/mo"
-              blurb="Audit-prep, requirements engine, and priority support."
-              onClick={() => setPickedPlan("enterprise")}
-            />
+          <div className="text-sm font-medium">Pay for Hive</div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="sub-staff">Active staff</Label>
+              <Input
+                id="sub-staff"
+                type="number"
+                min={1}
+                max={500}
+                value={staffCount}
+                onChange={(e) => setStaffCount(Number(e.target.value) || 1)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="sub-clients">Active clients</Label>
+              <Input
+                id="sub-clients"
+                type="number"
+                min={0}
+                max={5000}
+                value={clientCount}
+                onChange={(e) => setClientCount(Number(e.target.value) || 0)}
+              />
+            </div>
           </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={interval === "monthly" ? "default" : "outline"}
+              onClick={() => setInterval("monthly")}
+            >
+              Monthly
+            </Button>
+            <Button
+              type="button"
+              variant={interval === "annual" ? "default" : "outline"}
+              onClick={() => setInterval("annual")}
+            >
+              Annual · 20% off
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Enterprise custom work is not sold here.{" "}
+            <Link to="/contact" className="underline">
+              Contact us
+            </Link>
+            .
+          </p>
           <div className="flex flex-wrap gap-2">
             <Button
               data-testid="pay-with-stripe"
               disabled={busy || !d.paymentsConfigured}
-              onClick={() => pay(pickedPlan)}
+              onClick={pay}
               className="bg-[#0f1b3d] text-white hover:bg-[#1a2a5a]"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-              {d.lockedAt || !d.hasStripeCustomer ? "Pay with Stripe" : "Change plan"}
+              {d.lockedAt || !d.hasStripeCustomer ? "Pay with Stripe" : "Update seats"}
             </Button>
             {d.hasStripeCustomer && (
               <Button variant="outline" disabled={busy || !d.paymentsConfigured} onClick={manage}>
@@ -221,37 +312,5 @@ export function HiveSubscriptionPanel() {
         </div>
       )}
     </div>
-  );
-}
-
-function PlanPick({
-  active,
-  title,
-  price,
-  blurb,
-  onClick,
-}: {
-  active: boolean;
-  title: string;
-  price: string;
-  blurb: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-lg border p-3 text-left"
-      style={{
-        borderColor: active ? "rgba(15,27,61,0.8)" : undefined,
-        background: active ? "rgba(15,27,61,0.04)" : undefined,
-      }}
-    >
-      <div className="flex items-baseline justify-between">
-        <div className="font-semibold">{title}</div>
-        <div className="text-sm text-[#7a4a0a]">{price}</div>
-      </div>
-      <p className="mt-1 text-xs text-muted-foreground">{blurb}</p>
-    </button>
   );
 }

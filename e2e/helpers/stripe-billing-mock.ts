@@ -155,14 +155,27 @@ function billingStatus(world: BillingWorld) {
     testMode: true,
     paymentsConfigured: true,
     paymentsMessage: null,
-    plan: world.plan,
+    plan: world.plan === "enterprise" ? "enterprise" : "hive_standard",
     status: world.status,
-    mrrCents: world.billingExempt ? 0 : 49900,
+    mrrCents: world.billingExempt ? 0 : 50000,
     lockedAt: world.locked ? "2026-08-28T00:00:00.000Z" : null,
     lockReason: world.locked ? "Payment required to use Hive" : null,
     currentPeriodEnd: null,
     hasStripeCustomer: !world.locked && !world.billingExempt,
     orgName: world.orgName,
+    pricingSchedule: "founding",
+    foundingEndsAt: world.billingExempt ? null : "2027-08-28T00:00:00.000Z",
+    staffCount: 4,
+    clientCount: 10,
+    interval: "monthly",
+    perStaffCents: world.billingExempt ? 0 : 7900,
+    monthlyCents: world.billingExempt ? 0 : 31600,
+    billedCents: world.billingExempt ? 0 : 31600,
+    minimumApplied: true,
+    minimumCents: 29900,
+    quoteLabel: "Founding",
+    foundingSlotsRemaining: 5,
+    payingOrgCount: 0,
   };
 }
 
@@ -178,14 +191,21 @@ function serverFnPayload(world: BillingWorld, req: Request): unknown {
   const meta = decodeServerFnMeta(url);
   const hay = `${url} ${body} ${meta.exportName} ${meta.file} ${meta.raw}`.toLowerCase();
 
+  if (hay.includes("getsignuppricing")) {
+    return {
+      payingOrgCount: 0,
+      foundingCap: 5,
+      foundingSlotsRemaining: 5,
+      schedule: "founding",
+    };
+  }
   if (hay.includes("getbillingstatus")) return billingStatus(world);
   if (hay.includes("createsubscriptioncheckout")) {
     if (world.billingExempt) return { url: null, exempt: true, error: null };
     return { url: "https://checkout.stripe.com/c/pay/cs_test_e2e", exempt: false, error: null };
   }
   if (hay.includes("createtrainingcheckout")) {
-    const ala = hay.includes(CATALOG_ALA) || hay.includes("ala_carte") || hay.includes("cpr");
-    if (world.billingExempt || !ala) {
+    if (world.billingExempt) {
       world.trainingGranted = true;
       world.lastTrainingCharge = false;
       return { url: null, granted: true, error: null };
@@ -321,7 +341,7 @@ function restRows(world: BillingWorld, table: string): unknown[] {
         lock_reason: world.locked ? "Payment required to use Hive" : null,
         stripe_subscription_id: world.locked ? null : "sub_test",
         stripe_customer_id: world.locked ? null : "cus_test",
-        mrr_cents: world.billingExempt ? 0 : 49900,
+        mrr_cents: world.billingExempt ? 0 : 31600,
         created_at: "2026-01-01T00:00:00.000Z",
       },
     ];

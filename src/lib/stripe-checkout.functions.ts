@@ -16,17 +16,27 @@ import {
 } from "@/lib/billing-access";
 import {
   PAYMENTS_NOT_CONFIGURED,
-  TRAINING_EXTRA_PRICE_CENTS,
-  mrrCentsForPlan,
   readStripeEnv,
   stripePaymentsConfigured,
-  stripePriceIdForPlan,
-  stripePriceIdForTrainingExtra,
+  stripePriceIdForTrainingSku,
+  stripeUnitAmountForTrainingSku,
+  subscriptionLineItemsForQuote,
 } from "@/lib/stripe-config";
 import { appOriginFromRequest, getStripe } from "@/lib/stripe.server";
 import { activateSubscriptionFromCheckout } from "@/lib/stripe-webhook";
 import { fulfillTrainingOrder } from "@/lib/training-fulfillment.server";
-import { isPublicSelfServeTier, type TierId } from "@/lib/hive-tiers";
+import { countPayingOrgs } from "@/lib/hive-pricing.functions";
+import {
+  clampClientCount,
+  clampStaffCount,
+  foundingEndsAtFrom,
+  FOUNDING_ORG_CAP,
+  quoteHiveSubscription,
+  signupScheduleFromPayingCount,
+  type BillingInterval,
+  type HiveQuote,
+  type PricingSchedule,
+} from "@/lib/hive-pricing";
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 
@@ -49,10 +59,23 @@ async function requireOrgAdmin(
   }
 }
 
-async function loadOrgRow(orgId: string) {
+type OrgBillingRow = {
+  id: string;
+  name: string;
+  legalName: string | null;
+  dbaName: string | null;
+  billingExempt: boolean;
+  pricingSchedule: PricingSchedule | null;
+  foundingEndsAt: string | null;
+  approxClientCount: number | null;
+};
+
+async function loadOrgRow(orgId: string): Promise<OrgBillingRow> {
   const full = await supabaseAdmin
     .from("organizations")
-    .select("id, name, legal_name, dba_name, billing_exempt")
+    .select(
+      "id, name, legal_name, dba_name, billing_exempt, pricing_schedule, founding_ends_at, approx_client_count",
+    )
     .eq("id", orgId)
     .maybeSingle();
   if (!full.error && full.data) {
@@ -62,6 +85,9 @@ async function loadOrgRow(orgId: string) {
       legal_name: string | null;
       dba_name: string | null;
       billing_exempt?: boolean;
+      pricing_schedule?: string | null;
+      founding_ends_at?: string | null;
+      approx_client_count?: number | null;
     };
     return {
       id: row.id,
@@ -69,30 +95,61 @@ async function loadOrgRow(orgId: string) {
       legalName: row.legal_name,
       dbaName: row.dba_name,
       billingExempt: row.billing_exempt === true,
+      pricingSchedule: row.pricing_schedule === "founding" ? "founding" : row.pricing_schedule === "list" ? "list" : null,
+      foundingEndsAt: row.founding_ends_at ?? null,
+      approxClientCount: row.approx_client_count ?? null,
     };
   }
   const fallback = await supabaseAdmin
     .from("organizations")
-    .select("id, name, legal_name, dba_name")
+    .select("id, name, legal_name, dba_name, billing_exempt, approx_client_count")
     .eq("id", orgId)
     .maybeSingle();
-  if (fallback.error || !fallback.data) throw new Error("Organization not found.");
+  if (fallback.error || !fallback.data) {
+    const basic = await supabaseAdmin
+      .from("organizations")
+      .select("id, name, legal_name, dba_name")
+      .eq("id", orgId)
+      .maybeSingle();
+    if (basic.error || !basic.data) throw new Error("Organization not found.");
+    const row = basic.data as {
+      id: string;
+      name: string;
+      legal_name: string | null;
+      dba_name: string | null;
+    };
+    return {
+      id: row.id,
+      name: row.name,
+      legalName: row.legal_name,
+      dbaName: row.dba_name,
+      billingExempt: false,
+      pricingSchedule: null,
+      foundingEndsAt: null,
+      approxClientCount: null,
+    };
+  }
   const row = fallback.data as {
     id: string;
     name: string;
     legal_name: string | null;
     dba_name: string | null;
+    billing_exempt?: boolean;
+    approx_client_count?: number | null;
   };
   return {
     id: row.id,
     name: row.name,
     legalName: row.legal_name,
     dbaName: row.dba_name,
-    billingExempt: false,
+    billingExempt: row.billing_exempt === true,
+    pricingSchedule: null,
+    foundingEndsAt: null,
+    approxClientCount: row.approx_client_count ?? null,
   };
 }
 
-function orgIsComped(org: Awaited<ReturnType<typeof loadOrgRow>>): boolean {
+function orgIsComped(org: OrgBillingRow): boolean {
   return isBillingExempt({
     billingExempt: org.billingExempt,
     orgName: org.name,
@@ -101,7 +158,45 @@ function orgIsComped(org: Awaited<ReturnType<typeof loadOrgRow>>): boolean {
   });
 }
 
-async function ensurePausedSubscription(orgId: string, plan: TierId) {
+async function liveUsageCounts(orgId: string): Promise<{ staff: number; clients: number }> {
+  const [staffRes, clientRes] = await Promise.all([
+    supabaseAdmin
+      .from("organization_members")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", orgId)
+      .eq("active", true),
+    supabaseAdmin.from("clients").select("id", { count: "exact", head: true }).eq("organization_id", orgId),
+  ]);
+  return { staff: staffRes.count ?? 0, clients: clientRes.count ?? 0 };
+}
+
+async function resolveOrgSchedule(org: OrgBillingRow): Promise<{
+  schedule: PricingSchedule;
+  foundingEndsAt: string | null;
+}> {
+  if (org.pricingSchedule === "founding" || org.pricingSchedule === "list") {
+    return { schedule: org.pricingSchedule, foundingEndsAt: org.foundingEndsAt };
+  }
+  const paying = await countPayingOrgs();
+  const schedule = signupScheduleFromPayingCount(paying);
+  const foundingEndsAt = schedule === "founding" ? foundingEndsAtFrom() : null;
+  const { error } = await supabaseAdmin
+    .from("organizations")
+    .update({
+      pricing_schedule: schedule,
+      ...(foundingEndsAt ? { founding_ends_at: foundingEndsAt } : {}),
+    })
+    .eq("id", org.id);
+  if (error && !/pricing_schedule|founding_ends_at/i.test(error.message ?? "")) {
+    throw new Error(error.message);
+  }
+  return { schedule, foundingEndsAt };
+}
+
+async function ensurePausedSubscription(
+  orgId: string,
+  quote: HiveQuote,
+) {
   const nowIso = new Date().toISOString();
   const { data: existing } = await supabaseAdmin
     .from("org_subscriptions")
@@ -110,10 +205,11 @@ async function ensurePausedSubscription(orgId: string, plan: TierId) {
     .maybeSingle();
 
   const patch = {
-    plan,
+    plan: "hive_standard" as const,
     status: "paused" as const,
-    mrr_cents: mrrCentsForPlan(plan),
-    billing_interval: "monthly",
+    mrr_cents: quote.monthlyCents,
+    billing_interval: quote.interval,
+    staff_count: quote.staffCount,
     locked_at: nowIso,
     lock_reason: UNPAID_LOCK_REASON,
   };
@@ -135,7 +231,7 @@ async function ensurePausedSubscription(orgId: string, plan: TierId) {
   return data;
 }
 
-async function activateExemptOrg(orgId: string, plan: TierId) {
+async function activateExemptOrg(orgId: string, plan: "hive_standard" | "enterprise" = "hive_standard") {
   const nowIso = new Date().toISOString();
   const periodEnd = new Date(Date.now() + 365 * 86_400_000).toISOString();
   const { data: existing } = await supabaseAdmin
@@ -187,6 +283,19 @@ export const getBillingStatusFn = createServerFn({ method: "POST" })
       currentPeriodEnd: null as string | null,
       hasStripeCustomer: false,
       orgName: null as string | null,
+      pricingSchedule: "list" as PricingSchedule,
+      foundingEndsAt: null as string | null,
+      staffCount: 1,
+      clientCount: 0,
+      interval: "monthly" as BillingInterval,
+      perStaffCents: 0,
+      monthlyCents: 0,
+      billedCents: 0,
+      minimumApplied: false,
+      minimumCents: 0,
+      quoteLabel: "List",
+      foundingSlotsRemaining: 0,
+      payingOrgCount: 0,
     };
     if (!context.supabase || !context.userId) return empty;
 
@@ -208,7 +317,7 @@ export const getBillingStatusFn = createServerFn({ method: "POST" })
     const { data: sub } = await supabaseAdmin
       .from("org_subscriptions")
       .select(
-        "plan, status, mrr_cents, locked_at, lock_reason, current_period_end, stripe_customer_id, stripe_subscription_id",
+        "plan, status, mrr_cents, locked_at, lock_reason, current_period_end, stripe_customer_id, stripe_subscription_id, staff_count, billing_interval",
       )
       .eq("organization_id", orgId)
       .maybeSingle();
@@ -228,6 +337,35 @@ export const getBillingStatusFn = createServerFn({ method: "POST" })
         : null,
     });
 
+    const usage = await liveUsageCounts(orgId);
+    const staffCount = clampStaffCount(
+      (sub as { staff_count?: number | null } | null)?.staff_count || usage.staff || 1,
+    );
+    const clientCount = clampClientCount(usage.clients || org.approxClientCount || 0);
+    const interval: BillingInterval =
+      (sub as { billing_interval?: string | null } | null)?.billing_interval === "annual"
+        ? "annual"
+        : "monthly";
+    let schedule: PricingSchedule = org.pricingSchedule ?? "list";
+    let foundingEndsAt = org.foundingEndsAt;
+    if (!org.pricingSchedule && !exempt) {
+      const paying = await countPayingOrgs();
+      schedule = signupScheduleFromPayingCount(paying);
+    }
+    const quote = quoteHiveSubscription({
+      staffCount,
+      clientCount,
+      schedule,
+      interval,
+      foundingEndsAt,
+    });
+    let payingOrgCount = 0;
+    try {
+      payingOrgCount = await countPayingOrgs();
+    } catch {
+      payingOrgCount = 0;
+    }
+
     return {
       organizationId: orgId,
       billingExempt: exempt,
@@ -237,23 +375,44 @@ export const getBillingStatusFn = createServerFn({ method: "POST" })
       paymentsMessage: cfg.message,
       plan: (sub?.plan as string | null) ?? null,
       status: (sub?.status as string | null) ?? null,
-      mrrCents: (sub?.mrr_cents as number | null) ?? 0,
+      mrrCents: exempt ? 0 : quote.monthlyCents,
       lockedAt: (sub?.locked_at as string | null) ?? null,
       lockReason: (sub?.lock_reason as string | null) ?? null,
       currentPeriodEnd: (sub?.current_period_end as string | null) ?? null,
       hasStripeCustomer: !!(sub as { stripe_customer_id?: string | null } | null)?.stripe_customer_id,
       orgName: org.name,
+      pricingSchedule: quote.schedule,
+      foundingEndsAt,
+      staffCount: quote.staffCount,
+      clientCount: quote.clientCount,
+      interval: quote.interval,
+      perStaffCents: quote.perStaffCents,
+      monthlyCents: quote.monthlyCents,
+      billedCents: quote.billedCents,
+      minimumApplied: quote.minimumApplied,
+      minimumCents: quote.minimumCents,
+      quoteLabel: quote.label,
+      foundingSlotsRemaining: Math.max(0, FOUNDING_ORG_CAP - payingOrgCount),
+      payingOrgCount,
     };
   });
 
 export const createSubscriptionCheckoutFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { organizationId: string; plan: "pro" | "enterprise" }) => {
+  .inputValidator((input: {
+    organizationId: string;
+    staffCount?: number;
+    clientCount?: number;
+    interval?: BillingInterval;
+  }) => {
     const organizationId = String(input?.organizationId ?? "");
     if (!UUID_RE.test(organizationId)) throw new Error("Invalid organization.");
-    const plan = input?.plan;
-    if (!isPublicSelfServeTier(plan)) throw new Error("Pick Pro or Enterprise.");
-    return { organizationId, plan };
+    return {
+      organizationId,
+      staffCount: input?.staffCount != null ? clampStaffCount(input.staffCount) : undefined,
+      clientCount: input?.clientCount != null ? clampClientCount(input.clientCount) : undefined,
+      interval: input?.interval === "annual" ? ("annual" as const) : ("monthly" as const),
+    };
   })
   .handler(async ({ data, context }) => {
     if (!context.supabase || !context.userId) {
@@ -263,7 +422,7 @@ export const createSubscriptionCheckoutFn = createServerFn({ method: "POST" })
 
     const org = await loadOrgRow(data.organizationId);
     if (orgIsComped(org)) {
-      await activateExemptOrg(data.organizationId, data.plan);
+      await activateExemptOrg(data.organizationId, "enterprise");
       return { url: null, exempt: true, error: null as string | null };
     }
 
@@ -272,16 +431,34 @@ export const createSubscriptionCheckoutFn = createServerFn({ method: "POST" })
       return { url: null, exempt: false, error: cfg.message ?? PAYMENTS_NOT_CONFIGURED };
     }
 
-    const priceId = stripePriceIdForPlan(data.plan);
-    if (!priceId) {
-      return {
-        url: null,
-        exempt: false,
-        error: "Missing Stripe price for this plan. Add STRIPE_PRICE_PRO / STRIPE_PRICE_ENTERPRISE.",
-      };
-    }
+    const usage = await liveUsageCounts(data.organizationId);
+    const { data: existingSub } = await supabaseAdmin
+      .from("org_subscriptions")
+      .select("staff_count, billing_interval")
+      .eq("organization_id", data.organizationId)
+      .maybeSingle();
+    const staffCount = clampStaffCount(
+      data.staffCount ?? (existingSub as { staff_count?: number | null } | null)?.staff_count ?? usage.staff ?? 1,
+    );
+    const clientCount = clampClientCount(
+      data.clientCount ?? usage.clients ?? org.approxClientCount ?? 0,
+    );
+    const interval: BillingInterval = data.interval;
+    const assigned = await resolveOrgSchedule(org);
+    const quote = quoteHiveSubscription({
+      staffCount,
+      clientCount,
+      schedule: assigned.schedule,
+      interval,
+      foundingEndsAt: assigned.foundingEndsAt,
+    });
 
-    await ensurePausedSubscription(data.organizationId, data.plan);
+    await supabaseAdmin
+      .from("organizations")
+      .update({ approx_client_count: clientCount })
+      .eq("id", data.organizationId);
+
+    await ensurePausedSubscription(data.organizationId, quote);
 
     const { data: sub } = await supabaseAdmin
       .from("org_subscriptions")
@@ -303,6 +480,7 @@ export const createSubscriptionCheckoutFn = createServerFn({ method: "POST" })
         .eq("organization_id", data.organizationId);
     }
 
+    const built = subscriptionLineItemsForQuote(quote);
     const origin = appOriginFromRequest(getRequest());
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
@@ -310,18 +488,27 @@ export const createSubscriptionCheckoutFn = createServerFn({ method: "POST" })
       client_reference_id: data.organizationId,
       success_url: `${origin}/dashboard/billing/subscription?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/dashboard/billing/subscription?checkout=cancelled`,
-      line_items: [{ price: priceId, quantity: 1 }],
+      line_items: built.lineItems,
+      ...(built.discounts ? { discounts: built.discounts } : {}),
       metadata: {
         hive_kind: "subscription",
         organization_id: data.organizationId,
-        plan: data.plan,
+        plan: "hive_standard",
+        pricing_schedule: quote.schedule,
+        staff_count: String(quote.staffCount),
+        client_count: String(quote.clientCount),
+        interval: quote.interval,
+        monthly_cents: String(quote.monthlyCents),
         purchaser_user_id: context.userId,
       },
       subscription_data: {
         metadata: {
           hive_kind: "subscription",
           organization_id: data.organizationId,
-          plan: data.plan,
+          plan: "hive_standard",
+          pricing_schedule: quote.schedule,
+          staff_count: String(quote.staffCount),
+          interval: quote.interval,
         },
       },
     });
@@ -412,13 +599,16 @@ export const confirmCheckoutSessionFn = createServerFn({ method: "POST" })
 
     await activateSubscriptionFromCheckout({
       orgId,
-      plan: session.metadata?.plan || "pro",
+      plan: session.metadata?.plan || "hive_standard",
       customerId: typeof session.customer === "string" ? session.customer : null,
       subscriptionId: typeof session.subscription === "string" ? session.subscription : null,
       paymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : null,
-      amountCents: session.amount_total ?? mrrCentsForPlan(session.metadata?.plan || "pro"),
+      amountCents: session.amount_total ?? Number(session.metadata?.monthly_cents ?? 0),
       periodEndIso: null,
       eventId: `checkout_confirm:${session.id}`,
+      staffCount: Number(session.metadata?.staff_count ?? 0) || null,
+      billingInterval: session.metadata?.interval === "annual" ? "annual" : "monthly",
+      monthlyCents: Number(session.metadata?.monthly_cents ?? 0) || null,
     });
     return { ok: true, error: null };
   });
@@ -480,9 +670,8 @@ export const createTrainingCheckoutFn = createServerFn({ method: "POST" })
       plan: (sub?.plan as string | null) ?? null,
     });
     const env = readStripeEnv();
-    const extraPriceId = stripePriceIdForTrainingExtra(sku.kind, sku.stripe_price_id, env);
-    const unitCents =
-      extraPriceId && sku.kind !== "full_program" ? TRAINING_EXTRA_PRICE_CENTS : sku.price_cents;
+    const unitCents = stripeUnitAmountForTrainingSku(sku.sku, sku.price_cents);
+    const extraPriceId = stripePriceIdForTrainingSku(sku.sku, sku.stripe_price_id, env);
 
     const needsCharge = trainingRequiresCharge({
       billingExempt: exempt,

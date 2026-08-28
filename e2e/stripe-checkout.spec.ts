@@ -60,7 +60,7 @@ test("c) training extra is skipped for exempt and charged for a paying org", asy
   await installStripeBillingMock(page, exempt);
   await page.goto("/dashboard/hive-training", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("hive-training-hub")).toBeVisible({ timeout: 25_000 });
-  await page.getByRole("button", { name: /Add included training/i }).first().click();
+  await page.getByTestId("training-buy-full_program").click();
   await page.getByTestId("training-checkout-confirm").click();
   await expect(page).not.toHaveURL(/checkout\.stripe\.com/);
   await expect.poll(() => exempt.lastTrainingCharge === false || exempt.trainingGranted === true).toBeTruthy();
@@ -73,7 +73,7 @@ test("c) training extra is skipped for exempt and charged for a paying org", asy
   await page.goto("/dashboard/hive-training", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("hive-training-hub")).toBeVisible({ timeout: 25_000 });
   await expect(page.getByText(/CPR/i).first()).toBeVisible();
-  await page.getByRole("button", { name: /^Buy$/i }).first().click();
+  await page.getByTestId("training-buy-cpr_first_aid").click();
   await page.getByTestId("training-checkout-confirm").click();
   await expect.poll(() => paying.lastTrainingCharge === true).toBeTruthy();
 });

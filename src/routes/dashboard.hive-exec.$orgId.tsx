@@ -6,6 +6,7 @@ import { ArrowLeft, Save, Users, Contact2, Clock, Activity, Pencil, AlertTriangl
 import { toast } from "sonner";
 import { getCompanyDetail, upsertSubscription, updateOrgNames, updateAccountContact } from "@/lib/hive-exec.functions";
 import { setOrgBillingExemptFn } from "@/lib/billing-exempt.functions";
+import { setOrgPricingScheduleFn } from "@/lib/hive-pricing.functions";
 import { MasterController } from "@/components/hive-exec/master-controller";
 
 export const Route = createFileRoute("/dashboard/hive-exec/$orgId")({
@@ -27,6 +28,7 @@ function CompanyDetailPage() {
   const saveNamesFn = useServerFn(updateOrgNames);
   const saveContactFn = useServerFn(updateAccountContact);
   const exemptFn = useServerFn(setOrgBillingExemptFn);
+  const scheduleFn = useServerFn(setOrgPricingScheduleFn);
 
 
   const detailQ = useQuery({
@@ -402,11 +404,11 @@ function CompanyDetailPage() {
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Plan">
               <select value={plan} onChange={(e) => setPlan(e.target.value)} className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm">
-                <option value="pro">Pro</option>
-                <option value="enterprise">Enterprise</option>
+                <option value="hive_standard">Hive (per staff — list or founding)</option>
+                <option value="pro">Hive / Pro (same per-staff entitlements)</option>
+                <option value="enterprise">Enterprise (contact us — set MRR manually)</option>
                 <option value="starter">Starter (comped / not self-serve)</option>
                 <option value="custom">Custom</option>
-                <option value="hive_standard">HIVE Standard (legacy)</option>
               </select>
             </Field>
             <Field label="Status">
@@ -482,10 +484,54 @@ function CompanyDetailPage() {
               <span>
                 <strong>Billing-exempt (comped)</strong>
                 <span className="block text-xs text-muted-foreground">
-                  Skip Stripe Checkout, skip training charges, keep full access. True North Supports stays checked. Use this to comp another company without a code change.
+                  Skip Stripe Checkout, skip training charges, keep full access. True North Supports stays checked. Do not auto-exempt Dane&apos;s pay-test companies.
                 </span>
               </span>
             </label>
+          </div>
+
+          <div className="mt-3 rounded-md border border-border bg-muted/30 p-3">
+            <div className="text-sm font-medium">Pricing schedule</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Founding is $79 / staff ($299 min) for 12 months, then list. List is $125 / $109 / $99 per staff with a $500 minimum.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={`rounded-md border px-3 py-1.5 text-sm ${d?.pricing_schedule === "founding" ? "border-[#0f1b3d] bg-[#0f1b3d] text-white" : "border-border"}`}
+                onClick={() => {
+                  scheduleFn({ data: { organizationId: orgId, schedule: "founding" } })
+                    .then(() => {
+                      toast.success("Company is on founding pricing.");
+                      qc.invalidateQueries({ queryKey: ["hive-exec-company", orgId] });
+                      qc.invalidateQueries({ queryKey: ["hive-exec-companies"] });
+                    })
+                    .catch((err) => toast.error(err instanceof Error ? err.message : "Could not update"));
+                }}
+              >
+                Founding
+              </button>
+              <button
+                type="button"
+                className={`rounded-md border px-3 py-1.5 text-sm ${d?.pricing_schedule !== "founding" ? "border-[#0f1b3d] bg-[#0f1b3d] text-white" : "border-border"}`}
+                onClick={() => {
+                  scheduleFn({ data: { organizationId: orgId, schedule: "list" } })
+                    .then(() => {
+                      toast.success("Company is on list pricing.");
+                      qc.invalidateQueries({ queryKey: ["hive-exec-company", orgId] });
+                      qc.invalidateQueries({ queryKey: ["hive-exec-companies"] });
+                    })
+                    .catch((err) => toast.error(err instanceof Error ? err.message : "Could not update"));
+                }}
+              >
+                List
+              </button>
+            </div>
+            {d?.founding_ends_at ? (
+              <div className="mt-2 text-xs text-muted-foreground">
+                Founding ends {new Date(d.founding_ends_at).toLocaleDateString()}
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-3 flex items-center justify-end">

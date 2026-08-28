@@ -444,7 +444,11 @@ function ClientProfileHub() {
             hint="Billing codes, rates, annual units, and remaining funds"
           >
             <SectionPanel icon={ShieldCheck} accent="emerald">
-              <BillingCodesPanel clientId={clientId} />
+              <BillingCodesPanel
+                clientId={clientId}
+                clientName={fullName}
+                medicaidId={typeof client?.medicaid_id === "string" ? client.medicaid_id : null}
+              />
             </SectionPanel>
             <SectionPanel icon={Wallet} accent="teal">
               <ClientBudgetPanel clientId={clientId} />
@@ -1685,7 +1689,15 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
   );
 }
 
-function BillingCodesPanel({ clientId }: { clientId: string }) {
+function BillingCodesPanel({
+  clientId,
+  clientName,
+  medicaidId,
+}: {
+  clientId: string;
+  clientName?: string;
+  medicaidId?: string | null;
+}) {
   const qc = useQueryClient();
 
   // Safety net: surface external-service rows whose codes should probably be
@@ -1750,7 +1762,7 @@ function BillingCodesPanel({ clientId }: { clientId: string }) {
           </Button>
         </div>
       )}
-      <BillingCodesDetail clientId={clientId} />
+      <BillingCodesDetail clientId={clientId} clientName={clientName} medicaidId={medicaidId} />
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">Add a new authorized code</CardTitle>

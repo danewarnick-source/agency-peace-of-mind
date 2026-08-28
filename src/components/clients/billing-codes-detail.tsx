@@ -89,6 +89,9 @@ export function BillingCodesDetail({ clientId, clientName, medicaidId }: Props) 
     let start: Date | null = null;
     let end: Date | null = null;
     for (const b of budgets) {
+      // Missing service_start_date is status "no_period" — do not treat
+      // today's date (or a Jan 1 fallback) as a real 1056 plan year.
+      if (b.status === "no_period") continue;
       if (b.period_start && (!start || b.period_start < start)) start = b.period_start;
       if (b.period_end && (!end || b.period_end > end)) end = b.period_end;
     }

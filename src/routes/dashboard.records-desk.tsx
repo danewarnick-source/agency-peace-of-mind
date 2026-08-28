@@ -33,11 +33,19 @@ const TAB_MAP: Record<string, HubTab> = {
   "training-content": "records",
 };
 
+function hubTabFromRecordsDesk(search: { tab?: string; cc?: string }): HubTab {
+  // Old Records Desk Command Center "Urgent" held pending incidents.
+  // Do not dump those onto generic Records.
+  if (search.cc === "urgent" || search.cc === "pending") return "incidents";
+  if (search.tab === "command-center") return "incidents";
+  return search.tab ? TAB_MAP[search.tab] ?? "records" : "records";
+}
+
 export const Route = createFileRoute("/dashboard/records-desk")({
   head: () => ({ meta: [{ title: "Records Desk — HIVE" }] }),
   validateSearch: recordsDeskSearch,
   beforeLoad: ({ search }) => {
-    const next: HubTab = search.tab ? TAB_MAP[search.tab] ?? "records" : "records";
+    const next = hubTabFromRecordsDesk(search);
     throw redirect({
       to: "/dashboard/hub/documentation",
       search: { tab: next },

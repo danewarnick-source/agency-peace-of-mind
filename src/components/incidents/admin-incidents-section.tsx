@@ -477,9 +477,8 @@ export function AdminIncidentsSection({
   useEffect(() => {
     if (initialClientId) {
       setFilterClient(initialClientId);
-      setView(initialView ?? "log");
-      setStatus("all");
     }
+    if (initialView) setView(initialView);
   }, [initialClientId, initialView]);
 
   // The full org client roster only feeds the filter dropdown — it must never

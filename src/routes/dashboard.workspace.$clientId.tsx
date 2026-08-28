@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { useCaseload } from "@/hooks/use-caseload";
-import { useMyAssignments, allowedCodesFor } from "@/hooks/use-my-assignments";
+import { useMyAssignments, allowedCodesFor, clientAuthorizedCodes } from "@/hooks/use-my-assignments";
 import { isClockableServiceCode } from "@/lib/service-billing";
 
 import { Badge } from "@/components/ui/badge";
@@ -81,7 +81,7 @@ function ClientWorkspace() {
   }, [caseload, clientId]);
 
   const clientCodes = useMemo(
-    () => (client && Array.isArray(client.job_code) ? client.job_code : []),
+    () => (client ? clientAuthorizedCodes(client) : []),
     [client],
   );
   const allowedCodes = useMemo(
@@ -345,7 +345,9 @@ function ClientWorkspace() {
                 facility: client.physical_address,
                 authorizedCodes: allowedHourly.length
                   ? allowedHourly
-                  : (client.job_code ?? undefined),
+                  : (clientAuthorizedCodes(client).length
+                    ? clientAuthorizedCodes(client)
+                    : undefined),
                 homeLat: client.home_latitude,
                 homeLng: client.home_longitude,
                 geofenceRadiusFeet: client.geofence_radius_feet ?? 1000,

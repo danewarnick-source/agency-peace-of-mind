@@ -1075,6 +1075,8 @@ function AdminHomeDashboardInner() {
       tone: "green" | "amber" | "red" | "blue";
       text: string;
       at: Date;
+      to?: "/dashboard/hub/documentation";
+      search?: { tab: "incidents" };
     };
     const out: Act[] = [];
 
@@ -1119,6 +1121,8 @@ function AdminHomeDashboardInner() {
         tone,
         text: `Incident ${ir.report_number ?? ""} · ${ir.status.replace(/_/g, " ")}`,
         at: new Date(ir.updated_at ?? ir.created_at),
+        to: "/dashboard/hub/documentation",
+        search: { tab: "incidents" },
       });
     }
 
@@ -1475,11 +1479,8 @@ function AdminHomeDashboardInner() {
                     : a.tone === "red"
                       ? DOT_RED
                       : DOT_BLUE;
-              return (
-                <li
-                  key={a.key}
-                  className="flex items-start gap-2.5 border-b border-border py-2.5 last:border-0"
-                >
+              const body = (
+                <>
                   <span
                     className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
                     style={{ background: dot }}
@@ -1495,6 +1496,24 @@ function AdminHomeDashboardInner() {
                       })}
                     </div>
                   </div>
+                </>
+              );
+              return (
+                <li
+                  key={a.key}
+                  className="border-b border-border last:border-0"
+                >
+                  {a.to ? (
+                    <Link
+                      to={a.to}
+                      search={a.search}
+                      className="flex cursor-pointer items-start gap-2.5 py-2.5 transition hover:bg-muted/40"
+                    >
+                      {body}
+                    </Link>
+                  ) : (
+                    <div className="flex items-start gap-2.5 py-2.5">{body}</div>
+                  )}
                 </li>
               );
             })}
@@ -1523,9 +1542,13 @@ function AdminHomeDashboardInner() {
           </div>
           <div className={areaGapClass}>
             {areaRows.map((row) => {
+              const incidentHref =
+                row.key === "incidents"
+                  ? ({ to: "/dashboard/hub/documentation", search: { tab: "incidents" } } as const)
+                  : null;
               if (row.kind === "message") {
-                return (
-                  <div key={row.key}>
+                const inner = (
+                  <>
                     <div className="mb-1 flex items-center justify-between gap-2">
                       <span className="text-sm text-foreground">{row.label}</span>
                     </div>
@@ -1539,12 +1562,19 @@ function AdminHomeDashboardInner() {
                     >
                       {row.message}
                     </p>
-                  </div>
+                  </>
+                );
+                return incidentHref ? (
+                  <Link key={row.key} to={incidentHref.to} search={incidentHref.search} className="block cursor-pointer hover:opacity-90">
+                    {inner}
+                  </Link>
+                ) : (
+                  <div key={row.key}>{inner}</div>
                 );
               }
               const color = barColor(row.score);
-              return (
-                <div key={row.key}>
+              const barInner = (
+                <>
                   <div className="mb-1.5 flex items-center justify-between gap-2">
                     <span className="text-sm text-foreground">{row.label}</span>
                     <span className="text-sm font-semibold tabular-nums" style={{ color }}>
@@ -1552,7 +1582,14 @@ function AdminHomeDashboardInner() {
                     </span>
                   </div>
                   <ProgressBar score={row.score} color={color} />
-                </div>
+                </>
+              );
+              return incidentHref ? (
+                <Link key={row.key} to={incidentHref.to} search={incidentHref.search} className="block cursor-pointer hover:opacity-90">
+                  {barInner}
+                </Link>
+              ) : (
+                <div key={row.key}>{barInner}</div>
               );
             })}
           </div>

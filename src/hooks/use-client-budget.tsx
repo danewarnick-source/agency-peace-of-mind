@@ -61,34 +61,38 @@ export function useClientBudget(clientId: string | undefined) {
     queryKey: ["client-budget", org?.organization_id, clientId, allCodes?.length],
     refetchInterval: 60_000,
     queryFn: async (): Promise<CodeBudget[]> => {
-      const codes = (allCodes ?? []).filter((c) => c.client_id === clientId);
+      const codes = (allCodes ?? []).filter(
+        (c) => c.client_id === clientId && String(c.service_code ?? "").trim(),
+      );
       if (codes.length === 0) return [];
 
-      // Earliest period_start across this client's codes gates our data window.
+      // Earliest real service_start_date gates the fetch. Do not invent Jan 1.
       const now = new Date();
       const earliestStart = codes
         .map((c) => parseDate(c.service_start_date))
         .filter((d): d is Date => !!d)
-        .sort((a, b) => a.getTime() - b.getTime())[0] ?? new Date(now.getFullYear(), 0, 1);
+        .sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
 
       // Pull all completed punches for this client in the widest window.
-      const { data: tsRows, error: tsErr } = await supabase
+      let tsQ = supabase
         .from("evv_timesheets")
         .select("service_type_code, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, corrected_clock_in, corrected_clock_out, review_status, shift_note_text")
         .eq("organization_id", org!.organization_id)
-        .eq("client_id", clientId!)
-        .gte("clock_in_timestamp", earliestStart.toISOString());
+        .eq("client_id", clientId!);
+      if (earliestStart) tsQ = tsQ.gte("clock_in_timestamp", earliestStart.toISOString());
+      const { data: tsRows, error: tsErr } = await tsQ;
       if (tsErr) throw tsErr;
 
       // Daily-rate days come from the hhs_daily_records_v view; only
       // billable rows (attendance Present + daily note) consume budget.
-      const { data: dlRows, error: dlErr } = await supabase
+      let dlQ = supabase
         .from("hhs_daily_records_v")
         .select("record_date, service_code, billable")
         .eq("organization_id", org!.organization_id)
         .eq("client_id", clientId!)
-        .eq("billable", true)
-        .gte("record_date", earliestStart.toISOString().slice(0, 10));
+        .eq("billable", true);
+      if (earliestStart) dlQ = dlQ.gte("record_date", earliestStart.toISOString().slice(0, 10));
+      const { data: dlRows, error: dlErr } = await dlQ;
       if (dlErr) throw dlErr;
 
       // Hospitalized/non-billable RHS days never count toward budget usage.
@@ -102,9 +106,28 @@ export function useClientBudget(clientId: string | undefined) {
       );
 
       return codes.map((code): CodeBudget => {
-        const period_start = parseDate(code.service_start_date) ?? new Date(now.getFullYear(), 0, 1);
+        const period_start = parseDate(code.service_start_date);
         const period_end = parseDate(code.service_end_date);
         const is_daily = isDailyServiceCode(code.service_code);
+
+        if (!period_start) {
+          return {
+            code,
+            period_start: now,
+            period_end,
+            is_daily,
+            used_units: 0,
+            used_hours: 0,
+            remaining_units: code.annual_unit_authorization ?? 0,
+            remaining_hours: 0,
+            used_pct: 0,
+            weekly_pace_hours: 0,
+            hours_per_week_target: 0,
+            days_to_renewal: 0,
+            weeks_to_renewal: 0,
+            status: "no_period" as const,
+          };
+        }
 
         // Sum usage strictly within the code's period.
         let used_hours = 0;

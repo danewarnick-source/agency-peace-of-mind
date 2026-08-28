@@ -39,7 +39,7 @@ function DocumentationHub() {
           render: () => (
             <AdminIncidentsSection
               initialClientId={client ?? null}
-              initialView={client ? "log" : "queue"}
+              initialView="queue"
             />
           ),
         },

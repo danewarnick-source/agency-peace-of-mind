@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useCaseload, type CaseloadClient } from "@/hooks/use-caseload";
 import { useActiveShift, type ActiveShift } from "@/hooks/use-active-shift";
 import { useNectarPayPeriod } from "@/hooks/use-nectar-pay-period";
-import { useMyAssignments, allowedCodesFor, type AssignmentMap } from "@/hooks/use-my-assignments";
+import { useMyAssignments, allowedCodesFor, clientAuthorizedCodes, type AssignmentMap } from "@/hooks/use-my-assignments";
 import { useTodayShifts, type TodayShiftRow } from "@/hooks/use-today-shifts";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -65,7 +65,7 @@ function ClientDetail({
   assignments: AssignmentMap | undefined;
   trainings: ClientTraining[];
 }) {
-  const allCodes = (Array.isArray(c.job_code) ? c.job_code : []).filter(Boolean);
+  const allCodes = clientAuthorizedCodes(c);
   const codes = allowedCodesFor(assignments, c.id, allCodes);
   const isOnTheClock = !!activeShift && activeShift.client_id === c.id;
 
@@ -195,10 +195,10 @@ function ClientDetail({
           ].join(" ")}
           aria-label={`${
             isOnTheClock
-              ? "Continue Time Clock"
+              ? "Continue Punch pad"
               : daily
                 ? "Open Client Hub"
-                : "Open Time Clock"
+                : "Open Punch pad"
           } for ${fullName} (${selected})`}
         >
           <Link
@@ -208,10 +208,10 @@ function ClientDetail({
           >
             {daily && !isOnTheClock ? <Home /> : <Clock />}
             {isOnTheClock
-              ? "Continue Time Clock"
+              ? "Continue Punch pad"
               : daily
                 ? "Open Client Hub"
-                : "Open Time Clock"}
+                : "Open Punch pad"}
           </Link>
         </Button>
         <p className="mt-2 text-center text-xs text-muted-foreground">
@@ -414,7 +414,7 @@ export function StaffClientGrid() {
             My caseload · {source.length} {source.length === 1 ? "person" : "people"}
           </h2>
           <p className="text-xs text-muted-foreground">
-            Tap a person to view services and start a time clock.
+            Tap a person to view services. Clock in on Punch pad. EVV is submitted by CSV.
           </p>
         </div>
       </div>

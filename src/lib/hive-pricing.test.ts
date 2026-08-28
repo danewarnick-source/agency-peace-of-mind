@@ -28,7 +28,7 @@ describe("list volume rates", () => {
 });
 
 describe("quoteHiveSubscription list", () => {
-  it("applies the $500 monthly minimum", () => {
+  it("applies the $500 monthly minimum (4 seats at $125)", () => {
     const q = quoteHiveSubscription({
       staffCount: 2,
       clientCount: 5,
@@ -40,6 +40,14 @@ describe("quoteHiveSubscription list", () => {
     assert.equal(q.monthlyCents, LIST_MINIMUM_CENTS);
     assert.equal(q.minimumApplied, true);
     assert.equal(q.billedCents, LIST_MINIMUM_CENTS);
+    const four = quoteHiveSubscription({
+      staffCount: 4,
+      clientCount: 5,
+      schedule: "list",
+      interval: "monthly",
+    });
+    assert.equal(four.monthlyCents, 50_000);
+    assert.equal(four.minimumApplied, false);
   });
 
   it("does not invent a flat $499 / $1,299 plan", () => {

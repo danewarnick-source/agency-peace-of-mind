@@ -19,7 +19,9 @@ export const ANNUAL_DISCOUNT = 0.2;
 export const LIST_PER_STAFF_CENTS_1_19 = 12_500;
 export const LIST_PER_STAFF_CENTS_20_49 = 10_900;
 export const LIST_PER_STAFF_CENTS_50_PLUS = 9_900;
-export const LIST_MINIMUM_CENTS = 50_000;
+/** $125 × 4 seats = $500 list minimum. */
+export const LIST_MIN_SEATS = 4;
+export const LIST_MINIMUM_CENTS = LIST_PER_STAFF_CENTS_1_19 * LIST_MIN_SEATS;
 
 export const FOUNDING_PER_STAFF_CENTS = 7_900;
 export const FOUNDING_MINIMUM_CENTS = 29_900;

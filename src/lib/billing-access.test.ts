@@ -14,8 +14,12 @@ import {
   stripePaymentsConfigured,
   stripeClientConfigured,
   stripePriceIdForTrainingSku,
+  stripeSeatPriceForQuote,
+  subscriptionLineItemsForQuote,
   readStripeEnv,
+  STRIPE_SANDBOX_PRICE_IDS,
 } from "./stripe-config.ts";
+import { quoteHiveSubscription } from "./hive-pricing.ts";
 
 describe("billing-access", () => {
   it("True North name match is exempt even without the flag", () => {
@@ -179,7 +183,7 @@ describe("stripe-config", () => {
     assert.match(r.message ?? "", /Live Stripe keys are blocked/);
   });
 
-  it("accepts test keys without price ids (price_data fallback)", () => {
+  it("accepts test keys; seat Price IDs default to the Hive sandbox products", () => {
     const env = readStripeEnv({
       STRIPE_SECRET_KEY: "sk_test_abc",
       STRIPE_PUBLISHABLE_KEY: "pk_test_abc",
@@ -188,6 +192,8 @@ describe("stripe-config", () => {
     assert.equal(r.ok, true);
     assert.equal(r.testMode, true);
     assert.equal(isStripeTestPublishableKey(env.publishableKey), true);
+    assert.equal(env.priceStaffListMonthly, STRIPE_SANDBOX_PRICE_IDS.seatList);
+    assert.equal(env.priceStaffFoundingMonthly, STRIPE_SANDBOX_PRICE_IDS.seatFounding);
   });
 
   it("maps per-SKU training prices, not a $49 extra", () => {
@@ -202,6 +208,60 @@ describe("stripe-config", () => {
     assert.equal(stripePriceIdForTrainingSku("cpr_first_aid", null, env), "price_cpr");
     assert.equal(stripePriceIdForTrainingSku("mandt", null, env), "price_mandt");
     assert.equal(stripePriceIdForTrainingSku("dspd_required", "price_from_catalog", env), "price_from_catalog");
+  });
+
+  it("defaults seat and training Price IDs to the sandbox products (secrets stay empty)", () => {
+    const env = readStripeEnv({});
+    assert.equal(env.secretKey, null);
+    assert.equal(env.publishableKey, null);
+    assert.equal(env.webhookSecret, null);
+    assert.equal(env.priceStaffListMonthly, "price_1U9EeRIQWMytpLnbNurGi0Vq");
+    assert.equal(env.priceStaffFoundingMonthly, "price_1U9EgWIQWMytpLnbyBvs2f4L");
+    assert.equal(env.priceTrainingFull, "price_1U9EhyIQWMytpLnbg2nkCFd8");
+    assert.equal(env.priceTrainingCpr, "price_1U9EjNIQWMytpLnbPnfRb6Yz");
+    assert.equal(env.priceTrainingMandt, "price_1U9EkmIQWMytpLnb2coYT0rn");
+    assert.equal(env.priceTrainingDspd, "price_1U9Em5IQWMytpLnb2of9BFOj");
+  });
+
+  it("STRIPE_PRICE_SEAT_LIST / STRIPE_PRICE_SEAT_FOUNDING override sandbox defaults", () => {
+    const env = readStripeEnv({
+      STRIPE_PRICE_SEAT_LIST: "price_custom_list",
+      STRIPE_PRICE_SEAT_FOUNDING: "price_custom_founding",
+    });
+    assert.equal(env.priceStaffListMonthly, "price_custom_list");
+    assert.equal(env.priceStaffFoundingMonthly, "price_custom_founding");
+  });
+
+  it("list checkout uses the $125 seat price with a 4-seat floor", () => {
+    const env = readStripeEnv({});
+    const quote = quoteHiveSubscription({
+      staffCount: 2,
+      clientCount: 5,
+      schedule: "list",
+      interval: "monthly",
+    });
+    const pick = stripeSeatPriceForQuote(quote, env);
+    assert.equal(pick.priceId, STRIPE_SANDBOX_PRICE_IDS.seatList);
+    const items = subscriptionLineItemsForQuote(quote, env);
+    assert.equal(items.lineItems.length, 1);
+    assert.equal(items.lineItems[0]?.price, STRIPE_SANDBOX_PRICE_IDS.seatList);
+    assert.equal(items.lineItems[0]?.quantity, 4);
+  });
+
+  it("founding checkout uses the $79 seat price and tops up to $299", () => {
+    const env = readStripeEnv({});
+    const quote = quoteHiveSubscription({
+      staffCount: 2,
+      clientCount: 5,
+      schedule: "founding",
+      interval: "monthly",
+    });
+    const pick = stripeSeatPriceForQuote(quote, env);
+    assert.equal(pick.priceId, STRIPE_SANDBOX_PRICE_IDS.seatFounding);
+    const items = subscriptionLineItemsForQuote(quote, env);
+    assert.equal(items.lineItems[0]?.price, STRIPE_SANDBOX_PRICE_IDS.seatFounding);
+    assert.equal(items.lineItems[0]?.quantity, 2);
+    assert.equal(items.lineItems[1]?.price_data?.unit_amount, 29_900 - 15_800);
   });
 
   it("webhook/client can be configured without price ids", () => {

@@ -12,20 +12,20 @@ Hive charges companies in **Stripe test / sandbox only**. No real cards are char
 
 Test mode must stay ON (switch in the top right of the Stripe Dashboard).
 
-## Confirmed prices (do not use $499 / $1,299 or $49 training)
+## Confirmed prices
 
 **List** (public at `/pricing`):
 
 - $125 per active staff / month (1–19 clients)
 - $109 / staff at 20–49 clients, $99 / staff at 50+
-- $500 / month minimum
+- **$500 / month minimum** (4 seats at the $125 list price)
 - Annual = 20% off
 - Enterprise = contact us (no dollar amount in Stripe)
 
 **Founding** (first 5 paying companies, 12 months, then list):
 
 - $79 per staff / month
-- $299 / month minimum
+- **$299 / month minimum**
 - Hive Exec can mark a company founding vs list
 
 **Exempt:** True North Supports LLC is billing-exempt forever. Never charge seats or training. Hive Exec can toggle exempt on other companies. Dane’s `danewarnick@gmail` test companies are **not** auto-exempt — they pay unless he comps them.
@@ -36,35 +36,41 @@ Test mode must stay ON (switch in the top right of the Stripe Dashboard).
 - CPR/First Aid $75, Mandt $200, DSPD required $100
 - TNS / exempt skip these
 
-Until you paste `price_` IDs, Checkout uses Stripe `price_data` at these amounts so you can still test.
+## Sandbox products (already created)
 
-## Products (create in test mode, then paste Price IDs)
+These **Price IDs** are test-mode identifiers on `acct_1Ti6CMIQWmyptLnb`. Hive uses them as defaults. You can still override them with env vars. They are not secrets.
 
-| Product | Amount | Billing | Env var |
-|---|---|---|---|
-| Hive list / staff (1–19) | $125 | Recurring, monthly | `STRIPE_PRICE_STAFF_LIST_MONTHLY` |
-| Hive list / staff annual | 20% off yearly | Recurring, yearly | `STRIPE_PRICE_STAFF_LIST_ANNUAL` |
-| Hive list / staff (20–49) | $109 | Recurring, monthly | `STRIPE_PRICE_STAFF_LIST_20_MONTHLY` |
-| Hive list / staff (50+) | $99 | Recurring, monthly | `STRIPE_PRICE_STAFF_LIST_50_MONTHLY` |
-| Hive founding / staff | $79 | Recurring, monthly | `STRIPE_PRICE_STAFF_FOUNDING_MONTHLY` |
-| Hive founding / staff annual | 20% off yearly | Recurring, yearly | `STRIPE_PRICE_STAFF_FOUNDING_ANNUAL` |
-| Founding coupon (instead of a founding price) | — | Coupon | `STRIPE_COUPON_FOUNDING` |
-| Annual 20% coupon (optional) | 20% off | Coupon | `STRIPE_COUPON_ANNUAL` |
-| Training full program | $300 | One time | `STRIPE_PRICE_TRAINING_FULL` |
-| Training CPR/First Aid | $75 | One time | `STRIPE_PRICE_TRAINING_CPR` |
-| Training Mandt | $200 | One time | `STRIPE_PRICE_TRAINING_MANDT` |
-| Training DSPD required | $100 | One time | `STRIPE_PRICE_TRAINING_DSPD` |
+| Product | Amount | Product id | Price id | Env var |
+|---|---|---|---|---|
+| Hive seat list | $125 / month | `prod_V9XjHA2R4jLnn3` | `price_1U9EeRIQWMytpLnbNurGi0Vq` | `STRIPE_PRICE_SEAT_LIST` |
+| Hive seat founding | $79 / month | `prod_V9XmH5qQO0TjHi` | `price_1U9EgWIQWMytpLnbyBvs2f4L` | `STRIPE_PRICE_SEAT_FOUNDING` |
+| Training full program | $300 one-time | `prod_V9Xn9njjImRO15` | `price_1U9EhyIQWMytpLnbg2nkCFd8` | `STRIPE_PRICE_TRAINING_FULL` |
+| Training CPR/First Aid | $75 one-time | `prod_V9XpZpdcbeJXye` | `price_1U9EjNIQWMytpLnbPnfRb6Yz` | `STRIPE_PRICE_TRAINING_CPR` |
+| Training Mandt | $200 one-time | `prod_V9XqoHqzqR8JaY` | `price_1U9EkmIQWMytpLnb2coYT0rn` | `STRIPE_PRICE_TRAINING_MANDT` |
+| Training DSPD required | $100 one-time | `prod_V9Xr6M8IBuGzQK` | `price_1U9Em5IQWMytpLnb2of9BFOj` | `STRIPE_PRICE_TRAINING_DSPD` |
+
+Volume rates ($109 / $99) and annual (20% off) still use Stripe `price_data` until those products exist. The app still enforces the $500 list minimum and $299 founding minimum.
 
 Do **not** create or wire $499 Pro, $1,299 Enterprise, or $49 training extras.
 
 ## Environment variables (Vercel / Lovable)
 
-Never paste these into GitHub. Test keys only (`sk_test_` / `pk_test_`).
+**Never paste secret keys into GitHub.** Test keys only (`sk_test_` / `pk_test_`).
+
+Required (env-only — Hive does not invent these):
 
 - `STRIPE_SECRET_KEY` — `sk_test_…` (Developers → API keys)
 - `STRIPE_PUBLISHABLE_KEY` — `pk_test_…`
 - `STRIPE_WEBHOOK_SECRET` — `whsec_…` (from the webhook below)
-- The `STRIPE_PRICE_*` and `STRIPE_COUPON_*` values above — placeholders until you paste them
+
+Optional overrides (defaults are the sandbox Price IDs above):
+
+- `STRIPE_PRICE_SEAT_LIST`
+- `STRIPE_PRICE_SEAT_FOUNDING`
+- `STRIPE_PRICE_TRAINING_FULL`
+- `STRIPE_PRICE_TRAINING_CPR`
+- `STRIPE_PRICE_TRAINING_MANDT`
+- `STRIPE_PRICE_TRAINING_DSPD`
 
 If the secret key is missing, True North can still log in. New agencies see a clear “payments are not set up” message instead of a crash.
 

@@ -4,13 +4,13 @@
  * Account: Hive sandbox / Hive (acct_1Ti6CMIQWmyptLnb)
  * Dashboard: https://dashboard.stripe.com/acct_1Ti6CMIQWmyptLnb/test/dashboard
  *
- * Price IDs stay as env placeholders until Dane pastes the price_ values.
- * Checkout can still run with price_data when IDs are missing.
- * Never log secret values. Missing keys fail closed on Checkout, not on login.
- * Live sk_live_ keys are rejected.
+ * Seat and training Price IDs below are public test-mode identifiers (not secrets).
+ * STRIPE_SECRET_KEY / STRIPE_PUBLISHABLE_KEY / STRIPE_WEBHOOK_SECRET stay env-only.
+ * Live sk_live_ keys are rejected. Missing secret keys fail closed on Checkout, not on login.
  */
 
 import {
+  LIST_MIN_SEATS,
   LIST_PER_STAFF_CENTS_1_19,
   LIST_PER_STAFF_CENTS_20_49,
   LIST_PER_STAFF_CENTS_50_PLUS,
@@ -20,6 +20,25 @@ import {
 
 /** Hive sandbox (test mode). Not a secret. */
 export const STRIPE_TEST_ACCOUNT_ID = "acct_1Ti6CMIQWmyptLnb";
+
+/**
+ * Test-mode Price IDs on acct_1Ti6CMIQWmyptLnb. Used when the matching env var
+ * is unset. Override in the host environment; never commit secret keys.
+ */
+export const STRIPE_SANDBOX_PRICE_IDS = {
+  /** Hive seat list, $125/mo, prod_V9XjHA2R4jLnn3 */
+  seatList: "price_1U9EeRIQWMytpLnbNurGi0Vq",
+  /** Hive seat founding, $79/mo, prod_V9XmH5qQO0TjHi */
+  seatFounding: "price_1U9EgWIQWMytpLnbyBvs2f4L",
+  /** Full program $300 one-time, prod_V9Xn9njjImRO15 */
+  trainingFull: "price_1U9EhyIQWMytpLnbg2nkCFd8",
+  /** CPR/First Aid $75, prod_V9XpZpdcbeJXye */
+  trainingCpr: "price_1U9EjNIQWMytpLnbPnfRb6Yz",
+  /** Mandt $200, prod_V9XqoHqzqR8JaY */
+  trainingMandt: "price_1U9EkmIQWMytpLnb2coYT0rn",
+  /** DSPD required $100, prod_V9Xr6M8IBuGzQK */
+  trainingDspd: "price_1U9Em5IQWMytpLnb2of9BFOj",
+} as const;
 
 export type StripePriceEnv = {
   secretKey: string | null;
@@ -44,19 +63,30 @@ export function readStripeEnv(env: NodeJS.Dict<string> = process.env): StripePri
     secretKey: emptyToNull(env.STRIPE_SECRET_KEY),
     publishableKey: emptyToNull(env.STRIPE_PUBLISHABLE_KEY),
     webhookSecret: emptyToNull(env.STRIPE_WEBHOOK_SECRET),
-    priceStaffListMonthly: emptyToNull(env.STRIPE_PRICE_STAFF_LIST_MONTHLY),
+    priceStaffListMonthly:
+      emptyToNull(env.STRIPE_PRICE_SEAT_LIST) ??
+      emptyToNull(env.STRIPE_PRICE_STAFF_LIST_MONTHLY) ??
+      STRIPE_SANDBOX_PRICE_IDS.seatList,
     priceStaffListAnnual: emptyToNull(env.STRIPE_PRICE_STAFF_LIST_ANNUAL),
     priceStaffList20Monthly: emptyToNull(env.STRIPE_PRICE_STAFF_LIST_20_MONTHLY),
     priceStaffList50Monthly: emptyToNull(env.STRIPE_PRICE_STAFF_LIST_50_MONTHLY),
-    priceStaffFoundingMonthly: emptyToNull(env.STRIPE_PRICE_STAFF_FOUNDING_MONTHLY),
+    priceStaffFoundingMonthly:
+      emptyToNull(env.STRIPE_PRICE_SEAT_FOUNDING) ??
+      emptyToNull(env.STRIPE_PRICE_STAFF_FOUNDING_MONTHLY) ??
+      STRIPE_SANDBOX_PRICE_IDS.seatFounding,
     priceStaffFoundingAnnual: emptyToNull(env.STRIPE_PRICE_STAFF_FOUNDING_ANNUAL),
     couponFounding: emptyToNull(env.STRIPE_COUPON_FOUNDING),
     couponAnnual: emptyToNull(env.STRIPE_COUPON_ANNUAL),
     priceTrainingFull:
-      emptyToNull(env.STRIPE_PRICE_TRAINING_FULL) ?? emptyToNull(env.STRIPE_PRICE_TRAINING),
-    priceTrainingCpr: emptyToNull(env.STRIPE_PRICE_TRAINING_CPR),
-    priceTrainingMandt: emptyToNull(env.STRIPE_PRICE_TRAINING_MANDT),
-    priceTrainingDspd: emptyToNull(env.STRIPE_PRICE_TRAINING_DSPD),
+      emptyToNull(env.STRIPE_PRICE_TRAINING_FULL) ??
+      emptyToNull(env.STRIPE_PRICE_TRAINING) ??
+      STRIPE_SANDBOX_PRICE_IDS.trainingFull,
+    priceTrainingCpr:
+      emptyToNull(env.STRIPE_PRICE_TRAINING_CPR) ?? STRIPE_SANDBOX_PRICE_IDS.trainingCpr,
+    priceTrainingMandt:
+      emptyToNull(env.STRIPE_PRICE_TRAINING_MANDT) ?? STRIPE_SANDBOX_PRICE_IDS.trainingMandt,
+    priceTrainingDspd:
+      emptyToNull(env.STRIPE_PRICE_TRAINING_DSPD) ?? STRIPE_SANDBOX_PRICE_IDS.trainingDspd,
   };
 }
 
@@ -101,8 +131,8 @@ export function stripeClientConfigured(env: StripePriceEnv = readStripeEnv()): {
 }
 
 /**
- * Checkout is allowed with the secret key alone (price_data fallback).
- * Per-staff / training price_ IDs are optional until Dane pastes them.
+ * Checkout needs the secret key. Seat / training Price IDs default to the
+ * Hive sandbox products; env vars override those defaults.
  */
 export function stripePaymentsConfigured(env: StripePriceEnv = readStripeEnv()): {
   ok: boolean;
@@ -192,18 +222,36 @@ export type StripeLineItem = {
   };
 };
 
-export function subscriptionLineItemsForQuote(quote: HiveQuote): {
+export function subscriptionLineItemsForQuote(
+  quote: HiveQuote,
+  env: StripePriceEnv = readStripeEnv(),
+): {
   lineItems: StripeLineItem[];
   discounts: Array<{ coupon: string }> | undefined;
   pick: StripeSeatPricePick;
 } {
-  const env = readStripeEnv();
   const pickResolved = stripeSeatPriceForQuote(quote, env);
   const recurringInterval: "month" | "year" = quote.interval === "annual" ? "year" : "month";
   const productName =
     quote.schedule === "founding"
       ? `Hive founding · ${quote.staffCount} staff`
       : `Hive · ${quote.staffCount} staff · ${quote.volumeLabel}`;
+
+  const listSeatMonthly =
+    quote.schedule === "list" &&
+    quote.interval === "monthly" &&
+    quote.perStaffCents === LIST_PER_STAFF_CENTS_1_19 &&
+    !!pickResolved.priceId;
+
+  if (listSeatMonthly && pickResolved.priceId) {
+    // $500 list minimum = 4 seats at the $125 list price.
+    const quantity = Math.max(quote.staffCount, LIST_MIN_SEATS);
+    return {
+      lineItems: [{ price: pickResolved.priceId, quantity }],
+      discounts: pickResolved.couponId ? [{ coupon: pickResolved.couponId }] : undefined,
+      pick: pickResolved,
+    };
+  }
 
   if (pickResolved.priceId && !quote.minimumApplied) {
     const discounts = pickResolved.couponId ? [{ coupon: pickResolved.couponId }] : undefined;

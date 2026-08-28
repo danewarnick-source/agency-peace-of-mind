@@ -62,11 +62,16 @@ function b64url(obj: unknown): string {
 
 function session() {
   const now = new Date().toISOString();
+  const exp = Math.floor(Date.now() / 1000) + 86400;
   const user = {
     id: USER_ID,
     aud: "authenticated",
     role: "authenticated",
     email: "e2e.billing@example.com",
+    email_confirmed_at: now,
+    confirmed_at: now,
+    last_sign_in_at: now,
+    phone: "",
     app_metadata: { provider: "email", providers: ["email"] },
     user_metadata: { full_name: "E2E Admin" },
     identities: [],
@@ -74,17 +79,21 @@ function session() {
     updated_at: now,
     is_anonymous: false,
   };
-  const access_token = `${b64url({ alg: "none", typ: "JWT" })}.${b64url({
+  const access_token = `${b64url({ alg: "HS256", typ: "JWT" })}.${b64url({
+    aud: "authenticated",
     sub: USER_ID,
     email: user.email,
     role: "authenticated",
-    exp: Math.floor(Date.now() / 1000) + 86400,
-  })}.e2e`;
+    exp,
+    iat: exp - 86400,
+    iss: `https://${PROJECT_REF}.supabase.co/auth/v1`,
+    session_id: "e2e-billing-session",
+  })}.e2emock`;
   return {
     access_token,
     token_type: "bearer",
     expires_in: 86400,
-    expires_at: Math.floor(Date.now() / 1000) + 86400,
+    expires_at: exp,
     refresh_token: "e2e-refresh",
     user,
   };
@@ -157,6 +166,12 @@ function billingStatus(world: BillingWorld) {
   };
 }
 
+function addonsFor(world: BillingWorld) {
+  return world.billingExempt
+    ? ["nectar_infusion", "internal_audit", "requirements_engine", "priority_support", "hive_training"]
+    : ["nectar_infusion", "hive_training"];
+}
+
 function serverFnPayload(world: BillingWorld, req: Request): unknown {
   const url = req.url();
   const body = req.postData() ?? "";
@@ -193,9 +208,7 @@ function serverFnPayload(world: BillingWorld, req: Request): unknown {
       organization_id: ORG_ID,
       tier: world.billingExempt ? "enterprise" : world.plan,
       status: world.status,
-      addons: world.billingExempt
-        ? ["nectar_infusion", "internal_audit", "requirements_engine", "priority_support", "hive_training"]
-        : ["nectar_infusion", "hive_training"],
+      addons: addonsFor(world),
     };
   }
   if (hay.includes("getmyorgfeatures")) {
@@ -208,6 +221,8 @@ function serverFnPayload(world: BillingWorld, req: Request): unknown {
         pcsp: true,
         client_intake: true,
         staff_onboarding: true,
+        state_audit: true,
+        pba_ledgers: true,
       },
       registry: [],
     };
@@ -217,7 +232,48 @@ function serverFnPayload(world: BillingWorld, req: Request): unknown {
   if (hay.includes("getinboxunread") || hay.includes("getpendingupgrade")) return { count: 0 };
   if (hay.includes("getactivedraftjobs")) return { jobs: [] };
   if (hay.includes("getmycestatus")) return { ceApplies: false };
-  return {};
+  if (hay.includes("getmyotherassignments")) {
+    return { open_count: 0, safety_critical_open_count: 0, total: 0, completed: 0 };
+  }
+  if (
+    hay.includes("listcompanyobligations") ||
+    hay.includes("getincident") ||
+    hay.includes("listopensummaries") ||
+    hay.includes("listdeadline") ||
+    hay.includes("searchactivestaff") ||
+    hay.includes("getpendingtrackingforms") ||
+    hay.includes("getmytrainingenrollments") ||
+    hay.includes("gettrainingproducts") ||
+    hay.includes("getorgtrainingpurchases") ||
+    hay.includes("getrostertrainingstatus") ||
+    hay.includes("getmyclienttraining")
+  ) {
+    return [];
+  }
+
+  return {
+    isExecutive: false,
+    organization_id: ORG_ID,
+    organizationId: ORG_ID,
+    tier: world.billingExempt ? "enterprise" : world.plan,
+    status: world.status,
+    addons: addonsFor(world),
+    effective: {
+      hive_training: true,
+      nectar: true,
+      evv_timesheets: true,
+      pcsp: true,
+      client_intake: true,
+      staff_onboarding: true,
+    },
+    registry: [],
+    pending: [],
+    ceApplies: false,
+    count: 0,
+    jobs: [],
+    rows: [],
+    ...billingStatus(world),
+  };
 }
 
 function restRows(world: BillingWorld, table: string): unknown[] {

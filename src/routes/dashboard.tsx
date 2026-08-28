@@ -37,7 +37,7 @@ import { useEntitlements } from "@/hooks/use-entitlements";
 import { useOrgFeatures } from "@/hooks/use-feature-enabled";
 
 import { BillingBanner } from "@/components/billing/billing-banner";
-import { orgAccessIsLocked } from "@/lib/billing-access";
+import { orgDashboardIsLocked, pathBypassesBillingLock } from "@/lib/billing-lock-client";
 import { DraftJobsProvider } from "@/components/nectar/draft-jobs-driver";
 import { DraftJobsHeaderPill } from "@/components/nectar/draft-jobs-header-pill";
 import { GuidedTourProvider } from "@/components/nectar/guided-tour-provider";
@@ -76,9 +76,6 @@ export const Route = createFileRoute("/dashboard")({
       if (!session?.user?.id) return;
 
       // Realm mutual exclusion: auditor accounts can NEVER load /dashboard/*.
-      // They are a distinct account class (auditor_accounts row, no org
-      // membership). If somehow signed into the dashboard app, kick them
-      // out to the auditor portal.
       const { data: auditor } = await supabase
         .from("auditor_accounts")
         .select("id, status")
@@ -89,85 +86,20 @@ export const Route = createFileRoute("/dashboard")({
         throw redirect({ to: "/audit-portal" });
       }
 
-
-      // Resolve active org (matches use-org.ts contract).
       let activeOrgId: string | null = null;
       try { activeOrgId = window.localStorage.getItem("hive.activeOrgId"); } catch { /* ignore */ }
 
-      // Fetch the caller's memberships once — we need role too.
-      const { data: memberships } = await supabase
-        .from("organization_members")
-        .select("organization_id, role")
-        .eq("user_id", session.user.id)
-        .eq("active", true);
-      if (!memberships || memberships.length === 0) return;
-
-      const membership =
-        memberships.find((m) => m.organization_id === activeOrgId) ?? memberships[0];
-      const orgId = membership.organization_id;
-      const isAdmin = membership.role === "admin";
-
-      const { data: sub } = await supabase
-        .from("org_subscriptions")
-        .select("locked_at, status, stripe_subscription_id")
-        .eq("organization_id", orgId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      let orgRow: {
-        name?: string;
-        legal_name?: string | null;
-        dba_name?: string | null;
-        billing_exempt?: boolean;
-      } | null = null;
-      const orgFull = await supabase
-        .from("organizations")
-        .select("name, legal_name, dba_name, billing_exempt")
-        .eq("id", orgId)
-        .maybeSingle();
-      if (orgFull.error) {
-        const retry = await supabase
-          .from("organizations")
-          .select("name, legal_name, dba_name")
-          .eq("id", orgId)
-          .maybeSingle();
-        orgRow = retry.data;
-      } else {
-        orgRow = orgFull.data;
-      }
-
-      const locked = orgAccessIsLocked({
-        billingExempt: orgRow?.billing_exempt === true,
-        orgName: orgRow?.name ?? null,
-        legalName: orgRow?.legal_name,
-        dbaName: orgRow?.dba_name,
-        subscription: sub
-          ? {
-              status: sub.status,
-              locked_at: sub.locked_at,
-              stripe_subscription_id: (sub as { stripe_subscription_id?: string | null }).stripe_subscription_id,
-            }
-          : null,
+      const { locked, isAdmin } = await orgDashboardIsLocked({
+        userId: session.user.id,
+        activeOrgId,
       });
       if (!locked) return;
-
-      // Locked. Allow admins on the billing/subscription page so they can pay.
-      // Hive Exec can always reach the companies list to mark someone comped.
-      const path = location.pathname;
-      if (path.startsWith("/dashboard/hive-exec")) return;
-      const billingAllowlist = [
-        "/dashboard/billing/subscription",
-        "/dashboard/settings/subscription",
-      ];
-      if (isAdmin && billingAllowlist.some((p) => path === p || path.startsWith(p + "/"))) {
-        return;
-      }
+      if (pathBypassesBillingLock(location.pathname, isAdmin)) return;
       throw redirect({ to: "/billing-locked" });
     } catch (err) {
       if (isRedirect(err)) throw err;
       console.error("dashboard beforeLoad error:", err);
-      return; // fail open — client handles auth redirect
+      return; // fail open — client layout re-checks after hydrate
     }
   },
   component: DashboardLayout,
@@ -268,6 +200,30 @@ function DashboardLayout() {
   useEffect(() => {
     if (!loading && !session) navigate({ to: "/login" });
   }, [loading, session, navigate]);
+
+  // Full-page loads skip beforeLoad on SSR. Re-check after hydrate so unpaid
+  // companies cannot sit on the dashboard with only a banner.
+  useEffect(() => {
+    const uid = session?.user?.id;
+    if (!uid) return;
+    let cancelled = false;
+    let activeOrgId: string | null = null;
+    try {
+      activeOrgId = window.localStorage.getItem("hive.activeOrgId");
+    } catch {
+      /* ignore */
+    }
+    orgDashboardIsLocked({ userId: uid, activeOrgId })
+      .then(({ locked, isAdmin }) => {
+        if (cancelled || !locked) return;
+        if (pathBypassesBillingLock(pathname, isAdmin)) return;
+        navigate({ to: "/billing-locked", replace: true });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id, pathname, navigate]);
 
 
   // must_change_password is enforced globally at the router root

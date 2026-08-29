@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
 import { ROLE_RANK, type Role } from "@/lib/rbac";
 import { resolveCurrentMembership } from "@/lib/current-org";
+import { isCognitoAuth } from "@/lib/aws/env";
+import { isAwsBootstrapFailure } from "@/lib/cognito-login-gate";
 
 export type { Role };
 
@@ -41,13 +43,29 @@ function writeActiveOrgId(orgId: string | null) {
 }
 
 async function fetchMemberships(userId: string): Promise<CurrentMembership[]> {
-  const { data, error } = await supabase
+  const { data, error, status } = await supabase
     .from("organization_members")
-    .select("id, role, job_title, organization_id, organizations(name, is_demo, legal_name, dba_name, display_acronym)")
+    .select(
+      "id, role, job_title, organization_id, organizations(name, is_demo, legal_name, dba_name, display_acronym)",
+    )
     .eq("user_id", userId)
     .eq("active", true);
-  if (error || !data?.length) return [];
-  type OrgRow = { name: string; is_demo: boolean; legal_name: string | null; dba_name: string | null; display_acronym: string | null } | null;
+  if (error) {
+    // Cognito/RDS: a 5xx/401 bootstrap must not look like "no orgs" and spin.
+    // Vercel/Supabase keeps the previous empty-list degrade.
+    if (isCognitoAuth() && isAwsBootstrapFailure({ error, status })) {
+      throw new Error(error.message || `Org lookup failed (${status})`);
+    }
+    return [];
+  }
+  if (!data?.length) return [];
+  type OrgRow = {
+    name: string;
+    is_demo: boolean;
+    legal_name: string | null;
+    dba_name: string | null;
+    display_acronym: string | null;
+  } | null;
   return [...data]
     .sort((a, b) => ROLE_RANK[b.role as Role] - ROLE_RANK[a.role as Role])
     .map((m) => {
@@ -89,7 +107,6 @@ export function useOrgDisplayName() {
     prefixLabel: (suffix: string) => (acronym ? `${acronym} ${suffix}` : suffix),
   };
 }
-
 
 /**
  * Returns all active memberships for the signed-in user. Used by the org

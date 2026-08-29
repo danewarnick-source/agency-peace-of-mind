@@ -14,6 +14,7 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { Toaster } from "@/components/ui/sonner";
 import { isChunkLoadError, tryAutoReloadOnce, clearChunkReloadGuard } from "@/lib/chunk-reload";
 import { inviteTokenFromSearchStr } from "@/lib/join-invite";
+import { getPublicRuntimeBlob } from "@/lib/aws/env";
 
 function NotFoundComponent() {
   return (
@@ -196,7 +197,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           // Nominatim geocode + Supabase + Vercel analytics/ingest. Do NOT put
           // frame-ancestors here — browsers ignore it on <meta http-equiv> and
           // log a console warning; set that directive via HTTP headers only.
-          "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.vercel.app https://vercel.live https://nominatim.openstreetmap.org",
+          "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.vercel.app https://vercel.live https://nominatim.openstreetmap.org https://*.amazonaws.com https://cognito-idp.us-east-1.amazonaws.com",
           "object-src 'none'",
           "base-uri 'self'",
           "form-action 'self'",
@@ -259,10 +260,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 function RootShell({ children }: { children: React.ReactNode }) {
+  const runtime = JSON.stringify(getPublicRuntimeBlob()).replace(/</g, "\\u003c");
   return (
     <html lang="en">
       <head>
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: `window.__HIVE_RUNTIME__=${runtime}` }} />
       </head>
       <body>
         {children}

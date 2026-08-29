@@ -107,3 +107,36 @@ describe("completePasswordSignIn", () => {
     assert.deepEqual(result, { ok: false, message: GENERIC_LOGIN_ERROR });
   });
 });
+
+describe("Cognito leftover session must not skip the login form", () => {
+  it("skips auto-redirect when Cognito already has a session and they did not just sign in", async () => {
+    const { shouldSkipLoginAutoRedirect, isAwsBootstrapFailure } =
+      await import("./cognito-login-gate.ts");
+    assert.equal(
+      shouldSkipLoginAutoRedirect({
+        isCognito: true,
+        hadSessionOnArrival: true,
+        justSignedIn: false,
+      }),
+      true,
+    );
+    assert.equal(
+      shouldSkipLoginAutoRedirect({
+        isCognito: true,
+        hadSessionOnArrival: true,
+        justSignedIn: true,
+      }),
+      false,
+    );
+    assert.equal(
+      shouldSkipLoginAutoRedirect({
+        isCognito: false,
+        hadSessionOnArrival: true,
+        justSignedIn: false,
+      }),
+      false,
+    );
+    assert.equal(isAwsBootstrapFailure({ status: 500, error: { message: "HTTPError" } }), true);
+    assert.equal(isAwsBootstrapFailure({ status: 200, error: null }), false);
+  });
+});

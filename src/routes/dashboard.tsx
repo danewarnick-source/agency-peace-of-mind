@@ -47,6 +47,14 @@ import { DraftJobsProvider } from "@/components/nectar/draft-jobs-driver";
 import { DraftJobsHeaderPill } from "@/components/nectar/draft-jobs-header-pill";
 import { GuidedTourProvider } from "@/components/nectar/guided-tour-provider";
 import { OPEN_DASHBOARD_MENU_EVENT } from "@/lib/portal-view-landing";
+import { isCognitoAuth } from "@/lib/aws/env";
+import { AWS_DB_ERROR_EVENT } from "@/lib/aws/exec-http";
+import {
+  HIVE_BOOTSTRAP_ERROR_EVENT,
+  installBootstrapFailureWatch,
+  shouldLeaveCognitoLoadingOverlay,
+  type BootstrapFailureKind,
+} from "@/lib/cognito-login-gate";
 
 
 
@@ -184,7 +192,7 @@ type SidebarBodyProps = {
 
 function DashboardLayout() {
   const { session, loading, user } = useAuth();
-  const { data: org, isLoading: orgLoading } = useCurrentOrg();
+  const { data: org, isLoading: orgLoading, isError: orgError, error: orgQueryError } = useCurrentOrg();
   const { can } = usePermissions();
   const { view, hasStoredView, setView, stateCode, setStateCode, subView, setSubView, hydrated: viewHydrated } = usePortalView();
   const [states, setStates] = useState<PlatformStateLite[]>([]);
@@ -396,28 +404,95 @@ function DashboardLayout() {
     : null;
   const isComingSoonPreview = isStatePreview && currentPreviewState?.status === "coming_soon";
 
-  if (
-    dashboardShellShowsLoading({
-      sessionLoading: loading,
-      hasSession: !!session,
-      execLoading,
-      hydrated: viewHydrated,
-      orgLoading,
-      bootTimedOut,
-    })
-  ) {
-    return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading…</div>;
-  }
-
-
-
-
-
-  const signOut = async () => {
+  const signOut = async (to: "/" | "/login" = "/") => {
     await supabase.auth.signOut();
     toast.success("Signed out");
-    navigate({ to: "/" });
+    navigate({ to, replace: true });
   };
+
+  const [bootstrapStuck, setBootstrapStuck] = useState(false);
+  const [awsDbFailed, setAwsDbFailed] = useState(false);
+  const [awsDbErrorMessage, setAwsDbErrorMessage] = useState<string | null>(null);
+  const [failKind, setFailKind] = useState<BootstrapFailureKind | null>(null);
+  const awaitingBootstrap = dashboardShellShowsLoading({
+    sessionLoading: loading,
+    hasSession: !!session,
+    execLoading,
+    hydrated: viewHydrated,
+    orgLoading,
+    bootTimedOut,
+  });
+  const cognitoLeaveLoading = shouldLeaveCognitoLoadingOverlay({
+    isCognito: isCognitoAuth(),
+    hasSession: Boolean(session) && !loading,
+    awsDb5xx: awsDbFailed || failKind === "http-5xx",
+    orgError,
+    timedOut: bootstrapStuck,
+    unhandledHttpError: failKind === "unhandled-httperror",
+    html5xx: failKind === "html-500",
+  });
+  const bootstrapping = awaitingBootstrap && !cognitoLeaveLoading;
+
+  useEffect(() => {
+    if (!isCognitoAuth()) return;
+    const onFail = (kind: BootstrapFailureKind, message?: string) => {
+      setFailKind(kind);
+      setAwsDbFailed(true);
+      if (message) setAwsDbErrorMessage(message);
+    };
+    const onAwsDb = (e: Event) => {
+      const detail = (e as CustomEvent<{ message?: string; status?: number }>).detail;
+      onFail("http-5xx", detail?.message);
+    };
+    const onBootstrap = (e: Event) => {
+      const detail = (e as CustomEvent<{ kind?: BootstrapFailureKind; message?: string }>).detail;
+      onFail(detail?.kind ?? "http-5xx", detail?.message);
+    };
+    window.addEventListener(AWS_DB_ERROR_EVENT, onAwsDb);
+    window.addEventListener(HIVE_BOOTSTRAP_ERROR_EVENT, onBootstrap);
+    const stopWatch = installBootstrapFailureWatch((detail) => {
+      onFail(detail.kind, detail.message);
+    });
+    return () => {
+      window.removeEventListener(AWS_DB_ERROR_EVENT, onAwsDb);
+      window.removeEventListener(HIVE_BOOTSTRAP_ERROR_EVENT, onBootstrap);
+      stopWatch();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isCognitoAuth()) return;
+    if (!awaitingBootstrap) {
+      setBootstrapStuck(false);
+      return;
+    }
+    const t = window.setTimeout(() => setBootstrapStuck(true), 8_000);
+    return () => window.clearTimeout(t);
+  }, [awaitingBootstrap]);
+
+  if (bootstrapping) {
+    const cognitoEscape = isCognitoAuth() && (orgError || bootstrapStuck);
+    return (
+      <div className="grid min-h-screen place-items-center gap-4 px-4 text-center text-sm text-muted-foreground">
+        <p>{cognitoEscape ? "Couldn't finish signing you in." : "Loading…"}</p>
+        {cognitoEscape && (
+          <p className="max-w-sm text-xs">
+            {orgQueryError instanceof Error
+              ? orgQueryError.message
+              : "The workspace did not load. Sign out and enter your email and password."}
+          </p>
+        )}
+        <Button
+          data-testid="dashboard-spinner-sign-out"
+          variant="outline"
+          onClick={() => void signOut("/login")}
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          Sign out
+        </Button>
+      </div>
+    );
+  }
 
 
   const nectarNavForView = effectiveView === "admin"
@@ -465,6 +540,16 @@ function DashboardLayout() {
     <DraftJobsProvider>
     <div className="flex h-screen h-[100dvh] flex-col overflow-hidden">
       <ImpersonationBanner />
+      {isCognitoAuth() && (orgError || awsDbFailed) && (
+        <div
+          data-testid="cognito-bootstrap-error"
+          className="shrink-0 border-b border-amber-300/60 bg-amber-50 px-4 py-2 text-center text-xs text-amber-950 md:px-6"
+        >
+          {awsDbErrorMessage ||
+            (orgQueryError instanceof Error ? orgQueryError.message : null) ||
+            "Some workspace data did not load. You can keep working with what is available, or sign out."}
+        </div>
+      )}
 
 
       {/* Mobile shell — staff view only (below md) */}

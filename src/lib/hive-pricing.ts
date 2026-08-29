@@ -33,6 +33,65 @@ export const TRAINING_PRICE_CENTS = {
   dspd_required: 10_000,
 } as const;
 
+export type TrainingStorefrontKind = "full_program" | "ala_carte";
+
+export type TrainingStorefrontRow = {
+  id: string;
+  sku: keyof typeof TRAINING_PRICE_CENTS;
+  name: string;
+  kind: TrainingStorefrontKind;
+  price_cents: number;
+  includes: string[];
+  sort: number;
+};
+
+/** Confirmed public /training catalog. Three à la carte + the $300 bundle. */
+export const TRAINING_STOREFRONT_CATALOG: readonly TrainingStorefrontRow[] = [
+  {
+    id: "full_program",
+    sku: "full_program",
+    name: "Full Training Program",
+    kind: "full_program",
+    price_cents: TRAINING_PRICE_CENTS.full_program,
+    includes: [
+      "CPR & First Aid",
+      "Mandt behavioral intervention",
+      "30-day DSPD required training",
+      "Hands-on HIVE platform walkthrough",
+      "Competency verification & sign-off",
+      "12 hours custom ongoing training / year",
+    ],
+    sort: 0,
+  },
+  {
+    id: "cpr_first_aid",
+    sku: "cpr_first_aid",
+    name: "CPR & First Aid",
+    kind: "ala_carte",
+    price_cents: TRAINING_PRICE_CENTS.cpr_first_aid,
+    includes: ["CPR & First Aid certification"],
+    sort: 1,
+  },
+  {
+    id: "mandt",
+    sku: "mandt",
+    name: "Mandt Behavioral Intervention",
+    kind: "ala_carte",
+    price_cents: TRAINING_PRICE_CENTS.mandt,
+    includes: ["Mandt behavioral intervention"],
+    sort: 2,
+  },
+  {
+    id: "dspd_required",
+    sku: "dspd_required",
+    name: "DSPD Required Training",
+    kind: "ala_carte",
+    price_cents: TRAINING_PRICE_CENTS.dspd_required,
+    includes: ["30-day DSPD required training", "12 hours custom ongoing content / year"],
+    sort: 3,
+  },
+];
+
 export const LIST_VOLUME_TIERS = [
   { maxClients: 19, perStaffCents: LIST_PER_STAFF_CENTS_1_19, label: "1–19 clients" },
   { maxClients: 49, perStaffCents: LIST_PER_STAFF_CENTS_20_49, label: "20–49 clients" },
@@ -164,4 +223,47 @@ export function trainingPriceCentsForSku(sku: string, catalogPriceCents?: number
   if (key === "dspd_required" || key === "dspd") return TRAINING_PRICE_CENTS.dspd_required;
   const fallback = Math.floor(Number(catalogPriceCents) || 0);
   return fallback > 0 ? fallback : 0;
+}
+
+type LiveStorefrontRow = {
+  id?: string | null;
+  sku?: string | null;
+  name?: string | null;
+  kind?: string | null;
+  price_cents?: number | null;
+  includes?: string[] | null;
+  sort?: number | null;
+};
+
+function isTrainingStorefrontSku(sku: string): sku is keyof typeof TRAINING_PRICE_CENTS {
+  return sku === "full_program" || sku === "cpr_first_aid" || sku === "mandt" || sku === "dspd_required";
+}
+
+/**
+ * Public storefront always shows the three paid à la carte courses plus the
+ * $300 full program. Live hive_training_catalog rows may overlay names /
+ * includes / ids. Confirmed list prices win over $0 or missing live amounts.
+ */
+export function resolveTrainingStorefrontCatalog(
+  live: readonly LiveStorefrontRow[] | null | undefined,
+): TrainingStorefrontRow[] {
+  const bySku = new Map<string, LiveStorefrontRow>();
+  for (const row of live ?? []) {
+    const sku = typeof row.sku === "string" ? row.sku.trim().toLowerCase() : "";
+    if (isTrainingStorefrontSku(sku)) bySku.set(sku, row);
+  }
+
+  return TRAINING_STOREFRONT_CATALOG.map((base) => {
+    const overlay = bySku.get(base.sku);
+    const overlayIncludes = overlay?.includes?.filter((line) => typeof line === "string" && line.trim());
+    const price = trainingPriceCentsForSku(base.sku, overlay?.price_cents);
+    return {
+      ...base,
+      id: typeof overlay?.id === "string" && overlay.id.trim() ? overlay.id : base.id,
+      name: typeof overlay?.name === "string" && overlay.name.trim() ? overlay.name : base.name,
+      includes: overlayIncludes && overlayIncludes.length > 0 ? overlayIncludes : [...base.includes],
+      price_cents: price > 0 ? price : base.price_cents,
+      sort: typeof overlay?.sort === "number" && Number.isFinite(overlay.sort) ? overlay.sort : base.sort,
+    };
+  }).sort((a, b) => a.sort - b.sort);
 }

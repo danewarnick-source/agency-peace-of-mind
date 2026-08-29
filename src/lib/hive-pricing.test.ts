@@ -10,9 +10,11 @@ import {
   LIST_PER_STAFF_CENTS_20_49,
   LIST_PER_STAFF_CENTS_50_PLUS,
   TRAINING_PRICE_CENTS,
+  TRAINING_STOREFRONT_CATALOG,
   effectivePricingSchedule,
   listPerStaffCents,
   quoteHiveSubscription,
+  resolveTrainingStorefrontCatalog,
   signupScheduleFromPayingCount,
   trainingPriceCentsForSku,
 } from "./hive-pricing.ts";
@@ -128,5 +130,32 @@ describe("training catalog amounts", () => {
     assert.equal(TRAINING_PRICE_CENTS.dspd_required, 10_000);
     assert.equal(trainingPriceCentsForSku("mandt"), 20_000);
     assert.notEqual(trainingPriceCentsForSku("cpr_first_aid"), 4_900);
+  });
+
+  it("storefront catalog always has three à la carte courses at confirmed prices", () => {
+    const empty = resolveTrainingStorefrontCatalog(undefined);
+    const ala = empty.filter((c) => c.kind === "ala_carte");
+    assert.equal(TRAINING_STOREFRONT_CATALOG.filter((c) => c.kind === "ala_carte").length, 3);
+    assert.equal(ala.length, 3);
+    assert.equal(
+      ala.map((c) => c.sku).join(","),
+      "cpr_first_aid,mandt,dspd_required",
+    );
+    const alaTotal = ala.reduce((sum, c) => sum + c.price_cents, 0);
+    assert.equal(alaTotal, 37_500);
+    const full = empty.find((c) => c.sku === "full_program");
+    assert.equal(full?.price_cents, 30_000);
+    assert.equal(alaTotal - (full?.price_cents ?? 0), 7_500);
+  });
+
+  it("zero or missing live prices do not blank the storefront", () => {
+    const resolved = resolveTrainingStorefrontCatalog([
+      { sku: "full_program", kind: "full_program", price_cents: 0, name: "Full", includes: [], sort: 0 },
+      { sku: "cpr_first_aid", kind: "ala_carte", price_cents: 0, name: "CPR", includes: [], sort: 1 },
+    ]);
+    assert.equal(resolved.filter((c) => c.kind === "ala_carte").length, 3);
+    assert.ok(resolved.every((c) => c.price_cents > 0));
+    assert.equal(resolved.find((c) => c.sku === "cpr_first_aid")?.name, "CPR");
+    assert.equal(resolved.find((c) => c.sku === "mandt")?.price_cents, 20_000);
   });
 });

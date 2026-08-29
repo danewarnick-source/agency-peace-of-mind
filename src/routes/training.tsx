@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/site-header";
 import { Footer } from "@/components/landing/footer";
 import { Button } from "@/components/ui/button";
 import { Check, ArrowRight, GraduationCap } from "lucide-react";
+import { resolveTrainingStorefrontCatalog } from "@/lib/hive-pricing";
 
 export const Route = createFileRoute("/training")({
   head: () => ({
@@ -28,34 +29,25 @@ export const Route = createFileRoute("/training")({
   component: TrainingStorefront,
 });
 
-type CatalogRow = {
-  id: string;
-  sku: string;
-  name: string;
-  kind: "full_program" | "ala_carte";
-  price_cents: number;
-  includes: string[];
-  sort: number;
-};
-
 function TrainingStorefront() {
-  const { data: catalog = [] } = useQuery({
+  const { data: liveCatalog } = useQuery({
     queryKey: ["hive-training-catalog"],
-    queryFn: async (): Promise<CatalogRow[]> => {
-      const { data, error } = await supabase
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
         .from("hive_training_catalog")
         .select("id, sku, name, kind, price_cents, includes, sort")
         .eq("active", true)
         .order("sort");
-      if (error) throw error;
-      return (data ?? []) as CatalogRow[];
+      if (error || !Array.isArray(data)) return [];
+      return data;
     },
   });
 
+  const catalog = resolveTrainingStorefrontCatalog(liveCatalog);
   const full = catalog.find((c) => c.sku === "full_program");
   const alacarte = catalog.filter((c) => c.kind === "ala_carte");
   const aCarteTotal = alacarte.reduce((s, c) => s + c.price_cents, 0);
-  const fullCents = full?.price_cents ?? 30000;
+  const fullCents = full?.price_cents ?? 30_000;
   const savings = Math.max(0, aCarteTotal - fullCents);
 
   return (
@@ -86,7 +78,11 @@ function TrainingStorefront() {
         <section className="mx-auto grid max-w-6xl gap-6 px-4 pb-24 sm:px-6 md:grid-cols-2 md:gap-8 lg:px-8">
           {/* FULL PROGRAM */}
           <PricingCard featured navy>
-            <Eyebrow gold>Full program · save {savings > 0 ? `$${(savings / 100).toFixed(0)}` : ""}</Eyebrow>
+            <Eyebrow gold>
+              {savings > 0
+                ? `Full program · save $${(savings / 100).toFixed(0)}`
+                : "Full program"}
+            </Eyebrow>
             <CardTitle>Full training program</CardTitle>
             <Price cents={fullCents} suffix="/ staff · one-time" />
             <ul className="mt-6 space-y-3">

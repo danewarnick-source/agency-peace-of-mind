@@ -188,7 +188,11 @@ import { Route as DashboardBehaviorSupportClientIdRouteImport } from './routes/d
 import { Route as DashboardAdminEmarAuditRouteImport } from './routes/dashboard.admin.emar-audit'
 import { Route as DashboardAdminCeHoursRouteImport } from './routes/dashboard.admin.ce-hours'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe/webhook'
+import { Route as ApiPublicRuntimeConfigRouteImport } from './routes/api/public/runtime-config'
 import { Route as ApiComplianceUrgentRouteImport } from './routes/api/compliance/urgent'
+import { Route as ApiAwsStorageRouteImport } from './routes/api/aws/storage'
+import { Route as ApiAwsSessionRouteImport } from './routes/api/aws/session'
+import { Route as ApiAwsDbRouteImport } from './routes/api/aws/db'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as DashboardSmartImportJobIdReviewRouteImport } from './routes/dashboard.smart-import.$jobId.review'
@@ -1177,9 +1181,29 @@ const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
   path: '/api/stripe/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicRuntimeConfigRoute = ApiPublicRuntimeConfigRouteImport.update({
+  id: '/api/public/runtime-config',
+  path: '/api/public/runtime-config',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiComplianceUrgentRoute = ApiComplianceUrgentRouteImport.update({
   id: '/api/compliance/urgent',
   path: '/api/compliance/urgent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAwsStorageRoute = ApiAwsStorageRouteImport.update({
+  id: '/api/aws/storage',
+  path: '/api/aws/storage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAwsSessionRoute = ApiAwsSessionRouteImport.update({
+  id: '/api/aws/session',
+  path: '/api/aws/session',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAwsDbRoute = ApiAwsDbRouteImport.update({
+  id: '/api/aws/db',
+  path: '/api/aws/db',
   getParentRoute: () => rootRouteImport,
 } as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
@@ -1411,7 +1435,11 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof DashboardIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/aws/db': typeof ApiAwsDbRoute
+  '/api/aws/session': typeof ApiAwsSessionRoute
+  '/api/aws/storage': typeof ApiAwsStorageRoute
   '/api/compliance/urgent': typeof ApiComplianceUrgentRoute
+  '/api/public/runtime-config': typeof ApiPublicRuntimeConfigRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
@@ -1609,7 +1637,11 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/aws/db': typeof ApiAwsDbRoute
+  '/api/aws/session': typeof ApiAwsSessionRoute
+  '/api/aws/storage': typeof ApiAwsStorageRoute
   '/api/compliance/urgent': typeof ApiComplianceUrgentRoute
+  '/api/public/runtime-config': typeof ApiPublicRuntimeConfigRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
@@ -1815,7 +1847,11 @@ export interface FileRoutesById {
   '/dashboard/': typeof DashboardIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/aws/db': typeof ApiAwsDbRoute
+  '/api/aws/session': typeof ApiAwsSessionRoute
+  '/api/aws/storage': typeof ApiAwsStorageRoute
   '/api/compliance/urgent': typeof ApiComplianceUrgentRoute
+  '/api/public/runtime-config': typeof ApiPublicRuntimeConfigRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
@@ -2022,7 +2058,11 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/aws/db'
+    | '/api/aws/session'
+    | '/api/aws/storage'
     | '/api/compliance/urgent'
+    | '/api/public/runtime-config'
     | '/api/stripe/webhook'
     | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
@@ -2220,7 +2260,11 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/aws/db'
+    | '/api/aws/session'
+    | '/api/aws/storage'
     | '/api/compliance/urgent'
+    | '/api/public/runtime-config'
     | '/api/stripe/webhook'
     | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
@@ -2425,7 +2469,11 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/aws/db'
+    | '/api/aws/session'
+    | '/api/aws/storage'
     | '/api/compliance/urgent'
+    | '/api/public/runtime-config'
     | '/api/stripe/webhook'
     | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
@@ -2570,7 +2618,11 @@ export interface RootRouteChildren {
   AuditPortalIndexRoute: typeof AuditPortalIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  ApiAwsDbRoute: typeof ApiAwsDbRoute
+  ApiAwsSessionRoute: typeof ApiAwsSessionRoute
+  ApiAwsStorageRoute: typeof ApiAwsStorageRoute
   ApiComplianceUrgentRoute: typeof ApiComplianceUrgentRoute
+  ApiPublicRuntimeConfigRoute: typeof ApiPublicRuntimeConfigRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
   SignEmployeeLoanTokenRoute: typeof SignEmployeeLoanTokenRoute
   ApiPublicHooksBillingDailyCheckRoute: typeof ApiPublicHooksBillingDailyCheckRoute
@@ -3837,11 +3889,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStripeWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/runtime-config': {
+      id: '/api/public/runtime-config'
+      path: '/api/public/runtime-config'
+      fullPath: '/api/public/runtime-config'
+      preLoaderRoute: typeof ApiPublicRuntimeConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/compliance/urgent': {
       id: '/api/compliance/urgent'
       path: '/api/compliance/urgent'
       fullPath: '/api/compliance/urgent'
       preLoaderRoute: typeof ApiComplianceUrgentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/aws/storage': {
+      id: '/api/aws/storage'
+      path: '/api/aws/storage'
+      fullPath: '/api/aws/storage'
+      preLoaderRoute: typeof ApiAwsStorageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/aws/session': {
+      id: '/api/aws/session'
+      path: '/api/aws/session'
+      fullPath: '/api/aws/session'
+      preLoaderRoute: typeof ApiAwsSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/aws/db': {
+      id: '/api/aws/db'
+      path: '/api/aws/db'
+      fullPath: '/api/aws/db'
+      preLoaderRoute: typeof ApiAwsDbRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.mcp/invoke-tool/$tool': {
@@ -4536,7 +4616,11 @@ const rootRouteChildren: RootRouteChildren = {
   AuditPortalIndexRoute: AuditPortalIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  ApiAwsDbRoute: ApiAwsDbRoute,
+  ApiAwsSessionRoute: ApiAwsSessionRoute,
+  ApiAwsStorageRoute: ApiAwsStorageRoute,
   ApiComplianceUrgentRoute: ApiComplianceUrgentRoute,
+  ApiPublicRuntimeConfigRoute: ApiPublicRuntimeConfigRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
   SignEmployeeLoanTokenRoute: SignEmployeeLoanTokenRoute,
   ApiPublicHooksBillingDailyCheckRoute: ApiPublicHooksBillingDailyCheckRoute,

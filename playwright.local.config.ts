@@ -9,7 +9,7 @@ const BASE = `http://127.0.0.1:${PORT}`;
  */
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "compliance-desk.spec.ts",
+  testMatch: /(?:compliance-desk|hhs-hub)\.spec\.ts/,
   retries: 0,
   timeout: 90_000,
   expect: { timeout: 15_000 },

@@ -22,7 +22,6 @@ import {
   CLIENT_LIST,
   CLIENTS,
   DAILY_LOGS,
-  DSP_USER_ID,
   ORG_ID,
   ORG_NAME,
   PENDING_INVITE,
@@ -31,7 +30,7 @@ import {
   TEAMS,
 } from "../fixtures/tns-roster";
 
-export type MockPersona = "admin" | "dsp";
+export type MockPersona = "admin" | "dsp" | "manager";
 
 export type MockOptions = {
   persona?: MockPersona;
@@ -40,6 +39,8 @@ export type MockOptions = {
   emptyStaff?: boolean;
   emptyLogs?: boolean;
   logsError?: boolean;
+  /** Skip staff_assignments so the HHS hub bounce path can be asserted. */
+  noAssignments?: boolean;
 };
 
 type Row = Record<string, unknown>;
@@ -213,6 +214,74 @@ function clientRow(c: (typeof CLIENT_LIST)[number]): Row {
   };
 }
 
+function isoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** A day this month that is not today — used for Present-without-note fixture. */
+function presentWithoutNoteDate(): string {
+  const today = new Date();
+  const d = new Date(today.getFullYear(), today.getMonth(), Math.max(1, today.getDate() - 1));
+  if (d.getMonth() !== today.getMonth()) {
+    return isoDate(new Date(today.getFullYear(), today.getMonth(), 1));
+  }
+  return isoDate(d);
+}
+
+function hhsClientIds(): string[] {
+  return CLIENT_LIST.filter((c) => c.codes.includes("HHS")).map((c) => c.id);
+}
+
+function assignmentRows(_personaId?: string): Row[] {
+  const rows: Row[] = [];
+  const hhsIds = hhsClientIds();
+  const assignees = [ADMIN_USER_ID, STAFF.harvey.id, STAFF.jake.id];
+  for (const staffId of assignees) {
+    for (const clientId of hhsIds) {
+      rows.push({
+        id: `sa-${staffId.slice(-4)}-${clientId.slice(-4)}`,
+        organization_id: ORG_ID,
+        staff_id: staffId,
+        client_id: clientId,
+        service_codes: ["HHS"],
+        created_at: "2026-07-01T00:00:00.000Z",
+      });
+    }
+  }
+  return rows;
+}
+
+function hhsAttendanceRows(): Row[] {
+  const date = presentWithoutNoteDate();
+  return hhsClientIds().map((clientId) => ({
+    id: `att-${clientId.slice(-4)}-${date}`,
+    organization_id: ORG_ID,
+    client_id: clientId,
+    record_date: date,
+    presence_status: "Present",
+    away_reason: null,
+    away_category: null,
+    away_notes: null,
+    staff_initials_signature: "RA",
+    attestation_accepted: true,
+    provider_id: ADMIN_USER_ID,
+  }));
+}
+
+function hhsDailyRecordRows(): Row[] {
+  const date = presentWithoutNoteDate();
+  return hhsClientIds().map((clientId) => ({
+    organization_id: ORG_ID,
+    client_id: clientId,
+    record_date: date,
+    service_code: "HHS",
+    billable: false,
+    blocked_reason: "Present without a daily note — not billable",
+    attendance_status: "Present",
+    has_daily_note: false,
+  }));
+}
+
 function billingCodeRows(): Row[] {
   const out: Row[] = [];
   for (const c of CLIENT_LIST) {
@@ -327,6 +396,12 @@ function tableRows(table: string, opts: MockOptions, personaId: string): Row[] {
       return clients;
     case "client_billing_codes":
       return opts.emptyClients ? [] : billingCodeRows();
+    case "staff_assignments":
+      return opts.noAssignments ? [] : assignmentRows(personaId);
+    case "hhs_monthly_attendance":
+      return hhsAttendanceRows();
+    case "hhs_daily_records_v":
+      return hhsDailyRecordRows();
     case "client_external_services":
     case "client_medications":
     case "client_documents":
@@ -335,7 +410,6 @@ function tableRows(table: string, opts: MockOptions, personaId: string): Row[] {
     case "nectar_documents":
     case "policy_signatures":
     case "evv_timesheets":
-    case "staff_assignments":
     case "training_tracks":
     case "courses":
     case "course_assignments":
@@ -440,7 +514,11 @@ async function handleSupabase(route: Route, opts: MockOptions, personaId: string
   if (url.pathname.startsWith("/rest/v1/rpc/")) {
     const rpc = url.pathname.replace("/rest/v1/rpc/", "").split("/")[0];
     if (rpc === "clients_for_staff") {
-      const clients = opts.emptyClients ? [] : CLIENT_LIST.map(clientRow);
+      if (opts.emptyClients || opts.noAssignments) {
+        await fulfillJson(route, 200, []);
+        return;
+      }
+      const clients = CLIENT_LIST.map(clientRow);
       await fulfillJson(route, 200, clients);
       return;
     }
@@ -593,8 +671,25 @@ function decodeServerFnExport(url: string): string {
   }
 }
 
+/** Start 1.16x hashes server-fn ids; fall back to distinctive payload fields. */
+function inferServerFn(url: string, body: string): string {
+  const named = decodeServerFnExport(url);
+  if (named) return named;
+  const blob = `${url}\n${body}`;
+  if (/pcspGoalsAddressed|signatureDataUrl/i.test(blob)) return "saveDailyRecord";
+  if (/presenceStatus/i.test(blob)) return "setAttendance";
+  if (/monthStart/i.test(blob) && /00000000-0000-4000-a000-00000000010[1-4]/.test(blob)) {
+    return "getHhsMonthData";
+  }
+  if (/monthStart/i.test(blob)) return "listAttendance";
+  if (/"month"/i.test(blob) && /00000000-0000-4000-a000-00000000010[1-4]/.test(blob)) {
+    return "getMonthCertification";
+  }
+  return "";
+}
+
 function serverFnPayload(url: string, body: string): unknown {
-  const fn = decodeServerFnExport(url);
+  const fn = inferServerFn(url, body);
   if (/createInvitation/i.test(fn)) {
     let email = "invited@example.test";
     const m = `${url}\n${body}`.match(/sep1\.tester@example\.test|[a-z0-9._%+-]+@example\.test/i);
@@ -642,6 +737,32 @@ function serverFnPayload(url: string, body: string): unknown {
   if (/getHrComplianceMatrix/i.test(fn)) return { requirements: [], staff: [] };
   if (/getStaffPii|getStaffTrainingRiskFlags/i.test(fn)) return null;
   if (/recordPhiAccess|dismissUiPref|requestPermission/i.test(fn)) return { ok: true };
+  if (/saveDailyRecord/i.test(fn)) {
+    return { id: "00000000-0000-4000-a000-000000000801", status: "pending_approval" };
+  }
+  if (/setAttendance/i.test(fn)) return { ok: true };
+  if (/listAttendance/i.test(fn)) return hhsAttendanceRows();
+  if (/getHhsMonthData/i.test(fn)) {
+    const idMatch = `${url}\n${body}`.match(/00000000-0000-4000-a000-00000000010[1-4]/);
+    const clientId = idMatch?.[0] ?? CLIENTS.blake.id;
+    return {
+      attendance: hhsAttendanceRows()
+        .filter((r) => r.client_id === clientId)
+        .map((r) => ({
+          client_id: r.client_id,
+          record_date: r.record_date,
+          presence_status: r.presence_status,
+          away_reason: r.away_reason,
+          away_category: r.away_category,
+          staff_initials_signature: r.staff_initials_signature,
+        })),
+      blocked: hhsDailyRecordRows()
+        .filter((r) => r.client_id === clientId && r.billable === false)
+        .map((r) => ({ record_date: r.record_date, blocked_reason: r.blocked_reason })),
+    };
+  }
+  if (/getMonthCertification/i.test(fn)) return { tableReady: true, cert: null };
+  if (/certifyHhsMonth/i.test(fn)) return { ok: true };
   if (/evaluateShiftNote/i.test(fn)) {
     return { status: "Verified", feedback: "Mocked NECTAR coach — not a live review." };
   }
@@ -723,8 +844,9 @@ function isServerFnUrl(url: URL): boolean {
 
 export async function installHiveMocks(page: Page, opts: MockOptions = {}): Promise<void> {
   const persona = opts.persona ?? "admin";
-  const personaId = persona === "dsp" ? DSP_USER_ID : ADMIN_USER_ID;
-  const personaStaff = persona === "dsp" ? STAFF.jake : STAFF.admin;
+  const personaStaff =
+    persona === "dsp" ? STAFF.jake : persona === "manager" ? STAFF.harvey : STAFF.admin;
+  const personaId = personaStaff.id;
   const session = sessionBlob(personaId, personaStaff.email, personaStaff.name);
 
   await page.route(/https?:\/\/[^/]*supabase\.co\/.*/, (route) => handleSupabase(route, opts, personaId, session));
@@ -749,11 +871,16 @@ export async function installHiveMocks(page: Page, opts: MockOptions = {}): Prom
   });
 
   await page.addInitScript(
-    ({ storageKey, sessionJson, orgId, persona }) => {
+    ({ storageKey, sessionJson, orgId, persona, noAssignments, clientsError }) => {
       try {
         window.localStorage.setItem(storageKey, sessionJson);
         window.localStorage.setItem("hive.activeOrgId", orgId);
         window.localStorage.setItem("portal-view", persona === "dsp" ? "staff" : "admin");
+        window.localStorage.setItem("hive.e2e.persona", persona);
+        if (noAssignments) window.localStorage.setItem("hive.e2e.noAssignments", "1");
+        else window.localStorage.removeItem("hive.e2e.noAssignments");
+        if (clientsError) window.localStorage.setItem("hive.e2e.clientsError", "1");
+        else window.localStorage.removeItem("hive.e2e.clientsError");
       } catch {
         /* ignore */
       }
@@ -763,6 +890,8 @@ export async function installHiveMocks(page: Page, opts: MockOptions = {}): Prom
       sessionJson: JSON.stringify(session),
       orgId: ORG_ID,
       persona,
+      noAssignments: !!opts.noAssignments,
+      clientsError: !!opts.clientsError,
     },
   );
 }
@@ -780,8 +909,21 @@ export async function assertPageNotBlank(page: Page, label: string): Promise<voi
 
 export async function waitForDashboard(page: Page): Promise<void> {
   await page.waitForLoadState("domcontentloaded");
+  const hub = page.getByTestId("e2e-hhs-hub-harness");
+  const profile = page.getByText(/Clinical Profile/i);
+  const unavailable = page.getByText(/Client unavailable/i);
+  const bounced = page.getByText(/not assigned to any daily services/i);
+  await Promise.race([
+    hub.waitFor({ state: "visible", timeout: 45_000 }),
+    profile.waitFor({ state: "visible", timeout: 45_000 }),
+    unavailable.waitFor({ state: "visible", timeout: 45_000 }),
+    bounced.waitFor({ state: "visible", timeout: 45_000 }),
+    page.getByText(/^Loading…$/).waitFor({ state: "hidden", timeout: 45_000 }),
+  ]).catch(() => undefined);
   const loading = page.getByText(/^Loading…$/);
-  await loading.waitFor({ state: "hidden", timeout: 25_000 }).catch(() => undefined);
+  if (await loading.isVisible().catch(() => false)) {
+    await loading.waitFor({ state: "hidden", timeout: 20_000 }).catch(() => undefined);
+  }
 }
 
-export { ADMIN_EMAIL, ADMIN_NAME, ADMIN_USER_ID, CLIENTS, DAILY_LOGS, STAFF };
+export { ADMIN_EMAIL, ADMIN_NAME, ADMIN_USER_ID, CLIENTS, DAILY_LOGS, STAFF, presentWithoutNoteDate };

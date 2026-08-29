@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
 import { StaffMedicationsPanel } from "@/components/medications/staff-medications-panel";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -37,7 +37,7 @@ const hhsSearch = z.object({ tab: z.string().optional() });
 export const Route = createFileRoute("/dashboard/hhs-hub/$clientId")({
   head: () => ({ meta: [{ title: "Host Home Client Hub — HIVE" }] }),
   validateSearch: hhsSearch,
-  component: HhsClientHub,
+  component: HhsClientHubRoute,
 });
 
 interface ClientFull {
@@ -56,11 +56,15 @@ interface ClientFull {
   swallowing_alerts: string[] | null;
 }
 
-function HhsClientHub() {
+function HhsClientHubRoute() {
   const { clientId } = Route.useParams();
+  return <HhsClientHub clientId={clientId} />;
+}
+
+export function HhsClientHub({ clientId }: { clientId: string }) {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
-  const { tab: tabParam } = Route.useSearch();
+  const { tab: tabParam } = useSearch({ strict: false }) as { tab?: string };
   const navigate = useNavigate();
 
 

@@ -1533,11 +1533,12 @@ function AdminHomeDashboardInner() {
               Compliance by area
             </h2>
             <Link
-              to="/dashboard/company-obligations"
+              to={incidentStats.total > 0 ? "/dashboard/hub/documentation" : "/dashboard/company-obligations"}
+              search={incidentStats.total > 0 ? { tab: "incidents", cc: "urgent" } : undefined}
               className="flex cursor-pointer items-center gap-1 text-xs hover:underline"
               style={{ color: HIVE_TEAL }}
             >
-              Details →
+              {incidentStats.total > 0 ? "Urgent incidents →" : "Details →"}
             </Link>
           </div>
           <div className={areaGapClass}>
@@ -1550,7 +1551,12 @@ function AdminHomeDashboardInner() {
                 const inner = (
                   <>
                     <div className="mb-1 flex items-center justify-between gap-2">
-                      <span className="text-sm text-foreground">{row.label}</span>
+                      <span className={incidentHref ? "text-sm font-medium underline underline-offset-2" : "text-sm text-foreground"} style={incidentHref ? { color: HIVE_TEAL } : undefined}>
+                        {row.label}
+                      </span>
+                      {incidentHref ? (
+                        <span className="text-xs font-medium" style={{ color: HIVE_TEAL }}>Urgent →</span>
+                      ) : null}
                     </div>
                     <p
                       className={cn(
@@ -1576,9 +1582,11 @@ function AdminHomeDashboardInner() {
               const barInner = (
                 <>
                   <div className="mb-1.5 flex items-center justify-between gap-2">
-                    <span className="text-sm text-foreground">{row.label}</span>
-                    <span className="text-sm font-semibold tabular-nums" style={{ color }}>
-                      {row.score}%
+                    <span className={incidentHref ? "text-sm font-medium underline underline-offset-2" : "text-sm text-foreground"} style={incidentHref ? { color: HIVE_TEAL } : undefined}>
+                      {row.label}
+                    </span>
+                    <span className="text-sm font-semibold tabular-nums" style={{ color: incidentHref ? HIVE_TEAL : color }}>
+                      {incidentHref ? `${row.score}% · Urgent →` : `${row.score}%`}
                     </span>
                   </div>
                   <ProgressBar score={row.score} color={color} />

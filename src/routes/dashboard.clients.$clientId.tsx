@@ -49,6 +49,7 @@ import {
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
 
+import { displayMedicaidId } from "@/lib/medicaid-id";
 import { ClientBudgetPanel } from "@/components/clients/client-budget-panel";
 import { ClientMealPlannerMount } from "@/components/clients/client-meal-planner-mount";
 import { ChoreChartForClient } from "@/components/chores/chore-chart-mount";
@@ -338,7 +339,9 @@ function ClientProfileHub() {
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold truncate">{fullName}</h1>
           <div className="flex flex-wrap gap-2 mt-1 text-xs text-muted-foreground">
-            {client?.medicaid_id ? <span>Medicaid #{String(client.medicaid_id)}</span> : null}
+            {displayMedicaidId(client?.medicaid_id) ? (
+              <span>Medicaid #{displayMedicaidId(client?.medicaid_id)}</span>
+            ) : null}
             {client?.account_status ? (
               <Badge variant="outline">{String(client.account_status)}</Badge>
             ) : null}
@@ -447,7 +450,7 @@ function ClientProfileHub() {
               <BillingCodesPanel
                 clientId={clientId}
                 clientName={fullName}
-                medicaidId={typeof client?.medicaid_id === "string" ? client.medicaid_id : null}
+                medicaidId={displayMedicaidId(client?.medicaid_id)}
               />
             </SectionPanel>
             <SectionPanel icon={Wallet} accent="teal">

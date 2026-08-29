@@ -47,6 +47,7 @@ import {
 } from "lucide-react";
 import { isDailyServiceCode } from "@/lib/service-billing";
 import { remainingUnitsForCode } from "@/lib/billing-units";
+import { displayMedicaidId } from "@/lib/medicaid-id";
 import { isVariableRateCode } from "@/lib/variable-rate-codes";
 import {
   parseClientBudgetDocument,
@@ -84,21 +85,26 @@ export function BillingCodesDetail({ clientId, clientName, medicaidId }: Props) 
   const { data: budgets, isLoading } = useClientBudget(clientId);
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
-  const medicaidQ = useQuery({
-    enabled: !!clientId && !medicaidId,
-    queryKey: ["billing-card-medicaid", clientId],
+  const identityQ = useQuery({
+    enabled: !!clientId && (!displayMedicaidId(medicaidId) || !clientName?.trim()),
+    queryKey: ["billing-card-identity", clientId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("medicaid_id")
+        .select("medicaid_id, first_name, last_name")
         .eq("id", clientId)
         .maybeSingle();
       if (error) throw error;
-      return (data?.medicaid_id as string | null) ?? null;
+      const name = `${data?.first_name ?? ""} ${data?.last_name ?? ""}`.trim();
+      return {
+        medicaidId: displayMedicaidId(data?.medicaid_id),
+        clientName: name || null,
+      };
     },
     staleTime: 60_000,
   });
-  const displayMedicaid = medicaidId || medicaidQ.data || null;
+  const displayMedicaid = displayMedicaidId(medicaidId) ?? identityQ.data?.medicaidId ?? null;
+  const displayClientName = clientName?.trim() || identityQ.data?.clientName || "—";
 
   const planYear = useMemo(() => {
     if (!budgets || budgets.length === 0) return { start: null as Date | null, end: null as Date | null };
@@ -285,7 +291,7 @@ export function BillingCodesDetail({ clientId, clientName, medicaidId }: Props) 
         <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
           <div className="grid gap-3 sm:grid-cols-3">
             <Field icon={<IdCard className="h-3.5 w-3.5" />} label="Client">
-              <span className="font-semibold">{clientName}</span>
+              <span className="font-semibold">{displayClientName}</span>
             </Field>
             <Field icon={<Receipt className="h-3.5 w-3.5" />} label="Individual Medicaid ID">
               <span className="font-mono">{displayMedicaid || "—"}</span>

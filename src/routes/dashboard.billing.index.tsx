@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useAllClientBillingCodes } from "@/hooks/use-client-billing-codes";
 import { ChevronRight, AlertTriangle, CheckCircle2, CalendarX2 } from "lucide-react";
-import { fmtHours, fmtUnits, unitsToHours, computeEntryUnits } from "@/lib/billing-units";
+import { fmtHours, fmtUnits, unitsToHours, computeEntryUnits, effectiveBillingTimes, rollupClientUsage } from "@/lib/billing-units";
 import { isDailyServiceCode } from "@/lib/service-billing";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -46,7 +46,7 @@ function BillingOverviewPage() {
       const [tsRes, dlRes] = await Promise.all([
         supabase
           .from("evv_timesheets")
-          .select("client_id, service_type_code, clock_in_timestamp, clock_out_timestamp")
+          .select("client_id, service_type_code, clock_in_timestamp, clock_out_timestamp, rounded_clock_in, rounded_clock_out, corrected_clock_in, corrected_clock_out, review_status")
           .eq("organization_id", org!.organization_id)
           .gte("clock_in_timestamp", yearStart),
         // Daily-rate days come from the hhs_daily_records_v view. Billable
@@ -79,26 +79,27 @@ function BillingOverviewPage() {
     const tsRows = (usageQ.data?.ts ?? []) as Array<{
       client_id: string;
       service_type_code: string | null;
-      clock_in_timestamp: string;
+      clock_in_timestamp: string | null;
       clock_out_timestamp: string | null;
+      rounded_clock_in: string | null;
+      rounded_clock_out: string | null;
+      corrected_clock_in: string | null;
+      corrected_clock_out: string | null;
+      review_status: string | null;
     }>;
     const dlRows = (usageQ.data?.dl ?? []) as Array<{ client_id: string; record_date: string; service_code: string | null }>;
 
     return clientsQ.data.map((c) => {
       const clientCodes = codes.filter((b) => b.client_id === c.id);
-      let totalAnnual = 0;
-      let totalUsed = 0;
-      let earliest: Date | null = null;
       let latestEnd: Date | null = null;
       let flagged = 0;
 
+      const perCode: Array<{ annual: number; used: number }> = [];
       for (const code of clientCodes) {
         const periodStart = code.service_start_date ? new Date(code.service_start_date) : null;
         const periodEnd = code.service_end_date ? new Date(code.service_end_date) : null;
-        if (periodStart && (!earliest || periodStart < earliest)) earliest = periodStart;
         if (periodEnd && (!latestEnd || periodEnd > latestEnd)) latestEnd = periodEnd;
         const annual = code.annual_unit_authorization ?? 0;
-        totalAnnual += annual;
 
         const isDaily = isDailyServiceCode(code.service_code);
         let used = 0;
@@ -116,26 +117,29 @@ function BillingOverviewPage() {
           used = set.size;
         } else {
           for (const r of tsRows) {
-            if (r.client_id !== c.id || !r.clock_out_timestamp) continue;
+            if (r.client_id !== c.id) continue;
             if (r.service_type_code !== code.service_code) continue;
-            const inT = new Date(r.clock_in_timestamp);
+            const times = effectiveBillingTimes(r);
+            if (!times) continue;
+            const inT = new Date(times.in);
             if (periodStart && inT < periodStart) continue;
             if (periodEnd && inT > periodEnd) continue;
-            // Per-entry rounding; the bucket sums entry units, never re-rounds.
-            used += computeEntryUnits(r.clock_in_timestamp, r.clock_out_timestamp);
+            used += computeEntryUnits(times.in, times.out);
           }
         }
-        totalUsed += used;
+        perCode.push({ annual, used });
         if (annual > 0 && used / annual >= 0.9) flagged += 1;
       }
+
+      const rolled = rollupClientUsage(perCode);
 
       return {
         client: c,
         code_count: clientCodes.length,
-        total_annual_units: totalAnnual,
-        total_used_units: totalUsed,
-        remaining_units: Math.max(0, totalAnnual - totalUsed),
-        pct: totalAnnual > 0 ? (totalUsed / totalAnnual) * 100 : 0,
+        total_annual_units: rolled.totalAnnual,
+        total_used_units: rolled.totalUsed,
+        remaining_units: rolled.remaining,
+        pct: rolled.pct,
         renewal: latestEnd,
         flagged_codes: flagged,
       };

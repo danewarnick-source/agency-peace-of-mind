@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "./use-org";
+import { billingCodesForLiveClients } from "@/lib/billing-codes-live-clients";
 
 export type ClientBillingCode = {
   id: string;
@@ -25,6 +26,16 @@ export function useClientBillingCodes(clientId: string | undefined) {
     enabled: !!org?.organization_id && !!clientId,
     queryKey: ["client-billing-codes", org?.organization_id, clientId],
     queryFn: async (): Promise<ClientBillingCode[]> => {
+      // Two queries, join in JS. Skip codes if the clients row is gone.
+      const { data: client, error: clientError } = await supabase
+        .from("clients")
+        .select("id")
+        .eq("organization_id", org!.organization_id)
+        .eq("id", clientId!)
+        .maybeSingle();
+      if (clientError) throw clientError;
+      if (!client) return [];
+
       const { data, error } = await supabase
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .from("client_billing_codes" as any)
@@ -49,7 +60,7 @@ export function useAllClientBillingCodes() {
   const { data: org } = useCurrentOrg();
   return useQuery({
     enabled: !!org?.organization_id,
-    queryKey: ["all-client-billing-codes", org?.organization_id],
+    queryKey: ["all-client-billing-codes", org?.organization_id, "live-clients"],
     queryFn: async (): Promise<ClientBillingCode[]> => {
       const { data, error } = await supabase
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,7 +70,18 @@ export function useAllClientBillingCodes() {
         .order("client_id")
         .order("service_code");
       if (error) throw error;
-      return (data ?? []) as unknown as ClientBillingCode[];
+      const rows = (data ?? []) as unknown as ClientBillingCode[];
+      if (!rows.length) return [];
+      // Hide codes whose client_id has no clients row. Do not delete them.
+      const { data: clients, error: clientsError } = await supabase
+        .from("clients")
+        .select("id")
+        .eq("organization_id", org!.organization_id);
+      if (clientsError) throw clientsError;
+      return billingCodesForLiveClients(
+        rows,
+        (clients ?? []).map((c) => c.id),
+      );
     },
   });
 }

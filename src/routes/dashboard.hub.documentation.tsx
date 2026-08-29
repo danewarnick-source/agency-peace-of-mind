@@ -14,6 +14,7 @@ const search = z.object({
   tab: z.enum(["records", "incidents", "forms", "audit", "hrc"]).catch("records").optional(),
   client: z.string().optional(),
   focus: z.string().optional(),
+  cc: z.enum(["urgent", "pending"]).optional(),
 });
 
 export const Route = createFileRoute("/dashboard/hub/documentation")({
@@ -39,7 +40,7 @@ function DocumentationHub() {
           render: () => (
             <AdminIncidentsSection
               initialClientId={client ?? null}
-              initialView={client ? "log" : "queue"}
+              initialView="queue"
             />
           ),
         },

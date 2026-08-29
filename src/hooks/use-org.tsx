@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
 import { ROLE_RANK, type Role } from "@/lib/rbac";
+import { resolveCurrentMembership } from "@/lib/current-org";
 
 export type { Role };
 
@@ -104,31 +105,20 @@ export function useMyMemberships() {
 }
 
 /**
- * Deterministic default picker: prefer a non-demo org so a demo workspace
- * can never win as an accidental load-time fallback. Within each group
- * (non-demo / demo) sort by role rank, then organization_id for stability.
- */
-function pickDefaultMembership(memberships: CurrentMembership[]): CurrentMembership | null {
-  if (!memberships.length) return null;
-  const sorted = [...memberships].sort((a, b) => {
-    if (a.is_demo !== b.is_demo) return a.is_demo ? 1 : -1; // non-demo first
-    const r = ROLE_RANK[b.role] - ROLE_RANK[a.role];
-    if (r !== 0) return r;
-    return a.organization_id.localeCompare(b.organization_id);
-  });
-  return sorted[0];
-}
-
-/**
  * Returns the active membership for the signed-in user. Resolution is
  * deterministic:
  *   1. persisted activeOrgId (localStorage), if it still maps to an active membership
- *   2. otherwise a stable non-demo-preferred default (see pickDefaultMembership)
+ *   2. otherwise a stable non-demo-preferred default (see resolveCurrentMembership)
  * A demo org is NEVER selected as an accidental load-time fallback, which
  * kills the demo-banner race on multi-org users.
+ *
+ * Query key is [userId] only. Including hive.activeOrgId split the cache so
+ * the sidebar (hydrated id) could show TNS Owner while a child page
+ * (null id) rendered "No active organization."
  */
 export function useCurrentOrg() {
   const { user } = useAuth();
+  const qc = useQueryClient();
 
   // SSR-safe: initialize to null so server and first-client paint match.
   // LocalStorage is read inside useEffect (after mount) to avoid hydration mismatch.
@@ -138,23 +128,22 @@ export function useCurrentOrg() {
     if (typeof window === "undefined") return;
     setActiveOrgIdState(readActiveOrgId());
     const onStorage = (e: StorageEvent) => {
-      if (e.key === ACTIVE_ORG_KEY) setActiveOrgIdState(e.newValue);
+      if (e.key === ACTIVE_ORG_KEY) {
+        setActiveOrgIdState(e.newValue);
+        void qc.invalidateQueries({ queryKey: ["current-org", user?.id] });
+      }
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, []);
+  }, [qc, user?.id]);
 
   const q = useQuery({
     enabled: !!user,
-    queryKey: ["current-org", user?.id, activeOrgId],
+    queryKey: ["current-org", user?.id],
     queryFn: async (): Promise<CurrentMembership | null> => {
       const memberships = await fetchMemberships(user!.id);
-      if (!memberships.length) return null;
-      if (activeOrgId) {
-        const picked = memberships.find((m) => m.organization_id === activeOrgId);
-        if (picked) return picked;
-      }
-      return pickDefaultMembership(memberships);
+      // Read storage inside the query so a blank first paint still picks TNS.
+      return resolveCurrentMembership(memberships, readActiveOrgId());
     },
   });
 

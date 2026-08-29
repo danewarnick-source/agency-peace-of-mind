@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useCurrentOrg } from "@/hooks/use-org";
+import { isComplimentaryHiveOrg } from "@/lib/current-org";
 import {
   formatUsdFromCents,
   quoteHiveSubscription,
@@ -25,6 +27,9 @@ function fmtMoney(cents: number): string {
 
 export function HiveSubscriptionPanel() {
   const qc = useQueryClient();
+  const orgQ = useCurrentOrg();
+  const org = orgQ.data ?? null;
+  const orgId = org?.organization_id ?? null;
   const statusFn = useServerFn(getBillingStatusFn);
   const checkoutFn = useServerFn(createSubscriptionCheckoutFn);
   const portalFn = useServerFn(createPortalSessionFn);
@@ -33,18 +38,24 @@ export function HiveSubscriptionPanel() {
   const [staffCount, setStaffCount] = useState(4);
   const [clientCount, setClientCount] = useState(10);
   const [interval, setInterval] = useState<BillingInterval>("monthly");
+  const waitingForOrg = orgQ.isPending || (!orgId && orgQ.isFetching);
+
+  // Same resolution as the sidebar. A blank hive.activeOrgId is not "no org."
+  useEffect(() => {
+    if (!orgId || typeof window === "undefined") return;
+    try {
+      if (!window.localStorage.getItem("hive.activeOrgId")) {
+        window.localStorage.setItem("hive.activeOrgId", orgId);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [orgId]);
 
   const q = useQuery({
-    queryKey: ["hive-billing-status"],
-    queryFn: () => {
-      let organizationId: string | undefined;
-      try {
-        organizationId = window.localStorage.getItem("hive.activeOrgId") ?? undefined;
-      } catch {
-        /* ignore */
-      }
-      return statusFn({ data: { organizationId } });
-    },
+    enabled: !!orgId,
+    queryKey: ["hive-billing-status", orgId],
+    queryFn: () => statusFn({ data: { organizationId: orgId } }),
   });
 
   useEffect(() => {
@@ -93,6 +104,16 @@ export function HiveSubscriptionPanel() {
     });
   }, [d, staffCount, clientCount, interval]);
 
+  if (waitingForOrg) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Loading plan…
+      </div>
+    );
+  }
+  if (!orgId) {
+    return <div className="text-sm text-muted-foreground">No active organization.</div>;
+  }
   if (q.isLoading || !d) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -101,7 +122,12 @@ export function HiveSubscriptionPanel() {
     );
   }
 
+  // TNS is Free/Exempt even if the billing_exempt column is not set yet.
+  // Never show a pay button or start Stripe Checkout for that org.
+  const complimentary = d.billingExempt || isComplimentaryHiveOrg(org);
+
   const pay = async () => {
+    if (complimentary) return;
     if (!d.organizationId) return;
     setBusy(true);
     try {
@@ -148,13 +174,13 @@ export function HiveSubscriptionPanel() {
     }
   };
 
-  const statusLabel = d.billingExempt
-    ? "Exempt — never charged"
+  const statusLabel = complimentary
+    ? "Free / Exempt — never charged"
     : d.lockedAt
       ? "Payment needed"
       : (d.status ?? "unknown").replace("_", " ");
 
-  const rateKind = d.billingExempt
+  const rateKind = complimentary
     ? "Exempt"
     : quote?.schedule === "founding"
       ? "Founding"
@@ -183,7 +209,7 @@ export function HiveSubscriptionPanel() {
         </div>
       )}
 
-      {d.billingExempt && (
+      {complimentary && (
         <div
           className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950"
           data-testid="comped-note"
@@ -194,7 +220,7 @@ export function HiveSubscriptionPanel() {
         </div>
       )}
 
-      {!d.paymentsConfigured && !d.billingExempt && (
+      {!d.paymentsConfigured && !complimentary && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
           {d.paymentsMessage ?? "Payments are not set up yet. Ask a Hive Executive to add the Stripe test keys."}
         </div>
@@ -207,14 +233,14 @@ export function HiveSubscriptionPanel() {
             {rateKind}
           </div>
           <div className="text-lg font-medium text-[#7a4a0a]">
-            {d.billingExempt
+            {complimentary
               ? "No charge"
               : quote
                 ? `${fmtMoney(quote.perStaffCents)} / staff`
                 : "Per staff"}
           </div>
         </div>
-        {!d.billingExempt && quote && (
+        {!complimentary && quote && (
           <div className="mt-2 space-y-1 text-sm">
             <div>
               Monthly: <span className="font-medium">{fmtMoney(quote.monthlyCents)}</span>
@@ -236,14 +262,14 @@ export function HiveSubscriptionPanel() {
         <div className="mt-2 text-sm">
           Status: <span className="font-medium capitalize">{statusLabel}</span>
         </div>
-        {d.currentPeriodEnd && !d.billingExempt && (
+        {d.currentPeriodEnd && !complimentary && (
           <div className="mt-1 text-xs text-muted-foreground">
             Current period ends {new Date(d.currentPeriodEnd).toLocaleDateString()}
           </div>
         )}
       </div>
 
-      {!d.billingExempt && (
+      {!complimentary && (
         <div className="rounded-xl border border-border bg-card p-5 shadow-sm space-y-3">
           <div className="text-sm font-medium">Pay for Hive</div>
           <div className="grid gap-3 sm:grid-cols-2">

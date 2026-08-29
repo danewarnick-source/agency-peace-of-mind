@@ -11,7 +11,7 @@ import { RequirePermission } from "@/components/rbac-guard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Upload, FileText, Sparkles, X, ArrowLeft, CheckCircle2, AlertCircle, Pencil, Check, User, Download } from "lucide-react";
+import { Loader2, Upload, FileText, Sparkles, X, ArrowLeft, CheckCircle2, AlertCircle, Pencil, Check, User, Download, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import {
   createSmartImportJob,
@@ -23,6 +23,8 @@ import { TimesheetsImportWizard } from "@/components/smart-import/timesheets/tim
 import { DailyNotesImportWizard } from "@/components/smart-import/daily-notes/daily-notes-import-wizard";
 import { normalizeConfig } from "@/components/hr/staff-fields-panel";
 import { buildStaffTemplateCsv, triggerCsvDownload } from "@/lib/staff-import-template";
+import { downloadClientTemplate } from "@/lib/client-import-template";
+import { smartImportNeedsAi } from "@/lib/smart-import-ai-gate";
 
 const SearchSchema = z.object({ mode: z.enum(["employee", "client", "timesheets", "daily_notes"]).optional() });
 
@@ -282,6 +284,21 @@ function SmartImportPage() {
     [files, pasteText, org],
   );
 
+  const pasteLooksLikeCsv = useMemo(() => {
+    const t = pasteText.trim();
+    return t.length > 0 && /,|\t/.test(t) && t.includes("\n");
+  }, [pasteText]);
+
+  const csvOnly = useMemo(() => {
+    const hasAiDocs = files.some((f) => f.kind === "ai_doc");
+    const hasRoster = files.some((f) => f.kind === "roster");
+    const hasNarrativePaste = pasteText.trim().length > 0 && !pasteLooksLikeCsv;
+    return !smartImportNeedsAi({
+      hasPdfOrDocxDocs: hasAiDocs,
+      hasNonRosterText: hasNarrativePaste,
+    }) && (hasRoster || pasteLooksLikeCsv);
+  }, [files, pasteText, pasteLooksLikeCsv]);
+
   const process = useMutation({
     mutationFn: async () => {
       if (!org?.organization_id) throw new Error("No organization");
@@ -371,7 +388,9 @@ function SmartImportPage() {
         }
       }
 
-      setProgress("NECTAR is reading your documents…");
+      setProgress(csvOnly
+        ? "Reading your spreadsheet…"
+        : "NECTAR is reading your documents…");
       const summary = await runExtraction({
         data: { organizationId: org.organization_id, jobId: newJobId, rosterBatches, textBlobs },
       });
@@ -449,7 +468,7 @@ function SmartImportPage() {
       {!jobId && mode === "employee" && (
         <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
           <div className="text-sm text-muted-foreground">
-            Not sure what columns to use? Download a CSV template matching this org&apos;s staff fields.
+            Not sure what columns to use? Download a CSV template matching this org&apos;s staff fields. CSV import does not need NECTAR.
           </div>
           <Button
             variant="outline"
@@ -458,6 +477,21 @@ function SmartImportPage() {
             disabled={!staffIntakeConfigQuery.data}
           >
             <Download className="mr-2 h-4 w-4" /> Download staff template
+          </Button>
+        </div>
+      )}
+
+      {!jobId && mode === "client" && (
+        <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
+          <div className="text-sm text-muted-foreground">
+            Download a CSV template, or drop your own spreadsheet. CSV import does not need NECTAR.
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => downloadClientTemplate()}
+          >
+            <Download className="mr-2 h-4 w-4" /> Download client template
           </Button>
         </div>
       )}
@@ -519,7 +553,9 @@ function SmartImportPage() {
               size="lg"
             >
               {process.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              <Sparkles className="mr-2 h-4 w-4" /> Process with NECTAR
+              {csvOnly
+                ? <><FileSpreadsheet className="mr-2 h-4 w-4" /> Import CSV</>
+                : <><Sparkles className="mr-2 h-4 w-4" /> Process with NECTAR</>}
             </Button>
           </div>
         </>

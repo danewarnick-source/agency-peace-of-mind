@@ -6,6 +6,7 @@
  * fallback so TNS still works if the SQL handoff has not been run yet.
  */
 
+import { TNS_ORGANIZATION_ID } from "./current-org.ts";
 import { addonsForTier, getTier, normalizeTierId, type AddonId, type TierId } from "./hive-tiers.ts";
 
 export type SubscriptionGate = {
@@ -19,6 +20,8 @@ export type BillingGateInput = {
   orgName: string | null | undefined;
   legalName?: string | null;
   dbaName?: string | null;
+  organizationId?: string | null;
+  displayAcronym?: string | null;
   subscription: SubscriptionGate | null;
 };
 
@@ -26,8 +29,15 @@ export function orgLooksLikeTrueNorth(names: Array<string | null | undefined>): 
   return names.some((n) => (n ?? "").toLowerCase().includes("true north supports"));
 }
 
-export function isBillingExempt(input: Pick<BillingGateInput, "billingExempt" | "orgName" | "legalName" | "dbaName">): boolean {
+export function isBillingExempt(
+  input: Pick<
+    BillingGateInput,
+    "billingExempt" | "orgName" | "legalName" | "dbaName" | "organizationId" | "displayAcronym"
+  >,
+): boolean {
   if (input.billingExempt === true) return true;
+  if (input.organizationId === TNS_ORGANIZATION_ID) return true;
+  if ((input.displayAcronym ?? "").trim().toUpperCase() === "TNS") return true;
   return orgLooksLikeTrueNorth([input.orgName, input.legalName, input.dbaName]);
 }
 

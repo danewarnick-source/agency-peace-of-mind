@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useCaseload, type CaseloadClient } from "@/hooks/use-caseload";
 import { useActiveShift, type ActiveShift } from "@/hooks/use-active-shift";
 import { useNectarPayPeriod } from "@/hooks/use-nectar-pay-period";
-import { useMyAssignments, allowedCodesFor, type AssignmentMap } from "@/hooks/use-my-assignments";
+import { useMyAssignments, allowedCodesFor, clientAuthorizedCodes, defaultCaseloadCode, type AssignmentMap } from "@/hooks/use-my-assignments";
 import { useTodayShifts, type TodayShiftRow } from "@/hooks/use-today-shifts";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -65,13 +65,13 @@ function ClientDetail({
   assignments: AssignmentMap | undefined;
   trainings: ClientTraining[];
 }) {
-  const allCodes = (Array.isArray(c.job_code) ? c.job_code : []).filter(Boolean);
+  const allCodes = clientAuthorizedCodes(c);
   const codes = allowedCodesFor(assignments, c.id, allCodes);
   const isOnTheClock = !!activeShift && activeShift.client_id === c.id;
 
   const initial = isOnTheClock
     ? activeShift!.service_type_code
-    : codes[0] ?? allCodes[0] ?? "SEI";
+    : defaultCaseloadCode(codes, allCodes);
   const [selected, setSelected] = useState<string>(initial);
   useEffect(() => {
     if (isOnTheClock) setSelected(activeShift!.service_type_code);
@@ -80,8 +80,9 @@ function ClientDetail({
   }, [isOnTheClock, activeShift, codes.join("|")]);
 
   const fullName = `${c.first_name} ${c.last_name}`.trim();
-  const daily = isDaily(selected);
-  const pills = codes.length ? codes : [initial];
+  // Empty selected must not invent a clockable code (old SEI fallback).
+  const daily = !selected || isDaily(selected);
+  const pills = codes.length ? codes : initial ? [initial] : [];
 
   return (
     <div className="space-y-4 px-4 pb-4 pt-2">
@@ -195,10 +196,10 @@ function ClientDetail({
           ].join(" ")}
           aria-label={`${
             isOnTheClock
-              ? "Continue Time Clock"
+              ? "Continue Punch pad"
               : daily
                 ? "Open Client Hub"
-                : "Open Time Clock"
+                : "Open Punch pad"
           } for ${fullName} (${selected})`}
         >
           <Link
@@ -208,10 +209,10 @@ function ClientDetail({
           >
             {daily && !isOnTheClock ? <Home /> : <Clock />}
             {isOnTheClock
-              ? "Continue Time Clock"
+              ? "Continue Punch pad"
               : daily
                 ? "Open Client Hub"
-                : "Open Time Clock"}
+                : "Open Punch pad"}
           </Link>
         </Button>
         <p className="mt-2 text-center text-xs text-muted-foreground">
@@ -414,7 +415,7 @@ export function StaffClientGrid() {
             My caseload · {source.length} {source.length === 1 ? "person" : "people"}
           </h2>
           <p className="text-xs text-muted-foreground">
-            Tap a person to view services and start a time clock.
+            Tap a person to view services. Hourly codes use Punch pad. Host home (HHS) is the daily note — hosts do not clock in. EVV is submitted by CSV.
           </p>
         </div>
       </div>

@@ -184,11 +184,17 @@ function ObligationsTab({
   const footprintFn = useServerFn(getOrgServiceFootprint);
   const evidenceFn = useServerFn(getAuditEvidenceSnapshot);
 
-  const { data: obligations = [], isLoading } = useQuery<ObligationListItem[]>({
+  const {
+    data: obligations = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery<ObligationListItem[]>({
     queryKey: ["company-obligations", orgId],
     queryFn: () => listFn({ data: { organizationId: orgId } }),
     staleTime: 0,
     refetchInterval: 60_000,
+    retry: 1,
   });
 
   const { data: groups = [] } = useQuery<Array<StaffGroupRow & { member_count: number }>>({
@@ -536,7 +542,14 @@ function ObligationsTab({
         </div>
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">Could not load obligations.</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => void refetch()}>
+            Try again
+          </Button>
+        </div>
+      ) : isLoading ? (
         <p className="text-sm text-muted-foreground">Loading obligations…</p>
       ) : (
         <Tabs value={registerTab} onValueChange={setRegisterTab}>
@@ -738,7 +751,7 @@ function CompanyObligationsPage() {
   const { tab, new: openNew, obligation: focusObligationId } = Route.useSearch();
   const canAccess =
     org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
-  const { totalCount: actionCount } = useActionRequiredQueue(
+  const { totalCount: actionCount, isLoading: actionQueueLoading } = useActionRequiredQueue(
     canAccess ? org?.organization_id : null,
   );
   const activeTab: CompanyObligationsTab = tab ?? "obligations";
@@ -782,7 +795,7 @@ function CompanyObligationsPage() {
           <TabsTrigger value="utah-pack">Utah pack</TabsTrigger>
           <TabsTrigger value="policy-library">Authoritative Sources</TabsTrigger>
           <TabsTrigger value="action-required" className="gap-1.5">
-            {actionCount > 0 ? (
+            {!actionQueueLoading && actionCount > 0 ? (
               <>
                 Action Required
                 <Badge

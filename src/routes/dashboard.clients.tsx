@@ -25,7 +25,7 @@ import {
 import {
   UserPlus, Contact2, MapPin, Loader2,
   ChevronRight, AlertTriangle, Search,
-  ArrowLeft, Sparkles, Trash2,
+  ArrowLeft, Sparkles, Trash2, FileSpreadsheet,
 } from "lucide-react";
 import { toast } from "sonner";
 import { OnboardingReturnBar } from "@/components/onboarding/onboarding-return-bar";
@@ -356,6 +356,11 @@ export function ClientsPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="outline">
+            <Link to="/dashboard/smart-import" search={{ mode: "client" }}>
+              <FileSpreadsheet className="mr-2 h-4 w-4" /> Import CSV
+            </Link>
+          </Button>
           <Button asChild variant="outline" className="border-primary/40 text-primary hover:bg-primary/5">
             <Link to="/dashboard/smart-import" search={{ mode: "client" }}>
               <Sparkles className="mr-2 h-4 w-4" /> Smart Import

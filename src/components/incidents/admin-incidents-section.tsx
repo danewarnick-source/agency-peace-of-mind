@@ -477,9 +477,8 @@ export function AdminIncidentsSection({
   useEffect(() => {
     if (initialClientId) {
       setFilterClient(initialClientId);
-      setView(initialView ?? "log");
-      setStatus("all");
     }
+    if (initialView) setView(initialView);
   }, [initialClientId, initialView]);
 
   // The full org client roster only feeds the filter dropdown — it must never
@@ -559,7 +558,7 @@ export function AdminIncidentsSection({
         </h3>
         <nav className="ml-auto inline-flex rounded-lg border border-border bg-card p-1">
           {([
-            { id: "queue" as const, label: "Open queue" },
+            { id: "queue" as const, label: "Urgent" },
             { id: "log" as const, label: "Log / filter" },
           ]).map((t) => (
             <button

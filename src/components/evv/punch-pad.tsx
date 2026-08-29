@@ -22,6 +22,7 @@ import {
 import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { EVV_SERVICE_CODES, evvServiceLabel, isEvvLockedCode, padMemberId } from "@/lib/evv-codes";
+import { clientAuthorizedCodes } from "@/lib/assignment-codes";
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { computeEntryUnits } from "@/lib/billing-units";
 import { EvvConsentGate } from "@/components/evv/consent-gate";
@@ -134,6 +135,7 @@ export interface PunchPadProps {
     medicaid_id: string | null;
     physical_address: string | null;
     job_code?: string[] | null;
+    authorized_dspd_codes?: string[] | null;
     home_latitude?: number | null;
     home_longitude?: number | null;
     geofence_radius_feet?: number | null;
@@ -485,9 +487,13 @@ export function PunchPad({
   // EVV uses ALL authorized codes (no day-program filter here).
   const effectiveClientId = lockedClient?.id ?? selectedClientId ?? undefined;
   const clientBillingCodesQ = useClientBillingCodes(effectiveClientId || undefined);
-  const billingAuthorizedCodes: string[] | undefined = clientBillingCodesQ.data
-    ? clientBillingCodesQ.data.map((b) => b.service_code)
-    : undefined;
+  const billingAuthorizedCodes: string[] | undefined = (() => {
+    if (!clientBillingCodesQ.data) return undefined;
+    const codes = clientBillingCodesQ.data
+      .map((b) => String(b.service_code ?? "").trim())
+      .filter(Boolean);
+    return codes.length ? codes : undefined;
+  })();
 
   // ── Client derivation ───────────────────────────────────────────────────────
   const clientForPunch: LockedClient | null = lockedClient
@@ -500,10 +506,10 @@ export function PunchPad({
           name: `${c.first_name} ${c.last_name}`.trim(),
           memberId: padMemberId(c.medicaid_id),
           facility: c.physical_address,
-          // Use billing codes from client_billing_codes; fall back to caseload
-          // job_code only while the query is still loading (billingAuthorizedCodes
-          // is undefined until the first response arrives).
-          authorizedCodes: billingAuthorizedCodes ?? c.job_code ?? undefined,
+          // Prefer client_billing_codes. Empty/missing 1056 rows fall back to
+          // authorized_dspd_codes (then job_code) so SLH still appears.
+          authorizedCodes: billingAuthorizedCodes
+            ?? (clientAuthorizedCodes(c).length ? clientAuthorizedCodes(c) : undefined),
           homeLat: c.home_latitude ?? null,
           homeLng: c.home_longitude ?? null,
           geofenceRadiusFeet: c.geofence_radius_feet ?? null,
@@ -513,13 +519,13 @@ export function PunchPad({
 
   // ── Service codes ───────────────────────────────────────────────────────────
   const codesForClient = useMemo(() => {
-    // For a lockedClient, use its own authorizedCodes if available; otherwise
-    // fall back to billing codes fetched above.
     const authorized = lockedClient
       ? (lockedClient.authorizedCodes ?? billingAuthorizedCodes)
       : billingAuthorizedCodes;
-    if (authorized?.length) {
-      return authorized.map((code) => ({ code, label: evvServiceLabel(code) }));
+    const fallback = clientForPunch?.authorizedCodes;
+    const codes = (authorized?.length ? authorized : fallback) ?? [];
+    if (codes.length) {
+      return codes.map((code) => ({ code, label: evvServiceLabel(code) }));
     }
     // No authorized codes yet — if still loading, show nothing; once loaded
     // an empty array means the client truly has no authorized codes.
@@ -527,7 +533,7 @@ export function PunchPad({
       return EVV_SERVICE_CODES.map((c) => ({ code: c.code, label: c.label }));
     }
     return [];
-  }, [lockedClient, billingAuthorizedCodes, clientBillingCodesQ.isLoading]);
+  }, [lockedClient, billingAuthorizedCodes, clientBillingCodesQ.isLoading, clientForPunch]);
 
   // ── Geofence derivation ─────────────────────────────────────────────────────
   const mapRadiusFeet = clientForPunch?.geofenceRadiusFeet ?? 1000;

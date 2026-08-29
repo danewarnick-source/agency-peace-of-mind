@@ -49,6 +49,7 @@ import {
 import { ClientDocumentsCard } from "@/components/clients/client-documents-card";
 import { recordPhiAccess } from "@/lib/phi-access-audit.functions";
 
+import { displayMedicaidId } from "@/lib/medicaid-id";
 import { ClientBudgetPanel } from "@/components/clients/client-budget-panel";
 import { ClientMealPlannerMount } from "@/components/clients/client-meal-planner-mount";
 import { ChoreChartForClient } from "@/components/chores/chore-chart-mount";
@@ -338,7 +339,9 @@ function ClientProfileHub() {
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold truncate">{fullName}</h1>
           <div className="flex flex-wrap gap-2 mt-1 text-xs text-muted-foreground">
-            {client?.medicaid_id ? <span>Medicaid #{String(client.medicaid_id)}</span> : null}
+            {displayMedicaidId(client?.medicaid_id) ? (
+              <span>Medicaid #{displayMedicaidId(client?.medicaid_id)}</span>
+            ) : null}
             {client?.account_status ? (
               <Badge variant="outline">{String(client.account_status)}</Badge>
             ) : null}
@@ -444,7 +447,11 @@ function ClientProfileHub() {
             hint="Billing codes, rates, annual units, and remaining funds"
           >
             <SectionPanel icon={ShieldCheck} accent="emerald">
-              <BillingCodesPanel clientId={clientId} />
+              <BillingCodesPanel
+                clientId={clientId}
+                clientName={fullName}
+                medicaidId={displayMedicaidId(client?.medicaid_id)}
+              />
             </SectionPanel>
             <SectionPanel icon={Wallet} accent="teal">
               <ClientBudgetPanel clientId={clientId} />
@@ -1685,7 +1692,15 @@ function PersonCenteredProfilePanel({ clientId, orgId }: { clientId: string; org
   );
 }
 
-function BillingCodesPanel({ clientId }: { clientId: string }) {
+function BillingCodesPanel({
+  clientId,
+  clientName,
+  medicaidId,
+}: {
+  clientId: string;
+  clientName?: string;
+  medicaidId?: string | null;
+}) {
   const qc = useQueryClient();
 
   // Safety net: surface external-service rows whose codes should probably be
@@ -1750,7 +1765,7 @@ function BillingCodesPanel({ clientId }: { clientId: string }) {
           </Button>
         </div>
       )}
-      <BillingCodesDetail clientId={clientId} />
+      <BillingCodesDetail clientId={clientId} clientName={clientName} medicaidId={medicaidId} />
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">Add a new authorized code</CardTitle>

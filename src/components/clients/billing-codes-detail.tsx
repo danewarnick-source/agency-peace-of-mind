@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,6 +46,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { isDailyServiceCode } from "@/lib/service-billing";
+import { remainingUnitsForCode } from "@/lib/billing-units";
+import { displayMedicaidId } from "@/lib/medicaid-id";
 import { isVariableRateCode } from "@/lib/variable-rate-codes";
 import {
   parseClientBudgetDocument,
@@ -83,12 +85,35 @@ export function BillingCodesDetail({ clientId, clientName, medicaidId }: Props) 
   const { data: budgets, isLoading } = useClientBudget(clientId);
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
+  const identityQ = useQuery({
+    enabled: !!clientId && (!displayMedicaidId(medicaidId) || !clientName?.trim()),
+    queryKey: ["billing-card-identity", clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("medicaid_id, first_name, last_name")
+        .eq("id", clientId)
+        .maybeSingle();
+      if (error) throw error;
+      const name = `${data?.first_name ?? ""} ${data?.last_name ?? ""}`.trim();
+      return {
+        medicaidId: displayMedicaidId(data?.medicaid_id),
+        clientName: name || null,
+      };
+    },
+    staleTime: 60_000,
+  });
+  const displayMedicaid = displayMedicaidId(medicaidId) ?? identityQ.data?.medicaidId ?? null;
+  const displayClientName = clientName?.trim() || identityQ.data?.clientName || "—";
 
   const planYear = useMemo(() => {
     if (!budgets || budgets.length === 0) return { start: null as Date | null, end: null as Date | null };
     let start: Date | null = null;
     let end: Date | null = null;
     for (const b of budgets) {
+      // Missing service_start_date is status "no_period" — do not treat
+      // today's date (or a Jan 1 fallback) as a real 1056 plan year.
+      if (b.status === "no_period") continue;
       if (b.period_start && (!start || b.period_start < start)) start = b.period_start;
       if (b.period_end && (!end || b.period_end > end)) end = b.period_end;
     }
@@ -109,6 +134,33 @@ export function BillingCodesDetail({ clientId, clientName, medicaidId }: Props) 
       ),
     [budgets],
   );
+
+  // Read-only. Shows what is already on the 1056 row. Does not invent dates or rates.
+  const authWarnings = useMemo(() => {
+    const lines: string[] = [];
+    for (const b of budgets ?? []) {
+      const c = b.code as typeof b.code & { authorization_pending?: boolean };
+      const status = getAuthStatus(c.service_start_date, c.service_end_date);
+      const label = (c.service_code || "code").trim() || "code";
+      if (status === "expired" && c.service_end_date) {
+        lines.push(`${label} expired ${c.service_end_date}. Enter the real renewal 1056 — do not invent an end date.`);
+        continue;
+      }
+      if (c.service_end_date && status !== "expired") {
+        const end = new Date(`${c.service_end_date}T00:00:00`);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const days = Math.round((end.getTime() - today.getTime()) / 86_400_000);
+        if (Number.isFinite(days) && days >= 0 && days <= 14) {
+          lines.push(`${label} ends ${c.service_end_date}. Enter the real renewal when you have it.`);
+        }
+      }
+      if (c.authorization_pending || Number(c.rate_per_unit ?? 0) === 0) {
+        lines.push(`${label} is pending or $0. Enter the real rate and units from the 1056.`);
+      }
+    }
+    return lines;
+  }, [budgets]);
 
   const [bulkEdit, setBulkEdit] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
@@ -239,10 +291,10 @@ export function BillingCodesDetail({ clientId, clientName, medicaidId }: Props) 
         <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
           <div className="grid gap-3 sm:grid-cols-3">
             <Field icon={<IdCard className="h-3.5 w-3.5" />} label="Client">
-              <span className="font-semibold">{clientName}</span>
+              <span className="font-semibold">{displayClientName}</span>
             </Field>
             <Field icon={<Receipt className="h-3.5 w-3.5" />} label="Individual Medicaid ID">
-              <span className="font-mono">{medicaidId || "—"}</span>
+              <span className="font-mono">{displayMedicaid || "—"}</span>
             </Field>
             <Field icon={<CalendarRange className="h-3.5 w-3.5" />} label="Plan Year Renewal">
               <span className="font-semibold text-amber-700 dark:text-amber-300">
@@ -251,6 +303,19 @@ export function BillingCodesDetail({ clientId, clientName, medicaidId }: Props) 
             </Field>
           </div>
         </div>
+
+        {authWarnings.length > 0 && (
+          <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
+            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide">
+              <AlertTriangle className="h-3.5 w-3.5" /> Authorization needs a real 1056
+            </p>
+            <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-xs">
+              {authWarnings.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {isLoading ? (
           <div className="space-y-2">
@@ -644,7 +709,7 @@ function CodeRow({
   const usedUnits = budget.used_units;
   const annualUnits = code.annual_unit_authorization ?? 0;
   const rateNum = Number(code.rate_per_unit ?? 0);
-  const remainingUnits = Math.max(0, annualUnits - usedUnits);
+  const remainingUnits = remainingUnitsForCode(annualUnits, usedUnits);
   const totalBilled = usedUnits * rateNum;
   const remainingBudget = remainingUnits * rateNum;
   const pct = annualUnits > 0 ? Math.min(100, (usedUnits / annualUnits) * 100) : 0;

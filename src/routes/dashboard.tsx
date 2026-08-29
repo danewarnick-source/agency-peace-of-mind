@@ -127,6 +127,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/hub/clients", label: "Clients", icon: Contact2, feature: "client_intake" },
   { to: "/dashboard/scheduler", label: "Scheduler", icon: CalendarDays, feature: "evv_timesheets" },
   { to: "/dashboard/hub/documentation", label: "Documentation", icon: ClipboardCheck, feature: "pcsp" },
+  { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/company-obligations", label: "Compliance", icon: ClipboardList },
   { to: "/dashboard/summaries", label: "Summaries", icon: FileText },
   { to: "/dashboard/hub/finances", label: "Finances", icon: Receipt, perm: "view_billing", feature: "pba_ledgers" },
@@ -172,6 +173,7 @@ type SidebarBodyProps = {
   onNavigate?: () => void;
   inboxUnread: number;
   complianceActionCount: number;
+  complianceQueueLoading: boolean;
 };
 
 
@@ -351,9 +353,8 @@ function DashboardLayout() {
   });
 
   // Must stay above any conditional return — Rules of Hooks.
-  const { totalCount: complianceActionCount } = useActionRequiredQueue(
-    isAdminCapable ? org?.organization_id ?? null : null,
-  );
+  const { totalCount: complianceActionCount, isLoading: complianceQueueLoading } =
+    useActionRequiredQueue(isAdminCapable ? org?.organization_id ?? null : null);
 
   const currentPreviewState = isStatePreview
     ? states.find((s) => s.code === stateCode) ?? null
@@ -410,6 +411,7 @@ function DashboardLayout() {
     signOut,
     inboxUnread,
     complianceActionCount,
+    complianceQueueLoading,
   };
 
 
@@ -674,6 +676,7 @@ function SidebarBody({
   onNavigate,
   inboxUnread,
   complianceActionCount,
+  complianceQueueLoading,
 }: SidebarBodyProps) {
   const [upgradeFeatureKey, setUpgradeFeatureKey] = useState<string | null>(null);
   // Domain sections in the Executive Command Center sidebar are collapsed by
@@ -956,7 +959,9 @@ function SidebarBody({
             >
               <Icon className={`h-4 w-4 ${active ? (isNectar ? "text-white" : "") : isNectar ? "text-[#f4a93a]" : ""}`} />
               <span className="flex-1">{item.label}</span>
-              {item.to === "/dashboard/company-obligations" && complianceActionCount > 0 && (
+              {item.to === "/dashboard/company-obligations" &&
+                !complianceQueueLoading &&
+                complianceActionCount > 0 && (
                 <span
                   aria-label={`${complianceActionCount} action required`}
                   className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-destructive-foreground"

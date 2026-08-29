@@ -2,6 +2,14 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
 import { useCurrentOrg } from "./use-org";
+import type { AssignmentMap } from "@/lib/assignment-codes";
+
+export {
+  allowedCodesFor,
+  clientAuthorizedCodes,
+  defaultCaseloadCode,
+  type AssignmentMap,
+} from "@/lib/assignment-codes";
 
 /**
  * Per-staff caseload assignments scoped to specific service codes.
@@ -12,8 +20,6 @@ import { useCurrentOrg } from "./use-org";
  * keyed by client_id whose value is either the explicit code allow-list
  * (Set) or `null` meaning "all codes".
  */
-export type AssignmentMap = Map<string, Set<string> | null>;
-
 export function useMyAssignments() {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
@@ -48,17 +54,4 @@ export function useMyAssignments() {
       return map;
     },
   });
-}
-
-/** Returns the allowed codes for a client. `null` = all. `Set` = restrict. */
-export function allowedCodesFor(
-  map: AssignmentMap | undefined,
-  clientId: string,
-  clientCodes: string[],
-): string[] {
-  if (!map) return clientCodes;
-  if (!map.has(clientId)) return [];
-  const allow = map.get(clientId);
-  if (!allow) return clientCodes;
-  return clientCodes.filter((c) => allow.has(c));
 }

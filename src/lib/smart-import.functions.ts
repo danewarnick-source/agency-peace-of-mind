@@ -12,6 +12,7 @@ import { Buffer } from "node:buffer";
 import { gatewayFetch, assertBedrockConfigured, friendlyAiErrorMessage } from "@/lib/ai-bedrock.server";
 import { parseDocumentWithAI, extractGoalsOnly, documentLikelyHasGoals, CORE_CLIENT_FIELD_KEYS } from "@/lib/document-extraction";
 import { enrichNamesFromFull, firstNameWithMiddle, formatPersonName } from "@/lib/person-name";
+import { smartImportNeedsAi } from "@/lib/smart-import-ai-gate";
 
 function digitsOnly(v: string | null | undefined): string {
   return (v ?? "").replace(/\D/g, "");
@@ -413,12 +414,6 @@ export const runSmartExtraction = createServerFn({ method: "POST" })
     await sb.from("import_jobs").update({ status: "extracting" }).eq("id", data.jobId);
 
     try {
-      try {
-        assertBedrockConfigured();
-      } catch (e) {
-        throw new Error(friendlyAiErrorMessage(401, (e as Error).message));
-      }
-
       let allSubjects: Array<{ id: string; display_name: string }> = [];
 
       // ---- Roster batches: one subject per row ----
@@ -548,6 +543,40 @@ export const runSmartExtraction = createServerFn({ method: "POST" })
           });
         } catch (e) {
           throw new Error(`Failed to extract text from ${doc.file_name}: ${(e as Error).message}`);
+        }
+      }
+
+      // CSV/Excel roster rows are heuristic — no Bedrock. Only PDFs, DOCX,
+      // and pasted narrative need NECTAR. Tuesday fallback: if Bedrock is
+      // down, keep the roster subjects and skip AI docs instead of failing
+      // the whole job.
+      const needsAi = smartImportNeedsAi({
+        hasPdfOrDocxDocs: realTextBlobs.some((b) => {
+          const n = (b.file_name || "").toLowerCase();
+          return n.endsWith(".pdf") || n.endsWith(".docx");
+        }),
+        hasNonRosterText: realTextBlobs.some((b) => {
+          const n = (b.file_name || "").toLowerCase();
+          return !n.endsWith(".pdf") && !n.endsWith(".docx") && !!b.text?.trim();
+        }),
+      });
+
+      if (needsAi) {
+        try {
+          assertBedrockConfigured();
+        } catch (e) {
+          if (allSubjects.length === 0) {
+            throw new Error(friendlyAiErrorMessage(401, (e as Error).message));
+          }
+          await sb.from("import_audit").insert({
+            import_job_id: data.jobId,
+            org_id: data.organizationId,
+            item: `NECTAR unavailable — imported ${allSubjects.length} CSV/Excel row(s) without AI. PDF/DOCX skipped.`,
+            traces_to: "inferred",
+            actor: context.userId,
+            action: "extraction_ai_skipped",
+          });
+          realTextBlobs.length = 0;
         }
       }
 

@@ -29,6 +29,7 @@ import {
   saveRecordFields, saveManagerNote, toLocalInput, fromLocalInput, type AuditEntry,
 } from "@/lib/records-edit";
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
+import { formatPunchDateSpan, formatPunchRange, isLongOpenPunch, recordDurationMin, staffDisplayName } from "@/lib/record-duration";
 import { ResidentialDailyTab } from "@/components/residential/residential-daily-tab";
 import { TimeCorrectionReviewSection } from "@/components/records/time-correction-review-section";
 import { RecordDetailSheet } from "@/components/records/record-detail-sheet";
@@ -140,8 +141,7 @@ function fmtShort(iso: string): string {
   try { return format(parseISO(iso), "MMM d"); } catch { return iso; }
 }
 function durationMin(start: string, end: string | null): number {
-  if (!end) return 0;
-  return Math.max(0, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000));
+  return recordDurationMin({ clock_in_timestamp: start, clock_out_timestamp: end });
 }
 function fmtDur(min: number): string {
   const h = Math.floor(min / 60);
@@ -194,18 +194,21 @@ export function RecordsTab() {
       );
       if (userIds.length === 0) return [];
       const { data: directory } = await supabase
-        .from("org_member_directory")
-        .select("id, full_name")
+        .from("profiles")
+        .select("id, full_name, first_name, last_name")
         .in("id", userIds);
       const nameMap = new Map(
-        ((directory ?? []) as Array<{ id: string; full_name: string | null }>).map(
-          (d) => [d.id, (d.full_name ?? "").trim()],
-        ),
+        ((directory ?? []) as Array<{
+          id: string;
+          full_name: string | null;
+          first_name: string | null;
+          last_name: string | null;
+        }>).map((d) => [d.id, staffDisplayName(d)]),
       );
       return userIds
         .map((uid) => {
           const name = nameMap.get(uid) ?? "";
-          return { value: uid, label: name || uid.slice(0, 8) };
+          return { value: uid, label: name || "Staff" };
         })
         .sort((a, b) => a.label.localeCompare(b.label));
     },
@@ -360,7 +363,23 @@ export function RecordsTab() {
         if (chunk.length < FETCH_PAGE_SIZE) break;
       }
 
-      const staffMap = new Map((staffOptionsQ.data ?? []).map((s) => [s.value, s.label]));
+      const staffIds = Array.from(new Set(baseRows.map((r) => r.staff_id).filter(Boolean)));
+      const staffMap = new Map<string, string>();
+      if (staffIds.length) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id, full_name, first_name, last_name")
+          .in("id", staffIds);
+        for (const p of (profs ?? []) as Array<{
+          id: string;
+          full_name: string | null;
+          first_name: string | null;
+          last_name: string | null;
+        }>) {
+          staffMap.set(p.id, staffDisplayName(p));
+        }
+      }
+
       const teamMap = new Map((teamOptionsQ.data ?? []).map((t) => [t.value, t.label]));
 
       const derivedAll: Derived[] = baseRows.map((r) => {
@@ -371,24 +390,14 @@ export function RecordsTab() {
         // waiting on the staff member's own sign-off — nothing here is
         // actionable from the admin's side.
         const exc = awaiting ? [] : reviewExceptions(r);
-        // Duration reflects the authoritative billing time: approved
-        // correction, else the rounded (nearest-quarter-hour) punch, else
-        // raw as a last resort — same precedence as reDownloadBatch below.
-        // Never derived back into the raw/corrected columns themselves.
-        const billIn = (r.review_status === "approved" && r.corrected_clock_in)
-          ? r.corrected_clock_in
-          : (r.rounded_clock_in ?? r.clock_in_timestamp);
-        const billOut = (r.review_status === "approved" && r.corrected_clock_out)
-          ? r.corrected_clock_out
-          : (r.rounded_clock_out ?? r.clock_out_timestamp);
         return {
           ...r,
-          staff_name: staffMap.get(r.staff_id) ?? r.staff_id.slice(0, 8),
+          staff_name: staffMap.get(r.staff_id) || staffDisplayName(null, r.staff_id),
           client_name: r.clients
             ? `${r.clients.first_name ?? ""} ${r.clients.last_name ?? ""}`.trim()
             : r.client_id.slice(0, 8),
           team_name: r.clients?.team_id ? teamMap.get(r.clients.team_id) ?? null : null,
-          duration_min: durationMin(billIn, billOut),
+          duration_min: recordDurationMin(r),
           exceptions: exc,
           is_evv_locked: isEvvLockedCode(r.service_type_code),
           awaiting_staff_confirmation: awaiting,
@@ -428,12 +437,27 @@ export function RecordsTab() {
         data.push(...(chunk ?? []));
         if ((chunk ?? []).length < FETCH_PAGE_SIZE) break;
       }
-      const staffMap = new Map((staffOptionsQ.data ?? []).map((s) => [s.value, s.label]));
+      const staffIds = Array.from(new Set(((data ?? []) as Array<{ user_id: string }>).map((g) => g.user_id).filter(Boolean)));
+      const staffMap = new Map<string, string>();
+      if (staffIds.length) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id, full_name, first_name, last_name")
+          .in("id", staffIds);
+        for (const p of (profs ?? []) as Array<{
+          id: string;
+          full_name: string | null;
+          first_name: string | null;
+          last_name: string | null;
+        }>) {
+          staffMap.set(p.id, staffDisplayName(p));
+        }
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return ((data ?? []) as any[]).map((g): GeneralRow => ({
         id: g.id,
         staff_id: g.user_id,
-        staff_name: staffMap.get(g.user_id) ?? String(g.user_id).slice(0, 8),
+        staff_name: staffMap.get(g.user_id) || staffDisplayName(null, g.user_id),
         category: g.category ?? "general",
         note: g.note ?? "",
         clock_in_timestamp: g.clock_in_timestamp,
@@ -472,7 +496,7 @@ export function RecordsTab() {
       clientName: r.client_name,
       memberId: r.utah_medicaid_member_id ?? "",
       serviceCode: r.service_type_code,
-      date: fmtDate(r.clock_in_timestamp),
+      date: formatPunchDateSpan(r.corrected_clock_in ?? r.clock_in_timestamp, r.corrected_clock_out ?? r.clock_out_timestamp),
       clockIn: fmtTs(r.corrected_clock_in ?? r.clock_in_timestamp),
       clockOut: fmtTs(r.corrected_clock_out ?? r.clock_out_timestamp),
       durationMin: r.duration_min,
@@ -488,7 +512,7 @@ export function RecordsTab() {
       clientName: "",
       memberId: "",
       serviceCode: g.category,
-      date: fmtDate(g.clock_in_timestamp),
+      date: formatPunchDateSpan(g.clock_in_timestamp, g.clock_out_timestamp),
       clockIn: fmtTs(g.clock_in_timestamp),
       clockOut: fmtTs(g.clock_out_timestamp),
       durationMin: g.duration_min,
@@ -885,9 +909,14 @@ export function RecordsTab() {
                     <tr key={g.id} className="border-t border-border hover:bg-accent/40">
                       <td className="px-3 py-2">{g.staff_name}</td>
                       <td className="px-3 py-2 font-mono text-xs">{g.category}</td>
-                      <td className="px-3 py-2">{fmtDate(g.clock_in_timestamp)}</td>
-                      <td className="px-3 py-2">{fmtTs(g.clock_in_timestamp)} → {fmtTs(g.clock_out_timestamp)}</td>
-                      <td className="px-3 py-2 tabular-nums">{fmtDur(g.duration_min)}</td>
+                      <td className="px-3 py-2">{formatPunchDateSpan(g.clock_in_timestamp, g.clock_out_timestamp)}</td>
+                      <td className="px-3 py-2">{formatPunchRange(g.clock_in_timestamp, g.clock_out_timestamp)}</td>
+                      <td className={`px-3 py-2 tabular-nums ${isLongOpenPunch(g.duration_min) ? "font-semibold text-amber-800 dark:text-amber-300" : ""}`}>
+                        {fmtDur(g.duration_min)}
+                        {isLongOpenPunch(g.duration_min) && (
+                          <span className="ml-1 text-[10px] font-medium uppercase tracking-wider">open punch</span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{g.note || "—"}</td>
                     </tr>
                   ))}
@@ -938,9 +967,14 @@ export function RecordsTab() {
                           )}
                         </td>
                         <td className="px-3 py-2 font-mono text-xs">{r.service_type_code}</td>
-                        <td className="px-3 py-2">{fmtDate(r.clock_in_timestamp)}</td>
+                        <td className="px-3 py-2">{formatPunchDateSpan(r.corrected_clock_in ?? r.clock_in_timestamp, r.corrected_clock_out ?? r.clock_out_timestamp)}</td>
                         <InlineTimeCell row={r} adminName={adminName} userId={user?.id ?? null} qc={qc} />
-                        <td className="px-3 py-2 tabular-nums">{fmtDur(r.duration_min)}</td>
+                        <td className={`px-3 py-2 tabular-nums ${isLongOpenPunch(r.duration_min) ? "font-semibold text-amber-800 dark:text-amber-300" : ""}`}>
+                          {fmtDur(r.duration_min)}
+                          {isLongOpenPunch(r.duration_min) && (
+                            <span className="ml-1 text-[10px] font-medium uppercase tracking-wider">open punch</span>
+                          )}
+                        </td>
                         <InlineManagerNoteCell row={r} adminName={adminName} userId={user?.id ?? null} qc={qc} />
                         <td className="px-3 py-2">
                           <div className="flex flex-wrap items-center gap-1">
@@ -1147,7 +1181,7 @@ function InlineTimeCell({
       }}
       title={isEvv ? "EVV record — click to edit (UEVV transmission won't be amended)" : "Click to edit clock in/out"}
     >
-      {fmtTs(inTs)} → {fmtTs(outTs)}
+      {formatPunchRange(inTs, outTs)}
       {isEvv && (
         <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-orange-600 dark:text-orange-400">evv</span>
       )}

@@ -155,6 +155,7 @@ function orgIsComped(org: OrgBillingRow): boolean {
     orgName: org.name,
     legalName: org.legalName,
     dbaName: org.dbaName,
+    organizationId: org.id,
   });
 }
 

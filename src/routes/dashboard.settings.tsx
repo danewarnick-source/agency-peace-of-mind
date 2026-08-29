@@ -32,12 +32,12 @@ function SettingsPage() {
   const [goLiveDate, setGoLiveDate] = useState("");
   const [orgCreatedAt, setOrgCreatedAt] = useState("");
   const [busy, setBusy] = useState(false);
+  const isSettingsIndex = pathname === "/dashboard/settings";
 
-  if (pathname !== "/dashboard/settings") {
-    return <Outlet />;
-  }
-
+  // Hooks must run on every /dashboard/settings/* render. Returning <Outlet />
+  // before useEffect crashed the shell (React #300) when opening Subscription.
   useEffect(() => {
+    if (!isSettingsIndex) return;
     if (user) setFullName(user.user_metadata?.full_name ?? "");
     if (org) {
       setOrgName(org.organization_name);
@@ -68,7 +68,11 @@ function SettingsPage() {
           }
         });
     }
-  }, [user, org]);
+  }, [user, org, isSettingsIndex]);
+
+  if (!isSettingsIndex) {
+    return <Outlet />;
+  }
 
   const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault();

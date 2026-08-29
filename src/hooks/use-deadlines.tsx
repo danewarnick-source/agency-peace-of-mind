@@ -278,7 +278,7 @@ export function useDeadlines() {
             subjectKind: "client",
             dueAt: clock.deadline,
             status: bucketStatus(clock.deadline, now),
-            href: `/dashboard/hub/documentation?tab=incidents`,
+            href: `/dashboard/hub/documentation?tab=incidents&cc=urgent`,
             incidentId: inc.id,
             clientId: inc.client_id,
           });

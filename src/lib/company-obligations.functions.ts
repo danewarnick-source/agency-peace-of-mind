@@ -1704,11 +1704,16 @@ async function loadInstancesByObligation(
 /**
  * Shared bootstrap for the compliance register and the Deadlines page:
  * mark overdue, seed standing SOW duties, hide N/A service codes, and
- * generate the current/next calendar instances so clocks exist.
+ * (optionally) generate the current/next calendar instances so clocks exist.
+ *
+ * The register list must NOT generate. Per-staff / per-client generation
+ * hangs the page on “Loading obligations…” while Admin Home already
+ * reads the existing 18 overdue rows.
  */
 async function bootstrapVisibleObligationInstancesInternal(
   supabase: AnySupabase,
   organizationId: string,
+  opts?: { generateMissing?: boolean },
 ): Promise<{
   visibleObligations: CompanyObligationRow[];
   instancesByObligation: Map<string, ObligationInstanceRow[]>;
@@ -1736,10 +1741,14 @@ async function bootstrapVisibleObligationInstancesInternal(
   const obligationIds = visibleObligations.map((o: CompanyObligationRow) => o.id);
   let instancesByObligation = await loadInstancesByObligation(supabase, obligationIds);
 
+  if (opts?.generateMissing === false) {
+    return { visibleObligations, instancesByObligation };
+  }
+
   // Ensure current + next calendar periods for org-level duties, and
   // bootstrap staff duties that have no OPEN instance (so a completed
   // anniversary year still generates the next one; new hires still get
-  // a first instance).
+  // a first instance). Deadlines may generate; the register list does not.
   const needsGeneration = visibleObligations.filter((o: CompanyObligationRow) => {
     if (!o.active) return false;
     const rows = instancesByObligation.get(o.id) ?? [];
@@ -1757,7 +1766,7 @@ async function bootstrapVisibleObligationInstancesInternal(
     try {
       await generateNextInstanceInternal(supabase, organizationId, ob.id);
     } catch (e) {
-      console.warn(`[bootstrap] Could not generate instance for ${ob.id}:`, e);
+      console.warn("[bootstrap] Could not generate instance:", e);
     }
   }
   if (needsGeneration.length > 0) {
@@ -1776,7 +1785,9 @@ export const listCompanyObligations = createServerFn({ method: "POST" })
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
 
     const { visibleObligations, instancesByObligation } =
-      await bootstrapVisibleObligationInstancesInternal(supabase, data.organizationId);
+      await bootstrapVisibleObligationInstancesInternal(supabase, data.organizationId, {
+        generateMissing: false,
+      });
 
     return visibleObligations.map((o: CompanyObligationRow) => {
       const rows = instancesByObligation.get(o.id) ?? [];

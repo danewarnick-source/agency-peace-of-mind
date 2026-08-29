@@ -33,6 +33,43 @@ export const TRAINING_PRICE_CENTS = {
   dspd_required: 10_000,
 } as const;
 
+/** Same include list the public /pricing training card already shows. */
+export const PUBLIC_TRAINING_FULL_PROGRAM_INCLUDES = [
+  "CPR & First Aid",
+  "Mandt behavioral intervention",
+  "30-day DSPD required training",
+  "Hands-on Hive platform walkthrough",
+  "Competency verification & sign-off",
+  "12 hrs custom ongoing training content / year",
+] as const;
+
+export type PublicTrainingAlaCarteItem = {
+  sku: "cpr_first_aid" | "mandt" | "dspd_required";
+  name: string;
+  priceCents: number;
+  sub?: string;
+};
+
+/** Same three à la carte rows the public /pricing page already shows. */
+export const PUBLIC_TRAINING_ALA_CARTE: readonly PublicTrainingAlaCarteItem[] = [
+  { sku: "cpr_first_aid", name: "CPR / First Aid", priceCents: TRAINING_PRICE_CENTS.cpr_first_aid },
+  { sku: "mandt", name: "Mandt", priceCents: TRAINING_PRICE_CENTS.mandt },
+  {
+    sku: "dspd_required",
+    name: "DSPD required training",
+    priceCents: TRAINING_PRICE_CENTS.dspd_required,
+    sub: "Includes 12 hrs ongoing content / year",
+  },
+];
+
+export function publicTrainingAlaCarteTotalCents(): number {
+  return PUBLIC_TRAINING_ALA_CARTE.reduce((sum, row) => sum + row.priceCents, 0);
+}
+
+export function publicTrainingBundleSavingsCents(): number {
+  return Math.max(0, publicTrainingAlaCarteTotalCents() - TRAINING_PRICE_CENTS.full_program);
+}
+
 export const LIST_VOLUME_TIERS = [
   { maxClients: 19, perStaffCents: LIST_PER_STAFF_CENTS_1_19, label: "1–19 clients" },
   { maxClients: 49, perStaffCents: LIST_PER_STAFF_CENTS_20_49, label: "20–49 clients" },

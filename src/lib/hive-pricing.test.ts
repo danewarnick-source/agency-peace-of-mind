@@ -9,9 +9,12 @@ import {
   LIST_PER_STAFF_CENTS_1_19,
   LIST_PER_STAFF_CENTS_20_49,
   LIST_PER_STAFF_CENTS_50_PLUS,
+  PUBLIC_TRAINING_ALA_CARTE,
   TRAINING_PRICE_CENTS,
   effectivePricingSchedule,
   listPerStaffCents,
+  publicTrainingAlaCarteTotalCents,
+  publicTrainingBundleSavingsCents,
   quoteHiveSubscription,
   signupScheduleFromPayingCount,
   trainingPriceCentsForSku,
@@ -128,5 +131,17 @@ describe("training catalog amounts", () => {
     assert.equal(TRAINING_PRICE_CENTS.dspd_required, 10_000);
     assert.equal(trainingPriceCentsForSku("mandt"), 20_000);
     assert.notEqual(trainingPriceCentsForSku("cpr_first_aid"), 4_900);
+  });
+
+  it("public catalog matches /pricing: three à la carte rows and $75 bundle savings", () => {
+    assert.equal(PUBLIC_TRAINING_ALA_CARTE.length, 3);
+    assert.equal(
+      PUBLIC_TRAINING_ALA_CARTE.map((c) => `${c.name}:${c.priceCents / 100}`).join("|"),
+      "CPR / First Aid:75|Mandt:200|DSPD required training:100",
+    );
+    assert.equal(publicTrainingAlaCarteTotalCents(), 37_500);
+    assert.equal(TRAINING_PRICE_CENTS.full_program, 30_000);
+    assert.equal(publicTrainingBundleSavingsCents(), 7_500);
+    assert.ok(PUBLIC_TRAINING_ALA_CARTE.every((c) => c.priceCents > 0));
   });
 });

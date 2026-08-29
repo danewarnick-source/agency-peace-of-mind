@@ -41,7 +41,7 @@ function ShellInner({ title, children }: { title: string; children: ReactNode })
   return (
     <div
       ref={ref}
-      className="md:hidden fixed left-0 top-0 z-30 h-[100dvh] w-[100dvw] flex flex-col overflow-hidden bg-background"
+      className="md:hidden fixed left-0 top-0 z-30 flex h-[100dvh] w-[100dvw] max-w-[100dvw] flex-col overflow-hidden bg-background"
     >
       <StaffTopBar title={title} framed />
       {/*
@@ -55,7 +55,7 @@ function ShellInner({ title, children }: { title: string; children: ReactNode })
         className={
           isAskNectar
             ? "flex-1 overflow-hidden overscroll-none"
-            : `flex-1 overflow-y-auto overscroll-contain px-4 py-5 ${barVisible ? "pb-[calc(1.25rem+56px)]" : ""}`
+            : `flex-1 overflow-y-auto overscroll-contain px-4 py-5 ${barVisible ? "pb-[calc(1.25rem+6.5rem)]" : ""}`
         }
       >
         {children}

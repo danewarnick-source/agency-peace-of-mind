@@ -165,7 +165,7 @@ function SchedulerPage() {
 
   return (
     <div
-      className="min-h-screen"
+      className="min-h-0 min-w-0 max-w-full overflow-x-hidden"
       style={{ background: "#faf9f5", fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
     >
       <div className="px-4 pt-4"><NectarFocusBanner /></div>
@@ -654,7 +654,7 @@ function DayView({
   const staffById = useMemo(() => new Map(data.staff.map((s) => [s.id, s])), [data.staff]);
 
   return (
-    <div className="overflow-x-auto">
+    <div className="w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
       <div style={{ minWidth: 920 }}>
         {/* Header row */}
         <div className="flex items-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground" style={{ borderBottom: `1px solid ${LINE}` }}>
@@ -749,7 +749,7 @@ function WeekView({
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
   return (
-    <div className="overflow-x-auto">
+    <div className="w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
       <div style={{ minWidth: 920 }}>
         <div className="flex" style={{ borderBottom: `1px solid ${LINE}` }}>
           <div style={{ minWidth: 220, padding: "8px 12px" }} className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Client</div>

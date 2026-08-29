@@ -102,7 +102,14 @@ export function useActionRequiredQueue(orgIdOverride?: string | null) {
   const obligationsQ = useQuery({
     enabled: !!orgId,
     queryKey: ["company-obligations", orgId],
-    queryFn: () => listFn({ data: { organizationId: orgId! } }),
+    queryFn: async () => {
+      try {
+        return await listFn({ data: { organizationId: orgId! } });
+      } catch (e) {
+        console.error("[action-required] obligations list failed", e);
+        return [];
+      }
+    },
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
@@ -135,7 +142,10 @@ export function useActionRequiredQueue(orgIdOverride?: string | null) {
         .neq("status", "State_Confirmed")
         .order("discovered_at", { ascending: false })
         .limit(100);
-      if (error) throw error;
+      if (error) {
+        console.error("[action-required] incidents query failed", error);
+        return [];
+      }
       return (data ?? []) as Array<{
         id: string;
         report_number: string;
@@ -163,7 +173,10 @@ export function useActionRequiredQueue(orgIdOverride?: string | null) {
         .gt("created_at", since)
         .order("created_at", { ascending: false })
         .limit(50);
-      if (error) throw error;
+      if (error) {
+        console.error("[action-required] flagged query failed", error);
+        return [];
+      }
       return (data ?? []) as Array<{
         id: string;
         staff_id: string;
@@ -214,7 +227,10 @@ export function useActionRequiredQueue(orgIdOverride?: string | null) {
         .eq("active", true)
         .not("next_review_date", "is", null)
         .lte("next_review_date", cutoff);
-      if (error) throw error;
+      if (error) {
+        console.error("[action-required] hrc query failed", error);
+        return [];
+      }
       return (data ?? []) as Array<{
         id: string;
         client_id: string;

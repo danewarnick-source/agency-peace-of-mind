@@ -46,7 +46,6 @@ import { orgDashboardIsLocked, pathBypassesBillingLock } from "@/lib/billing-loc
 import { DraftJobsProvider } from "@/components/nectar/draft-jobs-driver";
 import { DraftJobsHeaderPill } from "@/components/nectar/draft-jobs-header-pill";
 import { GuidedTourProvider } from "@/components/nectar/guided-tour-provider";
-import { OpenCompanyViews } from "@/components/hive-exec/open-company-views";
 import { OPEN_DASHBOARD_MENU_EVENT } from "@/lib/portal-view-landing";
 
 
@@ -204,6 +203,17 @@ function DashboardLayout() {
   }, []);
 
   useEffect(() => {
+    if (!mobileSearchOpen && !mobileOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setMobileSearchOpen(false);
+      setMobileOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobileSearchOpen, mobileOpen]);
+
+  useEffect(() => {
     const t = window.setTimeout(() => setBootTimedOut(true), DASHBOARD_BOOT_TIMEOUT_MS);
     return () => window.clearTimeout(t);
   }, []);
@@ -354,9 +364,17 @@ function DashboardLayout() {
     // user off, only for the forward push to send them back once the
     // queries settle — the reload/refresh loop the user reported.
     if (execLoading || !viewHydrated || orgLoading) return;
-    if (isHiveExecView && !pathname.startsWith("/dashboard/hive-exec")) {
+    let stored: string | null = null;
+    try {
+      stored = window.localStorage.getItem("portal-view");
+    } catch {
+      stored = null;
+    }
+    const wantExec = stored === "hive_exec";
+    const wantState = stored === "state_preview";
+    if (wantExec && !pathname.startsWith("/dashboard/hive-exec")) {
       navigate({ to: "/dashboard/hive-exec", replace: true });
-    } else if (!isHiveExecView && !isStatePreview && pathname.startsWith("/dashboard/hive-exec")) {
+    } else if (!wantExec && !wantState && pathname.startsWith("/dashboard/hive-exec")) {
       navigate({ to: "/dashboard", replace: true });
     }
   }, [execLoading, viewHydrated, orgLoading, isHiveExecView, isStatePreview, pathname, navigate]);
@@ -458,7 +476,11 @@ function DashboardLayout() {
 
       {/* Desktop layout (md+) — unchanged. Also used on mobile for Admin View. */}
       <div
-        className={`grid w-full min-h-0 flex-1 md:grid-cols-[260px_minmax(0,1fr)] ${isStaffView && !isMobilePreview ? "hidden md:grid" : ""}`}
+        className={
+          isStaffView && !isMobilePreview
+            ? "hidden min-h-0 min-w-0 w-full flex-1 md:grid md:grid-cols-[260px_minmax(0,1fr)]"
+            : "grid min-h-0 min-w-0 w-full flex-1 md:grid-cols-[260px_minmax(0,1fr)]"
+        }
       >
         <aside className="hidden h-full flex-col overflow-y-auto bg-sidebar text-sidebar-foreground md:flex">
           <SidebarBody {...sidebarProps} />
@@ -475,7 +497,9 @@ function DashboardLayout() {
             }}
           >
             <div className="flex items-center gap-2 min-w-0">
-              {/* Always show on phones — including hive-exec. Portal View lives in this Sheet. */}
+              {/* Staff phones use the avatar drawer. Keep this control out of
+                  that tree so it is not a 0×0 ghost. Hive-exec + admin phones keep it. */}
+              {!(isStaffView && !isMobilePreview) && (
               <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
                 <SheetTrigger asChild>
                   <Button
@@ -494,6 +518,7 @@ function DashboardLayout() {
                   </div>
                 </SheetContent>
               </Sheet>
+              )}
               <div className="min-w-0">
                 <h1 className="truncate text-lg font-semibold tracking-tight">
                   {pageTitle}
@@ -555,11 +580,6 @@ function DashboardLayout() {
               </Button>
             </div>
           </header>
-          {isHiveExecView && (
-            <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-background px-4 py-2 md:px-6">
-              <OpenCompanyViews />
-            </div>
-          )}
           {/* Collapsed-by-default NECTAR ask bar on phones — expands from the
               header icon; the desktop inline bar is unchanged. */}
           {mobileSearchOpen && !isHiveExecView && (

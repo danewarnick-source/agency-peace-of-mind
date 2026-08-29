@@ -133,8 +133,15 @@ export function NotificationBell() {
         buttonRef.current && !buttonRef.current.contains(e.target as Node)
       ) setOpen(false);
     }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   const { data: notifications = [] } = useQuery({

@@ -378,6 +378,17 @@ export function RecordsTab() {
         }>) {
           staffMap.set(p.id, staffDisplayName(p));
         }
+        const missing = staffIds.filter((id) => !staffMap.get(id) || staffMap.get(id) === "Staff");
+        if (missing.length) {
+          const { data: dir } = await supabase
+            .from("org_member_directory")
+            .select("id, full_name")
+            .in("id", missing);
+          for (const d of (dir ?? []) as Array<{ id: string; full_name: string | null }>) {
+            const name = staffDisplayName({ full_name: d.full_name });
+            if (name !== "Staff") staffMap.set(d.id, name);
+          }
+        }
       }
 
       const teamMap = new Map((teamOptionsQ.data ?? []).map((t) => [t.value, t.label]));
@@ -451,6 +462,17 @@ export function RecordsTab() {
           last_name: string | null;
         }>) {
           staffMap.set(p.id, staffDisplayName(p));
+        }
+        const missing = staffIds.filter((id) => !staffMap.get(id) || staffMap.get(id) === "Staff");
+        if (missing.length) {
+          const { data: dir } = await supabase
+            .from("org_member_directory")
+            .select("id, full_name")
+            .in("id", missing);
+          for (const d of (dir ?? []) as Array<{ id: string; full_name: string | null }>) {
+            const name = staffDisplayName({ full_name: d.full_name });
+            if (name !== "Staff") staffMap.set(d.id, name);
+          }
         }
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

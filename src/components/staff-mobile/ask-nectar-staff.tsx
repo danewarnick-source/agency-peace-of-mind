@@ -115,6 +115,14 @@ export function AskNectarStaff({ clientId, compact = false, initialQuestion }: A
   const send = (q: string) => {
     const text = q.trim();
     if (!text || mutation.isPending) return;
+    if (!organizationId) {
+      setMessages((m) => [
+        ...m,
+        { id: crypto.randomUUID(), role: "user", text },
+        { id: crypto.randomUUID(), role: "nectar", text: "Still loading your workspace — try again in a moment." },
+      ]);
+      return;
+    }
     setMessages((m) => [
       ...m,
       { id: crypto.randomUUID(), role: "user", text },

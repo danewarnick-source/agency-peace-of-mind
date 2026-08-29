@@ -188,6 +188,7 @@ import { Route as DashboardBehaviorSupportClientIdRouteImport } from './routes/d
 import { Route as DashboardAdminEmarAuditRouteImport } from './routes/dashboard.admin.emar-audit'
 import { Route as DashboardAdminCeHoursRouteImport } from './routes/dashboard.admin.ce-hours'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe/webhook'
+import { Route as ApiComplianceUrgentRouteImport } from './routes/api/compliance/urgent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as DashboardSmartImportJobIdReviewRouteImport } from './routes/dashboard.smart-import.$jobId.review'
@@ -1176,6 +1177,11 @@ const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
   path: '/api/stripe/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiComplianceUrgentRoute = ApiComplianceUrgentRouteImport.update({
+  id: '/api/compliance/urgent',
+  path: '/api/compliance/urgent',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
   Char91DotmcpChar93InvokeToolToolRouteImport.update({
     id: '/.mcp/invoke-tool/$tool',
@@ -1405,6 +1411,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof DashboardIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/compliance/urgent': typeof ApiComplianceUrgentRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
@@ -1602,6 +1609,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/compliance/urgent': typeof ApiComplianceUrgentRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
@@ -1807,6 +1815,7 @@ export interface FileRoutesById {
   '/dashboard/': typeof DashboardIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/compliance/urgent': typeof ApiComplianceUrgentRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/dashboard/admin/ce-hours': typeof DashboardAdminCeHoursRoute
   '/dashboard/admin/emar-audit': typeof DashboardAdminEmarAuditRoute
@@ -2013,6 +2022,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/compliance/urgent'
     | '/api/stripe/webhook'
     | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
@@ -2210,6 +2220,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/compliance/urgent'
     | '/api/stripe/webhook'
     | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
@@ -2414,6 +2425,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/compliance/urgent'
     | '/api/stripe/webhook'
     | '/dashboard/admin/ce-hours'
     | '/dashboard/admin/emar-audit'
@@ -2558,6 +2570,7 @@ export interface RootRouteChildren {
   AuditPortalIndexRoute: typeof AuditPortalIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  ApiComplianceUrgentRoute: typeof ApiComplianceUrgentRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
   SignEmployeeLoanTokenRoute: typeof SignEmployeeLoanTokenRoute
   ApiPublicHooksBillingDailyCheckRoute: typeof ApiPublicHooksBillingDailyCheckRoute
@@ -3824,6 +3837,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStripeWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/compliance/urgent': {
+      id: '/api/compliance/urgent'
+      path: '/api/compliance/urgent'
+      fullPath: '/api/compliance/urgent'
+      preLoaderRoute: typeof ApiComplianceUrgentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/.mcp/invoke-tool/$tool': {
       id: '/.mcp/invoke-tool/$tool'
       path: '/.mcp/invoke-tool/$tool'
@@ -4516,6 +4536,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuditPortalIndexRoute: AuditPortalIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  ApiComplianceUrgentRoute: ApiComplianceUrgentRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
   SignEmployeeLoanTokenRoute: SignEmployeeLoanTokenRoute,
   ApiPublicHooksBillingDailyCheckRoute: ApiPublicHooksBillingDailyCheckRoute,

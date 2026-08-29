@@ -69,14 +69,25 @@ export function NectarSearchBar({
     return () => window.removeEventListener("keydown", onKey);
   }, [variant]);
 
-  // Click-outside to close.
+  // Click-outside / Escape to close (Escape must work even when focus left the input).
   useEffect(() => {
     if (!open) return;
     const onClick = (e: MouseEvent) => {
       if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setOpen(false);
+        inputRef.current?.blur();
+      }
+    };
     document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   const searchFn = useServerFn(searchOrgEntities);

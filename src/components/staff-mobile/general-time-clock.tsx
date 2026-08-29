@@ -15,6 +15,16 @@ import {
 import { toast } from "sonner";
 import { useGeneralShift } from "@/hooks/use-general-shift";
 import { useTimePaySettings, type TimePayCategory } from "@/hooks/use-time-pay-settings";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const ICON_BY_CODE: Record<string, typeof Briefcase> = {
   training: GraduationCap,
@@ -46,13 +56,15 @@ export function fmtElapsed(ms: number) {
  * Time & Pay settings. Categories marked `requires_description` (built-in
  * "Other" and any custom ones) gate Clock In until the note is non-empty.
  */
-export function GeneralTimeClock() {
+export function GeneralTimeClock({ autoConfirmEnd = false }: { autoConfirmEnd?: boolean }) {
   const { shift, start, stop, updateNote } = useGeneralShift();
   const { settings, enabledCategories } = useTimePaySettings();
   const [categoryCode, setCategoryCode] = useState<string>("");
   const [note, setNote] = useState("");
   const [now, setNow] = useState(Date.now());
   const [showNoteError, setShowNoteError] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [stopping, setStopping] = useState(false);
 
   const cats = enabledCategories;
   const active = useMemo<TimePayCategory | undefined>(
@@ -65,6 +77,10 @@ export function GeneralTimeClock() {
   }, [cats, categoryCode]);
 
   const running = !!shift;
+
+  useEffect(() => {
+    if (autoConfirmEnd && running) setConfirmOpen(true);
+  }, [autoConfirmEnd, running]);
 
   // Sync local note with the active shift so it's editable while clocked in.
   useEffect(() => {
@@ -112,8 +128,12 @@ export function GeneralTimeClock() {
   };
 
   const onStop = () => {
-    if (!shift) return;
-    if (!noteValid) {
+    if (!shift) {
+      toast.error("No open shift to clock out.");
+      return;
+    }
+    const noteToSave = trimmedNote.length >= MIN_NOTE_LEN ? trimmedNote : (shift.note ?? "").trim();
+    if (noteToSave.length < MIN_NOTE_LEN) {
       setShowNoteError(true);
       toast.error("Add a note describing this shift before clocking out.", {
         description: `At least ${MIN_NOTE_LEN} characters — what did you work on?`,
@@ -123,11 +143,26 @@ export function GeneralTimeClock() {
       el?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-    if (!window.confirm(`End ${shift.category} shift?`)) return;
-    stop(shift!.id, { note: trimmedNote });
-    setNote("");
-    setShowNoteError(false);
-    toast.success("General shift ended");
+    setConfirmOpen(true);
+  };
+
+  const confirmStop = async () => {
+    if (!shift) return;
+    const noteToSave = trimmedNote.length >= MIN_NOTE_LEN ? trimmedNote : (shift.note ?? "").trim();
+    setStopping(true);
+    try {
+      const ok = await stop(shift.id, { note: noteToSave });
+      if (!ok) {
+        toast.error("Could not clock out. Try again.");
+        return;
+      }
+      setNote("");
+      setShowNoteError(false);
+      setConfirmOpen(false);
+      toast.success("General shift ended");
+    } finally {
+      setStopping(false);
+    }
   };
 
 
@@ -254,8 +289,9 @@ export function GeneralTimeClock() {
           <Button
             type="button"
             onClick={onStop}
+            disabled={stopping}
             style={{ backgroundColor: "#dc2626", color: "#ffffff" }}
-            className="flex h-14 w-full items-center justify-center gap-2 rounded-xl !bg-rose-600 text-base font-bold uppercase tracking-wider !text-white shadow-lg shadow-rose-600/30 transition-all duration-150 hover:!bg-rose-700 active:scale-[0.98]"
+            className="relative z-10 flex h-14 w-full items-center justify-center gap-2 rounded-xl !bg-rose-600 text-base font-bold uppercase tracking-wider !text-white shadow-lg shadow-rose-600/30 transition-all duration-150 hover:!bg-rose-700 active:scale-[0.98]"
           >
             <Square className="h-5 w-5 fill-current" /> End {shift!.category} Shift
           </Button>
@@ -276,6 +312,30 @@ export function GeneralTimeClock() {
           </p>
         )}
       </div>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>End {shift?.category ?? "this"} shift?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This clocks you out of the open non-EVV / training punch. The note you entered is saved with the shift.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={stopping}>Keep working</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmStop();
+              }}
+              disabled={stopping}
+              className="bg-rose-600 text-white hover:bg-rose-700"
+            >
+              {stopping ? "Ending…" : "End shift"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }

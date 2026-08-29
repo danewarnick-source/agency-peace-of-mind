@@ -347,7 +347,7 @@ function StaffProfilePage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 max-w-full space-y-6 overflow-x-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => window.history.length > 1 ? router.history.back() : router.navigate({ to: "/dashboard/hub/employees" })}>
@@ -409,7 +409,7 @@ function StaffProfilePage() {
         onValueChange={(v) => navigate({ search: (prev) => ({ ...prev, tab: v === "record" ? undefined : (v as ProfileTab) }) })}
         className="w-full"
       >
-        <TabsList className="flex flex-wrap h-auto justify-start">
+        <TabsList className="flex h-auto w-full min-w-0 max-w-full flex-wrap justify-start overflow-x-auto">
           <TabsTrigger value="record">Staff record</TabsTrigger>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>

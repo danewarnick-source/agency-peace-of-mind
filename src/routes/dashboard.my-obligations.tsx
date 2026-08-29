@@ -17,6 +17,7 @@ import {
   cadenceDescription,
   type MyObligationInstanceRow,
 } from "@/lib/company-obligations.functions";
+import { isFormUuid } from "@/lib/resolve-obligation-form";
 import { dueLabel } from "@/components/company-obligations/my-obligations-widget";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 
@@ -86,7 +87,7 @@ function CompletedCard({ instance, completion }: { instance: MyObligationInstanc
             Submitted {formatDateTime(completion?.completed_at ?? instance.completed_at)}
           </p>
           <p className="text-xs text-muted-foreground">Evidence: {evidenceUsed}</p>
-          {evidenceUsed === "form" ? (
+          {evidenceUsed === "form" && isFormUuid(ob.linked_form_id) ? (
             <a
               href={`/dashboard/forms/${ob.linked_form_id}/submissions`}
               className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[#137182] hover:underline"
@@ -242,9 +243,15 @@ function OpenCard({
             <p className="mt-1 text-xs text-muted-foreground">
               This form is required {cadenceDescription(ob).toLowerCase()}. Due {new Date(instance.due_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}.
             </p>
-            <a href={`/dashboard/forms/${ob.linked_form_id}/fill?obligation_instance=${instance.id}`}>
-              <Button size="sm" className="mt-2">Open and complete form →</Button>
-            </a>
+            {isFormUuid(ob.linked_form_id) ? (
+              <a href={`/dashboard/forms/${ob.linked_form_id}/fill?obligation_instance=${instance.id}`}>
+                <Button size="sm" className="mt-2">Open and complete form →</Button>
+              </a>
+            ) : (
+              <p className="mt-2 text-xs text-amber-800">
+                This duty is a form, but no published form is linked yet. Ask your administrator to attach the form — do not open a blank link.
+              </p>
+            )}
             <p className="mt-1.5 text-xs text-muted-foreground">
               Once you submit the form, this obligation will automatically close.
             </p>

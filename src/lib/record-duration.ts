@@ -140,6 +140,7 @@ export function formatPunchDateSpan(
 }
 
 const UUID_LIKE = /^[0-9a-f]{8}(-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?$/i;
+const HEX_ID_FRAGMENT = /^[0-9a-f]{6,}$/i;
 
 /** True when a punch spans 24h or more (forgotten clock-out). Display only. */
 export function isLongOpenPunch(durationMin: number): boolean {
@@ -155,9 +156,11 @@ export function staffDisplayName(
   fallbackId?: string | null,
 ): string {
   const full = (profile?.full_name ?? "").trim();
-  if (full && !UUID_LIKE.test(full)) return full;
+  if (full && !UUID_LIKE.test(full) && !HEX_ID_FRAGMENT.test(full)) return full;
   const parts = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim();
-  if (parts && !UUID_LIKE.test(parts)) return parts;
-  if (fallbackId && UUID_LIKE.test(fallbackId.trim())) return "Staff";
+  if (parts && !UUID_LIKE.test(parts) && !HEX_ID_FRAGMENT.test(parts)) return parts;
+  if (fallbackId && (UUID_LIKE.test(fallbackId.trim()) || HEX_ID_FRAGMENT.test(fallbackId.trim()))) {
+    return "Staff";
+  }
   return "Staff";
 }

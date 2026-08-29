@@ -188,9 +188,12 @@ function Overview() {
   const { welcome } = Route.useSearch();
 
   const isManager = org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
-  const effectiveView = hasStoredView ? view : isManager ? "admin" : "staff";
+  const defaultView = isManager ? "admin" : "staff";
+  const effectiveView = hasStoredView ? view : defaultView;
   const isStatePreviewAdmin = effectiveView === "state_preview" && subView === "admin";
-  const showAdmin = (isManager && effectiveView === "admin") || isStatePreviewAdmin;
+  const showAdmin =
+    (isManager && (effectiveView === "admin" || effectiveView === "hive_exec")) ||
+    isStatePreviewAdmin;
 
   return (
     <div className="space-y-8">

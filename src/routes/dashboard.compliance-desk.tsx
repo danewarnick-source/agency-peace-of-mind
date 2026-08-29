@@ -1762,7 +1762,7 @@ function ArchiveTable({
   const staffOptions = useMemo(() => {
     const m = new Map<string, string>();
     for (const r of rows) {
-      const label = r.staff?.full_name ?? r.staff?.email ?? staffNameMap?.get(r.staff_id) ?? r.staff_id;
+      const label = r.staff?.full_name ?? r.staff?.email ?? staffNameMap?.get(r.staff_id) ?? "Staff";
       if (!m.has(r.staff_id)) m.set(r.staff_id, label);
     }
     return Array.from(m.entries())

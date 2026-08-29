@@ -112,21 +112,34 @@ export function useGeneralShift() {
   );
 
   const stop = useCallback(
-    (shiftId: string, opts?: { note?: string }) => {
-      if (!userId) return;
-      (async () => {
+    async (shiftId: string, opts?: { note?: string }): Promise<boolean> => {
+      if (!userId) return false;
+      try {
         const patch: Record<string, unknown> = {
           clock_out_timestamp: new Date().toISOString(),
         };
         if (typeof opts?.note === "string") patch.note = opts.note.trim();
-        const { error } = await db
+        const { data, error } = await db
           .from("general_shifts")
           .update(patch)
           .eq("id", shiftId)
-          .eq("user_id", userId);
-        if (error) console.error("[general-shift] stop failed", error);
+          .eq("user_id", userId)
+          .is("clock_out_timestamp", null)
+          .select("id");
+        if (error) {
+          console.error("[general-shift] stop failed", error);
+          return false;
+        }
+        if (!Array.isArray(data) || data.length === 0) {
+          console.error("[general-shift] stop wrote 0 rows");
+          return false;
+        }
         invalidate();
-      })().catch((e) => console.error("[general-shift] stop failed", e));
+        return true;
+      } catch (e) {
+        console.error("[general-shift] stop failed", e);
+        return false;
+      }
     },
     [userId, invalidate],
   );

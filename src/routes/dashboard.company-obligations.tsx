@@ -751,7 +751,7 @@ function CompanyObligationsPage() {
   const { tab, new: openNew, obligation: focusObligationId } = Route.useSearch();
   const canAccess =
     org?.role === "admin" || org?.role === "program_manager" || org?.role === "manager";
-  const { totalCount: actionCount } = useActionRequiredQueue(
+  const { totalCount: actionCount, isLoading: actionQueueLoading } = useActionRequiredQueue(
     canAccess ? org?.organization_id : null,
   );
   const activeTab: CompanyObligationsTab = tab ?? "obligations";
@@ -795,7 +795,7 @@ function CompanyObligationsPage() {
           <TabsTrigger value="utah-pack">Utah pack</TabsTrigger>
           <TabsTrigger value="policy-library">Authoritative Sources</TabsTrigger>
           <TabsTrigger value="action-required" className="gap-1.5">
-            {actionCount > 0 ? (
+            {!actionQueueLoading && actionCount > 0 ? (
               <>
                 Action Required
                 <Badge

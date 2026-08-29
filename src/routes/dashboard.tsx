@@ -173,6 +173,7 @@ type SidebarBodyProps = {
   onNavigate?: () => void;
   inboxUnread: number;
   complianceActionCount: number;
+  complianceQueueLoading: boolean;
 };
 
 
@@ -352,9 +353,8 @@ function DashboardLayout() {
   });
 
   // Must stay above any conditional return — Rules of Hooks.
-  const { totalCount: complianceActionCount } = useActionRequiredQueue(
-    isAdminCapable ? org?.organization_id ?? null : null,
-  );
+  const { totalCount: complianceActionCount, isLoading: complianceQueueLoading } =
+    useActionRequiredQueue(isAdminCapable ? org?.organization_id ?? null : null);
 
   const currentPreviewState = isStatePreview
     ? states.find((s) => s.code === stateCode) ?? null
@@ -411,6 +411,7 @@ function DashboardLayout() {
     signOut,
     inboxUnread,
     complianceActionCount,
+    complianceQueueLoading,
   };
 
 
@@ -675,6 +676,7 @@ function SidebarBody({
   onNavigate,
   inboxUnread,
   complianceActionCount,
+  complianceQueueLoading,
 }: SidebarBodyProps) {
   const [upgradeFeatureKey, setUpgradeFeatureKey] = useState<string | null>(null);
   // Domain sections in the Executive Command Center sidebar are collapsed by
@@ -957,7 +959,9 @@ function SidebarBody({
             >
               <Icon className={`h-4 w-4 ${active ? (isNectar ? "text-white" : "") : isNectar ? "text-[#f4a93a]" : ""}`} />
               <span className="flex-1">{item.label}</span>
-              {item.to === "/dashboard/company-obligations" && complianceActionCount > 0 && (
+              {item.to === "/dashboard/company-obligations" &&
+                !complianceQueueLoading &&
+                complianceActionCount > 0 && (
                 <span
                   aria-label={`${complianceActionCount} action required`}
                   className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-destructive-foreground"

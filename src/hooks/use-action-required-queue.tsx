@@ -8,6 +8,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { getIncidentOpenClocks } from "@/lib/incident-deadlines";
+import { stableActionRequiredCount } from "@/lib/action-required-count";
 import {
   listCompanyObligations,
   type ObligationListItem,
@@ -502,11 +503,15 @@ export function useActionRequiredQueue(orgIdOverride?: string | null) {
       hrcQ.isLoading ||
       hireDatesQ.isLoading);
 
+  // Badge / tab counts stay 0 until every source has settled. Partial
+  // totals (1, then 15) were the Compliance nav flap.
+  const settledCount = stableActionRequiredCount(isLoading, totalCount);
+
   return {
     orgId,
     items,
     sections,
-    totalCount,
+    totalCount: settledCount,
     checkedAt,
     isLoading,
     obligations: (obligationsQ.data ?? []) as ObligationListItem[],

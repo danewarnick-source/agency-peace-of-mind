@@ -238,6 +238,10 @@ export const ensureCurrentSummaryPeriods = createServerFn({ method: "POST" })
       entries.filter((e) => !e.start || e.start <= periodEnd);
 
     for (const [clientId, entries] of byClient) {
+      // Billing rows can outlive a deleted client; skip rather than FK-500
+      // the home-load ensure RPC (that JSON 500 used to be HTML-rewritten
+      // and hang dashboard Loading).
+      if (!clientMeta.has(clientId)) continue;
       const meta = clientMeta.get(clientId);
       const floor = summaryPeriodFloor({
         orgGoLiveDate,
@@ -319,7 +323,12 @@ export const ensureCurrentSummaryPeriods = createServerFn({ method: "POST" })
     const { error } = await (supabase as any)
       .from("client_progress_summaries")
       .upsert(inserts, { onConflict: "organization_id,client_id,period_kind,period_label", ignoreDuplicates: true });
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (/client_progress_summaries_client_id_fkey|foreign key constraint/i.test(error.message)) {
+        return { ensured: 0 };
+      }
+      throw new Error(error.message);
+    }
     return { ensured: inserts.length };
   });
 

@@ -3,6 +3,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { attachGetSessionBoot } from "@/lib/auth-session-boot";
 
 interface AuthCtx {
   user: User | null;
@@ -53,12 +54,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       prevUserId = nextUserId;
     });
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      prevUserId = data.session?.user?.id ?? null;
-      setLoading(false);
+    // getSession can hang (no reject) on a stalled GoTrue init/refresh.
+    // Without catch + timeout, loading stays true and /login never runs.
+    const stopBoot = attachGetSessionBoot({
+      getSession: () => (supabase as any).auth.getSession(),
+      onSession: (s) => {
+        setSession(s as Session | null);
+        prevUserId = s?.user?.id ?? null;
+      },
+      onLoadingDone: () => setLoading(false),
     });
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      stopBoot();
+    };
   }, [queryClient, router]);
 
   return (

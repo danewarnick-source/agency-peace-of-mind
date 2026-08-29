@@ -8,10 +8,11 @@
     "build": "NODE_OPTIONS=--max-old-space-size=8192 vite build",
     "build:dev": "NODE_OPTIONS=--max-old-space-size=8192 vite build --mode development",
     "build:aws": "NODE_OPTIONS=--max-old-space-size=8192 BUILD_TARGET=aws vite build",
+    "build:lambda": "NODE_OPTIONS=--max-old-space-size=8192 BUILD_TARGET=lambda vite build",
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test:unit": "node --test --experimental-strip-types src/lib/launchpad-gate.test.ts src/lib/geo.test.ts src/lib/geocode.test.ts src/lib/join-invite.test.ts src/lib/login-auth.test.ts src/lib/portal-view-landing.test.ts src/lib/billing-access.test.ts src/lib/hive-pricing.test.ts src/lib/assignment-codes.test.ts src/lib/record-duration.test.ts src/lib/billing-codes-live-clients.test.ts src/lib/current-org.test.ts src/lib/smart-import-ai-gate.test.ts src/lib/billing-remaining.test.ts src/lib/medicaid-id.test.ts src/lib/action-required-count.test.ts",
+    "test:unit": "node --test --experimental-strip-types src/lib/launchpad-gate.test.ts src/lib/geo.test.ts src/lib/geocode.test.ts src/lib/join-invite.test.ts src/lib/login-auth.test.ts src/lib/portal-view-landing.test.ts src/lib/billing-access.test.ts src/lib/hive-pricing.test.ts src/lib/assignment-codes.test.ts src/lib/record-duration.test.ts src/lib/billing-codes-live-clients.test.ts src/lib/current-org.test.ts src/lib/smart-import-ai-gate.test.ts src/lib/billing-remaining.test.ts src/lib/medicaid-id.test.ts src/lib/action-required-count.test.ts src/lib/catastrophic-ssr.test.ts src/lib/auth-session-boot.test.ts src/lib/nitro-origin-headers.test.ts src/lib/lambda-build-target.test.ts",
     "test:e2e": "playwright test --config=playwright.hive-exec-escape.config.ts && playwright test --config=playwright.local.config.ts && playwright test --config=playwright.scheduler.config.ts && playwright test --config=playwright.admin-home.config.ts && playwright test --config=playwright.roster.config.ts && playwright test --config=playwright.staff-go-live.config.ts && playwright test --config=playwright.daily-logs.config.ts && playwright test --config=playwright.1056.config.ts && playwright test --config=playwright.stripe.config.ts && playwright test --config=playwright.config.ts --project=mock"
   },
   "dependencies": {

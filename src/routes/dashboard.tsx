@@ -35,6 +35,11 @@ import { useServerFn } from "@tanstack/react-start";
 import { getInboxUnreadCount } from "@/lib/inbox-messages.functions";
 import { useEntitlements } from "@/hooks/use-entitlements";
 import { useOrgFeatures } from "@/hooks/use-feature-enabled";
+import {
+  DASHBOARD_BOOT_TIMEOUT_MS,
+  dashboardShouldRedirectToLogin,
+  dashboardShellShowsLoading,
+} from "@/lib/auth-session-boot";
 
 import { BillingBanner } from "@/components/billing/billing-banner";
 import { orgDashboardIsLocked, pathBypassesBillingLock } from "@/lib/billing-lock-client";
@@ -190,6 +195,7 @@ function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [taskCenterOpen, setTaskCenterOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [bootTimedOut, setBootTimedOut] = useState(false);
 
   useEffect(() => {
     const openMenu = () => setMobileOpen(true);
@@ -197,11 +203,22 @@ function DashboardLayout() {
     return () => window.removeEventListener(OPEN_DASHBOARD_MENU_EVENT, openMenu);
   }, []);
 
-
+  useEffect(() => {
+    const t = window.setTimeout(() => setBootTimedOut(true), DASHBOARD_BOOT_TIMEOUT_MS);
+    return () => window.clearTimeout(t);
+  }, []);
 
   useEffect(() => {
-    if (!loading && !session) navigate({ to: "/login" });
-  }, [loading, session, navigate]);
+    if (
+      dashboardShouldRedirectToLogin({
+        sessionLoading: loading,
+        hasSession: !!session,
+        bootTimedOut,
+      })
+    ) {
+      navigate({ to: "/login" });
+    }
+  }, [loading, session, bootTimedOut, navigate]);
 
   // Full-page loads skip beforeLoad on SSR. Re-check after hydrate so unpaid
   // companies cannot sit on the dashboard with only a banner.
@@ -361,7 +378,16 @@ function DashboardLayout() {
     : null;
   const isComingSoonPreview = isStatePreview && currentPreviewState?.status === "coming_soon";
 
-  if (loading || !session || execLoading || !viewHydrated || orgLoading) {
+  if (
+    dashboardShellShowsLoading({
+      sessionLoading: loading,
+      hasSession: !!session,
+      execLoading,
+      hydrated: viewHydrated,
+      orgLoading,
+      bootTimedOut,
+    })
+  ) {
     return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading…</div>;
   }
 

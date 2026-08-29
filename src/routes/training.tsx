@@ -1,11 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { SiteHeader } from "@/components/site-header";
 import { Footer } from "@/components/landing/footer";
 import { Button } from "@/components/ui/button";
 import { Check, ArrowRight, GraduationCap } from "lucide-react";
-import { resolveTrainingStorefrontCatalog } from "@/lib/hive-pricing";
+import {
+  PUBLIC_TRAINING_ALA_CARTE,
+  PUBLIC_TRAINING_FULL_PROGRAM_INCLUDES,
+  TRAINING_PRICE_CENTS,
+  publicTrainingAlaCarteTotalCents,
+  publicTrainingBundleSavingsCents,
+} from "@/lib/hive-pricing";
 
 export const Route = createFileRoute("/training")({
   head: () => ({
@@ -30,25 +34,10 @@ export const Route = createFileRoute("/training")({
 });
 
 function TrainingStorefront() {
-  const { data: liveCatalog } = useQuery({
-    queryKey: ["hive-training-catalog"],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("hive_training_catalog")
-        .select("id, sku, name, kind, price_cents, includes, sort")
-        .eq("active", true)
-        .order("sort");
-      if (error || !Array.isArray(data)) return [];
-      return data;
-    },
-  });
-
-  const catalog = resolveTrainingStorefrontCatalog(liveCatalog);
-  const full = catalog.find((c) => c.sku === "full_program");
-  const alacarte = catalog.filter((c) => c.kind === "ala_carte");
-  const aCarteTotal = alacarte.reduce((s, c) => s + c.price_cents, 0);
-  const fullCents = full?.price_cents ?? 30_000;
-  const savings = Math.max(0, aCarteTotal - fullCents);
+  const alacarte = PUBLIC_TRAINING_ALA_CARTE;
+  const aCarteTotal = publicTrainingAlaCarteTotalCents();
+  const fullCents = TRAINING_PRICE_CENTS.full_program;
+  const savings = publicTrainingBundleSavingsCents();
 
   return (
     <div className="flex min-h-screen flex-col" style={{ background: "var(--training-bg)" }}>
@@ -86,14 +75,7 @@ function TrainingStorefront() {
             <CardTitle>Full training program</CardTitle>
             <Price cents={fullCents} suffix="/ staff · one-time" />
             <ul className="mt-6 space-y-3">
-              {(full?.includes ?? [
-                "CPR & First Aid",
-                "Mandt behavioral intervention",
-                "30-day DSPD required training",
-                "Hands-on HIVE platform walkthrough",
-                "Competency verification & sign-off",
-                "12 hours custom ongoing training / year",
-              ]).map((line) => (
+              {PUBLIC_TRAINING_FULL_PROGRAM_INCLUDES.map((line) => (
                 <li key={line} className="flex items-start gap-3 text-sm">
                   <span
                     className="mt-0.5 inline-flex h-5 w-5 flex-none items-center justify-center rounded-full"
@@ -114,17 +96,20 @@ function TrainingStorefront() {
             <CardTitle>Individual courses</CardTitle>
             <div className="mt-6 divide-y divide-[color:var(--border-light)]">
               {alacarte.map((c) => (
-                <div key={c.id} className="flex items-center justify-between gap-4 py-4">
+                <div key={c.sku} className="flex items-center justify-between gap-4 py-4">
                   <div>
                     <p className="text-sm font-semibold" style={{ color: "var(--training-navy)" }}>
                       {c.name}
                     </p>
-                    {c.includes?.[0] && (
-                      <p className="mt-0.5 text-xs text-[color:var(--text-soft)]">{c.includes[0]}</p>
+                    {c.sub && (
+                      <p className="mt-0.5 text-xs text-[color:var(--text-soft)]">{c.sub}</p>
                     )}
                   </div>
                   <p className="text-lg font-bold" style={{ color: "var(--training-navy)" }}>
-                    ${(c.price_cents / 100).toFixed(0)}
+                    ${(c.priceCents / 100).toFixed(0)}
+                    <span className="ml-1 text-sm font-normal text-[color:var(--text-soft)]">
+                      / person
+                    </span>
                   </p>
                 </div>
               ))}
@@ -132,7 +117,7 @@ function TrainingStorefront() {
             <p className="mt-6 rounded-lg bg-[color:var(--surface-2)] px-4 py-3 text-xs text-[color:var(--text-soft)]">
               All three à la carte: <strong>${(aCarteTotal / 100).toFixed(0)}</strong> · Full program:{" "}
               <strong>${(fullCents / 100).toFixed(0)}</strong>
-              {savings > 0 && <> — save <strong>${(savings / 100).toFixed(0)}</strong>.</>}
+              {savings > 0 && <> — save <strong>${(savings / 100).toFixed(0)}</strong></>}
             </p>
             <CTA variant="outline" />
           </PricingCard>

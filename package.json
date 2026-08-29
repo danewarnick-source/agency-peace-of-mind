@@ -9,6 +9,7 @@
     "build:dev": "NODE_OPTIONS=--max-old-space-size=8192 vite build --mode development",
     "build:aws": "NODE_OPTIONS=--max-old-space-size=8192 BUILD_TARGET=aws vite build",
     "build:lambda": "NODE_OPTIONS=--max-old-space-size=8192 BUILD_TARGET=lambda vite build",
+    "zip:lambda": "bash scripts/package-lambda.sh",
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",

@@ -252,6 +252,7 @@ describe("this branch matches live CloudFront JS (image 1b8fbd50 / PR 190)", () 
     const lambda = readFileSync(new URL("../../docs/AWS_LAMBDA.md", import.meta.url), "utf8");
     assert.doesNotMatch(lambda, /Content-Security-Policy/);
     assert.match(lambda, /AllViewerExceptHostHeader/);
+    assert.match(lambda, /E1BPLMZE2XLSKD/);
 
     const nitro = readFileSync(new URL("../../nitro.config.ts", import.meta.url), "utf8");
     assert.doesNotMatch(nitro, /Content-Security-Policy/);

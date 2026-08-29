@@ -45,4 +45,32 @@ describe("Lambda build path does not collide with Vercel or build:aws", () => {
     assert.match(src, /index\.handler|exports\.handler|export[\s\S]*handler/);
     assert.match(src, /\.output\/public/);
   });
+
+  it("docs and Tony script reuse hive-app-server / hive-app-static / E1BPLMZE2XLSKD only", () => {
+    const docs = readFileSync(new URL("../../docs/AWS_LAMBDA.md", import.meta.url), "utf8");
+    assert.match(docs, /hive-app-server/);
+    assert.match(docs, /hive-app-static/);
+    assert.match(docs, /E1BPLMZE2XLSKD/);
+    assert.match(docs, /d2j3kgagxghm5i\.cloudfront\.net/);
+    assert.match(docs, /4wadoqttka47octom5yvlwk5lq0xtbnl\.lambda-url\.us-east-1\.on\.aws/);
+    assert.match(docs, /AllViewerExceptHostHeader/);
+    assert.match(docs, /hive\/ecs\/supabase-service-role/);
+    assert.match(docs, /index\.handler/);
+    assert.doesNotMatch(docs, /Create a Node\.js/);
+    assert.match(docs, /Do not use\s+`hive-platform-storage`/);
+    assert.doesNotMatch(docs, /Content-Security-Policy/);
+    assert.match(docs, /No API Gateway/);
+
+    const tony = readFileSync(new URL("../../scripts/tony-hive-app-server-cutover.sh", import.meta.url), "utf8");
+    assert.match(tony, /CONFIRM=I_AM_TONY/);
+    assert.match(tony, /function-name hive-app-server|fn="hive-app-server"/);
+    assert.match(tony, /hive-app-static/);
+    assert.match(tony, /index\.handler/);
+    assert.match(tony, /E1BPLMZE2XLSKD/);
+    assert.doesNotMatch(tony, /update-distribution/);
+    assert.doesNotMatch(tony, /aws ecs/);
+    assert.doesNotMatch(tony, /function-name hive-cognito/);
+    assert.doesNotMatch(tony, /create-function/);
+    assert.doesNotMatch(tony, /create-bucket/);
+  });
 });

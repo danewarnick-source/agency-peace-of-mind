@@ -28,9 +28,11 @@ Lovable deploys.
   `dist-aws/server/`.
 - `package.json` — added `npm run build:aws`.
 - `.gitignore` — added `dist-aws`.
-- `.github/workflows/deploy-aws.yml` — builds with `build:aws` on every push
-  to `main`, builds+pushes a Docker image to ECR, syncs `dist-aws/client` to
-  S3, deploys the new image to ECS Fargate, and invalidates CloudFront.
+- `.github/workflows/deploy-aws.yml` — **no longer ECS.** On every push
+  to `main` it runs `build:lambda`, updates Lambda `hive-app-server`
+  first, then syncs `.output/public` to S3, then invalidates CloudFront.
+  See [`docs/AWS_LAMBDA.md`](AWS_LAMBDA.md). The ECS / ECR / `build:aws`
+  recipe below is historical only.
 - `src/lib/ai-bedrock.server.ts` — Bedrock client credentials now fall back to
   the AWS SDK's default credential provider chain (which auto-resolves ECS
   task-role credentials) whenever `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`

@@ -73,4 +73,32 @@ describe("Lambda build path does not collide with Vercel or build:aws", () => {
     assert.doesNotMatch(tony, /create-function/);
     assert.doesNotMatch(tony, /create-bucket/);
   });
+
+  it("deploy-aws.yml updates matching Lambda before S3 --delete, then CloudFront", () => {
+    const yml = readFileSync(new URL("../../.github/workflows/deploy-aws.yml", import.meta.url), "utf8");
+    assert.match(yml, /npm run build:lambda/);
+    assert.doesNotMatch(yml, /npm run build:aws/);
+    assert.match(yml, /verify-lambda-output/);
+    assert.match(yml, /package-lambda\.sh/);
+    assert.match(yml, /update-function-code/);
+    assert.match(yml, /function-name hive-app-server/);
+    assert.match(yml, /wait function-updated/);
+    assert.match(yml, /\.output\/public/);
+    assert.match(yml, /s3 sync/);
+    assert.match(yml, /--delete/);
+    assert.match(yml, /create-invalidation/);
+    assert.match(yml, /contents:\s*read/);
+    assert.doesNotMatch(yml, /amazon-ecr-login/);
+    assert.doesNotMatch(yml, /docker build/);
+    assert.doesNotMatch(yml, /aws ecs/);
+    assert.doesNotMatch(yml, /dist-aws/);
+    assert.doesNotMatch(yml, /AWS_ACCESS_KEY_ID:\s*AKIA/);
+    const lambdaIdx = yml.indexOf("update-function-code");
+    const s3Idx = yml.indexOf("s3 sync");
+    const cfIdx = yml.indexOf("create-invalidation");
+    assert.ok(lambdaIdx > 0, "missing update-function-code");
+    assert.ok(s3Idx > lambdaIdx, "S3 sync must run after Lambda update");
+    assert.ok(cfIdx > s3Idx, "CloudFront invalidation must run after S3 sync");
+  });
 });
+

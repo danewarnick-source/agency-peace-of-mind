@@ -34,6 +34,25 @@ describe("billing-access", () => {
     );
   });
 
+  it("TNS org id and TNS acronym are exempt without the flag or name", () => {
+    assert.equal(
+      isBillingExempt({
+        billingExempt: false,
+        orgName: "Workspace",
+        organizationId: "7fabcf5d-f826-487f-8730-8b0c3f1969bb",
+      }),
+      true,
+    );
+    assert.equal(
+      isBillingExempt({
+        billingExempt: false,
+        orgName: "Workspace",
+        displayAcronym: "TNS",
+      }),
+      true,
+    );
+  });
+
   it("does not treat other agencies as True North", () => {
     assert.equal(
       isBillingExempt({

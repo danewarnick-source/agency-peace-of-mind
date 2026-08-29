@@ -75,6 +75,7 @@ export async function orgDashboardIsLocked(opts: {
     orgName: orgRow?.name ?? null,
     legalName: orgRow?.legal_name,
     dbaName: orgRow?.dba_name,
+    organizationId: orgId,
     subscription: sub
       ? {
           status: sub.status,

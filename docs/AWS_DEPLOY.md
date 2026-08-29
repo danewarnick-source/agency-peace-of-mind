@@ -1,5 +1,11 @@
 # AWS parallel deployment (HIVE)
 
+> **2026-08 host change:** Hive frontend is leaving ECS. Reuse existing
+> `hive-app-server` Lambda + `hive-app-static` + CloudFront `E1BPLMZE2XLSKD`
+> — see [`docs/AWS_LAMBDA.md`](AWS_LAMBDA.md). Do not create new AWS
+> resources. This page remains the **old ECS Fargate / `build:aws`** recipe.
+> Do not merge PR 189. Do not UpdateService from the Lambda work.
+
 A second deploy target that runs **alongside** Lovable/Cloudflare, from the same
 GitHub repo and main branch. Lovable's build, `wrangler.jsonc`, and
 `src/server.ts`'s Cloudflare entry are untouched — nothing here changes how

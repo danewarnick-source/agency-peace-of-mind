@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/tanstack/vite";
+import { NITRO_AWS_LAMBDA_PRESET } from "./src/lib/nitro-lambda-preset";
 
 /** Swap the live Supabase client for the in-memory e2e stub. Production builds never set this. */
 function e2eSupabaseMockPlugin(): Plugin {
@@ -29,15 +30,16 @@ function e2eSupabaseMockPlugin(): Plugin {
   };
 }
 
-// AWS parallel-deploy target (see docs/AWS_DEPLOY.md). Lovable/Cloudflare never sets this
-// env var, so its build is completely unaffected — only `npm run build:aws` switches the
-// nitro preset from the default cloudflare-module to node-server (run on Lambda via the
-// AWS Lambda Web Adapter — see nitro.config.ts and docs/AWS_DEPLOY.md). Previously used
-// nitro's own "aws-lambda" preset, but that had an unresolved incompatibility with
-// TanStack Start server functions (every server-fn call 500'd inside framework-internal
-// route dispatch, confirmed via extensive CloudWatch investigation — never reached any of
-// our own application code, however much logging was added).
+// Parallel AWS targets (see docs/AWS_LAMBDA.md and docs/AWS_DEPLOY.md).
+// Lovable / Vercel never set BUILD_TARGET, so `npm run build` stays on the
+// default cloudflare-module / Vercel path.
+//
+//   unset            — Vercel / Lovable (do not change)
+//   BUILD_TARGET=aws — existing node-server image (`npm run build:aws` → dist-aws/)
+//   BUILD_TARGET=lambda — Nitro aws-lambda (`npm run build:lambda` → .output/server
+//                         index.handler + .output/public). Dane's CloudFront host.
 const isAwsBuild = process.env.BUILD_TARGET === "aws";
+const isLambdaBuild = process.env.BUILD_TARGET === "lambda";
 
 // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
 // @cloudflare/vite-plugin builds from this — wrangler.jsonc main alone is insufficient.
@@ -56,7 +58,13 @@ export default defineConfig({
           },
         },
       }
-    : {}),
+    : isLambdaBuild
+      ? {
+          nitro: {
+            preset: NITRO_AWS_LAMBDA_PRESET,
+          },
+        }
+      : {}),
   vite: {
     plugins: [
       ...(process.env.VITE_E2E_HARNESS === "1" ? [e2eSupabaseMockPlugin()] : []),

@@ -12,6 +12,7 @@ dist
 dist-ssr
 dist-aws
 .output
+lambda-server.zip
 .vinxi
 .tanstack/**
 .nitro

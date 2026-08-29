@@ -1,23 +1,27 @@
 /**
- * Nitro request hook: reject direct ALB hits when ALB_ORIGIN_VERIFY_SECRET is set.
- * CloudFront must inject header `x-origin-verify: <secret>`.
+ * Nitro request hook: reject requests that skip CloudFront when
+ * ALB_ORIGIN_VERIFY_SECRET is set. CloudFront must inject
+ * `x-origin-verify: <secret>` on the Lambda Function URL (or ALB) origin.
  * Fail-open when the env var is unset (local / Vercel); fail-closed when set.
+ *
+ * Export a plain function. Do not use Nitro's `defineNitroPlugin` auto-import —
+ * the node-server / aws-lambda bundles inline this file without injecting
+ * that helper (`ReferenceError: defineNitroPlugin is not defined`).
+ * `defineNitroPlugin` is an identity wrapper anyway.
  */
 import { createError } from "h3";
 import { verifyAlbOriginSecret } from "../lib/cron-auth";
+import { requestFromNitroEvent } from "../lib/nitro-origin-headers";
 
-export default defineNitroPlugin((nitroApp) => {
+type NitroPluginApp = {
+  hooks: {
+    hook: (name: string, fn: (event: unknown) => void) => void;
+  };
+};
+
+export default function albOriginVerifyPlugin(nitroApp: NitroPluginApp) {
   nitroApp.hooks.hook("request", (event) => {
-    const req = event.node?.req;
-    if (!req) return;
-    // Build a Fetch Request-like headers map for the shared helper.
-    const headers = new Headers();
-    const raw = req.headers ?? {};
-    for (const [k, v] of Object.entries(raw)) {
-      if (typeof v === "string") headers.set(k, v);
-      else if (Array.isArray(v) && v[0]) headers.set(k, v[0]);
-    }
-    const fake = new Request("http://local", { headers });
+    const fake = requestFromNitroEvent(event);
     if (!verifyAlbOriginSecret(fake)) {
       throw createError({
         status: 403,
@@ -26,7 +30,4 @@ export default defineNitroPlugin((nitroApp) => {
       });
     }
   });
-});
-
-// Minimal typing so this file typechecks without pulling nitro types into client.
-declare function defineNitroPlugin(fn: (nitroApp: { hooks: { hook: (name: string, fn: (event: { node?: { req?: { headers?: Record<string, string | string[] | undefined> }; res: { statusCode: number; setHeader: (k: string, v: string) => void; end: (b: string) => void } } }) => void) => void } }) => void): unknown;
+}

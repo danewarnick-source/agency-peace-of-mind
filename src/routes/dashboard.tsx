@@ -1,4 +1,12 @@
-import { createFileRoute, isRedirect, Link, Outlet, redirect, useNavigate, useRouterState } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  isRedirect,
+  Link,
+  Outlet,
+  redirect,
+  useNavigate,
+  useRouterState,
+} from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -6,13 +14,51 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { usePortalView } from "@/hooks/use-portal-view";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import {
-  LayoutDashboard, GraduationCap, Settings, Hexagon,
-
-  LogOut, Users, Building2, Contact2, ClipboardCheck, Wallet, Pill, Menu, CalendarDays, HelpCircle, Lock, CreditCard, Activity, LifeBuoy, Receipt, FolderArchive, Database, ShieldCheck, ArrowRightLeft, Plus, UserCog, ExternalLink, Sparkles, MapPin, TrendingUp, HandCoins, Scale, FileText, Inbox, Search, Archive, ClipboardList,
+  LayoutDashboard,
+  GraduationCap,
+  Settings,
+  Hexagon,
+  LogOut,
+  Users,
+  Contact2,
+  ClipboardCheck,
+  Wallet,
+  Pill,
+  Menu,
+  CalendarDays,
+  HelpCircle,
+  Lock,
+  CreditCard,
+  Activity,
+  LifeBuoy,
+  Receipt,
+  FolderArchive,
+  Database,
+  ShieldCheck,
+  ArrowRightLeft,
+  Plus,
+  UserCog,
+  ExternalLink,
+  Sparkles,
+  MapPin,
+  TrendingUp,
+  HandCoins,
+  Scale,
+  FileText,
+  Inbox,
+  Search,
+  Archive,
+  ClipboardList,
 } from "lucide-react";
 import { useIsHiveExecutive } from "@/hooks/use-hive-executive";
 import { EXEC_NAV, EXEC_DOMAINS, COMMAND_CENTER_ITEM } from "@/lib/exec-nav";
@@ -39,7 +85,10 @@ import {
   DASHBOARD_BOOT_TIMEOUT_MS,
   dashboardShouldRedirectToLogin,
   dashboardShellShowsLoading,
+  readSessionHint,
+  writeSessionHint,
 } from "@/lib/auth-session-boot";
+import { PortalViewSwitcher } from "@/components/portal-view-switcher";
 
 import { BillingBanner } from "@/components/billing/billing-banner";
 import { orgDashboardIsLocked, pathBypassesBillingLock } from "@/lib/billing-lock-client";
@@ -56,8 +105,6 @@ import {
   type BootstrapFailureKind,
 } from "@/lib/cognito-login-gate";
 
-
-
 function DashboardShellError({ error }: { error: Error; reset: () => void }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -68,8 +115,15 @@ function DashboardShellError({ error }: { error: Error; reset: () => void }) {
           <button
             onClick={() => window.location.reload()}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-          >Reload</button>
-          <a href="/dashboard" className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground">Dashboard home</a>
+          >
+            Reload
+          </button>
+          <a
+            href="/dashboard"
+            className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground"
+          >
+            Dashboard home
+          </a>
         </div>
       </div>
     </div>
@@ -84,7 +138,9 @@ export const Route = createFileRoute("/dashboard")({
   beforeLoad: async ({ location }) => {
     if (typeof window === "undefined") return; // SSR has no session
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session?.user?.id) return;
 
       // Realm mutual exclusion: auditor accounts can NEVER load /dashboard/*.
@@ -99,7 +155,11 @@ export const Route = createFileRoute("/dashboard")({
       }
 
       let activeOrgId: string | null = null;
-      try { activeOrgId = window.localStorage.getItem("hive.activeOrgId"); } catch { /* ignore */ }
+      try {
+        activeOrgId = window.localStorage.getItem("hive.activeOrgId");
+      } catch {
+        /* ignore */
+      }
 
       const { locked, isAdmin } = await orgDashboardIsLocked({
         userId: session.user.id,
@@ -119,18 +179,46 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 import type { Permission } from "@/lib/rbac";
-type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean; perm?: Permission; feature?: string; isLocked?: boolean };
+type NavItem = {
+  to: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  exact?: boolean;
+  perm?: Permission;
+  feature?: string;
+  isLocked?: boolean;
+};
 
 const STAFF_NAV: NavItem[] = [
   { to: "/dashboard", label: "My Caseload", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/schedule", label: "Schedule", icon: CalendarDays, feature: "evv_timesheets" },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/my-obligations", label: "My Compliance", icon: ClipboardList },
-  { to: "/dashboard/my-historical-records", label: "Historical Records", icon: Archive, feature: "evv_timesheets" },
-  { to: "/dashboard/my-time-corrections", label: "My Time Corrections", icon: Clock, feature: "evv_timesheets" },
+  {
+    to: "/dashboard/my-historical-records",
+    label: "Historical Records",
+    icon: Archive,
+    feature: "evv_timesheets",
+  },
+  {
+    to: "/dashboard/my-time-corrections",
+    label: "My Time Corrections",
+    icon: Clock,
+    feature: "evv_timesheets",
+  },
   { to: "/dashboard/ask-nectar", label: "Ask NECTAR", icon: Sparkles, feature: "nectar" },
-  { to: "/dashboard/courses", label: "My Trainings", icon: GraduationCap, feature: "staff_onboarding" },
-  { to: "/dashboard/hive-training", label: "HIVE Training", icon: GraduationCap, feature: "hive_training" },
+  {
+    to: "/dashboard/courses",
+    label: "My Trainings",
+    icon: GraduationCap,
+    feature: "staff_onboarding",
+  },
+  {
+    to: "/dashboard/hive-training",
+    label: "HIVE Training",
+    icon: GraduationCap,
+    feature: "hive_training",
+  },
 ];
 
 const ADMIN_NAV: NavItem[] = [
@@ -138,25 +226,50 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard/hub/employees", label: "Employees", icon: Users, feature: "staff_onboarding" },
   { to: "/dashboard/hub/clients", label: "Clients", icon: Contact2, feature: "client_intake" },
   { to: "/dashboard/scheduler", label: "Scheduler", icon: CalendarDays, feature: "evv_timesheets" },
-  { to: "/dashboard/hub/documentation", label: "Documentation", icon: ClipboardCheck, feature: "pcsp" },
+  {
+    to: "/dashboard/hub/documentation",
+    label: "Documentation",
+    icon: ClipboardCheck,
+    feature: "pcsp",
+  },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/company-obligations", label: "Compliance", icon: ClipboardList },
   { to: "/dashboard/summaries", label: "Summaries", icon: FileText },
-  { to: "/dashboard/hub/finances", label: "Finances", icon: Receipt, perm: "view_billing", feature: "pba_ledgers" },
-  { to: "/dashboard/hive-training", label: "HIVE Training", icon: GraduationCap, feature: "hive_training" },
-  { to: "/dashboard/training/catalog", label: "Training Catalog", icon: GraduationCap, feature: "hive_training" },
-  { to: "/dashboard/state-audit", label: "State Audit", icon: ShieldCheck, feature: "state_audit", perm: "view_analytics" },
+  {
+    to: "/dashboard/hub/finances",
+    label: "Finances",
+    icon: Receipt,
+    perm: "view_billing",
+    feature: "pba_ledgers",
+  },
+  {
+    to: "/dashboard/hive-training",
+    label: "HIVE Training",
+    icon: GraduationCap,
+    feature: "hive_training",
+  },
+  {
+    to: "/dashboard/training/catalog",
+    label: "Training Catalog",
+    icon: GraduationCap,
+    feature: "hive_training",
+  },
+  {
+    to: "/dashboard/state-audit",
+    label: "State Audit",
+    icon: ShieldCheck,
+    feature: "state_audit",
+    perm: "view_analytics",
+  },
   { to: "/dashboard/reports", label: "Reports", icon: FileText, perm: "export_reports" },
   { to: "/dashboard/inbox", label: "Inbox", icon: Inbox },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
-
 const NECTAR_NAV: NavItem[] = [
   { to: "/dashboard/help", label: "Ask NECTAR", icon: HelpCircle, feature: "nectar" },
   { to: "/dashboard/hub/knowledge", label: "Knowledge base", icon: Database, feature: "nectar" },
 ];
-
 
 type PlatformStateLite = { code: string; name: string; status: "draft" | "active" | "coming_soon" };
 
@@ -188,13 +301,25 @@ type SidebarBodyProps = {
   complianceQueueLoading: boolean;
 };
 
-
-
 function DashboardLayout() {
   const { session, loading, user } = useAuth();
-  const { data: org, isLoading: orgLoading, isError: orgError, error: orgQueryError } = useCurrentOrg();
+  const {
+    data: org,
+    isLoading: orgLoading,
+    isError: orgError,
+    error: orgQueryError,
+  } = useCurrentOrg();
   const { can } = usePermissions();
-  const { view, hasStoredView, setView, stateCode, setStateCode, subView, setSubView, hydrated: viewHydrated } = usePortalView();
+  const {
+    view,
+    hasStoredView,
+    setView,
+    stateCode,
+    setStateCode,
+    subView,
+    setSubView,
+    hydrated: viewHydrated,
+  } = usePortalView();
   const [states, setStates] = useState<PlatformStateLite[]>([]);
   const { isExecutive, isLoading: execLoading } = useIsHiveExecutive();
   const navigate = useNavigate();
@@ -262,14 +387,17 @@ function DashboardLayout() {
     };
   }, [session?.user?.id, pathname, navigate]);
 
-
   // must_change_password is enforced globally at the router root
   // (MustChangePasswordGate in __root.tsx) — no per-layout check needed here.
   useEffect(() => {
     const uid = session?.user?.id;
     if (!uid) return;
     let cancelled = false;
-    supabase.from("profiles").select("bc_role").eq("id", uid).maybeSingle()
+    supabase
+      .from("profiles")
+      .select("bc_role")
+      .eq("id", uid)
+      .maybeSingle()
       .then(({ data }) => {
         if (cancelled) return;
         // Behaviorists (bc_role set) route directly to their caseload — no time clock,
@@ -278,12 +406,19 @@ function DashboardLayout() {
           navigate({ to: "/dashboard/behaviorist", replace: true });
         }
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [session?.user?.id, pathname, navigate]);
 
   const role: Role = org?.role ?? "employee";
   const isCommitteeMember = role === "committee_member";
-  const isAdminCapable = !isCommitteeMember && (can("view_staff_records") || role === "admin" || role === "program_manager" || role === "manager");
+  const isAdminCapable =
+    !isCommitteeMember &&
+    (can("view_staff_records") ||
+      role === "admin" ||
+      role === "program_manager" ||
+      role === "manager");
 
   // Fail-closed gate: a committee_member can ONLY access /dashboard/hrc.
   // Redirect away from anything else immediately.
@@ -305,30 +440,48 @@ function DashboardLayout() {
   }, [viewHydrated, orgLoading, execLoading, hasStoredView, isAdminCapable, setView]);
   // PV type is hoisted to module scope.
   const allowedViews: PV[] = ["staff"];
-  if (isAdminCapable) { allowedViews.push("admin", "staff_mobile"); }
-  if (isExecutive) { allowedViews.push("hive_exec", "state_preview"); }
+  if (isAdminCapable) {
+    allowedViews.push("admin", "staff_mobile");
+  }
+  if (isExecutive) {
+    allowedViews.push("hive_exec", "state_preview");
+  }
   // Default admin-capable users (who haven't explicitly chosen a view) to the
   // admin portal, so a fresh admin lands on the admin Home + nav rather than the
   // empty staff caseload. An explicit choice (incl. Staff View) is preserved.
   const defaultView: PV = isAdminCapable ? "admin" : "staff";
   const resolvedView: PV = hasStoredView ? view : defaultView;
-  const rawView: PV = allowedViews.includes(resolvedView) ? resolvedView : "staff";
+  const roleSignalsReady = !orgLoading && !execLoading;
+  const rawView: PV =
+    !roleSignalsReady && hasStoredView
+      ? resolvedView
+      : allowedViews.includes(resolvedView)
+        ? resolvedView
+        : "staff";
   const isMobilePreview = rawView === "staff_mobile";
-  const isHiveExecView  = rawView === "hive_exec";
-  const isStatePreview  = rawView === "state_preview";
+  const isHiveExecView = rawView === "hive_exec";
+  const isStatePreview = rawView === "state_preview";
   // HIVE Executive is its own context — never mixed with a company's admin/staff nav.
-  const effectiveView: "staff" | "admin" | "hive_exec" =
-    isHiveExecView ? "hive_exec"
-    : isStatePreview ? (subView === "staff" ? "staff" : "admin")
-    : (rawView === "admin" ? "admin" : "staff");
+  const effectiveView: "staff" | "admin" | "hive_exec" = isHiveExecView
+    ? "hive_exec"
+    : isStatePreview
+      ? subView === "staff"
+        ? "staff"
+        : "admin"
+      : rawView === "admin"
+        ? "admin"
+        : "staff";
   const execNav: NavItem[] = EXEC_NAV as NavItem[];
   const COMMITTEE_NAV: NavItem[] = [
     { to: "/dashboard/hrc", label: "Human Rights Committee", icon: Scale, exact: true },
   ];
-  const baseNav: NavItem[] =
-    isCommitteeMember            ? COMMITTEE_NAV :
-    effectiveView === "hive_exec" ? execNav :
-    effectiveView === "admin"     ? ADMIN_NAV : STAFF_NAV;
+  const baseNav: NavItem[] = isCommitteeMember
+    ? COMMITTEE_NAV
+    : effectiveView === "hive_exec"
+      ? execNav
+      : effectiveView === "admin"
+        ? ADMIN_NAV
+        : STAFF_NAV;
   const { hasAddon } = useEntitlements();
   const hiveTrainingEntitled = hasAddon("hive_training");
   const { isEnabled: isFeatureOn } = useOrgFeatures();
@@ -339,16 +492,21 @@ function DashboardLayout() {
     // Master-Controller gating: keep item visible; mark isLocked when feature is OFF.
     .map((n) => ({ ...n, isLocked: n.feature ? !isFeatureOn(n.feature) : false }));
 
-
   // Load states for the State portal dropdown (executives only).
   useEffect(() => {
     if (!isExecutive) return;
     let cancelled = false;
-    supabase.from("platform_states").select("code, name, status").order("name").then(({ data }) => {
-      if (cancelled) return;
-      setStates((data ?? []) as PlatformStateLite[]);
-    });
-    return () => { cancelled = true; };
+    supabase
+      .from("platform_states")
+      .select("code, name, status")
+      .order("name")
+      .then(({ data }) => {
+        if (cancelled) return;
+        setStates((data ?? []) as PlatformStateLite[]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [isExecutive]);
 
   // Default the previewed state to the first reference/active when entering the mode.
@@ -397,18 +555,23 @@ function DashboardLayout() {
 
   // Must stay above any conditional return — Rules of Hooks.
   const { totalCount: complianceActionCount, isLoading: complianceQueueLoading } =
-    useActionRequiredQueue(isAdminCapable ? org?.organization_id ?? null : null);
+    useActionRequiredQueue(isAdminCapable ? (org?.organization_id ?? null) : null);
 
   const currentPreviewState = isStatePreview
-    ? states.find((s) => s.code === stateCode) ?? null
+    ? (states.find((s) => s.code === stateCode) ?? null)
     : null;
   const isComingSoonPreview = isStatePreview && currentPreviewState?.status === "coming_soon";
 
   const signOut = async (to: "/" | "/login" = "/") => {
+    writeSessionHint(false);
     await supabase.auth.signOut();
     toast.success("Signed out");
     navigate({ to, replace: true });
   };
+
+  useEffect(() => {
+    writeSessionHint(!!session);
+  }, [session]);
 
   const [bootstrapStuck, setBootstrapStuck] = useState(false);
   const [awsDbFailed, setAwsDbFailed] = useState(false);
@@ -421,6 +584,7 @@ function DashboardLayout() {
     hydrated: viewHydrated,
     orgLoading,
     bootTimedOut,
+    sessionHint: readSessionHint(),
   });
   const cognitoLeaveLoading = shouldLeaveCognitoLoadingOverlay({
     isCognito: isCognitoAuth(),
@@ -472,9 +636,10 @@ function DashboardLayout() {
 
   if (bootstrapping) {
     const cognitoEscape = isCognitoAuth() && (orgError || bootstrapStuck);
+    const showSignOut = cognitoEscape || bootTimedOut;
     return (
-      <div className="grid min-h-screen place-items-center gap-4 px-4 text-center text-sm text-muted-foreground">
-        <p>{cognitoEscape ? "Couldn't finish signing you in." : "Loading…"}</p>
+      <div className="grid min-h-screen place-items-center gap-4 bg-background px-4 text-center text-sm text-muted-foreground">
+        <p>{cognitoEscape ? "Couldn't finish signing you in." : "Loading workspace…"}</p>
         {cognitoEscape && (
           <p className="max-w-sm text-xs">
             {orgQueryError instanceof Error
@@ -482,29 +647,34 @@ function DashboardLayout() {
               : "The workspace did not load. Sign out and enter your email and password."}
           </p>
         )}
-        <Button
-          data-testid="dashboard-spinner-sign-out"
-          variant="outline"
-          onClick={() => void signOut("/login")}
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          Sign out
-        </Button>
+        {showSignOut && (
+          <Button
+            data-testid="dashboard-spinner-sign-out"
+            variant="outline"
+            onClick={() => void signOut("/login")}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign out
+          </Button>
+        )}
       </div>
     );
   }
 
-
-  const nectarNavForView = effectiveView === "admin"
-    ? NECTAR_NAV.map((n) => ({ ...n, isLocked: n.feature ? !isFeatureOn(n.feature) : false }))
-    : [];
+  const nectarNavForView =
+    effectiveView === "admin"
+      ? NECTAR_NAV.map((n) => ({ ...n, isLocked: n.feature ? !isFeatureOn(n.feature) : false }))
+      : [];
   const allNav = [...nav, ...nectarNavForView];
   const lockedRouteItem = allNav
     .filter((n) => n.feature && n.isLocked)
     .sort((a, b) => b.to.length - a.to.length)
-    .find((n) => (n.exact ? pathname === n.to : pathname === n.to || pathname.startsWith(`${n.to}/`)));
+    .find((n) =>
+      n.exact ? pathname === n.to : pathname === n.to || pathname.startsWith(`${n.to}/`),
+    );
   const pageTitle =
-    allNav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ?? "Dashboard";
+    allNav.find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))?.label ??
+    "Dashboard";
   const isStaffView = effectiveView === "staff";
   const inboxUnread = unreadQ.data?.count ?? 0;
 
@@ -533,222 +703,226 @@ function DashboardLayout() {
     complianceQueueLoading,
   };
 
-
-
   return (
     <GuidedTourProvider>
-    <DraftJobsProvider>
-    <div className="flex h-screen h-[100dvh] flex-col overflow-hidden">
-      <ImpersonationBanner />
-      {isCognitoAuth() && (orgError || awsDbFailed) && (
-        <div
-          data-testid="cognito-bootstrap-error"
-          className="shrink-0 border-b border-amber-300/60 bg-amber-50 px-4 py-2 text-center text-xs text-amber-950 md:px-6"
-        >
-          {awsDbErrorMessage ||
-            (orgQueryError instanceof Error ? orgQueryError.message : null) ||
-            "Some workspace data did not load. You can keep working with what is available, or sign out."}
-        </div>
-      )}
+      <DraftJobsProvider>
+        <div className="flex h-screen h-[100dvh] flex-col overflow-hidden">
+          <ImpersonationBanner />
+          {isCognitoAuth() && (orgError || awsDbFailed) && (
+            <div
+              data-testid="cognito-bootstrap-error"
+              className="shrink-0 border-b border-amber-300/60 bg-amber-50 px-4 py-2 text-center text-xs text-amber-950 md:px-6"
+            >
+              {awsDbErrorMessage ||
+                (orgQueryError instanceof Error ? orgQueryError.message : null) ||
+                "Some workspace data did not load. You can keep working with what is available, or sign out."}
+            </div>
+          )}
 
+          {/* Mobile shell — staff view only (below md) */}
+          {isStaffView && !isMobilePreview && (
+            <StaffMobileShell title={pageTitle}>
+              <Outlet />
+            </StaffMobileShell>
+          )}
 
-      {/* Mobile shell — staff view only (below md) */}
-      {isStaffView && !isMobilePreview && (
-        <StaffMobileShell title={pageTitle}>
-          <Outlet />
-        </StaffMobileShell>
-      )}
-
-      {/* Desktop layout (md+) — unchanged. Also used on mobile for Admin View. */}
-      <div
-        className={
-          isStaffView && !isMobilePreview
-            ? "hidden min-h-0 min-w-0 w-full flex-1 md:grid md:grid-cols-[260px_minmax(0,1fr)]"
-            : "grid min-h-0 min-w-0 w-full flex-1 md:grid-cols-[260px_minmax(0,1fr)]"
-        }
-      >
-        <aside className="hidden h-full flex-col overflow-y-auto bg-sidebar text-sidebar-foreground md:flex">
-          <SidebarBody {...sidebarProps} />
-        </aside>
-
-        <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
-
-          <header
-            className="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-4 md:px-6 min-h-16"
-            style={{
-              paddingTop: "env(safe-area-inset-top)",
-              paddingLeft: "max(1rem, env(safe-area-inset-left))",
-              paddingRight: "max(1rem, env(safe-area-inset-right))",
-            }}
+          {/* Desktop layout (md+) — unchanged. Also used on mobile for Admin View. */}
+          <div
+            className={
+              isStaffView && !isMobilePreview
+                ? "hidden min-h-0 min-w-0 w-full flex-1 md:grid md:grid-cols-[260px_minmax(0,1fr)]"
+                : "grid min-h-0 min-w-0 w-full flex-1 md:grid-cols-[260px_minmax(0,1fr)]"
+            }
           >
-            <div className="flex items-center gap-2 min-w-0">
-              {/* Staff phones use the avatar drawer. Keep this control out of
+            <aside className="hidden h-full flex-col overflow-y-auto bg-sidebar text-sidebar-foreground md:flex">
+              <SidebarBody {...sidebarProps} />
+            </aside>
+
+            <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+              <header
+                className="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-4 md:px-6 min-h-16"
+                style={{
+                  paddingTop: "env(safe-area-inset-top)",
+                  paddingLeft: "max(1rem, env(safe-area-inset-left))",
+                  paddingRight: "max(1rem, env(safe-area-inset-right))",
+                }}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  {/* Staff phones use the avatar drawer. Keep this control out of
                   that tree so it is not a 0×0 ghost. Hive-exec + admin phones keep it. */}
-              {!(isStaffView && !isMobilePreview) && (
-              <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-                <SheetTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="md:hidden shrink-0 border border-border bg-background"
-                    aria-label="Open menu"
-                  >
-                    <Menu className="h-5 w-5" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-[280px] bg-sidebar p-0 text-sidebar-foreground [&>button]:text-sidebar-foreground">
-                  <SheetTitle className="sr-only">Navigation</SheetTitle>
-                  <div className="flex h-full flex-col">
-                    <SidebarBody {...sidebarProps} onNavigate={() => setMobileOpen(false)} />
-                  </div>
-                </SheetContent>
-              </Sheet>
-              )}
-              <div className="min-w-0">
-                <h1 className="truncate text-lg font-semibold tracking-tight">
-                  {pageTitle}
-                </h1>
-                <p className="truncate text-xs text-muted-foreground">
-                  {isHiveExecView
-                    ? "HIVE Platform · Executive Command Center"
-                    : isStatePreview
-                      ? `State Build/Preview · ${currentPreviewState?.name ?? "—"} · ${subView === "admin" ? "Admin" : "Staff"} view`
-                      : (
+                  {!(isStaffView && !isMobilePreview) && (
+                    <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+                      <SheetTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="md:hidden shrink-0 border border-border bg-background"
+                          aria-label="Open menu"
+                        >
+                          <Menu className="h-5 w-5" />
+                        </Button>
+                      </SheetTrigger>
+                      <SheetContent
+                        side="left"
+                        className="w-[280px] bg-sidebar p-0 text-sidebar-foreground [&>button]:text-sidebar-foreground"
+                      >
+                        <SheetTitle className="sr-only">Navigation</SheetTitle>
+                        <div className="flex h-full flex-col">
+                          <SidebarBody {...sidebarProps} onNavigate={() => setMobileOpen(false)} />
+                        </div>
+                      </SheetContent>
+                    </Sheet>
+                  )}
+                  <div className="min-w-0">
+                    <h1 className="truncate text-lg font-semibold tracking-tight">{pageTitle}</h1>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {isHiveExecView ? (
+                        "HIVE Platform · Executive Command Center"
+                      ) : isStatePreview ? (
+                        `State Build/Preview · ${currentPreviewState?.name ?? "—"} · ${subView === "admin" ? "Admin" : "Staff"} view`
+                      ) : (
                         <span className="inline-flex items-center gap-1.5">
                           {org?.organization_name ?? "Workspace"}
                           {org?.is_demo && <DemoBadge />}
                           <span>· {ROLE_LABEL[role]}</span>
                         </span>
                       )}
+                    </p>
+                  </div>
+                </div>
 
-                </p>
-              </div>
-            </div>
+                <div className="hidden flex-1 justify-center px-4 md:flex">
+                  {!isHiveExecView && (
+                    <NectarSearchBar
+                      nav={allNav.map((n) => ({ to: n.to, label: n.label }))}
+                      isAdminCapable={isAdminCapable && effectiveView === "admin"}
+                      variant="desktop"
+                      askRoute="/dashboard/help"
+                    />
+                  )}
+                </div>
 
-            <div className="hidden flex-1 justify-center px-4 md:flex">
-              {!isHiveExecView && (
-                <NectarSearchBar
-                  nav={allNav.map((n) => ({ to: n.to, label: n.label }))}
-                  isAdminCapable={isAdminCapable && effectiveView === "admin"}
-                  variant="desktop"
-                  askRoute="/dashboard/help"
-                />
-              )}
-            </div>
-
-
-            <div className="flex items-center gap-2">
-              {!isHiveExecView && (
-                <button
-                  type="button"
-                  aria-label={mobileSearchOpen ? "Close NECTAR search" : "Open NECTAR search"}
-                  aria-expanded={mobileSearchOpen}
-                  onClick={() => setMobileSearchOpen((v) => !v)}
-                  className="grid h-11 w-11 place-items-center rounded-md border border-white/15 bg-[#0B1126] text-white hover:bg-[#0d1430] md:hidden"
-                >
-                  <Search className="h-4 w-4" />
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setTaskCenterOpen(true)}
-                data-tour="nav.help"
-                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-md border border-white/15 bg-[#0B1126] px-2.5 py-1 text-xs font-medium text-white hover:bg-[#0d1430]"
-                title="Open NECTAR Task Center"
-              >
-                <ListChecks className="h-3.5 w-3.5 text-[#f4a93a]" /> <span className="hidden md:inline">Guide me</span>
-              </button>
-              {isAdminCapable && effectiveView === "admin" && <DraftJobsHeaderPill />}
-              {isAdminCapable && effectiveView === "admin" && <NotificationBell />}
-              <Button onClick={signOut} variant="ghost" size="sm" className="md:hidden">
-                <LogOut className="h-4 w-4" />
-              </Button>
-            </div>
-          </header>
-          {/* Collapsed-by-default NECTAR ask bar on phones — expands from the
-              header icon; the desktop inline bar is unchanged. */}
-          {mobileSearchOpen && !isHiveExecView && (
-            <div className="border-b border-border bg-[#0d112b] px-4 py-2 md:hidden">
-              <NectarSearchBar
-                nav={allNav.map((n) => ({ to: n.to, label: n.label }))}
-                isAdminCapable={isAdminCapable && effectiveView === "admin"}
-                variant="mobile"
-                askRoute="/dashboard/help"
-              />
-            </div>
-          )}
-          <NectarTaskCenter open={taskCenterOpen} onOpenChange={setTaskCenterOpen} />
-          {!isHiveExecView && !isStatePreview && <DemoOrgBanner />}
-
-          {isStatePreview && (
-            <div className="flex items-center justify-between gap-3 border-b border-[#f4a93a]/30 bg-[#f4a93a]/[0.08] px-4 py-2 text-xs md:px-6">
-              <div className="flex items-center gap-2 text-[#9a3412]">
-                <MapPin className="h-3.5 w-3.5" />
-                <span className="font-semibold uppercase tracking-wider">State Build/Preview</span>
-                <span className="text-[#9a3412]/80">
-                  {currentPreviewState?.name ?? "No state selected"} ·{" "}
-                  {subView === "admin" ? "Admin view" : "Staff view"} · template/sample data, not live company records
-                </span>
-              </div>
-              {currentPreviewState && (
-                <Link
-                  to="/dashboard/hive-exec/states/$stateCode"
-                  params={{ stateCode: currentPreviewState.code }}
-                  className="hidden md:inline-flex items-center gap-1 rounded-md border border-[#f4a93a]/40 bg-white/60 px-2 py-0.5 text-[11px] font-medium text-[#9a3412] hover:bg-white"
-                >
-                  Edit template
-                </Link>
-              )}
-            </div>
-          )}
-
-          {isAdminCapable && effectiveView === "admin" && org?.organization_id && (
-            <BillingBanner organizationId={org.organization_id} isAdmin />
-          )}
-
-          <main className={isMobilePreview ? "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-secondary/40" : "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-secondary/40 px-4 py-6 md:px-8"}>
-
-            {isStatePreview && !stateCode ? (
-              <div className="mx-auto max-w-xl rounded-lg border border-dashed border-border bg-background p-8 text-center text-sm text-muted-foreground">
-                Select a state from the sidebar to load the platform configured as that state.
-              </div>
-            ) : isComingSoonPreview ? (
-              <div className="mx-auto max-w-xl rounded-lg border border-dashed border-[#f4a93a]/40 bg-[#f4a93a]/[0.06] p-10 text-center">
-                <MapPin className="mx-auto h-8 w-8 text-[#f4a93a]" />
-                <h2 className="mt-3 text-lg font-semibold tracking-tight">
-                  Coming soon for {currentPreviewState?.name}
-                </h2>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  No template has been built for this state yet. Configure the state's skeleton to enable the {subView === "admin" ? "admin" : "staff"} preview.
-                </p>
-                {currentPreviewState && (
-                  <Link
-                    to="/dashboard/hive-exec/states/$stateCode"
-                    params={{ stateCode: currentPreviewState.code }}
-                    className="mt-4 inline-flex items-center gap-1 rounded-md border border-[#f4a93a]/40 bg-white px-3 py-1.5 text-xs font-medium text-[#9a3412] hover:bg-[#f4a93a]/10"
+                <div className="flex items-center gap-2">
+                  {!isHiveExecView && (
+                    <button
+                      type="button"
+                      aria-label={mobileSearchOpen ? "Close NECTAR search" : "Open NECTAR search"}
+                      aria-expanded={mobileSearchOpen}
+                      onClick={() => setMobileSearchOpen((v) => !v)}
+                      className="grid h-11 w-11 place-items-center rounded-md border border-white/15 bg-[#0B1126] text-white hover:bg-[#0d1430] md:hidden"
+                    >
+                      <Search className="h-4 w-4" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setTaskCenterOpen(true)}
+                    data-tour="nav.help"
+                    className="inline-flex min-h-[36px] items-center gap-1.5 rounded-md border border-white/15 bg-[#0B1126] px-2.5 py-1 text-xs font-medium text-white hover:bg-[#0d1430]"
+                    title="Open NECTAR Task Center"
                   >
-                    Build {currentPreviewState.name} template
-                  </Link>
+                    <ListChecks className="h-3.5 w-3.5 text-[#f4a93a]" />{" "}
+                    <span className="hidden md:inline">Guide me</span>
+                  </button>
+                  {isAdminCapable && effectiveView === "admin" && <DraftJobsHeaderPill />}
+                  {isAdminCapable && effectiveView === "admin" && <NotificationBell />}
+                  <Button onClick={signOut} variant="ghost" size="sm" className="md:hidden">
+                    <LogOut className="h-4 w-4" />
+                  </Button>
+                </div>
+              </header>
+              {/* Collapsed-by-default NECTAR ask bar on phones — expands from the
+              header icon; the desktop inline bar is unchanged. */}
+              {mobileSearchOpen && !isHiveExecView && (
+                <div className="border-b border-border bg-[#0d112b] px-4 py-2 md:hidden">
+                  <NectarSearchBar
+                    nav={allNav.map((n) => ({ to: n.to, label: n.label }))}
+                    isAdminCapable={isAdminCapable && effectiveView === "admin"}
+                    variant="mobile"
+                    askRoute="/dashboard/help"
+                  />
+                </div>
+              )}
+              <NectarTaskCenter open={taskCenterOpen} onOpenChange={setTaskCenterOpen} />
+              {!isHiveExecView && !isStatePreview && <DemoOrgBanner />}
+
+              {isStatePreview && (
+                <div className="flex items-center justify-between gap-3 border-b border-[#f4a93a]/30 bg-[#f4a93a]/[0.08] px-4 py-2 text-xs md:px-6">
+                  <div className="flex items-center gap-2 text-[#9a3412]">
+                    <MapPin className="h-3.5 w-3.5" />
+                    <span className="font-semibold uppercase tracking-wider">
+                      State Build/Preview
+                    </span>
+                    <span className="text-[#9a3412]/80">
+                      {currentPreviewState?.name ?? "No state selected"} ·{" "}
+                      {subView === "admin" ? "Admin view" : "Staff view"} · template/sample data,
+                      not live company records
+                    </span>
+                  </div>
+                  {currentPreviewState && (
+                    <Link
+                      to="/dashboard/hive-exec/states/$stateCode"
+                      params={{ stateCode: currentPreviewState.code }}
+                      className="hidden md:inline-flex items-center gap-1 rounded-md border border-[#f4a93a]/40 bg-white/60 px-2 py-0.5 text-[11px] font-medium text-[#9a3412] hover:bg-white"
+                    >
+                      Edit template
+                    </Link>
+                  )}
+                </div>
+              )}
+
+              {isAdminCapable && effectiveView === "admin" && org?.organization_id && (
+                <BillingBanner organizationId={org.organization_id} isAdmin />
+              )}
+
+              <main
+                className={
+                  isMobilePreview
+                    ? "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-secondary/40"
+                    : "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-secondary/40 px-4 py-6 md:px-8"
+                }
+              >
+                {isStatePreview && !stateCode ? (
+                  <div className="mx-auto max-w-xl rounded-lg border border-dashed border-border bg-background p-8 text-center text-sm text-muted-foreground">
+                    Select a state from the sidebar to load the platform configured as that state.
+                  </div>
+                ) : isComingSoonPreview ? (
+                  <div className="mx-auto max-w-xl rounded-lg border border-dashed border-[#f4a93a]/40 bg-[#f4a93a]/[0.06] p-10 text-center">
+                    <MapPin className="mx-auto h-8 w-8 text-[#f4a93a]" />
+                    <h2 className="mt-3 text-lg font-semibold tracking-tight">
+                      Coming soon for {currentPreviewState?.name}
+                    </h2>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      No template has been built for this state yet. Configure the state's skeleton
+                      to enable the {subView === "admin" ? "admin" : "staff"} preview.
+                    </p>
+                    {currentPreviewState && (
+                      <Link
+                        to="/dashboard/hive-exec/states/$stateCode"
+                        params={{ stateCode: currentPreviewState.code }}
+                        className="mt-4 inline-flex items-center gap-1 rounded-md border border-[#f4a93a]/40 bg-white px-3 py-1.5 text-xs font-medium text-[#9a3412] hover:bg-[#f4a93a]/10"
+                      >
+                        Build {currentPreviewState.name} template
+                      </Link>
+                    )}
+                  </div>
+                ) : lockedRouteItem?.feature ? (
+                  <FeatureLockedRoute featureKey={lockedRouteItem.feature} />
+                ) : isMobilePreview ? (
+                  <StaffMobilePreviewFrame title={pageTitle}>
+                    <Outlet />
+                  </StaffMobilePreviewFrame>
+                ) : (
+                  <Outlet />
                 )}
-              </div>
-            ) : lockedRouteItem?.feature ? (
-              <FeatureLockedRoute featureKey={lockedRouteItem.feature} />
-            ) : isMobilePreview ? (
-              <StaffMobilePreviewFrame title={pageTitle}>
-                <Outlet />
-              </StaffMobilePreviewFrame>
-            ) : (
-              <Outlet />
-            )}
-          </main>
+              </main>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-    </DraftJobsProvider>
+      </DraftJobsProvider>
     </GuidedTourProvider>
   );
 }
-
 
 /**
  * Hoisted to module scope so it keeps a stable component identity across
@@ -814,15 +988,15 @@ function SidebarBody({
   // default. The current route's domain auto-expands when the active domain
   // changes so the location stays visible; explicit user toggles persist while
   // the active domain stays the same.
-  const initialActiveDomain = EXEC_DOMAINS.find((d) =>
-    d.items.some((t) => (t.exact ? pathname === t.to : pathname.startsWith(t.to)))
-  )?.id ?? null;
+  const initialActiveDomain =
+    EXEC_DOMAINS.find((d) =>
+      d.items.some((t) => (t.exact ? pathname === t.to : pathname.startsWith(t.to))),
+    )?.id ?? null;
   const [collapsedDomains, setCollapsedDomains] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(EXEC_DOMAINS.map((d) => [d.id, d.id !== initialActiveDomain]))
+    Object.fromEntries(EXEC_DOMAINS.map((d) => [d.id, d.id !== initialActiveDomain])),
   );
   const lastActiveDomain = useRef<string | null>(initialActiveDomain);
-  const toggleDomain = (id: string) =>
-    setCollapsedDomains((c) => ({ ...c, [id]: !c[id] }));
+  const toggleDomain = (id: string) => setCollapsedDomains((c) => ({ ...c, [id]: !c[id] }));
   const { capabilities: execCaps } = useExecCapabilities();
   const execCountFn = useServerFn(getPendingUpgradeRequestCount);
   const execPendingQ = useQuery({
@@ -842,7 +1016,7 @@ function SidebarBody({
   const activeExecDomain = useMemo(() => {
     return (
       execVisibleDomains.find((d) =>
-        d.items.some((t) => (t.exact ? pathname === t.to : pathname.startsWith(t.to)))
+        d.items.some((t) => (t.exact ? pathname === t.to : pathname.startsWith(t.to))),
       )?.id ?? null
     );
   }, [pathname, execVisibleDomains]);
@@ -871,46 +1045,25 @@ function SidebarBody({
           <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/60">
             Portal View
           </label>
-          <Select value={rawView} onValueChange={(v) => setView(v as PV)}>
-            <SelectTrigger className="w-full border-sidebar-border bg-sidebar-accent/40 text-sidebar-foreground">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="staff">
-                <span className="inline-flex items-center gap-2">
-                  <GraduationCap className="h-3.5 w-3.5" /> Staff View
-                </span>
-              </SelectItem>
-              {isAdminCapable && (
-                <SelectItem value="admin">
-                  <span className="inline-flex items-center gap-2">
-                    <Building2 className="h-3.5 w-3.5" /> Admin View
-                  </span>
-                </SelectItem>
-              )}
-              {isAdminCapable && (
-                <SelectItem value="staff_mobile">
-                  <span className="inline-flex items-center gap-2">
-                    <GraduationCap className="h-3.5 w-3.5" /> Staff Mobile (Preview)
-                  </span>
-                </SelectItem>
-              )}
-              {isExecutive && (
-                <SelectItem value="hive_exec">
-                  <span className="inline-flex items-center gap-2">
-                    <Lock className="h-3.5 w-3.5" /> Executive Command Center
-                  </span>
-                </SelectItem>
-              )}
-              {isExecutive && (
-                <SelectItem value="state_preview">
-                  <span className="inline-flex items-center gap-2">
-                    <MapPin className="h-3.5 w-3.5" /> State (Build/Preview)
-                  </span>
-                </SelectItem>
-              )}
-            </SelectContent>
-          </Select>
+          <PortalViewSwitcher
+            value={rawView}
+            onChange={(v) => setView(v)}
+            options={[
+              { value: "staff", label: "Staff View" },
+              ...(isAdminCapable
+                ? [
+                    { value: "admin" as const, label: "Admin View" },
+                    { value: "staff_mobile" as const, label: "Staff Mobile (Preview)" },
+                  ]
+                : []),
+              ...(isExecutive
+                ? [
+                    { value: "hive_exec" as const, label: "Executive Command Center" },
+                    { value: "state_preview" as const, label: "State (Build/Preview)" },
+                  ]
+                : []),
+            ]}
+          />
 
           {isHiveExecView && isAdminCapable && (
             <CompanyClientsBridge setView={setView} onNavigate={onNavigate} />
@@ -939,7 +1092,11 @@ function SidebarBody({
                                 : "bg-slate-200 text-slate-600"
                             }`}
                           >
-                            {isActive ? "Active" : s.status === "coming_soon" ? "Coming soon" : "Inactive"}
+                            {isActive
+                              ? "Active"
+                              : s.status === "coming_soon"
+                                ? "Coming soon"
+                                : "Inactive"}
                           </span>
                         </span>
                       </SelectItem>
@@ -1011,14 +1168,16 @@ function SidebarBody({
                     aria-expanded={!isCollapsed}
                   >
                     <span>{d.label}</span>
-                    <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isCollapsed ? "-rotate-90" : ""}`} />
+                    <ChevronDown
+                      className={`h-3.5 w-3.5 transition-transform ${isCollapsed ? "-rotate-90" : ""}`}
+                    />
                   </button>
                   {!isCollapsed && (
                     <div className="mt-0.5 space-y-0.5">
                       {d.items.map((t) => {
                         const active = t.exact ? pathname === t.to : pathname.startsWith(t.to);
                         const Icon = t.icon;
-                        const badgeCount = t.badgeKey ? execBadges[t.badgeKey] ?? 0 : 0;
+                        const badgeCount = t.badgeKey ? (execBadges[t.badgeKey] ?? 0) : 0;
                         return (
                           <Link
                             key={t.to}
@@ -1034,7 +1193,9 @@ function SidebarBody({
                               <Icon className="h-4 w-4" /> {t.label}
                             </span>
                             {badgeCount > 0 && (
-                              <span className={`inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-white text-[#0f1b3d]" : "bg-[#d97a1c] text-white"}`}>
+                              <span
+                                className={`inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-white text-[#0f1b3d]" : "bg-[#d97a1c] text-white"}`}
+                              >
                                 {badgeCount}
                               </span>
                             )}
@@ -1048,69 +1209,71 @@ function SidebarBody({
             })}
           </div>
         ) : (
-        nav.map((item) => {
-          const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
-          const Icon = item.icon;
-          const slug = item.to.replace(/^\/dashboard\/?/, "") || "home";
-          const isNectar = item.label === "NECTAR";
-          const locked = !!item.isLocked;
+          nav.map((item) => {
+            const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
+            const Icon = item.icon;
+            const slug = item.to.replace(/^\/dashboard\/?/, "") || "home";
+            const isNectar = item.label === "NECTAR";
+            const locked = !!item.isLocked;
 
-          if (locked) {
+            if (locked) {
+              return (
+                <button
+                  key={item.to}
+                  type="button"
+                  data-tour={`nav.${slug}`}
+                  onClick={() => item.feature && setUpgradeFeatureKey(item.feature)}
+                  aria-label={`${item.label} — locked. Click to request upgrade.`}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/40 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground/60 transition-colors cursor-pointer"
+                >
+                  <Icon className="h-4 w-4 opacity-60" />
+                  <span className="flex-1 text-left">{item.label}</span>
+                  <Lock className="h-3 w-3 opacity-70" />
+                </button>
+              );
+            }
+
             return (
-              <button
+              <Link
                 key={item.to}
-                type="button"
+                to={item.to}
+                onClick={onNavigate}
                 data-tour={`nav.${slug}`}
-                onClick={() => item.feature && setUpgradeFeatureKey(item.feature)}
-                aria-label={`${item.label} — locked. Click to request upgrade.`}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/40 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground/60 transition-colors cursor-pointer"
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                  active
+                    ? isNectar
+                      ? "bg-[#d97a1c] text-white shadow-sm"
+                      : "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                    : isNectar
+                      ? "text-[#f4a93a] hover:bg-[#f4a93a]/10 hover:text-[#d97a1c]"
+                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                }`}
               >
-                <Icon className="h-4 w-4 opacity-60" />
-                <span className="flex-1 text-left">{item.label}</span>
-                <Lock className="h-3 w-3 opacity-70" />
-              </button>
+                <Icon
+                  className={`h-4 w-4 ${active ? (isNectar ? "text-white" : "") : isNectar ? "text-[#f4a93a]" : ""}`}
+                />
+                <span className="flex-1">{item.label}</span>
+                {item.to === "/dashboard/company-obligations" &&
+                  !complianceQueueLoading &&
+                  complianceActionCount > 0 && (
+                    <span
+                      aria-label={`${complianceActionCount} action required`}
+                      className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-destructive-foreground"
+                    >
+                      {complianceActionCount > 99 ? "99+" : complianceActionCount}
+                    </span>
+                  )}
+                {item.to === "/dashboard/inbox" && inboxUnread > 0 && (
+                  <span
+                    aria-label={`${inboxUnread} unread`}
+                    className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-destructive-foreground"
+                  >
+                    {inboxUnread > 99 ? "99+" : inboxUnread}
+                  </span>
+                )}
+              </Link>
             );
-          }
-
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              onClick={onNavigate}
-              data-tour={`nav.${slug}`}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
-                active
-                  ? isNectar
-                    ? "bg-[#d97a1c] text-white shadow-sm"
-                    : "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                  : isNectar
-                    ? "text-[#f4a93a] hover:bg-[#f4a93a]/10 hover:text-[#d97a1c]"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              }`}
-            >
-              <Icon className={`h-4 w-4 ${active ? (isNectar ? "text-white" : "") : isNectar ? "text-[#f4a93a]" : ""}`} />
-              <span className="flex-1">{item.label}</span>
-              {item.to === "/dashboard/company-obligations" &&
-                !complianceQueueLoading &&
-                complianceActionCount > 0 && (
-                <span
-                  aria-label={`${complianceActionCount} action required`}
-                  className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-destructive-foreground"
-                >
-                  {complianceActionCount > 99 ? "99+" : complianceActionCount}
-                </span>
-              )}
-              {item.to === "/dashboard/inbox" && inboxUnread > 0 && (
-                <span
-                  aria-label={`${inboxUnread} unread`}
-                  className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-destructive-foreground"
-                >
-                  {inboxUnread > 99 ? "99+" : inboxUnread}
-                </span>
-              )}
-            </Link>
-          );
-        })
+          })
         )}
 
         {showNectarCluster && (
@@ -1175,18 +1338,24 @@ function SidebarBody({
         <UpgradeGate
           featureKey={upgradeFeatureKey}
           open={!!upgradeFeatureKey}
-          onOpenChange={(o) => { if (!o) setUpgradeFeatureKey(null); }}
+          onOpenChange={(o) => {
+            if (!o) setUpgradeFeatureKey(null);
+          }}
         />
       )}
 
       <div className="border-t border-sidebar-border p-4">
         <div className="mb-3 text-xs text-sidebar-foreground/60">
-          <div className="font-medium text-sidebar-foreground">{user?.user_metadata?.full_name ?? user?.email}</div>
+          <div className="font-medium text-sidebar-foreground">
+            {user?.user_metadata?.full_name ?? user?.email}
+          </div>
           <div className="mt-2">
             {isHiveExecView ? (
               <div className="flex items-center justify-between">
                 <span className="truncate">HIVE Platform</span>
-                <span className="ml-2 rounded-full bg-sidebar-accent px-2 py-0.5 text-[10px] uppercase tracking-wider">HIVE Exec</span>
+                <span className="ml-2 rounded-full bg-sidebar-accent px-2 py-0.5 text-[10px] uppercase tracking-wider">
+                  HIVE Exec
+                </span>
               </div>
             ) : (
               <>

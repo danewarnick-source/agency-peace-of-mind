@@ -5,8 +5,19 @@ export function isFormUuid(id: string | null | undefined): id is string {
   return typeof id === "string" && UUID_RE.test(id);
 }
 
+/** Form-typed duty with no published form UUID — unactionable for staff. */
+export function isUnlinkedFormDuty(ob: {
+  evidence_type: string;
+  linked_form_id: string | null | undefined;
+}): boolean {
+  return ob.evidence_type === "form" && !isFormUuid(ob.linked_form_id);
+}
+
 function norm(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 /**

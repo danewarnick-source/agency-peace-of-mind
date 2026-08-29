@@ -6,6 +6,7 @@ import {
   companyAdminSwitchAccessibleName,
   nextPortalViewAfterLogin,
   resolvePostLoginLanding,
+  resolveRoleEntryLanding,
   STAFF_VIEW_ACCESSIBLE_NAME,
 } from "./portal-view-landing.ts";
 
@@ -124,6 +125,13 @@ describe("hive-exec Open company / Admin View control", () => {
     assert.match(src, /go\("staff"\)/);
   });
 
+  it("dashboard Portal View uses the portaled switcher, not Radix Select", () => {
+    const path = fileURLToPath(new URL("../routes/dashboard.tsx", import.meta.url));
+    const src = readFileSync(path, "utf8");
+    assert.match(src, /PortalViewSwitcher/);
+    assert.doesNotMatch(src, /SelectItem value="admin"/);
+  });
+
   it("dashboard hamburger stays on hive-exec (not gated off)", () => {
     const path = fileURLToPath(new URL("../routes/dashboard.tsx", import.meta.url));
     const src = readFileSync(path, "utf8");
@@ -133,6 +141,26 @@ describe("hive-exec Open company / Admin View control", () => {
       /!isHiveExecView[\s\S]{0,240}aria-label="Open menu"/,
       "Menu must not be wrapped in !isHiveExecView",
     );
+  });
+
+  it("/admin persists Admin View for an Owner instead of bouncing to staff", () => {
+    const owner = resolveRoleEntryLanding({
+      hasSession: true,
+      role: "admin",
+      allowed: ["admin", "program_manager", "manager", "super_admin"],
+      persistView: "admin",
+    });
+    assert.equal(owner.path, "/dashboard");
+    assert.equal(owner.persistView, "admin");
+
+    const dsp = resolveRoleEntryLanding({
+      hasSession: true,
+      role: "employee",
+      allowed: ["admin", "program_manager", "manager", "super_admin"],
+      persistView: "admin",
+    });
+    assert.equal(dsp.path, "/employee");
+    assert.equal(dsp.persistView, null);
   });
 
   it("login no longer blindly writes hive_exec for every executive", () => {

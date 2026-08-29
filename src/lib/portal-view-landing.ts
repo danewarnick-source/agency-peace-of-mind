@@ -110,3 +110,30 @@ export function nextPortalViewAfterLogin(input: {
   const landing = resolvePostLoginLanding(input);
   return landing.persistView ?? input.storedView;
 }
+
+export const ROLE_ENTRY_HOME: Record<string, string> = {
+  super_admin: "/dashboard/hive-exec",
+  admin: "/dashboard",
+  program_manager: "/dashboard",
+  manager: "/dashboard",
+  employee: "/employee",
+  committee_member: "/dashboard/hrc",
+};
+
+/**
+ * `/admin` (and the other role-entry bookmarks) must persist the matching
+ * Portal View. Otherwise an Owner who last used Staff View hits /admin,
+ * sees "Redirecting…", and lands back on the staff dashboard.
+ */
+export function resolveRoleEntryLanding(input: {
+  hasSession: boolean;
+  role: string;
+  allowed: readonly string[];
+  persistView: PortalView | null;
+}): { path: string; persistView: PortalView | null } {
+  if (!input.hasSession) return { path: "/login", persistView: null };
+  if (!input.allowed.includes(input.role)) {
+    return { path: ROLE_ENTRY_HOME[input.role] ?? "/dashboard", persistView: null };
+  }
+  return { path: "/dashboard", persistView: input.persistView };
+}

@@ -127,7 +127,18 @@ function DirectCompletionActions({
 
   if (obligation.evidence_type === "form") {
     if (!isFormUuid(obligation.linked_form_id)) {
-      return <p className="text-xs text-amber-800">Form not linked</p>;
+      return (
+        <div className="space-y-1">
+          <p className="text-xs text-amber-800">
+            No published form is linked yet — staff cannot complete this duty.
+          </p>
+          <a href={`/dashboard/company-obligations#obligation-${obligation.id}`}>
+            <Button size="sm" variant="outline">
+              Attach a form →
+            </Button>
+          </a>
+        </div>
+      );
     }
     return (
       <a

@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { isFormUuid, resolveObligationFormId } from "./resolve-obligation-form.ts";
+import {
+  isFormUuid,
+  isUnlinkedFormDuty,
+  resolveObligationFormId,
+} from "./resolve-obligation-form.ts";
 
 const FORMS = [
   { id: "11111111-1111-4111-8111-111111111111", name: "Medication Error Report" },
@@ -25,5 +29,12 @@ describe("resolveObligationFormId", () => {
 
   it("returns null when nothing matches", () => {
     assert.equal(resolveObligationFormId(null, FORMS, "Unrelated obligation"), null);
+  });
+
+  it("flags form duties with no published UUID as unactionable", () => {
+    assert.equal(isUnlinkedFormDuty({ evidence_type: "form", linked_form_id: null }), true);
+    assert.equal(isUnlinkedFormDuty({ evidence_type: "form", linked_form_id: "null" }), true);
+    assert.equal(isUnlinkedFormDuty({ evidence_type: "form", linked_form_id: FORMS[0].id }), false);
+    assert.equal(isUnlinkedFormDuty({ evidence_type: "attestation", linked_form_id: null }), false);
   });
 });

@@ -17,7 +17,8 @@ import {
   cadenceDescription,
   type MyObligationInstanceRow,
 } from "@/lib/company-obligations.functions";
-import { isFormUuid } from "@/lib/resolve-obligation-form";
+import { isFormUuid, isUnlinkedFormDuty } from "@/lib/resolve-obligation-form";
+import { toDisplayNameCase } from "@/lib/person-name";
 import { dueLabel } from "@/components/company-obligations/my-obligations-widget";
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 
@@ -44,32 +45,53 @@ type MyCompletionRow = {
 /** staff_per_client obligation titles carry a literal "[Client Name]"
  *  placeholder (e.g. "Client-Specific Training — [Client Name]") so staff
  *  clearly know which client a given instance is for. */
-function resolveObligationTitle(ob: MyObligationInstanceRow["obligation"], instance: MyObligationInstanceRow): string {
+function resolveObligationTitle(
+  ob: MyObligationInstanceRow["obligation"],
+  instance: MyObligationInstanceRow,
+): string {
   if (ob.scope === "staff_per_client" && instance.client_name) {
-    return ob.title.replace("[Client Name]", instance.client_name);
+    return ob.title.replace("[Client Name]", toDisplayNameCase(instance.client_name));
   }
   return ob.title;
 }
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+  return new Date(iso).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
-function CompletedCard({ instance, completion }: { instance: MyObligationInstanceRow; completion: MyCompletionRow | undefined }) {
+function CompletedCard({
+  instance,
+  completion,
+}: {
+  instance: MyObligationInstanceRow;
+  completion: MyCompletionRow | undefined;
+}) {
   const ob = instance.obligation;
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!completion?.upload_path) return;
     let cancelled = false;
-    supabase.storage.from("obligation-evidence").createSignedUrl(completion.upload_path, 300).then(({ data }) => {
-      if (!cancelled && data?.signedUrl) setDownloadUrl(data.signedUrl);
-    });
-    return () => { cancelled = true; };
+    supabase.storage
+      .from("obligation-evidence")
+      .createSignedUrl(completion.upload_path, 300)
+      .then(({ data }) => {
+        if (!cancelled && data?.signedUrl) setDownloadUrl(data.signedUrl);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [completion?.upload_path]);
 
-  const evidenceUsed = completion?.evidence_type_used ?? instance.evidence_type_used ?? ob.evidence_type;
+  const evidenceUsed =
+    completion?.evidence_type_used ?? instance.evidence_type_used ?? ob.evidence_type;
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
@@ -78,9 +100,13 @@ function CompletedCard({ instance, completion }: { instance: MyObligationInstanc
         <div className="min-w-0 flex-1">
           <p className="font-semibold">{resolveObligationTitle(ob, instance)}</p>
           {ob.source === "sow" ? (
-            <p className="text-xs text-muted-foreground">🔒 Required by state contract — DSPD SOW DHHS91172</p>
+            <p className="text-xs text-muted-foreground">
+              🔒 Required by state contract — DSPD SOW DHHS91172
+            </p>
           ) : (
-            ob.source_policy_section && <p className="text-xs text-muted-foreground">{ob.source_policy_section}</p>
+            ob.source_policy_section && (
+              <p className="text-xs text-muted-foreground">{ob.source_policy_section}</p>
+            )
           )}
           <p className="text-sm text-muted-foreground">{instance.period_key}</p>
           <p className="mt-1 text-sm font-medium text-success">
@@ -95,7 +121,12 @@ function CompletedCard({ instance, completion }: { instance: MyObligationInstanc
               View submission <ExternalLink className="h-3 w-3" />
             </a>
           ) : downloadUrl ? (
-            <a href={downloadUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[#137182] hover:underline">
+            <a
+              href={downloadUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[#137182] hover:underline"
+            >
               View submission <ExternalLink className="h-3 w-3" />
             </a>
           ) : completion?.attestation_text_snapshot ? (
@@ -112,7 +143,13 @@ function CompletedCard({ instance, completion }: { instance: MyObligationInstanc
 /** A previously-submitted upload NECTAR could not verify — the assignee has
  *  already acted, so this reads like a status card (not the input form),
  *  but stays out of the "Completed" bucket until an admin confirms it. */
-function PendingReviewCard({ instance, completion }: { instance: MyObligationInstanceRow; completion: MyCompletionRow }) {
+function PendingReviewCard({
+  instance,
+  completion,
+}: {
+  instance: MyObligationInstanceRow;
+  completion: MyCompletionRow;
+}) {
   const ob = instance.obligation;
   return (
     <div className="rounded-xl border border-amber-300/60 bg-amber-500/10 p-4 shadow-[var(--shadow-card)]">
@@ -125,7 +162,9 @@ function PendingReviewCard({ instance, completion }: { instance: MyObligationIns
           {(completion.nectar_validation_reasons?.length ?? 0) > 0 && (
             <p>{completion.nectar_validation_reasons!.join("; ")}</p>
           )}
-          <p className="mt-1 font-medium">Pending admin review — an admin will confirm your upload.</p>
+          <p className="mt-1 font-medium">
+            Pending admin review — an admin will confirm your upload.
+          </p>
         </div>
       </div>
     </div>
@@ -148,16 +187,20 @@ function OpenCard({
   const [file, setFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
-  const [nectarResult, setNectarResult] = useState<
-    { status: "passed" | "failed"; certType: string | null; expiresAt: string | null; reasons: string[] } | null
-  >(null);
+  const [nectarResult, setNectarResult] = useState<{
+    status: "passed" | "failed";
+    certType: string | null;
+    expiresAt: string | null;
+    reasons: string[];
+  } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const needsUpload = ob.evidence_type === "upload" || ob.evidence_type === "upload_and_attestation";
-  const needsAttestation = ob.evidence_type === "attestation" || ob.evidence_type === "upload_and_attestation";
-  const canSubmit = ob.evidence_type === "form"
-    ? true
-    : (!needsUpload || !!file) && (!needsAttestation || checked);
+  const needsUpload =
+    ob.evidence_type === "upload" || ob.evidence_type === "upload_and_attestation";
+  const needsAttestation =
+    ob.evidence_type === "attestation" || ob.evidence_type === "upload_and_attestation";
+  const canSubmit =
+    ob.evidence_type === "form" ? true : (!needsUpload || !!file) && (!needsAttestation || checked);
 
   const submit = async () => {
     setBusy(true);
@@ -167,7 +210,9 @@ function OpenCard({
       if (needsUpload && file) {
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
         const path = `${orgId}/${ob.id}/${instance.id}/${crypto.randomUUID()}-${safeName}`;
-        const { error: upErr } = await supabase.storage.from("obligation-evidence").upload(path, file);
+        const { error: upErr } = await supabase.storage
+          .from("obligation-evidence")
+          .upload(path, file);
         if (upErr) throw new Error(upErr.message);
         uploadPath = path;
         uploadFilename = file.name;
@@ -184,7 +229,17 @@ function OpenCard({
           notes: notes.trim() || null,
         },
       });
-      const validation = (result as { nectarValidation?: { ran: boolean; status: "passed" | "failed" | null; reasons: string[]; cert_type: string | null; expires_date: string | null } }).nectarValidation;
+      const validation = (
+        result as {
+          nectarValidation?: {
+            ran: boolean;
+            status: "passed" | "failed" | null;
+            reasons: string[];
+            cert_type: string | null;
+            expires_date: string | null;
+          };
+        }
+      ).nectarValidation;
       if (validation?.ran && validation.status) {
         setNectarResult({
           status: validation.status,
@@ -215,7 +270,9 @@ function OpenCard({
           <div>
             <p className="font-medium">NECTAR couldn't verify this upload</p>
             <p>{nectarResult.reasons.join("; ")}</p>
-            <p className="mt-1 font-medium">Pending admin review — an admin will confirm your upload.</p>
+            <p className="mt-1 font-medium">
+              Pending admin review — an admin will confirm your upload.
+            </p>
           </div>
         </div>
       </div>
@@ -226,13 +283,21 @@ function OpenCard({
     <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <p className="font-semibold">{resolveObligationTitle(ob, instance)}</p>
       {ob.source === "sow" ? (
-        <p className="text-xs text-muted-foreground">🔒 Required by state contract — DSPD SOW DHHS91172</p>
+        <p className="text-xs text-muted-foreground">
+          🔒 Required by state contract — DSPD SOW DHHS91172
+        </p>
       ) : (
-        ob.source_policy_section && <p className="text-xs text-muted-foreground">{ob.source_policy_section}</p>
+        ob.source_policy_section && (
+          <p className="text-xs text-muted-foreground">{ob.source_policy_section}</p>
+        )
       )}
       <p className="mt-1 text-sm font-medium text-muted-foreground">{cadenceDescription(ob)}</p>
-      <p className={`mt-1 text-lg font-semibold ${due.overdue ? "text-destructive" : "text-warning-foreground"}`}>
-        {due.overdue ? `Overdue — was due ${new Date(instance.due_at).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}` : `Due ${new Date(instance.due_at).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}`}
+      <p
+        className={`mt-1 text-lg font-semibold ${due.overdue ? "text-destructive" : "text-warning-foreground"}`}
+      >
+        {due.overdue
+          ? `Overdue — was due ${new Date(instance.due_at).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}`
+          : `Due ${new Date(instance.due_at).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}`}
       </p>
       {ob.description && <p className="mt-2 text-sm text-muted-foreground">{ob.description}</p>}
 
@@ -241,15 +306,26 @@ function OpenCard({
           <div className="rounded-lg border border-border bg-muted/30 p-3">
             <p className="text-sm font-medium">Linked form required</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              This form is required {cadenceDescription(ob).toLowerCase()}. Due {new Date(instance.due_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}.
+              This form is required {cadenceDescription(ob).toLowerCase()}. Due{" "}
+              {new Date(instance.due_at).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}
+              .
             </p>
             {isFormUuid(ob.linked_form_id) ? (
-              <a href={`/dashboard/forms/${ob.linked_form_id}/fill?obligation_instance=${instance.id}`}>
-                <Button size="sm" className="mt-2">Open and complete form →</Button>
+              <a
+                href={`/dashboard/forms/${ob.linked_form_id}/fill?obligation_instance=${instance.id}`}
+              >
+                <Button size="sm" className="mt-2">
+                  Open and complete form →
+                </Button>
               </a>
             ) : (
               <p className="mt-2 text-xs text-amber-800">
-                This duty is a form, but no published form is linked yet. Ask your administrator to attach the form — do not open a blank link.
+                Waiting on your administrator — this duty needs a published form before you can
+                complete it.
               </p>
             )}
             <p className="mt-1.5 text-xs text-muted-foreground">
@@ -298,7 +374,9 @@ function OpenCard({
             )}
             {needsAttestation && (
               <>
-                <div className="rounded-md border border-border bg-muted/40 p-2.5 text-sm leading-relaxed">{ob.attestation_text}</div>
+                <div className="rounded-md border border-border bg-muted/40 p-2.5 text-sm leading-relaxed">
+                  {ob.attestation_text}
+                </div>
                 <label className="flex min-h-[44px] cursor-pointer items-center gap-2.5 rounded-md px-1 text-sm">
                   <Checkbox
                     checked={checked}
@@ -347,7 +425,9 @@ function MyObligationsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("company_obligation_completions")
-        .select("instance_id, staff_name, completed_at, evidence_type_used, upload_path, upload_filename, attestation_text_snapshot, form_submission_id, nectar_validation_status, nectar_validation_reasons, nectar_extracted_cert_type, nectar_extracted_expires_date")
+        .select(
+          "instance_id, staff_name, completed_at, evidence_type_used, upload_path, upload_filename, attestation_text_snapshot, form_submission_id, nectar_validation_status, nectar_validation_reasons, nectar_extracted_cert_type, nectar_extracted_expires_date",
+        )
         .eq("staff_id", user!.id)
         .in("instance_id", instanceIds);
       if (error) throw new Error(error.message);
@@ -368,25 +448,38 @@ function MyObligationsPage() {
   const isPendingReview = (instId: string) =>
     completionByInstance.get(instId)?.nectar_validation_status === "failed";
 
-  const { open, completed } = useMemo(() => {
+  const { open, completed, unlinkedFormCount } = useMemo(() => {
     const open: MyObligationInstanceRow[] = [];
     const completed: MyObligationInstanceRow[] = [];
+    let unlinkedFormCount = 0;
     for (const inst of instances) {
       const hasCompletion = completionByInstance.has(inst.id);
-      const failedValidation = completionByInstance.get(inst.id)?.nectar_validation_status === "failed";
-      const iCompleted = inst.status === "completed" || inst.status === "waived" || (hasCompletion && !failedValidation);
-      if (iCompleted) completed.push(inst);
-      else open.push(inst);
+      const failedValidation =
+        completionByInstance.get(inst.id)?.nectar_validation_status === "failed";
+      const iCompleted =
+        inst.status === "completed" ||
+        inst.status === "waived" ||
+        (hasCompletion && !failedValidation);
+      if (iCompleted) {
+        completed.push(inst);
+        continue;
+      }
+      if (isUnlinkedFormDuty(inst.obligation)) {
+        unlinkedFormCount += 1;
+        continue;
+      }
+      open.push(inst);
     }
     open.sort((a, b) => new Date(a.due_at).getTime() - new Date(b.due_at).getTime());
     completed.sort((a, b) => new Date(b.due_at).getTime() - new Date(a.due_at).getTime());
-    return { open, completed };
+    return { open, completed, unlinkedFormCount };
   }, [instances, completionByInstance]);
 
   const dueSoon = open.filter((i) => !dueLabel(i.due_at).overdue);
   const overdue = open.filter((i) => dueLabel(i.due_at).overdue);
 
-  const shown = tab === "all" ? open : tab === "due_soon" ? dueSoon : tab === "overdue" ? overdue : completed;
+  const shown =
+    tab === "all" ? open : tab === "due_soon" ? dueSoon : tab === "overdue" ? overdue : completed;
 
   const onCompleted = () => {
     qc.invalidateQueries({ queryKey: ["my-obligation-instances"] });
@@ -403,12 +496,14 @@ function MyObligationsPage() {
       />
 
       <div className="flex flex-wrap gap-1.5 rounded-lg border border-border p-1">
-        {([
-          ["all", `All (${open.length})`],
-          ["due_soon", `Due soon (${dueSoon.length})`],
-          ["overdue", `Overdue (${overdue.length})`],
-          ["completed", `Completed (${completed.length})`],
-        ] as const).map(([key, label]) => (
+        {(
+          [
+            ["all", `All (${open.length})`],
+            ["due_soon", `Due soon (${dueSoon.length})`],
+            ["overdue", `Overdue (${overdue.length})`],
+            ["completed", `Completed (${completed.length})`],
+          ] as const
+        ).map(([key, label]) => (
           <button
             key={key}
             type="button"
@@ -420,6 +515,14 @@ function MyObligationsPage() {
         ))}
       </div>
 
+      {unlinkedFormCount > 0 && (
+        <div className="rounded-lg border border-amber-300/50 bg-amber-50 px-3 py-2.5 text-sm text-amber-950">
+          {unlinkedFormCount} {unlinkedFormCount === 1 ? "duty is" : "duties are"} waiting on a
+          published form. Ask an administrator to attach {unlinkedFormCount === 1 ? "it" : "them"}{" "}
+          under Compliance — nothing for you to complete here yet.
+        </div>
+      )}
+
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : instances.length === 0 ? (
@@ -428,25 +531,48 @@ function MyObligationsPage() {
         </div>
       ) : shown.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          Nothing here.
+          {unlinkedFormCount > 0 ? "No duties you can complete yet." : "Nothing here."}
         </div>
       ) : (
         <div className="grid w-full gap-3">
           {(() => {
             const renderCard = (inst: MyObligationInstanceRow) => {
               if (isPendingReview(inst.id)) {
-                return <PendingReviewCard key={inst.id} instance={inst} completion={completionByInstance.get(inst.id)!} />;
+                return (
+                  <PendingReviewCard
+                    key={inst.id}
+                    instance={inst}
+                    completion={completionByInstance.get(inst.id)!}
+                  />
+                );
               }
-              if (tab === "completed" || inst.status === "completed" || inst.status === "waived" || completionByInstance.has(inst.id)) {
-                return <CompletedCard key={inst.id} instance={inst} completion={completionByInstance.get(inst.id)} />;
+              if (
+                tab === "completed" ||
+                inst.status === "completed" ||
+                inst.status === "waived" ||
+                completionByInstance.has(inst.id)
+              ) {
+                return (
+                  <CompletedCard
+                    key={inst.id}
+                    instance={inst}
+                    completion={completionByInstance.get(inst.id)}
+                  />
+                );
               }
-              return <OpenCard key={inst.id} orgId={orgId!} instance={inst} onCompleted={onCompleted} />;
+              return (
+                <OpenCard key={inst.id} orgId={orgId!} instance={inst} onCompleted={onCompleted} />
+              );
             };
 
             // Group scope='staff_per_client' instances (e.g. multiple
             // client-specific trainings) by client name so staff see all
             // their per-client obligations for one Person together.
-            type Group = { key: string; clientLabel: string | null; items: MyObligationInstanceRow[] };
+            type Group = {
+              key: string;
+              clientLabel: string | null;
+              items: MyObligationInstanceRow[];
+            };
             const groups: Group[] = [];
             const groupIndexByClient = new Map<string, number>();
             for (const inst of shown) {
@@ -454,7 +580,11 @@ function MyObligationsPage() {
                 const idx = groupIndexByClient.get(inst.client_name);
                 if (idx === undefined) {
                   groupIndexByClient.set(inst.client_name, groups.length);
-                  groups.push({ key: `client:${inst.client_name}`, clientLabel: inst.client_name, items: [inst] });
+                  groups.push({
+                    key: `client:${inst.client_name}`,
+                    clientLabel: toDisplayNameCase(inst.client_name),
+                    items: [inst],
+                  });
                 } else {
                   groups[idx].items.push(inst);
                 }
@@ -463,16 +593,21 @@ function MyObligationsPage() {
               }
             }
 
-            return groups.map((g, i) => (
+            return groups.map((g, i) =>
               g.clientLabel ? (
-                <div key={g.key} className={`space-y-2.5 ${i > 0 ? "border-t border-border pt-4" : ""}`}>
-                  <p className="px-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{g.clientLabel}</p>
+                <div
+                  key={g.key}
+                  className={`space-y-2.5 ${i > 0 ? "border-t border-border pt-4" : ""}`}
+                >
+                  <p className="px-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {g.clientLabel}
+                  </p>
                   <div className="grid w-full gap-3">{g.items.map(renderCard)}</div>
                 </div>
               ) : (
                 g.items.map(renderCard)
-              )
-            ));
+              ),
+            );
           })()}
         </div>
       )}

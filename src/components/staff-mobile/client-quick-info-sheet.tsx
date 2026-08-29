@@ -1,15 +1,18 @@
-import { type ReactNode, type ReactElement, type MouseEvent, useEffect, useState, cloneElement, isValidElement, Children } from "react";
+import {
+  type ReactNode,
+  type ReactElement,
+  type MouseEvent,
+  useEffect,
+  useState,
+  cloneElement,
+  isValidElement,
+  Children,
+} from "react";
 import { MobileBottomSheet } from "./mobile-bottom-sheet";
 import { useActiveShift } from "@/hooks/use-active-shift";
 import type { CaseloadClient } from "@/hooks/use-caseload";
-import {
-  AlertTriangle,
-  Target,
-  Phone,
-  Heart,
-  IdCard,
-  ChevronRight,
-} from "lucide-react";
+import { displayPersonName } from "@/lib/person-name";
+import { AlertTriangle, Target, Phone, Heart, IdCard, ChevronRight } from "lucide-react";
 
 type Props = {
   client: CaseloadClient;
@@ -19,10 +22,11 @@ type Props = {
 function fmtDate(d: string | null) {
   if (!d) return "—";
   try {
-    return new Date(d + (d.length === 10 ? "T00:00:00" : "")).toLocaleDateString(
-      undefined,
-      { month: "short", day: "numeric", year: "numeric" },
-    );
+    return new Date(d + (d.length === 10 ? "T00:00:00" : "")).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   } catch {
     return d;
   }
@@ -52,12 +56,11 @@ export function ClientQuickInfoSheet({ client, trigger }: Props) {
     return () => window.clearInterval(t);
   }, [isOnTheClock]);
 
-  const fullName = `${client.first_name} ${client.last_name}`.trim();
+  const fullName = displayPersonName(client.first_name, client.last_name);
   const goals = client.pcsp_goals ?? [];
   const todaysGoal = goals[0];
-  const elapsed = isOnTheClock && active
-    ? fmtElapsed(now - new Date(active.clock_in_timestamp).getTime())
-    : "";
+  const elapsed =
+    isOnTheClock && active ? fmtElapsed(now - new Date(active.clock_in_timestamp).getTime()) : "";
 
   const [open, setOpen] = useState(false);
   const triggerEl = isValidElement(trigger)
@@ -85,12 +88,8 @@ export function ClientQuickInfoSheet({ client, trigger }: Props) {
         <header className="space-y-1 px-5 pt-3 text-left">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="break-words text-lg font-semibold leading-tight">
-                {fullName}
-              </h2>
-              <p className="break-words text-xs text-muted-foreground">
-                Quick info · safety first
-              </p>
+              <h2 className="break-words text-lg font-semibold leading-tight">{fullName}</h2>
+              <p className="break-words text-xs text-muted-foreground">Quick info · safety first</p>
             </div>
             {isOnTheClock && (
               <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#117a52]/10 px-2.5 py-1 text-[11px] font-semibold text-[#0d5c3d]">
@@ -117,26 +116,20 @@ export function ClientQuickInfoSheet({ client, trigger }: Props) {
               </p>
             ) : (
               <p className="text-sm text-muted-foreground">
-                No safety flags, triggers, or allergy alerts on file. Confirm with
-                supervisor before any procedure.
+                No safety flags, triggers, or allergy alerts on file. Confirm with supervisor before
+                any procedure.
               </p>
             )}
           </Section>
 
           {/* (b) PCSP goals — today + view all */}
-          <Section
-            tone="success"
-            icon={<Target className="h-4 w-4" />}
-            title="PCSP Goals"
-          >
+          <Section tone="success" icon={<Target className="h-4 w-4" />} title="PCSP Goals">
             {todaysGoal ? (
               <>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-[#0d5c3d]">
                   Today&apos;s focus
                 </p>
-                <p className="mt-0.5 text-sm font-medium text-foreground">
-                  {todaysGoal}
-                </p>
+                <p className="mt-0.5 text-sm font-medium text-foreground">{todaysGoal}</p>
                 {goals.length > 1 && (
                   <details className="mt-3">
                     <summary className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-[#0d5c3d] hover:underline">
@@ -157,49 +150,30 @@ export function ClientQuickInfoSheet({ client, trigger }: Props) {
                 )}
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                No PCSP goals on file.
-              </p>
+              <p className="text-sm text-muted-foreground">No PCSP goals on file.</p>
             )}
           </Section>
 
           {/* (c) Emergency contacts incl. on-call supervisor */}
-          <Section
-            tone="info"
-            icon={<Phone className="h-4 w-4" />}
-            title="Emergency Contacts"
-          >
+          <Section tone="info" icon={<Phone className="h-4 w-4" />} title="Emergency Contacts">
             <ContactRow
               label="Emergency contact"
               name={client.emergency_contact_name ?? null}
               phone={client.emergency_contact_phone ?? null}
             />
-            <ContactRow
-              label="On-call supervisor"
-              name="See team roster"
-              phone={null}
-              muted
-            />
+            <ContactRow label="On-call supervisor" name="See team roster" phone={null} muted />
           </Section>
 
           {/* (d) Interests & hobbies */}
-          <Section
-            tone="neutral"
-            icon={<Heart className="h-4 w-4" />}
-            title="Interests & Hobbies"
-          >
+          <Section tone="neutral" icon={<Heart className="h-4 w-4" />} title="Interests & Hobbies">
             <p className="text-sm text-muted-foreground">
-              Build rapport — ask about preferred activities at the start of shift.
-              Add details from the About tab to keep this fresh.
+              Build rapport — ask about preferred activities at the start of shift. Add details from
+              the About tab to keep this fresh.
             </p>
           </Section>
 
           {/* (e) Key IDs */}
-          <Section
-            tone="neutral"
-            icon={<IdCard className="h-4 w-4" />}
-            title="Key IDs & Address"
-          >
+          <Section tone="neutral" icon={<IdCard className="h-4 w-4" />} title="Key IDs & Address">
             <KvRow k="Medicaid ID" v={client.medicaid_id ?? "—"} mono />
             <KvRow k="Date of birth" v={fmtDate(client.date_of_birth ?? null)} />
             <KvRow k="Address" v={client.physical_address ?? "—"} />
@@ -272,11 +246,7 @@ function ContactRow({
   muted?: boolean;
 }) {
   if (!name && !phone) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        {label}: not on file
-      </p>
-    );
+    return <p className="text-sm text-muted-foreground">{label}: not on file</p>;
   }
   return (
     <div className="flex items-center justify-between gap-3 rounded-md bg-white/70 px-2.5 py-2">
@@ -284,7 +254,9 @@ function ContactRow({
         <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           {label}
         </p>
-        <p className={`truncate text-sm font-medium ${muted ? "text-muted-foreground" : "text-foreground"}`}>
+        <p
+          className={`truncate text-sm font-medium ${muted ? "text-muted-foreground" : "text-foreground"}`}
+        >
           {name ?? "—"}
         </p>
       </div>
@@ -303,9 +275,7 @@ function ContactRow({
 function KvRow({ k, v, mono = false }: { k: string; v: string; mono?: boolean }) {
   return (
     <div className="flex items-start justify-between gap-3 border-b border-border/60 py-1.5 last:border-0">
-      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {k}
-      </span>
+      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{k}</span>
       <span className={`text-right text-sm ${mono ? "font-mono" : ""}`}>{v}</span>
     </div>
   );

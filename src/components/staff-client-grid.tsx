@@ -5,16 +5,38 @@ import { useServerFn } from "@tanstack/react-start";
 import { useCaseload, type CaseloadClient } from "@/hooks/use-caseload";
 import { useActiveShift, type ActiveShift } from "@/hooks/use-active-shift";
 import { useNectarPayPeriod } from "@/hooks/use-nectar-pay-period";
-import { useMyAssignments, allowedCodesFor, clientAuthorizedCodes, defaultCaseloadCode, type AssignmentMap } from "@/hooks/use-my-assignments";
+import {
+  useMyAssignments,
+  allowedCodesFor,
+  clientAuthorizedCodes,
+  defaultCaseloadCode,
+  type AssignmentMap,
+} from "@/hooks/use-my-assignments";
 import { useTodayShifts, type TodayShiftRow } from "@/hooks/use-today-shifts";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { User, Search, Clock, Home, Info, ChevronDown, CalendarCheck2, CheckCircle2, GraduationCap, ChevronRight } from "lucide-react";
+import {
+  User,
+  Search,
+  Clock,
+  Home,
+  Info,
+  ChevronDown,
+  CalendarCheck2,
+  CheckCircle2,
+  GraduationCap,
+  ChevronRight,
+} from "lucide-react";
 import { ClientQuickInfoSheet } from "@/components/staff-mobile/client-quick-info-sheet";
 import { ClientCapBars } from "@/components/staff-mobile/client-cap-bars";
 import { getMyClientTrainingStatuses } from "@/lib/client-specific-training.functions";
-import { billingUnitLabel, isClockableServiceCode, isDailyServiceCode } from "@/lib/service-billing";
+import {
+  billingUnitLabel,
+  isClockableServiceCode,
+  isDailyServiceCode,
+} from "@/lib/service-billing";
 import { isEvvLockedCode } from "@/lib/evv-codes";
+import { displayPersonName } from "@/lib/person-name";
 
 type ClientTraining = {
   type: "person_specific" | "support_strategies" | "person_centered";
@@ -79,7 +101,7 @@ function ClientDetail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnTheClock, activeShift, codes.join("|")]);
 
-  const fullName = `${c.first_name} ${c.last_name}`.trim();
+  const fullName = displayPersonName(c.first_name, c.last_name);
   // Empty selected must not invent a clockable code (old SEI fallback).
   const daily = !selected || isDaily(selected);
   const pills = codes.length ? codes : initial ? [initial] : [];
@@ -141,7 +163,11 @@ function ClientDetail({
                         : "Payroll only: not billed by clock — separate evidence required"
                   }
                 >
-                  {isEvvLockedCode(code) ? "EVV billable" : isDailyServiceCode(code) ? "Daily rate" : "Payroll only"}
+                  {isEvvLockedCode(code)
+                    ? "EVV billable"
+                    : isDailyServiceCode(code)
+                      ? "Daily rate"
+                      : "Payroll only"}
                 </span>
               </button>
             );
@@ -160,10 +186,7 @@ function ClientDetail({
             .filter((t) => t.setupStatus === "published")
             .map((t) =>
               t.completionStatus === "completed" ? (
-                <div
-                  key={t.type}
-                  className="flex items-center gap-2 text-xs text-emerald-700"
-                >
+                <div key={t.type} className="flex items-center gap-2 text-xs text-emerald-700">
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   <span className="font-medium">{t.label}</span>
                   <span className="text-muted-foreground">· Completed</span>
@@ -185,7 +208,6 @@ function ClientDetail({
         </div>
       )}
 
-
       <div>
         <Button
           asChild
@@ -195,11 +217,7 @@ function ClientDetail({
             isOnTheClock ? "bg-[#117a52] text-white shadow-sm hover:bg-[#0f6b48]" : "",
           ].join(" ")}
           aria-label={`${
-            isOnTheClock
-              ? "Continue Punch pad"
-              : daily
-                ? "Open Client Hub"
-                : "Open Punch pad"
+            isOnTheClock ? "Continue Punch pad" : daily ? "Open Client Hub" : "Open Punch pad"
           } for ${fullName} (${selected})`}
         >
           <Link
@@ -208,11 +226,7 @@ function ClientDetail({
             search={daily ? undefined : { tab: "clock-in", code: selected }}
           >
             {daily && !isOnTheClock ? <Home /> : <Clock />}
-            {isOnTheClock
-              ? "Continue Punch pad"
-              : daily
-                ? "Open Client Hub"
-                : "Open Punch pad"}
+            {isOnTheClock ? "Continue Punch pad" : daily ? "Open Client Hub" : "Open Punch pad"}
           </Link>
         </Button>
         <p className="mt-2 text-center text-xs text-muted-foreground">
@@ -251,7 +265,7 @@ function ClientRow({
     (t) => t.setupStatus === "published" && t.completionStatus === "not_started",
   );
 
-  const fullName = `${c.first_name} ${c.last_name}`.trim();
+  const fullName = displayPersonName(c.first_name, c.last_name);
   const address = c.physical_address?.trim() || "No primary house on file";
   const initials = `${c.first_name?.[0] ?? ""}${c.last_name?.[0] ?? ""}`.toUpperCase() || "—";
   const elapsed = isOnTheClock
@@ -337,7 +351,12 @@ function ClientRow({
 
       {isOpen && (
         <div className="border-t border-border bg-background/60">
-          <ClientDetail c={c} activeShift={activeShift} assignments={assignments} trainings={trainings} />
+          <ClientDetail
+            c={c}
+            activeShift={activeShift}
+            assignments={assignments}
+            trainings={trainings}
+          />
         </div>
       )}
     </article>
@@ -358,7 +377,10 @@ export function StaffClientGrid() {
   });
   const trainingsByClient = useMemo(() => {
     const m = new Map<string, ClientTraining[]>();
-    for (const it of (ct?.items ?? []) as Array<{ clientId: string; trainings: ClientTraining[] }>) {
+    for (const it of (ct?.items ?? []) as Array<{
+      clientId: string;
+      trainings: ClientTraining[];
+    }>) {
       m.set(it.clientId, it.trainings ?? []);
     }
     return m;
@@ -415,7 +437,8 @@ export function StaffClientGrid() {
             My caseload · {source.length} {source.length === 1 ? "person" : "people"}
           </h2>
           <p className="text-xs text-muted-foreground">
-            Tap a person to view services. Hourly codes use Punch pad. Host home (HHS) is the daily note — hosts do not clock in. EVV is submitted by CSV.
+            Tap a person to view services. Hourly codes use Punch pad. Host home (HHS) is the daily
+            note — hosts do not clock in. EVV is submitted by CSV.
           </p>
         </div>
       </div>

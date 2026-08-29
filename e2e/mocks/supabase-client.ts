@@ -3,7 +3,7 @@
  * Selects return fixtures. Inserts/updates/deletes are rejected so tests
  * cannot write True North production timesheets.
  */
-import { ALL_PERMISSIONS } from "../../src/lib/rbac";
+import { ALL_PERMISSIONS, DEFAULT_MATRIX, PROVIDER_ROLES, type Permission, type ProviderRole } from "../../src/lib/rbac";
 import {
   ALL_TIMESHEETS,
   APPROVED_LOCATIONS,
@@ -21,6 +21,171 @@ import {
   TEAMS,
   USER_ID,
 } from "../fixtures/compliance-desk";
+import {
+  CLIENT_LIST,
+  ORG_ID as TNS_ORG_ID,
+  ORG_NAME as TNS_ORG_NAME,
+  STAFF,
+  STAFF_LIST,
+} from "../fixtures/tns-roster";
+
+function readFlag(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+type HhsPersona = "admin" | "dsp" | "manager";
+
+function hhsPersona(): HhsPersona | null {
+  const p = readFlag("hive.e2e.persona");
+  if (p === "dsp" || p === "manager" || p === "admin") return p;
+  return null;
+}
+
+function tnsOrg() {
+  return {
+    id: TNS_ORG_ID,
+    name: TNS_ORG_NAME,
+    is_demo: false,
+    legal_name: "True North Supports LLC",
+    dba_name: "True North Supports",
+    display_acronym: "TNS",
+    feature_config: {},
+  };
+}
+
+function tnsStaff() {
+  const p = hhsPersona();
+  if (p === "dsp") return STAFF.jake;
+  if (p === "manager") return STAFF.harvey;
+  return STAFF.admin;
+}
+
+function tnsSession() {
+  const staff = tnsStaff();
+  const now = Math.floor(Date.now() / 1000);
+  const user = {
+    id: staff.id,
+    aud: "authenticated",
+    role: "authenticated",
+    email: staff.email,
+    user_metadata: { full_name: staff.name },
+    app_metadata: { provider: "email", providers: ["email"] },
+    created_at: "2026-01-01T00:00:00.000Z",
+  };
+  return {
+    access_token: "e2e-hhs-access-token",
+    refresh_token: "e2e-hhs-refresh-token",
+    expires_in: 3600,
+    expires_at: now + 3600,
+    token_type: "bearer",
+    user,
+  };
+}
+
+function activeSession() {
+  return hhsPersona() ? tnsSession() : FAKE_SESSION;
+}
+
+function tnsClientRows(): Record<string, unknown>[] {
+  return CLIENT_LIST.map((c) => ({
+    id: c.id,
+    organization_id: TNS_ORG_ID,
+    first_name: c.first_name,
+    last_name: c.last_name,
+    phone_number: null,
+    physical_address: null,
+    job_code: [...c.codes],
+    authorized_dspd_codes: [...c.codes],
+    medicaid_id: c.medicaid_id,
+    account_status: "active",
+    geofence_radius_feet: 500,
+    special_directions: null,
+    date_of_birth: null,
+    feature_config: { emar: false },
+    profile_photo_url: null,
+    allergies: [],
+    dysphagia: false,
+    swallowing_alerts: [],
+    home_latitude: null,
+    home_longitude: null,
+    pcsp_goals: [...c.pcsp_goals],
+    intake_status: "complete",
+    team_id: c.team_id,
+    must_change_password: false,
+  }));
+}
+
+function tnsMemberRows(): Record<string, unknown>[] {
+  const org = tnsOrg();
+  return STAFF_LIST.map((s) => ({
+    id: `mem-${s.id.slice(-8)}`,
+    role: s.role,
+    job_title: s.jobTitle,
+    active: true,
+    user_id: s.id,
+    organization_id: TNS_ORG_ID,
+    created_at: "2025-01-15T00:00:00.000Z",
+    organizations: org,
+  }));
+}
+
+function tnsProfileRows(): Record<string, unknown>[] {
+  return STAFF_LIST.map((s) => {
+    const [first, ...rest] = s.name.split(" ");
+    return {
+      id: s.id,
+      full_name: s.name,
+      first_name: first,
+      last_name: rest.join(" ") || first,
+      email: s.email,
+      must_change_password: false,
+      staff_type_keys: s.jobTitle === "DSP" ? ["dsp"] : s.jobTitle === "House Manager" ? ["house_manager"] : [],
+      is_active: true,
+      hire_date: "2025-01-15",
+      start_date: "2025-01-15",
+    };
+  });
+}
+
+function assignmentRows(): Record<string, unknown>[] {
+  if (readFlag("hive.e2e.noAssignments") === "1") return [];
+  const rows: Record<string, unknown>[] = [];
+  const hhsIds = CLIENT_LIST.filter((c) => c.codes.includes("HHS")).map((c) => c.id);
+  const assignees = [STAFF.admin.id, STAFF.harvey.id, STAFF.jake.id];
+  for (const staffId of assignees) {
+    for (const clientId of hhsIds) {
+      rows.push({
+        id: `sa-${staffId.slice(-4)}-${clientId.slice(-4)}`,
+        organization_id: TNS_ORG_ID,
+        staff_id: staffId,
+        client_id: clientId,
+        service_codes: ["HHS"],
+      });
+    }
+  }
+  return rows;
+}
+
+function tnsRolePermissionRows(): Record<string, unknown>[] {
+  const rows: Record<string, unknown>[] = [];
+  for (const role of PROVIDER_ROLES) {
+    const granted = new Set<Permission>(DEFAULT_MATRIX[role as ProviderRole] ?? []);
+    for (const permission of ALL_PERMISSIONS) {
+      rows.push({
+        organization_id: TNS_ORG_ID,
+        role,
+        permission,
+        enabled: granted.has(permission),
+      });
+    }
+  }
+  return rows;
+}
 
 type Filter = { op: string; col: string; val?: unknown; extra?: unknown };
 
@@ -64,20 +229,28 @@ function applyFilters(rows: Record<string, unknown>[], filters: Filter[]): Recor
 }
 
 function tableRows(table: string): Record<string, unknown>[] {
+  const hhs = !!hhsPersona();
   switch (table) {
     case "evv_timesheets":
       return ALL_TIMESHEETS as unknown as Record<string, unknown>[];
     case "teams":
       return TEAMS as unknown as Record<string, unknown>[];
     case "organization_members":
-      return [MEMBERSHIP as unknown as Record<string, unknown>];
+      return hhs
+        ? tnsMemberRows()
+        : [MEMBERSHIP as unknown as Record<string, unknown>];
     case "organizations":
-      return [ORGANIZATION as unknown as Record<string, unknown>];
+      return hhs
+        ? [tnsOrg()]
+        : [ORGANIZATION as unknown as Record<string, unknown>];
     case "org_member_directory":
-      return DIRECTORY as unknown as Record<string, unknown>[];
+      return hhs
+        ? STAFF_LIST.map((s) => ({ id: s.id, full_name: s.name, email: s.email }))
+        : (DIRECTORY as unknown as Record<string, unknown>[]);
     case "profiles":
-      return [PROFILE as unknown as Record<string, unknown>];
+      return hhs ? tnsProfileRows() : [PROFILE as unknown as Record<string, unknown>];
     case "role_permissions":
+      if (hhs) return tnsRolePermissionRows();
       return ALL_PERMISSIONS.map((permission) => ({
         organization_id: ORG_ID,
         role: "admin",
@@ -95,13 +268,16 @@ function tableRows(table: string): Record<string, unknown>[] {
     case "client_billing_codes":
       return BILLING_CODES as unknown as Record<string, unknown>[];
     case "clients":
-      return CLIENTS as unknown as Record<string, unknown>[];
+      return hhs ? tnsClientRows() : (CLIENTS as unknown as Record<string, unknown>[]);
+    case "staff_assignments":
+      return hhs ? assignmentRows() : [];
+    case "hhs_monthly_attendance":
+    case "hhs_daily_records_v":
     case "nectar_documents":
     case "policy_signatures":
     case "auditor_accounts":
     case "hive_executives":
     case "org_subscriptions":
-    case "hhs_daily_records_v":
     case "host_supervision_contacts":
     case "incidents":
     case "daily_logs":
@@ -217,6 +393,13 @@ class QueryBuilder implements PromiseLike<{ data: unknown; error: unknown; count
     if (this.mode !== "select") {
       return { data: null, error: WRITE_BLOCK, count: null };
     }
+    if (this.table === "clients" && readFlag("hive.e2e.clientsError") === "1") {
+      return {
+        data: null,
+        error: { message: "Mocked clients read failure", code: "PGRST000" },
+        count: null,
+      };
+    }
     let rows = applyFilters(tableRows(this.table), this.filters);
     if (this.orderCol) {
       const col = this.orderCol;
@@ -246,26 +429,41 @@ const listeners = new Set<(event: string, session: typeof FAKE_SESSION | null) =
 
 export const supabase = {
   auth: {
-    getSession: async () => ({ data: { session: FAKE_SESSION }, error: null }),
-    getUser: async () => ({ data: { user: FAKE_USER }, error: null }),
-    onAuthStateChange: (cb: (event: string, session: typeof FAKE_SESSION | null) => void) => {
-      listeners.add(cb);
-      cb("SIGNED_IN", FAKE_SESSION);
+    getSession: async () => ({ data: { session: activeSession() }, error: null }),
+    getUser: async () => ({ data: { user: activeSession().user }, error: null }),
+    onAuthStateChange: (cb: (event: string, session: ReturnType<typeof activeSession> | null) => void) => {
+      listeners.add(cb as (event: string, session: typeof FAKE_SESSION | null) => void);
+      cb("SIGNED_IN", activeSession());
       return {
         data: {
           subscription: {
             unsubscribe: () => {
-              listeners.delete(cb);
+              listeners.delete(cb as (event: string, session: typeof FAKE_SESSION | null) => void);
             },
           },
         },
       };
     },
     signOut: async () => ({ error: null }),
-    signInWithPassword: async () => ({ data: { session: FAKE_SESSION, user: FAKE_USER }, error: null }),
+    signInWithPassword: async () => {
+      const session = activeSession();
+      return { data: { session, user: session.user }, error: null };
+    },
   },
   from: (table: string) => new QueryBuilder(table),
-  rpc: async () => ({ data: null, error: null }),
+  rpc: async (name: string, args?: Record<string, unknown>) => {
+    if (name === "clients_for_staff") {
+      if (readFlag("hive.e2e.noAssignments") === "1") return { data: [], error: null };
+      const staffId = String(args?._staff ?? activeSession().user.id);
+      const assigned = new Set(
+        assignmentRows()
+          .filter((r) => String(r.staff_id) === staffId)
+          .map((r) => String(r.client_id)),
+      );
+      return { data: tnsClientRows().filter((c) => assigned.has(String(c.id))), error: null };
+    }
+    return { data: null, error: null };
+  },
   channel: () => ({
     on: function on() {
       return this;

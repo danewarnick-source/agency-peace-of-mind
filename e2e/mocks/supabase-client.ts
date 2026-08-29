@@ -54,6 +54,7 @@ function tnsOrg() {
     legal_name: "True North Supports LLC",
     dba_name: "True North Supports",
     display_acronym: "TNS",
+    billing_exempt: true,
     feature_config: {},
   };
 }
@@ -277,7 +278,17 @@ function tableRows(table: string): Record<string, unknown>[] {
     case "policy_signatures":
     case "auditor_accounts":
     case "hive_executives":
+      return [];
     case "org_subscriptions":
+      return [
+        {
+          organization_id: hhs ? TNS_ORG_ID : ORG_ID,
+          locked_at: null,
+          status: "active",
+          stripe_subscription_id: "sub_e2e_fixture",
+          created_at: "2026-01-01T00:00:00.000Z",
+        },
+      ];
     case "host_supervision_contacts":
     case "incidents":
     case "daily_logs":

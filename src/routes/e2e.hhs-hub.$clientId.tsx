@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { HhsClientHub } from "./dashboard.hhs-hub.$clientId";
 
@@ -19,10 +18,6 @@ export const Route = createFileRoute("/e2e/hhs-hub/$clientId")({
 
 function E2eHhsHubHarness() {
   const { clientId } = Route.useParams();
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    setReady(true);
-  }, []);
 
   if (import.meta.env.VITE_E2E_HARNESS !== "1") {
     return (
@@ -33,10 +28,6 @@ function E2eHhsHubHarness() {
         </div>
       </div>
     );
-  }
-
-  if (!ready) {
-    return <p className="p-6 text-sm text-muted-foreground">Loading fixture…</p>;
   }
 
   return (

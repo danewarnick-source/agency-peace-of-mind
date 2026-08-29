@@ -42,6 +42,8 @@ export function computeEntryUnits(
 export type ReviewableTimesheetRow = {
   clock_in_timestamp: string | null | undefined;
   clock_out_timestamp: string | null | undefined;
+  rounded_clock_in?: string | null;
+  rounded_clock_out?: string | null;
   review_status?: string | null;
   corrected_clock_in?: string | null;
   corrected_clock_out?: string | null;
@@ -59,20 +61,46 @@ export function isBillableForReview(row: ReviewableTimesheetRow): boolean {
 
 /**
  * The (in, out) pair to use for billing/payroll math. Returns `null` when
- * the row is excluded by review status. When status is 'approved' AND
- * corrected_* are present, the corrected times are used; otherwise raw
- * timestamps are used.
+ * the row is excluded by review status. Same precedence as the client
+ * budget ledger: approved correction, else rounded punch, else raw.
  */
 export function effectiveBillingTimes(
   row: ReviewableTimesheetRow,
 ): { in: string; out: string } | null {
   if (!isBillableForReview(row)) return null;
-  if (!row.clock_in_timestamp || !row.clock_out_timestamp) return null;
   const status = (row.review_status ?? "clean").toLowerCase();
   if (status === "approved" && row.corrected_clock_in && row.corrected_clock_out) {
     return { in: row.corrected_clock_in, out: row.corrected_clock_out };
   }
-  return { in: row.clock_in_timestamp, out: row.clock_out_timestamp };
+  const billIn = row.rounded_clock_in ?? row.clock_in_timestamp;
+  const billOut = row.rounded_clock_out ?? row.clock_out_timestamp;
+  if (!billIn || !billOut) return null;
+  return { in: billIn, out: billOut };
+}
+
+/** Remaining units for one authorization. Never negative; over-cap is 0 left. */
+export function remainingUnitsForCode(annual: number, used: number): number {
+  return Math.max(0, annual - used);
+}
+
+/** Roll up per-code remaining (sum of clamped remainders, not clamp of the sum). */
+export function rollupClientUsage(
+  codes: Array<{ annual: number; used: number }>,
+): { totalAnnual: number; totalUsed: number; remaining: number; pct: number } {
+  let totalAnnual = 0;
+  let totalUsed = 0;
+  let remaining = 0;
+  for (const c of codes) {
+    totalAnnual += c.annual;
+    totalUsed += c.used;
+    remaining += remainingUnitsForCode(c.annual, c.used);
+  }
+  return {
+    totalAnnual,
+    totalUsed,
+    remaining,
+    pct: totalAnnual > 0 ? (totalUsed / totalAnnual) * 100 : 0,
+  };
 }
 
 /**

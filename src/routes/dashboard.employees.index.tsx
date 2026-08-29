@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Mail, UserPlus, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal, Ban, ExternalLink, Settings } from "lucide-react";
+import { Mail, UserPlus, KeyRound, Copy, UserCheck, UserX, ShieldPlus, Users as UsersIcon, Search, Loader2, Sparkles, MoreHorizontal, Ban, ExternalLink, Settings, FileSpreadsheet } from "lucide-react";
 import { StaffFieldsPanel } from "@/components/hr/staff-fields-panel";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
@@ -27,7 +27,8 @@ import { OnboardingReturnBar } from "@/components/onboarding/onboarding-return-b
 import { OnboardingGuidanceBanner } from "@/components/onboarding/onboarding-guidance-banner";
 
 import { RequirePermission } from "@/components/rbac-guard";
-// Smart Import replaces the legacy NECTAR Bulk Importer dialog.
+// CSV Import and Smart Import both open the existing Smart Import wizard.
+// CSV/Excel is heuristic (no Bedrock). PDFs still go through NECTAR.
 import { PersonAvatar } from "@/components/person/person-avatar";
 import { TrainingRequirementField } from "@/components/hr/training-requirement-field";
 import type { Position } from "@/lib/employee-positions";
@@ -330,6 +331,11 @@ export function EmployeesPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link to="/dashboard/smart-import" search={{ mode: "employee" }}>
+              <FileSpreadsheet className="mr-2 h-4 w-4" /> Import CSV
+            </Link>
+          </Button>
           <Button asChild variant="outline" className="border-primary/40 text-primary hover:bg-primary/5">
             <Link to="/dashboard/smart-import" search={{ mode: "employee" }}>
               <Sparkles className="mr-2 h-4 w-4" /> Smart Import

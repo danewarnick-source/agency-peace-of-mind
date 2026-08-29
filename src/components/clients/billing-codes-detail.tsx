@@ -46,6 +46,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { isDailyServiceCode } from "@/lib/service-billing";
+import { remainingUnitsForCode } from "@/lib/billing-units";
 import { isVariableRateCode } from "@/lib/variable-rate-codes";
 import {
   parseClientBudgetDocument,
@@ -702,7 +703,7 @@ function CodeRow({
   const usedUnits = budget.used_units;
   const annualUnits = code.annual_unit_authorization ?? 0;
   const rateNum = Number(code.rate_per_unit ?? 0);
-  const remainingUnits = Math.max(0, annualUnits - usedUnits);
+  const remainingUnits = remainingUnitsForCode(annualUnits, usedUnits);
   const totalBilled = usedUnits * rateNum;
   const remainingBudget = remainingUnits * rateNum;
   const pct = annualUnits > 0 ? Math.min(100, (usedUnits / annualUnits) * 100) : 0;

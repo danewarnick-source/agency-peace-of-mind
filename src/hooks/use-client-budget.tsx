@@ -4,7 +4,9 @@ import { useCurrentOrg } from "./use-org";
 import { useAllClientBillingCodes, type ClientBillingCode } from "./use-client-billing-codes";
 import {
   computeEntryUnits,
+  effectiveBillingTimes,
   isBillableForReview,
+  remainingUnitsForCode,
   unitsToHours,
   UNITS_PER_HOUR,
 } from "@/lib/billing-units";
@@ -118,7 +120,7 @@ export function useClientBudget(clientId: string | undefined) {
             is_daily,
             used_units: 0,
             used_hours: 0,
-            remaining_units: code.annual_unit_authorization ?? 0,
+            remaining_units: remainingUnitsForCode(code.annual_unit_authorization ?? 0, 0),
             remaining_hours: 0,
             used_pct: 0,
             weekly_pace_hours: 0,
@@ -200,19 +202,10 @@ export function useClientBudget(clientId: string | undefined) {
             review_status: string | null;
           }>) {
             if (r.service_type_code !== code.service_code) continue;
-            // needs_review/rejected are excluded until a supervisor approves.
-            if (!isBillableForReview(r)) continue;
-            // Same authoritative-time precedence as records-tab.tsx: approved
-            // correction, else the rounded (nearest-quarter-hour) punch, else
-            // raw as a last resort. Never derived back into the raw/corrected
-            // columns — only used to compute used units/hours here.
-            const billIn = (r.review_status === "approved" && r.corrected_clock_in)
-              ? r.corrected_clock_in
-              : (r.rounded_clock_in ?? r.clock_in_timestamp);
-            const billOut = (r.review_status === "approved" && r.corrected_clock_out)
-              ? r.corrected_clock_out
-              : (r.rounded_clock_out ?? r.clock_out_timestamp);
-            if (!billIn || !billOut) continue;
+            const times = effectiveBillingTimes(r);
+            if (!times) continue;
+            const billIn = times.in;
+            const billOut = times.out;
             const inT = new Date(billIn);
             if (inT < period_start) continue;
             if (period_end && inT > period_end) continue;
@@ -228,7 +221,7 @@ export function useClientBudget(clientId: string | undefined) {
 
         const used_units = is_daily ? used_days : used_entry_units;
         const annual = code.annual_unit_authorization ?? 0;
-        const remaining_units = Math.max(0, annual - used_units);
+        const remaining_units = remainingUnitsForCode(annual, used_units);
         const remaining_hours = is_daily
           ? remaining_units // for daily, "hours" col is irrelevant; mirror days
           : unitsToHours(remaining_units);

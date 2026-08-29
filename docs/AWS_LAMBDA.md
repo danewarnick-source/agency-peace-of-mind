@@ -82,6 +82,16 @@ creds for account `684707794522`. The script
 `Host`. Function URLs reject a CloudFront `Host`. `AllViewer` breaks
 `_serverFn`.
 
+## CI (every main push + workflow_dispatch)
+
+`.github/workflows/deploy-aws.yml` ships this same matching pair: 
+`build:lambda` → zip `.output/server` → `update-function-code` on
+`hive-app-server` → wait until live → `s3 sync .output/public` (delete
+OK only after Lambda already serves the new HTML) → invalidate
+CloudFront `E1BPLMZE2XLSKD`. ECS / ECR is not in that path. Tuesday
+Sep 1 stays on Vercel. This Action is the parallel AWS frontend only.
+
+
 ## Hang fixes that ship on this Lambda
 
 Ported from PR 190 onto latest main (not ECS Docker/task-def):

@@ -73,8 +73,12 @@ export function dashboardShouldRedirectToLogin(input: {
 /**
  * Live shell (`dashboard.tsx`) used to block on
  * session.loading || !session || execLoading || !hydrated || orgLoading.
- * After the boot timeout, a session must render the shell; no session
- * stays on Loading… only while the /login redirect runs.
+ * That replaced the whole dashboard with "Loading… / Sign out" on every
+ * client navigation whenever org/exec refetch or the layout remounted.
+ *
+ * Authenticated chrome stays mounted. The overlay is only for a missing
+ * session (first boot, or a remount that has not yet rehydrated auth).
+ * `sessionHint` covers the remount gap: this tab already had a session.
  */
 export function dashboardShellShowsLoading(input: {
   sessionLoading: boolean;
@@ -83,13 +87,31 @@ export function dashboardShellShowsLoading(input: {
   hydrated: boolean;
   orgLoading: boolean;
   bootTimedOut: boolean;
+  sessionHint?: boolean;
 }): boolean {
-  if (input.bootTimedOut) return !input.hasSession;
-  return (
-    input.sessionLoading ||
-    !input.hasSession ||
-    input.execLoading ||
-    !input.hydrated ||
-    input.orgLoading
-  );
+  if (input.hasSession) return false;
+  if (input.sessionHint && !input.bootTimedOut) return false;
+  if (input.bootTimedOut) return true;
+  return input.sessionLoading || !input.hasSession;
+}
+
+export const SESSION_HINT_KEY = "hive.session-hint";
+
+export function readSessionHint(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.sessionStorage.getItem(SESSION_HINT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function writeSessionHint(hasSession: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (hasSession) window.sessionStorage.setItem(SESSION_HINT_KEY, "1");
+    else window.sessionStorage.removeItem(SESSION_HINT_KEY);
+  } catch {
+    /* ignore */
+  }
 }

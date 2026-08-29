@@ -20,7 +20,7 @@ import {
   cadenceDescription,
   type MyObligationInstanceRow,
 } from "@/lib/company-obligations.functions";
-import { isFormUuid } from "@/lib/resolve-obligation-form";
+import { isFormUuid, isUnlinkedFormDuty } from "@/lib/resolve-obligation-form";
 
 const MY_OBLIGATIONS_KEY = "my-obligation-instances";
 
@@ -52,12 +52,17 @@ function EvidencePanel({
   const [checked, setChecked] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
-  const [nectarResult, setNectarResult] = useState<
-    { status: "passed" | "failed"; certType: string | null; expiresAt: string | null; reasons: string[] } | null
-  >(null);
+  const [nectarResult, setNectarResult] = useState<{
+    status: "passed" | "failed";
+    certType: string | null;
+    expiresAt: string | null;
+    reasons: string[];
+  } | null>(null);
 
-  const needsUpload = ob.evidence_type === "upload" || ob.evidence_type === "upload_and_attestation";
-  const needsAttestation = ob.evidence_type === "attestation" || ob.evidence_type === "upload_and_attestation";
+  const needsUpload =
+    ob.evidence_type === "upload" || ob.evidence_type === "upload_and_attestation";
+  const needsAttestation =
+    ob.evidence_type === "attestation" || ob.evidence_type === "upload_and_attestation";
   const canSubmit = (!needsUpload || !!file) && (!needsAttestation || checked);
 
   const submit = async () => {
@@ -68,7 +73,9 @@ function EvidencePanel({
       if (needsUpload && file) {
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
         const path = `${orgId}/${ob.id}/${instance.id}/${crypto.randomUUID()}-${safeName}`;
-        const { error: upErr } = await supabase.storage.from("obligation-evidence").upload(path, file);
+        const { error: upErr } = await supabase.storage
+          .from("obligation-evidence")
+          .upload(path, file);
         if (upErr) throw new Error(upErr.message);
         uploadPath = path;
         uploadFilename = file.name;
@@ -84,7 +91,17 @@ function EvidencePanel({
           attestationTextSnapshot: needsAttestation ? ob.attestation_text : null,
         },
       });
-      const validation = (result as { nectarValidation?: { ran: boolean; status: "passed" | "failed" | null; reasons: string[]; cert_type: string | null; expires_date: string | null } }).nectarValidation;
+      const validation = (
+        result as {
+          nectarValidation?: {
+            ran: boolean;
+            status: "passed" | "failed" | null;
+            reasons: string[];
+            cert_type: string | null;
+            expires_date: string | null;
+          };
+        }
+      ).nectarValidation;
       if (validation?.ran && validation.status) {
         setNectarResult({
           status: validation.status,
@@ -148,10 +165,12 @@ function EvidencePanel({
       )}
       {needsAttestation && (
         <>
-          <div className="rounded-md border border-border bg-muted/40 p-2 text-xs">{ob.attestation_text}</div>
+          <div className="rounded-md border border-border bg-muted/40 p-2 text-xs">
+            {ob.attestation_text}
+          </div>
           <label className="flex items-center gap-2 text-xs">
-            <Checkbox checked={checked} onCheckedChange={(v) => setChecked(v === true)} />
-            I confirm the above statement is accurate and true
+            <Checkbox checked={checked} onCheckedChange={(v) => setChecked(v === true)} />I confirm
+            the above statement is accurate and true
           </label>
         </>
       )}
@@ -184,7 +203,9 @@ function WidgetItem({ orgId, instance }: { orgId: string; instance: MyObligation
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">{ob.title}</p>
           <p className="text-xs text-muted-foreground">{cadenceDescription(ob)}</p>
-          <p className={`text-xs font-medium ${due.overdue ? "text-destructive" : "text-muted-foreground"}`}>
+          <p
+            className={`text-xs font-medium ${due.overdue ? "text-destructive" : "text-muted-foreground"}`}
+          >
             {due.text}
           </p>
         </div>
@@ -198,11 +219,18 @@ function WidgetItem({ orgId, instance }: { orgId: string; instance: MyObligation
               Complete form <ArrowRight className="ml-1 h-3.5 w-3.5" />
             </Button>
           </Link>
-        ) : ob.evidence_type === "form" ? (
-          <p className="shrink-0 text-[11px] text-amber-800">Form not linked</p>
-        ) : (
-          <Button size="sm" variant="outline" className="shrink-0" onClick={() => setPanelOpen((v) => !v)}>
-            {ob.evidence_type === "attestation" ? "Sign off" : ob.evidence_type === "upload" ? "Upload file" : "Submit evidence"}
+        ) : ob.evidence_type === "form" ? null : (
+          <Button
+            size="sm"
+            variant="outline"
+            className="shrink-0"
+            onClick={() => setPanelOpen((v) => !v)}
+          >
+            {ob.evidence_type === "attestation"
+              ? "Sign off"
+              : ob.evidence_type === "upload"
+                ? "Upload file"
+                : "Submit evidence"}
           </Button>
         )}
       </div>
@@ -228,6 +256,7 @@ export function MyObligationsWidget() {
 
   const openItems = instances
     .filter((i) => i.status === "pending" || i.status === "overdue")
+    .filter((i) => !isUnlinkedFormDuty(i.obligation))
     .sort((a, b) => new Date(a.due_at).getTime() - new Date(b.due_at).getTime());
 
   if (openItems.length === 0 || !orgId) return null;
@@ -240,7 +269,13 @@ export function MyObligationsWidget() {
       <div className="mb-3 flex items-center gap-2">
         <ClipboardList className="h-4 w-4 text-[#137182]" />
         <h2 className="text-sm font-semibold">My obligations</h2>
-        <Badge className={overdueCount > 0 ? "bg-rose-600 text-white hover:bg-rose-600" : "bg-amber-500 text-white hover:bg-amber-500"}>
+        <Badge
+          className={
+            overdueCount > 0
+              ? "bg-rose-600 text-white hover:bg-rose-600"
+              : "bg-amber-500 text-white hover:bg-amber-500"
+          }
+        >
           {openItems.length}
         </Badge>
       </div>
@@ -250,7 +285,10 @@ export function MyObligationsWidget() {
         ))}
       </ul>
       <div className="mt-3 text-right">
-        <Link to="/dashboard/my-obligations" className="text-xs font-medium text-[#137182] hover:underline">
+        <Link
+          to="/dashboard/my-obligations"
+          className="text-xs font-medium text-[#137182] hover:underline"
+        >
           View all {openItems.length} <ArrowRight className="ml-0.5 inline h-3 w-3" />
         </Link>
       </div>

@@ -42,6 +42,48 @@ export function formatPersonName(first: string, middle: string, last: string): s
   return [first.trim(), middle.trim(), last.trim()].filter(Boolean).join(" ");
 }
 
+const SUFFIX = /^(jr|sr|ii|iii|iv|md|phd)\.?$/i;
+
+function titleCaseToken(word: string): string {
+  if (!word) return word;
+  if (word.includes("-")) return word.split("-").map(titleCaseToken).join("-");
+  if (word.includes("'")) return word.split("'").map(titleCaseToken).join("'");
+
+  const letters = word.replace(/[^A-Za-z]/g, "");
+  if (
+    letters.length > 0 &&
+    letters !== letters.toUpperCase() &&
+    letters !== letters.toLowerCase()
+  ) {
+    return word;
+  }
+  if (SUFFIX.test(word)) {
+    const core = word.replace(/\.$/, "").toUpperCase();
+    return word.endsWith(".") ? `${core}.` : core;
+  }
+
+  const lower = word.toLowerCase();
+  if (/^mc[a-z]/.test(lower) && lower.length > 3) {
+    return `Mc${lower.charAt(2).toUpperCase()}${lower.slice(3)}`;
+  }
+  if (/^mac[a-z]/.test(lower) && lower.length > 4) {
+    return `Mac${lower.charAt(3).toUpperCase()}${lower.slice(4)}`;
+  }
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+
+/**
+ * Display-layer title case. Does not rewrite stored legal names.
+ * ALL CAPS imports become "Stephen Prince"; mixed-case legal names are kept.
+ */
+export function toDisplayNameCase(raw: string): string {
+  return raw.trim().split(/\s+/).filter(Boolean).map(titleCaseToken).join(" ");
+}
+
+export function displayPersonName(first: string, last: string, middle = ""): string {
+  return toDisplayNameCase(formatPersonName(first, middle, last));
+}
+
 /**
  * Prefer a richer full_name when first/last alone would drop a middle initial.
  * Returns updated first/last suitable for the clients table.
@@ -61,7 +103,10 @@ export function enrichNamesFromFull(
       f = firstNameWithMiddle(split.first || f, split.middle);
     } else if (!f.toLowerCase().includes(split.middle.toLowerCase().replace(/\./g, ""))) {
       // first exists but lacks middle token — append when first matches given name
-      if (norm(f).startsWith(norm(split.first)) || norm(split.first).startsWith(norm(f.split(/\s+/)[0] ?? ""))) {
+      if (
+        norm(f).startsWith(norm(split.first)) ||
+        norm(split.first).startsWith(norm(f.split(/\s+/)[0] ?? ""))
+      ) {
         f = firstNameWithMiddle(split.first || f, split.middle);
       }
     }
@@ -73,7 +118,7 @@ export function enrichNamesFromFull(
 
   const display =
     formatPersonName(
-      split.middle ? split.first : f.split(/\s+/)[0] ?? f,
+      split.middle ? split.first : (f.split(/\s+/)[0] ?? f),
       split.middle,
       l || split.last,
     ) || formatPersonName(f, "", l);

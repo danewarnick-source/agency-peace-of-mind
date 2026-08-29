@@ -3,11 +3,14 @@ import { useNavigate } from "@tanstack/react-router";
 import { Hexagon, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetDescription,
 } from "@/components/ui/sheet";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { PortalViewSwitcher } from "@/components/portal-view-switcher";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
@@ -27,7 +30,10 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
 
   const role: Role = org?.role ?? "employee";
   const isAdminCapable =
-    can("edit_staff_records") || role === "admin" || role === "program_manager" || role === "manager";
+    can("edit_staff_records") ||
+    role === "admin" ||
+    role === "program_manager" ||
+    role === "manager";
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -84,16 +90,16 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
                 <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-white/80">
                   Portal View
                 </label>
-                <Select value={view} onValueChange={(v) => setView(v as "staff" | "admin" | "staff_mobile")}>
-                  <SelectTrigger className="h-12 w-full border-white/15 bg-white/[0.06] text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="staff">Staff View</SelectItem>
-                    <SelectItem value="admin">Admin View</SelectItem>
-                    <SelectItem value="staff_mobile">Staff Mobile (Preview)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <PortalViewSwitcher
+                  value={view === "hive_exec" || view === "state_preview" ? "staff" : view}
+                  onChange={(v) => setView(v)}
+                  triggerClassName="h-12 border-white/15 bg-white/[0.06] text-white"
+                  options={[
+                    { value: "staff", label: "Staff View" },
+                    { value: "admin", label: "Admin View" },
+                    { value: "staff_mobile", label: "Staff Mobile (Preview)" },
+                  ]}
+                />
               </div>
             )}
 

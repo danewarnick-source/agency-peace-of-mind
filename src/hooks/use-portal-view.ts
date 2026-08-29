@@ -23,8 +23,11 @@ function readHasStoredView(): boolean {
   if (typeof window === "undefined") return false;
   const v = window.localStorage.getItem(KEY);
   return (
-    v === "staff" || v === "admin" || v === "staff_mobile" ||
-    v === "hive_exec" || v === "state_preview"
+    v === "staff" ||
+    v === "admin" ||
+    v === "staff_mobile" ||
+    v === "hive_exec" ||
+    v === "state_preview"
   );
 }
 
@@ -40,8 +43,8 @@ function readSub(): StatePreviewSubView {
 }
 
 export function usePortalView() {
-  const [view, setView] = useState<PortalView>("staff");
-  const [hasStoredView, setHasStoredView] = useState(false);
+  const [view, setView] = useState<PortalView>(readView);
+  const [hasStoredView, setHasStoredView] = useState(readHasStoredView);
   const [stateCode, setStateCodeState] = useState<string | null>(null);
   const [subView, setSubViewState] = useState<StatePreviewSubView>("admin");
   const [hydrated, setHydrated] = useState(typeof window !== "undefined");
@@ -86,5 +89,14 @@ export function usePortalView() {
     setSubViewState(s);
   }, []);
 
-  return { view, hasStoredView, setView: update, stateCode, setStateCode, subView, setSubView, hydrated };
+  return {
+    view,
+    hasStoredView,
+    setView: update,
+    stateCode,
+    setStateCode,
+    subView,
+    setSubView,
+    hydrated,
+  };
 }

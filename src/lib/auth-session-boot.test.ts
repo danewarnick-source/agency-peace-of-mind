@@ -130,6 +130,8 @@ describe("dashboard shell must not block forever", () => {
       }),
       false,
     );
+    // A session must keep the dashboard chrome mounted — org refetch is not
+    // an auth failure and must not flash "Loading… / Sign out".
     assert.equal(
       dashboardShellShowsLoading({
         ...blocked,
@@ -139,7 +141,14 @@ describe("dashboard shell must not block forever", () => {
         hydrated: true,
         orgLoading: true,
       }),
-      true,
+      false,
+    );
+    assert.equal(
+      dashboardShellShowsLoading({
+        ...blocked,
+        sessionHint: true,
+      }),
+      false,
     );
   });
 
@@ -212,7 +221,7 @@ describe("this branch matches live CloudFront JS (image 1b8fbd50 / PR 190)", () 
     assert.match(src, /dashboardShellShowsLoading/);
     assert.match(src, /dashboardShouldRedirectToLogin/);
     assert.match(src, /DASHBOARD_BOOT_TIMEOUT_MS/);
-    assert.match(src, /Loading…/);
+    assert.match(src, /Loading workspace…/);
     assert.doesNotMatch(
       src,
       /if \(loading \|\| !session \|\| execLoading \|\| !viewHydrated \|\| orgLoading\)/,
@@ -229,7 +238,10 @@ describe("this branch matches live CloudFront JS (image 1b8fbd50 / PR 190)", () 
   });
 
   it("browser client persistSession + detectSessionInUrl + localStorage; no cookieOptions", () => {
-    const src = readFileSync(new URL("../integrations/supabase/client.ts", import.meta.url), "utf8");
+    const src = readFileSync(
+      new URL("../integrations/supabase/client.ts", import.meta.url),
+      "utf8",
+    );
     assert.match(src, /persistSession:\s*true/);
     assert.match(src, /detectSessionInUrl:\s*true/);
     assert.match(src, /storage:\s*window\.localStorage/);

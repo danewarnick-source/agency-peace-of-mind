@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { RequireRole } from "@/components/rbac-guard";
-import { Receipt, Users, FileSpreadsheet, Upload, Sparkles } from "lucide-react";
+import { Receipt, Users, FileSpreadsheet, Upload, Sparkles, CreditCard } from "lucide-react";
 import { NectarBillingReadinessBar } from "@/components/billing/nectar-billing-readiness-bar";
 import { NectarFocusBanner } from "@/components/nectar/nectar-focus-banner";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -39,6 +39,7 @@ export const Route = createFileRoute("/dashboard/billing")({
 
 const TABS: Array<{ to: string; label: string; icon: typeof Users; exact?: boolean; perm?: Permission }> = [
   { to: "/dashboard/billing", label: "Overview", icon: Users, exact: true },
+  { to: "/dashboard/billing/subscription", label: "HIVE Subscription", icon: CreditCard },
   { to: "/dashboard/billing/nectar", label: "NECTAR", icon: Sparkles },
   { to: "/dashboard/billing/form520", label: "520 Form", icon: FileSpreadsheet },
   { to: "/dashboard/billing/imports", label: "Imports / Authorizations", icon: Upload },

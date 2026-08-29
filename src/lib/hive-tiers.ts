@@ -1,12 +1,18 @@
 /**
  * HIVE subscription tier catalog.
  *
- * Single source of truth for tier → NECTAR Infusion / add-on entitlements.
- * Tier assignment is functional today; payment collection is skeletoned and
- * fills in later (see Plans & Billing).
+ * Entitlements (what features a company gets) live here.
+ * Dollar amounts for self-serve Hive do NOT — those are per-staff list/founding
+ * rates in src/lib/hive-pricing.ts. Do not put $499 / $1,299 on these rows.
+ *
+ * Public checkout is per-staff Hive (hive_standard / pro). Enterprise is
+ * contact-us — Hive Exec assigns it. Starter is comped / not self-serve.
  */
 
 export type TierId = "starter" | "pro" | "enterprise" | "custom";
+
+/** Plans a new agency can pay for at /signup. Enterprise is contact-us, not Checkout. */
+export const PUBLIC_SELF_SERVE_TIERS: TierId[] = ["pro"];
 
 export type AddonId =
   | "nectar_infusion" // Guided Mode, plain-language answers, NECTAR-accelerated controls
@@ -25,7 +31,9 @@ export interface TierDef {
   id: TierId;
   name: string;
   tagline: string;
-  monthlyPriceCents: number | null; // null = "contact us" / custom
+  /** Flat monthly cents, or null when the price is per-staff / contact-us / included. */
+  monthlyPriceCents: number | null;
+  priceKind: "per_staff" | "contact" | "included" | "custom";
   addons: AddonId[];
   highlights: string[];
 }
@@ -64,29 +72,37 @@ export const TIER_CATALOG: TierDef[] = [
     name: "Starter",
     tagline: "Baseline HIVE — daily ops, documentation, billing.",
     monthlyPriceCents: 0,
+    priceKind: "included",
     addons: [],
     highlights: ["Clients & staff", "Daily logs & EVV", "Manual billing exports"],
   },
   {
     id: "pro",
-    name: "Pro",
-    tagline: "Adds NECTAR Infusion across the platform.",
-    monthlyPriceCents: 49900,
+    name: "Hive",
+    tagline: "Full platform, billed per active staff (list or founding).",
+    monthlyPriceCents: null,
+    priceKind: "per_staff",
     addons: ["nectar_infusion", "hive_training"],
-    highlights: ["Everything in Starter", "NECTAR Infusion", "Guided Mode", "HIVE Training"],
+    highlights: [
+      "Everything in Starter",
+      "NECTAR Infusion",
+      "HIVE Training hub (courses billed per staff)",
+      "Volume rates as client count grows",
+    ],
   },
   {
     id: "enterprise",
     name: "Enterprise",
-    tagline: "Audit-prep, requirements automation, and priority support.",
-    monthlyPriceCents: 129900,
+    tagline: "Custom-built features, integrations, and white-glove onboarding.",
+    monthlyPriceCents: null,
+    priceKind: "contact",
     addons: ["nectar_infusion", "internal_audit", "requirements_engine", "priority_support", "hive_training"],
     highlights: [
-      "Everything in Pro",
+      "Everything in Hive",
       "Internal Audit / QA",
       "Requirements Engine",
       "Priority Support",
-      "HIVE Training",
+      "Contact us for a quote — no public dollar amount",
     ],
   },
   {
@@ -94,21 +110,36 @@ export const TIER_CATALOG: TierDef[] = [
     name: "Custom",
     tagline: "Bespoke entitlement set — negotiated per company.",
     monthlyPriceCents: null,
+    priceKind: "custom",
     addons: ["nectar_infusion", "internal_audit", "requirements_engine", "priority_support", "hive_training"],
     highlights: ["Custom pricing", "Configurable add-on bundle"],
   },
 ];
 
+/** hive_standard is the live per-staff plan (same entitlements as Hive / pro). */
+export function normalizeTierId(id: string | null | undefined): TierId {
+  if (id === "hive_standard") return "pro";
+  if (id === "starter" || id === "pro" || id === "enterprise" || id === "custom") return id;
+  return "starter";
+}
+
 export function getTier(id: string): TierDef {
-  return TIER_CATALOG.find((t) => t.id === id) ?? TIER_CATALOG[0];
+  const normalized = normalizeTierId(id);
+  return TIER_CATALOG.find((t) => t.id === normalized) ?? TIER_CATALOG[0];
 }
 
 export function addonsForTier(id: string): AddonId[] {
   return getTier(id).addons;
 }
 
+export function isPublicSelfServeTier(id: string | null | undefined): boolean {
+  return id === "pro" || id === "hive_standard";
+}
+
 export function formatTierPrice(t: TierDef): string {
-  if (t.monthlyPriceCents === null) return "Contact us";
-  if (t.monthlyPriceCents === 0) return "Included";
+  if (t.priceKind === "per_staff") return "Per staff";
+  if (t.priceKind === "contact" || t.priceKind === "custom") return "Contact us";
+  if (t.priceKind === "included" || t.monthlyPriceCents === 0) return "Included";
+  if (t.monthlyPriceCents == null) return "Contact us";
   return `$${(t.monthlyPriceCents / 100).toLocaleString()}/mo`;
 }

@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { usePortalView } from "@/hooks/use-portal-view";
@@ -20,6 +21,7 @@ import {
 } from "lucide-react";
 import { z } from "zod";
 import { useEntitlements } from "@/hooks/use-entitlements";
+import { createTrainingCheckoutFn, confirmCheckoutSessionFn } from "@/lib/stripe-checkout.functions";
 import { FeatureLocked } from "@/components/feature-locked";
 import { useFeatureEnabled } from "@/hooks/use-feature-enabled";
 import { FeatureLockedRoute } from "@/components/upgrade-gate";
@@ -68,9 +70,15 @@ function HiveTrainingHub() {
   const { hasAddon, loading: entLoading } = useEntitlements();
   const featureOn = useFeatureEnabled("hive_training");
 
+  const confirmFn = useServerFn(confirmCheckoutSessionFn);
   useEffect(() => {
-    if (search.checkout === "success") toast.success("Payment received. Seats/assignments will appear shortly.");
-    else if (search.checkout === "cancelled") toast.info("Checkout cancelled.");
+    if (search.checkout === "success") {
+      toast.success("Payment received. Seats/assignments will appear shortly.");
+      const sessionId = search.session_id;
+      if (sessionId) {
+        confirmFn({ data: { sessionId } }).catch(() => undefined);
+      }
+    } else if (search.checkout === "cancelled") toast.info("Checkout cancelled.");
     if (search.card === "saved") toast.success("Card saved. Auto-renew is ready to go.");
     else if (search.card === "cancelled") toast.info("Card setup cancelled.");
   }, [search.checkout, search.card]);
@@ -812,6 +820,7 @@ function SetupRenewalsDialog({
   catalog: CatalogRow[];
   orgId: string;
 }) {
+  const checkoutFn = useServerFn(createTrainingCheckoutFn);
   const [busy, setBusy] = useState(false);
 
   const fullProgram = catalog.find((c) => c.kind === "full_program");
@@ -890,17 +899,23 @@ function SetupRenewalsDialog({
       // by returning to the page (webhook resolves each on its own). Keep it simple:
       // fire the first one now — the vast majority of selections resolve to a single group.
       const first = purchases[0];
-      const body: Record<string, unknown> = {
-        mode_context: "bulk_seats",
-        catalog_id: first.catalog.id,
-        quantity: first.intents.length,
-        renewal_intents: first.intents,
-      };
-      const { data, error } = await supabase.functions.invoke("create-training-checkout", { body });
-      if (error) throw error;
-      const url = (data as { url?: string })?.url;
-      if (!url) throw new Error("Checkout URL missing");
-      window.location.href = url;
+      const r = await checkoutFn({
+        data: {
+          organizationId: orgId,
+          catalogId: first.catalog.id,
+          modeContext: "bulk_seats",
+          quantity: first.intents.length,
+          renewalIntents: first.intents,
+        },
+      });
+      if (r.granted) {
+        toast.success("Included in your plan — no charge.");
+        onOpenChange(false);
+        setBusy(false);
+        return;
+      }
+      if (r.error || !r.url) throw new Error(r.error ?? "Checkout URL missing");
+      window.location.href = r.url;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Checkout failed";
       if (msg.includes("payments_not_configured")) {
@@ -1041,7 +1056,7 @@ function FeaturedCard({ row, members, onPurchased }: { row: CatalogRow; members:
           <li className="flex gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-[#C8881E]" /> Typed-signature competency sign-off</li>
           <li className="flex gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-[#C8881E]" /> Verifiable certificate + expiration tracking</li>
         </ul>
-        <PurchaseDialog row={row} members={members} onPurchased={onPurchased} triggerLabel="Buy Full Program" />
+        <PurchaseDialog row={row} members={members} onPurchased={onPurchased} triggerLabel="Buy" />
       </CardContent>
     </Card>
   );
@@ -1068,6 +1083,8 @@ function AlaCarteCard({ row, members, onPurchased }: { row: CatalogRow; members:
 function PurchaseDialog({
   row, members, onPurchased, triggerLabel,
 }: { row: CatalogRow; members: Member[]; onPurchased: () => void; triggerLabel: string }) {
+  const { data: org } = useCurrentOrg();
+  const checkoutFn = useServerFn(createTrainingCheckoutFn);
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"bulk_seats" | "individual">("bulk_seats");
   const [qty, setQty] = useState(1);
@@ -1080,21 +1097,32 @@ function PurchaseDialog({
   });
 
   const startCheckout = async () => {
+    if (!org?.organization_id) return;
     setBusy(true);
     try {
-      const body: Record<string, unknown> = { mode_context: mode, catalog_id: row.id };
-      if (mode === "bulk_seats") body.quantity = qty;
-      if (mode === "individual") body.assignee_user_id = assignee || undefined;
-      const { data, error } = await supabase.functions.invoke("create-training-checkout", { body });
-      if (error) throw error;
-      const url = (data as { url?: string })?.url;
-      if (!url) throw new Error("Checkout URL missing");
+      const r = await checkoutFn({
+        data: {
+          organizationId: org.organization_id,
+          catalogId: row.id,
+          modeContext: mode,
+          quantity: mode === "bulk_seats" ? qty : 1,
+          assigneeUserId: mode === "individual" ? assignee || null : null,
+        },
+      });
+      if (r.granted) {
+        toast.success("This company is billing-exempt — seats added, no charge.");
+        onPurchased();
+        setOpen(false);
+        setBusy(false);
+        return;
+      }
+      if (r.error || !r.url) throw new Error(r.error ?? "Checkout URL missing");
       onPurchased();
-      window.location.href = url;
+      window.location.href = r.url;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Checkout failed";
-      if (msg.includes("payments_not_configured")) {
-        toast.error("Payments are not configured yet. Add STRIPE_SECRET_KEY to enable checkout.");
+      if (msg.includes("payments_not_configured") || msg.includes("STRIPE_SECRET_KEY")) {
+        toast.error("Payments are not set up yet. Ask a Hive Executive to add the Stripe test keys.");
       } else {
         toast.error(msg);
       }
@@ -1105,7 +1133,7 @@ function PurchaseDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-[#1A2B47] hover:bg-[#1A2B47]/90 text-white w-full">
+        <Button className="bg-[#1A2B47] hover:bg-[#1A2B47]/90 text-white w-full" data-testid={`training-buy-${row.sku}`}>
           <ShoppingCart className="h-4 w-4 mr-1" /> {triggerLabel}
         </Button>
       </DialogTrigger>
@@ -1147,6 +1175,7 @@ function PurchaseDialog({
           <Button
             onClick={startCheckout}
             disabled={busy || (mode === "individual" && !assignee)}
+            data-testid="training-checkout-confirm"
             className="bg-[#C8881E] hover:bg-[#C8881E]/90 text-white"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Continue to payment"}

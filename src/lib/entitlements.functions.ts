@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { addonsForTier, type AddonId, type TierId } from "@/lib/hive-tiers";
+import { entitlementsForOrg, isBillingExempt } from "@/lib/billing-access";
+import type { AddonId, TierId } from "@/lib/hive-tiers";
 
 export interface MyEntitlements {
   organization_id: string | null;
@@ -44,12 +45,37 @@ export const getMyEntitlements = createServerFn({ method: "GET" })
       .eq("organization_id", primary.organization_id)
       .maybeSingle();
 
-    const tier = ((sub?.plan as TierId) ?? "starter") as TierId;
-    const status = (sub?.status as string) ?? "trial";
+    let billingExempt = false;
+    const orgFull = await supabase
+      .from("organizations")
+      .select("name, legal_name, dba_name, billing_exempt")
+      .eq("id", primary.organization_id)
+      .maybeSingle();
+    const org = orgFull.error
+      ? (await supabase
+          .from("organizations")
+          .select("name, legal_name, dba_name")
+          .eq("id", primary.organization_id)
+          .maybeSingle()).data
+      : orgFull.data;
+    if (org) {
+      billingExempt = isBillingExempt({
+        billingExempt: (org as { billing_exempt?: boolean }).billing_exempt === true,
+        orgName: org.name,
+        legalName: (org as { legal_name?: string | null }).legal_name,
+        dbaName: (org as { dba_name?: string | null }).dba_name,
+      });
+    }
+
+    const { tier, addons } = entitlementsForOrg({
+      billingExempt,
+      plan: (sub?.plan as string | null) ?? null,
+    });
+    const status = billingExempt ? "active" : ((sub?.status as string) ?? "paused");
     return {
       organization_id: primary.organization_id,
       tier,
       status,
-      addons: addonsForTier(tier),
+      addons,
     };
   });

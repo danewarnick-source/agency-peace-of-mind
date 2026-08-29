@@ -1,8 +1,7 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { HiveSubscriptionPanel } from "@/components/billing/hive-subscription-panel";
 
-// Moved: HIVE Subscription now lives under Settings.
 export const Route = createFileRoute("/dashboard/billing/subscription")({
-  beforeLoad: () => {
-    throw redirect({ to: "/dashboard/settings/subscription" });
-  },
+  head: () => ({ meta: [{ title: "HIVE Subscription — HIVE" }] }),
+  component: HiveSubscriptionPanel,
 });

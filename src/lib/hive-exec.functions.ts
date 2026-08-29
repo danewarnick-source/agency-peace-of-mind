@@ -1,5 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isBillingExempt } from "@/lib/billing-access";
+import {
+  quoteHiveSubscription,
+  type PricingSchedule,
+} from "@/lib/hive-pricing";
 
 // ───── Public types ────────────────────────────────────────────────────────
 
@@ -15,6 +20,9 @@ export interface CompanyRow {
   client_count: number;
   open_tickets: number;
   health: "good" | "warn" | "risk";
+  billing_exempt: boolean;
+  pricing_schedule: PricingSchedule;
+  founding_ends_at: string | null;
 }
 
 export interface ExecKpis {
@@ -33,6 +41,9 @@ export interface CompanyDetail {
   dba_name: string | null;
   display_acronym: string | null;
   billing_sms_phone: string | null;
+  billing_exempt: boolean;
+  pricing_schedule: PricingSchedule;
+  founding_ends_at: string | null;
 
   /** Provider-submitted fields captured during signup. Read-only in exec UI. */
   signup: {
@@ -94,23 +105,27 @@ export interface TicketRow {
 
 // ───── Helpers ─────────────────────────────────────────────────────────────
 
-/**
- * Hive Standard volume pricing — single rate table, $500 monthly minimum.
- * Mirrors signup.tsx pricing so MRR is consistent between the provider's
- * own billing page and the executive overview without a round-trip to Stripe.
- */
-function ratePerStaff(staff: number): number {
-  if (staff >= 50) return 99;
-  if (staff >= 20) return 109;
-  return 125;
-}
-function liveMonthlyCents(staffCount: number | null | undefined, plan: string | null | undefined): number {
-  // Enterprise plans are operator-priced — fall back to whatever mrr_cents is
-  // recorded on the subscription row (set manually by Hive Exec).
-  if (plan === "enterprise") return -1; // sentinel: caller uses recorded mrr_cents
-  const n = Math.max(0, Math.floor(staffCount ?? 0));
-  if (n <= 0) return 0;
-  return Math.max(500, n * ratePerStaff(n)) * 100;
+function liveSeatMrr(opts: {
+  exempt: boolean;
+  plan: string | null | undefined;
+  staffCount: number;
+  clientCount: number;
+  schedule: PricingSchedule | null | undefined;
+  foundingEndsAt: string | null | undefined;
+  interval: string | null | undefined;
+  storedMrr: number;
+}): number {
+  if (opts.exempt) return 0;
+  const plan = (opts.plan ?? "").toLowerCase();
+  if (plan === "enterprise" || plan === "custom") return opts.storedMrr;
+  const quote = quoteHiveSubscription({
+    staffCount: Math.max(1, opts.staffCount),
+    clientCount: opts.clientCount,
+    schedule: opts.schedule ?? "list",
+    interval: opts.interval === "annual" ? "annual" : "monthly",
+    foundingEndsAt: opts.foundingEndsAt ?? null,
+  });
+  return quote.monthlyCents;
 }
 
 async function ensureExecutive(
@@ -203,16 +218,12 @@ export const getExecKpis = createServerFn({ method: "GET" })
       plan: string | null;
     }>;
 
-    // MRR is computed live from current staff_count + volume tier — falls
-    // back to the recorded mrr_cents only for Enterprise (operator-priced)
-    // or when staff_count is somehow missing on legacy rows.
+    // MRR uses the amount stamped at checkout (per-staff quote). Exempt
+    // companies should already be stored as 0. Enterprise/custom keep the
+    // operator override on the row.
     const mrr_cents = rows
       .filter((r) => r.status === "active" || r.status === "past_due")
-      .reduce((sum, r) => {
-        const live = liveMonthlyCents(r.staff_count, r.plan);
-        const value = live >= 0 ? live : (r.mrr_cents ?? 0);
-        return sum + value;
-      }, 0);
+      .reduce((sum, r) => sum + (r.mrr_cents ?? 0), 0);
 
     return {
       active_companies: rows.filter((r) => r.status === "active").length,
@@ -234,10 +245,22 @@ export const listCompanies = createServerFn({ method: "GET" })
     await ensureExecutive(supabase, userId);
     await audit(supabase, userId, "list_companies", null, "Loaded company list");
 
-    const { data: orgs, error: orgsErr } = await supabase
+    const full = await supabase
       .from("organizations")
-      .select("id, name");
-    if (orgsErr) throw orgsErr;
+      .select("id, name, legal_name, dba_name, billing_exempt, pricing_schedule, founding_ends_at");
+    let orgs = full.data;
+    if (full.error) {
+      const msg = full.error.message ?? "";
+      if (!/billing_exempt|pricing_schedule|founding_ends_at/i.test(msg)) throw full.error;
+      const fallback = await supabase.from("organizations").select("id, name, legal_name, dba_name, billing_exempt");
+      if (fallback.error) {
+        const basic = await supabase.from("organizations").select("id, name, legal_name, dba_name");
+        if (basic.error) throw basic.error;
+        orgs = basic.data;
+      } else {
+        orgs = fallback.data;
+      }
+    }
 
     const { data: subs } = await supabase
       .from("org_subscriptions")
@@ -247,7 +270,7 @@ export const listCompanies = createServerFn({ method: "GET" })
     );
 
     // Counts (HEAD requests so no row data crosses the wire)
-    const orgIds = ((orgs ?? []) as Array<{ id: string; name: string }>).map((o) => o.id);
+    const orgIds = ((orgs ?? []) as Array<{ id: string; name: string; billing_exempt?: boolean; legal_name?: string | null; dba_name?: string | null }>).map((o) => o.id);
     const counts = await Promise.all(
       orgIds.map(async (orgId) => {
         const [staffRes, clientRes, ticketRes] = await Promise.all([
@@ -276,23 +299,40 @@ export const listCompanies = createServerFn({ method: "GET" })
     );
     const countByOrg = new Map(counts.map((c) => [c.orgId, c]));
 
-    return ((orgs ?? []) as Array<{ id: string; name: string }>).map((o) => {
+    return ((orgs ?? []) as Array<{
+      id: string;
+      name: string;
+      billing_exempt?: boolean;
+      legal_name?: string | null;
+      dba_name?: string | null;
+      pricing_schedule?: string | null;
+      founding_ends_at?: string | null;
+    }>).map((o) => {
       const sub = subByOrg.get(o.id);
       const c = countByOrg.get(o.id);
-      // No subscription row → show as inactive (was 'trial' before — Hive has
-      // no trial state). For accounts with a sub, surface the real status.
       const status = sub?.status ?? "inactive";
       const tickets = c?.tickets ?? 0;
       let health: CompanyRow["health"] = "good";
       if (status === "locked" || status === "past_due" || tickets >= 3) health = "risk";
       else if (status === "inactive" || tickets >= 1) health = "warn";
 
-      // Live MRR — recompute from current sub.staff_count + volume tier so
-      // the exec overview reflects today's billable basis, not a signup snapshot.
-      const subStaff = (sub as { staff_count: number | null } | null)?.staff_count ?? null;
-      const live = liveMonthlyCents(subStaff, sub?.plan ?? null);
-      const mrr_cents =
-        sub == null ? 0 : live >= 0 ? live : (sub.mrr_cents ?? 0);
+      const exempt = isBillingExempt({
+        billingExempt: o.billing_exempt === true,
+        orgName: o.name,
+        legalName: o.legal_name,
+        dbaName: o.dba_name,
+      });
+      const schedule: PricingSchedule = o.pricing_schedule === "founding" ? "founding" : "list";
+      const mrr_cents = liveSeatMrr({
+        exempt,
+        plan: sub?.plan ?? null,
+        staffCount: c?.staff ?? (sub as { staff_count?: number | null } | undefined)?.staff_count ?? 1,
+        clientCount: c?.clients ?? 0,
+        schedule,
+        foundingEndsAt: o.founding_ends_at ?? null,
+        interval: (sub as { billing_interval?: string | null } | undefined)?.billing_interval ?? null,
+        storedMrr: sub?.mrr_cents ?? 0,
+      });
 
       return {
         organization_id: o.id,
@@ -306,6 +346,9 @@ export const listCompanies = createServerFn({ method: "GET" })
         client_count: c?.clients ?? 0,
         open_tickets: tickets,
         health,
+        billing_exempt: exempt,
+        pricing_schedule: schedule,
+        founding_ends_at: o.founding_ends_at ?? null,
       };
     });
   });
@@ -330,12 +373,32 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
     await ensureExecutive(supabase, userId);
     await audit(supabase, userId, "view_company", data.organizationId, "Opened company detail");
 
-    const { data: org, error: orgErr } = await supabase
+    const orgFull = await supabase
       .from("organizations")
-      .select("id, name, legal_name, dba_name, display_acronym, billing_sms_phone, account_contact_name, account_contact_email, created_by, created_at")
+      .select("id, name, legal_name, dba_name, display_acronym, billing_sms_phone, billing_exempt, pricing_schedule, founding_ends_at, account_contact_name, account_contact_email, created_by, created_at")
       .eq("id", data.organizationId)
       .maybeSingle();
-    if (orgErr) throw orgErr;
+    let org = orgFull.data;
+    if (orgFull.error) {
+      const msg = orgFull.error.message ?? "";
+      if (!/billing_exempt|pricing_schedule|founding_ends_at/i.test(msg)) throw orgFull.error;
+      const retry = await supabase
+        .from("organizations")
+        .select("id, name, legal_name, dba_name, display_acronym, billing_sms_phone, billing_exempt, account_contact_name, account_contact_email, created_by, created_at")
+        .eq("id", data.organizationId)
+        .maybeSingle();
+      if (retry.error) {
+        const basic = await supabase
+          .from("organizations")
+          .select("id, name, legal_name, dba_name, display_acronym, billing_sms_phone, account_contact_name, account_contact_email, created_by, created_at")
+          .eq("id", data.organizationId)
+          .maybeSingle();
+        if (basic.error) throw basic.error;
+        org = basic.data;
+      } else {
+        org = retry.data;
+      }
+    }
     if (!org) throw new Error("Organization not found.");
 
     const { data: sub } = await supabase
@@ -429,8 +492,22 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
     // not whatever was stamped at signup. Enterprise plans keep the stored value.
     const subStaff = (sub as { staff_count: number | null } | null)?.staff_count ?? null;
     const subPlan = (sub as { plan: string | null } | null)?.plan ?? null;
-    const live = liveMonthlyCents(subStaff, subPlan);
-    const liveMrr = live >= 0 ? live : (sub?.mrr_cents ?? 0);
+    const orgExempt = isBillingExempt({
+      billingExempt: (org as { billing_exempt?: boolean }).billing_exempt === true,
+      orgName: org.name,
+      legalName: (org as { legal_name?: string | null }).legal_name,
+      dbaName: (org as { dba_name?: string | null }).dba_name,
+    });
+    const liveMrr = liveSeatMrr({
+      exempt: orgExempt,
+      plan: subPlan,
+      staffCount: staffRes.count || subStaff || 1,
+      clientCount: clientRes.count ?? 0,
+      schedule: (org as { pricing_schedule?: string | null }).pricing_schedule === "founding" ? "founding" : "list",
+      foundingEndsAt: (org as { founding_ends_at?: string | null }).founding_ends_at ?? null,
+      interval: (sub as { billing_interval: string | null } | null)?.billing_interval ?? null,
+      storedMrr: sub?.mrr_cents ?? 0,
+    });
 
     return {
       organization_id: org.id,
@@ -439,6 +516,10 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
       dba_name: (org as { dba_name: string | null }).dba_name ?? null,
       display_acronym: (org as { display_acronym: string | null }).display_acronym ?? null,
       billing_sms_phone: (org as { billing_sms_phone: string | null }).billing_sms_phone ?? null,
+      billing_exempt: orgExempt,
+      pricing_schedule:
+        (org as { pricing_schedule?: string | null }).pricing_schedule === "founding" ? "founding" : "list",
+      founding_ends_at: (org as { founding_ends_at?: string | null }).founding_ends_at ?? null,
       signup: {
         contact_name: contactName,
         contact_email: contactEmail,
@@ -496,7 +577,7 @@ function validateSubPatch(input: unknown): {
   if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new Error("Invalid organization id.");
   const patch = (i.patch ?? {}) as Record<string, unknown>;
   const out: ReturnType<typeof validateSubPatch>["patch"] = {};
-  const plans = ["hive_standard", "enterprise"];
+  const plans = ["hive_standard", "enterprise", "starter", "pro", "custom"];
   const statuses = ["active", "past_due", "locked", "cancelled", "canceled"];
   if (typeof patch.plan === "string" && plans.includes(patch.plan)) out.plan = patch.plan;
   if (typeof patch.status === "string" && statuses.includes(patch.status)) out.status = patch.status;

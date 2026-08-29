@@ -9,10 +9,13 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-
-const BASE_RATE = 125;
-const MIN_MONTHLY = 500;
-const ANNUAL_DISCOUNT = 0.2;
+import {
+  ANNUAL_DISCOUNT,
+  LIST_MINIMUM_CENTS,
+  LIST_PER_STAFF_CENTS_1_19,
+  LIST_VOLUME_TIERS,
+  quoteHiveSubscription,
+} from "@/lib/hive-pricing";
 
 const fmt = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -20,11 +23,10 @@ const fmt = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
 });
 
-const TIERS = [
-  { rate: 125, label: "1–19 clients" },
-  { rate: 109, label: "20–49 clients" },
-  { rate: 99, label: "50+ clients" },
-];
+const TIERS = LIST_VOLUME_TIERS.map((t) => ({
+  rate: t.perStaffCents / 100,
+  label: t.label,
+}));
 
 const HIVE_FEATURES = [
   "Scheduling & shift management",
@@ -96,14 +98,26 @@ const FAQ = [
 export function DspdPricing() {
   const [annual, setAnnual] = useState(false);
   const [staff, setStaff] = useState(20);
+  const [clients, setClients] = useState(12);
 
   const applyCycle = (monthly: number) =>
     annual ? monthly * (1 - ANNUAL_DISCOUNT) : monthly;
 
-  const hiveRate = applyCycle(BASE_RATE);
+  const hiveRate = applyCycle(LIST_PER_STAFF_CENTS_1_19 / 100);
 
-  const monthlyEstimate = Math.max(staff * BASE_RATE, MIN_MONTHLY);
-  const annualEstimate = monthlyEstimate * 12 * (1 - ANNUAL_DISCOUNT);
+  const quote = quoteHiveSubscription({
+    staffCount: staff,
+    clientCount: clients,
+    schedule: "list",
+    interval: annual ? "annual" : "monthly",
+  });
+  const monthlyEstimate = quote.monthlyCents / 100;
+  const annualEstimate = quoteHiveSubscription({
+    staffCount: staff,
+    clientCount: clients,
+    schedule: "list",
+    interval: "annual",
+  }).billedCents / 100;
   const annualSavings = monthlyEstimate * 12 - annualEstimate;
 
   const faqJsonLd = useMemo(
@@ -287,7 +301,8 @@ export function DspdPricing() {
           <div className="mt-8 rounded-2xl border border-border bg-card p-6 md:p-8">
             <h3 className="text-lg font-semibold">Estimate your monthly cost</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Based on the starting $125 / staff rate{annual ? " with the 20% annual discount" : ""}.
+              List rate by client count, with the $500 / month minimum
+              {annual ? " and the 20% annual discount" : ""}.
             </p>
 
             <div className="mt-6">
@@ -312,6 +327,31 @@ export function DspdPricing() {
               </div>
             </div>
 
+            <div className="mt-6">
+              <div className="flex items-center justify-between text-sm">
+                <label htmlFor="client-slider" className="font-medium">
+                  How many active clients do you have?
+                </label>
+                <span className="text-xl font-semibold tabular-nums">{clients}</span>
+              </div>
+              <Slider
+                id="client-slider"
+                value={[clients]}
+                onValueChange={(v) => setClients(v[0] ?? 0)}
+                min={0}
+                max={200}
+                step={1}
+                className="mt-4"
+              />
+              <div className="mt-1 flex justify-between text-xs text-muted-foreground">
+                <span>0</span>
+                <span>200</span>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Current list rate: {fmt.format(quote.perStaffCents / 100)} / staff · {quote.volumeLabel}
+              </p>
+            </div>
+
             <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className={`rounded-xl border p-5 ${!annual ? "border-[color:var(--amber-500)]" : "border-border"}`}>
                 <div className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -321,7 +361,7 @@ export function DspdPricing() {
                   {fmt.format(monthlyEstimate)}
                   <span className="ml-1 text-sm font-normal text-muted-foreground">/ month</span>
                 </div>
-                {monthlyEstimate === MIN_MONTHLY && (
+                {monthlyEstimate === LIST_MINIMUM_CENTS / 100 && (
                   <div className="mt-1 text-xs text-muted-foreground">$500/month minimum applied</div>
                 )}
               </div>

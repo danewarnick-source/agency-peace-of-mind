@@ -150,18 +150,43 @@ function bestExcerpt(text: string | null, kw: string[]): string {
   return best;
 }
 
+const MAX_SYSTEM_CHARS = 12_000;
+
+function clipSystem(system: string): string {
+  if (system.length <= MAX_SYSTEM_CHARS) return system;
+  return `${system.slice(0, MAX_SYSTEM_CHARS)}\n\n[context truncated]`;
+}
+
 async function callAI(system: string, user: string): Promise<string> {
   assertBedrockConfigured();
+  const slim = clipSystem(system);
   const res = await gatewayFetch({
       model: "bedrock",
       messages: [
-        { role: "system", content: system },
+        { role: "system", content: slim },
         { role: "user", content: user },
       ],
       response_format: { type: "json_object" },
     });
   if (res.status === 429) throw new Error("NECTAR is busy — try again in a moment.");
   if (res.status === 402) throw new Error("AI workspace credits exhausted.");
+  if (!res.ok && res.status === 400) {
+    const retry = await gatewayFetch({
+      model: "bedrock",
+      messages: [
+        {
+          role: "system",
+          content: `You are NECTAR Staff. Answer this staff how-to question in plain language. OUTPUT STRICT JSON: {"answer":"...","citations":[],"refused":false}`,
+        },
+        { role: "user", content: user },
+      ],
+      response_format: { type: "json_object" },
+    });
+    if (retry.ok) {
+      const json = (await retry.json()) as { choices?: Array<{ message?: { content?: string } }> };
+      return json.choices?.[0]?.message?.content ?? "{}";
+    }
+  }
   if (!res.ok) throw new Error(`AI error (${res.status}).`);
   const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
   return json.choices?.[0]?.message?.content ?? "{}";
@@ -252,7 +277,7 @@ export const askNectarStaff = createServerFn({ method: "POST" })
       .eq("organization_id", orgId)
       .in("document_type", STAFF_DOC_TYPES)
       .eq("is_current", true)
-      .limit(120);
+      .limit(24);
     const docRows = (docsQ.data as Array<{
       id: string; title: string; document_type: string; raw_text: string | null;
     }> | null) ?? [];
@@ -260,6 +285,8 @@ export const askNectarStaff = createServerFn({ method: "POST" })
     const training: TrainingFact[] = [];
     for (const d of docRows) {
       const excerpt = bestExcerpt(d.raw_text, kw);
+      const scored = kw.length === 0 ? 1 : kw.filter((k) => `${d.title} ${excerpt}`.toLowerCase().includes(k)).length;
+      if (scored === 0 && (policies.length + training.length) >= 6) continue;
       if (d.document_type === "training") {
         training.push({ id: d.id, title: d.title, kind: "doc", excerpt });
       } else {
@@ -268,9 +295,16 @@ export const askNectarStaff = createServerFn({ method: "POST" })
     }
 
     // 5. Assigned client medical/PCSP details. Scope strictly by allowed set.
-    const clientIdsToInclude = focusedId
-      ? [focusedId]
-      : assignedRows.slice(0, 8).map((c) => c.id);
+    // How-to questions ("How do I clock in?") do not need a PHI dump — a
+    // bloated system prompt was 400ing Bedrock on CloudFront.
+    const looksClientSpecific =
+      !!focusedId ||
+      /\b(client|pcsp|medication|meds|directions|caseload)\b/i.test(data.question);
+    const clientIdsToInclude = !looksClientSpecific
+      ? []
+      : focusedId
+        ? [focusedId]
+        : assignedRows.slice(0, 8).map((c) => c.id);
 
     const clientFacts: ClientFact[] = [];
     if (clientIdsToInclude.length > 0) {

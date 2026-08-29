@@ -203,20 +203,23 @@ export const getExecKpis = createServerFn({ method: "GET" })
     await ensureExecutive(supabase, userId);
     await audit(supabase, userId, "view_kpis", null, "Loaded executive KPIs");
 
-    const { data: subs } = await supabase
-      .from("org_subscriptions")
-      .select("status, mrr_cents, staff_count, plan");
-    const { count: ticketCount } = await supabase
-      .from("org_support_tickets")
-      .select("id", { count: "exact", head: true })
-      .in("status", ["submitted", "in_progress", "waiting_customer"]);
+    const [{ data: orgs }, { data: subs }, { count: ticketCount }] = await Promise.all([
+      supabase.from("organizations").select("id, name, legal_name, dba_name, billing_exempt"),
+      supabase.from("org_subscriptions").select("organization_id, status, mrr_cents, staff_count, plan"),
+      supabase
+        .from("org_support_tickets")
+        .select("id", { count: "exact", head: true })
+        .in("status", ["submitted", "in_progress", "waiting_customer"]),
+    ]);
 
     const rows = (subs ?? []) as Array<{
+      organization_id: string;
       status: string;
       mrr_cents: number | null;
       staff_count: number | null;
       plan: string | null;
     }>;
+    const subByOrg = new Map(rows.map((r) => [r.organization_id, r]));
 
     // MRR uses the amount stamped at checkout (per-staff quote). Exempt
     // companies should already be stored as 0. Enterprise/custom keep the
@@ -225,8 +228,27 @@ export const getExecKpis = createServerFn({ method: "GET" })
       .filter((r) => r.status === "active" || r.status === "past_due")
       .reduce((sum, r) => sum + (r.mrr_cents ?? 0), 0);
 
+    const orgList = (orgs ?? []) as Array<{
+      id: string;
+      name: string | null;
+      legal_name: string | null;
+      dba_name: string | null;
+      billing_exempt: boolean | null;
+    }>;
+    const active_companies = orgList.filter((o) => {
+      const exempt = isBillingExempt({
+        billingExempt: o.billing_exempt === true,
+        orgName: o.name,
+        legalName: o.legal_name,
+        dbaName: o.dba_name,
+        organizationId: o.id,
+      });
+      if (exempt) return true;
+      return subByOrg.get(o.id)?.status === "active";
+    }).length;
+
     return {
-      active_companies: rows.filter((r) => r.status === "active").length,
+      active_companies,
       trial_companies: 0, // no trial state in Hive — providers pay at signup
       past_due_companies: rows.filter((r) => r.status === "past_due").length,
       locked_companies: rows.filter((r) => r.status === "locked").length,
@@ -310,18 +332,20 @@ export const listCompanies = createServerFn({ method: "GET" })
     }>).map((o) => {
       const sub = subByOrg.get(o.id);
       const c = countByOrg.get(o.id);
-      const status = sub?.status ?? "inactive";
       const tickets = c?.tickets ?? 0;
-      let health: CompanyRow["health"] = "good";
-      if (status === "locked" || status === "past_due" || tickets >= 3) health = "risk";
-      else if (status === "inactive" || tickets >= 1) health = "warn";
-
       const exempt = isBillingExempt({
         billingExempt: o.billing_exempt === true,
         orgName: o.name,
         legalName: o.legal_name,
         dbaName: o.dba_name,
+        organizationId: o.id,
       });
+      const status = exempt && (!sub || sub.status !== "locked")
+        ? "active"
+        : (sub?.status ?? "inactive");
+      let health: CompanyRow["health"] = "good";
+      if (status === "locked" || status === "past_due" || tickets >= 3) health = "risk";
+      else if (status === "inactive" || tickets >= 1) health = "warn";
       const schedule: PricingSchedule = o.pricing_schedule === "founding" ? "founding" : "list";
       const mrr_cents = liveSeatMrr({
         exempt,

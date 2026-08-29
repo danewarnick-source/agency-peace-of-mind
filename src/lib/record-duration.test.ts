@@ -100,5 +100,6 @@ describe("staffDisplayName", () => {
       "Staff",
     );
     assert.equal(staffDisplayName({ full_name: "0a6df668" }), "Staff");
+    assert.equal(staffDisplayName({ full_name: "a1b2c3d4e5f6" }), "Staff");
   });
 });

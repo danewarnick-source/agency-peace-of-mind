@@ -20,6 +20,7 @@ import {
   cadenceDescription,
   type MyObligationInstanceRow,
 } from "@/lib/company-obligations.functions";
+import { isFormUuid } from "@/lib/resolve-obligation-form";
 
 const MY_OBLIGATIONS_KEY = "my-obligation-instances";
 
@@ -187,16 +188,18 @@ function WidgetItem({ orgId, instance }: { orgId: string; instance: MyObligation
             {due.text}
           </p>
         </div>
-        {ob.evidence_type === "form" ? (
+        {ob.evidence_type === "form" && isFormUuid(ob.linked_form_id) ? (
           <Link
             to="/dashboard/forms/$formId/fill"
-            params={{ formId: ob.linked_form_id ?? "" }}
+            params={{ formId: ob.linked_form_id }}
             search={{ obligation_instance: instance.id } as never}
           >
             <Button size="sm" variant="outline" className="shrink-0">
               Complete form <ArrowRight className="ml-1 h-3.5 w-3.5" />
             </Button>
           </Link>
+        ) : ob.evidence_type === "form" ? (
+          <p className="shrink-0 text-[11px] text-amber-800">Form not linked</p>
         ) : (
           <Button size="sm" variant="outline" className="shrink-0" onClick={() => setPanelOpen((v) => !v)}>
             {ob.evidence_type === "attestation" ? "Sign off" : ob.evidence_type === "upload" ? "Upload file" : "Submit evidence"}

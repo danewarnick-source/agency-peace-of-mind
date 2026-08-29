@@ -14,6 +14,7 @@ import {
 } from "./staff-groups.functions";
 import { runNectarCertOcrFromStoragePath } from "./nectar-cert-ocr";
 import { compareNames } from "./name-matching";
+import { isFormUuid, resolveObligationFormId } from "./resolve-obligation-form";
 import {
   addDaysUTC,
   addMonthsUTC,
@@ -1507,10 +1508,38 @@ export const listMyObligationInstances = createServerFn({ method: "POST" })
     if (oErr) throw new Error(oErr.message);
     const obligationById = new Map((obligations ?? []).map((o: CompanyObligationRow) => [o.id, o]));
 
+    const formNeeded = (obligations ?? []).some(
+      (o: CompanyObligationRow) =>
+        o.evidence_type === "form" && !isFormUuid(o.linked_form_id),
+    );
+    let publishedForms: Array<{ id: string; name: string }> = [];
+    if (formNeeded) {
+      const { data: formRows } = await supabase
+        .from("forms")
+        .select("id, name")
+        .eq("organization_id", data.organizationId)
+        .eq("status", "published");
+      publishedForms = (formRows ?? []) as Array<{ id: string; name: string }>;
+    }
+
     return (instances ?? [])
       .map((i: ObligationInstanceRow) => {
         const obligation = obligationById.get(i.obligation_id);
-        return obligation ? { ...i, obligation } : null;
+        if (!obligation) return null;
+        if (obligation.evidence_type === "form") {
+          return {
+            ...i,
+            obligation: {
+              ...obligation,
+              linked_form_id: resolveObligationFormId(
+                obligation.linked_form_id,
+                publishedForms,
+                obligation.title,
+              ),
+            },
+          };
+        }
+        return { ...i, obligation };
       })
       .filter((r: MyObligationInstanceRow | null): r is MyObligationInstanceRow => r !== null);
   });
@@ -1713,16 +1742,18 @@ async function loadInstancesByObligation(
 async function bootstrapVisibleObligationInstancesInternal(
   supabase: AnySupabase,
   organizationId: string,
-  opts?: { generateMissing?: boolean },
+  opts?: { generateMissing?: boolean; skipMutations?: boolean },
 ): Promise<{
   visibleObligations: CompanyObligationRow[];
   instancesByObligation: Map<string, ObligationInstanceRow[]>;
 }> {
-  await checkAndMarkOverdueInternal(supabase, organizationId);
-  try {
-    await ensureStandingDutiesInternal(supabase, organizationId);
-  } catch (e) {
-    console.warn("[obligations] standing-duty bootstrap failed:", e);
+  if (!opts?.skipMutations) {
+    await checkAndMarkOverdueInternal(supabase, organizationId);
+    try {
+      await ensureStandingDutiesInternal(supabase, organizationId);
+    } catch (e) {
+      console.warn("[obligations] standing-duty bootstrap failed:", e);
+    }
   }
 
   const { data: obligations, error } = await supabase
@@ -1782,21 +1813,27 @@ export const listCompanyObligations = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as { supabase: AnySupabase; userId: string };
     if (!supabase || !userId) return [] as ObligationListItem[];
-    await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+    try {
+      await requireOrgMembership(supabase, userId, data.organizationId, "employee");
 
-    const { visibleObligations, instancesByObligation } =
-      await bootstrapVisibleObligationInstancesInternal(supabase, data.organizationId, {
-        generateMissing: false,
+      const { visibleObligations, instancesByObligation } =
+        await bootstrapVisibleObligationInstancesInternal(supabase, data.organizationId, {
+          generateMissing: false,
+          skipMutations: true,
+        });
+
+      return visibleObligations.map((o: CompanyObligationRow) => {
+        const rows = instancesByObligation.get(o.id) ?? [];
+        return {
+          ...o,
+          current_instance: pickCurrentInstance(rows),
+          rollup: rows.length ? rollupFromInstances(rows) : emptyRollup(),
+        };
       });
-
-    return visibleObligations.map((o: CompanyObligationRow) => {
-      const rows = instancesByObligation.get(o.id) ?? [];
-      return {
-        ...o,
-        current_instance: pickCurrentInstance(rows),
-        rollup: rows.length ? rollupFromInstances(rows) : emptyRollup(),
-      };
-    });
+    } catch (e) {
+      console.error("[listCompanyObligations] failed", e);
+      return [] as ObligationListItem[];
+    }
   });
 
 /** How far ahead the Deadlines page looks for still-open obligation clocks. */

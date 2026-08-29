@@ -1,8 +1,19 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { useActiveShift } from "@/hooks/use-active-shift";
 import { useGeneralShift } from "@/hooks/use-general-shift";
 import { useLivePayPeriod } from "@/hooks/use-nectar-pay-period";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const fmtUSD = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -24,9 +35,11 @@ function fmtElapsed(ms: number) {
  */
 export function ActiveShiftBar({ framed = false }: { framed?: boolean }) {
   const { data: active } = useActiveShift();
-  const { shift: general } = useGeneralShift();
+  const { shift: general, stop } = useGeneralShift();
   const navigate = useNavigate();
   const [now, setNow] = useState(Date.now());
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [stopping, setStopping] = useState(false);
 
   const live = useLivePayPeriod();
 
@@ -65,7 +78,33 @@ export function ActiveShiftBar({ framed = false }: { framed?: boolean }) {
 
   const onClockOut = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isGeneral && general) {
+      const note = (general.note ?? "").trim();
+      if (note.length < 10) {
+        navigate({ to: "/dashboard/timeclock", search: { end: "1" } as never });
+        toast.error("Add a shift note, then tap End shift.");
+        return;
+      }
+      setConfirmOpen(true);
+      return;
+    }
     open();
+  };
+
+  const confirmGeneralStop = async () => {
+    if (!general) return;
+    setStopping(true);
+    try {
+      const ok = await stop(general.id, { note: (general.note ?? "").trim() });
+      if (!ok) {
+        toast.error("Could not clock out. Try again.");
+        return;
+      }
+      setConfirmOpen(false);
+      toast.success("General shift ended");
+    } finally {
+      setStopping(false);
+    }
   };
 
   const positioning = framed
@@ -124,12 +163,35 @@ export function ActiveShiftBar({ framed = false }: { framed?: boolean }) {
             }
           }}
           className="ml-1 inline-flex min-h-[36px] shrink-0 cursor-pointer items-center gap-1 rounded-md bg-white/15 px-3 text-xs font-semibold uppercase tracking-wide text-white hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-          aria-label="Go to clock-out flow (paperwork required to finalize)"
-          title="Opens the Clock In/Out tab — paperwork required to finalize"
+          aria-label={isGeneral ? "Clock out of non-EVV shift" : "Go to clock-out flow (paperwork required to finalize)"}
+          title={isGeneral ? "End this non-EVV / training shift" : "Opens the Clock In/Out tab — paperwork required to finalize"}
         >
-          Clock out <span aria-hidden>→</span>
+          Clock out
         </span>
       </button>
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>End {general?.category ?? "this"} shift?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This clocks you out of the open non-EVV punch.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={stopping}>Keep working</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmGeneralStop();
+              }}
+              disabled={stopping}
+              className="bg-rose-600 text-white hover:bg-rose-700"
+            >
+              {stopping ? "Ending…" : "End shift"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

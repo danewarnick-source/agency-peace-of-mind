@@ -5,12 +5,15 @@ import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 
 export const Route = createFileRoute("/dashboard/timeclock")({
   head: () => ({ meta: [{ title: "General Time Clock — HIVE" }] }),
+  validateSearch: (s: Record<string, unknown>): { end?: string } =>
+    typeof s.end === "string" ? { end: s.end } : {},
   component: TimeClockPage,
 });
 
 function TimeClockPage() {
+  const search = Route.useSearch();
   return (
-    <div className="mx-auto w-full max-w-xl">
+    <div className="mx-auto w-full max-w-xl pb-24">
       <StaffPageHeader
         eyebrow="Time · Non-client"
         eyebrowIcon={Clock}
@@ -45,7 +48,7 @@ function TimeClockPage() {
         </Link>
       </div>
 
-      <GeneralTimeClock />
+      <GeneralTimeClock autoConfirmEnd={search.end === "1"} />
     </div>
   );
 }

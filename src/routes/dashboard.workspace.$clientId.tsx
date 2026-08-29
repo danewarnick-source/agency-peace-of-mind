@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { useCaseload } from "@/hooks/use-caseload";
@@ -8,6 +8,7 @@ import { isClockableServiceCode } from "@/lib/service-billing";
 import { Badge } from "@/components/ui/badge";
 import { PunchPad } from "@/components/evv/punch-pad";
 import { padMemberId } from "@/lib/evv-codes";
+import { bindSpecialDirections } from "@/lib/bind-special-directions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
@@ -79,6 +80,33 @@ function ClientWorkspace() {
   const client = useMemo(() => {
     return (caseload ?? []).find((c) => c.id === clientId) ?? null;
   }, [caseload, clientId]);
+
+  // Banner/identity bind to the route client id — never a leftover caseload row.
+  const liveClientQ = useQuery({
+    queryKey: ["workspace-client-row", clientId],
+    enabled: !!clientId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("clients")
+        .select("id, first_name, last_name, special_directions")
+        .eq("id", clientId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { id: string; first_name: string | null; last_name: string | null; special_directions: string | null } | null;
+    },
+  });
+  const boundClient = liveClientQ.data?.id === clientId ? liveClientQ.data : null;
+  const displayFirst = boundClient?.first_name ?? client?.first_name ?? "";
+  const displayLast = boundClient?.last_name ?? client?.last_name ?? "";
+  const directionsText = bindSpecialDirections(
+    boundClient?.special_directions ?? client?.special_directions,
+    { first_name: displayFirst, last_name: displayLast },
+  );
+
+  const [tab, setTab] = useState(tabParam ?? "about");
+  useEffect(() => {
+    if (tabParam) setTab(tabParam);
+  }, [tabParam]);
 
   const clientCodes = useMemo(
     () => (client ? clientAuthorizedCodes(client) : []),
@@ -242,7 +270,7 @@ function ClientWorkspace() {
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-2">
                 <h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight">
-                  {client.first_name} {client.last_name}
+                  {displayFirst} {displayLast}
                 </h1>
                 <div className="flex shrink-0 items-center gap-2">
                   <FaceSheetButton clientId={client.id} />
@@ -275,23 +303,29 @@ function ClientWorkspace() {
           </div>
         </div>
 
-        {client.special_directions && (
-          <div className="flex items-start gap-3 rounded-xl border-2 border-amber-500 bg-amber-50 px-4 py-3 dark:bg-amber-950/20">
+        {directionsText && (
+          <div
+            key={`alerts-${clientId}`}
+            className="flex items-start gap-3 rounded-xl border-2 border-amber-500 bg-amber-50 px-4 py-3 dark:bg-amber-950/20"
+          >
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
             <div>
               <p className="text-sm font-bold text-amber-800 dark:text-amber-200">
                 Special Directions & Clinical Alerts
               </p>
               <p className="mt-0.5 text-sm text-amber-700 dark:text-amber-300 whitespace-pre-wrap">
-                {client.special_directions}
+                {directionsText}
               </p>
             </div>
           </div>
         )}
 
         <Tabs
-          value={tabParam ?? "about"}
-          onValueChange={(val) => navigate({ to: ".", search: { tab: val }, replace: true })}
+          value={tab}
+          onValueChange={(val) => {
+            setTab(val);
+            navigate({ to: ".", search: (prev) => ({ ...prev, tab: val }), replace: true });
+          }}
           className="w-full"
         >
           {/* Touch-friendly tab bar — amber active w/ 2px underline, navy inactive (tappable, never dimmed) */}

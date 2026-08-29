@@ -79,3 +79,14 @@ export function padMemberId(raw: string | null | undefined): string {
   if (!v) return "";
   return v.length >= 10 ? v : v.padStart(10, "0");
 }
+
+/**
+ * Screen-safe Medicaid Member ID: last 4 only. Never log or push the raw value.
+ * Uses the padded form so short IDs still mask consistently.
+ */
+export function maskMemberId(raw: string | null | undefined): string {
+  const padded = padMemberId(raw);
+  if (!padded) return "";
+  const last4 = padded.slice(-4);
+  return `****${last4}`;
+}

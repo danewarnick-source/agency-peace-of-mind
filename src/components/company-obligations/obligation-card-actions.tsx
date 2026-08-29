@@ -33,6 +33,7 @@ import {
   remindOutstandingAssignees,
   type ObligationInstanceRow,
 } from "@/lib/company-obligations.functions";
+import { isFormUuid } from "@/lib/resolve-obligation-form";
 import type { ObligationWithInstance } from "./obligation-card";
 import { useOutstandingRoster, RosterMultiSelect, type RosterEntry } from "./outstanding-roster";
 
@@ -125,6 +126,9 @@ function DirectCompletionActions({
   };
 
   if (obligation.evidence_type === "form") {
+    if (!isFormUuid(obligation.linked_form_id)) {
+      return <p className="text-xs text-amber-800">Form not linked</p>;
+    }
     return (
       <a
         href={`/dashboard/forms/${obligation.linked_form_id}/fill?obligation_instance=${instance.id}`}

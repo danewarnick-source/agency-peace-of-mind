@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { EVV_SERVICE_CODES, evvServiceLabel, isEvvLockedCode, padMemberId } from "@/lib/evv-codes";
+import { EVV_SERVICE_CODES, evvServiceLabel, isEvvLockedCode, maskMemberId, padMemberId } from "@/lib/evv-codes";
 import { clientAuthorizedCodes } from "@/lib/assignment-codes";
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { computeEntryUnits } from "@/lib/billing-units";
@@ -2208,7 +2208,7 @@ export function PunchPad({
             </p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
               Verified Medicaid ID:{" "}
-              <span className="font-mono">{lockedClient.memberId || "—"}</span>
+              <span className="font-mono">{maskMemberId(lockedClient.memberId) || "—"}</span>
               {typeof lockedClient.geofenceRadiusFeet === "number" && (
                 <> · Geofence:{" "}
                   <span className="font-mono">{lockedClient.geofenceRadiusFeet} ft</span>
@@ -2331,14 +2331,14 @@ export function PunchPad({
                       .map((c) => (
                         <SelectItem key={c.id} value={c.id}>
                           {c.first_name} {c.last_name}
-                          {c.medicaid_id ? ` · #${padMemberId(c.medicaid_id)}` : ""}
+                          {c.medicaid_id ? ` · #${maskMemberId(c.medicaid_id)}` : ""}
                         </SelectItem>
                       ))}
                   </SelectContent>
                 </Select>
                 {clientForPunch && (
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Member ID: <span className="font-mono">{clientForPunch.memberId || "missing"}</span>
+                    Member ID: <span className="font-mono">{maskMemberId(clientForPunch.memberId) || "missing"}</span>
                   </p>
                 )}
               </div>

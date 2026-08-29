@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isBillingExempt } from "@/lib/billing-access";
 
 async function ensureExecutive(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,15 +32,33 @@ export const getCommandMetrics = createServerFn({ method: "GET" })
       return { mrr_cents: 0, active_companies: 0, trial_companies: 0, past_due_companies: 0 };
     }
     await ensureExecutive(supabase, userId);
-    const { data } = await supabase
-      .from("org_subscriptions")
-      .select("status, mrr_cents");
-    const rows = (data ?? []) as Array<{ status: string; mrr_cents: number | null }>;
+    const [{ data: orgs }, { data }] = await Promise.all([
+      supabase.from("organizations").select("id, name, legal_name, dba_name, billing_exempt"),
+      supabase.from("org_subscriptions").select("organization_id, status, mrr_cents"),
+    ]);
+    const rows = (data ?? []) as Array<{ organization_id: string; status: string; mrr_cents: number | null }>;
+    const subByOrg = new Map(rows.map((r) => [r.organization_id, r]));
+    const active_companies = ((orgs ?? []) as Array<{
+      id: string;
+      name: string | null;
+      legal_name: string | null;
+      dba_name: string | null;
+      billing_exempt: boolean | null;
+    }>).filter((o) => {
+      const exempt = isBillingExempt({
+        billingExempt: o.billing_exempt === true,
+        orgName: o.name,
+        legalName: o.legal_name,
+        dbaName: o.dba_name,
+        organizationId: o.id,
+      });
+      return exempt || subByOrg.get(o.id)?.status === "active";
+    }).length;
     return {
       mrr_cents: rows
         .filter((r) => r.status === "active" || r.status === "past_due")
         .reduce((s, r) => s + (r.mrr_cents ?? 0), 0),
-      active_companies: rows.filter((r) => r.status === "active").length,
+      active_companies,
       trial_companies: rows.filter((r) => r.status === "trial").length,
       past_due_companies: rows.filter((r) => r.status === "past_due").length,
     };

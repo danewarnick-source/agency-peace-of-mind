@@ -31,9 +31,7 @@ export function OpenCompanyViews({
 
   const go = (view: "admin" | "staff") => {
     setView(view);
-    window.setTimeout(() => {
-      void navigate({ to: "/dashboard" });
-    }, 50);
+    void navigate({ to: "/dashboard" });
   };
 
   const btn = compact

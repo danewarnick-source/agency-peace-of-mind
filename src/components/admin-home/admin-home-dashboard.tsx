@@ -3,6 +3,9 @@
  *   1. company_obligation_instances + nested obligations / assignees / completions
  *   2. active clients (authorized_dspd_codes lives on clients)
  *
+ * Greeting, org name, and date render from session + useCurrentOrg. Query
+ * loading is local to the cards that need that data — never a full-page gate.
+ *
  * company_obligations has no `category` column (live + generated types).
  * Area grouping uses the SOW catalog overlay keyed by obligation title.
  */
@@ -37,12 +40,11 @@ const DENVER = "America/Denver";
 const INSTANCES_SELECT = [
   "id",
   "due_at",
-  "organization_id",
   "obligation_id",
   "client_id",
   "company_obligations!company_obligation_instances_obligation_id_fkey(title,source_policy_section,scope)",
   "company_obligation_instance_assignees!company_obligation_instance_assignees_instance_id_fkey(staff_id,staff_name,client_id)",
-  "company_obligation_completions!company_obligation_completions_instance_id_fkey(id,completed_at,nectar_extracted_expires_date,nectar_extracted_cert_type)",
+  "company_obligation_completions!company_obligation_completions_instance_id_fkey(id,nectar_extracted_expires_date,nectar_extracted_cert_type)",
 ].join(",");
 
 type ObligationEmbed = {
@@ -59,7 +61,6 @@ type AssigneeEmbed = {
 
 type CompletionEmbed = {
   id: string;
-  completed_at: string | null;
   nectar_extracted_expires_date: string | null;
   nectar_extracted_cert_type: string | null;
 };
@@ -67,7 +68,6 @@ type CompletionEmbed = {
 type InstanceRow = {
   id: string;
   due_at: string;
-  organization_id: string;
   obligation_id: string;
   client_id: string | null;
   company_obligations: ObligationEmbed | ObligationEmbed[] | null;
@@ -264,33 +264,22 @@ function Skeleton({ className }: { className?: string }) {
   return <div className={cn("animate-pulse rounded-md bg-muted", className)} />;
 }
 
-function AdminHomeSkeleton() {
+function TileSkeleton() {
+  return <Skeleton className="h-[130px] rounded-xl" />;
+}
+
+function CardBodySkeleton({ rows = 4 }: { rows?: number }) {
   return (
-    <div className="space-y-4" aria-hidden>
-      <div className="space-y-2">
-        <Skeleton className="h-6 w-56" />
-        <Skeleton className="h-4 w-64" />
-      </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Skeleton className="h-[280px] rounded-2xl" />
-        <div className="grid grid-cols-2 gap-3">
-          <Skeleton className="h-[130px] rounded-xl" />
-          <Skeleton className="h-[130px] rounded-xl" />
-          <Skeleton className="h-[130px] rounded-xl" />
-          <Skeleton className="h-[130px] rounded-xl" />
-        </div>
-      </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Skeleton className="h-72 rounded-2xl" />
-        <Skeleton className="h-72 rounded-2xl" />
-        <Skeleton className="h-72 rounded-2xl" />
-      </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
-        <Skeleton className="h-80 rounded-2xl" />
-        <Skeleton className="h-80 rounded-2xl" />
-      </div>
+    <div className="space-y-3" aria-hidden>
+      {Array.from({ length: rows }, (_, i) => (
+        <Skeleton key={i} className="h-10 w-full" />
+      ))}
     </div>
   );
+}
+
+function LoadError({ children }: { children: ReactNode }) {
+  return <p className="py-6 text-sm text-muted-foreground">{children}</p>;
 }
 
 function StatusBadge({
@@ -565,12 +554,14 @@ function AdminHomeDashboardInner() {
     };
   }, [instances, plus30Ymd, todayYmd]);
 
-  if (!orgId) {
-    if (orgLoading) return <AdminHomeSkeleton />;
-    return null;
-  }
+  if (!orgId && !orgLoading) return null;
 
-  if (instancesQ.isLoading || clientsQ.isLoading) return <AdminHomeSkeleton />;
+  const instancesReady = instancesQ.isSuccess;
+  const instancesFailed = instancesQ.isError;
+  const instancesLoading = !instancesReady && !instancesFailed;
+  const clientsReady = clientsQ.isSuccess;
+  const clientsFailed = clientsQ.isError;
+  const clientsLoading = !clientsReady && !clientsFailed;
 
   const firstName = sessionFirstName(user);
   const dateLine = formatDenverLongDate(now);
@@ -585,12 +576,18 @@ function AdminHomeDashboardInner() {
           Good {greetingWord(now)}, {firstName}
         </div>
         <div className="text-sm text-muted-foreground">
-          {orgName} · {dateLine}
+          {org ? `${orgName} · ${dateLine}` : dateLine}
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {derived.overdue.length === 0 ? (
+        {instancesLoading ? (
+          <Skeleton className="h-[280px] rounded-2xl" />
+        ) : instancesFailed ? (
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <LoadError>Could not load overdue items.</LoadError>
+          </div>
+        ) : derived.overdue.length === 0 ? (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-900/50 dark:bg-emerald-950/30">
             <div className="text-4xl font-extrabold tabular-nums text-emerald-700 dark:text-emerald-400">
               0
@@ -633,63 +630,89 @@ function AdminHomeDashboardInner() {
         )}
 
         <div className="grid grid-cols-2 gap-3">
-          <div
-            className={cn(
-              "rounded-xl border border-l-4 bg-card p-4",
-              derived.staffWithOverdue > 0 ? "border-l-rose-500" : "border-l-border",
-            )}
-          >
+          {instancesLoading ? (
+            <TileSkeleton />
+          ) : (
             <div
               className={cn(
-                "text-2xl font-bold tabular-nums",
-                derived.staffWithOverdue > 0
-                  ? "text-rose-700 dark:text-rose-400"
-                  : "text-foreground",
+                "rounded-xl border border-l-4 bg-card p-4",
+                !instancesFailed && derived.staffWithOverdue > 0
+                  ? "border-l-rose-500"
+                  : "border-l-border",
               )}
             >
-              {derived.staffWithOverdue}
+              <div
+                className={cn(
+                  "text-2xl font-bold tabular-nums",
+                  !instancesFailed && derived.staffWithOverdue > 0
+                    ? "text-rose-700 dark:text-rose-400"
+                    : "text-foreground",
+                )}
+              >
+                {instancesFailed ? "—" : derived.staffWithOverdue}
+              </div>
+              <div className="mt-1 text-sm font-medium text-foreground">Staff with overdue</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                {instancesFailed ? "Could not load" : "People with at least one overdue item"}
+              </div>
             </div>
-            <div className="mt-1 text-sm font-medium text-foreground">Staff with overdue</div>
-            <div className="mt-0.5 text-xs text-muted-foreground">
-              People with at least one overdue item
-            </div>
-          </div>
+          )}
 
-          <div className="rounded-xl border border-l-4 border-l-amber-500 bg-card p-4">
-            <div className="text-2xl font-bold tabular-nums text-amber-700 dark:text-amber-400">
-              {derived.pendingWithin30}
+          {instancesLoading ? (
+            <TileSkeleton />
+          ) : (
+            <div className="rounded-xl border border-l-4 border-l-amber-500 bg-card p-4">
+              <div className="text-2xl font-bold tabular-nums text-amber-700 dark:text-amber-400">
+                {instancesFailed ? "—" : derived.pendingWithin30}
+              </div>
+              <div className="mt-1 text-sm font-medium text-foreground">Due within 30 days</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                {instancesFailed ? "Could not load" : "Pending instances"}
+              </div>
             </div>
-            <div className="mt-1 text-sm font-medium text-foreground">Due within 30 days</div>
-            <div className="mt-0.5 text-xs text-muted-foreground">Pending instances</div>
-          </div>
+          )}
 
-          <div className="rounded-xl border border-l-4 border-l-emerald-500 bg-card p-4">
-            <div className="text-2xl font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
-              {clients.length}
+          {clientsLoading ? (
+            <TileSkeleton />
+          ) : (
+            <div className="rounded-xl border border-l-4 border-l-emerald-500 bg-card p-4">
+              <div className="text-2xl font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
+                {clientsFailed ? "—" : clients.length}
+              </div>
+              <div className="mt-1 text-sm font-medium text-foreground">Active clients</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                {clientsFailed ? "Could not load" : "Account status active"}
+              </div>
             </div>
-            <div className="mt-1 text-sm font-medium text-foreground">Active clients</div>
-            <div className="mt-0.5 text-xs text-muted-foreground">Account status active</div>
-          </div>
+          )}
 
-          <div
-            className={cn(
-              "rounded-xl border border-l-4 bg-card p-4",
-              derived.recommendations.length > 0 ? "border-l-amber-500" : "border-l-border",
-            )}
-          >
+          {instancesLoading ? (
+            <TileSkeleton />
+          ) : (
             <div
               className={cn(
-                "text-2xl font-bold tabular-nums",
-                derived.recommendations.length > 0
-                  ? "text-amber-700 dark:text-amber-400"
-                  : "text-foreground",
+                "rounded-xl border border-l-4 bg-card p-4",
+                !instancesFailed && derived.recommendations.length > 0
+                  ? "border-l-amber-500"
+                  : "border-l-border",
               )}
             >
-              {derived.recommendations.length}
+              <div
+                className={cn(
+                  "text-2xl font-bold tabular-nums",
+                  !instancesFailed && derived.recommendations.length > 0
+                    ? "text-amber-700 dark:text-amber-400"
+                    : "text-foreground",
+                )}
+              >
+                {instancesFailed ? "—" : derived.recommendations.length}
+              </div>
+              <div className="mt-1 text-sm font-medium text-foreground">Recommendations</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                {instancesFailed ? "Could not load" : "From obligation data"}
+              </div>
             </div>
-            <div className="mt-1 text-sm font-medium text-foreground">Recommendations</div>
-            <div className="mt-0.5 text-xs text-muted-foreground">From obligation data</div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -699,6 +722,11 @@ function AdminHomeDashboardInner() {
             <Users className="h-4 w-4" style={{ color: HIVE_TEAL }} />
             Staff status
           </h2>
+          {instancesLoading ? (
+            <CardBodySkeleton />
+          ) : instancesFailed ? (
+            <LoadError>Could not load staff status.</LoadError>
+          ) : (
           <ul>
             {derived.staff.map((m, idx) => {
               const avatarBg = idx % 2 === 0 ? HIVE_NAVY : NECTAR_VIOLET;
@@ -733,6 +761,7 @@ function AdminHomeDashboardInner() {
               <li className="py-6 text-sm text-muted-foreground">No assigned staff yet.</li>
             )}
           </ul>
+          )}
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
@@ -740,6 +769,11 @@ function AdminHomeDashboardInner() {
             <AlarmClock className="h-4 w-4" style={{ color: HIVE_TEAL }} />
             Due soon
           </h2>
+          {instancesLoading ? (
+            <CardBodySkeleton />
+          ) : instancesFailed ? (
+            <LoadError>Could not load upcoming due dates.</LoadError>
+          ) : (
           <ul>
             {dueSoon.map((item) => {
               const color =
@@ -774,6 +808,7 @@ function AdminHomeDashboardInner() {
               <li className="py-6 text-sm text-muted-foreground">Nothing due soon.</li>
             )}
           </ul>
+          )}
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
@@ -781,7 +816,11 @@ function AdminHomeDashboardInner() {
             <Lightbulb className="h-4 w-4" style={{ color: HIVE_TEAL }} />
             Recommendations
           </h2>
-          {derived.recommendations.length > 0 ? (
+          {instancesLoading ? (
+            <CardBodySkeleton />
+          ) : instancesFailed ? (
+            <LoadError>Could not load recommendations.</LoadError>
+          ) : derived.recommendations.length > 0 ? (
             <ul className="space-y-3">
               {derived.recommendations.map((rec) => (
                 <li key={rec.key} className="text-sm text-foreground">
@@ -799,6 +838,11 @@ function AdminHomeDashboardInner() {
             <BarChart3 className="h-4 w-4" style={{ color: HIVE_TEAL }} />
             Compliance by area
           </h2>
+          {instancesLoading ? (
+            <CardBodySkeleton rows={5} />
+          ) : instancesFailed ? (
+            <LoadError>Could not load compliance by area.</LoadError>
+          ) : (
           <div className="space-y-4">
             {derived.areas.map((area) => {
               const color = barColor(area.completed, area.total);
@@ -819,6 +863,7 @@ function AdminHomeDashboardInner() {
               <p className="py-6 text-sm text-muted-foreground">No obligation instances yet.</p>
             )}
           </div>
+          )}
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
@@ -826,6 +871,11 @@ function AdminHomeDashboardInner() {
             <CircleUser className="h-4 w-4" style={{ color: HIVE_TEAL }} />
             Active clients
           </h2>
+          {clientsLoading ? (
+            <CardBodySkeleton />
+          ) : clientsFailed ? (
+            <LoadError>Could not load clients.</LoadError>
+          ) : (
           <ul>
             {clients.map((c, idx) => {
               const name = `${c.first_name} ${c.last_name}`.trim();
@@ -854,6 +904,7 @@ function AdminHomeDashboardInner() {
               <li className="py-6 text-sm text-muted-foreground">No active clients.</li>
             )}
           </ul>
+          )}
           <div className="mt-3 border-t border-border pt-3">
             <div className="text-xs font-medium text-muted-foreground">Next billing window</div>
             <div className="mt-0.5 text-sm font-semibold text-foreground">
@@ -868,7 +919,25 @@ function AdminHomeDashboardInner() {
 
 export function AdminHomeDashboard() {
   return (
-    <Suspense fallback={<AdminHomeSkeleton />}>
+    <Suspense
+      fallback={
+        <div className="space-y-4">
+          <div>
+            <div className="text-lg font-semibold text-foreground">Good day</div>
+            <div className="text-sm text-muted-foreground">Loading workspace…</div>
+          </div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Skeleton className="h-[280px] rounded-2xl" />
+            <div className="grid grid-cols-2 gap-3">
+              <TileSkeleton />
+              <TileSkeleton />
+              <TileSkeleton />
+              <TileSkeleton />
+            </div>
+          </div>
+        </div>
+      }
+    >
       <AdminHomeDashboardInner />
     </Suspense>
   );

@@ -764,7 +764,16 @@ function serverFnPayload(url: string, body: string): unknown {
   if (/getMonthCertification/i.test(fn)) return { tableReady: true, cert: null };
   if (/certifyHhsMonth/i.test(fn)) return { ok: true };
   if (/evaluateShiftNote/i.test(fn)) {
-    return { status: "Verified", feedback: "Mocked NECTAR coach — not a live review." };
+    return {
+      status: "Verified",
+      feedback: "NECTAR completeness check passed: 30 words, client referenced, support documented, client response documented.",
+      checks: [
+        { key: "word_count", passed: true, message: "Word count met." },
+        { key: "client_referenced", passed: true, message: "Client is referenced." },
+        { key: "support_provided", passed: true, message: "Support is documented." },
+        { key: "client_response", passed: true, message: "Client response is documented." },
+      ],
+    };
   }
   if (/scanNoteForTriggers/i.test(fn)) {
     return {

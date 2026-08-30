@@ -97,7 +97,7 @@ import { orgDashboardIsLocked, pathBypassesBillingLock } from "@/lib/billing-loc
 import { DraftJobsProvider } from "@/components/nectar/draft-jobs-driver";
 import { DraftJobsHeaderPill } from "@/components/nectar/draft-jobs-header-pill";
 import { GuidedTourProvider } from "@/components/nectar/guided-tour-provider";
-import { OPEN_DASHBOARD_MENU_EVENT } from "@/lib/portal-view-landing";
+import { OPEN_DASHBOARD_MENU_EVENT, preventSheetDismissForPortalViewMenu } from "@/lib/portal-view-landing";
 import { isCognitoAuth } from "@/lib/aws/env";
 import { AWS_DB_ERROR_EVENT } from "@/lib/aws/exec-http";
 import {
@@ -776,6 +776,9 @@ function DashboardLayout() {
                       <SheetContent
                         side="left"
                         className="w-[280px] bg-sidebar p-0 text-sidebar-foreground [&>button]:text-sidebar-foreground"
+                        onPointerDownOutside={preventSheetDismissForPortalViewMenu}
+                        onFocusOutside={preventSheetDismissForPortalViewMenu}
+                        onInteractOutside={preventSheetDismissForPortalViewMenu}
                       >
                         <SheetTitle className="sr-only">Navigation</SheetTitle>
                         <div className="flex h-full flex-col">

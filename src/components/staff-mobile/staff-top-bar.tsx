@@ -19,6 +19,7 @@ import { usePortalView } from "@/hooks/use-portal-view";
 import { ROLE_LABEL, type Role } from "@/lib/rbac";
 import { toast } from "sonner";
 import { NectarSearchBar } from "@/components/nectar/nectar-search-bar";
+import { preventSheetDismissForPortalViewMenu } from "@/lib/portal-view-landing";
 
 export function StaffTopBar({ title, framed = false }: { title: string; framed?: boolean }) {
   const { user } = useAuth();
@@ -77,6 +78,9 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
             side="bottom"
             className="rounded-t-2xl border-t border-white/10 bg-[#141a3d] p-5 text-white [&>button]:text-white"
             style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.25rem)" }}
+            onPointerDownOutside={preventSheetDismissForPortalViewMenu}
+            onFocusOutside={preventSheetDismissForPortalViewMenu}
+            onInteractOutside={preventSheetDismissForPortalViewMenu}
           >
             <SheetHeader className="text-left">
               <SheetTitle className="text-white">{displayName}</SheetTitle>

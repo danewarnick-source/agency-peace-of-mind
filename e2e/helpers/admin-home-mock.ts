@@ -29,8 +29,11 @@ const AUTH_STORAGE_KEY = `sb-${PROJECT_REF}-auth-token`;
 
 export type MockPersona = "admin" | "employee";
 
+let mockIsExecutive = false;
+
 export type HiveMockOptions = {
   role?: MockPersona;
+  isExecutive?: boolean;
 };
 
 const isoDaysFromNow = (days: number) =>
@@ -849,7 +852,7 @@ function serverFnResult(
     case "getMyEntitlements":
       return entitlementsPayload();
     case "checkHiveExecutive":
-      return { isExecutive: false };
+      return { isExecutive: mockIsExecutive };
     case "getMyOrgFeatures":
       return orgFeaturesPayload();
     case "getAuditEvidenceSnapshot":
@@ -1038,6 +1041,7 @@ async function handleServerFn(route: Route, persona: MockPersona, fx: ReturnType
 
 export async function installHiveMocks(page: Page, opts: HiveMockOptions = {}) {
   const persona: MockPersona = opts.role ?? "admin";
+  mockIsExecutive = opts.isExecutive ?? false;
   const fx = fixtures();
   const session = sessionRecord(persona);
 

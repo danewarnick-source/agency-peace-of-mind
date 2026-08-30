@@ -4,7 +4,9 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   companyAdminSwitchAccessibleName,
+  isPortalViewMenuEventTarget,
   nextPortalViewAfterLogin,
+  preventSheetDismissForPortalViewMenu,
   resolvePostLoginLanding,
   resolveRoleEntryLanding,
   STAFF_VIEW_ACCESSIBLE_NAME,
@@ -132,6 +134,28 @@ describe("hive-exec Open company / Admin View control", () => {
     assert.doesNotMatch(src, /SelectItem value="admin"/);
   });
 
+  it("phone Sheet ignores taps on the portaled Portal View menu", () => {
+    const dash = readFileSync(fileURLToPath(new URL("../routes/dashboard.tsx", import.meta.url)), "utf8");
+    const staff = readFileSync(
+      fileURLToPath(new URL("../components/staff-mobile/staff-top-bar.tsx", import.meta.url)),
+      "utf8",
+    );
+    const switcher = readFileSync(
+      fileURLToPath(new URL("../components/portal-view-switcher.tsx", import.meta.url)),
+      "utf8",
+    );
+    assert.match(dash, /preventSheetDismissForPortalViewMenu/);
+    assert.match(staff, /preventSheetDismissForPortalViewMenu/);
+    assert.match(switcher, /pointer-events-auto/);
+    assert.match(switcher, /data-portal-view-menu/);
+    assert.match(switcher, /onPointerDown/);
+    assert.doesNotMatch(
+      switcher,
+      /className="fixed z-\[400\]/,
+      "menu must override body pointer-events:none from the Radix Sheet",
+    );
+  });
+
   it("dashboard hamburger stays on hive-exec (not gated off)", () => {
     const path = fileURLToPath(new URL("../routes/dashboard.tsx", import.meta.url));
     const src = readFileSync(path, "utf8");
@@ -161,6 +185,32 @@ describe("hive-exec Open company / Admin View control", () => {
     });
     assert.equal(dsp.path, "/employee");
     assert.equal(dsp.persistView, null);
+  });
+
+  it("sheet dismiss helper only blocks the portaled Portal View menu", () => {
+    assert.equal(isPortalViewMenuEventTarget(null), false);
+    const page = { closest: () => null };
+    const menu = { closest: (sel: string) => (sel === "[data-portal-view-menu]" ? {} : null) };
+    assert.equal(isPortalViewMenuEventTarget(page), false);
+    assert.equal(isPortalViewMenuEventTarget(menu), true);
+
+    let blocked = false;
+    preventSheetDismissForPortalViewMenu({
+      preventDefault: () => {
+        blocked = true;
+      },
+      target: page,
+    });
+    assert.equal(blocked, false);
+
+    preventSheetDismissForPortalViewMenu({
+      preventDefault: () => {
+        blocked = true;
+      },
+      target: page,
+      detail: { originalEvent: { target: menu } },
+    });
+    assert.equal(blocked, true);
   });
 
   it("login no longer blindly writes hive_exec for every executive", () => {

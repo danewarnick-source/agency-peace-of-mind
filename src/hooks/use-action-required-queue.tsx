@@ -94,13 +94,17 @@ export function actionRequiredQueryKey(orgId: string) {
   return ["action-required-queue", orgId] as const;
 }
 
-export function useActionRequiredQueue(orgIdOverride?: string | null) {
+export function useActionRequiredQueue(
+  orgIdOverride?: string | null,
+  opts?: { enabled?: boolean },
+) {
   const { data: org } = useCurrentOrg();
   const orgId = orgIdOverride ?? org?.organization_id ?? null;
+  const enabled = (opts?.enabled ?? true) && !!orgId;
   const listFn = useServerFn(listCompanyObligations);
 
   const obligationsQ = useQuery({
-    enabled: !!orgId,
+    enabled,
     queryKey: ["company-obligations", orgId],
     queryFn: async () => {
       try {
@@ -115,7 +119,7 @@ export function useActionRequiredQueue(orgIdOverride?: string | null) {
   });
 
   const clientsQ = useQuery({
-    enabled: !!orgId,
+    enabled,
     queryKey: [...actionRequiredQueryKey(orgId!), "clients"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -129,7 +133,7 @@ export function useActionRequiredQueue(orgIdOverride?: string | null) {
   });
 
   const incidentsQ = useQuery({
-    enabled: !!orgId,
+    enabled,
     queryKey: [...actionRequiredQueryKey(orgId!), "incidents"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -161,7 +165,7 @@ export function useActionRequiredQueue(orgIdOverride?: string | null) {
   });
 
   const flaggedQ = useQuery({
-    enabled: !!orgId,
+    enabled,
     queryKey: [...actionRequiredQueryKey(orgId!), "flagged"],
     queryFn: async () => {
       const since = new Date(Date.now() - 30 * DAY).toISOString();
@@ -190,7 +194,7 @@ export function useActionRequiredQueue(orgIdOverride?: string | null) {
   });
 
   const missingAttestQ = useQuery({
-    enabled: !!orgId,
+    enabled,
     queryKey: [...actionRequiredQueryKey(orgId!), "missing-attest"],
     queryFn: async () => {
       const since = new Date(Date.now() - 7 * DAY).toISOString();
@@ -216,7 +220,7 @@ export function useActionRequiredQueue(orgIdOverride?: string | null) {
   });
 
   const hrcQ = useQuery({
-    enabled: !!orgId,
+    enabled,
     queryKey: [...actionRequiredQueryKey(orgId!), "hrc"],
     queryFn: async () => {
       const cutoff = new Date(Date.now() + 30 * DAY).toISOString().slice(0, 10);
@@ -243,7 +247,7 @@ export function useActionRequiredQueue(orgIdOverride?: string | null) {
   });
 
   const hireDatesQ = useQuery({
-    enabled: !!orgId,
+    enabled,
     queryKey: [...actionRequiredQueryKey(orgId!), "hire-dates"],
     queryFn: async () => {
       const { data: members, error: mErr } = await supabase
@@ -277,7 +281,7 @@ export function useActionRequiredQueue(orgIdOverride?: string | null) {
   }, [flaggedQ.data, missingAttestQ.data]);
 
   const staffNamesQ = useQuery({
-    enabled: !!orgId && staffIdsNeedingNames.length > 0,
+    enabled: enabled && staffIdsNeedingNames.length > 0,
     queryKey: [...actionRequiredQueryKey(orgId!), "staff-names", staffIdsNeedingNames.join(",")],
     queryFn: async () => {
       const { data, error } = await supabase

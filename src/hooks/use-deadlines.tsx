@@ -94,9 +94,10 @@ function obligationSubject(row: DeadlineObligationItem): {
   return { subject: "Agency", subjectKind: "agency" };
 }
 
-export function useDeadlines() {
+export function useDeadlines(opts?: { enabled?: boolean }) {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id ?? null;
+  const allow = opts?.enabled ?? true;
   const isAdminRole =
     org?.role === "admin" ||
     org?.role === "program_manager" ||
@@ -107,13 +108,13 @@ export function useDeadlines() {
   const listObligationDeadlinesFn = useServerFn(listDeadlineObligationInstances);
 
   const obligationsQ = useQuery({
-    enabled: !!orgId,
+    enabled: allow && !!orgId,
     queryKey: ["deadlines", "company_obligations", orgId, isAdminRole],
     queryFn: () => listObligationDeadlinesFn({ data: { organizationId: orgId! } }),
   });
 
   const summariesQ = useQuery({
-    enabled: !!orgId && isAdminRole,
+    enabled: allow && !!orgId && isAdminRole,
     queryKey: ["deadlines", "summaries", orgId],
     queryFn: async () => {
       await ensureFn({ data: { organizationId: orgId! } });
@@ -122,7 +123,7 @@ export function useDeadlines() {
   });
 
   const clientsQ = useQuery({
-    enabled: !!orgId && isAdminRole,
+    enabled: allow && !!orgId && isAdminRole,
     queryKey: ["deadlines", "clients", orgId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -135,7 +136,7 @@ export function useDeadlines() {
   });
 
   const incidentsQ = useQuery({
-    enabled: !!orgId && isAdminRole,
+    enabled: allow && !!orgId && isAdminRole,
     queryKey: ["deadlines", "incidents", orgId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -159,7 +160,7 @@ export function useDeadlines() {
   });
 
   const hrcRestrictionsQ = useQuery({
-    enabled: !!orgId && isAdminRole,
+    enabled: allow && !!orgId && isAdminRole,
     queryKey: ["deadlines", "hrc_restrictions", orgId],
     queryFn: async () => {
       const { data, error } = await supabase

@@ -75,6 +75,8 @@ import { NectarSearchBar } from "@/components/nectar/nectar-search-bar";
 import { ListChecks, Clock } from "lucide-react";
 import { FeatureLockedRoute, UpgradeGate } from "@/components/upgrade-gate";
 import { useActionRequiredQueue } from "@/hooks/use-action-required-queue";
+import { useYieldToAdminHomeQueries } from "@/hooks/use-yield-to-admin-home";
+import { isAdminHomePath } from "@/lib/yield-to-admin-home";
 import { OrgSwitcher, DemoBadge, DemoOrgBanner } from "@/components/org-switcher";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -554,8 +556,17 @@ function DashboardLayout() {
   });
 
   // Must stay above any conditional return — Rules of Hooks.
+  // On Admin Home the queue/bell obligation bootstraps wait until the two
+  // home queries settle so they do not starve a phone radio. Other routes
+  // fetch immediately. Badge stays hidden while loading.
+  const layoutReady = useYieldToAdminHomeQueries(
+    org?.organization_id ?? null,
+    isAdminCapable && isAdminHomePath(pathname),
+  );
   const { totalCount: complianceActionCount, isLoading: complianceQueueLoading } =
-    useActionRequiredQueue(isAdminCapable ? (org?.organization_id ?? null) : null);
+    useActionRequiredQueue(isAdminCapable ? (org?.organization_id ?? null) : null, {
+      enabled: layoutReady,
+    });
 
   const currentPreviewState = isStatePreview
     ? (states.find((s) => s.code === stateCode) ?? null)
@@ -825,7 +836,9 @@ function DashboardLayout() {
                     <span className="hidden md:inline">Guide me</span>
                   </button>
                   {isAdminCapable && effectiveView === "admin" && <DraftJobsHeaderPill />}
-                  {isAdminCapable && effectiveView === "admin" && <NotificationBell />}
+                  {isAdminCapable && effectiveView === "admin" && (
+                    <NotificationBell deadlinesEnabled={layoutReady} />
+                  )}
                   <Button onClick={signOut} variant="ghost" size="sm" className="md:hidden">
                     <LogOut className="h-4 w-4" />
                   </Button>

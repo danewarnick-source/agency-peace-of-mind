@@ -11,7 +11,7 @@ import { TOMMY_BEHAVIORS, TOMMY_GOALS } from "./fixtures";
 const FRAUD =
   "I attest that this shift note is accurate and truthful, that it reflects services I personally provided, and that I understand submitting false Medicaid documentation constitutes fraud.";
 
-const FIFTY_WORDS = Array.from({ length: 50 }, (_, i) => `word${i + 1}`).join(" ");
+const THIRTY_WORDS = Array.from({ length: 30 }, (_, i) => `word${i + 1}`).join(" ");
 
 export function PunchPadClockOutStage({ search }: { search: Record<string, string | undefined> }) {
   const [narrative, setNarrative] = useState(search.note ?? "");
@@ -31,7 +31,7 @@ export function PunchPadClockOutStage({ search }: { search: Record<string, strin
   }, [narrative]);
 
   const hasGoalSelected = baseline || Object.values(checkedGoals).some(Boolean);
-  const narrativeOk = wordCount >= 50;
+  const narrativeOk = wordCount >= 30;
   const behaviorOk = validateBehaviorAnswers(behaviorAnswers) === null;
   const canSubmit =
     hasGoalSelected &&
@@ -51,8 +51,8 @@ export function PunchPadClockOutStage({ search }: { search: Record<string, strin
       <p data-e2e-attest-initial={attestationChecked ? "1" : "0"}>
         Fraud attestation starts unchecked.
       </p>
-      <button type="button" onClick={() => setNarrative(FIFTY_WORDS)}>
-        Fill 50-word note
+      <button type="button" onClick={() => setNarrative(THIRTY_WORDS)}>
+        Fill 30-word note
       </button>
 
       <OriginalSpeechAudit transcript={search.spoken ?? ""} />
@@ -87,7 +87,7 @@ export function PunchPadClockOutStage({ search }: { search: Record<string, strin
           onChange={(e) => setNarrative(e.target.value)}
           rows={8}
         />
-        <p>Word Count: {wordCount} / 50 words minimum</p>
+        <p>Word Count: {wordCount} / 30 words minimum</p>
       </section>
 
       <section>

@@ -37,7 +37,7 @@ export type PendingMedDose = {
 };
 
 const INLINE_STATUS_OPTIONS: { value: EmarStatus; label: string }[] = [
-  { value: "self_administered", label: "Observed" },
+  { value: "self_administered", label: "Self administered" },
   { value: "missed", label: "Missed" },
   { value: "refused", label: "Refused" },
   { value: "loa", label: "LOA (away with meds)" },

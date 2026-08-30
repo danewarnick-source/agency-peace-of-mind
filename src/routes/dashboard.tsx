@@ -808,7 +808,7 @@ function DashboardLayout() {
                       nav={allNav.map((n) => ({ to: n.to, label: n.label }))}
                       isAdminCapable={isAdminCapable && effectiveView === "admin"}
                       variant="desktop"
-                      askRoute="/dashboard/help"
+                      askRoute={effectiveView === "staff" ? "/dashboard/ask-nectar" : "/dashboard/help"}
                     />
                   )}
                 </div>
@@ -852,11 +852,15 @@ function DashboardLayout() {
                     nav={allNav.map((n) => ({ to: n.to, label: n.label }))}
                     isAdminCapable={isAdminCapable && effectiveView === "admin"}
                     variant="mobile"
-                    askRoute="/dashboard/help"
+                    askRoute={effectiveView === "staff" ? "/dashboard/ask-nectar" : "/dashboard/help"}
                   />
                 </div>
               )}
-              <NectarTaskCenter open={taskCenterOpen} onOpenChange={setTaskCenterOpen} />
+              <NectarTaskCenter
+                open={taskCenterOpen}
+                onOpenChange={setTaskCenterOpen}
+                surface={effectiveView === "staff" ? "staff" : "admin"}
+              />
               {!isHiveExecView && !isStatePreview && <DemoOrgBanner />}
 
               {isStatePreview && (

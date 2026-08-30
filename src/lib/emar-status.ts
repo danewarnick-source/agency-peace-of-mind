@@ -21,7 +21,7 @@ export function normalizeEmarStatus(raw: string): EmarStatus {
 }
 
 export const EMAR_STATUS_LABELS: Record<EmarStatus, string> = {
-  self_administered: "Observed",
+  self_administered: "Self administered",
   refused: "Refused",
   omitted: "Omitted",
   missed: "Missed",

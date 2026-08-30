@@ -8,6 +8,8 @@ export {
   allowedCodesFor,
   clientAuthorizedCodes,
   defaultCaseloadCode,
+  hasHostHomeDailyCode,
+  isHostHomeOnlyAssignment,
   type AssignmentMap,
 } from "@/lib/assignment-codes";
 

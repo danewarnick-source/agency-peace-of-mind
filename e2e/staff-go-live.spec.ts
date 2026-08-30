@@ -46,7 +46,7 @@ test.describe("Hive STAFF go-live — punch pad", () => {
     await expect(page.getByText(/Timesheet writes: 0/)).toBeVisible();
   });
 
-  test("punch pad requires goal, 50-word note, incident, behaviors, meds, attest", async ({
+  test("punch pad requires goal, 30-word note, incident, behaviors, meds, attest", async ({
     page,
   }) => {
     await gotoScenario(page, "clock-out");
@@ -58,8 +58,8 @@ test.describe("Hive STAFF go-live — punch pad", () => {
     await page.getByRole("checkbox", { name: /Increase independent cooking skills/i }).check();
     await expect(submit).toBeDisabled();
 
-    await page.getByRole("button", { name: /Fill 50-word note/i }).click();
-    await expect(page.getByRole("textbox", { name: "Shift note" })).toHaveValue(/word50/);
+    await page.getByRole("button", { name: /Fill 30-word note/i }).click();
+    await expect(page.getByRole("textbox", { name: "Shift note" })).toHaveValue(/word30/);
     await expect(submit).toBeDisabled();
 
     await page.getByRole("button", { name: /^No$/i }).click();

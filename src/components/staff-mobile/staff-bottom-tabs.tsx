@@ -67,6 +67,7 @@ export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
               ) : (
                 <Link
                   to={t.to}
+                  data-tour={`nav.${t.to.replace(/^\/dashboard\/?/, "") || "home"}`}
                   className={`relative flex min-h-[56px] flex-col items-center justify-center gap-0.5 px-1 py-2 text-[11px] font-medium tracking-tight transition-all duration-150 active:scale-[0.95] ${
                     active ? "text-[oklch(var(--accent-2))]" : "text-white/65 hover:text-white"
                   }`}

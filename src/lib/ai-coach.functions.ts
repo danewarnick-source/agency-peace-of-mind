@@ -3,13 +3,18 @@ import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 import { gatewayFetch, assertBedrockConfigured } from "@/lib/ai-bedrock.server";
+import {
+  type CompletenessItem,
+  type CompletenessResult,
+  localWordCountCheck,
+  mergeLocalAndNectarChecks,
+  parseNectarCompletenessPayload,
+} from "@/lib/nectar-completeness";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface CoachResult {
-  status: "Verified" | "Flagged";
-  feedback: string;
-}
+/** Submit-time completeness result. Kept as CoachResult so existing callers compile. */
+export type CoachResult = CompletenessResult;
 
 export interface ScanResult {
   hasIncidentTrigger: boolean;
@@ -95,38 +100,29 @@ export const evaluateShiftNote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateCoach)
   .handler(async ({ data }): Promise<CoachResult> => {
-    const serviceCode = data.serviceCode;
-    const system = `You are a strict but encouraging Medicaid DSPD Documentation Coach reviewing a direct support professional's shift progress note.
+    const wordCheck = localWordCountCheck(data.narrative);
+    if (!wordCheck.passed) {
+      return {
+        status: "Flagged",
+        feedback: wordCheck.message,
+        checks: [wordCheck],
+      };
+    }
 
-A compliant, quality shift note MUST meet ALL five standards below. Evaluate each independently.
+    const system = `You are NECTAR running the submit completeness check on a Utah DSPD progress note.
 
-STANDARD 1 — STAFF ACTIONS: The note must explicitly describe what the STAFF MEMBER did to support the client. What did staff prompt, assist with, facilitate, redirect, or provide? Passive descriptions of what the client did without staff involvement fail this standard. Required phrases include staff verbs: "staff prompted," "staff assisted," "staff supported," "staff facilitated," "staff redirected," "staff provided."
+Evaluate ONLY these three items. Do NOT flag goal alignment, noteworthy observations, style, or length — word count is checked separately.
 
-STANDARD 2 — CLIENT RESPONSE: The note must describe how the client responded — not just their mood label. Specific behaviors, choices, verbal responses, or reactions are required. "Client was in a good mood" fails. "Client declined the first activity but agreed when offered an alternative" passes.
+1. CLIENT REFERENCED — The note names or clearly refers to this specific client (first name, or an unambiguous pronoun referring to the named person). A note that could be about someone else fails.
 
-STANDARD 3 — GOAL ALIGNMENT: For each checked PCSP goal, the note must describe a specific interaction or support action that contextually addresses that goal in a real-world way. Generic "baseline support was provided" only passes when no goals are checked.
+2. SUPPORT PROVIDED — The note describes what staff did to support the client (prompted, assisted, facilitated, redirected, provided). Client-only activity with no staff action fails.
 
-STANDARD 4 — NOTEWORTHY OBSERVATIONS: The note must include at least one specific observation beyond routine — client mood with behavioral evidence, a health observation, a community interaction, a behavioral pattern, a safety note, or anything an auditor or next-shift staff would need to know. A note that could apply to any shift for any client fails this standard.
+3. CLIENT RESPONSE — The note describes how the client responded: a behavior, choice, verbal reply, or reaction. Mood-only ("good mood") without a response fails.
 
-STANDARD 5 — SUBSTANTIVE CONTENT: The note must be at least 30 words AND substantive. A 30-word note of vague filler fails even if it meets word count.
+For each item return passed true/false and a one-sentence message. If failed, say exactly what sentence to add. If passed, briefly confirm what you saw.
 
-SERVICE CODE CONTEXT:
-${serviceCode === "HHS" || serviceCode === "RHS" ? "- This is a residential shift. If medications were administered, the note should reference medication support or note that no medications were due." : ""}
-${serviceCode === "SEI" ? "- This is a supported employment shift. The note should reference employment goals, job tasks, employer interactions, or skill-building activities." : ""}
-${serviceCode === "DSI" || serviceCode === "DSG" || serviceCode === "DSP" ? "- This is a day program shift. The note should reference program activities, community participation, or skill development." : ""}
-${serviceCode === "SLH" || serviceCode === "SLN" ? "- This is a supported living shift. The note should reference independent living skills, community access, or daily living support." : ""}
-
-WHAT TO FLAG:
-- Notes that only describe client behavior without staff action
-- Vague mood statements without behavioral evidence
-- Notes that don't connect staff actions to checked goals
-- Notes that could describe any shift rather than this specific one
-- Clearly templated or copy-paste notes
-
-OUTPUT — return STRICT JSON only, no markdown, no code fences:
-{"status":"Verified"|"Flagged","feedback":"<1-2 sentences: name the specific standard that failed and tell the staff member exactly what sentence or detail to add>"}
-
-If ALL five standards are met, return "Verified" with a brief specific positive confirmation referencing what was done well.`;
+OUTPUT — STRICT JSON only, no markdown, no code fences:
+{"client_referenced":{"passed":true|false,"message":"..."},"support_provided":{"passed":true|false,"message":"..."},"client_response":{"passed":true|false,"message":"..."}}`;
 
     const user = `SERVICE CODE: ${data.serviceCode}
 CLIENT FIRST NAME: ${data.clientFirstName}
@@ -139,7 +135,7 @@ ${data.narrative}
 """`;
 
     const raw = await callAI(system, user);
-    let parsed: { status?: string; feedback?: string } = {};
+    let parsed: unknown = {};
     try {
       parsed = JSON.parse(raw);
     } catch {
@@ -147,16 +143,8 @@ ${data.narrative}
       if (m) { try { parsed = JSON.parse(m[0]); } catch { /* ignore */ } }
     }
 
-    const status: "Verified" | "Flagged" =
-      parsed.status === "Verified" ? "Verified" : "Flagged";
-    const feedback =
-      typeof parsed.feedback === "string" && parsed.feedback.trim().length > 0
-        ? parsed.feedback.trim()
-        : status === "Verified"
-          ? "Note meets DSPD documentation standards."
-          : "Add 1–2 sentences describing specifically how you supported each checked PCSP goal during this shift.";
-
-    return { status, feedback };
+    const nectarChecks: CompletenessItem[] = parseNectarCompletenessPayload(parsed);
+    return mergeLocalAndNectarChecks(data.narrative, nectarChecks);
   });
 
 // ─── Draft Assist — expand shorthand/voice into a compliant draft note ───────

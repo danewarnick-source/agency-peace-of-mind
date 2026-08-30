@@ -34,7 +34,13 @@ import { NoteTriggerPrompt } from "@/components/residential/note-trigger-prompt"
 import { DailyNoteMedsBlock, type DailyNoteMedication } from "@/components/medications/daily-note-meds-block";
 import { type PendingMedDose } from "@/components/medications/shift-med-due-check";
 import { NectarShiftNoteDraft } from "@/components/nectar/nectar-shift-note-draft";
-import { NECTAR_DRAFT_MIN_WORDS } from "@/lib/nectar-note-gate";
+import { NectarCompletenessErrors } from "@/components/nectar/nectar-completeness-errors";
+import { NECTAR_DRAFT_MIN_WORDS, countNoteWords } from "@/lib/nectar-note-gate";
+import {
+  type CompletenessItem,
+  COMPLETENESS_PASS_FEEDBACK,
+  localWordCountCheck,
+} from "@/lib/nectar-completeness";
 
 const hhsSearch = z.object({
   tab: z.string().optional(),
@@ -201,7 +207,7 @@ export function HhsClientHub({ clientId }: { clientId: string }) {
   );
 }
 
-// ============ Daily Note + NECTAR Coach + AI Interlock Gates ============
+// ============ Daily Note + NECTAR submit completeness + interlock gates ============
 const MEDICAL_RX = /\b(appointment|appt|doctor|dr\.|dentist|dental|clinic|specialist|checkup|check[- ]up|seen by|visited (?:the )?(?:doctor|md|clinic|hospital))\b/i;
 const today = () => denverYmd();
 
@@ -217,14 +223,10 @@ function DailyNoteTab({
   const navigate = useNavigate();
   const [note, setNote] = useState("");
   const [goals, setGoals] = useState<string[]>([]);
-  const [coach, setCoach] = useState<{ status: string; feedback: string } | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
-  const [aiFlagCount, setAiFlagCount] = useState(0);
-  const [aiIterations, setAiIterations] = useState(0);
-  const [allowException, setAllowException] = useState(false);
+  const [completenessErrors, setCompletenessErrors] = useState<CompletenessItem[]>([]);
   const [interlock, setInterlock] = useState<{ kind: "incident" | "medical"; msg: string } | null>(null);
   const [showNarrativeError, setShowNarrativeError] = useState(false);
-  const [success, setSuccess] = useState(false);
   // Nectar deterministic trigger gating — default true (no triggers fired).
   const [triggersResolved, setTriggersResolved] = useState(true);
   // Final attestation — "I attest this note accurately reflects today's support".
@@ -246,7 +248,7 @@ function DailyNoteTab({
   const pcsp   = client.pcsp_goals ?? [];
 
   const MIN_WORDS = NECTAR_DRAFT_MIN_WORDS;
-  const words     = note.trim().split(/\s+/).filter(Boolean).length;
+  const words     = countNoteWords(note);
   const narrativeOk = words >= MIN_WORDS;
   const hasGoal     = goals.length > 0;
 
@@ -296,9 +298,13 @@ function DailyNoteTab({
     return true;
   };
 
-  async function handleSubmit(opts?: { exception?: boolean }) {
+  async function handleSubmit() {
     if (!hasGoal) { toast.error("Select at least one PCSP goal."); return; }
-    if (!narrativeOk) { setShowNarrativeError(true); return; }
+    if (!narrativeOk) {
+      setShowNarrativeError(true);
+      setCompletenessErrors([localWordCountCheck(note)]);
+      return;
+    }
     if (!triggersResolved) {
       toast.error("Resolve Nectar's note triggers before submitting.");
       return;
@@ -321,25 +327,28 @@ function DailyNoteTab({
     }
     if (!hasSigRef.current) { toast.error("Please sign the daily note before saving."); return; }
 
-
-    const isException = !!opts?.exception;
-    let verdict = coach;
-    let iters   = aiIterations;
-
-    if (!isException && (!verdict || verdict.status !== "Verified")) {
-      setAiBusy(true);
-      try {
-        const result = await evalFn({ data: { narrative: note, goals, clientFirstName: client.first_name, serviceCode: "HHS" } });
-        verdict = result; setCoach(result);
-        iters += 1; setAiIterations(iters);
-        if (result.status === "Flagged") {
-          const next = aiFlagCount + 1; setAiFlagCount(next);
-          if (next >= 2) setAllowException(true);
-          setAiBusy(false); return;
-        }
-      } catch (e) {
-        toast.error((e as Error).message || "NECTAR coach unavailable."); setAiBusy(false); return;
+    let aiFeedback = COMPLETENESS_PASS_FEEDBACK;
+    setAiBusy(true);
+    try {
+      const result = await evalFn({
+        data: { narrative: note, goals, clientFirstName: client.first_name, serviceCode: "HHS" },
+      });
+      if (result.status !== "Verified") {
+        setCompletenessErrors(result.checks.filter((c) => !c.passed));
+        return;
       }
+      setCompletenessErrors([]);
+      aiFeedback = result.feedback || COMPLETENESS_PASS_FEEDBACK;
+    } catch (e) {
+      setCompletenessErrors([
+        {
+          key: "support_provided",
+          passed: false,
+          message: (e as Error).message || "NECTAR could not check this note. Tap Save Daily Note again.",
+        },
+      ]);
+      return;
+    } finally {
       setAiBusy(false);
     }
 
@@ -370,10 +379,8 @@ function DailyNoteTab({
           recordDate,
           narrative: note,
           pcspGoalsAddressed: goals,
-          aiStatus: isException ? "Exception" : (verdict?.status ?? null),
-          aiFeedback: isException
-            ? "Submitted with Exception Flag — pending admin review."
-            : (verdict?.feedback ?? null),
+          aiStatus: "Verified",
+          aiFeedback,
           signatureDataUrl: signature,
           backdated: recordDate < denverToday,
           originalDueDate: recordDate < denverToday ? recordDate : null,
@@ -381,49 +388,11 @@ function DailyNoteTab({
           incidentRequired: incidentAnswer === "yes",
         },
       });
-      // Medication compliance is now recorded in the real MAR (`emar_logs`)
-      // via the eMAR tab — no shadow attestation write here.
-
-      setSuccess(true);
       toast.success("Daily progress note saved.");
-      setNote(""); setGoals([]); setCoach(null); setAiIterations(0);
-      setAiFlagCount(0); setAllowException(false); setShowNarrativeError(false);
-      setMedDosesResolved(true);
-      setPendingMedDoses([]);
-      setNectarUsed(false);
-      setNectarAssistChecked(false);
-      hasSigRef.current = false; clearCanvas();
+      navigate({ to: "/dashboard" });
     } catch (e) {
       toast.error((e as Error).message || "Could not save note.");
     }
-  }
-
-  if (success) {
-    return (
-      <Card>
-        <CardContent className="py-10 text-center space-y-3">
-          <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
-          <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">Daily note submitted</p>
-          <p className="text-sm text-muted-foreground">Your progress note and signature have been saved and submitted for administrative approval. This date is marked present on monthly attendance.</p>
-          {incidentAnswer === "yes" ? (
-            <Button
-              className="h-12 w-full sm:w-auto"
-              onClick={() =>
-                navigate({ to: ".", search: { tab: "prn", open: "incident" }, replace: true })
-              }
-            >
-              Open incident report
-            </Button>
-          ) : null}
-          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-            <Button onClick={() => navigate({ to: "/dashboard" })}>Back to My Caseload</Button>
-            <Button variant="outline" onClick={() => { setSuccess(false); setIncidentAnswer(null); }}>
-              Submit another note
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
   }
 
   return (
@@ -471,7 +440,7 @@ function DailyNoteTab({
                     checked={checked}
                     onCheckedChange={(c) => {
                       setGoals(c ? [...goals, g] : goals.filter((x) => x !== g));
-                      if (coach) setCoach(null);
+                      if (completenessErrors.length) setCompletenessErrors([]);
                     }}
                   />
                   <span className="min-w-0 flex-1 leading-snug">{g}</span>
@@ -491,7 +460,7 @@ function DailyNoteTab({
             onChange={(e) => {
               setNote(e.target.value);
               if (showNarrativeError) setShowNarrativeError(false);
-              if (coach) setCoach(null);
+              if (completenessErrors.length) setCompletenessErrors([]);
             }}
             placeholder="Describe support provided, behaviors observed, goal progress, ADLs, community activities…"
             className="mt-1"
@@ -516,10 +485,11 @@ function DailyNoteTab({
           clientFirstName={client.first_name}
           onApplyDraft={(draft) => {
             setNote(draft);
-            if (coach) setCoach(null);
+            if (completenessErrors.length) setCompletenessErrors([]);
           }}
           onUsed={() => setNectarUsed(true)}
         />
+        <NectarCompletenessErrors checks={completenessErrors} />
 
         <NoteTriggerPrompt
           text={note}
@@ -535,24 +505,6 @@ function DailyNoteTab({
           }}
           onAllResolved={setTriggersResolved}
         />
-
-        {/* NECTAR Coach */}
-        {(aiBusy || coach) && (
-          <div className={`rounded-lg border-2 px-4 py-3 ${coach?.status === "Verified" ? "border-emerald-500/40 bg-emerald-500/10" : "border-amber-500/40 bg-amber-500/10"}`}>
-            <div className="mb-1 flex items-center gap-2 text-sm font-bold">
-              💡 NECTAR Documentation Coach
-              {aiBusy && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-            </div>
-            {coach && (
-              <p className={`text-xs leading-relaxed ${coach.status === "Verified" ? "text-emerald-800 dark:text-emerald-200" : "text-amber-900 dark:text-amber-100"}`}>
-                {coach.status === "Verified" ? "🟢 NECTAR CLEARED — " : "⚠️ "}{coach.feedback}
-              </p>
-            )}
-            {coach?.status === "Flagged" && (
-              <p className="mt-1 text-[11px] text-muted-foreground">Edit your narrative and re-submit. Iteration {aiIterations}.</p>
-            )}
-          </div>
-        )}
 
         {/* Signature */}
         <div>
@@ -649,17 +601,9 @@ function DailyNoteTab({
             onClick={() => handleSubmit()}
             disabled={!hasGoal || !narrativeOk || aiBusy || !triggersResolved || !finalAttest || (nectarUsed && !nectarAssistChecked) || !medDosesResolved || !incidentAnswer}>
             {aiBusy
-              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />NECTAR reviewing your note…</>
-              : coach?.status === "Flagged"
-              ? "🔁 Re-Check with NECTAR Coach"
+              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Checking note…</>
               : <><CheckCircle2 className="mr-2 h-4 w-4" />Save Daily Note</>}
           </Button>
-          {allowException && coach?.status === "Flagged" && (
-            <Button variant="outline" className="w-full border-rose-500/50 text-rose-700 hover:bg-rose-500/10 dark:text-rose-300"
-              onClick={() => handleSubmit({ exception: true })} disabled={aiBusy}>
-              🚩 Submit with Exception Flag
-            </Button>
-          )}
         </div>
       </CardContent>
 

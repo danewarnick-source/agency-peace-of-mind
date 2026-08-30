@@ -99,6 +99,9 @@ test.describe("HHS hub — mocked admin (Blake Stevens host home)", () => {
 
     // There is no Cancel button on this screen — leaving without Save is the abort.
     await expect(page.getByRole("button", { name: /Save Daily Note/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Review with NECTAR/i })).toHaveCount(0);
+    await expect(page.getByText(/NECTAR Documentation Coach/i)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Submit with Exception Flag/i })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Cancel/i })).toHaveCount(0);
     await shot(page, "hhs_daily_note_typed_not_saved");
     await page.getByRole("link", { name: /Back to caseload/i }).click();

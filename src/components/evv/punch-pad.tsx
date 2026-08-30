@@ -26,9 +26,15 @@ import { clientAuthorizedCodes } from "@/lib/assignment-codes";
 import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { computeEntryUnits } from "@/lib/billing-units";
 import { EvvConsentGate } from "@/components/evv/consent-gate";
-import { evaluateShiftNote, type CoachResult } from "@/lib/ai-coach.functions";
+import { evaluateShiftNote } from "@/lib/ai-coach.functions";
 import { NectarShiftNoteDraft } from "@/components/nectar/nectar-shift-note-draft";
-import { NECTAR_DRAFT_MIN_WORDS } from "@/lib/nectar-note-gate";
+import { NectarCompletenessErrors } from "@/components/nectar/nectar-completeness-errors";
+import { NECTAR_DRAFT_MIN_WORDS, countNoteWords } from "@/lib/nectar-note-gate";
+import {
+  type CompletenessItem,
+  COMPLETENESS_PASS_FEEDBACK,
+  localWordCountCheck,
+} from "@/lib/nectar-completeness";
 import { freezeOriginalTranscript } from "@/lib/original-transcript";
 import {
   accumulateSpeechResults,
@@ -300,12 +306,9 @@ export function PunchPad({
   const [correctionOut, setCorrectionOut] = useState<string>(""); // datetime-local
   const [correctionReason, setCorrectionReason] = useState("");
 
-  // ── NECTAR Documentation Coach state ────────────────────────────────────────────
-  const [aiBusy, setAiBusy]               = useState(false);
-  const [aiCoach, setAiCoach]             = useState<CoachResult | null>(null);
-  const [aiIterations, setAiIterations]   = useState(0);
-  const [aiFlagCount, setAiFlagCount]     = useState(0);
-  const [allowException, setAllowException] = useState(false);
+  // ── NECTAR submit completeness (the only documentation gate) ────────────────
+  const [aiBusy, setAiBusy] = useState(false);
+  const [completenessErrors, setCompletenessErrors] = useState<CompletenessItem[]>([]);
 
   // ── Voice dictation for the narrative textarea ──────────────────────────────
   const { enabled: nectarInfusionEnabled } = useNectarInfusion();
@@ -951,11 +954,7 @@ export function PunchPad({
 
 
 
-  const wordCount = useMemo(() => {
-    const t = narrative.trim();
-    if (!t) return 0;
-    return t.split(/\s+/).filter(Boolean).length;
-  }, [narrative]);
+  const wordCount = useMemo(() => countNoteWords(narrative), [narrative]);
 
   const hasGoalSelected    = baselineChecked || Object.values(checkedGoals).some(Boolean);
   const narrativeOk        = wordCount >= NECTAR_DRAFT_MIN_WORDS;
@@ -1008,10 +1007,7 @@ export function PunchPad({
     setIncidentAnswer(null);
 
     setShowNarrativeError(false);
-    setAiCoach(null);
-    setAiIterations(0);
-    setAiFlagCount(0);
-    setAllowException(false);
+    setCompletenessErrors([]);
     setAttestationChecked(false);
     setAttestationTimestamp(null);
     setNectarUsed(false);
@@ -1227,7 +1223,7 @@ export function PunchPad({
         if (display.trim()) {
           setOriginalTranscript((prev) => freezeOriginalTranscript(prev, display));
           setShowNarrativeError(false);
-          setAiCoach(null);
+          setCompletenessErrors([]);
         }
       },
       onSessionEnd: () => {
@@ -1276,38 +1272,6 @@ export function PunchPad({
       toast.error((e as Error).message || "NECTAR couldn't answer right now.");
     } finally {
       setAskBusy(false);
-    }
-  }
-
-  // Voluntary pre-submit review — same evaluateShiftNote call submitCompliance
-  // runs, but staff can trigger it any time the narrative has ≥20 words.
-  async function reviewWithNectar() {
-    if (!active) return;
-    setAiBusy(true);
-    try {
-      const selectedGoalsForAi = Object.entries(checkedGoals)
-        .filter(([, v]) => v)
-        .map(([k]) => k);
-      if (baselineChecked) selectedGoalsForAi.push("General baseline monitoring & safety oversight");
-
-      const clientFirst =
-        lockedClient?.name?.split(" ")?.[0] ??
-        caseload.find((c) => c.id === active.client_id)?.first_name ??
-        "the client";
-
-      const verdict = await evaluateShiftNote({
-        data: {
-          narrative: narrative.trim(),
-          goals: selectedGoalsForAi,
-          clientFirstName: clientFirst,
-          serviceCode: active.service_type_code,
-        },
-      });
-      setAiCoach(verdict);
-    } catch (e) {
-      toast.error((e as Error).message || "NECTAR coach unavailable — please try again.");
-    } finally {
-      setAiBusy(false);
     }
   }
 
@@ -1517,7 +1481,7 @@ export function PunchPad({
         context: {
           client_id: active.client_id,
           service_code: active.service_type_code,
-          nectar_review_status: aiCoach?.status ?? "not_reviewed",
+          nectar_review_status: args.aiStatus ?? "not_reviewed",
         },
         original_staff_input: frozenOriginal || null,
         nectar_expanded_output: nectarUsed ? nectarDraftApplied : null,
@@ -1767,7 +1731,7 @@ export function PunchPad({
     await qc.invalidateQueries({ queryKey: ["evv-active", user.id] });
   }
 
-  async function submitCompliance(opts?: { exception?: boolean }) {
+  async function submitCompliance() {
     if (!user || !active) return;
     if (!hasGoalSelected) {
       toast.error("Select at least one PCSP goal or baseline monitoring.");
@@ -1775,6 +1739,7 @@ export function PunchPad({
     }
     if (!narrativeOk) {
       setShowNarrativeError(true);
+      setCompletenessErrors([localWordCountCheck(narrative)]);
       return;
     }
     if (behaviorEnabled && behaviorError) {
@@ -1848,74 +1813,51 @@ export function PunchPad({
 
 
 
-    const isException     = !!opts?.exception;
-    let aiVerdict: CoachResult | null = aiCoach;
-    let iterationsToPersist = aiIterations;
-    let skippedServiceUnavailable = false;
-    let serviceErrorMsg = "";
+    // One completeness gate on Submit: local 30-word check, then NECTAR for
+    // client / support / response. Fail stays on the form. No exception path.
+    let aiVerdictFeedback = COMPLETENESS_PASS_FEEDBACK;
+    setAiBusy(true);
+    try {
+      const selectedGoalsForAi = Object.entries(checkedGoals)
+        .filter(([, v]) => v)
+        .map(([k]) => k);
+      if (baselineChecked) selectedGoalsForAi.push("General baseline monitoring & safety oversight");
 
-    if (!isException && (!aiVerdict || aiVerdict.status !== "Verified")) {
-      setAiBusy(true);
-      try {
-        const selectedGoalsForAi = Object.entries(checkedGoals)
-          .filter(([, v]) => v)
-          .map(([k]) => k);
-        if (baselineChecked) selectedGoalsForAi.push("General baseline monitoring & safety oversight");
+      const clientFirst =
+        lockedClient?.name?.split(" ")?.[0] ??
+        caseload.find((c) => c.id === active.client_id)?.first_name ??
+        "the client";
 
-        const clientFirst =
-          lockedClient?.name?.split(" ")?.[0] ??
-          caseload.find((c) => c.id === active.client_id)?.first_name ??
-          "the client";
-
-        const verdict = await evaluateShiftNote({
-          data: {
-            narrative: narrative.trim(),
-            goals: selectedGoalsForAi,
-            clientFirstName: clientFirst,
-            serviceCode: active.service_type_code,
-          },
-        });
-        aiVerdict = verdict;
-        setAiCoach(verdict);
-        const nextIter = aiIterations + 1;
-        setAiIterations(nextIter);
-        iterationsToPersist = nextIter;
-
-        if (verdict.status === "Flagged") {
-          const nextFlags = aiFlagCount + 1;
-          setAiFlagCount(nextFlags);
-          if (nextFlags >= 2) setAllowException(true);
-          return;
-        }
-      } catch (e) {
-        const errMsg = (e as Error).message ?? "";
-        const isServiceError = errMsg.includes("rate limit") ||
-                               errMsg.includes("unavailable") ||
-                               errMsg.includes("429") ||
-                               errMsg.includes("AI error");
-        if (isServiceError) {
-          // NECTAR unavailable — allow submission with flag, do not block staff from clocking out
-          toast.warning("NECTAR review unavailable — submitting with service flag. Admin will review.");
-          skippedServiceUnavailable = true;
-          serviceErrorMsg = errMsg;
-          // Continue to submission — do not return
-        } else {
-          // Validation error or bad input — show and block
-          toast.error(errMsg || "NECTAR coach unavailable — please try again.");
-          return;
-        }
-      } finally {
-        setAiBusy(false);
+      const verdict = await evaluateShiftNote({
+        data: {
+          narrative: narrative.trim(),
+          goals: selectedGoalsForAi,
+          clientFirstName: clientFirst,
+          serviceCode: active.service_type_code,
+        },
+      });
+      if (verdict.status !== "Verified") {
+        setCompletenessErrors(verdict.checks.filter((c) => !c.passed));
+        return;
       }
+      setCompletenessErrors([]);
+      aiVerdictFeedback = verdict.feedback || COMPLETENESS_PASS_FEEDBACK;
+    } catch (e) {
+      const errMsg = (e as Error).message ?? "";
+      setCompletenessErrors([
+        {
+          key: "support_provided",
+          passed: false,
+          message: errMsg || "NECTAR could not check this note. Fix nothing yet — tap Submit again.",
+        },
+      ]);
+      return;
+    } finally {
+      setAiBusy(false);
     }
 
-    const aiStatusForRow: "Verified" | "Exception" | "skipped_service_unavailable" =
-      skippedServiceUnavailable ? "skipped_service_unavailable" : isException ? "Exception" : "Verified";
-    const aiFeedbackForRow = skippedServiceUnavailable
-      ? `NECTAR review skipped: ${serviceErrorMsg}`
-      : isException
-      ? "🔴 Submitted with Exception Flag — NECTAR coaching not satisfied; pending admin review."
-      : aiVerdict?.feedback ?? "Verified by NECTAR Documentation Coach.";
+    const aiStatusForRow = "Verified" as const;
+    const aiFeedbackForRow = aiVerdictFeedback;
 
     setBusy(true);
     try {
@@ -2005,7 +1947,7 @@ export function PunchPad({
               pos,
               aiStatus: aiStatusForRow,
               aiFeedback: aiFeedbackForRow,
-              aiIterationCount: iterationsToPersist,
+              aiIterationCount: 1,
               correction: correctionPayload,
             });
           setPendingFormsDialog({
@@ -2040,7 +1982,7 @@ export function PunchPad({
         pos,
         aiStatus: aiStatusForRow,
         aiFeedback: aiFeedbackForRow,
-        aiIterationCount: iterationsToPersist,
+        aiIterationCount: 1,
         correction: correctionPayload,
       });
     } catch (e) {
@@ -2821,7 +2763,7 @@ export function PunchPad({
                     onChange={(e) => {
                       setNarrative(e.target.value);
                       if (showNarrativeError) setShowNarrativeError(false);
-                      if (aiCoach) setAiCoach(null);
+                      if (completenessErrors.length) setCompletenessErrors([]);
                     }}
                     placeholder="Describe client behaviors, choices, goal responses, and any incidents observed during this shift…"
                     maxLength={5000}
@@ -2863,25 +2805,11 @@ export function PunchPad({
                     onApplyDraft={(draft) => {
                       setNarrative(draft);
                       setNectarDraftApplied(draft);
-                      if (aiCoach) setAiCoach(null);
+                      if (completenessErrors.length) setCompletenessErrors([]);
                     }}
                     onUsed={() => setNectarUsed(true)}
                   />
-                  <div className="flex flex-wrap gap-2">
-                    {wordCount >= NECTAR_DRAFT_MIN_WORDS && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={reviewWithNectar}
-                        disabled={aiBusy}
-                        className="w-fit border-[color:var(--amber-600)]/60 text-[color:var(--amber-700)] hover:bg-[color:var(--amber-50)]"
-                      >
-                        {aiBusy ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-2 h-3.5 w-3.5" />}
-                        Review with NECTAR
-                      </Button>
-                    )}
-                  </div>
+                  <NectarCompletenessErrors checks={completenessErrors} />
                 </div>
 
                 {/* Incident report: explicit Yes/No so staff cannot skip it. */}
@@ -2979,35 +2907,6 @@ export function PunchPad({
                   }}
                 />
 
-
-                {/* NECTAR Documentation Coach */}
-                {(aiBusy || aiCoach) && (
-                  <div className={`rounded-lg border-2 px-4 py-3 ${
-                    aiCoach?.status === "Verified"
-                      ? "border-emerald-500/40 bg-emerald-500/10"
-                      : "border-amber-500/40 bg-amber-500/10"
-                  }`}>
-                    <div className="mb-1 flex items-center gap-2 text-sm font-bold">
-                      💡 NECTAR Documentation Coach
-                      {aiBusy && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-                    </div>
-                    {aiCoach && (
-                      <p className={`text-xs leading-relaxed ${
-                        aiCoach.status === "Verified"
-                          ? "text-emerald-800 dark:text-emerald-200"
-                          : "text-amber-900 dark:text-amber-100"
-                      }`}>
-                        {aiCoach.status === "Verified" ? "🟢 NECTAR CLEARED — " : "⚠️ "}
-                        {aiCoach.feedback}
-                      </p>
-                    )}
-                    {aiCoach?.status === "Flagged" && (
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        Edit your narrative above based on the tip, then re-submit. Iteration {aiIterations}.
-                      </p>
-                    )}
-                  </div>
-                )}
 
                 {/* Post-shift Behavior Observations (provider-toggled) */}
                 {behaviorEnabled && (
@@ -3386,26 +3285,9 @@ export function PunchPad({
                     }
                   >
                     {(busy || aiBusy) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {aiBusy
-                      ? "🧠 NECTAR Coach reviewing your note…"
-                      : awaitingGps
-                      ? "Getting location…"
-                      : aiCoach?.status === "Flagged"
-                      ? "🔁 Re-Check with NECTAR Coach"
-                      : "💾 Submit Timeclock"}
+                    {aiBusy ? "Checking note…" : awaitingGps ? "Getting location…" : "Submit Timeclock"}
                   </Button>
                 </div>
-                {allowException && aiCoach?.status === "Flagged" && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => submitCompliance({ exception: true })}
-                    disabled={busy || aiBusy}
-                    className="w-full border-rose-500/50 text-rose-700 hover:bg-rose-500/10 dark:text-rose-300"
-                  >
-                    🚩 Submit with Exception Flag
-                  </Button>
-                )}
               </div>
             </div>
           </DialogContent>

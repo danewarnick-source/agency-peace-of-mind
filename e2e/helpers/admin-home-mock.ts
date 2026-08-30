@@ -353,6 +353,44 @@ function parsePostgrestFilters(url: URL): Array<{ col: string; op: string; value
   return out;
 }
 
+function attachEmbeds(
+  table: string,
+  rows: Record<string, unknown>[],
+  select: string,
+  tables: Record<string, Record<string, unknown>[]>,
+): Record<string, unknown>[] {
+  if (table !== "company_obligation_instances") return rows;
+  const wantsObligations = /company_obligations/.test(select);
+  const wantsAssignees = /company_obligation_instance_assignees/.test(select);
+  const wantsCompletions = /company_obligation_completions/.test(select);
+  if (!wantsObligations && !wantsAssignees && !wantsCompletions) return rows;
+
+  return rows.map((row) => {
+    const next = { ...row };
+    if (wantsObligations) {
+      const ob = (tables.company_obligations ?? []).find((o) => o.id === row.obligation_id);
+      next.company_obligations = ob
+        ? {
+            title: ob.title,
+            source_policy_section: ob.source_policy_section,
+            scope: ob.scope,
+          }
+        : null;
+    }
+    if (wantsAssignees) {
+      next.company_obligation_instance_assignees = (
+        tables.company_obligation_instance_assignees ?? []
+      ).filter((a) => a.instance_id === row.id);
+    }
+    if (wantsCompletions) {
+      next.company_obligation_completions = (tables.company_obligation_completions ?? []).filter(
+        (c) => c.instance_id === row.id,
+      );
+    }
+    return next;
+  });
+}
+
 function rowMatches(row: Record<string, unknown>, filters: ReturnType<typeof parsePostgrestFilters>) {
   for (const f of filters) {
     const cell = row[f.col];
@@ -924,9 +962,15 @@ async function handleSupabase(route: Route, persona: MockPersona, fx: ReturnType
   }
 
   const table = decodeURIComponent(url.pathname.replace("/rest/v1/", "").split("/")[0] ?? "");
-  const rows = tableRows(persona, fx)[table] ?? [];
+  const tables = tableRows(persona, fx);
+  const rows = tables[table] ?? [];
   const filters = parsePostgrestFilters(url);
-  const matched = rows.filter((r) => rowMatches(r, filters));
+  const matched = attachEmbeds(
+    table,
+    rows.filter((r) => rowMatches(r, filters)),
+    url.searchParams.get("select") ?? "",
+    tables,
+  );
   const accept = (req.headers()["accept"] ?? "").toLowerCase();
   const wantObject = accept.includes("vnd.pgrst.object");
   const count = matched.length;

@@ -64,18 +64,20 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await installHiveMocks(page, { role: "admin" });
   });
 
-  test("Admin Home loads audit-readiness cards and True North org", async ({ page }) => {
+  test("Admin Home loads obligation cards and True North org", async ({ page }) => {
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
     await expect(page.getByText(/Good (morning|afternoon|evening), Dana/i)).toBeVisible({
       timeout: 25_000,
     });
     await expect(page.getByText(/True North Supports/i).first()).toBeVisible();
-    await expect(page.getByLabel(/Audit readiness \d+ percent/i)).toBeVisible();
-    await expect(page.getByText(/Staff with overdue obligations/i)).toBeVisible();
-    await expect(page.getByText(/Policy acknowledgment rate/i)).toBeVisible();
+    await expect(page.getByText(/Staff with overdue/i)).toBeVisible();
+    await expect(page.getByText(/Active clients/i).first()).toBeVisible();
     await expect(page.getByRole("heading", { name: /Staff status/i })).toBeVisible();
     await expect(page.getByRole("heading", { name: /Due soon/i })).toBeVisible();
     await expect(page.getByRole("heading", { name: /Compliance by area/i })).toBeVisible();
+    await expect(page.getByLabel(/Audit readiness \d+ percent/i)).toHaveCount(0);
+    await expect(page.getByText(/Policy acknowledgment rate/i)).toHaveCount(0);
+    await expect(page.getByText(/EVV documentation rate/i)).toHaveCount(0);
     await assertNoCrash(page, "admin home");
     await shot(page, "admin-home");
   });
@@ -97,14 +99,16 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
     await assertNoCrash(page, "nav → compliance");
 
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
-    await expect(page.getByText(/EVV documentation rate/i)).toBeVisible({ timeout: 20_000 });
-    await page.getByText(/EVV documentation rate/i).click();
-    await expect(page).toHaveURL(/\/dashboard\/compliance-desk/, { timeout: 15_000 });
-    await expect(page.getByRole("heading", { name: /EVV & Timesheet Control/i })).toBeVisible({
+    await expect(page.getByRole("link", { name: /View all/i }).first()).toBeVisible({
+      timeout: 20_000,
+    });
+    await page.getByRole("link", { name: /View all/i }).first().click();
+    await expect(page).toHaveURL(/\/dashboard\/company-obligations/, { timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: /Compliance register/i })).toBeVisible({
       timeout: 15_000,
     });
-    await assertNoCrash(page, "nav → compliance desk");
-    await shot(page, "compliance-desk");
+    await assertNoCrash(page, "home → company obligations");
+    await shot(page, "company-obligations-from-home");
 
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
     await expect(page.getByText(/Good (morning|afternoon|evening), Dana/i)).toBeVisible({
@@ -140,7 +144,9 @@ test.describe("Admin Home + obligations / audit-readiness", () => {
 
     await page.locator("aside").getByRole("link", { name: /^Home$/ }).click();
     await expect(page).toHaveURL(/\/dashboard\/?$/, { timeout: 15_000 });
-    await expect(page.getByLabel(/Audit readiness \d+ percent/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Good (morning|afternoon|evening), Dana/i)).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test("Company obligations list: due / overdue / complete, filters, open read-only", async ({

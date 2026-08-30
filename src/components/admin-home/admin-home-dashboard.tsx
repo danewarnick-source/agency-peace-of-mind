@@ -1,78 +1,205 @@
 /**
- * Admin Home Dashboard — audit readiness ring, metric tiles, staff / due soon /
- * activity columns, compliance-by-area bars, and clients list.
+ * Admin Home — rebuilt around two queries only:
+ *   1. company_obligation_instances + nested obligations / assignees / completions
+ *   2. active clients (authorized_dspd_codes lives on clients)
  *
- * Service-code gating hides non-applicable compliance rows and redistributes
- * audit-score weights so the ring only reflects what this org is responsible for.
+ * company_obligations has no `category` column (live + generated types).
+ * Area grouping uses the SOW catalog overlay keyed by obligation title.
  */
 import { Suspense, useMemo, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Activity,
   AlarmClock,
   BarChart3,
   CircleUser,
+  Lightbulb,
   Users,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
-import { useDeadlines, type DeadlineItem } from "@/hooks/use-deadlines";
 import { supabase } from "@/integrations/supabase/client";
-import { ROLE_LABEL, type Role } from "@/lib/rbac";
+import {
+  CATEGORY_LABEL,
+  sowCatalogEntry,
+  type ObligationCategory,
+} from "@/lib/sow-obligation-catalog";
 import { cn } from "@/lib/utils";
 
 const HIVE_NAVY = "#1C2A5E";
 const HIVE_TEAL = "#137182";
 const NECTAR_VIOLET = "#6C2BB3";
-const RING_TRACK = "#e4e7ef";
-const RING_C = 314; // 2π·50
 const DOT_GREEN = "#1baf7a";
 const DOT_AMBER = "#eda100";
 const DOT_RED = "#E24B4A";
-const DOT_BLUE = "#137182";
+const DENVER = "America/Denver";
 
-const EVV_CODES = [
-  "ACA",
-  "CHA",
-  "CMP",
-  "CMS",
-  "COM",
-  "HSQ",
-  "PAC",
-  "RP2",
-  "RP3",
-  "SLH",
-  "SLN",
-] as const;
-const BEHAVIOR_CODES = ["BC1", "BC2", "BC3"] as const;
-const UPI_CODES = ["SEI", "SJD", "CMP", "CMS"] as const;
+const INSTANCES_SELECT = [
+  "id",
+  "due_at",
+  "organization_id",
+  "obligation_id",
+  "client_id",
+  "company_obligations!company_obligation_instances_obligation_id_fkey(title,source_policy_section,scope)",
+  "company_obligation_instance_assignees!company_obligation_instance_assignees_instance_id_fkey(staff_id,staff_name,client_id)",
+  "company_obligation_completions!company_obligation_completions_instance_id_fkey(id,completed_at,nectar_extracted_expires_date,nectar_extracted_cert_type)",
+].join(",");
 
-const WEIGHTS = {
-  staff_obligations: 0.25,
-  evv: 0.2,
-  client_records: 0.15,
-  policy: 0.1,
-  shift_docs: 0.15,
-  incidents: 0.15,
-  medication: 0.1,
-  behavior: 0.1,
-  upi: 0.1,
-  hhs: 0.15,
-  hrc: 0.1,
-} as const;
+type ObligationEmbed = {
+  title: string | null;
+  source_policy_section: string | null;
+  scope: string | null;
+};
 
-type WeightKey = keyof typeof WEIGHTS;
+type AssigneeEmbed = {
+  staff_id: string;
+  staff_name: string;
+  client_id: string | null;
+};
 
-function pct(passing: number, total: number): number {
-  if (total <= 0) return 100;
-  return Math.round((100 * passing) / total);
+type CompletionEmbed = {
+  id: string;
+  completed_at: string | null;
+  nectar_extracted_expires_date: string | null;
+  nectar_extracted_cert_type: string | null;
+};
+
+type InstanceRow = {
+  id: string;
+  due_at: string;
+  organization_id: string;
+  obligation_id: string;
+  client_id: string | null;
+  company_obligations: ObligationEmbed | ObligationEmbed[] | null;
+  company_obligation_instance_assignees: AssigneeEmbed[] | AssigneeEmbed | null;
+  company_obligation_completions: CompletionEmbed[] | CompletionEmbed | null;
+};
+
+type ClientRow = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  authorized_dspd_codes: string[] | null;
+};
+
+type StaffRow = {
+  id: string;
+  name: string;
+  overdue: number;
+  pending: number;
+};
+
+type Recommendation = { key: string; text: string };
+
+function asOne<T>(value: T | T[] | null | undefined): T | null {
+  if (value == null) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
-function barColor(score: number): string {
-  if (score < 60) return DOT_RED;
-  if (score < 90) return DOT_AMBER;
-  return DOT_GREEN;
+function asMany<T>(value: T | T[] | null | undefined): T[] {
+  if (value == null) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function denverYmd(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: DENVER,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function denverHour(date: Date): number {
+  const raw = new Intl.DateTimeFormat("en-US", {
+    timeZone: DENVER,
+    hour: "numeric",
+    hour12: false,
+  }).format(date);
+  const hour = Number.parseInt(raw, 10);
+  if (!Number.isFinite(hour) || hour === 24) return 0;
+  return hour;
+}
+
+function greetingWord(date: Date): "morning" | "afternoon" | "evening" {
+  const hour = denverHour(date);
+  if (hour < 12) return "morning";
+  if (hour < 17) return "afternoon";
+  return "evening";
+}
+
+function sessionFirstName(user: { user_metadata?: Record<string, unknown>; email?: string | null } | null): string {
+  const meta = user?.user_metadata ?? {};
+  const first = typeof meta.first_name === "string" ? meta.first_name.trim() : "";
+  if (first) return first;
+  const full =
+    (typeof meta.full_name === "string" && meta.full_name.trim()) ||
+    (typeof meta.name === "string" && meta.name.trim()) ||
+    "";
+  if (full) return full.split(/\s+/)[0] ?? "there";
+  const fromEmail = user?.email?.split("@")[0]?.trim();
+  return fromEmail || "there";
+}
+
+function ymdParts(ymd: string): { y: number; m: number; d: number } | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(ymd);
+  if (!match) return null;
+  return {
+    y: Number(match[1]),
+    m: Number(match[2]),
+    d: Number(match[3]),
+  };
+}
+
+function addDaysYmd(ymd: string, days: number): string {
+  const parts = ymdParts(ymd);
+  if (!parts) return ymd;
+  const utc = Date.UTC(parts.y, parts.m - 1, parts.d + days);
+  const next = new Date(utc);
+  const y = next.getUTCFullYear();
+  const m = String(next.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(next.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function daysBetweenYmd(fromYmd: string, toYmd: string): number {
+  const from = ymdParts(fromYmd);
+  const to = ymdParts(toYmd);
+  if (!from || !to) return 0;
+  const a = Date.UTC(from.y, from.m - 1, from.d);
+  const b = Date.UTC(to.y, to.m - 1, to.d);
+  return Math.round((b - a) / 86_400_000);
+}
+
+function formatDenverLongDate(date: Date): string {
+  return date.toLocaleDateString("en-US", {
+    timeZone: DENVER,
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+function formatDueDate(dueAt: string): string {
+  return new Date(dueAt).toLocaleDateString("en-US", {
+    timeZone: DENVER,
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function nextBillingWindowLabel(now = new Date()): string {
+  const today = denverYmd(now);
+  const parts = ymdParts(today);
+  if (!parts) return "";
+  const nextMonth = parts.m === 12 ? 1 : parts.m + 1;
+  const nextYear = parts.m === 12 ? parts.y + 1 : parts.y;
+  const lastDay = new Date(Date.UTC(nextYear, nextMonth, 0)).getUTCDate();
+  const monthName = new Date(Date.UTC(nextYear, nextMonth - 1, 1)).toLocaleDateString("en-US", {
+    month: "long",
+    timeZone: "UTC",
+  });
+  return `${monthName} 1 — ${monthName} ${lastDay}`;
 }
 
 function initials(name: string): string {
@@ -82,45 +209,55 @@ function initials(name: string): string {
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
 }
 
-function overlaps(active: Set<string>, codes: readonly string[]): boolean {
-  return codes.some((c) => active.has(c));
+function barColor(completed: number, total: number): string {
+  if (total <= 0) return DOT_GREEN;
+  const ratio = completed / total;
+  if (ratio < 0.6) return DOT_RED;
+  if (ratio < 0.9) return DOT_AMBER;
+  return DOT_GREEN;
 }
 
-function isAuthActive(
-  row: {
-    authorization_pending: boolean | null;
-    service_start_date: string | null;
-    service_end_date: string | null;
-  },
-  today: string,
-): boolean {
-  if (row.authorization_pending) return false;
-  if (row.service_start_date && row.service_start_date > today) return false;
-  if (row.service_end_date && row.service_end_date < today) return false;
-  return true;
+function obligationTitle(row: InstanceRow): string {
+  return asOne(row.company_obligations)?.title?.trim() || "Obligation";
 }
 
-function nextBillingWindowLabel(now = new Date()): string {
-  const start = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 2, 0);
-  const fmt = (d: Date) =>
-    d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  return `${fmt(start)} — ${fmt(end)}`;
+function sowSection(row: InstanceRow): string {
+  return asOne(row.company_obligations)?.source_policy_section?.trim() || "";
 }
 
-function weightedScore(
-  parts: Array<{ key: WeightKey; score: number; applicable: boolean }>,
-): number {
-  let wSum = 0;
-  let sSum = 0;
-  for (const p of parts) {
-    if (!p.applicable) continue;
-    const w = WEIGHTS[p.key];
-    wSum += w;
-    sSum += p.score * w;
+function obligationScope(row: InstanceRow): string {
+  return (asOne(row.company_obligations)?.scope ?? "").toLowerCase();
+}
+
+function categoryFor(row: InstanceRow): { key: string; label: string } {
+  const title = obligationTitle(row);
+  const catalog = sowCatalogEntry(title);
+  if (catalog) {
+    return { key: catalog.category, label: CATEGORY_LABEL[catalog.category] };
   }
-  if (wSum <= 0) return 100;
-  return Math.round(sSum / wSum);
+  return { key: "other", label: "Other" };
+}
+
+function catalogCategory(row: InstanceRow): ObligationCategory | null {
+  return sowCatalogEntry(obligationTitle(row))?.category ?? null;
+}
+
+function isComplete(row: InstanceRow): boolean {
+  return asMany(row.company_obligation_completions).length > 0;
+}
+
+function isCredentialTitle(title: string): boolean {
+  return /cert|cpr|first aid|license|credential|screening|background/i.test(title);
+}
+
+function looksLikeTraining(row: InstanceRow): boolean {
+  const title = obligationTitle(row);
+  return catalogCategory(row) === "training" || /training/i.test(title);
+}
+
+function looksLikeCredential(row: InstanceRow): boolean {
+  const cat = catalogCategory(row);
+  return cat === "screening" || cat === "licensing" || isCredentialTitle(obligationTitle(row));
 }
 
 function Skeleton({ className }: { className?: string }) {
@@ -130,14 +267,11 @@ function Skeleton({ className }: { className?: string }) {
 function AdminHomeSkeleton() {
   return (
     <div className="space-y-4" aria-hidden>
-      <div className="flex items-center justify-between gap-4">
-        <div className="space-y-2">
-          <Skeleton className="h-6 w-48" />
-          <Skeleton className="h-4 w-40" />
-        </div>
-        <Skeleton className="h-9 w-44 rounded-lg" />
+      <div className="space-y-2">
+        <Skeleton className="h-6 w-56" />
+        <Skeleton className="h-4 w-64" />
       </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Skeleton className="h-[280px] rounded-2xl" />
         <div className="grid grid-cols-2 gap-3">
           <Skeleton className="h-[130px] rounded-xl" />
@@ -183,180 +317,139 @@ function StatusBadge({
   );
 }
 
-function ProgressBar({ score, color }: { score: number; color: string }) {
+function ProgressBar({ ratio, color }: { ratio: number; color: string }) {
+  const width = Math.min(100, Math.max(0, ratio * 100));
   return (
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-border">
       <div
         className="h-full rounded-full transition-all"
-        style={{ width: `${Math.min(100, Math.max(0, score))}%`, background: color }}
+        style={{ width: `${width}%`, background: color }}
       />
     </div>
   );
 }
 
-function AuditRing({ score, areasNeeding }: { score: number; areasNeeding: number }) {
-  const clamped = Math.min(100, Math.max(0, score));
-  const offset = RING_C * (1 - clamped / 100);
-  const status =
-    clamped >= 90 ? "Audit ready" : clamped >= 75 ? "Needs attention" : "Action required";
-  const sub =
-    areasNeeding === 0
-      ? "All tracked areas are on track."
-      : `${areasNeeding} area${areasNeeding === 1 ? "" : "s"} need attention.`;
+function buildRecommendations(
+  instances: InstanceRow[],
+  todayYmd: string,
+): Recommendation[] {
+  const horizon = addDaysYmd(todayYmd, 14);
+  const recs: Recommendation[] = [];
 
-  return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-      <div className="flex flex-col items-center text-center">
-        <div
-          className="relative grid h-[140px] w-[140px] place-items-center"
-          role="img"
-          aria-label={`Audit readiness ${clamped} percent`}
-        >
-          <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90" aria-hidden>
-            <circle
-              cx="60"
-              cy="60"
-              r="50"
-              fill="none"
-              stroke={RING_TRACK}
-              strokeWidth="10"
-            />
-            <circle
-              cx="60"
-              cy="60"
-              r="50"
-              fill="none"
-              stroke={HIVE_TEAL}
-              strokeWidth="10"
-              strokeLinecap="round"
-              strokeDasharray={RING_C}
-              strokeDashoffset={offset}
-              className="transition-[stroke-dashoffset] duration-700 ease-out"
-            />
-          </svg>
-          <div className="absolute inset-0 grid place-items-center">
-            <div>
-              <div
-                className="font-display text-3xl font-extrabold tabular-nums leading-none"
-                style={{ color: HIVE_TEAL }}
-              >
-                {clamped}
-              </div>
-              <div className="mt-0.5 text-xs font-semibold text-muted-foreground">%</div>
-            </div>
-          </div>
-        </div>
-        <div className="mt-3 text-sm font-semibold text-foreground">{status}</div>
-        <p className="mt-1 max-w-[28ch] text-xs text-muted-foreground">{sub}</p>
-      </div>
-    </div>
-  );
-}
+  const overdueByObligation = new Map<string, { title: string; staff: Set<string> }>();
+  const overdueByStaff = new Map<string, { name: string; obligations: Set<string> }>();
+  const clientTrainingPairs = new Set<string>();
 
-type AreaRow =
-  | {
-      key: WeightKey;
-      label: string;
-      kind: "bar";
-      score: number;
-      applicable: boolean;
+  for (const row of instances) {
+    const complete = isComplete(row);
+    const dueYmd = denverYmd(new Date(row.due_at));
+    const overdue = !complete && dueYmd < todayYmd;
+    const assignees = asMany(row.company_obligation_instance_assignees);
+    const title = obligationTitle(row);
+
+    if (overdue) {
+      const bucket = overdueByObligation.get(row.obligation_id) ?? {
+        title,
+        staff: new Set<string>(),
+      };
+      for (const a of assignees) bucket.staff.add(a.staff_id);
+      overdueByObligation.set(row.obligation_id, bucket);
+
+      for (const a of assignees) {
+        const staff = overdueByStaff.get(a.staff_id) ?? {
+          name: a.staff_name,
+          obligations: new Set<string>(),
+        };
+        staff.obligations.add(row.obligation_id);
+        overdueByStaff.set(a.staff_id, staff);
+      }
+
+      if (looksLikeTraining(row)) {
+        const instanceClient = row.client_id;
+        for (const a of assignees) {
+          const clientId = a.client_id ?? instanceClient;
+          if (!clientId) continue;
+          if (obligationScope(row) === "staff_per_client" || a.client_id || instanceClient) {
+            clientTrainingPairs.add(`${a.staff_id}:${clientId}`);
+          }
+        }
+      }
     }
-  | {
-      key: WeightKey;
-      label: string;
-      kind: "message";
-      message: string;
-      tone: "muted" | "green";
-      applicable: boolean;
-      score: number;
-    };
+  }
+
+  for (const [obligationId, group] of overdueByObligation) {
+    if (group.staff.size >= 3) {
+      recs.push({
+        key: `group-${obligationId}`,
+        text: `Schedule a group session for ${group.title} — ${group.staff.size} staff share this overdue item.`,
+      });
+    }
+  }
+
+  for (const [staffId, staff] of overdueByStaff) {
+    if (staff.obligations.size >= 3) {
+      recs.push({
+        key: `checkin-${staffId}`,
+        text: `Check in with ${staff.name} — ${staff.obligations.size} overdue obligations.`,
+      });
+    }
+  }
+
+  const expiring = new Set<string>();
+  for (const row of instances) {
+    const title = obligationTitle(row);
+    for (const c of asMany(row.company_obligation_completions)) {
+      const expires = c.nectar_extracted_expires_date;
+      if (!expires) continue;
+      const expYmd = expires.slice(0, 10);
+      if (expYmd >= todayYmd && expYmd <= horizon) {
+        expiring.add(c.nectar_extracted_cert_type?.trim() || title);
+      }
+    }
+    if (!isComplete(row) && looksLikeCredential(row)) {
+      const dueYmd = denverYmd(new Date(row.due_at));
+      if (dueYmd >= todayYmd && dueYmd <= horizon) {
+        expiring.add(title);
+      }
+    }
+  }
+  if (expiring.size > 0) {
+    const label = [...expiring][0];
+    recs.push({
+      key: "credential-window",
+      text:
+        expiring.size === 1
+          ? `${label} expires within 14 days. Start processing now — credential turnaround often needs the full window.`
+          : `${expiring.size} credentials expire within 14 days. Start processing now — turnaround often needs the full window.`,
+    });
+  }
+
+  if (clientTrainingPairs.size >= 3) {
+    recs.push({
+      key: "client-training",
+      text: `Schedule a group session for client-specific training — ${clientTrainingPairs.size} staff-and-client pairs are overdue.`,
+    });
+  }
+
+  return recs;
+}
 
 function AdminHomeDashboardInner() {
   const { user } = useAuth();
-  const { data: org } = useCurrentOrg();
+  const { data: org, isLoading: orgLoading } = useCurrentOrg();
   const orgId = org?.organization_id ?? null;
   const orgName = org?.organization_name ?? "Your agency";
 
-  const { overdue, dueSoon, upcoming, isLoading: deadlinesLoading } = useDeadlines();
-
-  const profileQ = useQuery({
-    enabled: !!user?.id,
-    queryKey: ["admin-home-dash-profile", user?.id],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("first_name")
-        .eq("id", user!.id)
-        .maybeSingle();
-      return data?.first_name?.trim() || null;
-    },
-  });
-
-  const obligationInstancesQ = useQuery({
+  const instancesQ = useQuery({
     enabled: !!orgId,
     queryKey: ["admin-home-obligation-instances", orgId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("company_obligation_instances")
-        .select("id, status, assignee_staff_id, obligation_id, due_at")
-        .eq("organization_id", orgId!);
+        .select(INSTANCES_SELECT)
+        .eq("organization_id", orgId);
       if (error) throw error;
-      return (data ?? []) as Array<{
-        id: string;
-        status: string;
-        assignee_staff_id: string | null;
-        obligation_id: string;
-        due_at: string | null;
-      }>;
-    },
-    staleTime: 30_000,
-  });
-
-  const obligationAssigneesQ = useQuery({
-    enabled: !!orgId,
-    queryKey: ["admin-home-obligation-assignees", orgId],
-    queryFn: async () => {
-      const { data: members, error: mErr } = await supabase
-        .from("organization_members")
-        .select("user_id, role, active")
-        .eq("organization_id", orgId!)
-        .eq("active", true);
-      if (mErr) throw mErr;
-      const rows = (members ?? []) as Array<{ user_id: string; role: string; active: boolean }>;
-      const ids = rows.map((r) => r.user_id);
-      if (!ids.length) {
-        return {
-          members: [] as Array<{ id: string; name: string; role: string }>,
-          assigneeRows: [] as Array<{ instance_id: string; staff_id: string }>,
-        };
-      }
-
-      const { data: dir, error: dErr } = await supabase
-        .from("org_member_directory")
-        .select("id, full_name")
-        .in("id", ids);
-      if (dErr) throw dErr;
-      const names = new Map(
-        ((dir ?? []) as Array<{ id: string; full_name: string | null }>).map((d) => [
-          d.id,
-          d.full_name?.trim() || "Unknown",
-        ]),
-      );
-
-      const { data: assignees } = await supabase
-        .from("company_obligation_instance_assignees")
-        .select("instance_id, staff_id")
-        .eq("organization_id", orgId!);
-      const assigneeRows = (assignees ?? []) as Array<{ instance_id: string; staff_id: string }>;
-
-      return {
-        members: rows.map((r) => ({
-          id: r.user_id,
-          name: names.get(r.user_id) ?? "Unknown",
-          role: r.role,
-        })),
-        assigneeRows,
-      };
+      return (data ?? []) as InstanceRow[];
     },
     staleTime: 30_000,
   });
@@ -365,1005 +458,250 @@ function AdminHomeDashboardInner() {
     enabled: !!orgId,
     queryKey: ["admin-home-clients", orgId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("clients")
-        .select("id, first_name, last_name, intake_status, account_status")
-        .eq("organization_id", orgId!)
-        .neq("account_status", "archived")
+        .select("id, first_name, last_name, authorized_dspd_codes")
+        .eq("organization_id", orgId)
+        .eq("account_status", "active")
         .order("last_name", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as Array<{
-        id: string;
-        first_name: string;
-        last_name: string;
-        intake_status: string | null;
-        account_status: string | null;
-      }>;
+      return (data ?? []) as ClientRow[];
     },
     staleTime: 30_000,
   });
 
-  const billingCodesQ = useQuery({
-    enabled: !!orgId && !!clientsQ.data,
-    queryKey: ["admin-home-billing-codes", orgId, clientsQ.data?.map((c) => c.id).join(",")],
-    queryFn: async () => {
-      const clientIds = (clientsQ.data ?? []).map((c) => c.id);
-      if (!clientIds.length) return [] as Array<{
-        client_id: string;
-        service_code: string;
-        authorization_pending: boolean | null;
-        service_start_date: string | null;
-        service_end_date: string | null;
-      }>;
-      const { data, error } = await supabase
-        .from("client_billing_codes")
-        .select(
-          "client_id, service_code, authorization_pending, service_start_date, service_end_date",
-        )
-        .eq("organization_id", orgId!)
-        .in("client_id", clientIds);
-      if (error) throw error;
-      return (data ?? []) as Array<{
-        client_id: string;
-        service_code: string;
-        authorization_pending: boolean | null;
-        service_start_date: string | null;
-        service_end_date: string | null;
-      }>;
-    },
-    staleTime: 60_000,
-  });
+  const now = useMemo(() => new Date(), []);
+  const todayYmd = useMemo(() => denverYmd(now), [now]);
+  const plus30Ymd = useMemo(() => addDaysYmd(todayYmd, 30), [todayYmd]);
 
-  const since30 = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return d.toISOString();
-  }, []);
-  const since7 = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 7);
-    return d.toISOString();
-  }, []);
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
-
-  const evvQ = useQuery({
-    enabled: !!orgId,
-    queryKey: ["admin-home-evv-30d", orgId, since30],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("evv_timesheets")
-        .select(
-          "id, shift_note_text, attested_at, ai_compliance_status, clock_out_timestamp, created_at",
-        )
-        .eq("organization_id", orgId!)
-        .not("clock_out_timestamp", "is", null)
-        .gte("created_at", since30);
-      if (error) throw error;
-      return (data ?? []) as Array<{
-        id: string;
-        shift_note_text: string | null;
-        attested_at: string | null;
-        ai_compliance_status: string | null;
-        clock_out_timestamp: string | null;
-        created_at: string;
-      }>;
-    },
-    staleTime: 30_000,
-  });
-
-  const policyQ = useQuery({
-    enabled: !!orgId,
-    queryKey: ["admin-home-policy-ack", orgId],
-    queryFn: async () => {
-      const { data: docs, error: dErr } = await supabase
-        .from("nectar_documents")
-        .select("id, requires_acknowledgment, is_current, status")
-        .eq("organization_id", orgId!);
-      if (dErr) throw dErr;
-      const activeDocs = (
-        (docs ?? []) as Array<{
-          id: string;
-          requires_acknowledgment: boolean | null;
-          is_current: boolean | null;
-          status: string | null;
-        }>
-      ).filter(
-        (d) =>
-          !!d.requires_acknowledgment && (d.is_current || d.status === "current"),
-      );
-      const docIds = activeDocs.map((d) => d.id);
-
-      const { data: members, error: mErr } = await supabase
-        .from("organization_members")
-        .select("user_id")
-        .eq("organization_id", orgId!)
-        .eq("active", true);
-      if (mErr) throw mErr;
-      const staffIds = ((members ?? []) as Array<{ user_id: string }>).map((m) => m.user_id);
-
-      if (!docIds.length || !staffIds.length) {
-        return { signed: 0, total: 0 };
-      }
-
-      const { data: sigs, error: sErr } = await supabase
-        .from("policy_signatures")
-        .select("document_id, user_id, is_current")
-        .in("document_id", docIds)
-        .eq("is_current", true)
-        .in("user_id", staffIds);
-      if (sErr) throw sErr;
-      const signed = ((sigs ?? []) as Array<{ document_id: string; user_id: string }>).length;
-      return { signed, total: docIds.length * staffIds.length };
-    },
-    staleTime: 60_000,
-  });
-
-  const dailyLogsQ = useQuery({
-    enabled: !!orgId,
-    queryKey: ["admin-home-daily-logs-30d", orgId, since30],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("daily_logs")
-        .select("id, status, log_date, submitted_at, created_at")
-        .eq("organization_id", orgId!)
-        .gte("log_date", since30.slice(0, 10));
-      if (error) throw error;
-      return (data ?? []) as Array<{
-        id: string;
-        status: string;
-        log_date: string;
-        submitted_at: string | null;
-        created_at: string;
-      }>;
-    },
-    staleTime: 30_000,
-  });
-
-  const incidentsQ = useQuery({
-    enabled: !!orgId,
-    queryKey: ["admin-home-incidents-30d", orgId, since30],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("incident_reports")
-        .select("id, status, report_number, created_at, updated_at")
-        .eq("organization_id", orgId!)
-        .gte("created_at", since30);
-      if (error) throw error;
-      return (data ?? []) as Array<{
-        id: string;
-        status: string;
-        report_number: string | null;
-        created_at: string;
-        updated_at: string | null;
-      }>;
-    },
-    staleTime: 30_000,
-  });
-
-  const emarQ = useQuery({
-    enabled: !!orgId,
-    queryKey: ["admin-home-emar-30d", orgId, since30],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("emar_logs")
-        .select("id, status, signature_attestation, administered_at")
-        .eq("organization_id", orgId!)
-        .gte("created_at", since30);
-      if (error) throw error;
-      return (data ?? []) as Array<{
-        id: string;
-        status: string;
-        signature_attestation: string | null;
-        administered_at: string | null;
-      }>;
-    },
-    staleTime: 60_000,
-  });
-
-  const hrcQ = useQuery({
-    enabled: !!orgId,
-    queryKey: ["admin-home-hrc-active", orgId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("hrc_restriction_records")
-        .select("id, client_id, active, next_review_date")
-        .eq("organization_id", orgId!)
-        .eq("active", true);
-      if (error) throw error;
-      return (data ?? []) as Array<{
-        id: string;
-        client_id: string;
-        active: boolean;
-        next_review_date: string | null;
-      }>;
-    },
-    staleTime: 60_000,
-  });
-
-  const activityEvvQ = useQuery({
-    enabled: !!orgId,
-    queryKey: ["admin-home-activity-evv", orgId, since7],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("evv_timesheets")
-        .select(
-          "id, clock_in_timestamp, clock_out_timestamp, ai_compliance_status, shift_note_text, client_id, staff_id, clients:client_id(first_name, last_name)",
-        )
-        .eq("organization_id", orgId!)
-        .gte("clock_in_timestamp", since7)
-        .order("clock_in_timestamp", { ascending: false })
-        .limit(5);
-      if (error) throw error;
-      return (data ?? []) as unknown as Array<{
-        id: string;
-        clock_in_timestamp: string;
-        clock_out_timestamp: string | null;
-        ai_compliance_status: string | null;
-        shift_note_text: string | null;
-        client_id: string;
-        staff_id: string;
-        clients: { first_name: string; last_name: string } | null;
-      }>;
-    },
-    staleTime: 30_000,
-  });
-
-  const behaviorQ = useQuery({
-    enabled: !!orgId,
-    queryKey: ["admin-home-behavior-30d", orgId, since30],
-    queryFn: async () => {
-      const { data: entries } = await supabase
-        .from("bc_data_entries")
-        .select("id, note, staff_user_id")
-        .eq("organization_id", orgId!)
-        .gte("occurred_at", since30);
-      const entryRows = (entries ?? []) as Array<{
-        note: string | null;
-        staff_user_id: string | null;
-      }>;
-      const entryPass = entryRows.filter(
-        (r) => (r.note ?? "").trim().length >= 20 && !!r.staff_user_id,
-      ).length;
-      const { data: reviews } = await supabase
-        .from("bc_review_notes")
-        .select("id, body")
-        .eq("organization_id", orgId!)
-        .gte("created_at", since30);
-      const reviewRows = (reviews ?? []) as Array<{ body: string | null }>;
-      const reviewPass = reviewRows.filter((r) => (r.body ?? "").trim().length >= 50).length;
-      return {
-        passing: entryPass + reviewPass,
-        total: entryRows.length + reviewRows.length,
-      };
-    },
-    staleTime: 60_000,
-  });
-
-  const upiQ = useQuery({
-    enabled: !!orgId,
-    queryKey: ["admin-home-upi", orgId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("upi_attestations")
-        .select("client_id, period_label")
-        .eq("organization_id", orgId!);
-      if (error) throw error;
-      return (data ?? []) as Array<{ client_id: string; period_label: string }>;
-    },
-    staleTime: 60_000,
-  });
-
-  const hhsQ = useQuery({
-    enabled: !!orgId,
-    queryKey: ["admin-home-hhs-docs", orgId],
-    queryFn: async () => {
-      const monthStart = new Date();
-      monthStart.setDate(1);
-      const monthIso = monthStart.toISOString().slice(0, 10);
-      const { data: attendance } = await supabase
-        .from("hhs_monthly_attendance")
-        .select("staff_initials_signature, attestation_accepted")
-        .eq("organization_id", orgId!)
-        .gte("record_date", monthIso);
-      const attRows = (attendance ?? []) as Array<{
-        staff_initials_signature: string | null;
-        attestation_accepted: boolean | null;
-      }>;
-      const attPass = attRows.filter(
-        (r) => !!r.staff_initials_signature && !!r.attestation_accepted,
-      ).length;
-      return { passing: attPass, total: attRows.length };
-    },
-    staleTime: 60_000,
-  });
-
-  const loading =
-    !orgId ||
-    profileQ.isLoading ||
-    obligationInstancesQ.isLoading ||
-    obligationAssigneesQ.isLoading ||
-    clientsQ.isLoading ||
-    billingCodesQ.isLoading ||
-    evvQ.isLoading ||
-    policyQ.isLoading ||
-    dailyLogsQ.isLoading ||
-    incidentsQ.isLoading ||
-    emarQ.isLoading ||
-    hrcQ.isLoading ||
-    activityEvvQ.isLoading ||
-    behaviorQ.isLoading ||
-    upiQ.isLoading ||
-    hhsQ.isLoading ||
-    deadlinesLoading;
-
-  const instances = obligationInstancesQ.data ?? [];
-  const members = obligationAssigneesQ.data?.members ?? [];
-  const assigneeRows = obligationAssigneesQ.data?.assigneeRows ?? [];
+  const instances = instancesQ.data ?? [];
   const clients = clientsQ.data ?? [];
-  const billingCodes = billingCodesQ.data ?? [];
 
-  const activeCodes = useMemo(() => {
-    const set = new Set<string>();
-    for (const row of billingCodes) {
-      if (!isAuthActive(row, today)) continue;
-      const code = (row.service_code ?? "").toUpperCase();
-      if (code) set.add(code);
-    }
-    return set;
-  }, [billingCodes, today]);
+  const derived = useMemo(() => {
+    const overdue: Array<{
+      id: string;
+      title: string;
+      assignee: string;
+      days: number;
+    }> = [];
+    const pending: Array<{
+      id: string;
+      title: string;
+      sow: string;
+      dueAt: string;
+      dueYmd: string;
+    }> = [];
+    const staffMap = new Map<string, StaffRow>();
+    const staffWithOverdue = new Set<string>();
+    let pendingWithin30 = 0;
+    const area = new Map<string, { label: string; completed: number; total: number }>();
 
-  const hasEvv = overlaps(activeCodes, EVV_CODES);
-  const hasBehavior = overlaps(activeCodes, BEHAVIOR_CODES);
-  const hasUpi = overlaps(activeCodes, UPI_CODES);
-  const hasHhs = activeCodes.has("HHS");
+    for (const row of instances) {
+      const complete = isComplete(row);
+      const dueYmd = denverYmd(new Date(row.due_at));
+      const assignees = asMany(row.company_obligation_instance_assignees);
+      const title = obligationTitle(row);
+      const cat = categoryFor(row);
+      const bucket = area.get(cat.key) ?? { label: cat.label, completed: 0, total: 0 };
+      bucket.total += 1;
+      if (complete) bucket.completed += 1;
+      area.set(cat.key, bucket);
 
-  const staffMetrics = useMemo(() => {
-    const overdueByStaff = new Map<string, number>();
-    const pendingByStaff = new Map<string, number>();
-    const assigneesByInstance = new Map<string, string[]>();
-    for (const a of assigneeRows) {
-      const arr = assigneesByInstance.get(a.instance_id) ?? [];
-      arr.push(a.staff_id);
-      assigneesByInstance.set(a.instance_id, arr);
-    }
+      const isOverdue = !complete && dueYmd < todayYmd;
+      const isPending = !complete && dueYmd >= todayYmd;
 
-    for (const inst of instances) {
-      const staffIds = new Set<string>();
-      if (inst.assignee_staff_id) staffIds.add(inst.assignee_staff_id);
-      for (const sid of assigneesByInstance.get(inst.id) ?? []) staffIds.add(sid);
+      for (const a of assignees) {
+        const staff = staffMap.get(a.staff_id) ?? {
+          id: a.staff_id,
+          name: a.staff_name || "Staff",
+          overdue: 0,
+          pending: 0,
+        };
+        if (isOverdue) staff.overdue += 1;
+        else if (isPending) staff.pending += 1;
+        staffMap.set(a.staff_id, staff);
+        if (isOverdue) staffWithOverdue.add(a.staff_id);
+      }
 
-      for (const sid of staffIds) {
-        if (inst.status === "overdue") {
-          overdueByStaff.set(sid, (overdueByStaff.get(sid) ?? 0) + 1);
-        } else if (inst.status === "pending") {
-          pendingByStaff.set(sid, (pendingByStaff.get(sid) ?? 0) + 1);
-        }
+      if (isOverdue) {
+        overdue.push({
+          id: row.id,
+          title,
+          assignee: assignees[0]?.staff_name?.trim() || "Unassigned",
+          days: daysBetweenYmd(dueYmd, todayYmd),
+        });
+      } else if (isPending) {
+        pending.push({
+          id: row.id,
+          title,
+          sow: sowSection(row),
+          dueAt: row.due_at,
+          dueYmd,
+        });
+        if (dueYmd <= plus30Ymd) pendingWithin30 += 1;
       }
     }
 
-    const staffWithOverdue = [...overdueByStaff.values()].filter((n) => n > 0).length;
-    const overdueInstances = instances.filter((i) => i.status === "overdue").length;
-    const completed = instances.filter(
-      (i) => i.status === "completed" || i.status === "waived",
-    ).length;
+    overdue.sort((a, b) => b.days - a.days);
+    pending.sort((a, b) => a.dueAt.localeCompare(b.dueAt));
+
+    const staff = [...staffMap.values()].sort((a, b) => {
+      if (b.overdue !== a.overdue) return b.overdue - a.overdue;
+      if (b.pending !== a.pending) return b.pending - a.pending;
+      return a.name.localeCompare(b.name);
+    });
+
+    const areas = [...area.values()].sort((a, b) => a.label.localeCompare(b.label));
+    const recommendations = buildRecommendations(instances, todayYmd);
 
     return {
-      staffWithOverdue,
-      overdueInstances,
-      completed,
-      total: instances.length,
-      overdueByStaff,
-      pendingByStaff,
-      obligationScore: pct(completed, instances.length),
+      overdue,
+      pending,
+      staff,
+      staffWithOverdue: staffWithOverdue.size,
+      pendingWithin30,
+      areas,
+      recommendations,
     };
-  }, [instances, assigneeRows]);
+  }, [instances, plus30Ymd, todayYmd]);
 
-  const evvPassing = useMemo(() => {
-    const rows = evvQ.data ?? [];
-    const passing = rows.filter((r) => {
-      const note = (r.shift_note_text ?? "").trim();
-      return note.length > 50 && !!r.attested_at;
-    }).length;
-    return { passing, total: rows.length, score: pct(passing, rows.length) };
-  }, [evvQ.data]);
+  if (!orgId) {
+    if (orgLoading) return <AdminHomeSkeleton />;
+    return null;
+  }
 
-  const clientComplete = useMemo(() => {
-    const total = clients.length;
-    const passing = clients.filter((c) => c.intake_status === "complete").length;
-    return { passing, total, score: pct(passing, total) };
-  }, [clients]);
+  if (instancesQ.isLoading || clientsQ.isLoading) return <AdminHomeSkeleton />;
 
-  const policyRate = useMemo(() => {
-    const signed = policyQ.data?.signed ?? 0;
-    const total = policyQ.data?.total ?? 0;
-    return { signed, total, score: pct(signed, total) };
-  }, [policyQ.data]);
-
-  const shiftDocs = useMemo(() => {
-    const rows = dailyLogsQ.data ?? [];
-    const passing = rows.filter((r) => r.status === "approved").length;
-    return { passing, total: rows.length, score: pct(passing, rows.length) };
-  }, [dailyLogsQ.data]);
-
-  const incidentStats = useMemo(() => {
-    const rows = incidentsQ.data ?? [];
-    const passing = rows.filter((r) => {
-      const st = (r.status ?? "").toLowerCase();
-      return (
-        st === "submitted_to_state" ||
-        st === "state_confirmed" ||
-        st === "submitted" ||
-        st === "closed" ||
-        st === "upi_filed"
-      );
-    }).length;
-    return { passing, total: rows.length, score: pct(passing, rows.length) };
-  }, [incidentsQ.data]);
-
-  const medStats = useMemo(() => {
-    const rows = emarQ.data ?? [];
-    const passing = rows.filter((r) => {
-      const st = (r.status ?? "").toLowerCase();
-      const given =
-        st === "given" || st === "administered" || st === "self_administered";
-      return given && !!r.signature_attestation && !!r.administered_at;
-    }).length;
-    return { passing, total: rows.length, score: pct(passing, rows.length) };
-  }, [emarQ.data]);
-
-  const hrcStats = useMemo(() => {
-    const rows = hrcQ.data ?? [];
-    if (!rows.length) {
-      return { applicable: false as const, score: 100, total: 0, passing: 0 };
-    }
-    const passing = rows.filter((r) => {
-      if (!r.next_review_date) return true;
-      return r.next_review_date >= today;
-    }).length;
-    return {
-      applicable: true as const,
-      score: pct(passing, rows.length),
-      total: rows.length,
-      passing,
-    };
-  }, [hrcQ.data, today]);
-
-  const upiStats = useMemo(() => {
-    if (!hasUpi) return { applicable: false, score: 100, passing: 0, total: 0 };
-    const upiClients = new Set<string>();
-    for (const row of billingCodes) {
-      if (!isAuthActive(row, today)) continue;
-      const code = (row.service_code ?? "").toUpperCase();
-      if (!UPI_CODES.includes(code as (typeof UPI_CODES)[number])) continue;
-      upiClients.add(row.client_id);
-    }
-    const total = upiClients.size;
-    if (!total) return { applicable: false, score: 100, passing: 0, total: 0 };
-    const currentMonth = today.slice(0, 7);
-    const current = new Set<string>();
-    for (const a of upiQ.data ?? []) {
-      const label = a.period_label ?? "";
-      if (label === currentMonth || label.startsWith(currentMonth) || label === "current month") {
-        current.add(a.client_id);
-      }
-    }
-    let passing = 0;
-    for (const id of upiClients) if (current.has(id)) passing += 1;
-    return { applicable: true, score: pct(passing, total), passing, total };
-  }, [hasUpi, billingCodes, today, upiQ.data]);
-
-  const behaviorStats = useMemo(() => {
-    if (!hasBehavior) return { applicable: false, score: 100, passing: 0, total: 0 };
-    const t = behaviorQ.data?.total ?? 0;
-    const p = behaviorQ.data?.passing ?? 0;
-    return { applicable: true, score: pct(p, t), passing: p, total: t };
-  }, [hasBehavior, behaviorQ.data]);
-
-  const hhsStats = useMemo(() => {
-    if (!hasHhs) return { applicable: false, score: 100, passing: 0, total: 0 };
-    const t = hhsQ.data?.total ?? 0;
-    const p = hhsQ.data?.passing ?? 0;
-    return { applicable: true, score: pct(p, t), passing: p, total: t };
-  }, [hasHhs, hhsQ.data]);
-
-  const areaRows: AreaRow[] = useMemo(() => {
-    const rows: AreaRow[] = [];
-
-    rows.push({
-      key: "staff_obligations",
-      label: "Staff obligations",
-      kind: "bar",
-      score: staffMetrics.obligationScore,
-      applicable: true,
-    });
-
-    if (hasEvv) {
-      if (evvPassing.total === 0) {
-        rows.push({
-          key: "evv",
-          label: "EVV documentation",
-          kind: "message",
-          message: "No shifts recorded this month",
-          tone: "muted",
-          applicable: true,
-          score: 100,
-        });
-      } else {
-        rows.push({
-          key: "evv",
-          label: "EVV documentation",
-          kind: "bar",
-          score: evvPassing.score,
-          applicable: true,
-        });
-      }
-    }
-
-    rows.push({
-      key: "client_records",
-      label: "Client records",
-      kind: "bar",
-      score: clientComplete.score,
-      applicable: true,
-    });
-
-    rows.push({
-      key: "policy",
-      label: "Policy acknowledgments",
-      kind: "bar",
-      score: policyRate.score,
-      applicable: true,
-    });
-
-    rows.push({
-      key: "shift_docs",
-      label: "Shift documentation",
-      kind: "bar",
-      score: shiftDocs.score,
-      applicable: true,
-    });
-
-    if (incidentStats.total === 0) {
-      rows.push({
-        key: "incidents",
-        label: "Incident reports",
-        kind: "message",
-        message: "No incidents reported this period",
-        tone: "green",
-        applicable: true,
-        score: 100,
-      });
-    } else {
-      rows.push({
-        key: "incidents",
-        label: "Incident reports",
-        kind: "bar",
-        score: incidentStats.score,
-        applicable: true,
-      });
-    }
-
-    if (medStats.total > 0) {
-      rows.push({
-        key: "medication",
-        label: "Medication records",
-        kind: "bar",
-        score: medStats.score,
-        applicable: true,
-      });
-    }
-
-    if (behaviorStats.applicable) {
-      rows.push({
-        key: "behavior",
-        label: "Behavior support",
-        kind: "bar",
-        score: behaviorStats.score,
-        applicable: true,
-      });
-    }
-
-    if (upiStats.applicable) {
-      rows.push({
-        key: "upi",
-        label: "UPI attestations",
-        kind: "bar",
-        score: upiStats.score,
-        applicable: true,
-      });
-    }
-
-    if (hhsStats.applicable) {
-      rows.push({
-        key: "hhs",
-        label: "HHS documentation",
-        kind: "bar",
-        score: hhsStats.score,
-        applicable: true,
-      });
-    }
-
-    if (!hrcStats.applicable || hrcStats.total === 0) {
-      rows.push({
-        key: "hrc",
-        label: "HRC reviews",
-        kind: "message",
-        message: "No active restrictions — compliant",
-        tone: "green",
-        applicable: true,
-        score: 100,
-      });
-    } else {
-      rows.push({
-        key: "hrc",
-        label: "HRC reviews",
-        kind: "bar",
-        score: hrcStats.score,
-        applicable: true,
-      });
-    }
-
-    return rows;
-  }, [
-    staffMetrics.obligationScore,
-    hasEvv,
-    evvPassing,
-    clientComplete.score,
-    policyRate.score,
-    shiftDocs.score,
-    incidentStats,
-    medStats,
-    behaviorStats,
-    upiStats,
-    hhsStats,
-    hrcStats,
-  ]);
-
-  const auditScore = useMemo(() => {
-    const parts: Array<{ key: WeightKey; score: number; applicable: boolean }> = [
-      { key: "staff_obligations", score: staffMetrics.obligationScore, applicable: true },
-      { key: "evv", score: evvPassing.score, applicable: hasEvv },
-      { key: "client_records", score: clientComplete.score, applicable: true },
-      { key: "policy", score: policyRate.score, applicable: true },
-      { key: "shift_docs", score: shiftDocs.score, applicable: true },
-      { key: "incidents", score: incidentStats.score, applicable: true },
-      { key: "medication", score: medStats.score, applicable: medStats.total > 0 },
-      { key: "behavior", score: behaviorStats.score, applicable: behaviorStats.applicable },
-      { key: "upi", score: upiStats.score, applicable: upiStats.applicable },
-      { key: "hhs", score: hhsStats.score, applicable: hhsStats.applicable },
-      {
-        key: "hrc",
-        score: hrcStats.score,
-        applicable: true, // always contributes (100 when no restrictions)
-      },
-    ];
-    return weightedScore(parts);
-  }, [
-    staffMetrics.obligationScore,
-    evvPassing.score,
-    hasEvv,
-    clientComplete.score,
-    policyRate.score,
-    shiftDocs.score,
-    incidentStats.score,
-    medStats,
-    behaviorStats,
-    upiStats,
-    hhsStats,
-    hrcStats,
-  ]);
-
-  const areasNeeding = useMemo(
-    () =>
-      areaRows.filter((r) => {
-        if (r.kind === "message" && r.tone === "green") return false;
-        if (r.kind === "message" && r.tone === "muted") return false;
-        return r.score < 90;
-      }).length,
-    [areaRows],
-  );
-
-  const dueSoonItems = useMemo(() => {
-    return [...overdue, ...dueSoon, ...upcoming]
-      .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime())
-      .slice(0, 4);
-  }, [overdue, dueSoon, upcoming]);
-
-  const activityItems = useMemo(() => {
-    type Act = {
-      key: string;
-      tone: "green" | "amber" | "red" | "blue";
-      text: string;
-      at: Date;
-      to?: "/dashboard/hub/documentation";
-      search?: { tab: "incidents"; cc: "urgent" };
-    };
-    const out: Act[] = [];
-
-    for (const s of activityEvvQ.data ?? []) {
-      const client = s.clients
-        ? `${s.clients.first_name} ${s.clients.last_name}`
-        : "Client";
-      const cleared =
-        (s.ai_compliance_status ?? "").toLowerCase() === "verified" ||
-        (s.ai_compliance_status ?? "").toLowerCase() === "cleared";
-      const flagged = (s.ai_compliance_status ?? "").toLowerCase().includes("flag");
-      const done = !!s.clock_out_timestamp;
-      out.push({
-        key: `evv-${s.id}`,
-        tone: flagged ? "amber" : cleared || done ? "green" : "blue",
-        text: done
-          ? `Clock-out · ${client}${cleared ? " · NECTAR cleared" : ""}`
-          : `Clock-in · ${client}`,
-        at: new Date(s.clock_out_timestamp ?? s.clock_in_timestamp),
-      });
-    }
-
-    const recentIncidents = [...(incidentsQ.data ?? [])]
-      .sort(
-        (a, b) =>
-          new Date(b.updated_at ?? b.created_at).getTime() -
-          new Date(a.updated_at ?? a.created_at).getTime(),
-      )
-      .slice(0, 3);
-    for (const ir of recentIncidents) {
-      const st = (ir.status ?? "").toLowerCase();
-      const tone: Act["tone"] =
-        st.includes("reject") || st.includes("overdue")
-          ? "red"
-          : st.includes("pending")
-            ? "amber"
-            : st.includes("confirm") || st.includes("closed") || st.includes("submitted")
-              ? "green"
-              : "blue";
-      out.push({
-        key: `ir-${ir.id}`,
-        tone,
-        text: `Incident ${ir.report_number ?? ""} · ${ir.status.replace(/_/g, " ")}`,
-        at: new Date(ir.updated_at ?? ir.created_at),
-        to: "/dashboard/hub/documentation",
-        search: { tab: "incidents", cc: "urgent" },
-      });
-    }
-
-    const recentLogs = [...(dailyLogsQ.data ?? [])]
-      .sort(
-        (a, b) =>
-          new Date(b.submitted_at ?? b.created_at).getTime() -
-          new Date(a.submitted_at ?? a.created_at).getTime(),
-      )
-      .slice(0, 3);
-    for (const log of recentLogs) {
-      const tone: Act["tone"] =
-        log.status === "approved"
-          ? "green"
-          : log.status === "rejected"
-            ? "red"
-            : "amber";
-      out.push({
-        key: `dl-${log.id}`,
-        tone,
-        text: `Daily log · ${log.status.replace(/_/g, " ")} · ${log.log_date}`,
-        at: new Date(log.submitted_at ?? log.created_at),
-      });
-    }
-
-    return out.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, 8);
-  }, [activityEvvQ.data, incidentsQ.data, dailyLogsQ.data]);
-
-  const clientCodesById = useMemo(() => {
-    const map = new Map<string, string[]>();
-    for (const row of billingCodes) {
-      if (!isAuthActive(row, today)) continue;
-      const code = (row.service_code ?? "").toUpperCase();
-      if (!code) continue;
-      const arr = map.get(row.client_id) ?? [];
-      if (!arr.includes(code)) arr.push(code);
-      map.set(row.client_id, arr);
-    }
-    return map;
-  }, [billingCodes, today]);
-
-  if (loading) return <AdminHomeSkeleton />;
-
-  const firstName = profileQ.data || "there";
-  const now = new Date();
-  const dateLine = now.toLocaleDateString(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-
-  const dueDateColor = (item: DeadlineItem) => {
-    if (item.status === "overdue") return DOT_RED;
-    if (item.status === "due_soon") return DOT_AMBER;
-    return undefined;
-  };
-
-  const areaGapClass =
-    areaRows.length <= 5 ? "space-y-5" : areaRows.length <= 7 ? "space-y-4" : "space-y-3";
+  const firstName = sessionFirstName(user);
+  const dateLine = formatDenverLongDate(now);
+  const plus14Ymd = addDaysYmd(todayYmd, 14);
+  const topOverdue = derived.overdue.slice(0, 4);
+  const dueSoon = derived.pending.slice(0, 4);
 
   return (
     <div className="space-y-4">
-      {/* Section 1 — Top bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="text-lg font-semibold text-foreground">
-            Good {now.getHours() < 12 ? "morning" : now.getHours() < 17 ? "afternoon" : "evening"},{" "}
-            {firstName}
+      <div>
+        <div className="text-lg font-semibold text-foreground">
+          Good {greetingWord(now)}, {firstName}
+        </div>
+        <div className="text-sm text-muted-foreground">
+          {orgName} · {dateLine}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {derived.overdue.length === 0 ? (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+            <div className="text-4xl font-extrabold tabular-nums text-emerald-700 dark:text-emerald-400">
+              0
+            </div>
+            <div className="mt-2 text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+              All current
+            </div>
+            <p className="mt-1 text-sm text-emerald-800/80 dark:text-emerald-300/80">
+              No overdue obligation instances.
+            </p>
           </div>
-          <div className="text-sm text-muted-foreground">{dateLine}</div>
-        </div>
-        <div
-          className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium"
-          style={{ background: HIVE_NAVY, color: "#fff" }}
-        >
-          <span
-            className="inline-block h-2 w-2 rounded-full"
-            style={{ background: HIVE_TEAL }}
-            aria-hidden
-          />
-          {orgName}
-        </div>
-      </div>
-
-      {/* Section 2 — Hero row */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
-        <AuditRing score={auditScore} areasNeeding={areasNeeding} />
-
-        <div className="grid grid-cols-2 gap-3">
-          <Link
-            to="/dashboard/company-obligations"
-            className={cn(
-              "cursor-pointer rounded-xl border border-l-4 rounded-l-none bg-card p-4 transition hover:shadow-sm",
-              staffMetrics.staffWithOverdue > 0 ? "border-l-rose-500" : "border-l-emerald-500",
-            )}
-          >
-            <div className="text-xs font-medium text-muted-foreground">
-              Staff with overdue obligations
+        ) : (
+          <div className="rounded-2xl p-5 text-white" style={{ background: HIVE_NAVY }}>
+            <div className="text-4xl font-extrabold tabular-nums leading-none">
+              {derived.overdue.length}
             </div>
-            <div
-              className={cn(
-                "mt-1 text-2xl font-bold tabular-nums",
-                staffMetrics.staffWithOverdue > 0
-                  ? "text-rose-700 dark:text-rose-400"
-                  : "text-emerald-700 dark:text-emerald-400",
-              )}
-            >
-              {staffMetrics.staffWithOverdue}
+            <div className="mt-2 text-sm font-medium text-white/75">
+              Overdue obligation instance{derived.overdue.length === 1 ? "" : "s"}
             </div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              {staffMetrics.overdueInstances} overdue instance
-              {staffMetrics.overdueInstances === 1 ? "" : "s"}
-            </div>
-          </Link>
-
-          {hasEvv ? (
+            <ul className="mt-4 space-y-2.5">
+              {topOverdue.map((item) => (
+                <li key={item.id} className="border-b border-white/10 pb-2.5 last:border-0 last:pb-0">
+                  <div className="truncate text-sm font-medium">{item.title}</div>
+                  <div className="mt-0.5 flex items-center justify-between gap-3 text-xs text-white/70">
+                    <span className="truncate">{item.assignee}</span>
+                    <span className="shrink-0 tabular-nums">
+                      {item.days} day{item.days === 1 ? "" : "s"} overdue
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
             <Link
-              to="/dashboard/compliance-desk"
-              className={cn(
-                "cursor-pointer rounded-xl border border-l-4 rounded-l-none bg-card p-4 transition hover:shadow-sm",
-                evvPassing.score < 90 ? "border-l-amber-500" : "border-l-emerald-500",
-              )}
-            >
-              <div className="text-xs font-medium text-muted-foreground">
-                EVV documentation rate
-              </div>
-              <div
-                className={cn(
-                  "mt-1 text-2xl font-bold tabular-nums",
-                  evvPassing.score < 90
-                    ? "text-amber-700 dark:text-amber-400"
-                    : "text-emerald-700 dark:text-emerald-400",
-                )}
-              >
-                {evvPassing.score}%
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                {evvPassing.passing} / {evvPassing.total} shifts · last 30 days
-              </div>
-            </Link>
-          ) : (
-            <Link
-              to="/dashboard/hub/clients"
-              className={cn(
-                "cursor-pointer rounded-xl border border-l-4 rounded-l-none bg-card p-4 transition hover:shadow-sm",
-                clientComplete.score < 100 ? "border-l-amber-500" : "border-l-emerald-500",
-              )}
-            >
-              <div className="text-xs font-medium text-muted-foreground">
-                Clients with complete intake
-              </div>
-              <div
-                className={cn(
-                  "mt-1 text-2xl font-bold tabular-nums",
-                  clientComplete.score < 100
-                    ? "text-amber-700 dark:text-amber-400"
-                    : "text-emerald-700 dark:text-emerald-400",
-                )}
-              >
-                {clientComplete.passing}/{clientComplete.total}
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground">Active clients</div>
-            </Link>
-          )}
-
-          {hasEvv && (
-            <Link
-              to="/dashboard/hub/clients"
-              className={cn(
-                "cursor-pointer rounded-xl border border-l-4 rounded-l-none bg-card p-4 transition hover:shadow-sm",
-                clientComplete.score < 100 ? "border-l-amber-500" : "border-l-emerald-500",
-              )}
-            >
-              <div className="text-xs font-medium text-muted-foreground">
-                Clients with complete intake
-              </div>
-              <div
-                className={cn(
-                  "mt-1 text-2xl font-bold tabular-nums",
-                  clientComplete.score < 100
-                    ? "text-amber-700 dark:text-amber-400"
-                    : "text-emerald-700 dark:text-emerald-400",
-                )}
-              >
-                {clientComplete.passing}/{clientComplete.total}
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground">Active clients</div>
-            </Link>
-          )}
-
-          <Link
-            to="/dashboard/settings"
-            className={cn(
-              "cursor-pointer rounded-xl border border-l-4 rounded-l-none bg-card p-4 transition hover:shadow-sm",
-              policyRate.score < 100 ? "border-l-amber-500" : "border-l-emerald-500",
-              !hasEvv && "col-span-1",
-            )}
-          >
-            <div className="text-xs font-medium text-muted-foreground">
-              Policy acknowledgment rate
-            </div>
-            <div
-              className={cn(
-                "mt-1 text-2xl font-bold tabular-nums",
-                policyRate.score < 100
-                  ? "text-amber-700 dark:text-amber-400"
-                  : "text-emerald-700 dark:text-emerald-400",
-              )}
-            >
-              {policyRate.score}%
-            </div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              {policyRate.signed} / {policyRate.total} signatures
-            </div>
-          </Link>
-        </div>
-      </div>
-
-      {/* Section 3 — Mid row */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Users className="h-4 w-4" style={{ color: HIVE_TEAL }} />
-              Staff status
-            </h2>
-            <Link
-              to="/dashboard/employees"
-              className="flex cursor-pointer items-center gap-1 text-xs hover:underline"
-              style={{ color: HIVE_TEAL }}
+              to="/dashboard/company-obligations"
+              className="mt-4 inline-flex cursor-pointer text-sm font-medium text-white/90 hover:underline"
             >
               View all →
             </Link>
           </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <div
+            className={cn(
+              "rounded-xl border border-l-4 bg-card p-4",
+              derived.staffWithOverdue > 0 ? "border-l-rose-500" : "border-l-border",
+            )}
+          >
+            <div
+              className={cn(
+                "text-2xl font-bold tabular-nums",
+                derived.staffWithOverdue > 0
+                  ? "text-rose-700 dark:text-rose-400"
+                  : "text-foreground",
+              )}
+            >
+              {derived.staffWithOverdue}
+            </div>
+            <div className="mt-1 text-sm font-medium text-foreground">Staff with overdue</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              People with at least one overdue item
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-l-4 border-l-amber-500 bg-card p-4">
+            <div className="text-2xl font-bold tabular-nums text-amber-700 dark:text-amber-400">
+              {derived.pendingWithin30}
+            </div>
+            <div className="mt-1 text-sm font-medium text-foreground">Due within 30 days</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">Pending instances</div>
+          </div>
+
+          <div className="rounded-xl border border-l-4 border-l-emerald-500 bg-card p-4">
+            <div className="text-2xl font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
+              {clients.length}
+            </div>
+            <div className="mt-1 text-sm font-medium text-foreground">Active clients</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">Account status active</div>
+          </div>
+
+          <div
+            className={cn(
+              "rounded-xl border border-l-4 bg-card p-4",
+              derived.recommendations.length > 0 ? "border-l-amber-500" : "border-l-border",
+            )}
+          >
+            <div
+              className={cn(
+                "text-2xl font-bold tabular-nums",
+                derived.recommendations.length > 0
+                  ? "text-amber-700 dark:text-amber-400"
+                  : "text-foreground",
+              )}
+            >
+              {derived.recommendations.length}
+            </div>
+            <div className="mt-1 text-sm font-medium text-foreground">Recommendations</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">From obligation data</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Users className="h-4 w-4" style={{ color: HIVE_TEAL }} />
+            Staff status
+          </h2>
           <ul>
-            {members.slice(0, 8).map((m, idx) => {
-              const overdueCount = staffMetrics.overdueByStaff.get(m.id) ?? 0;
-              const pendingCount = staffMetrics.pendingByStaff.get(m.id) ?? 0;
+            {derived.staff.map((m, idx) => {
               const avatarBg = idx % 2 === 0 ? HIVE_NAVY : NECTAR_VIOLET;
-              const roleLabel =
-                m.role in ROLE_LABEL ? ROLE_LABEL[m.role as Role] : m.role;
               return (
                 <li key={m.id} className="border-b border-border last:border-0">
                   <Link
@@ -1377,14 +715,13 @@ function AdminHomeDashboardInner() {
                     >
                       {initials(m.name)}
                     </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-foreground">{m.name}</div>
-                      <div className="truncate text-xs text-muted-foreground">{roleLabel}</div>
+                    <div className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                      {m.name}
                     </div>
-                    {overdueCount > 0 ? (
-                      <StatusBadge tone="red">{overdueCount} overdue</StatusBadge>
-                    ) : pendingCount > 0 ? (
-                      <StatusBadge tone="amber">{pendingCount} pending</StatusBadge>
+                    {m.overdue > 0 ? (
+                      <StatusBadge tone="red">{m.overdue} overdue</StatusBadge>
+                    ) : m.pending > 0 ? (
+                      <StatusBadge tone="amber">{m.pending} pending</StatusBadge>
                     ) : (
                       <StatusBadge tone="green">Current</StatusBadge>
                     )}
@@ -1392,235 +729,111 @@ function AdminHomeDashboardInner() {
                 </li>
               );
             })}
-            {members.length === 0 && (
-              <li className="py-6 text-sm text-muted-foreground">No active staff yet.</li>
+            {derived.staff.length === 0 && (
+              <li className="py-6 text-sm text-muted-foreground">No assigned staff yet.</li>
             )}
           </ul>
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <AlarmClock className="h-4 w-4" style={{ color: HIVE_TEAL }} />
-              Due soon
-            </h2>
-            <Link
-              to="/dashboard/company-obligations"
-              search={{ tab: "action-required" }}
-              className="flex cursor-pointer items-center gap-1 text-xs hover:underline"
-              style={{ color: HIVE_TEAL }}
-            >
-              Action required →
-            </Link>
-          </div>
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+            <AlarmClock className="h-4 w-4" style={{ color: HIVE_TEAL }} />
+            Due soon
+          </h2>
           <ul>
-            {dueSoonItems.map((item) => {
-              const color = dueDateColor(item);
-              const href = item.href ?? "/dashboard/company-obligations";
-              const [path, qs] = href.split("?");
-              const search = qs
-                ? Object.fromEntries(new URLSearchParams(qs).entries())
-                : undefined;
+            {dueSoon.map((item) => {
+              const color =
+                item.dueYmd < todayYmd
+                  ? DOT_RED
+                  : item.dueYmd <= plus14Ymd
+                    ? DOT_AMBER
+                    : undefined;
               return (
-                <li key={item.key} className="border-b border-border last:border-0">
+                <li key={item.id} className="border-b border-border last:border-0">
                   <Link
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    to={path as any}
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    search={search as any}
+                    to="/dashboard/company-obligations"
                     className="flex cursor-pointer items-start justify-between gap-3 py-2.5 transition hover:bg-muted/40"
                   >
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-medium text-foreground">
-                        {item.title}
-                      </div>
-                      <div className="truncate text-xs text-muted-foreground">
-                        {item.policySection ||
-                          item.cadenceLabel ||
-                          item.dutyTitle ||
-                          item.source.replace(/_/g, " ")}
-                      </div>
+                      <div className="truncate text-sm font-medium text-foreground">{item.title}</div>
+                      {item.sow ? (
+                        <div className="truncate text-xs text-muted-foreground">{item.sow}</div>
+                      ) : null}
                     </div>
                     <div
                       className="shrink-0 text-xs font-semibold tabular-nums"
                       style={color ? { color } : undefined}
                     >
-                      {item.dueAtMissing
-                        ? "—"
-                        : item.dueAt.toLocaleDateString(undefined, {
-                            month: "short",
-                            day: "numeric",
-                          })}
+                      {formatDueDate(item.dueAt)}
                     </div>
                   </Link>
                 </li>
               );
             })}
-            {dueSoonItems.length === 0 && (
+            {dueSoon.length === 0 && (
               <li className="py-6 text-sm text-muted-foreground">Nothing due soon.</li>
             )}
           </ul>
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Activity className="h-4 w-4" style={{ color: HIVE_TEAL }} />
-              Recent activity
-            </h2>
-          </div>
-          <ul>
-            {activityItems.map((a) => {
-              const dot =
-                a.tone === "green"
-                  ? DOT_GREEN
-                  : a.tone === "amber"
-                    ? DOT_AMBER
-                    : a.tone === "red"
-                      ? DOT_RED
-                      : DOT_BLUE;
-              const body = (
-                <>
-                  <span
-                    className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-                    style={{ background: dot }}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm text-foreground">{a.text}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {a.at.toLocaleString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
-                    </div>
-                  </div>
-                </>
-              );
-              return (
-                <li
-                  key={a.key}
-                  className="border-b border-border last:border-0"
-                >
-                  {a.to ? (
-                    <Link
-                      to={a.to}
-                      search={a.search}
-                      className="flex cursor-pointer items-start gap-2.5 py-2.5 transition hover:bg-muted/40"
-                    >
-                      {body}
-                    </Link>
-                  ) : (
-                    <div className="flex items-start gap-2.5 py-2.5">{body}</div>
-                  )}
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Lightbulb className="h-4 w-4" style={{ color: HIVE_TEAL }} />
+            Recommendations
+          </h2>
+          {derived.recommendations.length > 0 ? (
+            <ul className="space-y-3">
+              {derived.recommendations.map((rec) => (
+                <li key={rec.key} className="text-sm text-foreground">
+                  {rec.text}
                 </li>
-              );
-            })}
-            {activityItems.length === 0 && (
-              <li className="py-6 text-sm text-muted-foreground">No recent activity.</li>
-            )}
-          </ul>
+              ))}
+            </ul>
+          ) : null}
         </div>
       </div>
 
-      {/* Section 4 — Bottom row */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
         <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-          <div className="mb-4 flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <BarChart3 className="h-4 w-4" style={{ color: HIVE_TEAL }} />
-              Compliance by area
-            </h2>
-            <Link
-              to={incidentStats.total > 0 ? "/dashboard/hub/documentation" : "/dashboard/company-obligations"}
-              search={incidentStats.total > 0 ? { tab: "incidents", cc: "urgent" } : undefined}
-              className="flex cursor-pointer items-center gap-1 text-xs hover:underline"
-              style={{ color: HIVE_TEAL }}
-            >
-              {incidentStats.total > 0 ? "Urgent incidents →" : "Details →"}
-            </Link>
-          </div>
-          <div className={areaGapClass}>
-            {areaRows.map((row) => {
-              const incidentHref =
-                row.key === "incidents"
-                  ? ({ to: "/dashboard/hub/documentation", search: { tab: "incidents", cc: "urgent" } } as const)
-                  : null;
-              if (row.kind === "message") {
-                const inner = (
-                  <>
-                    <div className="mb-1 flex items-center justify-between gap-2">
-                      <span className={incidentHref ? "text-sm font-medium underline underline-offset-2" : "text-sm text-foreground"} style={incidentHref ? { color: HIVE_TEAL } : undefined}>
-                        {row.label}
-                      </span>
-                      {incidentHref ? (
-                        <span className="text-xs font-medium" style={{ color: HIVE_TEAL }}>Urgent →</span>
-                      ) : null}
-                    </div>
-                    <p
-                      className={cn(
-                        "text-xs",
-                        row.tone === "green"
-                          ? "text-emerald-700 dark:text-emerald-400"
-                          : "text-muted-foreground",
-                      )}
-                    >
-                      {row.message}
-                    </p>
-                  </>
-                );
-                return incidentHref ? (
-                  <Link key={row.key} to={incidentHref.to} search={incidentHref.search} className="block cursor-pointer hover:opacity-90">
-                    {inner}
-                  </Link>
-                ) : (
-                  <div key={row.key}>{inner}</div>
-                );
-              }
-              const color = barColor(row.score);
-              const barInner = (
-                <>
+          <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
+            <BarChart3 className="h-4 w-4" style={{ color: HIVE_TEAL }} />
+            Compliance by area
+          </h2>
+          <div className="space-y-4">
+            {derived.areas.map((area) => {
+              const color = barColor(area.completed, area.total);
+              const ratio = area.total > 0 ? area.completed / area.total : 0;
+              return (
+                <div key={area.label}>
                   <div className="mb-1.5 flex items-center justify-between gap-2">
-                    <span className={incidentHref ? "text-sm font-medium underline underline-offset-2" : "text-sm text-foreground"} style={incidentHref ? { color: HIVE_TEAL } : undefined}>
-                      {row.label}
-                    </span>
-                    <span className="text-sm font-semibold tabular-nums" style={{ color: incidentHref ? HIVE_TEAL : color }}>
-                      {incidentHref ? `${row.score}% · Urgent →` : `${row.score}%`}
+                    <span className="text-sm text-foreground">{area.label}</span>
+                    <span className="text-sm font-semibold tabular-nums" style={{ color }}>
+                      {area.completed} of {area.total}
                     </span>
                   </div>
-                  <ProgressBar score={row.score} color={color} />
-                </>
-              );
-              return incidentHref ? (
-                <Link key={row.key} to={incidentHref.to} search={incidentHref.search} className="block cursor-pointer hover:opacity-90">
-                  {barInner}
-                </Link>
-              ) : (
-                <div key={row.key}>{barInner}</div>
+                  <ProgressBar ratio={ratio} color={color} />
+                </div>
               );
             })}
+            {derived.areas.length === 0 && (
+              <p className="py-6 text-sm text-muted-foreground">No obligation instances yet.</p>
+            )}
           </div>
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <CircleUser className="h-4 w-4" style={{ color: HIVE_TEAL }} />
-              Clients
-            </h2>
-          </div>
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+            <CircleUser className="h-4 w-4" style={{ color: HIVE_TEAL }} />
+            Active clients
+          </h2>
           <ul>
-            {clients.slice(0, 10).map((c, idx) => {
-              const name = `${c.first_name} ${c.last_name}`;
-              const codes = clientCodesById.get(c.id) ?? [];
+            {clients.map((c, idx) => {
+              const name = `${c.first_name} ${c.last_name}`.trim();
+              const codes = (c.authorized_dspd_codes ?? []).filter(Boolean);
               const avatarBg = idx % 2 === 0 ? HIVE_NAVY : HIVE_TEAL;
               return (
                 <li key={c.id} className="border-b border-border last:border-0">
-                  <Link
-                    to="/dashboard/hub/clients"
-                    className="flex cursor-pointer items-center gap-2.5 py-2.5 transition hover:bg-muted/40"
-                  >
+                  <div className="flex items-center gap-2.5 py-2.5">
                     <span
                       className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-medium text-white"
                       style={{ background: avatarBg }}
@@ -1630,11 +843,10 @@ function AdminHomeDashboardInner() {
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium text-foreground">{name}</div>
                       <div className="truncate text-xs text-muted-foreground">
-                        {codes.length ? codes.join(" · ") : "No active codes"}
+                        {codes.length ? codes.join(" · ") : "No authorized codes"}
                       </div>
                     </div>
-                    <StatusBadge tone="green">Active</StatusBadge>
-                  </Link>
+                  </div>
                 </li>
               );
             })}
@@ -1645,7 +857,7 @@ function AdminHomeDashboardInner() {
           <div className="mt-3 border-t border-border pt-3">
             <div className="text-xs font-medium text-muted-foreground">Next billing window</div>
             <div className="mt-0.5 text-sm font-semibold text-foreground">
-              {nextBillingWindowLabel()}
+              {nextBillingWindowLabel(now)}
             </div>
           </div>
         </div>

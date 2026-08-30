@@ -12,7 +12,9 @@ export {
   hasHhsCode,
   hasHostHomeDailyCode,
   isDualHhsAndClockable,
+  isHostHomeDailyNoteCard,
   isHostHomeOnlyAssignment,
+  stackDualCaseloadActions,
   type AssignmentMap,
 } from "@/lib/assignment-codes";
 

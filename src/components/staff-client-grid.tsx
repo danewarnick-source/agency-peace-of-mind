@@ -12,8 +12,8 @@ import {
   defaultCaseloadCode,
   firstClockableCode,
   hasHostHomeDailyCode,
-  isDualHhsAndClockable,
-  isHostHomeOnlyAssignment,
+  isHostHomeDailyNoteCard,
+  stackDualCaseloadActions,
   type AssignmentMap,
 } from "@/hooks/use-my-assignments";
 import { DualCaseloadActions } from "@/components/staff-mobile/dual-caseload-actions";
@@ -86,16 +86,16 @@ function ClientDetail({
   activeShift,
   assignments,
   trainings,
+  stackDual,
 }: {
   c: CaseloadClient;
   activeShift: ActiveShift | null;
   assignments: AssignmentMap | undefined;
   trainings: ClientTraining[];
+  stackDual: boolean;
 }) {
   const allCodes = clientAuthorizedCodes(c);
   const codes = allowedCodesFor(assignments, c.id, allCodes);
-  const effectiveCodes = codes.length ? codes : allCodes;
-  const dual = isDualHhsAndClockable(effectiveCodes);
   const isOnTheClock = !!activeShift && activeShift.client_id === c.id;
 
   const initial = isOnTheClock
@@ -128,7 +128,7 @@ function ClientDetail({
             const active = selected === code;
             const locked =
               isOnTheClock &&
-              !dual &&
+              !stackDual &&
               code !== activeShift!.service_type_code;
             return (
               <button
@@ -218,7 +218,7 @@ function ClientDetail({
         </div>
       )}
 
-      {dual ? (
+      {stackDual ? (
         <p className="text-center text-xs text-muted-foreground">
           Punch pad is for the hourly code. Daily note is for HHS — available even while clocked in.
         </p>
@@ -280,9 +280,19 @@ function ClientRow({
   const allCodes = clientAuthorizedCodes(c);
   const codes = allowedCodesFor(assignments, c.id, allCodes);
   const effectiveCodes = codes.length ? codes : allCodes;
-  const hostOnly = isHostHomeOnlyAssignment(effectiveCodes);
   const hasHhs = hasHostHomeDailyCode(effectiveCodes);
-  const dual = isDualHhsAndClockable(effectiveCodes);
+  const hasClockableToday = !!(todayShift && isClockableServiceCode(todayShift.job_code));
+  const hostHomeCard = isHostHomeDailyNoteCard({
+    codes: effectiveCodes,
+    todayJobCode: todayShift?.job_code,
+    isOnTheClock,
+  });
+  const stackDual = stackDualCaseloadActions({
+    codes: effectiveCodes,
+    isHostHomeDailyNoteCard: hostHomeCard,
+    hasClockableShiftToday: hasClockableToday,
+    isOnTheClock,
+  });
   const punchCode = isOnTheClock
     ? activeShift!.service_type_code
     : todayShift && isClockableServiceCode(todayShift.job_code)
@@ -314,7 +324,7 @@ function ClientRow({
       <button
         type="button"
         onClick={() => {
-          if (hostOnly && !dual && !isOnTheClock) {
+          if (hostHomeCard) {
             navigate({ to: "/dashboard/hhs-hub/$clientId", params: { clientId: c.id } });
             return;
           }
@@ -383,7 +393,7 @@ function ClientRow({
         />
       </button>
 
-      {dual ? (
+      {stackDual ? (
         <div className="border-t border-border px-4 py-3">
           <DualCaseloadActions
             clientId={c.id}
@@ -401,6 +411,7 @@ function ClientRow({
             activeShift={activeShift}
             assignments={assignments}
             trainings={trainings}
+            stackDual={stackDual}
           />
         </div>
       )}
@@ -482,8 +493,9 @@ export function StaffClientGrid() {
             My caseload · {source.length} {source.length === 1 ? "person" : "people"}
           </h2>
           <p className="text-xs text-muted-foreground">
-            Tap a person to view services. Hourly codes use Punch pad. HHS-only is the daily note —
-            hosts do not clock. HHS plus another code (DSI, SLH, SEI, …) shows both. EVV is submitted by CSV.
+            Tap a person to view services. Hourly codes use Punch pad. Host home (HHS) is the daily
+            note — hosts do not clock on that card. A clockable shift today (DSI, SLH, SEI, …) is a
+            separate Punch pad row. EVV is submitted by CSV.
           </p>
         </div>
       </div>

@@ -10,7 +10,7 @@ import {
   clientAuthorizedCodes,
   firstClockableCode,
   hasHostHomeDailyCode,
-  isDualHhsAndClockable,
+  stackDualCaseloadActions,
 } from "@/hooks/use-my-assignments";
 import { isClockableServiceCode } from "@/lib/service-billing";
 import { displayPersonName } from "@/lib/person-name";
@@ -74,9 +74,14 @@ export function TodayHero() {
     const activeCodes = activeClient
       ? allowedCodesFor(assignments, activeClient.id, clientAuthorizedCodes(activeClient))
       : [];
-    const dualWhileClocked = isDualHhsAndClockable(
-      activeCodes.length ? activeCodes : clientAuthorizedCodes(activeClient ?? { job_code: null }),
-    );
+    const dualWhileClocked = stackDualCaseloadActions({
+      codes: activeCodes.length
+        ? activeCodes
+        : clientAuthorizedCodes(activeClient ?? { job_code: null }),
+      isHostHomeDailyNoteCard: false,
+      hasClockableShiftToday: isClockableServiceCode(active.service_type_code),
+      isOnTheClock: true,
+    });
     const punchCode = active.service_type_code || firstClockableCode(activeCodes);
     const activeName = activeClient
       ? displayPersonName(activeClient.first_name, activeClient.last_name)
@@ -274,13 +279,23 @@ export function TodayHero() {
             </div>
           </div>
           {(() => {
+            const isHostHomeLead = primaryDaily || !primary;
             const lead = (caseload ?? []).find((c) => c.id === leadClientId);
             const leadCodes = lead
               ? allowedCodesFor(assignments, lead.id, clientAuthorizedCodes(lead))
               : [];
-            const leadDual = isDualHhsAndClockable(
-              leadCodes.length ? leadCodes : clientAuthorizedCodes(lead ?? { job_code: null }),
-            );
+            const effectiveLeadCodes = leadCodes.length
+              ? leadCodes
+              : clientAuthorizedCodes(lead ?? { job_code: null });
+            // HOST HOME / HHS daily-note card: daily note only. Never Punch pad —
+            // even when Tommy has DSI/SEI/SLH on file. Clockable punch is a
+            // separate shift row when one exists today.
+            const leadDual = stackDualCaseloadActions({
+              codes: effectiveLeadCodes,
+              isHostHomeDailyNoteCard: isHostHomeLead,
+              hasClockableShiftToday: !!(primary && !primaryDaily),
+              isOnTheClock: false,
+            });
             if (leadDual) {
               return (
                 <div className="w-full sm:max-w-xs">
@@ -295,7 +310,7 @@ export function TodayHero() {
             }
             return (
               <Button asChild size="lg" className="h-12 shrink-0 px-5 text-base">
-                {primaryDaily || !primary ? (
+                {isHostHomeLead ? (
                   <Link
                     to="/dashboard/hhs-hub/$clientId"
                     params={{ clientId: leadClientId }}

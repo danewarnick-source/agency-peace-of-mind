@@ -91,9 +91,52 @@ export function firstClockableCode(codes: string[]): string {
 }
 
 /**
- * HHS plus at least one clockable code — staff see punch pad AND daily note.
- * HHS-only stays daily-note only. DSI-only stays punch only.
+ * Person has HHS plus at least one clockable code on file (DSI/SLH/SEI/…).
+ * This is NOT permission to paint Punch pad onto the host-home daily-note
+ * card. That card opens `/dashboard/hhs-hub/$clientId` and is daily note
+ * only — hosts do not clock there. Punch belongs on a separate clockable
+ * shift row (or an in-progress punch), never as a second button on HHS.
  */
 export function isDualHhsAndClockable(codes: string[]): boolean {
   return hasHhsCode(codes) && !!firstClockableCode(codes);
+}
+
+function isClockableAssignmentCode(code: string): boolean {
+  const u = String(code ?? "").trim().toUpperCase();
+  return !!u && u !== "HHS" && u !== "PPS" && u !== "MTP";
+}
+
+/**
+ * Today's surface for this person is the host-home daily note.
+ * True for HHS-only, and for dual-code people who have no clockable
+ * shift today and are not already on the clock. Codes on file (DSI/SEI/SLH)
+ * must not flip this — treat the HOST HOME / HHS card as host-home only.
+ */
+export function isHostHomeDailyNoteCard(opts: {
+  codes: string[];
+  todayJobCode?: string | null;
+  isOnTheClock?: boolean;
+}): boolean {
+  if (!hasHostHomeDailyCode(opts.codes)) return false;
+  if (opts.isOnTheClock) return false;
+  const today = String(opts.todayJobCode ?? "").trim();
+  if (today && isClockableAssignmentCode(today)) return false;
+  return true;
+}
+
+/**
+ * Stack Punch pad + daily note on one card.
+ * Never true for a host-home daily-note card — even when the person also
+ * has a clockable code on file. Dual-code punch stays on a clockable
+ * shift row or the in-progress punch.
+ */
+export function stackDualCaseloadActions(opts: {
+  codes: string[];
+  isHostHomeDailyNoteCard: boolean;
+  hasClockableShiftToday: boolean;
+  isOnTheClock: boolean;
+}): boolean {
+  if (opts.isHostHomeDailyNoteCard) return false;
+  if (!isDualHhsAndClockable(opts.codes)) return false;
+  return opts.hasClockableShiftToday || opts.isOnTheClock;
 }

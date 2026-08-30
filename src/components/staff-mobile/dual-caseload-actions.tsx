@@ -3,9 +3,9 @@ import { Clock, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 /**
- * Phone-first dual actions for a person with HHS plus a clockable code.
- * Punch pad and daily note are both always available — including while
- * already clocked in on the non-HHS service.
+ * Phone-first dual actions for a clockable shift / in-progress punch when
+ * that same person also has HHS. Never mount this on the HOST HOME / HHS
+ * daily-note card — that card is daily note only (hosts do not clock).
  */
 export function DualCaseloadActions({
   clientId,

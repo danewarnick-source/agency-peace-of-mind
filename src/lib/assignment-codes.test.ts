@@ -8,7 +8,9 @@ import {
   hasHhsCode,
   hasHostHomeDailyCode,
   isDualHhsAndClockable,
+  isHostHomeDailyNoteCard,
   isHostHomeOnlyAssignment,
+  stackDualCaseloadActions,
   type AssignmentMap,
 } from "./assignment-codes.ts";
 
@@ -94,12 +96,110 @@ describe("host-home daily assignment", () => {
     assert.equal(isHostHomeOnlyAssignment(["SLH"]), false);
   });
 
-  it("flags HHS + DSI as dual (punch and daily note)", () => {
+  it("flags HHS + DSI as dual codes on file — not as punch-on-host-home", () => {
     assert.equal(hasHhsCode(["HHS", "DSI"]), true);
     assert.equal(firstClockableCode(["HHS", "DSI"]), "DSI");
     assert.equal(isDualHhsAndClockable(["HHS", "DSI"]), true);
     assert.equal(isDualHhsAndClockable(["HHS"]), false);
     assert.equal(isDualHhsAndClockable(["DSI"]), false);
     assert.equal(isDualHhsAndClockable(["HHS", "SLH", "SEI"]), true);
+  });
+
+  it("treats Tommy-style HHS + DSI/SEI/SLH with no clockable shift today as host-home only", () => {
+    const tommy = ["DSI", "HHS", "SEI", "SLH"];
+    assert.equal(isDualHhsAndClockable(tommy), true);
+    assert.equal(
+      isHostHomeDailyNoteCard({ codes: tommy, todayJobCode: null, isOnTheClock: false }),
+      true,
+    );
+    assert.equal(
+      stackDualCaseloadActions({
+        codes: tommy,
+        isHostHomeDailyNoteCard: true,
+        hasClockableShiftToday: false,
+        isOnTheClock: false,
+      }),
+      false,
+    );
+  });
+
+  it("never stacks Punch pad onto a host-home daily-note card", () => {
+    assert.equal(
+      stackDualCaseloadActions({
+        codes: ["HHS", "DSI"],
+        isHostHomeDailyNoteCard: true,
+        hasClockableShiftToday: false,
+        isOnTheClock: false,
+      }),
+      false,
+    );
+    // Even if a clockable shift exists elsewhere, the HHS card itself stays daily-note only.
+    assert.equal(
+      stackDualCaseloadActions({
+        codes: ["HHS", "DSI"],
+        isHostHomeDailyNoteCard: true,
+        hasClockableShiftToday: true,
+        isOnTheClock: false,
+      }),
+      false,
+    );
+  });
+
+  it("puts punch on a separate clockable row / in-progress punch, not on HHS", () => {
+    assert.equal(
+      isHostHomeDailyNoteCard({
+        codes: ["HHS", "DSI"],
+        todayJobCode: "DSI",
+        isOnTheClock: false,
+      }),
+      false,
+    );
+    assert.equal(
+      stackDualCaseloadActions({
+        codes: ["HHS", "DSI"],
+        isHostHomeDailyNoteCard: false,
+        hasClockableShiftToday: true,
+        isOnTheClock: false,
+      }),
+      true,
+    );
+    assert.equal(
+      stackDualCaseloadActions({
+        codes: ["HHS", "DSI"],
+        isHostHomeDailyNoteCard: false,
+        hasClockableShiftToday: false,
+        isOnTheClock: true,
+      }),
+      true,
+    );
+  });
+
+  it("leaves HHS-only and clockable-only unchanged", () => {
+    assert.equal(
+      isHostHomeDailyNoteCard({ codes: ["HHS"], todayJobCode: "HHS", isOnTheClock: false }),
+      true,
+    );
+    assert.equal(
+      stackDualCaseloadActions({
+        codes: ["HHS"],
+        isHostHomeDailyNoteCard: true,
+        hasClockableShiftToday: false,
+        isOnTheClock: false,
+      }),
+      false,
+    );
+    assert.equal(
+      isHostHomeDailyNoteCard({ codes: ["DSI"], todayJobCode: "DSI", isOnTheClock: false }),
+      false,
+    );
+    assert.equal(
+      stackDualCaseloadActions({
+        codes: ["DSI"],
+        isHostHomeDailyNoteCard: false,
+        hasClockableShiftToday: true,
+        isOnTheClock: false,
+      }),
+      false,
+    );
   });
 });

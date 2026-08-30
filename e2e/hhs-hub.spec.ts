@@ -178,7 +178,7 @@ test.describe("HHS hub — mocked admin (Blake Stevens host home)", () => {
 });
 
 test.describe("HHS hub — staff DSP (Jake Probert) and unassigned bounce", () => {
-  test("6. Assigned staff can open the HHS hub; dual-code caseload shows punch and daily note", async ({
+  test("6. Assigned staff can open the HHS hub; host-home card is daily note only", async ({
     page,
   }) => {
     await installHiveMocks(page, { persona: "dsp" });
@@ -190,12 +190,20 @@ test.describe("HHS hub — staff DSP (Jake Probert) and unassigned bounce", () =
     await expect(page.getByText(/Clinical Profile/i)).toHaveCount(0);
     await expect(page.getByRole("tab", { name: /Daily Note/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /Clock in|Start shift/i })).toHaveCount(0);
-    // Hub itself is still not a punch pad; caseload (not this page) shows both actions.
+    // Hub is never a punch pad. Host-home caseload cards stay daily-note only
+    // even when DSI/SEI/SLH exist on file (Tommy-style dual codes).
 
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
-    const caseloadHint = page.getByText(/My Caseload|Blake Stevens/i).first();
+    const caseloadHint = page.getByText(/My Caseload|Blake Stevens|Tommy Jones/i).first();
     await caseloadHint.waitFor({ state: "visible", timeout: 20_000 }).catch(() => undefined);
     if (await caseloadHint.isVisible().catch(() => false)) {
+      await expect(page.getByRole("link", { name: /Open Punch pad for (Tommy Jones|Blake Stevens)/i })).toHaveCount(0);
+      const hostHomeCopy = page.getByText(/Daily note — hosts do not clock in/i);
+      if (await hostHomeCopy.isVisible().catch(() => false)) {
+        await expect(hostHomeCopy).toBeVisible();
+        await expect(page.getByRole("link", { name: /Open Punch pad/i })).toHaveCount(0);
+        await expect(page.getByRole("link", { name: /Open daily note/i }).first()).toBeVisible();
+      }
       const blakeRow = page.getByText("Blake Stevens", { exact: true }).first();
       if (await blakeRow.isVisible().catch(() => false)) {
         await blakeRow.click();
@@ -204,10 +212,9 @@ test.describe("HHS hub — staff DSP (Jake Probert) and unassigned bounce", () =
         }).catch(() => undefined);
       }
       const hubCta = page.getByRole("link", { name: /Open daily note for Blake Stevens/i });
-      const clockCta = page.getByRole("link", { name: /Open Punch pad for Blake Stevens/i });
       if (await hubCta.isVisible().catch(() => false)) {
         await expect(hubCta).toBeVisible();
-        await expect(clockCta).toBeVisible();
+        await expect(page.getByRole("link", { name: /Open Punch pad for Blake Stevens/i })).toHaveCount(0);
         await hubCta.click();
       }
       if (page.url().includes(`/hhs-hub/${CLIENTS.blake.id}`)) {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useCaseload, type CaseloadClient } from "@/hooks/use-caseload";
@@ -10,6 +10,8 @@ import {
   allowedCodesFor,
   clientAuthorizedCodes,
   defaultCaseloadCode,
+  hasHostHomeDailyCode,
+  isHostHomeOnlyAssignment,
   type AssignmentMap,
 } from "@/hooks/use-my-assignments";
 import { useTodayShifts, type TodayShiftRow } from "@/hooks/use-today-shifts";
@@ -217,7 +219,7 @@ function ClientDetail({
             isOnTheClock ? "bg-[#117a52] text-white shadow-sm hover:bg-[#0f6b48]" : "",
           ].join(" ")}
           aria-label={`${
-            isOnTheClock ? "Continue Punch pad" : daily ? "Open Client Hub" : "Open Punch pad"
+            isOnTheClock ? "Continue Punch pad" : daily ? "Open daily note" : "Open Punch pad"
           } for ${fullName} (${selected})`}
         >
           <Link
@@ -226,7 +228,7 @@ function ClientDetail({
             search={daily ? undefined : { tab: "clock-in", code: selected }}
           >
             {daily && !isOnTheClock ? <Home /> : <Clock />}
-            {isOnTheClock ? "Continue Punch pad" : daily ? "Open Client Hub" : "Open Punch pad"}
+            {isOnTheClock ? "Continue Punch pad" : daily ? "Open daily note" : "Open Punch pad"}
           </Link>
         </Button>
         <p className="mt-2 text-center text-xs text-muted-foreground">
@@ -260,6 +262,11 @@ function ClientRow({
 }) {
   const isOnTheClock = !!activeShift && activeShift.client_id === c.id;
   useTick(isOnTheClock);
+  const navigate = useNavigate();
+  const allCodes = clientAuthorizedCodes(c);
+  const codes = allowedCodesFor(assignments, c.id, allCodes);
+  const hostOnly = isHostHomeOnlyAssignment(codes.length ? codes : allCodes);
+  const hasHhs = hasHostHomeDailyCode(codes.length ? codes : allCodes);
 
   const hasTrainingDue = trainings.some(
     (t) => t.setupStatus === "published" && t.completionStatus === "not_started",
@@ -285,7 +292,13 @@ function ClientRow({
     >
       <button
         type="button"
-        onClick={onToggle}
+        onClick={() => {
+          if (hostOnly && !isOnTheClock) {
+            navigate({ to: "/dashboard/hhs-hub/$clientId", params: { clientId: c.id } });
+            return;
+          }
+          onToggle();
+        }}
         aria-expanded={isOpen}
         className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-muted/40"
       >
@@ -314,7 +327,7 @@ function ClientRow({
               </span>
             ) : (
               <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                No shift today
+                {hasHhs ? "Daily note" : "No shift today"}
               </span>
             )}
             {hasTrainingDue && (
@@ -430,7 +443,7 @@ export function StaffClientGrid() {
   }, [source, q, todayByClient]);
 
   return (
-    <section aria-label="My Caseload" className="space-y-3">
+    <section aria-label="My Caseload" data-tour="staff.caseload" className="space-y-3">
       <div className="flex items-end justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold tracking-tight">

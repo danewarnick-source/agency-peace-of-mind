@@ -56,3 +56,21 @@ export function defaultCaseloadCode(
   }
   return "";
 }
+
+/** True when this person's assigned/authorized codes include a host-home daily code. */
+export function hasHostHomeDailyCode(codes: string[]): boolean {
+  return codes.some((c) => {
+    const u = String(c ?? "").trim().toUpperCase();
+    return u === "HHS" || u === "PPS" || u === "MTP";
+  });
+}
+
+/** True when every assigned code is host-home daily (hosts do not clock). */
+export function isHostHomeOnlyAssignment(codes: string[]): boolean {
+  const cleaned = codes.map((c) => String(c ?? "").trim()).filter(Boolean);
+  if (cleaned.length === 0) return false;
+  return cleaned.every((c) => {
+    const u = c.toUpperCase();
+    return u === "HHS" || u === "PPS" || u === "MTP";
+  });
+}

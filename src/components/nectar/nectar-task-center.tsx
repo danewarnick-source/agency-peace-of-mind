@@ -14,9 +14,11 @@ interface Props {
   onOpenChange?: (open: boolean) => void;
   /** Optional pre-filled goal (e.g. detected from chat). */
   initialGoal?: string;
+  /** Staff view must send surface=staff so the planner uses staff anchors. */
+  surface?: "admin" | "staff";
 }
 
-export function NectarTaskCenter({ trigger, open, onOpenChange, initialGoal }: Props) {
+export function NectarTaskCenter({ trigger, open, onOpenChange, initialGoal, surface = "admin" }: Props) {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id ?? "";
   const role = org?.role ?? "employee";
@@ -36,7 +38,7 @@ export function NectarTaskCenter({ trigger, open, onOpenChange, initialGoal }: P
   });
 
   const planM = useMutation({
-    mutationFn: (g: string) => plan({ data: { goal: g, role, orgId, surface: "admin" } }),
+    mutationFn: (g: string) => plan({ data: { goal: g, role, orgId, surface } }),
     onSuccess: () => {
       setGoal("");
       qc.invalidateQueries({ queryKey: ["nectar-guides", orgId] });
@@ -88,7 +90,11 @@ export function NectarTaskCenter({ trigger, open, onOpenChange, initialGoal }: P
             value={goal}
             onChange={(e) => setGoal(e.target.value)}
             rows={2}
-            placeholder="e.g. Help me prepare for my DSPD audit"
+            placeholder={
+              surface === "staff"
+                ? "e.g. Help me write today's daily note"
+                : "e.g. Help me prepare for my DSPD audit"
+            }
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#d97a1c]/40"
           />
           <button

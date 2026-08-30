@@ -4,6 +4,8 @@ import {
   allowedCodesFor,
   clientAuthorizedCodes,
   defaultCaseloadCode,
+  hasHostHomeDailyCode,
+  isHostHomeOnlyAssignment,
   type AssignmentMap,
 } from "./assignment-codes.ts";
 
@@ -70,5 +72,22 @@ describe("defaultCaseloadCode — do not invent SEI", () => {
 
   it("prefers the assignment list", () => {
     assert.equal(defaultCaseloadCode(["HHS"], ["HHS", "DSI"]), "HHS");
+  });
+});
+
+describe("host-home daily assignment", () => {
+  it("treats HHS as host-home daily", () => {
+    assert.equal(hasHostHomeDailyCode(["HHS"]), true);
+    assert.equal(isHostHomeOnlyAssignment(["HHS"]), true);
+  });
+
+  it("does not treat mixed HHS + clockable as host-only", () => {
+    assert.equal(hasHostHomeDailyCode(["HHS", "DSI"]), true);
+    assert.equal(isHostHomeOnlyAssignment(["HHS", "DSI"]), false);
+  });
+
+  it("treats clockable-only as not host-home", () => {
+    assert.equal(hasHostHomeDailyCode(["SLH"]), false);
+    assert.equal(isHostHomeOnlyAssignment(["SLH"]), false);
   });
 });

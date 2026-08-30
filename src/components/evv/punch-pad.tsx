@@ -27,6 +27,8 @@ import { roundToQuarterHourISO } from "@/lib/time-rounding";
 import { computeEntryUnits } from "@/lib/billing-units";
 import { EvvConsentGate } from "@/components/evv/consent-gate";
 import { evaluateShiftNote, type CoachResult } from "@/lib/ai-coach.functions";
+import { NectarShiftNoteDraft } from "@/components/nectar/nectar-shift-note-draft";
+import { NECTAR_DRAFT_MIN_WORDS } from "@/lib/nectar-note-gate";
 import { freezeOriginalTranscript } from "@/lib/original-transcript";
 import {
   accumulateSpeechResults,
@@ -34,7 +36,7 @@ import {
   type ContinuousSpeechSession,
 } from "@/lib/continuous-speech";
 import { OriginalSpeechAudit } from "@/components/staff-mobile/original-speech-audit";
-import { draftVarianceJustification, answerProceduralQuestion, type ProceduralResult } from "@/lib/ai-coach.functions";
+import { answerProceduralQuestion, type ProceduralResult } from "@/lib/ai-coach.functions";
 import { NectarInfusionLock } from "@/components/nectar/nectar-infusion-lock";
 import { useNectarInfusion } from "@/hooks/use-nectar-infusion";
 import {
@@ -319,6 +321,9 @@ export function PunchPad({
   // ── Staff attestation (Medicaid fraud statement) ────────────────────────────
   const [attestationChecked, setAttestationChecked] = useState(false);
   const [attestationTimestamp, setAttestationTimestamp] = useState<string | null>(null);
+  const [nectarUsed, setNectarUsed] = useState(false);
+  const [nectarAssistChecked, setNectarAssistChecked] = useState(false);
+  const [nectarDraftApplied, setNectarDraftApplied] = useState<string | null>(null);
 
   // ── NECTAR Completeness Check (Infusion add-on) ────────────────────────────
   type CFlag = {
@@ -335,12 +340,6 @@ export function PunchPad({
   const [dismissingKey, setDismissingKey] = useState<string | null>(null);
   const [dismissReasonDraft, setDismissReasonDraft] = useState("");
   const navigate = useNavigate();
-
-  // ── NECTAR Variance Rescue (Infusion add-on) ───────────────────────────────
-  const [varShorthand, setVarShorthand]       = useState("");
-  const [varDraftBusy, setVarDraftBusy]       = useState(false);
-  const [outVarShorthand, setOutVarShorthand] = useState("");
-  const [outVarDraftBusy, setOutVarDraftBusy] = useState(false);
 
   // ── Post-shift Behavior Observations ───────────────────────────────────────
   const { data: behaviorSetting } = useShiftBehaviorSetting();
@@ -959,7 +958,7 @@ export function PunchPad({
   }, [narrative]);
 
   const hasGoalSelected    = baselineChecked || Object.values(checkedGoals).some(Boolean);
-  const narrativeOk        = wordCount >= 50;
+  const narrativeOk        = wordCount >= NECTAR_DRAFT_MIN_WORDS;
   const behaviorError      = behaviorEnabled ? validateBehaviorAnswers(behaviorAnswers) : null;
   const behaviorOk         = behaviorError === null;
   const liveDurationMs = active
@@ -994,6 +993,7 @@ export function PunchPad({
     hasGoalSelected && narrativeOk && behaviorOk &&
     longShiftOk && triggersResolved && medDosesResolved &&
     incidentAnswer !== null && !busy && attestationChecked &&
+    (!nectarUsed || nectarAssistChecked) &&
     (!correctionOpen || !correctionHasChange || correctionValid);
 
 
@@ -1014,6 +1014,9 @@ export function PunchPad({
     setAllowException(false);
     setAttestationChecked(false);
     setAttestationTimestamp(null);
+    setNectarUsed(false);
+    setNectarAssistChecked(false);
+    setNectarDraftApplied(null);
     setCompletenessRan(false);
     setCompletenessFlags([]);
     setDismissals({});
@@ -1107,7 +1110,7 @@ export function PunchPad({
           key: "short-note",
           type: "narrative_too_short",
           severity: "hard",
-          message: `Progress note is ${wordCount} words — Medicaid requires at least 50.`,
+          message: `Progress note is ${wordCount} words — write at least ${NECTAR_DRAFT_MIN_WORDS}.`,
           fix: { label: "Expand note" },
         });
       }
@@ -1243,44 +1246,6 @@ export function PunchPad({
     }
     recognitionSessionRef.current = session;
     setIsRecording(true);
-  }
-
-  async function handleDraftVariance(phase: "clock_in" | "clock_out") {
-    const shorthand = phase === "clock_in" ? varShorthand.trim() : outVarShorthand.trim();
-    if (shorthand.length < 2) {
-      toast.error("Add a few words first — NECTAR will expand it.");
-      return;
-    }
-    const v = phase === "clock_in" ? variance : outVariance;
-    const clientFirst =
-      lockedClient?.name?.split(" ")?.[0] ??
-      caseload.find((c) => c.id === (active?.client_id ?? selectedClientId))?.first_name ??
-      "the client";
-    const setBusyFn = phase === "clock_in" ? setVarDraftBusy : setOutVarDraftBusy;
-    setBusyFn(true);
-    try {
-      const res = await draftVarianceJustification({
-        data: {
-          shorthand,
-          distanceFeet: v?.distanceFeet ?? null,
-          limitFeet:    v?.limitFeet ?? null,
-          serviceCode:  serviceCode || null,
-          clientFirstName: clientFirst,
-          phase,
-          frameBlocked: phase === "clock_in" ? !!variance?.frameBlocked : !!outVariance?.frameBlocked,
-        },
-      });
-      if (phase === "clock_in") {
-        setVarianceReason(res.draft);
-      } else {
-        setOutVarianceReason(res.draft);
-      }
-      toast.success("Draft ready — review and edit before submitting.");
-    } catch (e) {
-      toast.error((e as Error).message || "NECTAR couldn't draft a justification.");
-    } finally {
-      setBusyFn(false);
-    }
   }
 
   async function handleAskNectar() {
@@ -1526,10 +1491,7 @@ export function PunchPad({
       // Per-entry quarter-hour units (round-to-NEAREST); raw timestamps stay untouched.
       billed_units:         computeEntryUnits(active.clock_in_timestamp, clockOut),
     };
-    // NECTAR no longer drafts notes — staff always write their own; this
-    // field stays false so downstream billing/audit views don't need a
-    // separate "never drafted" state.
-    update.nectar_drafted = false;
+    update.nectar_drafted = nectarUsed;
     update.nectar_review_service_code = active.service_type_code;
     update.attested_accurate = true;
     update.attested_at = attestationTimestamp;
@@ -1558,7 +1520,7 @@ export function PunchPad({
           nectar_review_status: aiCoach?.status ?? "not_reviewed",
         },
         original_staff_input: frozenOriginal || null,
-        nectar_expanded_output: null,
+        nectar_expanded_output: nectarUsed ? nectarDraftApplied : null,
         input_confirmed_at: attestationTimestamp,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any);
@@ -1825,6 +1787,14 @@ export function PunchPad({
     }
     if (!medDosesResolved) {
       toast.error("Log all scheduled medication doses in eMAR before submitting.");
+      return;
+    }
+    if (nectarUsed && !nectarAssistChecked) {
+      toast.error("You used NECTAR on this punch — attest that you reviewed the draft.");
+      return;
+    }
+    if (!attestationChecked) {
+      toast.error("Attest that the note and time punch are accurate before clocking out.");
       return;
     }
     if (correctionOpen && correctionHasChange && !correctionValid) {
@@ -2542,11 +2512,11 @@ export function PunchPad({
         />
 
         {/* Clock-in variance — text only, no map */}
-        <Dialog open={!!variance} onOpenChange={(o) => { if (!o) { setVariance(null); setVarianceReason(""); setVarShorthand(""); } }}>
+        <Dialog open={!!variance} onOpenChange={(o) => { if (!o) { setVariance(null); setVarianceReason(""); } }}>
           <DialogContent className="max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                {variance?.frameBlocked ? "📡 GPS Unavailable" : "⚠️ Geofence Variance Notice"}
+                {variance?.frameBlocked ? "GPS unavailable" : "Outside the geofence"}
               </DialogTitle>
               <DialogDescription>
                 {variance?.frameBlocked
@@ -2562,54 +2532,20 @@ export function PunchPad({
                 <span className="font-mono font-semibold">{variance.limitFeet.toLocaleString()} ft</span>
               </div>
             )}
-            <NectarInfusionLock
-              featureName="NECTAR variance rescue"
-              benefit="Type a few words and NECTAR drafts an auditor-ready justification. You always review and confirm before submitting."
-            >
-              <div className="rounded-md border border-[color:var(--amber-300)] bg-[color:var(--amber-50)]/60 p-3">
-                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-700)]">
-                  <Hexagon className="h-3.5 w-3.5" /> NECTAR · Variance rescue
-                </p>
-                <Textarea
-                  rows={2}
-                  value={varShorthand}
-                  onChange={(e) => setVarShorthand(e.target.value)}
-                  placeholder='Shorthand — e.g. "community outing, library" or "medical transit"'
-                  maxLength={400}
-                  className="mt-2 text-sm"
-                />
-                <div className="mt-2 flex justify-end">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => handleDraftVariance("clock_in")}
-                    disabled={varDraftBusy || varShorthand.trim().length < 2}
-                    className="bg-[color:var(--amber-500)] text-[color:var(--navy-900)] hover:bg-[color:var(--amber-600)]"
-                  >
-                    {varDraftBusy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1 h-3.5 w-3.5" />}
-                    Draft justification
-                  </Button>
-                </div>
-              </div>
-            </NectarInfusionLock>
             <div className="grid gap-2">
               <Label htmlFor="variance-reason">
-                {variance?.frameBlocked ? "GPS unavailable — reason" : "Location variance justification"}
+                Why are you outside the geofence?
               </Label>
               <Textarea
                 id="variance-reason"
                 rows={4}
                 value={varianceReason}
                 onChange={(e) => setVarianceReason(e.target.value)}
-                placeholder={
-                  variance?.frameBlocked
-                    ? "e.g., GPS unavailable — no signal indoors, location permission off, device error."
-                    : "Describe your location or device situation (e.g., Device location permissions restricted, starting shift at community job site, bad cell reception)."
-                }
+                placeholder="Write why you are clocking in away from the saved home pin."
                 maxLength={500}
               />
               <p className="text-[11px] text-muted-foreground">
-                {varianceReason.trim().length}/10 characters minimum — review NECTAR drafts before confirming.
+                {varianceReason.trim().length}/10 characters minimum
               </p>
             </div>
 
@@ -2626,11 +2562,11 @@ export function PunchPad({
         </Dialog>
 
         {/* Clock-out variance — text only, no map */}
-        <Dialog open={!!outVariance} onOpenChange={(o) => { if (!o) { setOutVariance(null); setOutVarianceReason(""); setOutVarShorthand(""); } }}>
+        <Dialog open={!!outVariance} onOpenChange={(o) => { if (!o) { setOutVariance(null); setOutVarianceReason(""); } }}>
           <DialogContent className="max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                {outVariance?.frameBlocked ? "📡 GPS Unavailable" : "📍 Out-of-Bounds EVV Exception Alert"}
+                {outVariance?.frameBlocked ? "GPS unavailable" : "Outside the geofence"}
               </DialogTitle>
               <DialogDescription>
                 {outVariance?.frameBlocked
@@ -2655,50 +2591,16 @@ export function PunchPad({
                 )}
               </div>
             )}
-            <NectarInfusionLock
-              featureName="NECTAR variance rescue"
-              benefit="Type a few words and NECTAR drafts an auditor-ready clock-out justification. You always review and confirm."
-            >
-              <div className="rounded-md border border-[color:var(--amber-300)] bg-[color:var(--amber-50)]/60 p-3">
-                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--amber-700)]">
-                  <Hexagon className="h-3.5 w-3.5" /> NECTAR · Variance rescue
-                </p>
-                <Textarea
-                  rows={2}
-                  value={outVarShorthand}
-                  onChange={(e) => setOutVarShorthand(e.target.value)}
-                  placeholder='Shorthand — e.g. "finished outing at park" or "dropped at day program"'
-                  maxLength={400}
-                  className="mt-2 text-sm"
-                />
-                <div className="mt-2 flex justify-end">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => handleDraftVariance("clock_out")}
-                    disabled={outVarDraftBusy || outVarShorthand.trim().length < 2}
-                    className="bg-[color:var(--amber-500)] text-[color:var(--navy-900)] hover:bg-[color:var(--amber-600)]"
-                  >
-                    {outVarDraftBusy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1 h-3.5 w-3.5" />}
-                    Draft justification
-                  </Button>
-                </div>
-              </div>
-            </NectarInfusionLock>
             <div className="grid gap-2">
               <Label htmlFor="out-variance-reason">
-                {outVariance?.frameBlocked ? "GPS unavailable — reason" : "Variance justification"}
+                Why are you outside the geofence?
               </Label>
               <Textarea
                 id="out-variance-reason"
                 rows={4}
                 value={outVarianceReason}
                 onChange={(e) => setOutVarianceReason(e.target.value)}
-                placeholder={
-                  outVariance?.frameBlocked
-                    ? "e.g., GPS unavailable — no signal indoors, location permission off, device error."
-                    : "e.g., Completed community outing and clocked out at the destination."
-                }
+                placeholder="Write why you are clocking out away from the saved home pin."
                 maxLength={500}
               />
             </div>
@@ -2758,7 +2660,12 @@ export function PunchPad({
         </Dialog>
 
         {/* Clock-OUT success confirmation */}
-        <Dialog open={!!success} onOpenChange={(o) => !o && setSuccess(null)}>
+        <Dialog open={!!success} onOpenChange={(o) => {
+          if (!o) {
+            setSuccess(null);
+            navigate({ to: "/dashboard" });
+          }
+        }}>
           <DialogContent className="overflow-hidden p-0">
             <div className={`px-6 py-5 ${success?.evvClean ? "bg-emerald-50 dark:bg-emerald-950" : "bg-amber-50 dark:bg-amber-950"}`}>
               <div className="flex items-center gap-3">
@@ -2799,12 +2706,15 @@ export function PunchPad({
               </p>
               <div className="flex justify-end">
                 <Button
-                  onClick={() => setSuccess(null)}
+                  onClick={() => {
+                    setSuccess(null);
+                    navigate({ to: "/dashboard" });
+                  }}
                   className={success?.evvClean
                     ? "bg-emerald-600 hover:bg-emerald-700 text-white"
                     : "bg-amber-600 hover:bg-amber-700 text-white"}
                 >
-                  Done
+                  Back to My Caseload
                 </Button>
               </div>
             </div>
@@ -2919,7 +2829,7 @@ export function PunchPad({
                   />
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className={`text-xs font-medium ${narrativeOk ? "text-emerald-600" : "text-muted-foreground"}`}>
-                      Word Count: {wordCount} / 50 words minimum
+                      Word Count: {wordCount} / {NECTAR_DRAFT_MIN_WORDS} words minimum
                     </div>
                     {speechSupported && (
                       <Button
@@ -2936,12 +2846,29 @@ export function PunchPad({
                   </div>
                   {showNarrativeError && !narrativeOk && (
                     <div className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-300">
-                      ⚠️ Compliance Failure: Your daily progress narrative must be at least 50 words
-                      to satisfy state Medicaid auditing and DSPD billing validation criteria.
+                      Your progress note must be at least {NECTAR_DRAFT_MIN_WORDS} words and describe how you supported the person.
                     </div>
                   )}
+                  <NectarShiftNoteDraft
+                    narrative={narrative}
+                    goals={[
+                      ...Object.entries(checkedGoals).filter(([, v]) => v).map(([k]) => k),
+                      ...(baselineChecked ? ["General baseline monitoring & safety oversight"] : []),
+                    ]}
+                    clientFirstName={
+                      lockedClient?.name?.split(" ")?.[0] ??
+                      caseload.find((c) => c.id === active?.client_id)?.first_name ??
+                      "the client"
+                    }
+                    onApplyDraft={(draft) => {
+                      setNarrative(draft);
+                      setNectarDraftApplied(draft);
+                      if (aiCoach) setAiCoach(null);
+                    }}
+                    onUsed={() => setNectarUsed(true)}
+                  />
                   <div className="flex flex-wrap gap-2">
-                    {wordCount >= 20 && (
+                    {wordCount >= NECTAR_DRAFT_MIN_WORDS && (
                       <Button
                         type="button"
                         size="sm"
@@ -3352,6 +3279,22 @@ export function PunchPad({
                         Cancel correction
                       </Button>
                     </div>
+                  </div>
+                )}
+
+                {nectarUsed && (
+                  <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3">
+                    <label className="flex cursor-pointer items-start gap-2.5 text-sm">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[color:var(--amber-600)]"
+                        checked={nectarAssistChecked}
+                        onChange={(e) => setNectarAssistChecked(e.target.checked)}
+                      />
+                      <span className="leading-relaxed text-amber-900 dark:text-amber-100">
+                        I used NECTAR to help draft this note. I reviewed the draft and confirm it is accurate.
+                      </span>
+                    </label>
                   </div>
                 )}
 

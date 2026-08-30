@@ -108,7 +108,7 @@ STANDARD 3 — GOAL ALIGNMENT: For each checked PCSP goal, the note must describ
 
 STANDARD 4 — NOTEWORTHY OBSERVATIONS: The note must include at least one specific observation beyond routine — client mood with behavioral evidence, a health observation, a community interaction, a behavioral pattern, a safety note, or anything an auditor or next-shift staff would need to know. A note that could apply to any shift for any client fails this standard.
 
-STANDARD 5 — SUBSTANTIVE CONTENT: The note must be at least 50 words AND substantive. A 50-word note of vague filler fails even if it meets word count.
+STANDARD 5 — SUBSTANTIVE CONTENT: The note must be at least 30 words AND substantive. A 30-word note of vague filler fails even if it meets word count.
 
 SERVICE CODE CONTEXT:
 ${serviceCode === "HHS" || serviceCode === "RHS" ? "- This is a residential shift. If medications were administered, the note should reference medication support or note that no medications were due." : ""}
@@ -165,6 +165,7 @@ interface DraftInput {
   shorthand: string;
   goals: string[];
   clientFirstName: string;
+  followUpAnswers?: string;
 }
 
 function validateDraft(input: unknown): DraftInput {
@@ -180,45 +181,60 @@ function validateDraft(input: unknown): DraftInput {
   if (shorthand.length < 3 || shorthand.length > 4000) {
     throw new Error("Shorthand must be 3–4000 characters.");
   }
-  return { shorthand, goals, clientFirstName };
+  const followUpAnswers =
+    typeof i.followUpAnswers === "string" ? i.followUpAnswers.trim().slice(0, 4000) : "";
+  return { shorthand, goals, clientFirstName, followUpAnswers: followUpAnswers || undefined };
+}
+
+export interface ShiftNoteFollowUp {
+  question: string;
 }
 
 export interface DraftResult {
   draft: string;
   wordCount: number;
+  followUps: ShiftNoteFollowUp[];
 }
 
 export const draftShiftNote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateDraft)
   .handler(async ({ data }): Promise<DraftResult> => {
+    const foldingAnswers = !!data.followUpAnswers;
     const system = `You are NECTAR, a Medicaid DSPD progress-note drafting assistant for direct-support caregivers.
 
 GOAL:
-Expand the caregiver's shorthand or voice transcript into a professional, audit-ready progress-note narrative for the end-of-shift Shift Verification & Medicaid Compliance Form.
+Expand the caregiver's own note into a professional, audit-ready progress-note narrative. The caregiver already wrote what happened — do not invent facts.
 
 REQUIREMENTS:
-- Write 60–120 words (must be at least 55 words to clear the 50-word minimum comfortably).
-- Past tense, third person, objective and behavior-focused. No subjective fluff ("had a great day"). Describe what the client did, chose, said, and how staff supported them.
-- Explicitly reference each checked PCSP goal by what the caregiver did to support it (functional, real-world actions). Do NOT invent facts that are not implied by the shorthand — if a goal isn't covered by the shorthand, note baseline support for it generically (e.g. "Provided prompting and oversight aligned with [goal]") instead of fabricating events.
+- Write 40–100 words. Past tense, third person, objective and behavior-focused.
+- Explicitly describe how STAFF supported the person (prompted, assisted, facilitated, redirected).
+- Reference each checked PCSP goal only from what the caregiver wrote. If a goal is not covered, do not fabricate an event.
 - Use the client's first name naturally.
-- Keep medical/incident claims only if clearly stated in the shorthand. Never invent injuries, medications, or incidents.
-- No markdown, no headings, no bullet lists — return one or two clean paragraphs.
+- Never invent injuries, medications, or incidents.
+- No markdown, no headings, no bullet lists — one or two clean paragraphs.
+
+FOLLOW-UPS:
+- If the caregiver note does not clearly say HOW staff supported the person, add 1–3 concrete follow-up questions in "followUps".
+- Each question must be answerable in one sentence (e.g. "What did you say or do when Blake refused the first activity?").
+- If follow-up answers are provided below, fold those answers into the draft and return an empty followUps array.
+${foldingAnswers ? "- Follow-up answers ARE provided. Fold them in. Return followUps: []." : ""}
 
 OUTPUT FORMAT — return STRICT JSON only, no markdown, no code fences:
-{"draft":"<the narrative paragraph(s)>"}`;
+{"draft":"<the narrative paragraph(s)>","followUps":[{"question":"<one concrete question>"}]}`;
 
     const user = `CLIENT FIRST NAME: ${data.clientFirstName}
 CHECKED PCSP GOALS (${data.goals.length}):
 ${data.goals.length ? data.goals.map((g, i) => `${i + 1}. ${g}`).join("\n") : "(none — write a general baseline-support narrative)"}
 
-CAREGIVER SHORTHAND / VOICE TRANSCRIPT:
+CAREGIVER NOTE:
 """
 ${data.shorthand}
-"""`;
+"""
+${data.followUpAnswers ? `\nSTAFF ANSWERS TO NECTAR FOLLOW-UPS:\n"""\n${data.followUpAnswers}\n"""` : ""}`;
 
     const raw = await callAI(system, user);
-    let parsed: { draft?: string } = {};
+    let parsed: { draft?: string; followUps?: unknown } = {};
     try {
       parsed = JSON.parse(raw);
     } catch {
@@ -229,8 +245,18 @@ ${data.shorthand}
     const draft = typeof parsed.draft === "string" ? parsed.draft.trim() : "";
     if (!draft) throw new Error("NECTAR could not generate a draft — please try again or write the note manually.");
 
+    const followUps: ShiftNoteFollowUp[] = foldingAnswers
+      ? []
+      : Array.isArray(parsed.followUps)
+        ? (parsed.followUps as unknown[])
+            .map((g) => g as Record<string, unknown>)
+            .filter((g) => typeof g?.question === "string" && String(g.question).trim().length > 0)
+            .slice(0, 3)
+            .map((g) => ({ question: String(g.question).trim().slice(0, 240) }))
+        : [];
+
     const wordCount = draft.split(/\s+/).filter(Boolean).length;
-    return { draft, wordCount };
+    return { draft, wordCount, followUps };
   });
 
 

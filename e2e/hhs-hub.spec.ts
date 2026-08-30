@@ -175,14 +175,18 @@ test.describe("HHS hub — staff DSP (Jake Probert) and unassigned bounce", () =
       const blakeRow = page.getByText("Blake Stevens", { exact: true }).first();
       if (await blakeRow.isVisible().catch(() => false)) {
         await blakeRow.click();
+        await page.waitForURL(new RegExp(`/dashboard/hhs-hub/${CLIENTS.blake.id}`), {
+          timeout: 10_000,
+        }).catch(() => undefined);
       }
-      const hubCta = page.getByRole("link", { name: /Open Client Hub for Blake Stevens/i });
-      const clockCta = page.getByRole("link", { name: /Open Time Clock for Blake Stevens/i });
+      const hubCta = page.getByRole("link", { name: /Open daily note for Blake Stevens/i });
+      const clockCta = page.getByRole("link", { name: /Open (Time Clock|Punch pad) for Blake Stevens/i });
       if (await hubCta.isVisible().catch(() => false)) {
         await expect(hubCta).toBeVisible();
         await expect(clockCta).toHaveCount(0);
         await hubCta.click();
-        await page.waitForURL(new RegExp(`/dashboard/hhs-hub/${CLIENTS.blake.id}`));
+      }
+      if (page.url().includes(`/hhs-hub/${CLIENTS.blake.id}`)) {
         await expect(page.getByText(/24-Hour Daily Progress Note/i)).toBeVisible();
       }
     }

@@ -31,7 +31,10 @@ import { evaluateShiftNote } from "@/lib/ai-coach.functions";
 import { saveDailyRecord, setAttendance, savePrnForm, saveIncidentReport, listAttendance } from "@/lib/hhs.functions";
 import { useClientFeature } from "@/lib/client-features";
 import { NoteTriggerPrompt } from "@/components/residential/note-trigger-prompt";
-import { ShiftMedDueCheck } from "@/components/medications/shift-med-due-check";
+import { DailyNoteMedsBlock, type DailyNoteMedication } from "@/components/medications/daily-note-meds-block";
+import { type PendingMedDose } from "@/components/medications/shift-med-due-check";
+import { NectarShiftNoteDraft } from "@/components/nectar/nectar-shift-note-draft";
+import { NECTAR_DRAFT_MIN_WORDS } from "@/lib/nectar-note-gate";
 
 const hhsSearch = z.object({ tab: z.string().optional() });
 export const Route = createFileRoute("/dashboard/hhs-hub/$clientId")({
@@ -258,7 +261,11 @@ export function HhsClientHub({ clientId }: { clientId: string }) {
         </TabsList>
 
         <TabsContent value="note" className="mt-3">
-          <DailyNoteTab orgId={orgId} client={client} />
+          <DailyNoteTab
+            orgId={orgId}
+            client={client}
+            medications={(meds as DailyNoteMedication[]) ?? []}
+          />
         </TabsContent>
         {emarEnabled && (
           <TabsContent value="emar" className="mt-3">
@@ -288,8 +295,15 @@ const INCIDENT_RX = /\b(fell|fall|fainted|seizure|injur(y|ed|ies)|bleed|blood|ho
 const MEDICAL_RX = /\b(appointment|appt|doctor|dr\.|dentist|dental|clinic|specialist|checkup|check[- ]up|seen by|visited (?:the )?(?:doctor|md|clinic|hospital))\b/i;
 const today = () => new Date().toISOString().slice(0, 10);
 
-function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) {
-  const { user } = useAuth();
+function DailyNoteTab({
+  orgId,
+  client,
+  medications,
+}: {
+  orgId: string;
+  client: ClientFull;
+  medications: DailyNoteMedication[];
+}) {
   const navigate = useNavigate();
   const [note, setNote] = useState("");
   const [goals, setGoals] = useState<string[]>([]);
@@ -306,13 +320,9 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
   // Final attestation — "I attest this note accurately reflects today's support".
   const [finalAttest, setFinalAttest] = useState(false);
   const [medDosesResolved, setMedDosesResolved] = useState(true);
-
-  // Shift window for the daily-note attestation = the local calendar day.
-  const dayWindow = useMemo(() => {
-    const s = new Date(); s.setHours(0, 0, 0, 0);
-    const e = new Date(s); e.setDate(e.getDate() + 1);
-    return { start: s.toISOString(), end: e.toISOString() };
-  }, []);
+  const [pendingMedDoses, setPendingMedDoses] = useState<PendingMedDose[]>([]);
+  const [nectarUsed, setNectarUsed] = useState(false);
+  const [nectarAssistChecked, setNectarAssistChecked] = useState(false);
 
   // Signature canvas
   const canvasRef  = useRef<HTMLCanvasElement | null>(null);
@@ -323,7 +333,7 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
   const saveFn = useServerFn(saveDailyRecord);
   const pcsp   = client.pcsp_goals ?? [];
 
-  const MIN_WORDS = 50;
+  const MIN_WORDS = NECTAR_DRAFT_MIN_WORDS;
   const words     = note.trim().split(/\s+/).filter(Boolean).length;
   const narrativeOk = words >= MIN_WORDS;
   const hasGoal     = goals.length > 0;
@@ -397,8 +407,12 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
       toast.error("Please attest the note accurately reflects today's support.");
       return;
     }
+    if (nectarUsed && !nectarAssistChecked) {
+      toast.error("You used NECTAR on this note — attest that you reviewed the draft.");
+      return;
+    }
     if (!medDosesResolved) {
-      toast.error("Log all scheduled medication doses in eMAR before submitting.");
+      toast.error("Confirm medications on this daily note before submitting.");
       return;
     }
     if (!hasSigRef.current) { toast.error("Please sign the daily note before saving."); return; }
@@ -411,7 +425,7 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
     if (!isException && (!verdict || verdict.status !== "Verified")) {
       setAiBusy(true);
       try {
-        const result = await evalFn({ data: { narrative: note, goals, clientFirstName: client.first_name } });
+        const result = await evalFn({ data: { narrative: note, goals, clientFirstName: client.first_name, serviceCode: "HHS" } });
         verdict = result; setCoach(result);
         iters += 1; setAiIterations(iters);
         if (result.status === "Flagged") {
@@ -429,6 +443,19 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
     if (!ok) return;
 
     const signature = canvasRef.current?.toDataURL("image/png") ?? null;
+
+    if (pendingMedDoses.length > 0) {
+      try {
+        const { logMedicationPass } = await import("@/lib/emar-pass.functions");
+        for (const dose of pendingMedDoses) {
+          await logMedicationPass({ data: dose });
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        toast.error(`Medication log failed: ${msg}`);
+        return;
+      }
+    }
 
     try {
       await saveFn({
@@ -453,6 +480,9 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
       setNote(""); setGoals([]); setCoach(null); setAiIterations(0);
       setAiFlagCount(0); setAllowException(false); setShowNarrativeError(false);
       setMedDosesResolved(true);
+      setPendingMedDoses([]);
+      setNectarUsed(false);
+      setNectarAssistChecked(false);
       hasSigRef.current = false; clearCanvas();
     } catch (e) {
       toast.error((e as Error).message || "Could not save note.");
@@ -464,17 +494,20 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
       <Card>
         <CardContent className="py-10 text-center space-y-3">
           <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
-          <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">✅ Daily Note Submitted</p>
+          <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">Daily note submitted</p>
           <p className="text-sm text-muted-foreground">Your progress note and signature have been saved and submitted for administrative approval.</p>
-          <Button onClick={() => setSuccess(false)}>Submit Another Note</Button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <Button onClick={() => navigate({ to: "/dashboard" })}>Back to My Caseload</Button>
+            <Button variant="outline" onClick={() => setSuccess(false)}>Submit another note</Button>
+          </div>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card>
-      <CardHeader><CardTitle className="text-base">📝 24-Hour Daily Progress Note</CardTitle></CardHeader>
+    <Card data-tour="staff.daily-note">
+      <CardHeader><CardTitle className="text-base">24-Hour Daily Progress Note</CardTitle></CardHeader>
       <CardContent className="space-y-4">
 
         {/* PCSP Goals — phone-friendly tap rows (≥44px), full-width, easy to check */}
@@ -531,12 +564,23 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
           </div>
           {showNarrativeError && !narrativeOk && (
             <div className="mt-2 rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-300">
-              ⚠️ Your narrative must be at least {MIN_WORDS} words to meet DSPD Medicaid documentation requirements.
+              Your narrative must be at least {MIN_WORDS} words and describe how you supported the person.
             </div>
           )}
         </div>
 
         {/* Nectar deterministic trigger prompt — runs on-device, blocks submit. */}
+        <NectarShiftNoteDraft
+          narrative={note}
+          goals={goals}
+          clientFirstName={client.first_name}
+          onApplyDraft={(draft) => {
+            setNote(draft);
+            if (coach) setCoach(null);
+          }}
+          onUsed={() => setNectarUsed(true)}
+        />
+
         <NoteTriggerPrompt
           text={note}
           clientId={client.id}
@@ -590,20 +634,24 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
           </div>
         </div>
 
+        {nectarUsed && (
+          <label className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+            <Checkbox checked={nectarAssistChecked} onCheckedChange={(c) => setNectarAssistChecked(!!c)} />
+            <span>I used NECTAR to help draft this note. I reviewed the draft and confirm it is accurate.</span>
+          </label>
+        )}
+
         {/* Final attestation — required, parity with punch-pad clock-out form. */}
         <label className="flex items-start gap-2 rounded-md border bg-muted/30 p-2 text-xs">
           <Checkbox checked={finalAttest} onCheckedChange={(c) => setFinalAttest(!!c)} />
-          <span>I attest this note accurately reflects today's support.</span>
+          <span>I attest this note and the time information on it are accurate.</span>
         </label>
 
-        {/* Pre-submit medication check — routes staff into the real MAR */}
-        <ShiftMedDueCheck
-          organizationId={orgId}
+        <DailyNoteMedsBlock
           clientId={client.id}
           clientName={client.first_name}
-          windowStart={dayWindow.start}
-          windowEnd={dayWindow.end}
-          emarHref={`/dashboard/hhs-hub/${client.id}?tab=mar`}
+          medications={medications}
+          onPendingDosesChange={setPendingMedDoses}
           onResolvedChange={setMedDosesResolved}
         />
 
@@ -615,7 +663,7 @@ function DailyNoteTab({ orgId, client }: { orgId: string; client: ClientFull }) 
           <Button
             className="h-12 w-full bg-emerald-600 text-base font-semibold hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
             onClick={() => handleSubmit()}
-            disabled={!hasGoal || !narrativeOk || aiBusy || !triggersResolved || !finalAttest}>
+            disabled={!hasGoal || !narrativeOk || aiBusy || !triggersResolved || !finalAttest || (nectarUsed && !nectarAssistChecked) || !medDosesResolved}>
             {aiBusy
               ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />NECTAR reviewing your note…</>
               : coach?.status === "Flagged"

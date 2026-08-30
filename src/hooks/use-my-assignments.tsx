@@ -6,11 +6,15 @@ import type { AssignmentMap } from "@/lib/assignment-codes";
 
 export {
   allowedCodesFor,
+  caseloadCardActions,
+  caseloadDailyNoteLabel,
+  caseloadTimeClockLabel,
   clientAuthorizedCodes,
   defaultCaseloadCode,
   firstClockableCode,
   hasHhsCode,
   hasHostHomeDailyCode,
+  hostHomeDailyNoteCode,
   isDualHhsAndClockable,
   isHostHomeDailyNoteCard,
   isHostHomeOnlyAssignment,

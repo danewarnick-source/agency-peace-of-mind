@@ -92,43 +92,83 @@ export function firstClockableCode(codes: string[]): string {
 
 /**
  * Person has HHS plus at least one clockable code on file (DSI/SLH/SEI/…).
- * This is NOT permission to paint Punch pad onto the host-home daily-note
- * card. That card opens `/dashboard/hhs-hub/$clientId` and is daily note
- * only — hosts do not clock there. Punch belongs on a separate clockable
- * shift row (or an in-progress punch), never as a second button on HHS.
+ * Codes on file are NOT permission to paint a start-punch button onto the
+ * caseload card. Time clock on that card is only for an already-open punch.
  */
 export function isDualHhsAndClockable(codes: string[]): boolean {
   return hasHhsCode(codes) && !!firstClockableCode(codes);
 }
 
-function isClockableAssignmentCode(code: string): boolean {
-  const u = String(code ?? "").trim().toUpperCase();
-  return !!u && u !== "HHS" && u !== "PPS" && u !== "MTP";
+/** Host-home daily-note code for labels. Prefer HHS; else PPS/MTP. */
+export function hostHomeDailyNoteCode(codes: string[]): string {
+  for (const raw of codes) {
+    const u = String(raw ?? "").trim().toUpperCase();
+    if (u === "HHS") return "HHS";
+  }
+  for (const raw of codes) {
+    const u = String(raw ?? "").trim().toUpperCase();
+    if (u === "PPS" || u === "MTP") return u;
+  }
+  return "HHS";
+}
+
+/** Caseload daily-note CTA. "Complete" only when today's note already exists. */
+export function caseloadDailyNoteLabel(opts: {
+  code?: string | null;
+  alreadyDoneToday?: boolean;
+}): string {
+  const code = String(opts.code ?? "").trim() || "HHS";
+  return opts.alreadyDoneToday
+    ? `Complete daily note (${code})`
+    : `Open daily note (${code})`;
+}
+
+/** Caseload return-to-open-punch CTA. CODE is the job on that open punch. */
+export function caseloadTimeClockLabel(code?: string | null): string {
+  const c = String(code ?? "").trim();
+  return c ? `Open time clock (${c})` : "Open time clock";
+}
+
+/**
+ * What the caseload card may show.
+ * Daily note: every host-home / HHS person, every day — even with DSI/SLH/SEI
+ * on file or a scheduled clockable shift. Time clock: only an in-progress
+ * open punch. A scheduled shift is not enough; start that from Punch pad.
+ */
+export function caseloadCardActions(opts: {
+  codes: string[];
+  isOnTheClock: boolean;
+  hasClockableShiftToday?: boolean;
+}): { showDailyNote: boolean; showTimeClock: boolean } {
+  void opts.hasClockableShiftToday;
+  return {
+    showDailyNote: hasHostHomeDailyCode(opts.codes),
+    showTimeClock: !!opts.isOnTheClock,
+  };
 }
 
 /**
  * Today's surface for this person is the host-home daily note.
- * True for HHS-only, and for dual-code people who have no clockable
- * shift today and are not already on the clock. Codes on file (DSI/SEI/SLH)
- * must not flip this — treat the HOST HOME / HHS card as host-home only.
+ * True whenever they have a host-home code and are not already punched in.
+ * A clockable code on file or a scheduled DSI/SLH/SEI shift today must not
+ * flip this into a start-punch card.
  */
 export function isHostHomeDailyNoteCard(opts: {
   codes: string[];
   todayJobCode?: string | null;
   isOnTheClock?: boolean;
 }): boolean {
+  void opts.todayJobCode;
   if (!hasHostHomeDailyCode(opts.codes)) return false;
   if (opts.isOnTheClock) return false;
-  const today = String(opts.todayJobCode ?? "").trim();
-  if (today && isClockableAssignmentCode(today)) return false;
   return true;
 }
 
 /**
- * Stack Punch pad + daily note on one card.
- * Never true for a host-home daily-note card — even when the person also
- * has a clockable code on file. Dual-code punch stays on a clockable
- * shift row or the in-progress punch.
+ * Stack daily note + open time clock on one card.
+ * Only when this person is HHS/host-home AND the staff member already has
+ * an in-progress punch. Never because they have a clockable code on file
+ * or a scheduled shift today.
  */
 export function stackDualCaseloadActions(opts: {
   codes: string[];
@@ -136,7 +176,11 @@ export function stackDualCaseloadActions(opts: {
   hasClockableShiftToday: boolean;
   isOnTheClock: boolean;
 }): boolean {
-  if (opts.isHostHomeDailyNoteCard) return false;
-  if (!isDualHhsAndClockable(opts.codes)) return false;
-  return opts.hasClockableShiftToday || opts.isOnTheClock;
+  void opts.isHostHomeDailyNoteCard;
+  const actions = caseloadCardActions({
+    codes: opts.codes,
+    isOnTheClock: opts.isOnTheClock,
+    hasClockableShiftToday: opts.hasClockableShiftToday,
+  });
+  return actions.showDailyNote && actions.showTimeClock;
 }

@@ -7,14 +7,18 @@ import { useCaseload } from "@/hooks/use-caseload";
 import {
   useMyAssignments,
   allowedCodesFor,
+  caseloadCardActions,
+  caseloadDailyNoteLabel,
   clientAuthorizedCodes,
   firstClockableCode,
   hasHostHomeDailyCode,
+  hostHomeDailyNoteCode,
   stackDualCaseloadActions,
 } from "@/hooks/use-my-assignments";
 import { isClockableServiceCode } from "@/lib/service-billing";
 import { displayPersonName } from "@/lib/person-name";
 import { DualCaseloadActions } from "@/components/staff-mobile/dual-caseload-actions";
+import { useTodayDailyNoteClients } from "@/hooks/use-today-daily-notes";
 
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString(undefined, {
@@ -49,6 +53,7 @@ export function TodayHero() {
   const { data: shifts = [], isLoading } = useTodayShifts();
   const { data: caseload } = useCaseload();
   const { data: assignments } = useMyAssignments();
+  const { data: todayNotes } = useTodayDailyNoteClients();
   const now = Date.now();
 
   const hhsPeople = (caseload ?? []).filter((c) => {
@@ -74,15 +79,22 @@ export function TodayHero() {
     const activeCodes = activeClient
       ? allowedCodesFor(assignments, activeClient.id, clientAuthorizedCodes(activeClient))
       : [];
+    const effectiveActiveCodes = activeCodes.length
+      ? activeCodes
+      : clientAuthorizedCodes(activeClient ?? { job_code: null });
     const dualWhileClocked = stackDualCaseloadActions({
-      codes: activeCodes.length
-        ? activeCodes
-        : clientAuthorizedCodes(activeClient ?? { job_code: null }),
+      codes: effectiveActiveCodes,
       isHostHomeDailyNoteCard: false,
       hasClockableShiftToday: isClockableServiceCode(active.service_type_code),
       isOnTheClock: true,
     });
     const punchCode = active.service_type_code || firstClockableCode(activeCodes);
+    const activeDailyNoteCode = caseloadCardActions({
+      codes: effectiveActiveCodes,
+      isOnTheClock: true,
+    }).showDailyNote
+      ? hostHomeDailyNoteCode(effectiveActiveCodes)
+      : "";
     const activeName = activeClient
       ? displayPersonName(activeClient.first_name, activeClient.last_name)
       : "this person";
@@ -141,6 +153,8 @@ export function TodayHero() {
                 fullName={activeName}
                 punchCode={punchCode}
                 isOnTheClock
+                dailyNoteCode={activeDailyNoteCode || null}
+                dailyNoteDone={!!todayNotes?.has(active.client_id)}
               />
             </div>
           ) : (
@@ -188,7 +202,7 @@ export function TodayHero() {
           <div>
             <h2 className="text-base font-semibold">No shift scheduled today</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Your caseload is below. Time-clock codes use Punch pad. Host home (HHS) opens the daily note.
+              Your caseload is below. Host home (HHS) opens the daily note. Start a new punch from the Punch pad tab.
             </p>
           </div>
         </div>
@@ -209,10 +223,27 @@ export function TodayHero() {
   const code = primary?.job_code ?? "";
   const primaryDaily = primary ? isDailyCode(primary.job_code) : false;
 
+  const leadDailyNoteCode = (() => {
+    const lead = (caseload ?? []).find((c) => c.id === (primary?.client_id ?? extraHhs[0]?.id));
+    const leadCodes = lead
+      ? allowedCodesFor(assignments, lead.id, clientAuthorizedCodes(lead))
+      : [];
+    const effective = leadCodes.length
+      ? leadCodes
+      : clientAuthorizedCodes(lead ?? { job_code: null });
+    return hostHomeDailyNoteCode(effective);
+  })();
+  const leadDailyClientId = primary?.client_id ?? extraHhs[0]?.id;
+  const leadDailyDone = leadDailyClientId ? !!todayNotes?.has(leadDailyClientId) : false;
+  const hostHomeCta = caseloadDailyNoteLabel({
+    code: leadDailyNoteCode,
+    alreadyDoneToday: leadDailyDone,
+  });
+
   const ctaLabel = !primary
-    ? "Open daily note"
+    ? hostHomeCta
     : primaryDaily
-      ? "Open daily note"
+      ? hostHomeCta
       : state === "now" || state === "soon"
         ? "Clock in now"
         : state === "past"
@@ -287,9 +318,8 @@ export function TodayHero() {
             const effectiveLeadCodes = leadCodes.length
               ? leadCodes
               : clientAuthorizedCodes(lead ?? { job_code: null });
-            // HOST HOME / HHS daily-note card: daily note only. Never Punch pad —
-            // even when Tommy has DSI/SEI/SLH on file. Clockable punch is a
-            // separate shift row when one exists today.
+            // Not punched in: never Open Punch pad on this row — even for
+            // dual-code people with a scheduled DSI/SLH/SEI shift.
             const leadDual = stackDualCaseloadActions({
               codes: effectiveLeadCodes,
               isHostHomeDailyNoteCard: isHostHomeLead,
@@ -304,6 +334,8 @@ export function TodayHero() {
                     fullName={leadName}
                     punchCode={code && !primaryDaily ? code : firstClockableCode(leadCodes)}
                     isOnTheClock={false}
+                    dailyNoteCode={hostHomeDailyNoteCode(effectiveLeadCodes)}
+                    dailyNoteDone={!!todayNotes?.has(leadClientId)}
                   />
                 </div>
               );
@@ -364,42 +396,58 @@ export function TodayHero() {
             ))}
             {dailyShifts
               .filter((s) => s.id !== primary?.id)
-              .map((s) => (
-                <li key={s.id} className="flex items-center justify-between gap-3 text-sm">
+              .map((s) => {
+                const noteCode = String(s.job_code ?? "").trim() || "HHS";
+                const noteLabel = caseloadDailyNoteLabel({
+                  code: noteCode,
+                  alreadyDoneToday: !!todayNotes?.has(s.client_id),
+                });
+                return (
+                  <li key={s.id} className="flex items-center justify-between gap-3 text-sm">
+                    <div className="min-w-0 truncate">
+                      <span className="font-medium">{s.client_name}</span>
+                      <span className="ml-1.5 font-mono text-xs text-muted-foreground">
+                        {noteCode}
+                      </span>
+                      <span className="ml-2 text-xs text-muted-foreground">Daily note</span>
+                    </div>
+                    <Link
+                      to="/dashboard/hhs-hub/$clientId"
+                      params={{ clientId: s.client_id }}
+                      className="shrink-0 text-xs font-semibold text-primary hover:underline"
+                    >
+                      {noteLabel}
+                    </Link>
+                  </li>
+                );
+              })}
+            {moreHhs.map((c) => {
+              const all = clientAuthorizedCodes(c);
+              const codes = allowedCodesFor(assignments, c.id, all);
+              const noteCode = hostHomeDailyNoteCode(codes.length ? codes : all);
+              const noteLabel = caseloadDailyNoteLabel({
+                code: noteCode,
+                alreadyDoneToday: !!todayNotes?.has(c.id),
+              });
+              return (
+                <li key={c.id} className="flex items-center justify-between gap-3 text-sm">
                   <div className="min-w-0 truncate">
-                    <span className="font-medium">{s.client_name}</span>
-                    <span className="ml-1.5 font-mono text-xs text-muted-foreground">
-                      {s.job_code ?? "HHS"}
+                    <span className="font-medium">
+                      {displayPersonName(c.first_name, c.last_name)}
                     </span>
+                    <span className="ml-1.5 font-mono text-xs text-muted-foreground">{noteCode}</span>
                     <span className="ml-2 text-xs text-muted-foreground">Daily note</span>
                   </div>
                   <Link
                     to="/dashboard/hhs-hub/$clientId"
-                    params={{ clientId: s.client_id }}
+                    params={{ clientId: c.id }}
                     className="shrink-0 text-xs font-semibold text-primary hover:underline"
                   >
-                    Daily note
+                    {noteLabel}
                   </Link>
                 </li>
-              ))}
-            {moreHhs.map((c) => (
-              <li key={c.id} className="flex items-center justify-between gap-3 text-sm">
-                <div className="min-w-0 truncate">
-                  <span className="font-medium">
-                    {displayPersonName(c.first_name, c.last_name)}
-                  </span>
-                  <span className="ml-1.5 font-mono text-xs text-muted-foreground">HHS</span>
-                  <span className="ml-2 text-xs text-muted-foreground">Daily note</span>
-                </div>
-                <Link
-                  to="/dashboard/hhs-hub/$clientId"
-                  params={{ clientId: c.id }}
-                  className="shrink-0 text-xs font-semibold text-primary hover:underline"
-                >
-                  Daily note
-                </Link>
-              </li>
-            ))}
+              );
+            })}
           </ul>
         </div>
       )}

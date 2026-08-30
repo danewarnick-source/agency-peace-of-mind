@@ -2,11 +2,15 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   allowedCodesFor,
+  caseloadCardActions,
+  caseloadDailyNoteLabel,
+  caseloadTimeClockLabel,
   clientAuthorizedCodes,
   defaultCaseloadCode,
   firstClockableCode,
   hasHhsCode,
   hasHostHomeDailyCode,
+  hostHomeDailyNoteCode,
   isDualHhsAndClockable,
   isHostHomeDailyNoteCard,
   isHostHomeOnlyAssignment,
@@ -112,6 +116,10 @@ describe("host-home daily assignment", () => {
       isHostHomeDailyNoteCard({ codes: tommy, todayJobCode: null, isOnTheClock: false }),
       true,
     );
+    assert.deepEqual(caseloadCardActions({ codes: tommy, isOnTheClock: false }), {
+      showDailyNote: true,
+      showTimeClock: false,
+    });
     assert.equal(
       stackDualCaseloadActions({
         codes: tommy,
@@ -123,74 +131,68 @@ describe("host-home daily assignment", () => {
     );
   });
 
-  it("never stacks Punch pad onto a host-home daily-note card", () => {
+  it("HHS+DSI on file, no open punch → daily note only (even with a scheduled DSI shift)", () => {
+    const codes = ["HHS", "DSI"];
     assert.equal(
-      stackDualCaseloadActions({
-        codes: ["HHS", "DSI"],
-        isHostHomeDailyNoteCard: true,
-        hasClockableShiftToday: false,
-        isOnTheClock: false,
-      }),
-      false,
-    );
-    // Even if a clockable shift exists elsewhere, the HHS card itself stays daily-note only.
-    assert.equal(
-      stackDualCaseloadActions({
-        codes: ["HHS", "DSI"],
-        isHostHomeDailyNoteCard: true,
-        hasClockableShiftToday: true,
-        isOnTheClock: false,
-      }),
-      false,
-    );
-  });
-
-  it("puts punch on a separate clockable row / in-progress punch, not on HHS", () => {
-    assert.equal(
-      isHostHomeDailyNoteCard({
-        codes: ["HHS", "DSI"],
-        todayJobCode: "DSI",
-        isOnTheClock: false,
-      }),
-      false,
-    );
-    assert.equal(
-      stackDualCaseloadActions({
-        codes: ["HHS", "DSI"],
-        isHostHomeDailyNoteCard: false,
-        hasClockableShiftToday: true,
-        isOnTheClock: false,
-      }),
+      isHostHomeDailyNoteCard({ codes, todayJobCode: "DSI", isOnTheClock: false }),
       true,
     );
+    assert.deepEqual(
+      caseloadCardActions({ codes, isOnTheClock: false, hasClockableShiftToday: true }),
+      { showDailyNote: true, showTimeClock: false },
+    );
     assert.equal(
       stackDualCaseloadActions({
-        codes: ["HHS", "DSI"],
+        codes,
+        isHostHomeDailyNoteCard: true,
+        hasClockableShiftToday: true,
+        isOnTheClock: false,
+      }),
+      false,
+    );
+    assert.equal(caseloadDailyNoteLabel({ code: "HHS" }), "Open daily note (HHS)");
+  });
+
+  it("HHS + open DSI punch → daily note (HHS) + open time clock (DSI)", () => {
+    const codes = ["HHS", "DSI"];
+    assert.equal(
+      isHostHomeDailyNoteCard({ codes, todayJobCode: "DSI", isOnTheClock: true }),
+      false,
+    );
+    assert.deepEqual(caseloadCardActions({ codes, isOnTheClock: true }), {
+      showDailyNote: true,
+      showTimeClock: true,
+    });
+    assert.equal(
+      stackDualCaseloadActions({
+        codes,
         isHostHomeDailyNoteCard: false,
         hasClockableShiftToday: false,
         isOnTheClock: true,
       }),
       true,
     );
+    assert.equal(hostHomeDailyNoteCode(codes), "HHS");
+    assert.equal(caseloadDailyNoteLabel({ code: "HHS" }), "Open daily note (HHS)");
+    assert.equal(
+      caseloadDailyNoteLabel({ code: "HHS", alreadyDoneToday: true }),
+      "Complete daily note (HHS)",
+    );
+    assert.equal(caseloadTimeClockLabel("DSI"), "Open time clock (DSI)");
   });
 
-  it("leaves HHS-only and clockable-only unchanged", () => {
-    assert.equal(
-      isHostHomeDailyNoteCard({ codes: ["HHS"], todayJobCode: "HHS", isOnTheClock: false }),
-      true,
-    );
-    assert.equal(
-      stackDualCaseloadActions({
-        codes: ["HHS"],
-        isHostHomeDailyNoteCard: true,
-        hasClockableShiftToday: false,
-        isOnTheClock: false,
-      }),
-      false,
-    );
+  it("clockable-only with no open punch → no Open Punch pad on the card", () => {
     assert.equal(
       isHostHomeDailyNoteCard({ codes: ["DSI"], todayJobCode: "DSI", isOnTheClock: false }),
       false,
+    );
+    assert.deepEqual(
+      caseloadCardActions({
+        codes: ["DSI"],
+        isOnTheClock: false,
+        hasClockableShiftToday: true,
+      }),
+      { showDailyNote: false, showTimeClock: false },
     );
     assert.equal(
       stackDualCaseloadActions({
@@ -201,5 +203,58 @@ describe("host-home daily assignment", () => {
       }),
       false,
     );
+  });
+
+  it("clockable-only with an open punch → time clock only, labeled with that punch code", () => {
+    assert.deepEqual(caseloadCardActions({ codes: ["SLH"], isOnTheClock: true }), {
+      showDailyNote: false,
+      showTimeClock: true,
+    });
+    assert.equal(caseloadTimeClockLabel("SLH"), "Open time clock (SLH)");
+  });
+
+  it("never stacks a start-punch button onto a host-home daily-note card", () => {
+    assert.equal(
+      stackDualCaseloadActions({
+        codes: ["HHS", "DSI"],
+        isHostHomeDailyNoteCard: true,
+        hasClockableShiftToday: false,
+        isOnTheClock: false,
+      }),
+      false,
+    );
+    assert.equal(
+      stackDualCaseloadActions({
+        codes: ["HHS", "DSI"],
+        isHostHomeDailyNoteCard: true,
+        hasClockableShiftToday: true,
+        isOnTheClock: false,
+      }),
+      false,
+    );
+  });
+
+  it("leaves HHS-only as daily note only until they are on the clock", () => {
+    assert.equal(
+      isHostHomeDailyNoteCard({ codes: ["HHS"], todayJobCode: "HHS", isOnTheClock: false }),
+      true,
+    );
+    assert.deepEqual(caseloadCardActions({ codes: ["HHS"], isOnTheClock: false }), {
+      showDailyNote: true,
+      showTimeClock: false,
+    });
+    assert.equal(
+      stackDualCaseloadActions({
+        codes: ["HHS"],
+        isHostHomeDailyNoteCard: true,
+        hasClockableShiftToday: false,
+        isOnTheClock: false,
+      }),
+      false,
+    );
+    assert.deepEqual(caseloadCardActions({ codes: ["HHS", "SEI"], isOnTheClock: true }), {
+      showDailyNote: true,
+      showTimeClock: true,
+    });
   });
 });

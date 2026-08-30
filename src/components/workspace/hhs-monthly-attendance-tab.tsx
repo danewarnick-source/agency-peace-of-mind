@@ -131,8 +131,9 @@ export function HhsMonthlyAttendanceTab({
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          Compiled from the host family's daily attendance. Green = present (billable), amber = away,
-          red dot = unbillable day, grey = no entry. Read-only — entries are made on the Attendance tab.
+          View only. Present now comes from a saved daily note (services provided).
+          Green = present, amber = away (existing not-present records), grey = no mark.
+          Unbillable days stay listed below. Admin/manager certifies the month.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">

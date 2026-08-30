@@ -4,7 +4,10 @@ import {
   allowedCodesFor,
   clientAuthorizedCodes,
   defaultCaseloadCode,
+  firstClockableCode,
+  hasHhsCode,
   hasHostHomeDailyCode,
+  isDualHhsAndClockable,
   isHostHomeOnlyAssignment,
   type AssignmentMap,
 } from "./assignment-codes.ts";
@@ -89,5 +92,14 @@ describe("host-home daily assignment", () => {
   it("treats clockable-only as not host-home", () => {
     assert.equal(hasHostHomeDailyCode(["SLH"]), false);
     assert.equal(isHostHomeOnlyAssignment(["SLH"]), false);
+  });
+
+  it("flags HHS + DSI as dual (punch and daily note)", () => {
+    assert.equal(hasHhsCode(["HHS", "DSI"]), true);
+    assert.equal(firstClockableCode(["HHS", "DSI"]), "DSI");
+    assert.equal(isDualHhsAndClockable(["HHS", "DSI"]), true);
+    assert.equal(isDualHhsAndClockable(["HHS"]), false);
+    assert.equal(isDualHhsAndClockable(["DSI"]), false);
+    assert.equal(isDualHhsAndClockable(["HHS", "SLH", "SEI"]), true);
   });
 });

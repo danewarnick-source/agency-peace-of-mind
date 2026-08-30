@@ -25,12 +25,14 @@ export const saveDailyRecord = createServerFn({ method: "POST" })
       backdated:         z.boolean().optional().default(false),
       originalDueDate:   z.string().nullable().optional(),
       submittedLate:     z.boolean().optional().default(false),
+      incidentRequired:  z.boolean(),
     }).parse(i)
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     if (!supabase || !userId) return null;
     await requireOrgMembership(supabase, userId, data.organizationId, "employee");
+    const followupTypes = data.incidentRequired ? ["incident_report"] : [];
     const { error, data: row } = await supabase
       .from("daily_logs")
       .insert({
@@ -47,11 +49,33 @@ export const saveDailyRecord = createServerFn({ method: "POST" })
         backdated:             data.backdated ?? false,
         original_due_date:     data.originalDueDate ?? null,
         submitted_late:        data.submittedLate ?? false,
+        requires_followup_form: data.incidentRequired,
+        followup_form_types:   followupTypes,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any)
       .select()
       .single();
     if (error) throw new Error(error.message);
+
+    // A completed daily note always marks that client/date Present.
+    // Reuses hhs_monthly_attendance upsert (same conflict key as setAttendance).
+    const { error: attErr } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .from("hhs_monthly_attendance" as never)
+      .upsert({
+        organization_id: data.organizationId,
+        client_id: data.clientId,
+        record_date: data.recordDate,
+        presence_status: "Present",
+        away_reason: null,
+        away_category: null,
+        staff_initials_signature: "DN",
+        attestation_accepted: true,
+        provider_id: userId,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as never, { onConflict: "client_id,record_date" });
+    if (attErr) throw new Error(attErr.message);
+
     return row;
   });
 

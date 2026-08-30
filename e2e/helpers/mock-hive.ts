@@ -910,7 +910,7 @@ export async function assertPageNotBlank(page: Page, label: string): Promise<voi
 export async function waitForDashboard(page: Page): Promise<void> {
   await page.waitForLoadState("domcontentloaded");
   const hub = page.getByTestId("e2e-hhs-hub-harness");
-  const profile = page.getByText(/Clinical Profile/i);
+  const profile = page.getByText(/24-Hour Daily Progress Note/i);
   const unavailable = page.getByText(/Client unavailable/i);
   const bounced = page.getByText(/not assigned to any daily services/i);
   await Promise.race([

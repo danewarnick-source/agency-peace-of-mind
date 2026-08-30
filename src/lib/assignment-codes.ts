@@ -74,3 +74,26 @@ export function isHostHomeOnlyAssignment(codes: string[]): boolean {
     return u === "HHS" || u === "PPS" || u === "MTP";
   });
 }
+
+/** True when assigned/authorized codes include Host Home Supports. */
+export function hasHhsCode(codes: string[]): boolean {
+  return codes.some((c) => String(c ?? "").trim().toUpperCase() === "HHS");
+}
+
+/** First clockable code (DSI, SLH, SEI, RHS, …). Empty when none. Hosts never clock HHS/PPS/MTP. */
+export function firstClockableCode(codes: string[]): string {
+  for (const raw of codes) {
+    const code = String(raw ?? "").trim();
+    const u = code.toUpperCase();
+    if (code && u !== "HHS" && u !== "PPS" && u !== "MTP") return code;
+  }
+  return "";
+}
+
+/**
+ * HHS plus at least one clockable code — staff see punch pad AND daily note.
+ * HHS-only stays daily-note only. DSI-only stays punch only.
+ */
+export function isDualHhsAndClockable(codes: string[]): boolean {
+  return hasHhsCode(codes) && !!firstClockableCode(codes);
+}

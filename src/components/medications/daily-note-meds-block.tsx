@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { type PendingMedDose } from "@/components/medications/shift-med-due-check";
 import { type EmarStatus } from "@/lib/emar-status";
+import { denverWallToIso, denverYmd } from "@/lib/denver-date";
 
 export type DailyNoteMedication = {
   id: string;
@@ -29,32 +30,7 @@ const OUTCOMES: { value: EmarStatus; label: string }[] = [
 ];
 
 const ATTEST =
-  "I attest that I supported the client with self-administration of each medication listed. Selecting Self administered means the person took the medication themselves; I did not administer it.";
-
-function denverYmd(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Denver",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
-
-function denverWallToIso(ymd: string, hh: number, mm: number): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  // Probe UTC then shift so the wall clock in America/Denver matches hh:mm.
-  const utcGuess = Date.parse(`${ymd}T${pad(hh)}:${pad(mm)}:00Z`);
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Denver",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(new Date(utcGuess));
-  const gotH = Number(parts.find((p) => p.type === "hour")?.value ?? hh);
-  const gotM = Number(parts.find((p) => p.type === "minute")?.value ?? mm);
-  const deltaMin = (gotH * 60 + gotM) - (hh * 60 + mm);
-  return new Date(utcGuess - deltaMin * 60_000).toISOString();
-}
+  "I reviewed every medication on this list and marked each one correctly — Self administered, Missed, Refused, or LOA. I am attesting that these statuses are accurate, not that I administered every medication.";
 
 type RowState = {
   status: EmarStatus;
@@ -69,12 +45,14 @@ export function DailyNoteMedsBlock({
   clientId,
   clientName,
   medications,
+  recordDate,
   onPendingDosesChange,
   onResolvedChange,
 }: {
   clientId: string;
   clientName: string;
   medications: DailyNoteMedication[];
+  recordDate?: string;
   onPendingDosesChange: (pending: PendingMedDose[]) => void;
   onResolvedChange: (resolved: boolean) => void;
 }) {
@@ -117,7 +95,7 @@ export function DailyNoteMedsBlock({
       onPendingDosesChange([]);
       return;
     }
-    const ymd = denverYmd();
+    const ymd = recordDate && /^\d{4}-\d{2}-\d{2}$/.test(recordDate) ? recordDate : denverYmd();
     const pending: PendingMedDose[] = active.map((m) => {
       const r = rows[m.id] ?? { status: "self_administered" as const, why: "" };
       const firstTime = (m.scheduled_times ?? [])[0];
@@ -144,7 +122,7 @@ export function DailyNoteMedsBlock({
       };
     });
     onPendingDosesChange(pending);
-  }, [active, attested, clientId, clientName, exceptionOk, onPendingDosesChange, rows]);
+  }, [active, attested, clientId, clientName, exceptionOk, onPendingDosesChange, recordDate, rows]);
 
   if (active.length === 0) return null;
 
@@ -155,8 +133,8 @@ export function DailyNoteMedsBlock({
         <div>
           <p className="text-sm font-semibold">Medications — {clientName}</p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
-            Each medication on file. Default is Self administered (the person took it;
-            you supported self-administration). Missed, Refused, or LOA need a reason.
+            Each medication on file. Default is Self administered (the person took it).
+            Missed, Refused, or LOA need a reason.
           </p>
         </div>
       </div>

@@ -39,12 +39,15 @@ export function NoteTriggerPrompt({
   date,
   onOpenForm,
   onAllResolved,
+  incidentAttest,
 }: {
   text: string;
   clientId: string;
   date: string;
   onOpenForm: (kind: TriggerKind) => void;
   onAllResolved?: (resolved: boolean) => void;
+  /** Daily-note yes/no: Yes = save + deep-link; No = no-incident attest. */
+  incidentAttest?: "yes" | "no" | null;
 }) {
   const hits = useMemo<NoteTriggerHit[]>(() => scanNoteForTriggers(text), [text]);
   const incidentHit = hits.some((h) => h.kind === "incident");
@@ -86,7 +89,10 @@ export function NoteTriggerPrompt({
   const submittedIr = submittedQ.data?.incident ?? null;
 
   const isResolved = (kind: TriggerKind): boolean => {
-    if (kind === "incident") return !!submittedIr || dismissed.incident;
+    if (kind === "incident") {
+      if (incidentAttest === "yes" || incidentAttest === "no") return true;
+      return !!submittedIr || dismissed.incident;
+    }
     return appointmentOpened || dismissed.appointment;
   };
   const unresolved = hits.filter((h) => !isResolved(h.kind));

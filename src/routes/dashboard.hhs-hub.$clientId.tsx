@@ -1,11 +1,9 @@
 import { useMemo, useState, useRef, useEffect } from "react";
 import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
-import { StaffMedicationsPanel } from "@/components/medications/staff-medications-panel";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/use-auth";
 import { useCurrentOrg } from "@/hooks/use-org";
 import { useMyAssignments, allowedCodesFor } from "@/hooks/use-my-assignments";
 import { isDailyServiceCode } from "@/lib/service-billing";
@@ -18,17 +16,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  ArrowLeft, FileText, Pill, Calendar, CalendarRange, ClipboardList, AlertTriangle, Phone, Stethoscope, Box, Flame, Repeat, BookOpen, Eraser, CheckCircle2, Loader2, Home,
+  ArrowLeft, FileText, Pill, Calendar, CalendarRange, ClipboardList, AlertTriangle, Phone, Stethoscope, Box, Flame, Repeat, BookOpen, Eraser, CheckCircle2, Loader2,
 } from "lucide-react";
 import { HhsMonthlyAttendanceTab } from "@/components/workspace/hhs-monthly-attendance-tab";
+import { HhsAttendanceCalendar } from "@/components/hhs/hhs-attendance-calendar";
+import { HhsMarOverviewCalendar } from "@/components/hhs/hhs-mar-overview-calendar";
 
 import { toast } from "sonner";
 import { evaluateShiftNote } from "@/lib/ai-coach.functions";
-import { saveDailyRecord, setAttendance, savePrnForm, saveIncidentReport, listAttendance } from "@/lib/hhs.functions";
+import { saveDailyRecord, savePrnForm, saveIncidentReport } from "@/lib/hhs.functions";
+import { denverYmd } from "@/lib/denver-date";
 import { useClientFeature } from "@/lib/client-features";
 import { NoteTriggerPrompt } from "@/components/residential/note-trigger-prompt";
 import { DailyNoteMedsBlock, type DailyNoteMedication } from "@/components/medications/daily-note-meds-block";
@@ -36,7 +36,10 @@ import { type PendingMedDose } from "@/components/medications/shift-med-due-chec
 import { NectarShiftNoteDraft } from "@/components/nectar/nectar-shift-note-draft";
 import { NECTAR_DRAFT_MIN_WORDS } from "@/lib/nectar-note-gate";
 
-const hhsSearch = z.object({ tab: z.string().optional() });
+const hhsSearch = z.object({
+  tab: z.string().optional(),
+  open: z.string().optional(),
+});
 export const Route = createFileRoute("/dashboard/hhs-hub/$clientId")({
   head: () => ({ meta: [{ title: "Host Home Client Hub — HIVE" }] }),
   validateSearch: hhsSearch,
@@ -67,7 +70,10 @@ function HhsClientHubRoute() {
 export function HhsClientHub({ clientId }: { clientId: string }) {
   const { data: org } = useCurrentOrg();
   const orgId = org?.organization_id;
-  const { tab: tabParam } = useSearch({ strict: false }) as { tab?: string };
+  const { tab: tabParam, open: openParam } = useSearch({ strict: false }) as {
+    tab?: string;
+    open?: string;
+  };
   const navigate = useNavigate();
 
 
@@ -132,104 +138,9 @@ export function HhsClientHub({ clientId }: { clientId: string }) {
         <ArrowLeft className="h-3.5 w-3.5" /> Back to caseload
       </Link>
 
-      {/* CLINICAL PROFILE — sticky safety strip. Always visible while the host
-          scrolls through documentation tabs (med pass, daily note, etc). */}
-      <div className="sticky top-0 z-20 -mx-3 sm:mx-0">
-        <Card className="rounded-none border-x-0 border-red-300 bg-red-50/95 backdrop-blur-sm shadow-sm sm:rounded-xl sm:border-x dark:bg-red-950/40">
-          <CardContent className="space-y-1.5 p-3 text-xs">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="inline-flex items-center gap-1.5 text-sm font-semibold">
-                <Stethoscope className="h-4 w-4 text-red-700" />
-                Clinical Profile · {fullName}
-              </span>
-              <Badge className="bg-amber-500 text-[10px]">HHS</Badge>
-            </div>
-            <div className="leading-snug">
-              <strong>Medical Concerns / Allergies:</strong>{" "}
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    className="font-semibold text-red-700 underline decoration-dotted underline-offset-2 hover:text-red-900 dark:text-red-300"
-                  >
-                    See client chart
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-80 space-y-2 text-xs">
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Allergies & swallowing — {fullName}
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-semibold text-red-700">Allergies</div>
-                    {(client.allergies ?? []).length > 0 ? (
-                      <ul className="mt-0.5 list-disc pl-4">
-                        {(client.allergies ?? []).map((a) => (
-                          <li key={a}>{a}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <div className="mt-0.5 text-muted-foreground">No known allergies on file.</div>
-                    )}
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-semibold text-amber-700">Dysphagia / Swallowing</div>
-                    {client.dysphagia ? (
-                      <div className="mt-0.5">Dysphagia flagged — follow crushed-med / thickened-liquid policy.</div>
-                    ) : (
-                      <div className="mt-0.5 text-muted-foreground">No dysphagia flag.</div>
-                    )}
-                    {(client.swallowing_alerts ?? []).length > 0 && (
-                      <ul className="mt-1 list-disc pl-4">
-                        {(client.swallowing_alerts ?? []).map((s) => (
-                          <li key={s}>{s}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                  <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-                    Re-verify allergies in the client's profile before any med pass.
-                  </div>
-                </PopoverContent>
-              </Popover>{" "}
-              — re-verify before any med pass.
-            </div>
-
-            <div className="leading-snug text-amber-800 dark:text-amber-200">
-              <AlertTriangle className="-mt-0.5 mr-1 inline h-3.5 w-3.5" />
-              <strong>Choking / Swallow Reflex:</strong> Confirm upright posture and crushed-med policy per care plan.
-            </div>
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 text-[11px]"
-                onClick={() =>
-                  navigate({
-                    to: "/dashboard/clients/$clientId",
-                    params: { clientId },
-                    search: { tab: "documents" },
-                  })
-                }
-              >
-                <FileText className="mr-1 h-3.5 w-3.5" /> Emergency Med Auth
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 text-[11px]"
-                onClick={() =>
-                  navigate({
-                    to: "/dashboard/clients/$clientId",
-                    params: { clientId },
-                    search: { tab: "documents" },
-                  })
-                }
-              >
-                <FileText className="mr-1 h-3.5 w-3.5" /> Advanced Directives
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="flex flex-wrap items-center gap-2">
+        <h1 className="text-base font-semibold">{fullName}</h1>
+        <Badge className="bg-amber-500 text-[10px]">HHS</Badge>
       </div>
 
       {client.special_directions && (
@@ -269,21 +180,21 @@ export function HhsClientHub({ clientId }: { clientId: string }) {
         </TabsContent>
         {emarEnabled && (
           <TabsContent value="emar" className="mt-3">
-            <StaffMedicationsPanel
-              clientId={client.id}
-              clientName={`${client.first_name} ${client.last_name}`}
-              serviceContext="HHS"
-            />
+            <HhsMarOverviewCalendar orgId={orgId} clientId={client.id} />
           </TabsContent>
         )}
         <TabsContent value="att" className="mt-3">
-          <AttendanceTab orgId={orgId} clientId={client.id} />
+          <HhsAttendanceCalendar orgId={orgId} clientId={client.id} />
         </TabsContent>
         <TabsContent value="month" className="mt-3">
           <HhsMonthlyAttendanceTab orgId={orgId} clientId={client.id} clientName={fullName} />
         </TabsContent>
         <TabsContent value="prn" className="mt-3">
-          <PrnFormsTab orgId={orgId} clientId={client.id} />
+          <PrnFormsTab
+            orgId={orgId}
+            clientId={client.id}
+            initialKind={openParam === "incident" ? "incident" : null}
+          />
         </TabsContent>
       </Tabs>
     </div>
@@ -291,9 +202,8 @@ export function HhsClientHub({ clientId }: { clientId: string }) {
 }
 
 // ============ Daily Note + NECTAR Coach + AI Interlock Gates ============
-const INCIDENT_RX = /\b(fell|fall|fainted|seizure|injur(y|ed|ies)|bleed|blood|hospital|ER|emergency|crisis|aggress|hit\s+(?:them|him|her)|self[- ]harm|elop(e|ed|ement)|abuse|neglect)\b/i;
 const MEDICAL_RX = /\b(appointment|appt|doctor|dr\.|dentist|dental|clinic|specialist|checkup|check[- ]up|seen by|visited (?:the )?(?:doctor|md|clinic|hospital))\b/i;
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => denverYmd();
 
 function DailyNoteTab({
   orgId,
@@ -323,6 +233,8 @@ function DailyNoteTab({
   const [pendingMedDoses, setPendingMedDoses] = useState<PendingMedDose[]>([]);
   const [nectarUsed, setNectarUsed] = useState(false);
   const [nectarAssistChecked, setNectarAssistChecked] = useState(false);
+  const [recordDate, setRecordDate] = useState(() => denverYmd());
+  const [incidentAnswer, setIncidentAnswer] = useState<"yes" | "no" | null>(null);
 
   // Signature canvas
   const canvasRef  = useRef<HTMLCanvasElement | null>(null);
@@ -370,26 +282,14 @@ function DailyNoteTab({
   function onPointerUp() { drawingRef.current = false; }
 
   const checkInterlocks = async (): Promise<boolean> => {
-    const t = today();
-    if (INCIDENT_RX.test(note)) {
-      const { count } = await supabase
-        .from("hhs_incident_reports" as never)
-        .select("id", { count: "exact", head: true })
-        .eq("client_id", client.id)
-        .gte("occurred_at", `${t}T00:00:00Z`);
-      if (!count || count === 0) {
-        setInterlock({ kind: "incident", msg: "⚠️ NECTAR Compliance Lock: Your daily summary describes a critical event or injury. State regulations mandate an incident intake log. Please complete the Incident Report in the PRN Forms tab before saving." });
-        return false;
-      }
-    }
     if (MEDICAL_RX.test(note)) {
       const { count } = await supabase
         .from("hhs_medical_logs" as never)
         .select("id", { count: "exact", head: true })
         .eq("client_id", client.id)
-        .gte("appointment_at", `${t}T00:00:00Z`);
+        .gte("appointment_at", `${recordDate}T00:00:00Z`);
       if (!count || count === 0) {
-        setInterlock({ kind: "medical", msg: "⚠️ NECTAR Compliance Lock: Your note references a medical appointment. Please complete the Medical Appointment Log in the PRN Forms tab first." });
+        setInterlock({ kind: "medical", msg: "Your note references a medical appointment. Complete the Medical Appointment Log in PRN Forms first." });
         return false;
       }
     }
@@ -413,6 +313,10 @@ function DailyNoteTab({
     }
     if (!medDosesResolved) {
       toast.error("Confirm medications on this daily note before submitting.");
+      return;
+    }
+    if (!incidentAnswer) {
+      toast.error("Answer whether any incidents required an incident report.");
       return;
     }
     if (!hasSigRef.current) { toast.error("Please sign the daily note before saving."); return; }
@@ -458,18 +362,23 @@ function DailyNoteTab({
     }
 
     try {
+      const denverToday = denverYmd();
       await saveFn({
         data: {
           organizationId: orgId,
           clientId: client.id,
-          recordDate: today(),
+          recordDate,
           narrative: note,
           pcspGoalsAddressed: goals,
           aiStatus: isException ? "Exception" : (verdict?.status ?? null),
           aiFeedback: isException
-            ? "🔴 Submitted with Exception Flag — pending admin review."
+            ? "Submitted with Exception Flag — pending admin review."
             : (verdict?.feedback ?? null),
           signatureDataUrl: signature,
+          backdated: recordDate < denverToday,
+          originalDueDate: recordDate < denverToday ? recordDate : null,
+          submittedLate: recordDate < denverToday,
+          incidentRequired: incidentAnswer === "yes",
         },
       });
       // Medication compliance is now recorded in the real MAR (`emar_logs`)
@@ -495,10 +404,22 @@ function DailyNoteTab({
         <CardContent className="py-10 text-center space-y-3">
           <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
           <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">Daily note submitted</p>
-          <p className="text-sm text-muted-foreground">Your progress note and signature have been saved and submitted for administrative approval.</p>
+          <p className="text-sm text-muted-foreground">Your progress note and signature have been saved and submitted for administrative approval. This date is marked present on monthly attendance.</p>
+          {incidentAnswer === "yes" ? (
+            <Button
+              className="h-12 w-full sm:w-auto"
+              onClick={() =>
+                navigate({ to: ".", search: { tab: "prn", open: "incident" }, replace: true })
+              }
+            >
+              Open incident report
+            </Button>
+          ) : null}
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
             <Button onClick={() => navigate({ to: "/dashboard" })}>Back to My Caseload</Button>
-            <Button variant="outline" onClick={() => setSuccess(false)}>Submit another note</Button>
+            <Button variant="outline" onClick={() => { setSuccess(false); setIncidentAnswer(null); }}>
+              Submit another note
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -509,6 +430,25 @@ function DailyNoteTab({
     <Card data-tour="staff.daily-note">
       <CardHeader><CardTitle className="text-base">24-Hour Daily Progress Note</CardTitle></CardHeader>
       <CardContent className="space-y-4">
+
+        <div>
+          <Label htmlFor="hhs-note-date">Note date</Label>
+          <Input
+            id="hhs-note-date"
+            type="date"
+            value={recordDate}
+            max={denverYmd()}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) return;
+              setRecordDate(v);
+            }}
+            className="mt-1 h-12 w-full max-w-sm text-base"
+          />
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Defaults to today in America/Denver. Saving writes this date.
+          </p>
+        </div>
 
         {/* PCSP Goals — phone-friendly tap rows (≥44px), full-width, easy to check */}
         <div>
@@ -584,11 +524,12 @@ function DailyNoteTab({
         <NoteTriggerPrompt
           text={note}
           clientId={client.id}
-          date={today()}
+          date={recordDate}
+          incidentAttest={incidentAnswer}
           onOpenForm={(kind) => {
             navigate({
               to: ".",
-              search: { tab: kind === "incident" ? "incident" : "prn" },
+              search: kind === "incident" ? { tab: "prn", open: "incident" } : { tab: "prn" },
               replace: true,
             });
           }}
@@ -647,10 +588,53 @@ function DailyNoteTab({
           <span>I attest this note and the time information on it are accurate.</span>
         </label>
 
+        <div className="space-y-2 rounded-xl border p-3">
+          <p className="text-sm font-semibold">Incidents</p>
+          <p className="text-xs text-muted-foreground">
+            Were there any incidents that required an incident report on this date?
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant={incidentAnswer === "no" ? "default" : "outline"}
+              className="h-12"
+              onClick={() => setIncidentAnswer("no")}
+            >
+              No
+            </Button>
+            <Button
+              type="button"
+              variant={incidentAnswer === "yes" ? "default" : "outline"}
+              className="h-12"
+              onClick={() => setIncidentAnswer("yes")}
+            >
+              Yes
+            </Button>
+          </div>
+          {incidentAnswer === "no" ? (
+            <p className="text-xs text-muted-foreground">
+              No means you attest there were no incidents worthy of an incident report this day.
+            </p>
+          ) : null}
+          {incidentAnswer === "yes" ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-12 w-full"
+              onClick={() =>
+                navigate({ to: ".", search: { tab: "prn", open: "incident" }, replace: true })
+              }
+            >
+              Open incident report form
+            </Button>
+          ) : null}
+        </div>
+
         <DailyNoteMedsBlock
           clientId={client.id}
           clientName={client.first_name}
           medications={medications}
+          recordDate={recordDate}
           onPendingDosesChange={setPendingMedDoses}
           onResolvedChange={setMedDosesResolved}
         />
@@ -663,7 +647,7 @@ function DailyNoteTab({
           <Button
             className="h-12 w-full bg-emerald-600 text-base font-semibold hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
             onClick={() => handleSubmit()}
-            disabled={!hasGoal || !narrativeOk || aiBusy || !triggersResolved || !finalAttest || (nectarUsed && !nectarAssistChecked) || !medDosesResolved}>
+            disabled={!hasGoal || !narrativeOk || aiBusy || !triggersResolved || !finalAttest || (nectarUsed && !nectarAssistChecked) || !medDosesResolved || !incidentAnswer}>
             {aiBusy
               ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />NECTAR reviewing your note…</>
               : coach?.status === "Flagged"
@@ -696,209 +680,27 @@ function DailyNoteTab({
 }
 
 
-// ============ Attendance — 31-day grid + court-proof attestation ============
-function AttendanceTab({ orgId, clientId }: { orgId: string; clientId: string }) {
-  const { user } = useAuth();
-  const fn = useServerFn(setAttendance);
-  const listFn = useServerFn(listAttendance);
-  const qc = useQueryClient();
-
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const todayDay = now.getDate();
-  const monthStart = new Date(year, month, 1);
-  const monthEnd = new Date(year, month + 1, 0);
-  const daysInMonth = monthEnd.getDate();
-  const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
-  const { data: rows = [] } = useQuery({
-    enabled: !!orgId,
-    queryKey: ["hhs-att-month", orgId, clientId, fmt(monthStart)],
-    queryFn: () => listFn({ data: { organizationId: orgId, monthStart: fmt(monthStart), monthEnd: fmt(monthEnd) } }),
-  });
-  const byDate = useMemo(() => {
-    const m = new Map<string, Record<string, unknown>>();
-    (rows as Array<Record<string, unknown>>)
-      .filter((r) => String(r.client_id) === clientId)
-      .forEach((r) => m.set(String(r.record_date), r));
-    return m;
-  }, [rows, clientId]);
-
-  const [selected, setSelected] = useState<number | null>(todayDay);
-  const [action, setAction] = useState<"Present" | "Away" | null>(null);
-  const [agreed, setAgreed] = useState(false);
-  const [initials, setInitials] = useState("");
-  const [awayCategory, setAwayCategory] = useState<"Hospitalization" | "Family Leave" | "Unapproved Absence">("Hospitalization");
-  const [awayNotes, setAwayNotes] = useState("");
-
-  const fullName = (user?.user_metadata?.full_name ?? user?.email ?? "").toString().trim();
-  const parts = fullName.split(/\s+/).filter(Boolean);
-  const expectedInitials = (parts[0]?.[0] ?? "") + (parts[parts.length - 1]?.[0] ?? "");
-  const initialsValid = initials.trim().toUpperCase() === expectedInitials.toUpperCase() && expectedInitials.length === 2;
-
-  const selectedDate = selected ? new Date(year, month, selected) : null;
-  const isToday = selected === todayDay;
-  const isFuture = !!selected && selected > todayDay;
-
-  const mut = useMutation({
-    mutationFn: async () => {
-      if (!selectedDate || !action) throw new Error("Pick a date and an action.");
-      return fn({
-        data: {
-          organizationId: orgId,
-          clientId,
-          recordDate: fmt(selectedDate),
-          presenceStatus: action,
-          awayReason: action === "Away" ? awayCategory : null,
-          awayCategory: action === "Away" ? awayCategory : null,
-          awayNotes: action === "Away" && awayCategory === "Hospitalization" ? awayNotes.trim() : null,
-          staffInitials: action === "Present" ? initials.trim().toUpperCase() : null,
-          attestationAccepted: action === "Present" ? agreed : false,
-        },
-      });
-    },
-    onSuccess: () => {
-      toast.success("Attendance recorded with court-admissible audit trail.");
-      setAction(null); setAgreed(false); setInitials(""); setAwayNotes("");
-      qc.invalidateQueries({ queryKey: ["hhs-att-month"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">📅 {now.toLocaleString(undefined, { month: "long", year: "numeric" })} — Court-Proof Attendance</CardTitle>
-        <p className="text-xs text-muted-foreground">Tap a date tile. Future dates are locked. Light-green = signed present; amber = away.</p>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-7 gap-1.5">
-          {["S","M","T","W","T","F","S"].map((d, i) => (
-            <div key={i} className="text-center text-[10px] font-medium text-muted-foreground">{d}</div>
-          ))}
-          {Array.from({ length: monthStart.getDay() }).map((_, i) => <div key={`pad-${i}`} />)}
-          {Array.from({ length: daysInMonth }, (_, i) => {
-            const day = i + 1;
-            const rec = byDate.get(fmt(new Date(year, month, day)));
-            const status = rec ? String(rec.presence_status) : null;
-            const isHospitalized = status === "Away" && String((rec as Record<string, unknown> | undefined)?.away_category ?? "") === "Hospitalization";
-            const initialsStamp = rec ? String((rec as Record<string, unknown>).staff_initials_signature ?? "") : "";
-            const future = day > todayDay;
-            const isSel = selected === day;
-            const cls = future
-              ? "bg-muted/40 text-muted-foreground/40 cursor-not-allowed"
-              : isHospitalized
-                ? "bg-rose-200 dark:bg-rose-900/40 text-rose-900 dark:text-rose-100 border-rose-500"
-                : status === "Present"
-                  ? "bg-green-200 dark:bg-green-900/40 text-green-900 dark:text-green-100 border-green-400"
-                  : status === "Away"
-                    ? "bg-amber-200 dark:bg-amber-900/40 text-amber-900 dark:text-amber-100 border-amber-400"
-                    : "bg-background hover:bg-muted";
-            return (
-              <button
-                key={day}
-                disabled={future}
-                onClick={() => { setSelected(day); setAction(null); setAgreed(false); setInitials(""); setAwayNotes(""); }}
-                className={`relative h-12 rounded border text-xs font-medium transition ${cls} ${isSel ? "ring-2 ring-primary" : ""}`}
-                title={status ? `Day ${day}: ${status}${isHospitalized ? " — Hospitalized (non-billable)" : ""}${initialsStamp ? ` (${initialsStamp})` : ""}` : `Day ${day}`}
-              >
-                <div>{day}</div>
-                {status === "Present" && initialsStamp && (
-                  <div className="absolute bottom-0.5 right-1 text-[9px] font-bold">{initialsStamp}</div>
-                )}
-                {status === "Present" && <div className="absolute top-0.5 left-1 text-[9px]">✓</div>}
-                {isHospitalized && <div className="absolute top-0.5 left-1 text-[9px]">🏥</div>}
-                {status === "Away" && !isHospitalized && <div className="absolute top-0.5 left-1 text-[9px]">AWAY</div>}
-              </button>
-            );
-          })}
-        </div>
-
-        {selected && !isFuture && (
-          <div className="rounded-lg border-2 border-dashed p-4 space-y-3">
-            <div className="font-semibold text-sm">
-              ✍️ Daily Attendance & Billing Verification — {selectedDate?.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
-              {!isToday && <Badge variant="outline" className="ml-2">backfill</Badge>}
-            </div>
-            <RadioGroup value={action ?? ""} onValueChange={(v) => setAction(v as "Present" | "Away")} className="space-y-2">
-              <label className="flex items-center gap-2 text-sm">
-                <RadioGroupItem value="Present" /> 🟢 Client Present Overnight (billable)
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <RadioGroupItem value="Away" /> 🟡 Client Away / Leave (unbillable)
-              </label>
-            </RadioGroup>
-
-            {action === "Present" && (
-              <div className="space-y-2 rounded border border-red-300 bg-red-50/40 dark:bg-red-950/20 p-3">
-                <p className="text-xs leading-relaxed">
-                  <strong>⚠️ LEGAL ATTESTATION:</strong> I hereby certify and formally attest under penalty of Medicaid fraud and perjury that the information recorded for this calendar date is true, accurate, and complete. I verify that the client slept overnight under my direct supervision in a certified Host Home setting, and I understand that falsification of this billing data is subject to state and federal criminal prosecution.
-                </p>
-                <label className="flex items-start gap-2 text-xs">
-                  <Checkbox checked={agreed} onCheckedChange={(c) => setAgreed(!!c)} />
-                  <span>I have read and agree to this legal attestation statement.</span>
-                </label>
-                <div>
-                  <Label className="text-xs">Type your initials ({expectedInitials || "—"})</Label>
-                  <Input value={initials} onChange={(e) => setInitials(e.target.value)} maxLength={4} className="h-9 w-24 font-bold tracking-widest" />
-                  {initials && !initialsValid && (
-                    <p className="text-[11px] text-destructive mt-1">Initials must match your profile name ({expectedInitials}).</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {action === "Away" && (
-              <div className="space-y-2 rounded border border-amber-300 bg-amber-50/40 dark:bg-amber-950/20 p-3">
-                <Label className="text-xs">Reason for absence</Label>
-                <Select value={awayCategory} onValueChange={(v) => setAwayCategory(v as typeof awayCategory)}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Hospitalization">Hospitalization</SelectItem>
-                    <SelectItem value="Family Leave">Family Leave</SelectItem>
-                    <SelectItem value="Unapproved Absence">Unapproved Absence</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-[11px] text-muted-foreground">This day will be flagged as unbillable.</p>
-                {awayCategory === "Hospitalization" && (
-                  <div className="space-y-1 pt-1">
-                    <Label className="text-xs">🏥 Hospitalization details (required)</Label>
-                    <Textarea
-                      value={awayNotes}
-                      onChange={(e) => setAwayNotes(e.target.value)}
-                      placeholder="Reason for hospitalization, hospital name, expected duration…"
-                      className="min-h-[70px]"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
-            <Button
-              onClick={() => mut.mutate()}
-              disabled={
-                mut.isPending ||
-                !action ||
-                (action === "Present" && (!agreed || !initialsValid)) ||
-                (action === "Away" && !awayCategory) ||
-                (action === "Away" && awayCategory === "Hospitalization" && !awayNotes.trim())
-              }
-            >
-              {mut.isPending ? "Saving…" : action === "Present" ? "Sign & Save (Billable)" : "Save Absence"}
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
 // ============ PRN Forms ============
 type PrnKind = "medical" | "summary" | "inventory" | "drill" | "transfer" | "incident";
 
-function PrnFormsTab({ orgId, clientId }: { orgId: string; clientId: string }) {
-  const [open, setOpen] = useState<PrnKind | null>(null);
+function PrnFormsTab({
+  orgId,
+  clientId,
+  initialKind,
+}: {
+  orgId: string;
+  clientId: string;
+  initialKind?: PrnKind | null;
+}) {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState<PrnKind | null>(initialKind ?? null);
+  useEffect(() => {
+    if (initialKind) setOpen(initialKind);
+  }, [initialKind]);
+  const closeForm = () => {
+    setOpen(null);
+    navigate({ to: ".", search: { tab: "prn" }, replace: true });
+  };
   const items: { kind: PrnKind; icon: React.ReactNode; title: string; desc: string }[] = [
     { kind: "medical", icon: <Stethoscope className="h-5 w-5" />, title: "🩺 Medical & Specialist Appointment Log", desc: "Record an appointment visit and orders." },
     { kind: "summary", icon: <BookOpen className="h-5 w-5" />, title: "📈 Comprehensive Monthly Review Summary", desc: "Monthly PCSP narrative and community outings." },
@@ -927,10 +729,10 @@ function PrnFormsTab({ orgId, clientId }: { orgId: string; clientId: string }) {
       </CardContent>
 
       {open && open !== "incident" && (
-        <PrnFormDialog kind={open} orgId={orgId} clientId={clientId} onClose={() => setOpen(null)} />
+        <PrnFormDialog kind={open} orgId={orgId} clientId={clientId} onClose={closeForm} />
       )}
       {open === "incident" && (
-        <IncidentFormDialog orgId={orgId} clientId={clientId} onClose={() => setOpen(null)} />
+        <IncidentFormDialog orgId={orgId} clientId={clientId} onClose={closeForm} />
       )}
     </Card>
   );

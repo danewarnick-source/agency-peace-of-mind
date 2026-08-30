@@ -8,10 +8,13 @@ import {
   useMyAssignments,
   allowedCodesFor,
   clientAuthorizedCodes,
+  firstClockableCode,
   hasHostHomeDailyCode,
+  isDualHhsAndClockable,
 } from "@/hooks/use-my-assignments";
 import { isClockableServiceCode } from "@/lib/service-billing";
 import { displayPersonName } from "@/lib/person-name";
+import { DualCaseloadActions } from "@/components/staff-mobile/dual-caseload-actions";
 
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString(undefined, {
@@ -67,6 +70,17 @@ export function TodayHero() {
           hour: "numeric", minute: "2-digit",
         })
       : "earlier";
+    const activeClient = (caseload ?? []).find((c) => c.id === active.client_id);
+    const activeCodes = activeClient
+      ? allowedCodesFor(assignments, activeClient.id, clientAuthorizedCodes(activeClient))
+      : [];
+    const dualWhileClocked = isDualHhsAndClockable(
+      activeCodes.length ? activeCodes : clientAuthorizedCodes(activeClient ?? { job_code: null }),
+    );
+    const punchCode = active.service_type_code || firstClockableCode(activeCodes);
+    const activeName = activeClient
+      ? displayPersonName(activeClient.first_name, activeClient.last_name)
+      : "this person";
 
     return (
       <section
@@ -109,19 +123,32 @@ export function TodayHero() {
               <p className="mt-1 text-xs text-muted-foreground">
                 {needsClockOut
                   ? `This shift started ${clockInLabel}. Open it and clock out to keep your timesheet accurate.`
-                  : "Return to finish the shift and clock out."}
+                  : dualWhileClocked
+                    ? "Return to finish the shift, or open the HHS daily note without clocking out."
+                    : "Return to finish the shift and clock out."}
               </p>
             </div>
           </div>
-          <Button asChild size="lg" className="h-12 shrink-0 px-5 text-base">
-            <Link
-              to="/dashboard/workspace/$clientId"
-              params={{ clientId: active.client_id }}
-              search={{ tab: "clock-in" }}
-            >
-              {needsClockOut ? "Clock out now" : "Return to shift"}
-            </Link>
-          </Button>
+          {dualWhileClocked ? (
+            <div className="w-full sm:max-w-xs">
+              <DualCaseloadActions
+                clientId={active.client_id}
+                fullName={activeName}
+                punchCode={punchCode}
+                isOnTheClock
+              />
+            </div>
+          ) : (
+            <Button asChild size="lg" className="h-12 shrink-0 px-5 text-base">
+              <Link
+                to="/dashboard/workspace/$clientId"
+                params={{ clientId: active.client_id }}
+                search={{ tab: "clock-in" }}
+              >
+                {needsClockOut ? "Clock out now" : "Return to shift"}
+              </Link>
+            </Button>
+          )}
         </div>
       </section>
     );
@@ -246,25 +273,48 @@ export function TodayHero() {
               </p>
             </div>
           </div>
-          <Button asChild size="lg" className="h-12 shrink-0 px-5 text-base">
-            {primaryDaily || !primary ? (
-              <Link
-                to="/dashboard/hhs-hub/$clientId"
-                params={{ clientId: leadClientId }}
-              >
-                <Home className="h-4 w-4" />
-                {ctaLabel}
-              </Link>
-            ) : (
-              <Link
-                to="/dashboard/workspace/$clientId"
-                params={{ clientId: leadClientId }}
-                search={{ tab: "clock-in", ...(code ? { code } : {}) }}
-              >
-                {ctaLabel}
-              </Link>
-            )}
-          </Button>
+          {(() => {
+            const lead = (caseload ?? []).find((c) => c.id === leadClientId);
+            const leadCodes = lead
+              ? allowedCodesFor(assignments, lead.id, clientAuthorizedCodes(lead))
+              : [];
+            const leadDual = isDualHhsAndClockable(
+              leadCodes.length ? leadCodes : clientAuthorizedCodes(lead ?? { job_code: null }),
+            );
+            if (leadDual) {
+              return (
+                <div className="w-full sm:max-w-xs">
+                  <DualCaseloadActions
+                    clientId={leadClientId}
+                    fullName={leadName}
+                    punchCode={code && !primaryDaily ? code : firstClockableCode(leadCodes)}
+                    isOnTheClock={false}
+                  />
+                </div>
+              );
+            }
+            return (
+              <Button asChild size="lg" className="h-12 shrink-0 px-5 text-base">
+                {primaryDaily || !primary ? (
+                  <Link
+                    to="/dashboard/hhs-hub/$clientId"
+                    params={{ clientId: leadClientId }}
+                  >
+                    <Home className="h-4 w-4" />
+                    {ctaLabel}
+                  </Link>
+                ) : (
+                  <Link
+                    to="/dashboard/workspace/$clientId"
+                    params={{ clientId: leadClientId }}
+                    search={{ tab: "clock-in", ...(code ? { code } : {}) }}
+                  >
+                    {ctaLabel}
+                  </Link>
+                )}
+              </Button>
+            );
+          })()}
         </div>
       )}
 

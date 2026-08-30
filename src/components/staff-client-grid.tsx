@@ -10,10 +10,13 @@ import {
   allowedCodesFor,
   clientAuthorizedCodes,
   defaultCaseloadCode,
+  firstClockableCode,
   hasHostHomeDailyCode,
+  isDualHhsAndClockable,
   isHostHomeOnlyAssignment,
   type AssignmentMap,
 } from "@/hooks/use-my-assignments";
+import { DualCaseloadActions } from "@/components/staff-mobile/dual-caseload-actions";
 import { useTodayShifts, type TodayShiftRow } from "@/hooks/use-today-shifts";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -91,6 +94,8 @@ function ClientDetail({
 }) {
   const allCodes = clientAuthorizedCodes(c);
   const codes = allowedCodesFor(assignments, c.id, allCodes);
+  const effectiveCodes = codes.length ? codes : allCodes;
+  const dual = isDualHhsAndClockable(effectiveCodes);
   const isOnTheClock = !!activeShift && activeShift.client_id === c.id;
 
   const initial = isOnTheClock
@@ -121,7 +126,10 @@ function ClientDetail({
         >
           {pills.map((code) => {
             const active = selected === code;
-            const locked = isOnTheClock && code !== activeShift!.service_type_code;
+            const locked =
+              isOnTheClock &&
+              !dual &&
+              code !== activeShift!.service_type_code;
             return (
               <button
                 key={code}
@@ -210,33 +218,39 @@ function ClientDetail({
         </div>
       )}
 
-      <div>
-        <Button
-          asChild
-          size="lg"
-          className={[
-            "h-12 w-full text-base",
-            isOnTheClock ? "bg-[#117a52] text-white shadow-sm hover:bg-[#0f6b48]" : "",
-          ].join(" ")}
-          aria-label={`${
-            isOnTheClock ? "Continue Punch pad" : daily ? "Open daily note" : "Open Punch pad"
-          } for ${fullName} (${selected})`}
-        >
-          <Link
-            to={daily ? "/dashboard/hhs-hub/$clientId" : "/dashboard/workspace/$clientId"}
-            params={{ clientId: c.id }}
-            search={daily ? undefined : { tab: "clock-in", code: selected }}
-          >
-            {daily && !isOnTheClock ? <Home /> : <Clock />}
-            {isOnTheClock ? "Continue Punch pad" : daily ? "Open daily note" : "Open Punch pad"}
-          </Link>
-        </Button>
-        <p className="mt-2 text-center text-xs text-muted-foreground">
-          {daily
-            ? "Daily note · PCSP narrative · month-end paperwork"
-            : "EVV time punch · shift & month-end paperwork"}
+      {dual ? (
+        <p className="text-center text-xs text-muted-foreground">
+          Punch pad is for the hourly code. Daily note is for HHS — available even while clocked in.
         </p>
-      </div>
+      ) : (
+        <div>
+          <Button
+            asChild
+            size="lg"
+            className={[
+              "h-12 w-full text-base",
+              isOnTheClock ? "bg-[#117a52] text-white shadow-sm hover:bg-[#0f6b48]" : "",
+            ].join(" ")}
+            aria-label={`${
+              isOnTheClock ? "Continue Punch pad" : daily ? "Open daily note" : "Open Punch pad"
+            } for ${fullName} (${selected})`}
+          >
+            <Link
+              to={daily ? "/dashboard/hhs-hub/$clientId" : "/dashboard/workspace/$clientId"}
+              params={{ clientId: c.id }}
+              search={daily ? undefined : { tab: "clock-in", code: selected }}
+            >
+              {daily && !isOnTheClock ? <Home /> : <Clock />}
+              {isOnTheClock ? "Continue Punch pad" : daily ? "Open daily note" : "Open Punch pad"}
+            </Link>
+          </Button>
+          <p className="mt-2 text-center text-xs text-muted-foreground">
+            {daily
+              ? "Daily note · PCSP narrative · month-end paperwork"
+              : "EVV time punch · shift & month-end paperwork"}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -265,8 +279,15 @@ function ClientRow({
   const navigate = useNavigate();
   const allCodes = clientAuthorizedCodes(c);
   const codes = allowedCodesFor(assignments, c.id, allCodes);
-  const hostOnly = isHostHomeOnlyAssignment(codes.length ? codes : allCodes);
-  const hasHhs = hasHostHomeDailyCode(codes.length ? codes : allCodes);
+  const effectiveCodes = codes.length ? codes : allCodes;
+  const hostOnly = isHostHomeOnlyAssignment(effectiveCodes);
+  const hasHhs = hasHostHomeDailyCode(effectiveCodes);
+  const dual = isDualHhsAndClockable(effectiveCodes);
+  const punchCode = isOnTheClock
+    ? activeShift!.service_type_code
+    : todayShift && isClockableServiceCode(todayShift.job_code)
+      ? todayShift.job_code
+      : firstClockableCode(effectiveCodes);
 
   const hasTrainingDue = trainings.some(
     (t) => t.setupStatus === "published" && t.completionStatus === "not_started",
@@ -293,7 +314,7 @@ function ClientRow({
       <button
         type="button"
         onClick={() => {
-          if (hostOnly && !isOnTheClock) {
+          if (hostOnly && !dual && !isOnTheClock) {
             navigate({ to: "/dashboard/hhs-hub/$clientId", params: { clientId: c.id } });
             return;
           }
@@ -361,6 +382,17 @@ function ClientRow({
           className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`}
         />
       </button>
+
+      {dual ? (
+        <div className="border-t border-border px-4 py-3">
+          <DualCaseloadActions
+            clientId={c.id}
+            fullName={fullName}
+            punchCode={punchCode}
+            isOnTheClock={isOnTheClock}
+          />
+        </div>
+      ) : null}
 
       {isOpen && (
         <div className="border-t border-border bg-background/60">
@@ -450,8 +482,8 @@ export function StaffClientGrid() {
             My caseload · {source.length} {source.length === 1 ? "person" : "people"}
           </h2>
           <p className="text-xs text-muted-foreground">
-            Tap a person to view services. Hourly codes use Punch pad. Host home (HHS) is the daily
-            note — hosts do not clock in. EVV is submitted by CSV.
+            Tap a person to view services. Hourly codes use Punch pad. HHS-only is the daily note —
+            hosts do not clock. HHS plus another code (DSI, SLH, SEI, …) shows both. EVV is submitted by CSV.
           </p>
         </div>
       </div>

@@ -9,9 +9,10 @@ import { HhsClientHub } from "./dashboard.hhs-hub.$clientId";
  */
 export const Route = createFileRoute("/e2e/hhs-hub/$clientId")({
   head: () => ({ meta: [{ title: "E2E — HHS Host Home Hub" }] }),
-  validateSearch: (s: Record<string, unknown>): { tab?: string } => {
+  validateSearch: (s: Record<string, unknown>): { tab?: string; open?: string } => {
     const tab = typeof s.tab === "string" ? s.tab : undefined;
-    return tab ? { tab } : {};
+    const open = typeof s.open === "string" ? s.open : undefined;
+    return { ...(tab ? { tab } : {}), ...(open ? { open } : {}) };
   },
   component: E2eHhsHubHarness,
 });

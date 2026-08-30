@@ -23,3 +23,37 @@ test("hive-exec phone chrome: Open company Admin is findable at 390x844", async 
   await expect(page.getByRole("button", { name: STAFF_VIEW_ACCESSIBLE_NAME })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open menu" })).toBeVisible();
 });
+
+/**
+ * Root-cause fixture: a Radix modal Sheet sets pointer-events:none on body
+ * and pointer-events:auto on the overlay. A menu portaled to body paints at
+ * z-400 but inherits none — taps hit the page behind. pointer-events-auto
+ * on the menu is the fix.
+ */
+test("portaled menu over a modal overlay receives the tap only when pointer-events-auto", async ({
+  page,
+}) => {
+  await page.setContent(`<!DOCTYPE html>
+    <html><body style="margin:0;pointer-events:none">
+      <div id="page-behind" style="position:fixed;inset:0;z-index:50;pointer-events:auto;background:#fde68a">PAGE BEHIND</div>
+      <div id="menu-dead" style="position:fixed;top:80px;left:16px;width:220px;z-index:400;background:#fff;border:1px solid #ccc">
+        <button id="staff-dead" type="button" style="display:block;width:100%;padding:16px">Staff View dead</button>
+      </div>
+      <div id="menu-live" style="position:fixed;top:200px;left:16px;width:220px;z-index:400;pointer-events:auto;background:#fff;border:1px solid #ccc">
+        <button id="staff-live" type="button" style="display:block;width:100%;padding:16px">Staff View live</button>
+      </div>
+      <script>
+        window.__hits = { behind: 0, dead: 0, live: 0 };
+        document.getElementById("page-behind").addEventListener("pointerdown", () => { window.__hits.behind++; });
+        document.getElementById("staff-dead").addEventListener("pointerdown", () => { window.__hits.dead++; });
+        document.getElementById("staff-live").addEventListener("pointerdown", () => { window.__hits.live++; });
+      </script>
+    </body></html>`);
+
+  await page.locator("#staff-dead").tap();
+  await page.locator("#staff-live").tap();
+  const hits = await page.evaluate(() => (window as unknown as { __hits: { behind: number; dead: number; live: number } }).__hits);
+  expect(hits.dead, "menu without pointer-events-auto must not receive the tap").toBe(0);
+  expect(hits.behind, "tap falls through the painted menu onto the overlay").toBeGreaterThan(0);
+  expect(hits.live, "menu with pointer-events-auto must receive the tap").toBe(1);
+});

@@ -13,6 +13,36 @@ export const PORTAL_VIEW_KEY = "portal-view";
 export const PORTAL_VIEW_CHANGE_EVENT = "portal-view-change";
 export const OPEN_DASHBOARD_MENU_EVENT = "hive:open-dashboard-menu";
 
+/** Portaled listbox. Used so the mobile Sheet does not treat option taps as "outside". */
+export const PORTAL_VIEW_MENU_ATTR = "data-portal-view-menu";
+export const PORTAL_VIEW_MENU_SELECTOR = "[data-portal-view-menu]";
+
+export function isPortalViewMenuEventTarget(target: EventTarget | null | undefined): boolean {
+  if (!target || typeof target !== "object") return false;
+  const node = target as { closest?: (selector: string) => unknown };
+  if (typeof node.closest !== "function") return false;
+  return Boolean(node.closest(PORTAL_VIEW_MENU_SELECTOR));
+}
+
+/**
+ * Radix Sheet (Dialog) is modal: body gets pointer-events:none and any pointer
+ * outside SheetContent dismisses the drawer. The Portal View menu is portaled
+ * to document.body (it must be — the Sheet's slide transform would break
+ * position:fixed), so a tap on Staff View is "outside" the drawer in the DOM.
+ * Without this, the tap hits the dimmed page / closes the Sheet and never
+ * commits the view.
+ */
+export function preventSheetDismissForPortalViewMenu(event: {
+  preventDefault: () => void;
+  target?: EventTarget | null;
+  detail?: { originalEvent?: { target?: EventTarget | null } };
+}): void {
+  const fromDetail = event.detail?.originalEvent?.target;
+  if (isPortalViewMenuEventTarget(fromDetail) || isPortalViewMenuEventTarget(event.target)) {
+    event.preventDefault();
+  }
+}
+
 export const COMPANY_PORTAL_VIEWS = ["admin", "staff", "staff_mobile"] as const;
 export const COMPANY_ADMIN_ROLES = ["admin", "super_admin", "program_manager", "manager"] as const;
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Building2, ChevronDown, GraduationCap, Lock, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,12 @@ const ICONS: Record<PortalView, typeof GraduationCap> = {
  * Portal View control. Radix Select cannot be used here: its popper viewport
  * is locked to the trigger height, so items paint over the nav (bleed-through)
  * and clicks/Enter never commit a new view.
+ *
+ * The menu is portaled to document.body so position:fixed is not trapped by
+ * the mobile Sheet's slide transform. That puts it outside the Sheet's
+ * pointer-events:auto island — Radix sets pointer-events:none on body while
+ * the drawer is open — so the menu MUST be pointer-events-auto or taps fall
+ * through to the dimmed page behind it.
  */
 export function PortalViewSwitcher({
   value,
@@ -52,7 +58,7 @@ export function PortalViewSwitcher({
   useEffect(() => {
     if (!open) return;
     place();
-    const onDoc = (e: MouseEvent) => {
+    const onDoc = (e: Event) => {
       const t = e.target as Node;
       if (triggerRef.current?.contains(t) || menuRef.current?.contains(t)) return;
       setOpen(false);
@@ -60,11 +66,13 @@ export function PortalViewSwitcher({
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
+    window.addEventListener("pointerdown", onDoc);
     window.addEventListener("mousedown", onDoc);
     window.addEventListener("keydown", onKey);
     window.addEventListener("resize", place);
     window.addEventListener("scroll", place, true);
     return () => {
+      window.removeEventListener("pointerdown", onDoc);
       window.removeEventListener("mousedown", onDoc);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("resize", place);
@@ -74,6 +82,11 @@ export function PortalViewSwitcher({
 
   useEffect(() => {
     if (!open) return;
+    // Autofocus would move focus outside the mobile Sheet (menu is portaled
+    // to body) and Radix would treat that as dismiss. Keyboard users still
+    // reach options via ArrowDown on the trigger.
+    const coarse = window.matchMedia?.("(pointer: coarse)")?.matches;
+    if (coarse) return;
     const selected = menuRef.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]');
     selected?.focus();
   }, [open]);
@@ -89,6 +102,16 @@ export function PortalViewSwitcher({
       e.preventDefault();
       setOpen(true);
     }
+  };
+
+  const onOptionPointerDown = (e: PointerEvent<HTMLButtonElement>, next: PortalView) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    // Commit on pointerdown: iOS often never delivers click after a modal
+    // layer races the same tap. preventDefault stops the ghost click that
+    // would otherwise land on Admin Home behind the closing menu.
+    e.preventDefault();
+    e.stopPropagation();
+    commit(next);
   };
 
   const onOptionKey = (e: KeyboardEvent<HTMLButtonElement>, idx: number) => {
@@ -114,8 +137,12 @@ export function PortalViewSwitcher({
         role="listbox"
         aria-label="Portal View"
         data-testid="portal-view-menu"
-        className="fixed z-[400] overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
+        data-portal-view-menu=""
+        className="pointer-events-auto fixed z-[400] overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
         style={{ top: pos.top, left: pos.left, width: pos.width }}
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
       >
         {options.map((opt, idx) => {
           const Icon = ICONS[opt.value];
@@ -133,7 +160,12 @@ export function PortalViewSwitcher({
                   ? "bg-accent text-accent-foreground"
                   : "hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
               )}
-              onClick={() => commit(opt.value)}
+              onPointerDown={(e) => onOptionPointerDown(e, opt.value)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                commit(opt.value);
+              }}
               onKeyDown={(e) => onOptionKey(e, idx)}
             >
               <Icon className="h-3.5 w-3.5 shrink-0" />

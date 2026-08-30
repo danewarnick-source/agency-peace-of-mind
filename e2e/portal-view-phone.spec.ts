@@ -4,7 +4,17 @@
  * tap hits the Sheet overlay (the page behind the painted menu).
  */
 import { test, expect, type Page } from "@playwright/test";
-import { installHiveMocks } from "./helpers/admin-home-mock";
+import fs from "node:fs";
+import { installHiveMocks, screenshotPath } from "./helpers/admin-home-mock";
+
+async function shot(page: Page, name: string) {
+  try {
+    fs.mkdirSync("/opt/cursor/artifacts/screenshots", { recursive: true });
+    await page.screenshot({ path: screenshotPath(name), fullPage: true });
+  } catch {
+    await page.screenshot({ path: `test-results/${name}.png`, fullPage: true }).catch(() => {});
+  }
+}
 
 test.use({
   viewport: { width: 390, height: 844 },
@@ -23,6 +33,7 @@ async function openPortalViewMenu(page: Page) {
   await expect(trigger).toBeVisible({ timeout: 15_000 });
   await trigger.tap();
   await expect(page.getByTestId("portal-view-menu")).toBeVisible();
+  await shot(page, "portal_view_phone_menu_open");
 }
 
 test.describe("Portal View on a phone-sized viewport", () => {
@@ -48,6 +59,7 @@ test.describe("Portal View on a phone-sized viewport", () => {
     await expect(page.getByTestId("portal-view-menu")).toHaveCount(0);
     const stored = await page.evaluate(() => window.localStorage.getItem("portal-view"));
     expect(stored).toBe("staff");
+    await shot(page, "portal_view_phone_after_staff_tap");
   });
 
   test("Admin View is tappable after switching away", async ({ page }) => {

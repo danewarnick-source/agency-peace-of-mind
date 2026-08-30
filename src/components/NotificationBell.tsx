@@ -58,7 +58,11 @@ function badgeColor(urgency: Urgency) {
   return "bg-blue-500 text-white";
 }
 
-export function NotificationBell() {
+export function NotificationBell({
+  deadlinesEnabled = true,
+}: {
+  deadlinesEnabled?: boolean;
+}) {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
   const qc = useQueryClient();
@@ -242,7 +246,7 @@ export function NotificationBell() {
   // summary, SEI employment data, and CMP/CMS monthly summary. These only
   // fire into the bell on the 1st/5th/10th of the month; the Deadlines panel
   // shows the underlying item every day it's open.
-  const { items: deadlineItems } = useDeadlines();
+  const { items: deadlineItems } = useDeadlines({ enabled: deadlinesEnabled });
   const cadenceSynthetics = useMemo<AppNotification[]>(() => {
     if (!isUpiReminderFireDay(new Date())) return [];
     return deadlineItems

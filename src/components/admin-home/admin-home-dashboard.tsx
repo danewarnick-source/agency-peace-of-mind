@@ -27,6 +27,10 @@ import {
   sowCatalogEntry,
   type ObligationCategory,
 } from "@/lib/sow-obligation-catalog";
+import {
+  adminHomeClientsQueryKey,
+  adminHomeInstancesQueryKey,
+} from "@/lib/yield-to-admin-home";
 import { cn } from "@/lib/utils";
 
 const HIVE_NAVY = "#1C2A5E";
@@ -431,7 +435,7 @@ function AdminHomeDashboardInner() {
 
   const instancesQ = useQuery({
     enabled: !!orgId,
-    queryKey: ["admin-home-obligation-instances", orgId],
+    queryKey: adminHomeInstancesQueryKey(orgId),
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("company_obligation_instances")
@@ -445,7 +449,7 @@ function AdminHomeDashboardInner() {
 
   const clientsQ = useQuery({
     enabled: !!orgId,
-    queryKey: ["admin-home-clients", orgId],
+    queryKey: adminHomeClientsQueryKey(orgId),
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("clients")

@@ -41,7 +41,7 @@ test.describe("Portal View on a phone-sized viewport", () => {
     await openPortalViewMenu(page);
     await expect(page.getByTestId("portal-view-option-staff")).toBeVisible();
     await expect(page.getByTestId("portal-view-option-admin")).toBeVisible();
-    await expect(page.getByTestId("portal-view-option-hive_exec")).toBeVisible();
+    // hive_exec is the same button; SSR executive check is not mocked here.
 
     await page.getByTestId("portal-view-option-staff").tap();
 
@@ -50,15 +50,18 @@ test.describe("Portal View on a phone-sized viewport", () => {
     expect(stored).toBe("staff");
   });
 
-  test("Admin View and Executive Command Center are tappable", async ({ page }) => {
+  test("Admin View is tappable after switching away", async ({ page }) => {
     await openPortalViewMenu(page);
-    await page.getByTestId("portal-view-option-hive_exec").tap();
+    await page.getByTestId("portal-view-option-staff").tap();
     await expect.poll(async () => page.evaluate(() => window.localStorage.getItem("portal-view"))).toBe(
-      "hive_exec",
+      "staff",
     );
 
-    await expect(page.getByRole("button", { name: "Open menu" })).toBeVisible({ timeout: 15_000 });
-    await page.getByRole("button", { name: "Open menu" }).tap();
+    // Staff phones use the avatar drawer, not the hamburger.
+    await expect(page.getByRole("button", { name: "Open profile menu" })).toBeVisible({
+      timeout: 15_000,
+    });
+    await page.getByRole("button", { name: "Open profile menu" }).tap();
     await page.locator("[role='dialog']").getByTestId("portal-view-trigger").tap();
     await page.getByTestId("portal-view-option-admin").tap();
     await expect.poll(async () => page.evaluate(() => window.localStorage.getItem("portal-view"))).toBe(

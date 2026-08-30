@@ -50,10 +50,23 @@ test("portaled menu over a modal overlay receives the tap only when pointer-even
       </script>
     </body></html>`);
 
-  await page.locator("#staff-dead").tap();
-  await page.locator("#staff-live").tap();
-  const hits = await page.evaluate(() => (window as unknown as { __hits: { behind: number; dead: number; live: number } }).__hits);
-  expect(hits.dead, "menu without pointer-events-auto must not receive the tap").toBe(0);
-  expect(hits.behind, "tap falls through the painted menu onto the overlay").toBeGreaterThan(0);
-  expect(hits.live, "menu with pointer-events-auto must receive the tap").toBe(1);
+  const hitAt = (selector: string) =>
+    page.locator(selector).evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return top?.id ?? top?.tagName ?? null;
+    });
+
+  expect(await hitAt("#staff-dead"), "menu without pointer-events-auto loses hit-testing to the overlay").toBe(
+    "page-behind",
+  );
+  expect(await hitAt("#staff-live"), "menu with pointer-events-auto wins hit-testing").toBe("staff-live");
+
+  const liveBox = await page.locator("#staff-live").boundingBox();
+  expect(liveBox).toBeTruthy();
+  await page.touchscreen.tap(liveBox!.x + liveBox!.width / 2, liveBox!.y + liveBox!.height / 2);
+  const hits = await page.evaluate(
+    () => (window as unknown as { __hits: { behind: number; dead: number; live: number } }).__hits,
+  );
+  expect(hits.live, "tap on pointer-events-auto menu must reach Staff View").toBe(1);
 });

@@ -236,7 +236,7 @@ const ADMIN_NAV: NavItem[] = [
   },
   {
     to: "/dashboard/hive-training",
-    label: "Classes",
+    label: "Training",
     icon: GraduationCap,
     feature: "hive_training",
   },

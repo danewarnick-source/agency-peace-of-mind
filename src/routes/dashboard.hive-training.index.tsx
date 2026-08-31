@@ -23,11 +23,11 @@ import { z } from "zod";
 import { useEntitlements } from "@/hooks/use-entitlements";
 import { createTrainingCheckoutFn, confirmCheckoutSessionFn } from "@/lib/stripe-checkout.functions";
 import { ClassRosterDialog, type RosterMemberOption } from "@/components/training/class-roster-form";
-import { TRAINING_PRICE_CENTS, formatUsdFromCents } from "@/lib/hive-pricing";
+import { formatUsdFromCents, trainingPriceCentsForSku } from "@/lib/hive-pricing";
 import { isBillingExempt } from "@/lib/billing-access";
 import { getBillingStatusFn } from "@/lib/stripe-checkout.functions";
 import { getOrgTrainingClasses } from "@/lib/training-class.functions";
-import { trainingClassLabel, type TrainingClassType } from "@/lib/training-class";
+import { trainingClassLabel, trainingClassSku, type TrainingClassType } from "@/lib/training-class";
 import { ClassCardUploadButtons } from "@/components/training/class-card-upload";
 import { FeatureLocked } from "@/components/feature-locked";
 import { useFeatureEnabled } from "@/hooks/use-feature-enabled";
@@ -202,19 +202,25 @@ function AdminView({ orgId }: { orgId: string }) {
         .from("org_member_directory")
         .select("id, full_name, email, username")
         .in("id", ids);
+      const { data: phones } = await (supabase as any)
+        .from("profiles")
+        .select("id, phone")
+        .in("id", ids);
+      const phoneById = new Map(
+        ((phones ?? []) as Array<{ id: string; phone?: string | null }>).map((p) => [p.id, p.phone ?? null]),
+      );
       return ((profs ?? []) as Array<{
         id: string | null;
         full_name: string | null;
         email: string | null;
         username: string | null;
-        phone?: string | null;
       }>)
         .filter((p): p is typeof p & { id: string } => !!p.id)
         .map((p) => ({
           id: p.id,
           label: p.full_name || p.email || p.username || "—",
           email: p.email,
-          phone: p.phone ?? null,
+          phone: phoneById.get(p.id) ?? null,
         }));
     },
   });
@@ -734,9 +740,9 @@ function SetupRenewalsDialog({
     // Cost with full program vs à la carte for those users.
     const perUserAlaCarte = Array.from(fpCourses).reduce((sum, cid) => {
       const cat = catalog.find((c) => c.kind !== "full_program" && ((c.fulfills_course_ids ?? []) as string[]).includes(cid));
-      return sum + (cat?.price_cents ?? 0);
+      return sum + trainingPriceCentsForSku(cat?.sku ?? "", cat?.price_cents);
     }, 0);
-    const savingsPerUser = Math.max(0, perUserAlaCarte - fullProgram.price_cents);
+    const savingsPerUser = Math.max(0, perUserAlaCarte - trainingPriceCentsForSku(fullProgram.sku, fullProgram.price_cents));
     return { users: bundledUsers, savingsPerUser, fpCourses };
   }, [selection, fullProgram, catalog]);
 
@@ -770,7 +776,7 @@ function SetupRenewalsDialog({
   }, [selection, bundle, fullProgram, catalog]);
 
   const totalCents = useMemo(
-    () => purchases.reduce((s, p) => s + p.catalog.price_cents * p.intents.length, 0),
+    () => purchases.reduce((s, p) => s + trainingPriceCentsForSku(p.catalog.sku, p.catalog.price_cents) * p.intents.length, 0),
     [purchases],
   );
   const totalFmt = (totalCents / 100).toLocaleString(undefined, { style: "currency", currency: "USD" });
@@ -841,7 +847,7 @@ function SetupRenewalsDialog({
             {purchases.map((p) => (
               <li key={p.catalog.id} className="flex justify-between">
                 <span>{p.catalog.name} × {p.intents.length}</span>
-                <span>{((p.catalog.price_cents * p.intents.length) / 100).toLocaleString(undefined, { style: "currency", currency: "USD" })}</span>
+                <span>{formatUsdFromCents(trainingPriceCentsForSku(p.catalog.sku, p.catalog.price_cents) * p.intents.length)}</span>
               </li>
             ))}
           </ul>
@@ -910,37 +916,39 @@ function Storefront({
     priceCents: number;
     featured?: boolean;
     sku: string;
-  }> = [
-    {
-      type: "package",
-      title: "Training package",
-      blurb: "CPR, Mandt, and the in-Hive 30-day course for the same roster. Saves $75 versus buying each seat.",
-      priceCents: TRAINING_PRICE_CENTS.full_program,
-      featured: true,
-      sku: "full_program",
-    },
-    {
-      type: "cpr_first_aid",
-      title: "CPR / First Aid",
-      blurb: "External class. After pay, Hive Executive gets one alert. Staff see an obligation until you upload the card.",
-      priceCents: TRAINING_PRICE_CENTS.cpr_first_aid,
-      sku: "cpr_first_aid",
-    },
-    {
-      type: "mandt",
-      title: "Mandt",
-      blurb: "External class. After pay, Hive Executive gets one alert. Staff see an obligation until you upload the card.",
-      priceCents: TRAINING_PRICE_CENTS.mandt,
-      sku: "mandt",
-    },
-    {
-      type: "thirty_day",
-      title: "30-day orientation",
-      blurb: "In-Hive course from My Obligations. Buying a 30-day seat assigns that obligation. Not an external class.",
-      priceCents: TRAINING_PRICE_CENTS.thirty_day,
-      sku: "dspd_required",
-    },
-  ];
+  }> = (
+    [
+      {
+        type: "package" as const,
+        title: "Training package",
+        blurb: "CPR, Mandt, and the in-Hive 30-day course for the same roster. Saves $75 versus buying each seat.",
+        featured: true,
+      },
+      {
+        type: "cpr_first_aid" as const,
+        title: "CPR / First Aid",
+        blurb: "External class. After pay, Hive Executive gets one alert. Staff see an obligation until you upload the card.",
+      },
+      {
+        type: "mandt" as const,
+        title: "Mandt",
+        blurb: "External class. After pay, Hive Executive gets one alert. Staff see an obligation until you upload the card.",
+      },
+      {
+        type: "thirty_day" as const,
+        title: "30-day orientation",
+        blurb: "In-Hive course from My Obligations. Buying a 30-day seat assigns that obligation. Not an external class.",
+      },
+    ] as const
+  ).map((card) => {
+    const sku = trainingClassSku(card.type);
+    const catalogRow = catalog.find((c) => c.sku === sku);
+    return {
+      ...card,
+      sku,
+      priceCents: trainingPriceCentsForSku(sku, catalogRow?.price_cents),
+    };
+  });
 
   return (
     <section id="ht-storefront" className="space-y-3">
@@ -968,9 +976,14 @@ function Storefront({
               <CardDescription className="text-xs">{card.blurb}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="text-2xl font-bold text-[#1A2B47]">
-                {billingExempt ? "$0" : formatUsdFromCents(card.priceCents)}
-                <span className="text-sm font-normal text-muted-foreground"> / seat</span>
+              <div data-testid={`training-price-${card.sku}`}>
+                <div className="text-2xl font-bold text-[#1A2B47]">
+                  {formatUsdFromCents(card.priceCents)}
+                  <span className="text-sm font-normal text-muted-foreground"> / seat</span>
+                </div>
+                {billingExempt ? (
+                  <p className="text-sm text-[#1A2B47]">True North $0 — never charged</p>
+                ) : null}
               </div>
               {orgId ? (
                 <ClassRosterDialog
@@ -1009,7 +1022,10 @@ function SubmittedClasses({ orgId }: { orgId: string }) {
           <Card key={c.id}>
             <CardContent className="p-4 text-sm">
               <div className="font-medium text-[#1A2B47]">
-                {trainingClassLabel(c.trainingType)} · {c.seatCount} staff · {c.paymentStatus === "waived" || c.amountCents === 0 ? "$0" : formatUsdFromCents(c.amountCents)}
+                {trainingClassLabel(c.trainingType)} · {c.seatCount} staff ·{" "}
+                {formatUsdFromCents(c.unitPriceCents || trainingPriceCentsForSku(trainingClassSku(c.trainingType)))} / seat
+                {" · "}
+                {c.paymentStatus === "waived" || c.amountCents === 0 ? "$0" : formatUsdFromCents(c.amountCents)}
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
                 {c.status} · submitted {c.submittedAt ? new Date(c.submittedAt).toLocaleDateString() : "—"}

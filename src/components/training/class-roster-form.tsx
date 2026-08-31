@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -13,11 +14,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createTrainingClassCheckoutFn } from "@/lib/stripe-checkout.functions";
 import {
+  mergeSelectedMembersIntoRoster,
   quoteTrainingClass,
   trainingClassLabel,
+  trainingClassUnitCents,
   validateRosterRows,
   type TrainingClassRosterRow,
   type TrainingClassType,
@@ -49,27 +51,66 @@ export function ClassRosterDialog({
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<TrainingClassRosterRow[]>([emptyRow()]);
   const [busy, setBusy] = useState(false);
+  const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
+  const [memberQuery, setMemberQuery] = useState("");
 
-  const quote = useMemo(
-    () => quoteTrainingClass(trainingType, Math.max(1, rows.filter((r) => r.name || r.email).length || 1), billingExempt),
-    [trainingType, rows, billingExempt],
-  );
+  const listUnitCents = trainingClassUnitCents(trainingType);
   const filledCount = rows.filter((r) => r.name.trim() && r.email.trim() && r.phone.trim()).length;
   const liveQuote = quoteTrainingClass(trainingType, Math.max(1, filledCount), billingExempt);
+  const listTotalCents = listUnitCents * Math.max(1, filledCount);
+
+  const alreadyOnRoster = useMemo(() => {
+    const ids = new Set<string>();
+    for (const row of rows) {
+      if (row.staffUserId) ids.add(row.staffUserId);
+    }
+    return ids;
+  }, [rows]);
+
+  const filteredMembers = useMemo(() => {
+    const needle = memberQuery.trim().toLowerCase();
+    return members.filter((m) => {
+      if (!needle) return true;
+      return (
+        m.label.toLowerCase().includes(needle) ||
+        (m.email ?? "").toLowerCase().includes(needle)
+      );
+    });
+  }, [members, memberQuery]);
+
+  const selectableFiltered = filteredMembers.filter((m) => !alreadyOnRoster.has(m.id));
+  const allFilteredSelected =
+    selectableFiltered.length > 0 && selectableFiltered.every((m) => pickedIds.has(m.id));
 
   const updateRow = (idx: number, patch: Partial<TrainingClassRosterRow>) => {
     setRows((prev) => prev.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
   };
 
-  const pickMember = (idx: number, memberId: string) => {
-    const m = members.find((x) => x.id === memberId);
-    if (!m) return;
-    updateRow(idx, {
-      staffUserId: m.id,
-      name: m.label,
-      email: m.email ?? "",
-      phone: m.phone ?? "",
+  const togglePicked = (id: string, checked: boolean) => {
+    setPickedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
     });
+  };
+
+  const selectAllFiltered = () => {
+    setPickedIds((prev) => {
+      const next = new Set(prev);
+      if (allFilteredSelected) {
+        selectableFiltered.forEach((m) => next.delete(m.id));
+      } else {
+        selectableFiltered.forEach((m) => next.add(m.id));
+      }
+      return next;
+    });
+  };
+
+  const addSelected = () => {
+    if (pickedIds.size === 0) return;
+    setRows((prev) => mergeSelectedMembersIntoRoster(prev, members, [...pickedIds]));
+    setPickedIds(new Set());
   };
 
   const submit = async () => {
@@ -97,6 +138,7 @@ export function ClassRosterDialog({
         onSubmitted?.();
         setOpen(false);
         setRows([emptyRow()]);
+        setPickedIds(new Set());
         setBusy(false);
         return;
       }
@@ -115,9 +157,19 @@ export function ClassRosterDialog({
 
   const title = trainingClassLabel(trainingType);
   const isExternal = trainingType !== "thirty_day";
+  const seatLabel = (filledCount || 1) === 1 ? "seat" : "seats";
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) {
+          setPickedIds(new Set());
+          setMemberQuery("");
+        }
+      }}
+    >
       <DialogTrigger asChild>
         <Button className="w-full bg-[#1A2B47] text-white hover:bg-[#1A2B47]/90" data-testid={testId}>
           {triggerLabel}
@@ -134,9 +186,87 @@ export function ClassRosterDialog({
         </p>
         {billingExempt && (
           <p className="rounded-md border border-[#C8881E]/30 bg-[#FFF9EE] px-3 py-2 text-xs text-[#1A2B47]">
-            True North Supports is never charged. This roster still opens the obligations.
+            True North Supports is never charged. List price stays {formatUsdFromCents(listUnitCents)} / seat.
+            This roster still opens the obligations.
           </p>
         )}
+
+        {members.length > 0 && (
+          <div className="space-y-2 rounded-md border p-3" data-testid="training-roster-multiselect">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label className="text-xs">Add from team</Label>
+              <span className="text-xs text-muted-foreground">{pickedIds.size} selected</span>
+            </div>
+            <Input
+              value={memberQuery}
+              onChange={(e) => setMemberQuery(e.target.value)}
+              placeholder="Search staff…"
+              className="h-9"
+              data-testid="training-roster-staff-search"
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={selectAllFiltered}
+                disabled={selectableFiltered.length === 0}
+                data-testid="training-roster-select-all"
+              >
+                {allFilteredSelected ? "Clear" : "Select all"}
+              </Button>
+              {pickedIds.size > 0 && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setPickedIds(new Set())}>
+                  Clear
+                </Button>
+              )}
+              <Button
+                type="button"
+                size="sm"
+                className="bg-[#1A2B47] text-white hover:bg-[#1A2B47]/90"
+                onClick={addSelected}
+                disabled={pickedIds.size === 0}
+                data-testid="training-roster-add-selected"
+              >
+                Add selected ({pickedIds.size})
+              </Button>
+            </div>
+            <div className="max-h-48 space-y-1 overflow-y-auto rounded-md border bg-background p-1.5">
+              {filteredMembers.length === 0 ? (
+                <p className="px-1.5 py-2 text-xs text-muted-foreground">No staff match that search.</p>
+              ) : (
+                filteredMembers.map((m) => {
+                  const already = alreadyOnRoster.has(m.id);
+                  const checked = already || pickedIds.has(m.id);
+                  return (
+                    <label
+                      key={m.id}
+                      className={`flex min-h-[40px] items-center gap-2 rounded px-1.5 py-1 text-sm ${
+                        already ? "cursor-default opacity-60" : "cursor-pointer hover:bg-muted"
+                      }`}
+                    >
+                      <Checkbox
+                        checked={checked}
+                        disabled={already}
+                        onCheckedChange={(v) => togglePicked(m.id, v === true)}
+                        data-testid={`training-roster-staff-${m.id}`}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-medium text-[#1A2B47]">{m.label}</span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {m.email || "No email on file"}
+                          {m.phone ? ` · ${m.phone}` : ""}
+                          {already ? " · already on roster" : ""}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-3">
           {rows.map((row, idx) => (
             <div key={idx} className="space-y-2 rounded-md border p-3">
@@ -154,19 +284,6 @@ export function ClassRosterDialog({
                   </Button>
                 )}
               </div>
-              {members.length > 0 && (
-                <div>
-                  <Label className="text-xs">Fill from team</Label>
-                  <Select onValueChange={(v) => pickMember(idx, v)}>
-                    <SelectTrigger><SelectValue placeholder="Optional — pick a staff member" /></SelectTrigger>
-                    <SelectContent>
-                      {members.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
               <div>
                 <Label htmlFor={`roster-name-${idx}`}>Name</Label>
                 <Input
@@ -206,13 +323,18 @@ export function ClassRosterDialog({
           </Button>
         </div>
         <div className="flex items-baseline justify-between border-t pt-3 text-sm">
-          <span className="text-muted-foreground">
-            {filledCount || 1} seat{(filledCount || 1) === 1 ? "" : "s"} · {formatUsdFromCents(liveQuote.unitCents)} each
+          <span className="text-muted-foreground" data-testid="training-roster-list-price">
+            {filledCount || 1} {seatLabel} × {formatUsdFromCents(listUnitCents)}
           </span>
-          <span className="text-base font-semibold text-[#1A2B47]">
-            {billingExempt ? "$0" : formatUsdFromCents(liveQuote.totalCents)}
+          <span className="text-base font-semibold text-[#1A2B47]" data-testid="training-roster-total">
+            {billingExempt ? "True North $0" : formatUsdFromCents(liveQuote.totalCents)}
           </span>
         </div>
+        {billingExempt && (
+          <p className="text-xs text-muted-foreground">
+            List total {formatUsdFromCents(listTotalCents)} — True North is never charged.
+          </p>
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
           <Button
@@ -224,7 +346,6 @@ export function ClassRosterDialog({
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : billingExempt ? "Submit roster" : "Continue to payment"}
           </Button>
         </DialogFooter>
-        <p className="sr-only">{quote.totalCents}</p>
       </DialogContent>
     </Dialog>
   );

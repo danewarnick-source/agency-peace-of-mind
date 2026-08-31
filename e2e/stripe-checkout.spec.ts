@@ -60,6 +60,11 @@ test("c) training extra is skipped for exempt and charged for a paying org", asy
   await installStripeBillingMock(page, exempt);
   await page.goto("/dashboard/hive-training", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("hive-training-hub")).toBeVisible({ timeout: 25_000 });
+  await expect(page.getByTestId("training-price-full_program")).toContainText("$300");
+  await expect(page.getByTestId("training-price-cpr_first_aid")).toContainText("$100");
+  await expect(page.getByTestId("training-price-mandt")).toContainText("$200");
+  await expect(page.getByTestId("training-price-dspd_required")).toContainText("$75");
+  await expect(page.getByTestId("training-price-full_program")).toContainText(/True North \$0/);
   await page.getByTestId("training-buy-full_program").click();
   await expect(page.getByTestId("training-roster-name-0")).toBeVisible();
   await page.getByTestId("training-roster-name-0").fill("TNS Staff");
@@ -77,6 +82,8 @@ test("c) training extra is skipped for exempt and charged for a paying org", asy
   await page.goto("/dashboard/hive-training", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("hive-training-hub")).toBeVisible({ timeout: 25_000 });
   await expect(page.getByText(/CPR/i).first()).toBeVisible();
+  await expect(page.getByTestId("training-price-cpr_first_aid")).toContainText("$100");
+  await expect(page.getByTestId("training-price-cpr_first_aid")).not.toContainText(/True North \$0/);
   await page.getByTestId("training-buy-cpr_first_aid").click();
   await expect(page.getByTestId("training-roster-name-0")).toBeVisible();
   await page.getByTestId("training-roster-name-0").fill("Pay Staff");

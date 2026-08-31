@@ -6,7 +6,7 @@
  * Staff never buy. True North / billing-exempt is always $0.
  */
 
-import { TRAINING_PRICE_CENTS } from "./hive-pricing.ts";
+import { TRAINING_PRICE_CENTS, trainingPriceCentsForSku } from "./hive-pricing.ts";
 import { THIRTY_DAY_OBLIGATION_TITLE } from "./in-hive-training.ts";
 
 export const TRAINING_CLASS_TYPES = ["cpr_first_aid", "mandt", "thirty_day", "package"] as const;
@@ -52,11 +52,70 @@ export function trainingClassIsExternal(type: TrainingClassType): boolean {
   return type === "cpr_first_aid" || type === "mandt" || type === "package";
 }
 
+export function trainingClassSku(type: TrainingClassType): string {
+  if (type === "thirty_day") return "dspd_required";
+  if (type === "package") return "full_program";
+  return type;
+}
+
 export function trainingClassUnitCents(type: TrainingClassType): number {
   if (type === "cpr_first_aid") return TRAINING_PRICE_CENTS.cpr_first_aid;
   if (type === "mandt") return TRAINING_PRICE_CENTS.mandt;
   if (type === "thirty_day") return TRAINING_PRICE_CENTS.thirty_day;
   return TRAINING_PRICE_CENTS.full_program;
+}
+
+/** Locked list price. Known SKUs ignore stale catalog rows ($75 CPR, $100 30-day). */
+export function trainingClassUnitCentsFromCatalog(
+  type: TrainingClassType,
+  catalogPriceCents?: number | null,
+): number {
+  return trainingPriceCentsForSku(trainingClassSku(type), catalogPriceCents);
+}
+
+export type RosterMemberLite = {
+  id: string;
+  label: string;
+  email?: string | null;
+  phone?: string | null;
+};
+
+/** Add every selected team member in one pass. Skips people already on the roster. */
+export function mergeSelectedMembersIntoRoster(
+  rows: TrainingClassRosterRow[],
+  members: RosterMemberLite[],
+  selectedIds: string[],
+): TrainingClassRosterRow[] {
+  const byId = new Map(members.map((m) => [m.id, m]));
+  const existingStaff = new Set(
+    rows.map((r) => r.staffUserId?.trim()).filter((id): id is string => !!id),
+  );
+  const existingEmail = new Set(
+    rows.map((r) => normalizeRosterEmail(r.email)).filter((e) => e.length > 0),
+  );
+  const additions: TrainingClassRosterRow[] = [];
+  for (const id of selectedIds) {
+    const member = byId.get(id);
+    if (!member) continue;
+    const email = normalizeRosterEmail(member.email ?? "");
+    if (existingStaff.has(member.id)) continue;
+    if (email && existingEmail.has(email)) continue;
+    additions.push({
+      name: member.label.trim(),
+      email: (member.email ?? "").trim(),
+      phone: (member.phone ?? "").trim(),
+      staffUserId: member.id,
+    });
+    existingStaff.add(member.id);
+    if (email) existingEmail.add(email);
+  }
+  const kept = rows.filter(
+    (r) => r.name.trim() || r.email.trim() || r.phone.trim() || r.staffUserId,
+  );
+  if (kept.length === 0 && additions.length === 0) {
+    return [{ name: "", email: "", phone: "", staffUserId: null }];
+  }
+  return [...kept, ...additions];
 }
 
 export function quoteTrainingClass(

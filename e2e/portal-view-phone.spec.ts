@@ -137,3 +137,29 @@ test.describe("Portal View on a phone-sized viewport", () => {
     await shot(page, "staff_phone_tab_dailylogs_from_top");
   });
 });
+
+test.describe("Staff employee phone after login (React 310 path)", () => {
+  test.beforeEach(async ({ page }) => {
+    await installHiveMocks(page, { role: "employee" });
+    await page.addInitScript(() => {
+      try {
+        window.sessionStorage.setItem("hive.session-hint", "1");
+      } catch {
+        /* ignore */
+      }
+    });
+  });
+
+  test("dashboard shell survives spinner to staff chrome", async ({ page }) => {
+    await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+    await expect(page.getByText("Loading workspace…")).toHaveCount(0, { timeout: 40_000 });
+    await expect(page.getByText("Something went wrong in the dashboard shell")).toHaveCount(0);
+    await expect(page.getByText(/Minified React error #310/)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Open profile menu" })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.locator("[data-staff-top-bar]")).toHaveCount(1);
+    await expect(page.getByRole("button", { name: /Open NECTAR search/i })).toHaveCount(0);
+    await shot(page, "staff_employee_phone_after_login");
+  });
+});

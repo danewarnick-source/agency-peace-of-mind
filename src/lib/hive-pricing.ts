@@ -6,7 +6,8 @@
  *
  * Founding (first 5 paying orgs, 12 months, then list): $79 / staff, $299 minimum.
  *
- * Training is one-time per staff (Mandt name stays). True North / billing-exempt skip it.
+ * Training is one-time per staff (Mandt name stays): CPR $100, 30-day $75,
+ * Mandt $200, package $300. True North / billing-exempt skip it.
  */
 
 export type PricingSchedule = "list" | "founding";
@@ -28,9 +29,11 @@ export const FOUNDING_MINIMUM_CENTS = 29_900;
 
 export const TRAINING_PRICE_CENTS = {
   full_program: 30_000,
-  cpr_first_aid: 7_500,
+  cpr_first_aid: 10_000,
   mandt: 20_000,
-  dspd_required: 10_000,
+  thirty_day: 7_500,
+  /** Alias for the in-Hive 30-day course. Kept so leftover catalog SKUs still resolve. */
+  dspd_required: 7_500,
 } as const;
 
 /** Same include list the public /pricing training card already shows. */
@@ -44,21 +47,21 @@ export const PUBLIC_TRAINING_FULL_PROGRAM_INCLUDES = [
 ] as const;
 
 export type PublicTrainingAlaCarteItem = {
-  sku: "cpr_first_aid" | "mandt" | "dspd_required";
+  sku: "cpr_first_aid" | "mandt" | "thirty_day" | "dspd_required";
   name: string;
   priceCents: number;
   sub?: string;
 };
 
-/** Same three à la carte rows the public /pricing page already shows. */
+/** Locked à la carte rows. Package ($300) saves $75 vs $375. */
 export const PUBLIC_TRAINING_ALA_CARTE: readonly PublicTrainingAlaCarteItem[] = [
   { sku: "cpr_first_aid", name: "CPR / First Aid", priceCents: TRAINING_PRICE_CENTS.cpr_first_aid },
   { sku: "mandt", name: "Mandt", priceCents: TRAINING_PRICE_CENTS.mandt },
   {
-    sku: "dspd_required",
-    name: "DSPD required training",
-    priceCents: TRAINING_PRICE_CENTS.dspd_required,
-    sub: "Includes 12 hrs ongoing content / year",
+    sku: "thirty_day",
+    name: "30-day orientation",
+    priceCents: TRAINING_PRICE_CENTS.thirty_day,
+    sub: "In-Hive course from My Obligations",
   },
 ];
 
@@ -194,11 +197,18 @@ export function formatUsdFromCents(cents: number): string {
 }
 
 export function trainingPriceCentsForSku(sku: string, catalogPriceCents?: number | null): number {
-  const key = sku.trim().toLowerCase();
-  if (key === "full_program" || key === "full") return TRAINING_PRICE_CENTS.full_program;
+  const key = sku.trim().toLowerCase().replace(/-/g, "_");
+  if (key === "full_program" || key === "full" || key === "package") return TRAINING_PRICE_CENTS.full_program;
   if (key === "cpr_first_aid" || key === "cpr") return TRAINING_PRICE_CENTS.cpr_first_aid;
   if (key === "mandt") return TRAINING_PRICE_CENTS.mandt;
-  if (key === "dspd_required" || key === "dspd") return TRAINING_PRICE_CENTS.dspd_required;
+  if (
+    key === "thirty_day" ||
+    key === "orientation_30" ||
+    key === "dspd_required" ||
+    key === "dspd"
+  ) {
+    return TRAINING_PRICE_CENTS.thirty_day;
+  }
   const fallback = Math.floor(Number(catalogPriceCents) || 0);
   return fallback > 0 ? fallback : 0;
 }

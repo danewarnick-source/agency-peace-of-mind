@@ -87,6 +87,7 @@ export const EXEC_DOMAINS: ExecDomain[] = [
       { to: "/dashboard/hive-exec/messages", label: "Message Center", icon: Mail, capability: "support.manage" },
       { to: "/dashboard/hive-exec/nectar", label: "NECTAR", icon: Hexagon, capability: "steve.use" },
       { to: "/dashboard/hive-exec/training", label: "Training", icon: GraduationCap, capability: "training.manage" },
+      { to: "/dashboard/hive-exec/classes", label: "Classes", icon: GraduationCap, capability: "training.manage" },
     ],
   },
 ];

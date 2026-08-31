@@ -30,14 +30,20 @@ export const STRIPE_SANDBOX_PRICE_IDS = {
   seatList: "price_1U9EeRIQWMytpLnbNurGi0Vq",
   /** Hive seat founding, $79/mo, prod_V9XmH5qQO0TjHi */
   seatFounding: "price_1U9EgWIQWMytpLnbyBvs2f4L",
-  /** Full program $300 one-time, prod_V9Xn9njjImRO15 */
+  /** Full program / package $300 one-time, prod_V9Xn9njjImRO15 */
   trainingFull: "price_1U9EhyIQWMytpLnbg2nkCFd8",
-  /** CPR/First Aid $75, prod_V9XpZpdcbeJXye */
-  trainingCpr: "price_1U9EjNIQWMytpLnbPnfRb6Yz",
+  /**
+   * Stale sandbox CPR Price ID ($75). Do not use as a default — locked CPR is $100.
+   * Checkout uses price_data unless STRIPE_PRICE_TRAINING_CPR is set to a $100 price.
+   */
+  trainingCprStale75: "price_1U9EjNIQWMytpLnbPnfRb6Yz",
   /** Mandt $200, prod_V9XqoHqzqR8JaY */
   trainingMandt: "price_1U9EkmIQWMytpLnb2coYT0rn",
-  /** DSPD required $100, prod_V9Xr6M8IBuGzQK */
-  trainingDspd: "price_1U9Em5IQWMytpLnb2of9BFOj",
+  /**
+   * Stale sandbox DSPD Price ID ($100). Locked 30-day is $75.
+   * Checkout uses price_data unless STRIPE_PRICE_TRAINING_THIRTY_DAY is set.
+   */
+  trainingDspdStale100: "price_1U9Em5IQWMytpLnb2of9BFOj",
 } as const;
 
 export type StripePriceEnv = {
@@ -55,6 +61,7 @@ export type StripePriceEnv = {
   priceTrainingFull: string | null;
   priceTrainingCpr: string | null;
   priceTrainingMandt: string | null;
+  priceTrainingThirtyDay: string | null;
   priceTrainingDspd: string | null;
 };
 
@@ -81,12 +88,14 @@ export function readStripeEnv(env: NodeJS.Dict<string> = process.env): StripePri
       emptyToNull(env.STRIPE_PRICE_TRAINING_FULL) ??
       emptyToNull(env.STRIPE_PRICE_TRAINING) ??
       STRIPE_SANDBOX_PRICE_IDS.trainingFull,
-    priceTrainingCpr:
-      emptyToNull(env.STRIPE_PRICE_TRAINING_CPR) ?? STRIPE_SANDBOX_PRICE_IDS.trainingCpr,
+    // No stale $75 CPR default — use price_data at $100 unless Dane sets a new Price ID.
+    priceTrainingCpr: emptyToNull(env.STRIPE_PRICE_TRAINING_CPR),
     priceTrainingMandt:
       emptyToNull(env.STRIPE_PRICE_TRAINING_MANDT) ?? STRIPE_SANDBOX_PRICE_IDS.trainingMandt,
+    priceTrainingThirtyDay:
+      emptyToNull(env.STRIPE_PRICE_TRAINING_THIRTY_DAY) ?? emptyToNull(env.STRIPE_PRICE_TRAINING_DSPD),
     priceTrainingDspd:
-      emptyToNull(env.STRIPE_PRICE_TRAINING_DSPD) ?? STRIPE_SANDBOX_PRICE_IDS.trainingDspd,
+      emptyToNull(env.STRIPE_PRICE_TRAINING_THIRTY_DAY) ?? emptyToNull(env.STRIPE_PRICE_TRAINING_DSPD),
   };
 }
 
@@ -181,11 +190,13 @@ export function stripePriceIdForTrainingSku(
   env: StripePriceEnv = readStripeEnv(),
 ): string | null {
   if (typeof catalogPriceId === "string" && catalogPriceId.startsWith("price_")) return catalogPriceId;
-  const key = sku.trim().toLowerCase();
-  if (key === "full_program" || key === "full") return env.priceTrainingFull;
+  const key = sku.trim().toLowerCase().replace(/-/g, "_");
+  if (key === "full_program" || key === "full" || key === "package") return env.priceTrainingFull;
   if (key === "cpr_first_aid" || key === "cpr") return env.priceTrainingCpr;
   if (key === "mandt") return env.priceTrainingMandt;
-  if (key === "dspd_required" || key === "dspd") return env.priceTrainingDspd;
+  if (key === "thirty_day" || key === "orientation_30" || key === "dspd_required" || key === "dspd") {
+    return env.priceTrainingThirtyDay ?? env.priceTrainingDspd;
+  }
   return null;
 }
 

@@ -13,6 +13,7 @@ import {
 import { isBillingExempt, UNPAID_LOCK_REASON } from "@/lib/billing-access";
 import { mrrCentsForPlan } from "@/lib/stripe-config";
 import { fulfillTrainingOrder } from "@/lib/training-fulfillment.server";
+import { fulfillTrainingClass } from "@/lib/training-class-fulfillment.server";
 import { normalizeTierId } from "@/lib/hive-tiers";
 
 export type StripeLikeEvent = {
@@ -169,6 +170,25 @@ export async function handleVerifiedStripeEvent(event: StripeLikeEvent): Promise
     case "checkout.session.completed": {
       const hiveKind = meta.hive_kind ?? (obj.mode === "payment" && meta.catalog_id ? "training" : "subscription");
       const orgId = meta.organization_id || (await orgIdFromCustomer(customerId));
+      if (hiveKind === "training_class") {
+        if (!meta.class_id || !orgId) break;
+        await fulfillTrainingClass({
+          classId: meta.class_id,
+          organizationId: orgId,
+          stripeSessionId: asString(obj.id),
+          stripePaymentIntentId: asString(obj.payment_intent),
+          amountCents: typeof obj.amount_total === "number" ? obj.amount_total : 0,
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabaseAdmin as any).from("payment_events").insert({
+          org_id: orgId,
+          event_type: "payment_succeeded",
+          amount_cents: typeof obj.amount_total === "number" ? obj.amount_total : 0,
+          stripe_event_id: eventId,
+          metadata: { hive_kind: "training_class", class_id: meta.class_id },
+        });
+        break;
+      }
       if (hiveKind === "training") {
         if (!meta.hive_order_id || !meta.catalog_id || !orgId) break;
         await fulfillTrainingOrder({

@@ -237,9 +237,10 @@ describe("stripe-config", () => {
     assert.equal(env.priceStaffListMonthly, "price_1U9EeRIQWMytpLnbNurGi0Vq");
     assert.equal(env.priceStaffFoundingMonthly, "price_1U9EgWIQWMytpLnbyBvs2f4L");
     assert.equal(env.priceTrainingFull, "price_1U9EhyIQWMytpLnbg2nkCFd8");
-    assert.equal(env.priceTrainingCpr, "price_1U9EjNIQWMytpLnbPnfRb6Yz");
+    assert.equal(env.priceTrainingCpr, null);
     assert.equal(env.priceTrainingMandt, "price_1U9EkmIQWMytpLnb2coYT0rn");
-    assert.equal(env.priceTrainingDspd, "price_1U9Em5IQWMytpLnb2of9BFOj");
+    assert.equal(env.priceTrainingThirtyDay, null);
+    assert.equal(env.priceTrainingDspd, null);
   });
 
   it("STRIPE_PRICE_SEAT_LIST / STRIPE_PRICE_SEAT_FOUNDING override sandbox defaults", () => {

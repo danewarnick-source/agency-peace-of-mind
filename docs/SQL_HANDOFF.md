@@ -6,6 +6,57 @@ it worked before moving on.
 
 ---
 
+## ACTION — Training class rosters + locked prices (2026-08-31)
+
+**Do not run this until Dane approves the PR.** This is a new-table migration.
+It does **not** drop or truncate anything. It does **not** change True North
+client/PHI tables.
+
+**What this is for:** Admin submits one class roster (name, email, phone per
+staff) for CPR / Mandt / package / 30-day. Hive Executive gets one alert per
+external class and a Classes tab. Prices lock to CPR $100, 30-day $75, Mandt
+$200, package $300. True North stays $0 in app code even before this SQL runs.
+
+**Two new tables (RLS one table at a time):**
+
+1. `training_classes` — one row per admin submit. Org admins/managers can
+   read; only org **admin** (or Hive Executive) can insert. Exec can update
+   (mark class done).
+2. `training_class_roster` — staff name/email/phone on that class. Same
+   read/write rules. Staff do **not** read this table; they only see their
+   obligation.
+
+**Also updates leftover catalog prices** on `training_products` and, if it
+still exists, `hive_training_catalog`. No rows deleted.
+
+**Also widens `notifications.type`** so Hive Executive can get one inbox
+row (`hive_training_class`) per class. The Classes tab still works even
+if this constraint step is skipped.
+
+**To apply:** paste the full contents of
+`supabase/migrations/20260831060000_training_classes_and_locked_prices.sql`
+into Lovable’s SQL editor (clear the editor first) and run it.
+
+**What you'll see:** `Success. No rows returned` (or a small UPDATE count).
+
+**Confirm (paste this next, after clearing the editor):**
+
+```sql
+SELECT string_agg(table_name, ' | ' ORDER BY table_name) AS new_tables
+FROM information_schema.tables
+WHERE table_schema = 'public'
+  AND table_name IN ('training_classes', 'training_class_roster');
+
+SELECT string_agg(sku || '=' || price_cents::text, ' | ' ORDER BY sku) AS product_prices
+FROM public.training_products
+WHERE sku IN ('CPR_FIRST_AID', 'MANDT', 'ORIENTATION_30');
+```
+
+You want `training_classes | training_class_roster` and
+`CPR_FIRST_AID=10000 | MANDT=20000 | ORIENTATION_30=7500`.
+
+---
+
 ## ACTION — Stripe billing: founding vs list (2026-08-28)
 
 **What this is for:** Dane's confirmed prices. New agencies pay **per active staff**

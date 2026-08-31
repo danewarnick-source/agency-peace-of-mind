@@ -204,16 +204,17 @@ function serverFnPayload(world: BillingWorld, req: Request): unknown {
     if (world.billingExempt) return { url: null, exempt: true, error: null };
     return { url: "https://checkout.stripe.com/c/pay/cs_test_e2e", exempt: false, error: null };
   }
-  if (hay.includes("createtrainingcheckout")) {
+  if (hay.includes("createtrainingclasscheckout") || hay.includes("createtrainingcheckout")) {
     if (world.billingExempt) {
       world.trainingGranted = true;
       world.lastTrainingCharge = false;
-      return { url: null, granted: true, error: null };
+      return { url: null, granted: true, classId: "class-tns", error: null };
     }
     world.lastTrainingCharge = true;
     return {
       url: "https://checkout.stripe.com/c/pay/cs_test_training",
       granted: false,
+      classId: "class-pay",
       error: null,
     };
   }
@@ -265,6 +266,9 @@ function serverFnPayload(world: BillingWorld, req: Request): unknown {
     hay.includes("getmytrainingenrollments") ||
     hay.includes("gettrainingproducts") ||
     hay.includes("getorgtrainingpurchases") ||
+    hay.includes("getorgtrainingclasses") ||
+    hay.includes("listtrainingclasses") ||
+    hay.includes("listrecenttrainingclass") ||
     hay.includes("getrostertrainingstatus") ||
     hay.includes("getmyclienttraining")
   ) {
@@ -364,13 +368,16 @@ function restRows(world: BillingWorld, table: string): unknown[] {
         sku: "cpr_first_aid",
         name: "CPR & First Aid",
         kind: "ala_carte",
-        price_cents: 7500,
+        price_cents: 10000,
         currency: "usd",
         active: true,
         fulfills_course_ids: [],
         sort: 2,
       },
     ];
+  }
+  if (table === "training_classes" || table === "training_class_roster") {
+    return [];
   }
   if (table === "hive_training_orders" || table === "hive_training_seats" || table === "hive_training_assignments") {
     return world.trainingGranted ? [{ id: "ord-1", status: "paid", organization_id: ORG_ID }] : [];

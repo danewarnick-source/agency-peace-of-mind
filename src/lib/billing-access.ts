@@ -78,7 +78,7 @@ export function entitlementsForOrg(opts: {
 /**
  * Extra HIVE Training catalog purchases (one-time per staff).
  * - Comped orgs (True North, or Hive Exec exempt) never pay seats or training.
- * - Paying orgs are charged catalog amounts: full $300, CPR $75, Mandt $200, DSPD $100.
+ * - Paying orgs are charged locked amounts: package $300, CPR $100, Mandt $200, 30-day $75.
  * - Training is not included in the per-staff subscription.
  */
 export function trainingRequiresCharge(opts: {

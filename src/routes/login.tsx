@@ -186,7 +186,7 @@ function LoginPage() {
       <div className="flex w-full max-w-md flex-col items-center">
         <HiveWordmark to="/" tone="canvas" />
         <p className="mt-2 text-sm text-[var(--hive-text-muted)]">
-          Ops, training, and compliance, visible.
+          Utah DSPD · Community Supports Waiver.
         </p>
 
         <div className="mt-8 w-full rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)] p-7">
@@ -295,7 +295,7 @@ export function AuthShell({
       <div className="flex w-full max-w-md flex-col items-center">
         <HiveWordmark to="/" tone="canvas" />
         <p className="mt-2 text-sm text-[var(--hive-text-muted)]">
-          Ops, training, and compliance, visible.
+          Utah DSPD · Community Supports Waiver.
         </p>
         <div className="mt-8 w-full rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)] p-7">
           <div className="mb-7 text-center">

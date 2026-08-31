@@ -27,7 +27,7 @@ export function Footer() {
         </div>
         <div className="mt-12 flex flex-col items-start justify-between gap-2 border-t border-[var(--hive-border)] pt-6 text-xs text-[var(--hive-text-muted)] md:flex-row md:items-center">
           <p>© {new Date().getFullYear()} Hive. All rights reserved.</p>
-          <p>HIPAA · 21st Century Cures Act · SOC 2-aligned</p>
+          <p>HIPAA-aligned · Utah DSPD · Community Supports Waiver</p>
         </div>
       </div>
     </footer>

@@ -168,29 +168,35 @@ export function ClassRosterDialog({
                 </div>
               )}
               <div>
-                <Label>Name</Label>
+                <Label htmlFor={`roster-name-${idx}`}>Name</Label>
                 <Input
+                  id={`roster-name-${idx}`}
                   value={row.name}
                   onChange={(e) => updateRow(idx, { name: e.target.value })}
                   autoComplete="name"
+                  data-testid={`training-roster-name-${idx}`}
                 />
               </div>
               <div>
-                <Label>Email</Label>
+                <Label htmlFor={`roster-email-${idx}`}>Email</Label>
                 <Input
+                  id={`roster-email-${idx}`}
                   type="email"
                   value={row.email}
                   onChange={(e) => updateRow(idx, { email: e.target.value })}
                   autoComplete="email"
+                  data-testid={`training-roster-email-${idx}`}
                 />
               </div>
               <div>
-                <Label>Phone</Label>
+                <Label htmlFor={`roster-phone-${idx}`}>Phone</Label>
                 <Input
+                  id={`roster-phone-${idx}`}
                   type="tel"
                   value={row.phone}
                   onChange={(e) => updateRow(idx, { phone: e.target.value })}
                   autoComplete="tel"
+                  data-testid={`training-roster-phone-${idx}`}
                 />
               </div>
             </div>

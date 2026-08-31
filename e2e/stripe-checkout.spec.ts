@@ -61,9 +61,10 @@ test("c) training extra is skipped for exempt and charged for a paying org", asy
   await page.goto("/dashboard/hive-training", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("hive-training-hub")).toBeVisible({ timeout: 25_000 });
   await page.getByTestId("training-buy-full_program").click();
-  await page.getByLabel("Name").first().fill("TNS Staff");
-  await page.getByLabel("Email").first().fill("tns.staff@hive.test");
-  await page.getByLabel("Phone").first().fill("801-555-0100");
+  await expect(page.getByTestId("training-roster-name-0")).toBeVisible();
+  await page.getByTestId("training-roster-name-0").fill("TNS Staff");
+  await page.getByTestId("training-roster-email-0").fill("tns.staff@hive.test");
+  await page.getByTestId("training-roster-phone-0").fill("801-555-0100");
   await page.getByTestId("training-roster-submit").click();
   await expect(page).not.toHaveURL(/checkout\.stripe\.com/);
   await expect.poll(() => exempt.lastTrainingCharge === false || exempt.trainingGranted === true).toBeTruthy();
@@ -77,9 +78,10 @@ test("c) training extra is skipped for exempt and charged for a paying org", asy
   await expect(page.getByTestId("hive-training-hub")).toBeVisible({ timeout: 25_000 });
   await expect(page.getByText(/CPR/i).first()).toBeVisible();
   await page.getByTestId("training-buy-cpr_first_aid").click();
-  await page.getByLabel("Name").first().fill("Pay Staff");
-  await page.getByLabel("Email").first().fill("pay.staff@hive.test");
-  await page.getByLabel("Phone").first().fill("801-555-0199");
+  await expect(page.getByTestId("training-roster-name-0")).toBeVisible();
+  await page.getByTestId("training-roster-name-0").fill("Pay Staff");
+  await page.getByTestId("training-roster-email-0").fill("pay.staff@hive.test");
+  await page.getByTestId("training-roster-phone-0").fill("801-555-0199");
   await page.getByTestId("training-roster-submit").click();
   await expect.poll(() => paying.lastTrainingCharge === true).toBeTruthy();
 });

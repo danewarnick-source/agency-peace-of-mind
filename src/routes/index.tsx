@@ -12,7 +12,7 @@ import { Footer } from "@/components/landing/footer";
 import { FounderStory } from "@/components/landing/founder-story";
 import { HexBackdrop as HexBg } from "@/components/brand/hex-backdrop";
 import { HiveWordmark } from "@/components/brand/hive-mark";
-import { HeroPhone } from "@/components/landing/hero-phone";
+import { HeroPhonePortrait, HeroPhoneWide } from "@/components/landing/hero-phone";
 import {
   FrameAskNectar,
   FrameComplianceTraining,
@@ -57,6 +57,34 @@ const NAV_LINKS = [
   ["#documentation", "Documentation"],
   ["#scheduler", "Scheduler"],
 ] as const;
+
+function HeroCopy() {
+  return (
+    <>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--hive-gold)]">
+        Utah DSPD · Medicaid HCBS
+      </p>
+      <h1 className="font-display mt-3 text-4xl font-bold leading-[1.08] tracking-tight text-[var(--hive-text)] sm:text-5xl lg:text-[2.85rem] xl:text-[3.15rem]">
+        Finally, software that already speaks the Scope of Work.
+      </h1>
+      <p className="mt-6 max-w-xl text-lg leading-relaxed text-[var(--hive-text-muted)]">
+        Built for DSPD agencies on the Community Supports Waiver. The DHHS91172 obligations,
+        the forms, the codes. You do not spend year one teaching a national care app what SLH,
+        DSI, Host Home, and the Human Rights Committee are.
+      </p>
+      <div className="mt-8 flex flex-wrap gap-3">
+        <Button asChild size="lg">
+          <Link to="/signup">
+            Get started <ArrowRight className="h-4 w-4" />
+          </Link>
+        </Button>
+        <Button asChild size="lg" variant="outline">
+          <Link to="/login">Sign in</Link>
+        </Button>
+      </div>
+    </>
+  );
+}
 
 function HiveLandingPage() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -134,34 +162,24 @@ function HiveLandingPage() {
       </nav>
 
       <header className="relative overflow-hidden bg-[var(--hive-bg)]">
-        <Honeycomb />
-        <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 py-14 sm:px-6 lg:grid-cols-12 lg:gap-12 lg:px-8 lg:py-20">
-          <div className="lg:col-span-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--hive-gold)]">
-              Utah DSPD · Medicaid HCBS
-            </p>
-            <h1 className="font-display mt-3 text-4xl font-bold leading-[1.08] tracking-tight text-[var(--hive-text)] sm:text-5xl lg:text-[3.15rem]">
-              Finally, software that already speaks the Scope of Work.
-            </h1>
-            <p className="mt-6 max-w-xl text-lg leading-relaxed text-[var(--hive-text-muted)]">
-              Built for DSPD agencies on the Community Supports Waiver. The DHHS91172 obligations,
-              the forms, the codes. You do not spend year one teaching a national care app what SLH,
-              DSI, Host Home, and the Human Rights Committee are.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Button asChild size="lg">
-                <Link to="/signup">
-                  Get started <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link to="/login">Sign in</Link>
-              </Button>
+        <div className="relative hidden lg:block">
+          <HeroPhoneWide />
+          <div className="pointer-events-none absolute inset-0">
+            <div className="mx-auto flex h-full max-w-7xl items-center justify-end px-8">
+              <div className="pointer-events-auto w-[min(36rem,50%)]">
+                <HeroCopy />
+              </div>
             </div>
           </div>
+        </div>
 
-          <div className="lg:col-span-6">
-            <HeroPhone className="lg:translate-x-2 lg:-rotate-2" />
+        <div className="relative px-4 py-14 sm:px-6 lg:hidden">
+          <Honeycomb />
+          <div className="relative">
+            <HeroCopy />
+            <div className="mt-10">
+              <HeroPhonePortrait />
+            </div>
           </div>
         </div>
       </header>

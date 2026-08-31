@@ -29,6 +29,7 @@ import { getBillingStatusFn } from "@/lib/stripe-checkout.functions";
 import { getOrgTrainingClasses } from "@/lib/training-class.functions";
 import { trainingClassLabel, trainingClassSku, type TrainingClassType } from "@/lib/training-class";
 import { ClassCardUploadButtons } from "@/components/training/class-card-upload";
+import { InternalTrainingsPanel } from "@/components/training/internal-trainings-panel";
 import { FeatureLocked } from "@/components/feature-locked";
 import { useFeatureEnabled } from "@/hooks/use-feature-enabled";
 import { FeatureLockedRoute } from "@/components/upgrade-gate";
@@ -37,6 +38,7 @@ const searchSchema = z.object({
   checkout: z.enum(["success", "cancelled"]).optional(),
   session_id: z.string().optional(),
   card: z.enum(["saved", "cancelled"]).optional(),
+  tab: z.enum(["classes", "internal"]).optional(),
 }).partial();
 
 export const Route = createFileRoute("/dashboard/hive-training/")({
@@ -73,9 +75,11 @@ type Member = { id: string; label: string; email?: string | null; phone?: string
 function HiveTrainingHub() {
   const { data: org } = useCurrentOrg();
   const search = useSearch({ from: Route.id });
+  const navigate = useNavigate({ from: Route.id });
   const { view, hydrated } = usePortalView();
   const { hasAddon, loading: entLoading } = useEntitlements();
   const featureOn = useFeatureEnabled("hive_training");
+  const tab = search.tab === "internal" ? "internal" : "classes";
 
   const confirmFn = useServerFn(confirmCheckoutSessionFn);
   useEffect(() => {
@@ -96,19 +100,20 @@ function HiveTrainingHub() {
     );
   }
 
-  // Master Controller (org-level toggle) — same gate as the nav bubble.
-  if (!featureOn) {
-    return <FeatureLockedRoute featureKey="hive_training" />;
-  }
-
-  // Legacy paid add-on entitlement — separate gate for tier-locked access.
-  if (!hasAddon("hive_training")) {
-    return <FeatureLocked featureName="HIVE Training" />;
-  }
-
-
   const realIsAdmin = ["admin", "program_manager", "manager"].includes(org.role);
   const isAdmin = realIsAdmin && view !== "staff" && view !== "staff_mobile";
+
+  const setTab = (next: "classes" | "internal") => {
+    void navigate({
+      search: (prev) => ({ ...prev, tab: next === "classes" ? undefined : next }),
+    });
+  };
+
+  const classRosterLocked = !featureOn
+    ? <FeatureLockedRoute featureKey="hive_training" />
+    : !hasAddon("hive_training")
+      ? <FeatureLocked featureName="HIVE Training" />
+      : null;
 
   return (
     <div className="mx-auto max-w-6xl p-4 md:p-6 space-y-6" data-testid="hive-training-hub">
@@ -127,15 +132,39 @@ function HiveTrainingHub() {
           </div>
           <p className="text-sm text-muted-foreground">
             {isAdmin
-              ? "DSPD-aligned courses, competency sign-off, and verifiable certificates for your team."
+              ? "Class roster, locked seat prices, and internal agency trainings in one place."
               : "Your assigned trainings and certificates."}
           </p>
         </div>
       </header>
 
-      {isAdmin
-        ? <AdminView orgId={org.organization_id} />
-        : <StaffView />}
+      {isAdmin ? (
+        <>
+          <div className="inline-flex rounded-lg border bg-card p-1 text-sm" data-testid="training-subnav">
+            <button
+              type="button"
+              data-testid="training-subtab-classes"
+              className={`rounded-md px-3 py-1.5 ${tab === "classes" ? "bg-[#1A2B47] text-white" : "text-muted-foreground"}`}
+              onClick={() => setTab("classes")}
+            >
+              Class roster
+            </button>
+            <button
+              type="button"
+              data-testid="training-subtab-internal"
+              className={`rounded-md px-3 py-1.5 ${tab === "internal" ? "bg-[#1A2B47] text-white" : "text-muted-foreground"}`}
+              onClick={() => setTab("internal")}
+            >
+              Internal trainings
+            </button>
+          </div>
+          {tab === "internal"
+            ? <InternalTrainingsPanel orgId={org.organization_id} />
+            : (classRosterLocked ?? <AdminView orgId={org.organization_id} />)}
+        </>
+      ) : (
+        <StaffView />
+      )}
     </div>
   );
 }

@@ -267,6 +267,8 @@ function serverFnPayload(world: BillingWorld, req: Request): unknown {
     hay.includes("gettrainingproducts") ||
     hay.includes("getorgtrainingpurchases") ||
     hay.includes("getorgtrainingclasses") ||
+    hay.includes("listagencypolicies") ||
+    hay.includes("listpolicyjobcodeoptions") ||
     hay.includes("listtrainingclasses") ||
     hay.includes("listrecenttrainingclass") ||
     hay.includes("getrostertrainingstatus") ||

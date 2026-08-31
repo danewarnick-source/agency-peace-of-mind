@@ -44,7 +44,7 @@ export const TOUR_ANCHORS: TourAnchor[] = [
   { id: "nav.my-time-corrections", label: "My Time Corrections", route: "/dashboard/my-time-corrections", description: "Correction requests you sent to a supervisor.", surface: "staff" },
   { id: "nav.ask-nectar", label: "Ask NECTAR", route: "/dashboard/ask-nectar", description: "Ask NECTAR a staff question about your shift, caseload, or a form.", surface: "staff" },
   { id: "nav.courses", label: "My Obligations", route: "/dashboard/my-obligations", description: "Assigned trainings and forms — staff only complete what is already on My Obligations.", surface: "staff" },
-  { id: "nav.hive-training", label: "Training", route: "/dashboard/hive-training", description: "Admin class roster for CPR, Mandt, and the training package.", surface: "admin" },
+  { id: "nav.hive-training", label: "Training", route: "/dashboard/hive-training", description: "Admin class roster, locked seat prices, and Internal trainings (agency policy binder).", surface: "admin" },
 
   // Staff page CTAs
   { id: "staff.caseload", label: "Caseload list", route: "/dashboard", description: "The list of people assigned to you. Tap an HHS name for the daily note.", surface: "staff" },

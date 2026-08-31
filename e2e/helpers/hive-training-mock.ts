@@ -303,7 +303,12 @@ function serverFnPayload(world: HiveE2EWorld, req: Request): unknown {
     return { count: 0 };
   }
 
-  if (hay.includes("listcompanyobligations") || hay.includes("getincident")) {
+  if (
+    hay.includes("listcompanyobligations") ||
+    hay.includes("getincident") ||
+    hay.includes("listagencypolicies") ||
+    hay.includes("listpolicyjobcodeoptions")
+  ) {
     return [];
   }
 

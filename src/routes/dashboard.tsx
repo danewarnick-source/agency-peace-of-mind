@@ -58,7 +58,6 @@ import {
   Search,
   Archive,
   ClipboardList,
-  BookOpen,
 } from "lucide-react";
 import { useIsHiveExecutive } from "@/hooks/use-hive-executive";
 import { EXEC_NAV, EXEC_DOMAINS, COMMAND_CENTER_ITEM } from "@/lib/exec-nav";
@@ -81,7 +80,6 @@ import { OrgSwitcher, DemoBadge, DemoOrgBanner } from "@/components/org-switcher
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getInboxUnreadCount } from "@/lib/inbox-messages.functions";
-import { useEntitlements } from "@/hooks/use-entitlements";
 import { useOrgFeatures } from "@/hooks/use-feature-enabled";
 import {
   DASHBOARD_BOOT_TIMEOUT_MS,
@@ -225,7 +223,6 @@ const ADMIN_NAV: NavItem[] = [
   },
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck },
   { to: "/dashboard/company-obligations", label: "Compliance", icon: ClipboardList },
-  { to: "/dashboard/policies", label: "Policies", icon: BookOpen },
   { to: "/dashboard/summaries", label: "Summaries", icon: FileText },
   {
     to: "/dashboard/hub/finances",
@@ -238,7 +235,6 @@ const ADMIN_NAV: NavItem[] = [
     to: "/dashboard/hive-training",
     label: "Training",
     icon: GraduationCap,
-    feature: "hive_training",
   },
   {
     to: "/dashboard/state-audit",
@@ -468,14 +464,11 @@ function DashboardLayout() {
       : effectiveView === "admin"
         ? ADMIN_NAV
         : STAFF_NAV;
-  const { hasAddon } = useEntitlements();
-  const hiveTrainingEntitled = hasAddon("hive_training");
   const { isEnabled: isFeatureOn } = useOrgFeatures();
   const nav: NavItem[] = baseNav
     .filter((n) => !n.perm || can(n.perm) || role === "admin")
-    // Legacy add-on tier gate still applies to HIVE Training (paid entitlement).
-    .filter((n) => hiveTrainingEntitled || n.to !== "/dashboard/hive-training")
     // Master-Controller gating: keep item visible; mark isLocked when feature is OFF.
+    // Training stays visible without hive_training — Internal trainings replaced Policies.
     .map((n) => ({ ...n, isLocked: n.feature ? !isFeatureOn(n.feature) : false }));
 
   // Load states for the State portal dropdown (executives only).

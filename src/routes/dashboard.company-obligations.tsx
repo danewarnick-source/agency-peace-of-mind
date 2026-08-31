@@ -733,13 +733,13 @@ function PolicyLibraryTab() {
     <Card>
       <CardContent className="space-y-4 p-6">
         <p className="text-sm text-muted-foreground">
-          Your agency binder is Policies — add a handbook, pick who it applies to, and staff
-          finish it on My Obligations. State PDFs stay in Authoritative Sources for Nectar.
-          That shelf does not replace the binder.
+          Your agency binder is Internal trainings under Training — add a handbook, pick who it
+          applies to, and staff finish it on My Obligations. State PDFs stay in Authoritative
+          Sources for Nectar. That shelf does not replace the binder.
         </p>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => navigate({ to: "/dashboard/policies" })}>
-            <FolderOpen className="mr-1.5 h-4 w-4" /> Policies
+          <Button onClick={() => navigate({ to: "/dashboard/hive-training", search: { tab: "internal" } })}>
+            <FolderOpen className="mr-1.5 h-4 w-4" /> Internal trainings
           </Button>
           <Button variant="outline" onClick={() => navigate({ to: "/dashboard/authoritative-sources" })}>
             <Upload className="mr-1.5 h-4 w-4" /> Authoritative Sources

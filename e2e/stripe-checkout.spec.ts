@@ -65,6 +65,11 @@ test("c) training extra is skipped for exempt and charged for a paying org", asy
   await expect(page.getByTestId("training-price-mandt")).toContainText("$200");
   await expect(page.getByTestId("training-price-dspd_required")).toContainText("$75");
   await expect(page.getByTestId("training-price-full_program")).toContainText(/True North \$0/);
+  await expect(page.getByTestId("training-subtab-internal")).toBeVisible();
+  await page.getByTestId("training-subtab-internal").click();
+  await expect(page.getByTestId("internal-trainings-panel")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Internal trainings" })).toBeVisible();
+  await page.getByTestId("training-subtab-classes").click();
   await page.getByTestId("training-buy-full_program").click();
   await expect(page.getByTestId("training-roster-name-0")).toBeVisible();
   await expect(page.getByTestId("training-roster-multiselect")).toBeVisible();

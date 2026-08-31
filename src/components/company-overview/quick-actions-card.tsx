@@ -33,9 +33,9 @@ export function QuickActionsCard({
         <NectarButton
           variant="ghost"
           icon={<GraduationCap className="h-4 w-4" />}
-          onClick={() => navigate({ to: "/dashboard/courses" })}
+          onClick={() => navigate({ to: "/dashboard/hive-training" })}
         >
-          Assign a module
+          Submit a class roster
         </NectarButton>
         <NectarButton
           variant="ghost"

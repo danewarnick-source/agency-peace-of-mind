@@ -75,31 +75,23 @@ test("1. Admin can open Hive Training without crash", async ({ page }) => {
   expect(completionWrites(writes), "must not write live completions").toHaveLength(0);
 });
 
-test("2. Staff Hive Training list + assignment player render locked vs available", async ({
+test("2. Staff Hive Training shop is gone — staff land on My Obligations", async ({
   page,
 }) => {
   const writes: WriteAttempt[] = [];
   await openAs(page, { role: "employee", hasPassedLaunchpad: false }, writes);
 
   await page.goto("/dashboard/hive-training", { waitUntil: "domcontentloaded" });
-  const hub = visibleTestId(page, "hive-training-hub");
-  await expect(hub).toBeVisible({ timeout: 20_000 });
-  await expect(hub.getByRole("heading", { name: /Assigned trainings/i })).toBeVisible();
-  await expect(hub.getByText(/DSPD Provider Orientation/i)).toBeVisible();
-  await expect(hub.getByText(/In progress/i).first()).toBeVisible();
-  await expect(hub.getByRole("button", { name: /Continue/i })).toBeVisible();
-  await shot(page, "02-hive-training-staff-list");
+  await page.waitForURL(/\/dashboard\/my-obligations/, { timeout: 20_000 });
+  await expect(page.getByText(/My Obligations/i).first()).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(/Training Catalog/i);
+  await shot(page, "02-hive-training-staff-redirect");
 
   await page.goto(`/dashboard/hive-training/course/${IDS.assignment}`, {
     waitUntil: "domcontentloaded",
   });
-  const player = visibleTestId(page, "hive-training-player");
-  await expect(player).toBeVisible({ timeout: 20_000 });
-  await expect(player.getByText(/Welcome to Launchpad/i)).toBeVisible();
-  await expect(player.getByText(/Competency check/i)).toBeVisible();
-  await expect(player.getByRole("button", { name: /Mark complete/i }).first()).toBeVisible();
-  await shot(page, "02b-hive-training-player");
-  // Do not click Mark complete — that would be a fake completion.
+  await page.waitForURL(/\/dashboard\/my-obligations/, { timeout: 20_000 });
+  await shot(page, "02b-hive-training-player-redirect");
 
   expect(completionWrites(writes)).toHaveLength(0);
 });
@@ -170,60 +162,53 @@ test("5. Admin roster shows who has / has not passed Launchpad", async ({ page }
   expect(completionWrites(writes)).toHaveLength(0);
 });
 
-test("6. Training catalog, courses, public /training, and core list do not crash", async ({
+test("6. Leftover catalog and LMS shop pages redirect; public /training has no seat shop", async ({
   page,
 }) => {
   const writes: WriteAttempt[] = [];
   await openAs(page, { role: "admin", hasPassedLaunchpad: true }, writes);
 
   await page.goto("/training", { waitUntil: "domcontentloaded" });
-  await expect(page.getByText(/HIVE Training|Certifications|Staff Training/i).first()).toBeVisible({
+  await expect(page.getByText(/Hive Training|Staff training lives inside Hive/i).first()).toBeVisible({
     timeout: 15_000,
   });
+  await expect(page.locator("body")).not.toContainText(/Buy seats|à la carte|Full training program/i);
   await expect(page.locator("body")).not.toContainText(/something went wrong/i);
   await shot(page, "06-public-training");
 
   await page.goto("/dashboard/training", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("body")).not.toContainText(/something went wrong/i);
+  await page.waitForURL(/\/dashboard\/my-obligations/, { timeout: 15_000 });
   await shot(page, "06b-dashboard-training");
 
   await page.goto("/dashboard/training/catalog", { waitUntil: "domcontentloaded" });
-  await expect(page.getByText(/Training Catalog|HIVE Training/i).first()).toBeVisible({
-    timeout: 15_000,
-  });
-  await expect(page.locator("body")).not.toContainText(/something went wrong/i);
+  await page.waitForURL(/\/dashboard\/hive-training/, { timeout: 15_000 });
+  await expect(page.getByTestId("hive-training-hub")).toBeVisible({ timeout: 15_000 });
   await shot(page, "06c-training-catalog");
 
   await page.goto("/dashboard/courses", { waitUntil: "domcontentloaded" });
-  await expect(page.getByText(/My Trainings|30 Day Core Training/i).first()).toBeVisible({
-    timeout: 15_000,
-  });
+  await page.waitForURL(/\/dashboard\/my-obligations/, { timeout: 15_000 });
+  await expect(page.getByText(/My Obligations/i).first()).toBeVisible();
   await shot(page, "06d-courses");
 
   await page.goto("/dashboard/courses/core", { waitUntil: "domcontentloaded" });
-  await expect(page.getByTestId("core-training-list")).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByTestId("core-topic-seizure_disorders")).toHaveAttribute(
-    "data-status",
-    "completed",
-  );
-  await expect(page.getByTestId("core-topic-agency_policies")).toHaveAttribute(
-    "data-status",
-    "not_started",
-  );
+  await page.waitForURL(/\/dashboard\/my-obligations/, { timeout: 15_000 });
   await shot(page, "06e-courses-core");
 
   await page.goto(`/dashboard/courses/topic/${IDS.topicReady}`, {
     waitUntil: "domcontentloaded",
   });
-  await expect(page.locator("body")).not.toContainText(/something went wrong/i);
+  await page.waitForURL(/\/dashboard\/my-obligations/, { timeout: 15_000 });
   await shot(page, "06f-topic-player");
-  // Review-only — do not click Sign & Complete.
 
   await page.goto(`/dashboard/training/${IDS.trainingModule}`, {
     waitUntil: "domcontentloaded",
   });
-  await expect(page.locator("body")).not.toContainText(/something went wrong/i);
+  await page.waitForURL(/\/dashboard\/my-obligations/, { timeout: 15_000 });
   await shot(page, "06g-training-module");
+
+  await page.goto("/dashboard/programs", { waitUntil: "domcontentloaded" });
+  await page.waitForURL(/\/dashboard\/my-obligations/, { timeout: 15_000 });
+  await shot(page, "06h-programs");
 
   expect(
     writes.filter((w) => w.table === "training_completions" || w.table === "hive_training_certificates"),

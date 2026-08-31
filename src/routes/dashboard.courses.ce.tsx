@@ -269,7 +269,7 @@ function ContinuingEducation() {
 
 function BackLink() {
   return (
-    <Link to="/dashboard/courses" className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground">
+    <Link to="/dashboard/my-obligations" className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground">
       <ChevronLeft className="h-3 w-3" /> Back to Training
     </Link>
   );

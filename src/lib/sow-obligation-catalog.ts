@@ -577,7 +577,7 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     category: "client_docs",
     fulfillment: "in_hive",
     fulfillment_note:
-      "One instance per staff+client assignment, due 30 days after assignment. Complete the linked form in HIVE. Support Strategies should be published before this is marked complete.",
+      "One instance per staff+client assignment, due 30 days after assignment. Staff open this from My Obligations and complete the existing client-specific form (attest). Not a scenario course.",
     due_rule: { kind: "days_after_assignment", days: 30 },
     owner: "staff",
     service_codes: [],
@@ -590,11 +590,24 @@ const SOW_ENTRIES: SowCatalogEntry[] = [
     category: "client_docs",
     fulfillment: "in_hive",
     fulfillment_note:
-      "Develop Support Strategies for each PCSP goal and submit to the Support Coordinator within 30 days of PCSP activation. Log a new event when a PCSP is activated or renewed. BSP / Medical Care Plan substitute for BC and nursing clients.",
+      "Staff open this from My Obligations and complete the existing support strategies form (attest) after it is published for that client. Due 30 days after the plan is activated.",
     due_rule: { kind: "days_after_event", days: 30 },
     owner: "manager",
     service_codes: [],
     evidence_standard: "Support Strategies submitted to the SC within 30 days of PCSP activation.",
+  },
+  {
+    title: "Person-Centered Thinking — [Client Name]",
+    citation: "DHHS91172 SOW §1.8(5)(C)",
+    category: "client_docs",
+    fulfillment: "in_hive",
+    fulfillment_note:
+      "One instance per staff+client assignment. Staff open this from My Obligations and complete the existing person-centered thinking form with the client. Separate from the hire-level Person-Centered Thinking and Practices course.",
+    due_rule: { kind: "days_after_assignment", days: 30 },
+    owner: "staff",
+    service_codes: [],
+    evidence_standard:
+      "Completed person-centered thinking profile for the assigned client, attested by the staff member.",
   },
 
   // ── Standing duties (seeded on first register open + SQL handoff) ────────

@@ -591,6 +591,7 @@ export const DSPD_AUDIT_ITEMS: AuditItem[] = [
     obligation_titles: [
       "30-Day New Hire Orientation Training",
       "Client-Specific Training — [Client Name]",
+      "Person-Centered Thinking — [Client Name]",
     ],
     fulfillment: "in_hive",
     note: "One-time hire requirement. Person-specific training (O) is a separate instance per staff+client assignment, due 30 days after assignment.",

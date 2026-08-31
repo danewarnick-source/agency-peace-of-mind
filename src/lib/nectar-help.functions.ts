@@ -49,7 +49,7 @@ STAFF AREA (employee/host_family):
 - /dashboard                 — My Caseload.
 - /dashboard/timeclock       — General Time Clock.
 - /dashboard/daily-logs      — Daily logs and host-home daily workflow.
-- /dashboard/courses         — My Trainings.
+- /dashboard/my-obligations  — Assigned trainings and forms (staff complete only what is listed here).
 
 ROLE RULES: Staff & host-family NEVER see billing rates, dollar amounts, the 520 view, or other clients' data.`;
 

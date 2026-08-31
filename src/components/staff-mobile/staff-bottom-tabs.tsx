@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, CalendarDays, ClipboardCheck, GraduationCap, Sparkles, Lock, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, CalendarDays, ClipboardCheck, Sparkles, Lock, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { UpgradeGate } from "@/components/upgrade-gate";
 import { useOrgFeatures } from "@/hooks/use-feature-enabled";
@@ -21,7 +21,6 @@ const TABS: StaffTab[] = [
   { to: "/dashboard/daily-logs", label: "Daily Logs", icon: ClipboardCheck, exact: false, code: "logs" },
   { to: "/dashboard/ask-nectar", label: "Ask NECTAR", icon: Sparkles, exact: false, code: "nectar", feature: "nectar" },
   { to: "/dashboard/my-obligations", label: "Obligations", icon: ClipboardCheck, exact: false, code: "obligations" },
-  { to: "/dashboard/courses", label: "Trainings", icon: GraduationCap, exact: false, code: "courses", feature: "staff_onboarding" },
 ];
 
 export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {

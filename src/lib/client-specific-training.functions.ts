@@ -3,6 +3,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { CLIENT_FORM_LABEL, clientFormKindForTitle } from "@/lib/client-form-obligations";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -1465,8 +1466,92 @@ export const completeClientSpecificTraining = createServerFn({ method: "POST" })
       if (iErr) throw new Error(iErr.message);
     }
 
+    await closeMatchingClientFormObligations(
+      supabase,
+      m.organization_id,
+      userId,
+      data.clientId,
+      trainingType,
+      tc.id as string,
+    );
+
     return { ok: true, completionId: tc.id, requirementId, contentHash: hash };
   });
+
+/** Reuse existing obligation instances — do not invent a new assignment path. */
+async function closeMatchingClientFormObligations(
+  supabase: AnySupabase,
+  organizationId: string,
+  staffId: string,
+  clientId: string,
+  trainingType: "person_specific" | "support_strategies" | "person_centered",
+  trainingCompletionId: string,
+): Promise<void> {
+  const { data: obligations, error: oErr } = await supabase
+    .from("company_obligations")
+    .select("id, title")
+    .eq("organization_id", organizationId)
+    .eq("active", true);
+  if (oErr) throw new Error(oErr.message);
+  const matchingIds = ((obligations ?? []) as Array<{ id: string; title: string }>)
+    .filter((o) => clientFormKindForTitle(o.title) === trainingType)
+    .map((o) => o.id);
+  if (!matchingIds.length) return;
+
+  const { data: instances, error: iErr } = await supabase
+    .from("company_obligation_instances")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("client_id", clientId)
+    .eq("assignee_staff_id", staffId)
+    .in("obligation_id", matchingIds)
+    .in("status", ["pending", "overdue"]);
+  if (iErr) throw new Error(iErr.message);
+  const open = (instances ?? []) as Array<{ id: string }>;
+  if (!open.length) return;
+
+  const { data: dir } = await supabase
+    .from("org_member_directory")
+    .select("full_name")
+    .eq("id", staffId)
+    .maybeSingle();
+  const staffName = (dir?.full_name as string | null) ?? "Unknown";
+  const nowIso = new Date().toISOString();
+
+  for (const inst of open) {
+    const { data: existing } = await supabase
+      .from("company_obligation_completions")
+      .select("id")
+      .eq("instance_id", inst.id)
+      .eq("staff_id", staffId)
+      .maybeSingle();
+    if (!existing) {
+      const { error: cErr } = await supabase.from("company_obligation_completions").insert({
+        instance_id: inst.id,
+        organization_id: organizationId,
+        staff_id: staffId,
+        staff_name: staffName,
+        evidence_type_used: "form",
+        form_submission_id: null,
+        notes: `client-form:${trainingType}:${trainingCompletionId}`,
+        completed_at: nowIso,
+      });
+      if (cErr && (cErr as { code?: string }).code !== "23505") throw new Error(cErr.message);
+    }
+    const { error: upErr } = await supabase
+      .from("company_obligation_instances")
+      .update({
+        status: "completed",
+        completed_at: nowIso,
+        completed_by_id: staffId,
+        completed_by_name: staffName,
+        evidence_type_used: "form",
+      })
+      .eq("id", inst.id)
+      .in("status", ["pending", "overdue"]);
+    if (upErr) throw new Error(upErr.message);
+  }
+}
 
 // ── STAFF/ADMIN: list assigned clients with per-training completion status ──
 // Used by the staff training hub to show "Start" / "Completed" links.
@@ -1548,12 +1633,7 @@ export const getMyClientTrainingStatuses = createServerFn({ method: "GET" })
         clientName: clientMap[cid] ?? cid,
         trainings: (["person_specific", "support_strategies", "person_centered"] as const).map((type) => {
           const t = ct[type];
-          const label =
-            type === "person_specific"
-              ? "Person-specific"
-              : type === "support_strategies"
-                ? "Support strategies"
-                : "Person-Centered Thinking";
+          const label = CLIENT_FORM_LABEL[type];
           if (!t) return { type, label, setupStatus: "not_setup" as const, completionStatus: "not_started" as const, completedAt: null as string | null };
           if (t.status !== "published") return { type, label, setupStatus: "draft" as const, completionStatus: "not_started" as const, completedAt: null as string | null };
           const completedAt = completionMap[t.id] ?? null;

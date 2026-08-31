@@ -104,7 +104,7 @@ export function AttentionStrip() {
     const safety = other.safety_critical_open_count > 0;
     chips.push({
       key: "other",
-      to: "/dashboard/courses/other",
+      to: "/dashboard/my-obligations",
       icon: safety ? AlertTriangle : BookOpen,
       tone: safety ? "danger" : "warn",
       label: safety
@@ -140,7 +140,7 @@ export function AttentionStrip() {
     if (clientsWithDue > 0) {
       chips.push({
         key: "client-training-due",
-        to: "/dashboard/my-client-trainings",
+        to: "/dashboard/my-obligations",
         icon: GraduationCap,
         tone: "warn",
         label: `${totalDue} training${totalDue === 1 ? "" : "s"} due`,

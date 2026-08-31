@@ -23,6 +23,13 @@ import { dueLabel } from "@/components/company-obligations/my-obligations-widget
 import { StaffPageHeader } from "@/components/staff-mobile/staff-page-header";
 import { IN_HIVE_COURSE_EVIDENCE, inHiveCourseIdForTitle } from "@/lib/in-hive-training";
 import { hasAnyInHiveProgress } from "@/lib/in-hive-training.functions";
+import {
+  CLIENT_FORM_LABEL,
+  clientFormKindForTitle,
+  clientFormTitleForKind,
+  type ClientFormKind,
+} from "@/lib/client-form-obligations";
+import { getMyClientTrainingStatuses } from "@/lib/client-specific-training.functions";
 
 function courseTopicCodes(courseId: "thirty-day" | "abi"): string[] {
   return courseId === "thirty-day"
@@ -129,6 +136,18 @@ function CompletedCard({
             >
               Open course / exam export <ExternalLink className="h-3 w-3" />
             </Link>
+          ) : clientFormKindForTitle(ob.title) && instance.client_id ? (
+            <Link
+              to="/dashboard/client-training/$clientId"
+              params={{ clientId: instance.client_id }}
+              search={{
+                trainingType: clientFormKindForTitle(ob.title)!,
+                obligation_instance: instance.id,
+              }}
+              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[var(--hive-ink)] hover:underline"
+            >
+              View form <ExternalLink className="h-3 w-3" />
+            </Link>
           ) : evidenceUsed === "form" && isFormUuid(ob.linked_form_id) ? (
             <a
               href={`/dashboard/forms/${ob.linked_form_id}/submissions`}
@@ -212,6 +231,7 @@ function OpenCard({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const courseId = inHiveCourseIdForTitle(ob.title);
+  const formKind = clientFormKindForTitle(ob.title);
   const { user } = useAuth();
   const resumeQ = useQuery({
     queryKey: ["in-hive-resume", user?.id, courseId],
@@ -342,6 +362,23 @@ function OpenCard({
               </Button>
             </Link>
           </div>
+        ) : formKind && instance.client_id ? (
+          <div className="rounded-lg border border-border bg-muted/30 p-3">
+            <p className="text-sm font-medium">Form</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Open and complete this form from here. Your existing attestation is saved to this
+              obligation.
+            </p>
+            <Link
+              to="/dashboard/client-training/$clientId"
+              params={{ clientId: instance.client_id }}
+              search={{ trainingType: formKind, obligation_instance: instance.id }}
+            >
+              <Button size="sm" className="mt-2 min-h-[44px]">
+                Open and complete form
+              </Button>
+            </Link>
+          </div>
         ) : ob.evidence_type === "form" ? (
           <div className="rounded-lg border border-border bg-muted/30 p-3">
             <p className="text-sm font-medium">Linked form required</p>
@@ -439,6 +476,50 @@ function OpenCard({
   );
 }
 
+function OverlayClientFormCard({
+  row,
+}: {
+  row: {
+    clientId: string;
+    clientName: string;
+    kind: ClientFormKind;
+    completedAt: string | null;
+    done: boolean;
+  };
+}) {
+  const title = clientFormTitleForKind(row.kind).replace(
+    "[Client Name]",
+    toDisplayNameCase(row.clientName),
+  );
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <p className="font-semibold">{title}</p>
+      <p className="text-xs text-muted-foreground">{CLIENT_FORM_LABEL[row.kind]}</p>
+      {row.done ? (
+        <p className="mt-1 text-sm font-medium text-success">
+          Submitted {formatDateTime(row.completedAt)}
+        </p>
+      ) : (
+        <div className="mt-3 rounded-lg border border-border bg-muted/30 p-3">
+          <p className="text-sm font-medium">Form</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Open and complete this form. Completing it records your attestation.
+          </p>
+          <Link
+            to="/dashboard/client-training/$clientId"
+            params={{ clientId: row.clientId }}
+            search={{ trainingType: row.kind }}
+          >
+            <Button size="sm" className="mt-2 min-h-[44px]">
+              Open and complete form
+            </Button>
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MyObligationsPage() {
   const { user } = useAuth();
   const { data: org } = useCurrentOrg();
@@ -446,6 +527,7 @@ function MyObligationsPage() {
   const qc = useQueryClient();
   const listFn = useServerFn(listMyObligationInstances);
   const checkFn = useServerFn(checkAndMarkOverdue);
+  const clientTrainingsFn = useServerFn(getMyClientTrainingStatuses);
 
   useEffect(() => {
     if (orgId) checkFn({ data: { organizationId: orgId } });
@@ -456,6 +538,13 @@ function MyObligationsPage() {
     queryKey: ["my-obligation-instances", orgId, user?.id],
     enabled: !!orgId && !!user,
     queryFn: () => listFn({ data: { organizationId: orgId! } }),
+  });
+
+  const { data: clientTrainings } = useQuery({
+    queryKey: ["my-client-training-statuses", user?.id],
+    enabled: !!user,
+    queryFn: () => clientTrainingsFn(),
+    staleTime: 60_000,
   });
 
   const instanceIds = useMemo(() => instances.map((i) => i.id), [instances]);
@@ -488,17 +577,35 @@ function MyObligationsPage() {
   const isPendingReview = (instId: string) =>
     completionByInstance.get(instId)?.nectar_validation_status === "failed";
 
-  const { open, completed, unlinkedFormCount } = useMemo(() => {
+  const formDoneByClientKind = useMemo(() => {
+    const done = new Set<string>();
+    for (const item of clientTrainings?.items ?? []) {
+      for (const t of item.trainings ?? []) {
+        if (t.setupStatus === "published" && t.completionStatus === "completed") {
+          done.add(`${item.clientId}:${t.type}`);
+        }
+      }
+    }
+    return done;
+  }, [clientTrainings]);
+
+  const { open, completed, unlinkedFormCount, overlayOpen } = useMemo(() => {
     const open: MyObligationInstanceRow[] = [];
     const completed: MyObligationInstanceRow[] = [];
     let unlinkedFormCount = 0;
+    const covered = new Set<string>();
     for (const inst of instances) {
+      const kind = clientFormKindForTitle(inst.obligation.title);
+      if (kind && inst.client_id) covered.add(`${inst.client_id}:${kind}`);
       const hasCompletion = completionByInstance.has(inst.id);
       const failedValidation =
         completionByInstance.get(inst.id)?.nectar_validation_status === "failed";
+      const formAlreadyDone =
+        !!kind && !!inst.client_id && formDoneByClientKind.has(`${inst.client_id}:${kind}`);
       const iCompleted =
         inst.status === "completed" ||
         inst.status === "waived" ||
+        formAlreadyDone ||
         (hasCompletion && !failedValidation);
       if (iCompleted) {
         completed.push(inst);
@@ -512,18 +619,46 @@ function MyObligationsPage() {
     }
     open.sort((a, b) => new Date(a.due_at).getTime() - new Date(b.due_at).getTime());
     completed.sort((a, b) => new Date(b.due_at).getTime() - new Date(a.due_at).getTime());
-    return { open, completed, unlinkedFormCount };
-  }, [instances, completionByInstance]);
 
+    const overlayOpen: Array<{
+      clientId: string;
+      clientName: string;
+      kind: ClientFormKind;
+      completedAt: string | null;
+      done: boolean;
+    }> = [];
+    for (const item of clientTrainings?.items ?? []) {
+      for (const t of item.trainings ?? []) {
+        if (t.setupStatus !== "published") continue;
+        const key = `${item.clientId}:${t.type}`;
+        if (covered.has(key)) continue;
+        overlayOpen.push({
+          clientId: item.clientId,
+          clientName: item.clientName,
+          kind: t.type as ClientFormKind,
+          completedAt: t.completedAt ?? null,
+          done: t.completionStatus === "completed",
+        });
+      }
+    }
+    return { open, completed, unlinkedFormCount, overlayOpen };
+  }, [instances, completionByInstance, clientTrainings, formDoneByClientKind]);
+
+  const overlayDue = overlayOpen.filter((o) => !o.done);
+  const overlayDone = overlayOpen.filter((o) => o.done);
   const dueSoon = open.filter((i) => !dueLabel(i.due_at).overdue);
   const overdue = open.filter((i) => dueLabel(i.due_at).overdue);
+  const openCount = open.length + overlayDue.length;
+  const completedCount = completed.length + overlayDone.length;
 
   const shown =
     tab === "all" ? open : tab === "due_soon" ? dueSoon : tab === "overdue" ? overdue : completed;
+  const shownOverlay = tab === "completed" ? overlayDone : tab === "overdue" ? [] : overlayDue;
 
   const onCompleted = () => {
     qc.invalidateQueries({ queryKey: ["my-obligation-instances"] });
     qc.invalidateQueries({ queryKey: ["my-obligation-completions"] });
+    qc.invalidateQueries({ queryKey: ["my-client-training-statuses"] });
   };
 
   return (
@@ -538,10 +673,10 @@ function MyObligationsPage() {
       <div className="flex flex-wrap gap-1.5 rounded-lg border border-border p-1">
         {(
           [
-            ["all", `All (${open.length})`],
-            ["due_soon", `Due soon (${dueSoon.length})`],
+            ["all", `All (${openCount})`],
+            ["due_soon", `Due soon (${dueSoon.length + overlayDue.length})`],
             ["overdue", `Overdue (${overdue.length})`],
-            ["completed", `Completed (${completed.length})`],
+            ["completed", `Completed (${completedCount})`],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -565,11 +700,11 @@ function MyObligationsPage() {
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : instances.length === 0 ? (
+      ) : instances.length === 0 && overlayOpen.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
           No obligations assigned yet. Check with your administrator.
         </div>
-      ) : shown.length === 0 ? (
+      ) : shown.length === 0 && shownOverlay.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
           {unlinkedFormCount > 0 ? "No duties you can complete yet." : "Nothing here."}
         </div>
@@ -586,10 +721,16 @@ function MyObligationsPage() {
                   />
                 );
               }
+              const formKind = clientFormKindForTitle(inst.obligation.title);
+              const formAlreadyDone =
+                !!formKind &&
+                !!inst.client_id &&
+                formDoneByClientKind.has(`${inst.client_id}:${formKind}`);
               if (
                 tab === "completed" ||
                 inst.status === "completed" ||
                 inst.status === "waived" ||
+                formAlreadyDone ||
                 completionByInstance.has(inst.id)
               ) {
                 return (
@@ -607,7 +748,7 @@ function MyObligationsPage() {
 
             // Group scope='staff_per_client' instances (e.g. multiple
             // client-specific trainings) by client name so staff see all
-            // their per-client obligations for one Person together.
+            // their per-client obligations for one client together.
             type Group = {
               key: string;
               clientLabel: string | null;
@@ -633,20 +774,29 @@ function MyObligationsPage() {
               }
             }
 
-            return groups.map((g, i) =>
-              g.clientLabel ? (
-                <div
-                  key={g.key}
-                  className={`space-y-2.5 ${i > 0 ? "border-t border-border pt-4" : ""}`}
-                >
-                  <p className="px-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {g.clientLabel}
-                  </p>
-                  <div className="grid w-full gap-3">{g.items.map(renderCard)}</div>
-                </div>
-              ) : (
-                g.items.map(renderCard)
-              ),
+            const overlayCards = shownOverlay.map((row) => (
+              <OverlayClientFormCard key={`${row.clientId}:${row.kind}`} row={row} />
+            ));
+
+            return (
+              <>
+                {groups.map((g, i) =>
+                  g.clientLabel ? (
+                    <div
+                      key={g.key}
+                      className={`space-y-2.5 ${i > 0 ? "border-t border-border pt-4" : ""}`}
+                    >
+                      <p className="px-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {g.clientLabel}
+                      </p>
+                      <div className="grid w-full gap-3">{g.items.map(renderCard)}</div>
+                    </div>
+                  ) : (
+                    g.items.map(renderCard)
+                  ),
+                )}
+                {overlayCards}
+              </>
             );
           })()}
         </div>

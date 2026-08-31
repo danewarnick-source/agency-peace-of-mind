@@ -2,14 +2,14 @@ import { Hexagon, Crosshair } from "lucide-react";
 
 export function FounderStory() {
   return (
-    <section className="relative overflow-hidden bg-hive-navy-900 text-primary-foreground">
+    <section className="relative overflow-hidden bg-[var(--hive-sidebar)] text-[var(--hive-text)]">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
         <div className="absolute -right-20 -top-20 h-72 w-72 opacity-[0.04] clip-hex bg-nectar-gold-500" />
         <div className="absolute -left-16 bottom-10 h-56 w-56 opacity-[0.03] clip-hex bg-nectar-gold-500" />
       </div>
       <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
         <div className="mx-auto max-w-3xl text-center">
-          <span className="inline-flex items-center gap-2 rounded-full border border-nectar-gold-500/20 bg-nectar-gold-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-nectar-gold-300">
+          <span className="inline-flex items-center gap-2 rounded-full border border-[var(--hive-gold)]/20 bg-[color-mix(in_srgb,var(--hive-gold)_10%,transparent)] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[var(--hive-gold)]">
             <Hexagon className="h-3.5 w-3.5" strokeWidth={2.5} />
             Built by a provider, not a vendor
           </span>

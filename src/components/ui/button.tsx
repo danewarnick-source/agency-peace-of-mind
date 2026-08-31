@@ -9,23 +9,20 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // Primary CTA across the site: amber gradient + dark navy text
         default:
-          "bg-[image:var(--gradient-amber)] text-[color:var(--navy-900)] shadow-[0_8px_20px_-10px_rgba(244,169,58,0.65)] hover:brightness-[1.04] hover:shadow-[0_10px_22px_-10px_rgba(244,169,58,0.75)]",
+          "bg-[var(--hive-gold)] text-[var(--hive-on-gold)] hover:bg-[var(--hive-gold-hover)]",
         cta:
-          "bg-[image:var(--gradient-amber)] text-[color:var(--navy-900)] shadow-[0_8px_20px_-10px_rgba(244,169,58,0.65)] hover:brightness-[1.04] hover:shadow-[0_10px_22px_-10px_rgba(244,169,58,0.75)]",
-        // Secondary on light surfaces: navy outline
+          "bg-[var(--hive-gold)] text-[var(--hive-on-gold)] hover:bg-[var(--hive-gold-hover)]",
         secondary:
-          "bg-white text-[color:var(--navy-900)] border border-[color:var(--border-light)] hover:bg-[color:var(--surface-2)] hover:border-[color:var(--navy-700)]",
-        // White / ghost variant for dark hero sections
+          "bg-[var(--hive-surface)] text-[var(--hive-text)] border border-[var(--hive-border)] hover:bg-[var(--hive-canvas)]",
         ghostOnDark:
-          "bg-white/[0.04] text-white border border-white/15 backdrop-blur hover:bg-white/10 hover:border-white/25",
+          "bg-transparent text-[var(--hive-gold)] border border-[var(--hive-gold)] hover:bg-[color-mix(in_srgb,var(--hive-gold)_10%,transparent)]",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:
-          "border border-[color:var(--border-light)] bg-white text-[color:var(--navy-900)] hover:bg-[color:var(--surface-2)] hover:border-[color:var(--navy-700)]",
-        ghost: "hover:bg-[color:var(--surface-2)] hover:text-foreground",
-        link: "text-[color:var(--amber-600)] underline-offset-4 hover:underline",
-        life: "bg-[image:var(--gradient-amber)] text-[color:var(--navy-900)] hover:brightness-[1.04]",
+          "border border-[var(--hive-gold)] bg-transparent text-[var(--hive-gold)] hover:bg-[color-mix(in_srgb,var(--hive-gold)_10%,transparent)]",
+        ghost: "text-[var(--hive-text)] hover:bg-[var(--hive-surface)] hover:text-[var(--hive-text)]",
+        link: "text-[var(--hive-gold)] underline-offset-4 hover:underline",
+        life: "bg-[var(--hive-gold)] text-[var(--hive-on-gold)] hover:bg-[var(--hive-gold-hover)]",
       },
       size: {
         default: "h-10 px-4 py-2",

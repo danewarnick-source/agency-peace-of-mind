@@ -46,7 +46,7 @@ async function waitForSchedulerChrome(page: Page) {
     // "Publish" is unique to the admin scheduler brand bar. getByText("SCHEDULER")
     // is case-insensitive and also matches the sidebar "Scheduler" link / h1.
     await expect(page.getByRole("button", { name: /^Publish$/ })).toBeVisible({ timeout: 25_000 });
-    await expect(page.getByText("SCHEDULER", { exact: true })).toBeVisible();
+    await expect(page.getByText("HIVE SCHEDULER")).toBeVisible();
   } catch (err) {
     const dump = await page.evaluate(() => ({
       href: location.href,

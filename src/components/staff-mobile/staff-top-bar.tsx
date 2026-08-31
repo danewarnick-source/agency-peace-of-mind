@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { Hexagon, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +28,10 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
   const { view, setView } = usePortalView();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  // Caseload already has an in-flow "Search by name" field. A second search in
+  // this chrome stays on screen and covers client names as the list scrolls.
+  const isCaseloadHome = pathname === "/dashboard" || pathname === "/dashboard/";
 
   const role: Role = org?.role ?? "employee";
   const isAdminCapable =
@@ -47,7 +51,7 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
 
   const headerCls = framed
     ? "relative z-30 flex shrink-0 flex-col border-b border-[color-mix(in_srgb,white_14%,var(--hive-sidebar))] bg-[var(--hive-sidebar)] px-3 text-[var(--hive-chrome-text)]"
-    : "sticky top-0 z-30 flex flex-col border-b border-[color-mix(in_srgb,white_14%,var(--hive-sidebar))] bg-[var(--hive-sidebar)] px-3 text-[var(--hive-chrome-text)] md:hidden";
+    : "relative z-30 flex flex-col border-b border-[color-mix(in_srgb,white_14%,var(--hive-sidebar))] bg-[var(--hive-sidebar)] px-3 text-[var(--hive-chrome-text)] md:hidden";
 
   return (
     <header
@@ -117,14 +121,16 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
         </Sheet>
       </div>
 
-      <div className="pb-2">
-        <NectarSearchBar
-          nav={[]}
-          isAdminCapable={isAdminCapable}
-          variant="mobile"
-          askRoute="/dashboard/ask-nectar"
-        />
-      </div>
+      {!isCaseloadHome && (
+        <div className="pb-2">
+          <NectarSearchBar
+            nav={[]}
+            isAdminCapable={isAdminCapable}
+            variant="mobile"
+            askRoute="/dashboard/ask-nectar"
+          />
+        </div>
+      )}
     </header>
   );
 }

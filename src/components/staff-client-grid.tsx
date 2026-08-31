@@ -518,7 +518,8 @@ export function StaffClientGrid() {
         </div>
       </div>
 
-      <div className="relative">
+      {/* In-flow only — never sticky/fixed. A pinned search covers client names. */}
+      <div className="relative static">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder="Search by name…"

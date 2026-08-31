@@ -3,6 +3,7 @@ import { LayoutDashboard, CalendarDays, ClipboardCheck, Sparkles, Lock, type Luc
 import { useState } from "react";
 import { UpgradeGate } from "@/components/upgrade-gate";
 import { useOrgFeatures } from "@/hooks/use-feature-enabled";
+import { useMyOpenObligationCount } from "@/hooks/use-my-open-obligation-count";
 
 type StaffTab = {
   to: string;
@@ -27,6 +28,7 @@ export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { isEnabled } = useOrgFeatures();
   const [upgradeFeatureKey, setUpgradeFeatureKey] = useState<string | null>(null);
+  const obligationAttention = useMyOpenObligationCount();
 
   const tabs = TABS;
 
@@ -72,7 +74,17 @@ export function StaffBottomTabs({ framed = false }: { framed?: boolean }) {
                       : "text-[var(--hive-chrome-text)]/65 hover:text-[var(--hive-chrome-text)]"
                   }`}
                 >
-                  <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
+                  <span className="relative">
+                    <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
+                    {t.code === "obligations" && obligationAttention > 0 && (
+                      <span
+                        aria-label={`${obligationAttention} obligations need attention`}
+                        className="absolute -right-2.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--hive-danger)] px-1 text-[9px] font-bold leading-none text-white"
+                      >
+                        {obligationAttention > 99 ? "99+" : obligationAttention}
+                      </span>
+                    )}
+                  </span>
                   <span className="truncate">{t.label}</span>
                   {active && (
                     <span className="absolute top-0 h-0.5 w-8 rounded-full bg-[var(--hive-gold)]" />

@@ -46,21 +46,20 @@ export function StaffTopBar({ title, framed = false }: { title: string; framed?:
     (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Staff";
 
   const headerCls = framed
-    ? "relative z-30 flex shrink-0 flex-col border-b border-white/10 px-3 text-white"
-    : "sticky top-0 z-30 flex flex-col border-b border-white/10 px-3 text-white md:hidden";
+    ? "relative z-30 flex shrink-0 flex-col border-b border-[color-mix(in_srgb,white_14%,var(--hive-sidebar))] bg-[var(--hive-sidebar)] px-3 text-[var(--hive-chrome-text)]"
+    : "sticky top-0 z-30 flex flex-col border-b border-[color-mix(in_srgb,white_14%,var(--hive-sidebar))] bg-[var(--hive-sidebar)] px-3 text-[var(--hive-chrome-text)] md:hidden";
 
   return (
     <header
       className={headerCls}
       style={{
-        backgroundImage: "var(--gradient-navy)",
         paddingTop: "env(safe-area-inset-top)",
       }}
     >
       <div className="flex h-14 items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] shadow-[0_0_0_1px_rgba(244,169,58,0.08)_inset]">
-            <Hexagon className="h-4 w-4 text-[oklch(var(--accent-2))]" strokeWidth={2.5} />
+            <Hexagon className="h-4 w-4 text-[var(--hive-gold)]" strokeWidth={2.5} />
           </span>
           <h1 className="truncate text-base font-semibold tracking-tight">{title}</h1>
         </div>

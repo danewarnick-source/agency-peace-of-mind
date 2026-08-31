@@ -15,7 +15,6 @@ import {
   ClipboardList,
   Contact2,
   FolderOpen,
-  Home,
   LayoutDashboard,
   Lock,
   Scale,
@@ -265,12 +264,12 @@ export function FrameSchedulerSlhDsi() {
           </div>
           <div className="flex gap-1.5">
             <div className="flex-1 rounded-md border border-[var(--hive-border)] bg-[var(--hive-canvas)] px-2 py-1.5">
-              <p className="text-[10px] font-medium text-[var(--hive-text)]">Jordan E.</p>
-              <p className="text-[9px] text-[var(--hive-text-muted)]">8:00a – 2:00p</p>
+              <p className="text-[10px] font-medium text-[var(--hive-text)]">Priya Lang</p>
+              <p className="text-[9px] text-[var(--hive-text-muted)]">Riley · 8:00a – 2:00p</p>
             </div>
             <div className="flex-1 rounded-md border border-[var(--hive-border)] bg-[var(--hive-canvas)] px-2 py-1.5">
-              <p className="text-[10px] font-medium text-[var(--hive-text)]">Jordan E.</p>
-              <p className="text-[9px] text-[var(--hive-text-muted)]">2:00p – 8:00p</p>
+              <p className="text-[10px] font-medium text-[var(--hive-text)]">Priya Lang</p>
+              <p className="text-[9px] text-[var(--hive-text-muted)]">Riley · 2:00p – 8:00p</p>
             </div>
           </div>
         </div>
@@ -285,8 +284,8 @@ export function FrameSchedulerSlhDsi() {
           </div>
           <div className="flex gap-1.5">
             <div className="flex-1 rounded-md border border-[var(--hive-border)] bg-[var(--hive-canvas)] px-2 py-1.5">
-              <p className="text-[10px] font-medium text-[var(--hive-text)]">Morgan H.</p>
-              <p className="text-[9px] text-[var(--hive-text-muted)]">9:00a – 3:00p · 6h max</p>
+              <p className="text-[10px] font-medium text-[var(--hive-text)]">Noah Kessler</p>
+              <p className="text-[9px] text-[var(--hive-text-muted)]">Riley · 9:00a – 3:00p · 6h max</p>
             </div>
           </div>
         </div>
@@ -308,17 +307,26 @@ export function FrameHhsDailyNote() {
       </p>
       <div className="rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)] p-3">
         <div className="mb-2 flex items-start gap-2">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--hive-canvas)] text-[var(--hive-text)]">
-            <Home className="h-4 w-4" />
+          <span className="grid h-8 w-8 place-items-center rounded-full bg-[var(--hive-canvas)] text-[10px] font-semibold text-[var(--hive-text)]">
+            CB
           </span>
           <div>
             <p className="text-[11px] font-semibold text-[var(--hive-text)]">
-              Sam W. <span className="font-mono font-normal text-[var(--hive-text-muted)]">HHS</span>
+              Cole Brennan <span className="font-mono font-normal text-[var(--hive-text-muted)]">HHS</span>
             </p>
             <p className="text-[10px] text-[var(--hive-text-muted)]">
               Daily note — hosts do not clock in
             </p>
           </div>
+        </div>
+        <div className="mb-2 flex items-center gap-2 rounded-md border border-[var(--hive-border)] bg-[var(--hive-canvas)] px-2 py-1.5">
+          <span className="grid h-6 w-6 place-items-center rounded-full bg-[var(--hive-surface)] text-[9px] font-semibold text-[var(--hive-text)]">
+            ME
+          </span>
+          <p className="text-[10px] text-[var(--hive-text)]">
+            Maya Ellison <span className="font-mono text-[var(--hive-text-muted)]">HHS</span>
+            <span className="ml-1.5 text-[var(--hive-text-muted)]">Host Home · note due</span>
+          </p>
         </div>
         <h4 className="text-[11px] font-semibold text-[var(--hive-text)]">
           Host Home Daily Compliance Journal
@@ -337,8 +345,13 @@ export function FrameHhsDailyNote() {
           Describe today's care, activities, mood, meals, incidents, and goal progress in detail…
         </div>
         <p className="mt-1 text-[9px] text-[var(--hive-text-muted)]">0 / 40 words</p>
-        <div className="mt-2 h-10 rounded-lg border-2 border-[var(--hive-border)] bg-white" />
-        <p className="mt-1 text-[9px] text-[var(--hive-text-muted)]">Caregiver Signature</p>
+        <div className="mt-2 flex items-center gap-2">
+          <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--hive-canvas)] text-[9px] font-semibold text-[var(--hive-text)]">
+            R
+          </span>
+          <div className="h-10 flex-1 rounded-lg border-2 border-[var(--hive-border)] bg-white" />
+        </div>
+        <p className="mt-1 text-[9px] text-[var(--hive-text-muted)]">Caregiver Signature · Riley</p>
       </div>
     </ProductChrome>
   );

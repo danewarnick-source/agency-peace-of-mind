@@ -62,7 +62,7 @@ function HiveLandingPage() {
 
   return (
     <div className="min-h-screen bg-[var(--hive-bg)] text-[var(--hive-text)]">
-      <nav className="sticky top-0 z-50 border-b border-[var(--hive-border)] bg-[color-mix(in_srgb,var(--hive-bg)_92%,transparent)] backdrop-blur-md">
+      <nav className="sticky top-0 z-50 border-b border-[var(--hive-border)] bg-[color-mix(in_srgb,var(--hive-bg)_92%,transparent)] pt-safe backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <HiveWordmark to="/" tone="canvas" />
 

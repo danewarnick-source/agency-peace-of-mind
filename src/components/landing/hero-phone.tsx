@@ -1,6 +1,6 @@
 /**
  * The one landing hero device — Staff View · My Caseload.
- * Fictional people with photo avatars. No extra phones on the page.
+ * Fictional people, initials avatars only. No extra phones on the page.
  */
 import {
   CalendarDays,
@@ -15,18 +15,23 @@ import {
 } from "lucide-react";
 import { HiveMark } from "@/components/brand/hive-mark";
 
-const RILEY = "/landing/riley-staff.jpg";
-const MAYA = "/landing/maya-ellison.jpg";
-const COLE = "/landing/cole-brennan.jpg";
-
-function Avatar({ src, alt, size = "md" }: { src: string; alt: string; size?: "sm" | "md" }) {
-  const dim = size === "sm" ? "h-8 w-8" : "h-10 w-10";
+function InitialsAvatar({
+  initials,
+  label,
+  size = "md",
+}: {
+  initials: string;
+  label: string;
+  size?: "sm" | "md";
+}) {
+  const dim = size === "sm" ? "h-8 w-8 text-[10px]" : "h-10 w-10 text-[11px]";
   return (
-    <img
-      src={src}
-      alt={alt}
-      className={`${dim} shrink-0 rounded-full object-cover ring-1 ring-[var(--hive-border)]`}
-    />
+    <span
+      aria-label={label}
+      className={`${dim} grid shrink-0 place-items-center rounded-full bg-[var(--hive-sidebar)] font-semibold tracking-wide text-[var(--hive-chrome-text)]`}
+    >
+      {initials}
+    </span>
   );
 }
 
@@ -54,7 +59,7 @@ export function HeroPhone({ className = "" }: { className?: string }) {
 
         <div className="bg-[var(--hive-canvas)] px-3 pb-2 pt-3">
           <div className="flex items-center gap-2">
-            <Avatar src={RILEY} alt="Riley" size="sm" />
+            <InitialsAvatar initials="R" label="Riley" size="sm" />
             <div>
               <p className="text-[9px] font-semibold uppercase tracking-wider text-[var(--hive-text-muted)]">
                 Staff
@@ -77,7 +82,7 @@ export function HeroPhone({ className = "" }: { className?: string }) {
           </p>
           <div className="mt-1.5 rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)] p-2.5 shadow-[var(--shadow-card)]">
             <div className="flex items-start gap-2">
-              <Avatar src={MAYA} alt="Maya Ellison" />
+              <InitialsAvatar initials="ME" label="Maya Ellison" />
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] font-semibold text-[var(--hive-text)]">Maya Ellison</p>
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--hive-text-muted)]">
@@ -98,7 +103,7 @@ export function HeroPhone({ className = "" }: { className?: string }) {
             Also today
           </p>
           <div className="mt-1.5 flex items-center gap-2 rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)] p-2.5">
-            <Avatar src={COLE} alt="Cole Brennan" />
+            <InitialsAvatar initials="CB" label="Cole Brennan" />
             <div className="min-w-0 flex-1">
               <p className="text-[13px] font-semibold text-[var(--hive-text)]">Cole Brennan</p>
               <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--hive-text-muted)]">

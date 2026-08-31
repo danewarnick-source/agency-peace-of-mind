@@ -13,12 +13,13 @@ import {
   CalendarDays,
   ClipboardCheck,
   ClipboardList,
+  Clock,
   Contact2,
+  FileText,
   FolderOpen,
   LayoutDashboard,
   Lock,
   Scale,
-  Shield,
   ShieldAlert,
   Sparkles,
   Users,
@@ -123,17 +124,6 @@ export function FrameComplianceTraining() {
             }`}
           >
             {tab}
-          </span>
-        ))}
-      </div>
-      <div className="mb-2 flex flex-wrap items-center gap-1">
-        <span className="text-[9px] text-[var(--hive-text-muted)]">This program's services</span>
-        {["HHS", "SLH", "DSI", "SEI"].map((c) => (
-          <span
-            key={c}
-            className="rounded-full bg-[var(--secondary)] px-1.5 py-0.5 text-[9px] font-semibold text-[var(--hive-text)]"
-          >
-            {c}
           </span>
         ))}
       </div>
@@ -242,185 +232,132 @@ export function FrameDocumentationHrc() {
   );
 }
 
-/** Scheduler — SLH Supported Living + DSI Individual Day Support. */
-export function FrameSchedulerSlhDsi() {
+/** Scheduler — staff, people served, time windows. No service-code pitch. */
+export function FrameSchedulerBoard() {
   return (
     <ProductChrome active="Scheduler" tall>
-      <div className="mb-2 flex items-center gap-3 text-[9px] text-[var(--hive-text-muted)]">
-        <span className="inline-flex items-center gap-1">
-          <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--hive-gold)]" /> Staff
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <span className="h-2.5 w-2.5 rounded-full bg-[var(--hive-ok)]" /> Client
-        </span>
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-[12px] font-semibold text-[var(--hive-text)]">Today</h3>
+        <div className="flex items-center gap-3 text-[9px] text-[var(--hive-text-muted)]">
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--hive-gold)]" /> Staff
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-full bg-[var(--hive-ok)]" /> Person served
+          </span>
+        </div>
       </div>
       <div className="space-y-2">
         <div className="rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)] p-2.5">
-          <div className="mb-2 flex items-center gap-2">
-            <span className="rounded-md bg-[#3b6aa8] px-1.5 py-0.5 text-[9px] font-extrabold text-white">
-              SLH
-            </span>
-            <span className="text-[11px] font-semibold text-[var(--hive-text)]">Supported Living</span>
-          </div>
+          <p className="mb-2 text-[10px] font-semibold text-[var(--hive-text)]">Morning</p>
           <div className="flex gap-1.5">
             <div className="flex-1 rounded-md border border-[var(--hive-border)] bg-[var(--hive-canvas)] px-2 py-1.5">
               <p className="text-[10px] font-medium text-[var(--hive-text)]">Priya Lang</p>
               <p className="text-[9px] text-[var(--hive-text-muted)]">Riley · 8:00a – 2:00p</p>
             </div>
             <div className="flex-1 rounded-md border border-[var(--hive-border)] bg-[var(--hive-canvas)] px-2 py-1.5">
+              <p className="text-[10px] font-medium text-[var(--hive-text)]">Noah Kessler</p>
+              <p className="text-[9px] text-[var(--hive-text-muted)]">Riley · 9:00a – 3:00p</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)] p-2.5">
+          <p className="mb-2 text-[10px] font-semibold text-[var(--hive-text)]">Afternoon</p>
+          <div className="flex gap-1.5">
+            <div className="flex-1 rounded-md border border-[var(--hive-border)] bg-[var(--hive-canvas)] px-2 py-1.5">
               <p className="text-[10px] font-medium text-[var(--hive-text)]">Priya Lang</p>
               <p className="text-[9px] text-[var(--hive-text-muted)]">Riley · 2:00p – 8:00p</p>
             </div>
           </div>
         </div>
-        <div className="rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)] p-2.5">
-          <div className="mb-2 flex items-center gap-2">
-            <span className="rounded-md bg-[#7eb45b] px-1.5 py-0.5 text-[9px] font-extrabold text-white">
-              DSI
-            </span>
-            <span className="text-[11px] font-semibold text-[var(--hive-text)]">
-              Individual Day Support
-            </span>
-          </div>
-          <div className="flex gap-1.5">
-            <div className="flex-1 rounded-md border border-[var(--hive-border)] bg-[var(--hive-canvas)] px-2 py-1.5">
-              <p className="text-[10px] font-medium text-[var(--hive-text)]">Noah Kessler</p>
-              <p className="text-[9px] text-[var(--hive-text-muted)]">Riley · 9:00a – 3:00p · 6h max</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </ProductChrome>
-  );
-}
-
-/** Host Home Supports daily note — hosts do not clock. */
-export function FrameHhsDailyNote() {
-  return (
-    <ProductChrome active="Daily Logs" variant="staff" tall>
-      <p className="text-[9px] font-semibold uppercase tracking-wider text-[var(--hive-gold)]">
-        Host Home · Daily Compliance Journal
-      </p>
-      <h3 className="mt-0.5 text-[13px] font-semibold text-[var(--hive-text)]">Daily Logs</h3>
-      <p className="mb-2 text-[10px] text-[var(--hive-text-muted)]">
-        Host Home Supports (HHS) — select a client to submit today's PCSP narrative and signature.
-      </p>
-      <div className="rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)] p-3">
-        <div className="mb-2 flex items-start gap-2">
-          <span className="grid h-8 w-8 place-items-center rounded-full bg-[var(--hive-canvas)] text-[10px] font-semibold text-[var(--hive-text)]">
-            CB
-          </span>
-          <div>
-            <p className="text-[11px] font-semibold text-[var(--hive-text)]">
-              Cole Brennan <span className="font-mono font-normal text-[var(--hive-text-muted)]">HHS</span>
-            </p>
-            <p className="text-[10px] text-[var(--hive-text-muted)]">
-              Daily note — hosts do not clock in
-            </p>
-          </div>
-        </div>
-        <div className="mb-2 flex items-center gap-2 rounded-md border border-[var(--hive-border)] bg-[var(--hive-canvas)] px-2 py-1.5">
-          <span className="grid h-6 w-6 place-items-center rounded-full bg-[var(--hive-surface)] text-[9px] font-semibold text-[var(--hive-text)]">
-            ME
-          </span>
-          <p className="text-[10px] text-[var(--hive-text)]">
-            Maya Ellison <span className="font-mono text-[var(--hive-text-muted)]">HHS</span>
-            <span className="ml-1.5 text-[var(--hive-text-muted)]">Host Home · note due</span>
-          </p>
-        </div>
-        <h4 className="text-[11px] font-semibold text-[var(--hive-text)]">
-          Host Home Daily Compliance Journal
-        </h4>
-        <p className="mt-2 text-[10px] font-medium text-[var(--hive-text)]">PCSP Goals Addressed Today</p>
-        <div className="mt-1 flex flex-wrap gap-1">
-          <span className="rounded-full border border-[var(--hive-text)] bg-[var(--hive-text)] px-2 py-0.5 text-[9px] text-white">
-            ✓ Community participation
-          </span>
-          <span className="rounded-full border border-[var(--hive-border)] bg-[var(--hive-surface)] px-2 py-0.5 text-[9px] text-[var(--hive-text)]">
-            Daily living skills
-          </span>
-        </div>
-        <p className="mt-2 text-[10px] font-medium text-[var(--hive-text)]">Daily Summary Narrative</p>
-        <div className="mt-1 min-h-[52px] rounded-md border border-[var(--hive-border)] bg-[var(--hive-canvas)] px-2 py-1.5 text-[9px] text-[var(--hive-text-muted)]">
-          Describe today's care, activities, mood, meals, incidents, and goal progress in detail…
-        </div>
-        <p className="mt-1 text-[9px] text-[var(--hive-text-muted)]">0 / 40 words</p>
-        <div className="mt-2 flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--hive-canvas)] text-[9px] font-semibold text-[var(--hive-text)]">
-            R
-          </span>
-          <div className="h-10 flex-1 rounded-lg border-2 border-[var(--hive-border)] bg-white" />
-        </div>
-        <p className="mt-1 text-[9px] text-[var(--hive-text-muted)]">Caregiver Signature · Riley</p>
       </div>
     </ProductChrome>
   );
 }
 
 /**
- * Ask Nectar empty state — real starter chips only.
- * No composed SOW Q&A thread.
+ * Nectar on the work — punch, note review, incident draft, summaries.
+ * No composed SOW chat. No house feed.
  */
-const ASK_NECTAR_STARTERS = [
-  "What are my client's PCSP goals today?",
-  "Walk me through the reimbursement process.",
-  "What's the medication procedure for a missed dose?",
-  "How many hours have I worked this period?",
-] as const;
-
-export function FrameAskNectar() {
+export function FrameNectarOnTheWork() {
   return (
     <ProductChrome active="Nectar" variant="staff" tall>
-      <div className="overflow-hidden rounded-xl border border-[var(--hive-border)] bg-[var(--hive-surface)]">
-        <div className="flex items-center gap-2 bg-[var(--hive-sidebar)] px-3 py-2">
-          <NectarMark size="sm" />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <NectarBadge size="xs" />
-              <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--hive-chrome-text)]/80">
-                Staff assistant
-              </span>
-            </div>
-            <p className="font-display text-[11px] font-bold text-[var(--hive-chrome-text)]">
-              Ask NECTAR · Staff
-            </p>
-          </div>
-          <span className="inline-flex items-center gap-1 rounded-full border border-[var(--hive-gold)]/40 bg-[var(--hive-gold)]/10 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wider text-[var(--hive-gold)]">
-            <Shield className="h-2.5 w-2.5" /> PHI
-          </span>
-        </div>
-        <div className="space-y-2 p-3">
-          <div className="flex items-start gap-1.5 rounded-lg border border-[var(--hive-gold)]/30 bg-[var(--hive-gold-soft)] px-2.5 py-1.5 text-[10px] leading-snug text-[var(--hive-on-gold)]">
-            <Shield className="mt-0.5 h-3 w-3 shrink-0" />
-            <span>
-              Client info here is for people on your caseload — treat as confidential PHI.
+      <div className="mb-2 flex items-center gap-2">
+        <NectarMark size="sm" />
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <NectarBadge size="xs" />
+            <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--hive-text-muted)]">
+              On the work
             </span>
           </div>
-          <p className="text-[11px] leading-snug text-[var(--hive-text-muted)]">
-            I help with company policies, your trainings, job duties, your pay, and the people
-            on your caseload — their goals, safety, and meds.
+          <p className="font-display text-[12px] font-semibold text-[var(--hive-text)]">
+            Tracks, flags, drafts — a person still attests
           </p>
-          <p className="text-[9px] font-semibold uppercase tracking-wider text-[var(--hive-text-muted)]">
-            Try asking
-          </p>
-          <div className="space-y-1.5">
-            {ASK_NECTAR_STARTERS.map((s) => (
-              <div
-                key={s}
-                className="rounded-lg border border-[var(--hive-border)] bg-[var(--hive-surface)] px-2.5 py-2 text-left text-[11px] leading-snug text-[var(--hive-text)]"
-              >
-                {s}
+        </div>
+      </div>
+      <div className="space-y-2">
+        <div className="rounded-lg border border-[var(--hive-border)] bg-[var(--hive-surface)] p-2.5">
+          <div className="flex items-start gap-2">
+            <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--hive-gold)]" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <p className="text-[11px] font-semibold text-[var(--hive-text)]">Punch</p>
+                <span className="rounded-full bg-[var(--hive-ok-soft)] px-1.5 py-0.5 text-[8px] font-semibold text-[var(--hive-ok-fg)]">
+                  Clocked
+                </span>
               </div>
-            ))}
+              <p className="mt-0.5 text-[10px] text-[var(--hive-text-muted)]">
+                Riley · Cole Brennan · 8:04a — already on the timesheet
+              </p>
+            </div>
           </div>
         </div>
-        <div className="border-t border-[var(--hive-border)] px-3 py-2">
-          <div className="flex items-center gap-2">
-            <div className="h-8 flex-1 rounded-full border border-[var(--hive-border)] bg-[var(--hive-canvas)] px-3 text-[10px] leading-8 text-[var(--hive-text-muted)]">
-              Ask NECTAR anything about your training…
+        <div className="rounded-lg border border-[var(--hive-border)] bg-[var(--hive-surface)] p-2.5">
+          <div className="flex items-start gap-2">
+            <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--hive-gold)]" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <p className="text-[11px] font-semibold text-[var(--hive-text)]">Shift note</p>
+                <span className="rounded-full bg-[var(--hive-gold-soft)] px-1.5 py-0.5 text-[8px] font-semibold text-[var(--hive-gold)]">
+                  Reviewed against SOW
+                </span>
+              </div>
+              <p className="mt-0.5 text-[10px] text-[var(--hive-text-muted)]">
+                Maya Ellison · Flag: client response not documented
+              </p>
             </div>
-            <div className="grid h-8 w-8 place-items-center rounded-full bg-[var(--hive-gold)] text-[var(--hive-on-gold)]">
-              <Sparkles className="h-3.5 w-3.5" />
+          </div>
+        </div>
+        <div className="rounded-lg border border-[var(--hive-border)] bg-[var(--hive-surface)] p-2.5">
+          <div className="flex items-start gap-2">
+            <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--hive-gold)]" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <p className="text-[11px] font-semibold text-[var(--hive-text)]">Incident</p>
+                <span className="rounded-full bg-[var(--secondary)] px-1.5 py-0.5 text-[8px] font-semibold text-[var(--hive-text)]">
+                  Draft started
+                </span>
+              </div>
+              <p className="mt-0.5 text-[10px] text-[var(--hive-text-muted)]">
+                From the shift · 5 Ws prompted · human attests
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-lg border border-[var(--hive-border)] bg-[var(--hive-surface)] p-2.5">
+          <div className="flex items-start gap-2">
+            <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--hive-gold)]" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <p className="text-[11px] font-semibold text-[var(--hive-text)]">Summaries</p>
+                <span className="rounded-full bg-[var(--secondary)] px-1.5 py-0.5 text-[8px] font-semibold text-[var(--hive-text)]">
+                  Drafted by Nectar
+                </span>
+              </div>
+              <p className="mt-0.5 text-[10px] text-[var(--hive-text-muted)]">
+                Q2 and July — from notes already in Hive · review before send
+              </p>
             </div>
           </div>
         </div>

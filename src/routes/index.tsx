@@ -9,15 +9,14 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Footer } from "@/components/landing/footer";
-import { FounderStory } from "@/components/landing/founder-story";
 import { HexBackdrop as HexBg } from "@/components/brand/hex-backdrop";
 import { HiveWordmark } from "@/components/brand/hive-mark";
 import { HeroPhone } from "@/components/landing/hero-phone";
 import {
-  FrameAskNectar,
   FrameComplianceTraining,
   FrameDocumentationHrc,
-  FrameSchedulerSlhDsi,
+  FrameNectarOnTheWork,
+  FrameSchedulerBoard,
 } from "@/components/landing/product-frames";
 
 export const Route = createFileRoute("/")({
@@ -27,7 +26,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Hive is built for Utah DSPD agencies on the Community Supports Waiver. DHHS91172 obligations, SLH, DSI, Host Home Supports, and the Human Rights Committee — without year one spent teaching a national care app the contract.",
+          "Hive is built for Utah DSPD providers on the Community Supports Waiver. DHHS91172 arrives loaded. Nectar reviews notes, drafts summaries, and sits on the punch and the incident — so the evening is not a second job.",
       },
       {
         property: "og:title",
@@ -36,7 +35,7 @@ export const Route = createFileRoute("/")({
       {
         property: "og:description",
         content:
-          "Built for DSPD agencies on the Community Supports Waiver. The obligations, the forms, the codes.",
+          "Built for Utah DSPD providers on the Community Supports Waiver. The contract is on the desk. Nectar gives the evening back.",
       },
     ],
   }),
@@ -144,9 +143,9 @@ function HiveLandingPage() {
               Finally, software that already speaks the Scope of Work.
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-[var(--hive-text-muted)]">
-              Built for DSPD agencies on the Community Supports Waiver. The DHHS91172 obligations,
-              the forms, the codes. You do not spend year one teaching a national care app what SLH,
-              DSI, Host Home, and the Human Rights Committee are.
+              Built for Utah DSPD providers on the Community Supports Waiver. DHHS91172 arrives
+              loaded. The punch, the shift note, and the incident already have Nectar on them —
+              so the evening is not spent reconstructing the day.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild size="lg">
@@ -174,16 +173,18 @@ function HiveLandingPage() {
               Nectar
             </span>
             <h2 className="font-display mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
-              Nectar already speaks DSPD.
+              Time back — because the day is already in Hive.
             </h2>
             <p className="mt-5 text-base leading-relaxed text-[var(--hive-chrome-text)]/80">
-              Ask Nectar on caseload, training, and PCSP goals. It lives in the staff chrome (⌘K).
-              It advises and flags. A human still attests. The Scope of Work proof sits in
-              Compliance — not in a chat transcript.
+              Nectar reviews shift notes against the Scope of Work so a quality manager is not
+              rereading every note for contract compliance. It drafts monthly and quarterly
+              summaries from work already captured — staff did the day; the summary is not another
+              writing assignment. Punches, notes, and incidents are already in its path. It tracks,
+              flags, and drafts. A person still attests. It does not file UPI to the state.
             </p>
           </div>
           <div className="lg:col-span-7">
-            <FrameAskNectar />
+            <FrameNectarOnTheWork />
           </div>
         </div>
       </section>
@@ -198,12 +199,13 @@ function HiveLandingPage() {
               Compliance that arrives loaded.
             </h2>
             <p className="mt-5 text-base leading-relaxed text-[var(--hive-text-muted)]">
-              Client-specific training is cited to the contract —{" "}
+              The register is loaded from the Utah DSPD contract. Client-specific training is cited
+              to the Scope of Work —{" "}
               <span className="font-medium text-[var(--hive-text)]">
                 SOW §1.8(4)(O) — Person-Specific Training
               </span>
-              . Tracked in Hive, with Details &amp; SOW explanation. Not an LMS checklist you invent
-              at month-end.
+              — tracked in Hive, with the section explanation on the row. Not an LMS checklist
+              invented at month-end.
             </p>
           </div>
           <div className="lg:col-span-7">
@@ -225,8 +227,8 @@ function HiveLandingPage() {
               The desk already knows DSPD.
             </h2>
             <p className="mt-5 text-base leading-relaxed text-[var(--hive-text-muted)]">
-              Records, Incidents, Forms, Audit, and Human Rights Committee. Daily logs for Host Home
-              Supports — never home health. EVV timesheets when the code needs them.
+              Records, incidents, forms, audit packets, and the Human Rights Committee live on one
+              desk. Rights restrictions carry the HCBS Settings Rule elements a reviewer expects.
             </p>
           </div>
         </div>
@@ -239,15 +241,15 @@ function HiveLandingPage() {
               Scheduler
             </span>
             <h2 className="font-display mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-              A board that schedules SLH and DSI.
+              A board that schedules the waiver.
             </h2>
             <p className="mt-5 text-base leading-relaxed text-[var(--hive-text-muted)]">
-              Supported Living and Individual Day Support as first-class services. Host Home does
-              not clock — the host's artifact is the daily note.
+              Staff, people served, and time windows on one board. Authorizations and EVV where the
+              contract requires them — not a generic workforce calendar with Utah added later.
             </p>
           </div>
           <div className="lg:col-span-7">
-            <FrameSchedulerSlhDsi />
+            <FrameSchedulerBoard />
           </div>
         </div>
       </section>
@@ -265,9 +267,7 @@ function HiveLandingPage() {
         </div>
       </section>
 
-      <FounderStory />
-
-      <section id="faq" className="bg-[var(--hive-canvas)] py-20 sm:py-24">
+      <section id="faq" className="bg-[var(--hive-bg)] py-20 sm:py-24">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--hive-gold)]">
@@ -286,23 +286,23 @@ function HiveLandingPage() {
             {[
               {
                 q: "Is this built for Utah DSPD, or is Utah a filter on a national product?",
-                a: "Hive is built for DSPD agencies on the Community Supports Waiver. The compliance register is loaded from DHHS91172. Service codes, Host Home daily notes, and the Human Rights Committee are first-class — not a later configuration.",
+                a: "Hive is built for Utah DSPD providers on the Community Supports Waiver. The compliance register is loaded from DHHS91172. Obligations, forms, and the Human Rights Committee are first-class — not a later configuration.",
               },
               {
-                q: "What does HHS mean here?",
-                a: "Host Home Supports. Not home health. Hosts do not clock. The host's artifact is the daily note and overnight confirmation. Agency staff visits into a host home are timed shifts.",
+                q: "We run residential, employment, or respite. Is this still for us?",
+                a: "Yes. Hive is for Utah DSPD agencies on the Community Supports Waiver. The staff phone may show a Host Home note because that is a real screen. The pitch is the contract and the time Nectar gives back — not one service line.",
+              },
+              {
+                q: "What does HHS mean on the staff phone?",
+                a: "Host Home Supports — a Utah DSPD service. Not home health. The screenshot is an example of a staff caseload, not a claim that every agency runs host homes.",
               },
               {
                 q: "What is Nectar?",
-                a: "Nectar is Hive's intelligence layer. Staff can ask about PCSP goals, training, and the people on their caseload from the staff chrome (⌘K). It coaches notes for completeness. It does not invent documentation, file UPI, or act unreviewed. The SOW proof lives on Compliance — for example Client-Specific Training cited to §1.8(4)(O).",
-              },
-              {
-                q: "Do you support SLH, DSI, and the Human Rights Committee?",
-                a: "Yes. The scheduler groups clocked codes such as SLH Supported Living and DSI Individual Day Support. Documentation includes a Human Rights Committee tab for rights restrictions under SOW §1.20 / the HCBS Settings Rule.",
+                a: "Nectar is Hive's intelligence layer. It reviews shift notes against the Scope of Work, drafts monthly and quarterly summaries from data already in Hive, and sits on the punch and the incident so those three things are not a hunt. It tracks, flags, and drafts. It does not invent documentation, file UPI to the state, or act unreviewed. A person still attests.",
               },
               {
                 q: "How is pricing structured?",
-                a: "See the pricing page. Implementation is a conversation with people who have billed the waiver.",
+                a: "See the pricing page. Implementation is a conversation.",
               },
             ].map((item, i) => (
               <AccordionItem key={i} value={`item-${i}`} className="border-0">
@@ -318,7 +318,7 @@ function HiveLandingPage() {
         </div>
       </section>
 
-      <section className="relative overflow-hidden bg-[var(--hive-bg)]">
+      <section className="relative overflow-hidden bg-[var(--hive-canvas)]">
         <div className="relative mx-auto flex max-w-5xl flex-col items-center gap-6 px-4 py-20 text-center sm:px-6 lg:px-8">
           <h2 className="font-display text-3xl font-bold tracking-tight text-[var(--hive-text)] sm:text-5xl">
             Sit at a desk that already knows the waiver.

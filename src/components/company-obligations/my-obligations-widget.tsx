@@ -23,6 +23,7 @@ import {
 import { isFormUuid, isUnlinkedFormDuty } from "@/lib/resolve-obligation-form";
 import { inHiveCourseIdForTitle } from "@/lib/in-hive-training";
 import { hasAnyInHiveProgress } from "@/lib/in-hive-training.functions";
+import { clientFormKindForTitle } from "@/lib/client-form-obligations";
 
 const MY_OBLIGATIONS_KEY = "my-obligation-instances";
 
@@ -193,6 +194,7 @@ function WidgetItem({ orgId, instance }: { orgId: string; instance: MyObligation
   const ob = instance.obligation;
   const due = dueLabel(instance.due_at);
   const courseId = inHiveCourseIdForTitle(ob.title);
+  const formKind = clientFormKindForTitle(ob.title);
   const resumeQ = useQuery({
     queryKey: ["in-hive-resume", user?.id, courseId],
     enabled: !!user && !!courseId,
@@ -217,7 +219,11 @@ function WidgetItem({ orgId, instance }: { orgId: string; instance: MyObligation
     <li className="rounded-lg border border-border bg-background/60 px-3 py-2.5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{ob.title}</p>
+          <p className="truncate text-sm font-medium">
+            {ob.scope === "staff_per_client" && instance.client_name
+              ? ob.title.replace("[Client Name]", instance.client_name)
+              : ob.title}
+          </p>
           <p className="text-xs text-muted-foreground">{cadenceDescription(ob)}</p>
           <p
             className={`text-xs font-medium ${due.overdue ? "text-destructive" : "text-muted-foreground"}`}
@@ -233,6 +239,19 @@ function WidgetItem({ orgId, instance }: { orgId: string; instance: MyObligation
             <Button size="sm" variant="outline" className="shrink-0">
               {resumeQ.data ? "Pick up where you left off" : "Open course"}{" "}
               <ArrowRight className="ml-1 h-3.5 w-3.5" />
+            </Button>
+          </Link>
+        ) : formKind && instance.client_id ? (
+          <Link
+            to="/dashboard/client-training/$clientId"
+            params={{ clientId: instance.client_id }}
+            search={{
+              trainingType: formKind,
+              obligation_instance: instance.id,
+            }}
+          >
+            <Button size="sm" variant="outline" className="shrink-0">
+              Complete form <ArrowRight className="ml-1 h-3.5 w-3.5" />
             </Button>
           </Link>
         ) : ob.evidence_type === "form" && isFormUuid(ob.linked_form_id) ? (
@@ -260,7 +279,7 @@ function WidgetItem({ orgId, instance }: { orgId: string; instance: MyObligation
           </Button>
         )}
       </div>
-      {panelOpen && !courseId && ob.evidence_type !== "form" && (
+      {panelOpen && !courseId && !formKind && ob.evidence_type !== "form" && (
         <EvidencePanel orgId={orgId} instance={instance} onDone={onDone} />
       )}
     </li>
@@ -273,12 +292,13 @@ export function MyObligationsWidget() {
   const orgId = org?.organization_id;
   const listFn = useServerFn(listMyObligationInstances);
 
-  const { data: instances = [] } = useQuery<MyObligationInstanceRow[]>({
+  const { data: instancesRaw = [] } = useQuery<MyObligationInstanceRow[]>({
     queryKey: [MY_OBLIGATIONS_KEY, orgId, user?.id],
     enabled: !!orgId && !!user,
     queryFn: () => listFn({ data: { organizationId: orgId! } }),
     staleTime: 30_000,
   });
+  const instances = Array.isArray(instancesRaw) ? instancesRaw : [];
 
   const openItems = instances
     .filter((i) => i.status === "pending" || i.status === "overdue")

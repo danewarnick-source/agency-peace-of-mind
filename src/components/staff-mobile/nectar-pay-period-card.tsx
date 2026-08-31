@@ -232,7 +232,7 @@ export function NectarPayPeriodCard() {
             {otherOpen > 0 && (
               <li>
                 <Link
-                  to="/dashboard/courses/other"
+                  to="/dashboard/my-obligations"
                   className={`flex min-h-[44px] items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium text-white transition active:scale-[0.99] ${
                     otherSafety > 0
                       ? "bg-red-500/25 hover:bg-red-500/35 ring-1 ring-red-400/60"

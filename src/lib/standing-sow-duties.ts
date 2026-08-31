@@ -414,6 +414,22 @@ export const STANDING_SOW_DUTIES: StandingDutySeed[] = [
     target_service_codes: ["SLH", "SLN"],
     assign_all_staff: false,
   },
+  {
+    title: "Person-Centered Thinking — [Client Name]",
+    description:
+      "Each assigned staff member completes the person-centered thinking form for that client within 30 days of assignment. This is the per-client form — separate from the hire-level Person-Centered Thinking and Practices course.",
+    source_policy_section: "SOW §1.8(5)(C) — Person-Centered Thinking (per client)",
+    cadence: "one_time",
+    due_day_config: { days_after_assignment: 30 },
+    reminder_days_before: [14, 7, 3],
+    evidence_type: "form",
+    attestation_text: null,
+    requires_individual_completion: true,
+    assignee_role: "any_assigned",
+    scope: "staff_per_client",
+    target_service_codes: [],
+    assign_all_staff: false,
+  },
 ];
 
 export const STANDING_SOW_TITLES = new Set(STANDING_SOW_DUTIES.map((d) => d.title));

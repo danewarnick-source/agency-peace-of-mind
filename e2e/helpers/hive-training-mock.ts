@@ -279,8 +279,16 @@ function serverFnPayload(world: HiveE2EWorld, req: Request): unknown {
     return [];
   }
 
-  if (hay.includes("getrostertrainingstatus") || hay.includes("getmyclienttraining")) {
+  if (hay.includes("listmyobligationinstances") || hay.includes("checkandmarkoverdue")) {
     return [];
+  }
+
+  if (hay.includes("getrostertrainingstatus")) {
+    return [];
+  }
+
+  if (hay.includes("getmyclienttraining")) {
+    return { items: [] };
   }
 
   if (hay.includes("getmyotherassignments")) {

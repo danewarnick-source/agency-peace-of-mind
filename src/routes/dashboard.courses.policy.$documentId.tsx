@@ -148,7 +148,7 @@ export function PolicySignPage() {
     mutationFn: persistSignature,
     onSuccess: () => {
       toast.success("Policy signed — record saved.");
-      navigate({ to: "/dashboard/courses" });
+      navigate({ to: "/dashboard/my-obligations" });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -165,7 +165,7 @@ export function PolicySignPage() {
       <div className="space-y-3">
         <p className="text-sm text-muted-foreground">Policy not found.</p>
         <Button asChild variant="outline" size="sm">
-          <Link to="/dashboard/courses"><ArrowLeft className="mr-1 h-4 w-4" /> Back to My Trainings</Link>
+          <Link to="/dashboard/my-obligations"><ArrowLeft className="mr-1 h-4 w-4" /> Back to My Obligations</Link>
         </Button>
       </div>
     );
@@ -174,7 +174,7 @@ export function PolicySignPage() {
     <div className="-mx-4 -my-5 flex h-full min-h-[calc(100dvh-9rem)] flex-col bg-background md:min-h-[600px]">
       <header className="border-b border-border bg-card px-4 py-3">
         <Button asChild variant="ghost" size="sm" className="-ml-2 shrink-0">
-          <Link to="/dashboard/courses"><ArrowLeft className="mr-1 h-4 w-4" /> My Trainings</Link>
+          <Link to="/dashboard/my-obligations"><ArrowLeft className="mr-1 h-4 w-4" /> My Obligations</Link>
         </Button>
         <h1 className="mt-1 text-base font-semibold leading-snug tracking-tight">{doc.title}</h1>
         <p className="text-xs text-muted-foreground">Version {doc.version} · Scroll to the end, then sign below.</p>

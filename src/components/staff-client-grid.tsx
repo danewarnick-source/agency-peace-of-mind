@@ -210,9 +210,7 @@ function ClientDetail({
               ) : (
                 <Link
                   key={t.type}
-                  to="/dashboard/client-training/$clientId"
-                  params={{ clientId: c.id }}
-                  search={{ trainingType: t.type }}
+                  to="/dashboard/my-obligations"
                   className="flex items-center gap-2 rounded-md border border-amber-300/60 bg-amber-500/5 px-2 py-1.5 text-xs font-semibold text-amber-800 transition hover:border-amber-400"
                 >
                   <GraduationCap className="h-3.5 w-3.5" />

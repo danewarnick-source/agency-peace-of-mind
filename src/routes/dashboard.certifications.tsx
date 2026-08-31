@@ -45,7 +45,7 @@ function CertificationsPage() {
         <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
           <Award className="mx-auto h-8 w-8 text-muted-foreground" />
           <p className="mt-3 text-sm text-muted-foreground">No certifications yet — complete a course to earn one.</p>
-          <Button asChild className="mt-4"><Link to="/dashboard/training">Go to My Training</Link></Button>
+          <Button asChild className="mt-4"><Link to="/dashboard/my-obligations">Go to My Obligations</Link></Button>
         </div>
       ) : (
         <div className="grid gap-3">

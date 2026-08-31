@@ -26,7 +26,7 @@ function MindsmithPlayer() {
           <h2 className="text-base font-semibold tracking-tight truncate">{title ?? "External Lesson"}</h2>
         </div>
         <Button asChild variant="outline" size="sm">
-          <Link to="/dashboard/courses">
+          <Link to="/dashboard/my-obligations">
             <ArrowLeft className="mr-1 h-4 w-4" /> Back
           </Link>
         </Button>

@@ -23,6 +23,7 @@ import { toast } from "sonner";
 
 const searchSchema = z.object({
   trainingType: z.enum(["person_specific", "support_strategies", "person_centered"]).optional(),
+  obligation_instance: z.string().uuid().optional(),
 });
 
 export const Route = createFileRoute("/dashboard/client-training/$clientId")({
@@ -38,7 +39,7 @@ const MIN_WORDS = 25;
 
 function ClientTrainingViewer() {
   const { clientId } = Route.useParams();
-  const { trainingType: rawType } = Route.useSearch();
+  const { trainingType: rawType, obligation_instance: obligationInstance } = Route.useSearch();
   const trainingType = rawType ?? "person_specific";
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -53,7 +54,7 @@ function ClientTrainingViewer() {
   const [certOpen, setCertOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  const queryKey = ["staff-client-training", clientId, trainingType];
+  const queryKey = ["staff-client-training", clientId, trainingType, obligationInstance ?? null];
   const { data, isLoading, error } = useQuery({
     queryKey,
     queryFn: () => getFn({ data: { clientId, trainingType } }),
@@ -123,9 +124,12 @@ function ClientTrainingViewer() {
       });
     },
     onSuccess: () => {
-      toast.success("Training completed — record saved.");
+      toast.success("Form completed — record saved.");
       setJustCompleted(true);
       qc.invalidateQueries({ queryKey });
+      qc.invalidateQueries({ queryKey: ["my-obligation-instances"] });
+      qc.invalidateQueries({ queryKey: ["my-obligation-completions"] });
+      qc.invalidateQueries({ queryKey: ["my-client-training-statuses"] });
       setSignature("");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -133,23 +137,11 @@ function ClientTrainingViewer() {
 
   const typeLabel =
     trainingType === "support_strategies"
-      ? "Support Strategies"
+      ? "Support strategies"
       : trainingType === "person_centered"
-        ? "Person-Centered Thinking"
-        : "Client-Specific Training";
-  // Cycle person_specific → support_strategies → person_centered → person_specific.
-  const otherType =
-    trainingType === "person_specific"
-      ? "support_strategies"
-      : trainingType === "support_strategies"
-        ? "person_centered"
-        : "person_specific";
-  const otherLabel =
-    otherType === "support_strategies"
-      ? "Support Strategies"
-      : otherType === "person_centered"
-        ? "Person-Centered Thinking"
-        : "Client-Specific Training";
+        ? "Person-centered thinking"
+        : "Client-specific training";
+  const backToObligations = () => navigate({ to: "/dashboard/my-obligations" });
 
   if (isLoading) {
     return (
@@ -166,8 +158,8 @@ function ClientTrainingViewer() {
           <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
           <span>{(error as Error).message}</span>
         </div>
-        <Button variant="outline" size="sm" onClick={() => navigate({ to: "/dashboard" })}>
-          <ArrowLeft className="mr-1 h-4 w-4" /> Back
+        <Button variant="outline" size="sm" onClick={backToObligations}>
+          <ArrowLeft className="mr-1 h-4 w-4" /> Back to My Obligations
         </Button>
       </div>
     );
@@ -177,8 +169,8 @@ function ClientTrainingViewer() {
     return (
       <div className="p-6 space-y-3">
         <p className="text-sm text-muted-foreground">No published {typeLabel.toLowerCase()} training is available for this client yet.</p>
-        <Button variant="outline" size="sm" onClick={() => navigate({ to: "/dashboard" })}>
-          <ArrowLeft className="mr-1 h-4 w-4" /> Back
+        <Button variant="outline" size="sm" onClick={backToObligations}>
+          <ArrowLeft className="mr-1 h-4 w-4" /> Back to My Obligations
         </Button>
       </div>
     );
@@ -195,16 +187,9 @@ function ClientTrainingViewer() {
       <header className="border-b border-border bg-card px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <Button asChild variant="ghost" size="sm" className="-ml-2 shrink-0">
-            <Link to="/dashboard">
-              <ArrowLeft className="mr-1 h-4 w-4" /> Back
+            <Link to="/dashboard/my-obligations">
+              <ArrowLeft className="mr-1 h-4 w-4" /> My Obligations
             </Link>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate({ to: "/dashboard/client-training/$clientId", params: { clientId }, search: { trainingType: otherType } })}
-          >
-            Switch to {otherLabel}
           </Button>
         </div>
         <div className="mt-2">
@@ -241,11 +226,8 @@ function ClientTrainingViewer() {
                   <FileSignature className="mr-1 h-4 w-4" /> View certificate
                 </Button>
               )}
-              <Button
-                onClick={() => navigate({ to: "/dashboard" })}
-                className="bg-[var(--hive-gold)] text-[var(--hive-on-gold)]"
-              >
-                Back to My Caseload
+              <Button onClick={backToObligations}>
+                Back to My Obligations
               </Button>
             </div>
           </div>
@@ -291,7 +273,7 @@ function ClientTrainingViewer() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <BookOpen className="h-4 w-4 text-accent" />
-                  <h3 className="text-sm font-semibold">PCSP Goals</h3>
+                  <h3 className="text-sm font-semibold">Goals</h3>
                   <Badge variant="outline" className="text-xs">{goals.length}</Badge>
                 </div>
                 <GoalsView goals={goals} />

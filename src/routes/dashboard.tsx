@@ -209,18 +209,6 @@ const STAFF_NAV: NavItem[] = [
     feature: "evv_timesheets",
   },
   { to: "/dashboard/ask-nectar", label: "Nectar", icon: Sparkles, feature: "nectar" },
-  {
-    to: "/dashboard/courses",
-    label: "My Trainings",
-    icon: GraduationCap,
-    feature: "staff_onboarding",
-  },
-  {
-    to: "/dashboard/hive-training",
-    label: "HIVE Training",
-    icon: GraduationCap,
-    feature: "hive_training",
-  },
 ];
 
 const ADMIN_NAV: NavItem[] = [
@@ -246,13 +234,7 @@ const ADMIN_NAV: NavItem[] = [
   },
   {
     to: "/dashboard/hive-training",
-    label: "HIVE Training",
-    icon: GraduationCap,
-    feature: "hive_training",
-  },
-  {
-    to: "/dashboard/training/catalog",
-    label: "Training Catalog",
+    label: "Classes",
     icon: GraduationCap,
     feature: "hive_training",
   },

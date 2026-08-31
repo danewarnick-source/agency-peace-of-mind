@@ -43,8 +43,8 @@ export const TOUR_ANCHORS: TourAnchor[] = [
   { id: "nav.my-historical-records", label: "Historical Records", route: "/dashboard/my-historical-records", description: "Past notes and timesheets brought over for you to review.", surface: "staff" },
   { id: "nav.my-time-corrections", label: "My Time Corrections", route: "/dashboard/my-time-corrections", description: "Correction requests you sent to a supervisor.", surface: "staff" },
   { id: "nav.ask-nectar", label: "Ask NECTAR", route: "/dashboard/ask-nectar", description: "Ask NECTAR a staff question about your shift, caseload, or a form.", surface: "staff" },
-  { id: "nav.courses", label: "My Trainings", route: "/dashboard/courses", description: "Required courses and policy acknowledgments.", surface: "staff" },
-  { id: "nav.hive-training", label: "HIVE Training", route: "/dashboard/hive-training", description: "Launchpad and HIVE how-to training.", surface: "staff" },
+  { id: "nav.courses", label: "My Obligations", route: "/dashboard/my-obligations", description: "Assigned trainings and forms — staff only complete what is already on My Obligations.", surface: "staff" },
+  { id: "nav.hive-training", label: "Classes", route: "/dashboard/hive-training", description: "Admin class roster for CPR, Mandt, and the training package.", surface: "admin" },
 
   // Staff page CTAs
   { id: "staff.caseload", label: "Caseload list", route: "/dashboard", description: "The list of people assigned to you. Tap an HHS name for the daily note.", surface: "staff" },

@@ -2,229 +2,50 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/site-header";
 import { Footer } from "@/components/landing/footer";
 import { Button } from "@/components/ui/button";
-import { Check, ArrowRight, GraduationCap } from "lucide-react";
-import {
-  PUBLIC_TRAINING_ALA_CARTE,
-  PUBLIC_TRAINING_FULL_PROGRAM_INCLUDES,
-  TRAINING_PRICE_CENTS,
-  publicTrainingAlaCarteTotalCents,
-  publicTrainingBundleSavingsCents,
-} from "@/lib/hive-pricing";
 
 export const Route = createFileRoute("/training")({
   head: () => ({
     meta: [
-      { title: "HIVE Training — DSPD staff training + certifications" },
+      { title: "Hive Training — assigned in Hive" },
       {
         name: "description",
         content:
-          "CPR & First Aid, Mandt behavioral intervention, and 30-day DSPD required training for direct-support staff. Buy seats for your team or pay per course.",
+          "Staff complete assigned training inside Hive on My Obligations. Agencies do not sell seats to staff. True North Supports stays $0.",
       },
-      { property: "og:title", content: "HIVE Training — DSPD staff training + certifications" },
-      {
-        property: "og:description",
-        content:
-          "One-time $300 full program or à la carte courses. CPR/First Aid, Mandt, DSPD required + 12 hrs ongoing content per year.",
-      },
+      { property: "og:title", content: "Hive Training — assigned in Hive" },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: TrainingStorefront,
+  component: TrainingExplainer,
 });
 
-function TrainingStorefront() {
-  const alacarte = PUBLIC_TRAINING_ALA_CARTE;
-  const aCarteTotal = publicTrainingAlaCarteTotalCents();
-  const fullCents = TRAINING_PRICE_CENTS.full_program;
-  const savings = publicTrainingBundleSavingsCents();
-
+function TrainingExplainer() {
   return (
-    <div className="flex min-h-screen flex-col" style={{ background: "var(--training-bg)" }}>
+    <div className="flex min-h-screen flex-col bg-background">
       <SiteHeader />
       <main className="flex-1">
-        <section className="mx-auto max-w-6xl px-4 pb-6 pt-16 sm:px-6 md:pt-24 lg:px-8">
-          <div className="text-center">
-            <p
-              className="text-[11px] font-semibold uppercase tracking-[0.28em]"
-              style={{ color: "var(--training-gold)" }}
-            >
-              Staff Training
-            </p>
-            <h1
-              className="mt-4 font-display text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl"
-              style={{ color: "var(--training-navy)" }}
-            >
-              Certifications your team actually finishes.
-            </h1>
-            <p className="mx-auto mt-5 max-w-2xl text-base text-[color:var(--text-soft)] sm:text-lg">
-              CPR, Mandt, and DSPD-required training, delivered on the phone your DSPs already use.
-              Buy seats for your whole team, or let staff pay for a single course.
-            </p>
-          </div>
-        </section>
-
-        <section className="mx-auto grid max-w-6xl gap-6 px-4 pb-24 sm:px-6 md:grid-cols-2 md:gap-8 lg:px-8">
-          {/* FULL PROGRAM */}
-          <PricingCard featured navy>
-            <Eyebrow gold>
-              {savings > 0
-                ? `Full program · save $${(savings / 100).toFixed(0)}`
-                : "Full program"}
-            </Eyebrow>
-            <CardTitle>Full training program</CardTitle>
-            <Price cents={fullCents} suffix="/ staff · one-time" />
-            <ul className="mt-6 space-y-3">
-              {PUBLIC_TRAINING_FULL_PROGRAM_INCLUDES.map((line) => (
-                <li key={line} className="flex items-start gap-3 text-sm">
-                  <span
-                    className="mt-0.5 inline-flex h-5 w-5 flex-none items-center justify-center rounded-full"
-                    style={{ background: "var(--training-gold)", color: "white" }}
-                  >
-                    <Check className="h-3 w-3" strokeWidth={3} />
-                  </span>
-                  <span style={{ color: "var(--training-navy)" }}>{line}</span>
-                </li>
-              ))}
-            </ul>
-            <CTA />
-          </PricingCard>
-
-          {/* À LA CARTE */}
-          <PricingCard>
-            <Eyebrow>À la carte — only what you need</Eyebrow>
-            <CardTitle>Individual courses</CardTitle>
-            <div className="mt-6 divide-y divide-[color:var(--border-light)]">
-              {alacarte.map((c) => (
-                <div key={c.sku} className="flex items-center justify-between gap-4 py-4">
-                  <div>
-                    <p className="text-sm font-semibold" style={{ color: "var(--training-navy)" }}>
-                      {c.name}
-                    </p>
-                    {c.sub && (
-                      <p className="mt-0.5 text-xs text-[color:var(--text-soft)]">{c.sub}</p>
-                    )}
-                  </div>
-                  <p className="text-lg font-bold" style={{ color: "var(--training-navy)" }}>
-                    ${(c.priceCents / 100).toFixed(0)}
-                    <span className="ml-1 text-sm font-normal text-[color:var(--text-soft)]">
-                      / person
-                    </span>
-                  </p>
-                </div>
-              ))}
-            </div>
-            <p className="mt-6 rounded-lg bg-[color:var(--surface-2)] px-4 py-3 text-xs text-[color:var(--text-soft)]">
-              All three à la carte: <strong>${(aCarteTotal / 100).toFixed(0)}</strong> · Full program:{" "}
-              <strong>${(fullCents / 100).toFixed(0)}</strong>
-              {savings > 0 && <> — save <strong>${(savings / 100).toFixed(0)}</strong></>}
-            </p>
-            <CTA variant="outline" />
-          </PricingCard>
-        </section>
-
-        <section className="border-t border-[color:var(--border-light)] bg-white/60 py-14">
-          <div className="mx-auto max-w-4xl px-4 text-center sm:px-6">
-            <GraduationCap
-              className="mx-auto mb-4 h-8 w-8"
-              style={{ color: "var(--training-gold)" }}
-            />
-            <h2 className="font-display text-2xl font-bold" style={{ color: "var(--training-navy)" }}>
-              Already using HIVE?
-            </h2>
-            <p className="mx-auto mt-2 max-w-xl text-sm text-[color:var(--text-soft)]">
-              Training assignments made in your HIVE dashboard and via this storefront are the same
-              records. Log in and open the Training tab.
-            </p>
-            <div className="mt-6 flex justify-center gap-3">
-              <Button asChild variant="outline">
-                <Link to="/login">Log in</Link>
-              </Button>
-            </div>
+        <section className="mx-auto max-w-2xl px-4 pb-16 pt-16 sm:px-6 md:pt-24">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
+            Hive Training
+          </p>
+          <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-foreground">
+            Staff training lives inside Hive
+          </h1>
+          <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+            Staff never buy seats. An admin submits a class roster for CPR, Mandt, or the training
+            package. Assigned work shows up on My Obligations. True North Supports is always $0.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Button asChild>
+              <Link to="/login">Sign in</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link to="/contact">Contact us</Link>
+            </Button>
           </div>
         </section>
       </main>
       <Footer />
     </div>
-  );
-}
-
-function Eyebrow({ children, gold }: { children: React.ReactNode; gold?: boolean }) {
-  return (
-    <p
-      className="text-[10px] font-semibold uppercase tracking-[0.24em]"
-      style={{ color: gold ? "var(--training-gold)" : "var(--training-navy)" }}
-    >
-      {children}
-    </p>
-  );
-}
-
-function CardTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h3
-      className="mt-3 font-display text-2xl font-bold tracking-tight"
-      style={{ color: "var(--training-navy)" }}
-    >
-      {children}
-    </h3>
-  );
-}
-
-function Price({ cents, suffix }: { cents: number; suffix: string }) {
-  return (
-    <p className="mt-4 flex items-baseline gap-2">
-      <span className="text-4xl font-bold" style={{ color: "var(--training-navy)" }}>
-        ${(cents / 100).toFixed(0)}
-      </span>
-      <span className="text-sm text-[color:var(--text-soft)]">{suffix}</span>
-    </p>
-  );
-}
-
-function PricingCard({
-  children,
-  featured,
-  navy,
-}: {
-  children: React.ReactNode;
-  featured?: boolean;
-  navy?: boolean;
-}) {
-  void navy;
-  return (
-    <div
-      className="relative rounded-3xl bg-white p-8 sm:p-10"
-      style={{
-        boxShadow: featured
-          ? "var(--training-glow)"
-          : "0 4px 24px -8px rgba(13,17,43,0.08), 0 1px 3px rgba(13,17,43,0.04)",
-        border: featured
-          ? "1px solid rgba(200,136,30,0.35)"
-          : "1px solid var(--border-light)",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function CTA({ variant = "primary" }: { variant?: "primary" | "outline" }) {
-  const base =
-    "mt-8 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold transition";
-  const primary = "text-white shadow-lg hover:brightness-110";
-  const outline = "border border-[color:var(--training-navy)]/20 hover:bg-[color:var(--surface-2)]";
-  return (
-    <a
-      href="/signup?flow=training"
-      className={`${base} ${variant === "primary" ? primary : outline}`}
-      style={
-        variant === "primary"
-          ? { background: "var(--training-gold)" }
-          : { color: "var(--training-navy)" }
-      }
-    >
-      Sign up <ArrowRight className="h-4 w-4" />
-    </a>
   );
 }

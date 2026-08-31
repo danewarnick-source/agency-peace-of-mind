@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
+import { createFileRoute, Link, useSearch, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -15,8 +15,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import {
-  GraduationCap, Users, Loader2, PlayCircle,
-  AlertTriangle, Sparkles, Award, ShieldCheck, TrendingUp, Clock,
+  GraduationCap, Users, Loader2,
+  AlertTriangle, Sparkles, Clock,
   Repeat, CreditCard, CheckCircle2,
 } from "lucide-react";
 import { z } from "zod";
@@ -145,150 +145,14 @@ function HiveTrainingHub() {
 // ============================================================
 
 function StaffView() {
-  const { data: userId } = useQuery({
-    queryKey: ["auth-user-id"],
-    queryFn: async () => (await supabase.auth.getUser()).data.user?.id ?? null,
-    staleTime: 5 * 60_000,
-  });
-
-  const { data: assignments, isLoading } = useQuery({
-    enabled: !!userId,
-    queryKey: ["ht-my-assignments", userId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("hive_training_assignments")
-        .select("id, organization_id, user_id, course_id, status, progress_pct, completed_at, expires_at, payment_model, course:hive_training_courses(title, slug, cert_validity_months)")
-        .eq("user_id", userId!)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as unknown as AssignmentRow[];
-    },
-  });
-
-  const { data: certs } = useQuery({
-    enabled: !!userId && !!assignments?.length,
-    queryKey: ["ht-my-certs", userId],
-    queryFn: async () => {
-      const ids = (assignments ?? []).map((a) => a.id);
-      if (!ids.length) return [];
-      const { data, error } = await supabase
-        .from("hive_training_certificates")
-        .select("id, assignment_id, code, issued_at, expires_at, pdf_url")
-        .in("assignment_id", ids)
-        .order("issued_at", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  const stats = useMemo(() => {
-    const list = assignments ?? [];
-    const total = list.length;
-    const completed = list.filter((a) => a.status === "completed").length;
-    const inProgress = list.filter((a) => a.status === "in_progress").length;
-    const avgPct = total ? Math.round(list.reduce((s, a) => s + (a.progress_pct ?? 0), 0) / total) : 0;
-    const nextDue = list
-      .filter((a) => a.status !== "completed" && a.expires_at)
-      .sort((a, b) => (a.expires_at! < b.expires_at! ? -1 : 1))[0];
-    return { total, completed, inProgress, avgPct, nextDue };
-  }, [assignments]);
-
-  if (isLoading) return <div className="flex justify-center py-10"><Loader2 className="animate-spin" /></div>;
-
+  const navigate = useNavigate();
+  useEffect(() => {
+    void navigate({ to: "/dashboard/my-obligations" });
+  }, [navigate]);
   return (
-    <div className="space-y-6">
-      {/* Stats strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Overall progress" value={`${stats.avgPct}%`} />
-        <StatCard icon={<PlayCircle className="h-4 w-4" />} label="In progress" value={`${stats.inProgress}`} />
-        <StatCard icon={<ShieldCheck className="h-4 w-4" />} label="Completed" value={`${stats.completed} / ${stats.total}`} />
-        <StatCard
-          icon={<Clock className="h-4 w-4" />}
-          label="Next due"
-          value={stats.nextDue?.expires_at ? new Date(stats.nextDue.expires_at).toLocaleDateString() : "—"}
-        />
-      </div>
-
-      {/* Assigned trainings */}
-      <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-[#1A2B47]">Assigned trainings</h2>
-        {(!assignments || assignments.length === 0) ? (
-          <Card>
-            <CardContent className="p-6 text-center text-sm text-muted-foreground">
-              No trainings assigned yet — your admin will assign these.
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            {assignments.map((a) => (
-              <Card key={a.id}>
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-base">{a.course?.title ?? "Course"}</CardTitle>
-                    <StatusBadge status={a.status} />
-                  </div>
-                  <CardDescription>
-                    {a.progress_pct != null ? `${a.progress_pct}% complete` : "Not started"}
-                    {a.expires_at ? ` · expires ${new Date(a.expires_at).toLocaleDateString()}` : ""}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <Link
-                    to="/dashboard/hive-training/course/$assignmentId"
-                    params={{ assignmentId: a.id }}
-                    className="inline-flex"
-                  >
-                    <Button size="sm" className="bg-[#1A2B47] hover:bg-[#1A2B47]/90 text-white">
-                      <PlayCircle className="h-4 w-4 mr-1" />
-                      {a.status === "completed" ? "Review" : a.status === "not_started" ? "Start" : "Continue"}
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Earned certificates */}
-      <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-[#1A2B47]">Earned certificates</h2>
-        {(!certs || certs.length === 0) ? (
-          <Card>
-            <CardContent className="p-4 text-center text-sm text-muted-foreground">
-              Complete a training to earn your first certificate.
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-2 md:grid-cols-2">
-            {certs.map((c) => (
-              <div key={c.id} className="flex items-center gap-3 border rounded-md p-3 bg-white">
-                <Award className="h-5 w-5 text-[#C8881E]" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-[#1A2B47]">Certificate #{c.code}</div>
-                  <div className="text-xs text-muted-foreground">
-                    Issued {new Date(c.issued_at).toLocaleDateString()}
-                    {c.expires_at ? ` · expires ${new Date(c.expires_at).toLocaleDateString()}` : ""}
-                  </div>
-                </div>
-                <Link to="/verify/$code" params={{ code: c.code }} className="text-xs text-[#1A2B47] underline">
-                  View
-                </Link>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-    </div>
-  );
-}
-
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="rounded-lg border bg-white p-3">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">{icon}{label}</div>
-      <div className="mt-1 text-lg font-semibold text-[#1A2B47]">{value}</div>
-    </div>
+    <p className="text-sm text-muted-foreground">
+      Assigned training is on My Obligations. You cannot shop a catalog.
+    </p>
   );
 }
 
@@ -1163,7 +1027,7 @@ function SubmittedClasses({ orgId }: { orgId: string }) {
 }
 
 // Leftover LMS buy-seats dialogs were replaced by the class roster above.
-// The /dashboard/training/catalog page is still in the repo (chunk 3 must not delete it).
+// /dashboard/training/catalog now redirects here.
 
 // ---- Roster ----
 

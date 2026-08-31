@@ -182,4 +182,32 @@ describe("staff phone leftover search + tab scroll (source)", () => {
     assert.match(fn, /staffNectarFailureMessage/);
     assert.doesNotMatch(fn, /AI error \(/);
   });
+
+  it("Ask NECTAR page does not pull under the title bar", () => {
+    const page = readFileSync(
+      fileURLToPath(new URL("../routes/dashboard.ask-nectar.tsx", import.meta.url)),
+      "utf8",
+    );
+    assert.match(page, /data-ask-nectar-page/);
+    assert.match(page, /pt-2/);
+    assert.doesNotMatch(page, /className="[^"]*-my-5/);
+    assert.doesNotMatch(page, /100%\+2\.5rem/);
+  });
+
+  it("Ask NECTAR composer is in-flow, locked, and clears the clock bar", () => {
+    const chat = readFileSync(
+      fileURLToPath(new URL("../components/staff-mobile/ask-nectar-staff.tsx", import.meta.url)),
+      "utf8",
+    );
+    assert.match(chat, /data-ask-nectar-composer/);
+    assert.match(chat, /shrink-0/);
+    assert.match(chat, /overscroll-none/);
+    assert.match(chat, /STAFF_CLOCK_BAR_PX/);
+    assert.doesNotMatch(chat, /createPortal/);
+    assert.doesNotMatch(
+      chat,
+      /addEventListener\("scroll"/,
+      "visualViewport scroll lets swipe hide the composer",
+    );
+  });
 });

@@ -25,7 +25,15 @@ function AskNectarStaffPage() {
   const { clientId, q } = useSearch({ from: "/dashboard/ask-nectar" });
   return (
     <FeatureGate featureKey="nectar">
-      <div className="-mx-4 -my-5 flex h-[calc(100%+2.5rem)] min-h-0 flex-col overflow-hidden bg-card md:mx-auto md:my-0 md:h-[calc(100vh-8rem)] md:w-full md:max-w-3xl md:rounded-2xl md:border md:border-border md:shadow-[var(--shadow-card)]">
+      {/*
+        Staff phone main for this route has no px/py (shell overflow-hidden).
+        Do not use negative vertical margin — that pulled the thread under the title bar / iOS
+        safe area. Page-level padding only; chrome components stay untouched.
+      */}
+      <div
+        data-ask-nectar-page
+        className="flex h-full min-h-0 flex-col overflow-hidden overscroll-none bg-card pt-2 md:mx-auto md:h-[calc(100vh-8rem)] md:w-full md:max-w-3xl md:rounded-2xl md:border md:border-border md:pt-0 md:shadow-[var(--shadow-card)]"
+      >
         <AskNectarStaff clientId={clientId} initialQuestion={q} />
       </div>
     </FeatureGate>

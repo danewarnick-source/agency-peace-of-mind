@@ -65,7 +65,9 @@ creds for account `684707794522`. The script
    - Runtime env (same Hive-Platform values as ECS; never print):
      `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`,
      `SUPABASE_SERVICE_ROLE_KEY` (from secret `hive/ecs/supabase-service-role`),
-     `AWS_REGION=us-east-1`, `BEDROCK_MODEL_ID`, `ALB_ORIGIN_VERIFY_SECRET`,
+     `AWS_REGION=us-east-1`, `BEDROCK_MODEL_ID` (must be an on-demand
+     inference profile such as `us.anthropic.claude-sonnet-4-6`, not a
+     bare `anthropic.claude-…` foundation id), `ALB_ORIGIN_VERIFY_SECRET`,
      `PUBLIC_SITE_URL=https://d2j3kgagxghm5i.cloudfront.net`.
      Build-time already baked: `VITE_SUPABASE_URL`,
      `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID`.
@@ -91,6 +93,35 @@ OK only after Lambda already serves the new HTML) → invalidate
 CloudFront `E1BPLMZE2XLSKD`. ECS / ECR is not in that path. Tuesday
 Sep 1 stays on Vercel. This Action is the parallel AWS frontend only.
 
+
+## BEDROCK_MODEL_ID (Ask NECTAR / Nectar AI)
+
+Staff Ask NECTAR calls Bedrock from the **server** (`src/lib/ai-bedrock.server.ts`).
+The client never sends a model id. Live `hivecertify.com` failed with the
+staff-facing “inference profile” copy because the runtime env was a bare
+foundation model id (or an old Lovable-era value).
+
+Code now remaps `anthropic.claude-…` → `us.anthropic.claude-…` and the
+short id this account already used (`claude-sonnet-4-6`) →
+`us.anthropic.claude-sonnet-4-6`. That is **not** a new Claude id.
+
+This cloud VM cannot write AWS or Vercel secrets. If live still 400s after
+this deploy, Dane/Tony must set **one key** on these surfaces (same value,
+never commit it):
+
+| Surface | Where | Key |
+|---|---|---|
+| **Primary (hivecertify.com)** | AWS Lambda `hive-app-server` · us-east-1 · Configuration → Environment variables | `BEDROCK_MODEL_ID` |
+| Vercel (Tuesday / `agency-peace-of-mind`) | Project Settings → Environment Variables · Production | `BEDROCK_MODEL_ID` |
+| Supabase Edge Functions | Project secrets (Deno `bedrock-fetch`) | `BEDROCK_MODEL_ID` |
+| GitHub Actions | **Not used.** `deploy-aws.yml` does not inject this; it is Lambda runtime only. | — |
+
+Value must be an **on-demand inference profile**, for example
+`us.anthropic.claude-sonnet-4-6` (already invoked on this account). Wrong:
+`anthropic.claude-sonnet-4-6` or any foundation-model id without the `us.`
+geo prefix.
+
+Also set `AWS_REGION=us-east-1`. Do not paste the value into a PR.
 
 ## Hang fixes that ship on this Lambda
 

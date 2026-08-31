@@ -229,7 +229,10 @@ and service.
 1. Go to **Task definitions** (left sidebar) → **Create new task definition** →
    **Create new task definition with JSON**.
 2. Paste the JSON below, replacing `ACCOUNT_ID` with your 12-digit account ID
-   and `YOUR_SUPABASE_PUBLISHABLE_KEY` / `YOUR_BEDROCK_MODEL_ID` with real values:
+   and `YOUR_SUPABASE_PUBLISHABLE_KEY` / `YOUR_BEDROCK_MODEL_ID` with real
+   values. `BEDROCK_MODEL_ID` must be an on-demand inference profile
+   (`us.anthropic.claude-sonnet-4-6` — the model this Hive account already
+   invoked), not a foundation model id (`anthropic.claude-…`):
 
    ```json
    {

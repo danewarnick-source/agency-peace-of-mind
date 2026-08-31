@@ -14,6 +14,7 @@ import {
   type Message,
 } from "@aws-sdk/client-bedrock-runtime";
 import { FetchHttpHandler } from "@smithy/fetch-http-handler";
+import { resolveBedrockModelId } from "@/lib/bedrock-model-id";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant";
@@ -80,9 +81,22 @@ function getClient(): BedrockRuntimeClient {
 }
 
 function getModelId(): string {
-  const id = process.env.BEDROCK_MODEL_ID;
-  if (!id) throw new BedrockError(500, "BEDROCK_MODEL_ID is not configured.");
-  return id;
+  try {
+    const { modelId, remapped } = resolveBedrockModelId(
+      process.env.BEDROCK_MODEL_ID,
+      process.env.AWS_REGION,
+    );
+    if (remapped) {
+      console.warn(
+        "[bedrock] BEDROCK_MODEL_ID was a foundation model id; using inference profile",
+        modelId,
+      );
+    }
+    return modelId;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "BEDROCK_MODEL_ID is not configured.";
+    throw new BedrockError(500, msg);
+  }
 }
 
 /** Throw early (before uploads) when Bedrock env is incomplete. */

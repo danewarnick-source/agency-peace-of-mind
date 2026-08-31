@@ -116,11 +116,29 @@ function buildMessages(messages: OpenAIMessage[]): { system: string; convo: Mess
   return { system: systemParts.join("\n\n"), convo };
 }
 
+/** Mirror of src/lib/bedrock-model-id.ts — Deno cannot import from src/. */
+function resolveEdgeModelId(raw: string | undefined, region: string | undefined): string {
+  const id = (raw ?? "").trim();
+  if (!id) throw new Error("BEDROCK_MODEL_ID is not configured.");
+  if (id.startsWith("arn:aws:bedrock:")) return id;
+  if (/^(us|eu|apac|global)\./i.test(id)) return id;
+  if (/inference-profile/i.test(id)) return id;
+  if (id.toLowerCase() === "claude-sonnet-4-6") return "us.anthropic.claude-sonnet-4-6";
+  if (/^(anthropic|amazon|meta|mistral|cohere|ai21)\./i.test(id)) {
+    const r = (region ?? "us-east-1").toLowerCase();
+    const geo = r.startsWith("eu-") ? "eu" : r.startsWith("ap-") ? "apac" : "us";
+    return `${geo}.${id}`;
+  }
+  return id;
+}
+
 export async function gatewayFetch(body: OpenAIChatBody): Promise<GatewayFetchResponse> {
   try {
     const client = getClient();
-    const modelId = Deno.env.get("BEDROCK_MODEL_ID");
-    if (!modelId) throw new Error("BEDROCK_MODEL_ID is not configured.");
+    const modelId = resolveEdgeModelId(
+      Deno.env.get("BEDROCK_MODEL_ID"),
+      Deno.env.get("AWS_REGION"),
+    );
 
     const { system, convo } = buildMessages(body.messages);
     const jsonMode = body.response_format?.type === "json_object";

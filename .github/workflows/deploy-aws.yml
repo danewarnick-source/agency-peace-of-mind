@@ -26,6 +26,8 @@ name: Deploy AWS (parallel target)
 # mmknqtdrefbzwfdtykza or a legacy JWT anon key. Copy Vercel
 # production VITE_SUPABASE_* into GitHub Actions secrets — never
 # the Lovable project. Lambda runtime env must match.
+# BEDROCK_MODEL_ID is hive-app-server runtime env (inference profile
+# us.anthropic.claude-…), not a GitHub Actions build secret.
 
 on:
   push:
